@@ -467,8 +467,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	applyRequirementHandler := &events.AggregateApplyRequirements{
-		PullApprovedChecker: vcsClient,
-		WorkingDir:          workingDir,
+		WorkingDir:       workingDir,
 	}
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
@@ -547,6 +546,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		boltdb,
 	)
 
+	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
 	applyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,
 		userConfig.DisableApplyAll,
@@ -561,6 +561,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
+		pullReqStatusFetcher,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(

@@ -35,6 +35,11 @@ const (
 	planfileSlashReplace = "::"
 )
 
+type PullReqStatus struct {
+	Approved  bool
+	Mergeable bool
+}
+
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
@@ -140,10 +145,6 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 			Hostname: cloneURLParsed.Hostname(),
 		},
 	}, nil
-}
-
-type PullReqStatus struct {
-	Approved ApprovalStatus
 }
 
 type ApprovalStatus struct {
@@ -374,9 +375,7 @@ type ProjectCommandContext struct {
 	HeadRepo Repo
 	// Log is a logger that's been set up for this context.
 	Log logging.SimpleLogging
-	// PullMergeable is true if the pull request for this project is able to be merged.
-	PullMergeable bool
-	// CurrentProjectPlanStatus is the status of the current project prior to this command.
+	// PullReqStatus holds state about the PR that requires additional computation outside models.PullRequest
 	PullReqStatus PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus ProjectPlanStatus

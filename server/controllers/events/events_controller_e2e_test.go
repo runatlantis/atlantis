@@ -726,6 +726,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			userConfig.EnablePolicyChecksFlag = true
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
+
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -937,8 +938,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		Webhooks:         &mockWebhookSender{},
 		WorkingDirLocker: locker,
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
-			PullApprovedChecker: e2eVCSClient,
-			WorkingDir:          workingDir,
+			WorkingDir: workingDir,
 		},
 	}
 
@@ -984,6 +984,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		boltdb,
 	)
 
+	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
+
 	applyCommandRunner := events.NewApplyCommandRunner(
 		e2eVCSClient,
 		false,
@@ -998,6 +1000,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		false,
+		e2ePullReqStatusFetcher,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(

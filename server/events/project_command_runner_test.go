@@ -20,7 +20,6 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	mocks2 "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	tmocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -147,13 +146,11 @@ func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockWorkingDir := mocks.NewMockWorkingDir()
-	mockApproved := mocks2.NewMockPullApprovedChecker()
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
-			PullApprovedChecker: mockApproved,
-			WorkingDir:          mockWorkingDir,
+			WorkingDir: mockWorkingDir,
 		},
 	}
 	ctx := models.ProjectCommandContext{
@@ -162,9 +159,6 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
-	When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(models.ApprovalStatus{
-		IsApproved: false,
-	}, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Pull request must be approved by at least one person other than the author before running apply.", res.Failure)
@@ -182,7 +176,9 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 		},
 	}
 	ctx := models.ProjectCommandContext{
-		PullMergeable:     false,
+		PullReqStatus: models.PullReqStatus{
+			Mergeable: false,
+		},
 		ApplyRequirements: []string{"mergeable"},
 	}
 	tmp, cleanup := TempDir(t)
@@ -302,13 +298,11 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			mockApply := mocks.NewMockStepRunner()
 			mockRun := mocks.NewMockCustomStepRunner()
 			mockEnv := mocks.NewMockEnvStepRunner()
-			mockApproved := mocks2.NewMockPullApprovedChecker()
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
 			applyReqHandler := &events.AggregateApplyRequirements{
-				PullApprovedChecker: mockApproved,
-				WorkingDir:          mockWorkingDir,
+				WorkingDir: mockWorkingDir,
 			}
 
 			runner := events.DefaultProjectCommandRunner{
@@ -338,7 +332,10 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Workspace:         "default",
 				ApplyRequirements: c.applyReqs,
 				RepoRelDir:        ".",
-				PullMergeable:     c.pullMergeable,
+				PullReqStatus: models.PullReqStatus{
+					Approved: true,
+					Mergeable: true,
+				},
 			}
 			expEnvs := map[string]string{
 				"key": "value",
@@ -348,9 +345,6 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
 			When(mockRun.Run(ctx, "", repoDir, expEnvs)).ThenReturn("run", nil)
 			When(mockEnv.Run(ctx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
-			When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(models.ApprovalStatus{
-				IsApproved: true,
-			}, nil)
 
 			res := runner.Apply(ctx)
 			Equals(t, c.expOut, res.ApplySuccess)
@@ -358,8 +352,6 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 
 			for _, step := range c.expSteps {
 				switch step {
-				case "approved":
-					mockApproved.VerifyWasCalledOnce().PullIsApproved(ctx.BaseRepo, ctx.Pull)
 				case "init":
 					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 				case "plan":

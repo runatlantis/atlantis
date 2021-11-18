@@ -159,7 +159,9 @@ projects:
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
-				PullMergeable: true,
+				PullRequestStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
 				Log:           logger,
 			})
 			Ok(t, err)
@@ -1062,7 +1064,9 @@ projects:
 		Pull:          models.PullRequest{},
 		User:          models.User{},
 		Log:           logger,
-		PullMergeable: true,
+		PullRequestStatus: models.PullReqStatus{
+			Mergeable: true,
+		},
 	})
 	Ok(t, err)
 	Equals(t, 0, len(actCtxs))
@@ -1108,7 +1112,9 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
-		PullMergeable: true,
+		PullRequestStatus: models.PullReqStatus{
+			Mergeable: true,
+		},
 		Log:           logger,
 	})
 
