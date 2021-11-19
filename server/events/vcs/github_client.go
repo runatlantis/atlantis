@@ -520,11 +520,12 @@ func (g *GithubClient) getRepoChecks(repo models.Repo, sha string) ([]*github.Ch
 		}
 
 		result, response, err := g.client.Checks.ListCheckRunsForRef(g.ctx, repo.Owner, repo.Name, sha, opts)
-		results = append(results, result.CheckRuns...)
 
 		if err != nil {
 			return results, errors.Wrapf(err, "getting check runs for page %d", nextPage)
 		}
+
+		results = append(results, result.CheckRuns...)
 
 		if response.NextPage == 0 {
 			break
