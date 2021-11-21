@@ -66,6 +66,76 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 	return nil
 }
 
+// ConfigureGitSSHClone adds gitHostname public keys to ~/.ssh/known_hosts 
+// and is enforcing to clone repo using SSH instead of HTTPS.
+// It will create the known_hosts file and subdirectories if they are missing.
+func ConfigureGitSSHClone(gitUser string, gitToken string, gitHostname string, home string, logger logging.SimpleLogging) error {
+	gitCloneTokenPattern := `https://%s:%s@%s/`
+	gitCloneSSHPattern := `ssh://git@%s/`
+	gitCloneTokenUrl := fmt.Sprintf(gitCloneTokenPattern, gitUser, gitToken, gitHostname)
+	gitCloneSSHUrl := fmt.Sprintf(gitCloneSSHPattern, gitHostname)
+	gitconfigFile := filepath.Join(home, ".gitconfig")
+
+	urlCmd := exec.Command("git", "config", "--global", fmt.Sprintf("url.%s.insteadOf", gitCloneSSHUrl), gitCloneTokenUrl) // nolint: gosec
+
+	if out, err := urlCmd.CombinedOutput(); err != nil {
+		return errors.Wrapf(err, "there was an error while conigure git to clone ssh instead of https: %s", string(out))
+	}
+
+	if err := os.Chmod(gitconfigFile, 0700); err != nil {
+		return err
+	}
+
+	if err := updateSSHKnownHosts(gitHostname, home); err != nil {
+		return err
+	}
+
+	logger.Info("Successfully configured cloning repositories using ssh instead of https")
+	
+	return nil
+}
+
+func updateSSHKnownHosts(gitHostname string, home string) error {
+	sshKnownHostsFile := filepath.Join(home, ".ssh/known_hosts")
+	
+	sshScanCmd := exec.Command("ssh-keyscan", gitHostname)
+	out, err := sshScanCmd.CombinedOutput()
+	
+	if err != nil {
+		return errors.Wrapf(err, "there was an error running %s: %s", strings.Join(sshScanCmd.Args, " "), string(out))
+	}
+
+	sshPublicKeys := string(out)
+	
+	if _, err := os.Stat(sshKnownHostsFile); err != nil {
+		sshDir := filepath.Join(home, ".ssh")
+
+		if err := os.MkdirAll(sshDir, 0700); err != nil {
+			return errors.Wrapf(err, "during creating %s dir", sshDir)
+		}
+
+		if err := os.WriteFile(sshKnownHostsFile, []byte(sshPublicKeys), 0600); err != nil {
+			return errors.Wrapf(err, "during writing %s ssh fingerprints to %s", gitHostname, sshKnownHostsFile)
+		}
+	} else {
+		sshKeys := strings.Split(sshPublicKeys,`\n`)
+
+		for _, k := range sshKeys {
+			contains, err := fileHasLine(k, sshKnownHostsFile)
+			
+			if err != nil {
+				return err
+			}
+
+			if !contains {
+				fileAppend(k, sshKnownHostsFile)
+			}
+		}		
+	}
+
+	return nil
+}
+
 func fileHasLine(line string, filename string) (bool, error) {
 	currContents, err := os.ReadFile(filename) // nolint: gosec
 	if err != nil {

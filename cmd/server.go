@@ -63,6 +63,7 @@ const (
 	EnablePolicyChecksFlag     = "enable-policy-checks"
 	EnableRegExpCmdFlag        = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat   = "enable-diff-markdown-format"
+	GitSSHCloneFlag            = "git-ssh-clone"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -393,6 +394,11 @@ var boolFlags = map[string]boolFlag{
 	WriteGitCredsFlag: {
 		description: "Write out a .git-credentials file with the provider user and token to allow cloning private modules over HTTPS or SSH." +
 			" This writes secrets to disk and should only be enabled in a secure environment.",
+		defaultValue: false,
+	},
+	GitSSHCloneFlag: {
+		description: "Configure git to use SSH instead of HTTPS during clone." +
+			" Also adds githost ssh keys to ~/.ssh/known_hosts. Omitted when write-git-creds set to true",
 		defaultValue: false,
 	},
 	SkipCloneNoChanges: {

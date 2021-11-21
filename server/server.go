@@ -227,6 +227,40 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
+	if userConfig.GitSSHClone && !userConfig.WriteGitCreds {
+		home, err := homedir.Dir()
+		if err != nil {
+			return nil, errors.Wrap(err, "getting home dir to configure git clone using ssh instead of https")
+		}
+
+		if userConfig.GithubUser != "" {
+			if err := events.ConfigureGitSSHClone(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger); err != nil {
+				return nil, err
+			}
+		}
+		if userConfig.GitlabUser != "" {
+			if err := events.ConfigureGitSSHClone(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger); err != nil {
+				return nil, err
+			}
+		}
+		if userConfig.BitbucketUser != "" {
+			// The default BitbucketBaseURL is https://api.bitbucket.org which can't actually be used for git
+			// so we override it here only if it's that to be bitbucket.org
+			bitbucketBaseURL := userConfig.BitbucketBaseURL
+			if bitbucketBaseURL == "https://api.bitbucket.org" {
+				bitbucketBaseURL = "bitbucket.org"
+			}
+			if err := events.ConfigureGitSSHClone(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger); err != nil {
+				return nil, err
+			}
+		}
+		if userConfig.AzureDevopsUser != "" {
+			if err := events.ConfigureGitSSHClone(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if userConfig.WriteGitCreds {
 		home, err := homedir.Dir()
 		if err != nil {
