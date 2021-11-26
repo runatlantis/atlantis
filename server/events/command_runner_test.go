@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 
@@ -131,6 +132,8 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		defaultBoltDB,
 	)
 
+	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
+
 	applyCommandRunner = events.NewApplyCommandRunner(
 		vcsClient,
 		false,
@@ -145,6 +148,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		parallelPoolSize,
 		SilenceNoProjects,
 		false,
+		pullReqStatusFetcher,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
