@@ -48,8 +48,12 @@ type ProjectCommandOutputHandler interface {
 	// Send will enqueue the msg and wait for Handle() to receive the message.
 	Send(ctx models.ProjectCommandContext, msg string)
 
-	// Receive will create a channel for projectPullInfo and run a callback function argument when the new channel receives a message.
-	Receive(projectInfo string, receiver chan string, callback func(msg string) error) error
+	// Register registers a channel and blocks until it is caught up. Callers should call this asynchronously when attempting
+	// to read the channel in the same goroutine
+	Register(projectInfo string, receiver chan string)
+
+	// Deregister removes a channel from successive updates and closes it.
+	Deregister(projectInfo string, receiver chan string)
 
 	// Listens for msg from channel
 	Handle()
@@ -90,19 +94,8 @@ func (p *AsyncProjectCommandOutputHandler) Send(ctx models.ProjectCommandContext
 	}
 }
 
-func (p *AsyncProjectCommandOutputHandler) Receive(projectInfo string, receiver chan string, callback func(msg string) error) error {
-	// Avoid deadlock when projectOutputBuffer size is greater than the channel (currently set to 1000)
-	// Running this as a goroutine allows for the channel to be read in callback
-	go p.addChan(receiver, projectInfo)
-	defer p.cleanUp(projectInfo, receiver)
-
-	for msg := range receiver {
-		if err := callback(msg); err != nil {
-			return err
-		}
-	}
-
-	return nil
+func (p *AsyncProjectCommandOutputHandler) Register(projectInfo string, receiver chan string) {
+	p.addChan(receiver, projectInfo)
 }
 
 func (p *AsyncProjectCommandOutputHandler) Handle() {
@@ -138,13 +131,6 @@ func (p *AsyncProjectCommandOutputHandler) clearLogLines(pull string) {
 }
 
 func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, pull string) {
-	p.receiverBuffersLock.Lock()
-	if p.receiverBuffers[pull] == nil {
-		p.receiverBuffers[pull] = map[chan string]bool{}
-	}
-	p.receiverBuffers[pull][ch] = true
-	p.receiverBuffersLock.Unlock()
-
 	p.projectOutputBuffersLock.RLock()
 	buffer := p.projectOutputBuffers[pull]
 	p.projectOutputBuffersLock.RUnlock()
@@ -152,6 +138,15 @@ func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, pull string) 
 	for _, line := range buffer {
 		ch <- line
 	}
+
+	// add the channel to our registry after we backfill the contents of the buffer,
+	// to prevent new messages coming in interleaving with this backfill.
+	p.receiverBuffersLock.Lock()
+	if p.receiverBuffers[pull] == nil {
+		p.receiverBuffers[pull] = map[chan string]bool{}
+	}
+	p.receiverBuffers[pull][ch] = true
+	p.receiverBuffersLock.Unlock()
 }
 
 //Add log line to buffer and send to all current channels
@@ -186,7 +181,8 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(pull string, line string
 }
 
 //Remove channel, so client no longer receives Terraform output
-func (p *AsyncProjectCommandOutputHandler) cleanUp(pull string, ch chan string) {
+func (p *AsyncProjectCommandOutputHandler) Deregister(pull string, ch chan string) {
+	p.logger.Debug("Removing channel for %s", pull)
 	p.receiverBuffersLock.Lock()
 	delete(p.receiverBuffers[pull], ch)
 	p.receiverBuffersLock.Unlock()
@@ -219,9 +215,8 @@ type NoopProjectOutputHandler struct{}
 func (p *NoopProjectOutputHandler) Send(ctx models.ProjectCommandContext, msg string) {
 }
 
-func (p *NoopProjectOutputHandler) Receive(projectInfo string, receiver chan string, callback func(msg string) error) error {
-	return nil
-}
+func (p *NoopProjectOutputHandler) Register(projectInfo string, receiver chan string)   {}
+func (p *NoopProjectOutputHandler) Deregister(projectInfo string, receiver chan string) {}
 
 func (p *NoopProjectOutputHandler) Handle() {
 }

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/handlers"
@@ -67,23 +66,31 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 	Msg := "Test Terraform Output"
 	ctx := createTestProjectCmdContext(t)
 
-	t.Run("Should Receive Message Sent in the ProjectCmdOutput channel", func(t *testing.T) {
+	t.Run("receive message from main channel", func(t *testing.T) {
 		var wg sync.WaitGroup
 		var expectedMsg string
 		projectOutputHandler := createProjectCommandOutputHandler(t)
 
-		wg.Add(1)
 		ch := make(chan string)
+
+		// register channel and backfill from buffer
+		// Note: We call this synchronously because otherwise
+		// there could be a race where we are unable to register the channel
+		// before sending messages due to the way we lock our buffer memory cache
+		projectOutputHandler.Register(ctx.PullInfo(), ch)
+
+		wg.Add(1)
+
+		// read from channel
 		go func() {
-			err := projectOutputHandler.Receive(ctx.PullInfo(), ch, func(msg string) error {
+			for msg := range ch {
 				expectedMsg = msg
 				wg.Done()
-				return nil
-			})
-			Ok(t, err)
+			}
 		}()
 
 		projectOutputHandler.Send(ctx, Msg)
+		wg.Wait()
 		close(ch)
 
 		// Wait for the msg to be read.
@@ -91,114 +98,74 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		Equals(t, expectedMsg, Msg)
 	})
 
-	t.Run("Should Clear ProjectOutputBuffer when new Plan", func(t *testing.T) {
+	t.Run("clear buffer", func(t *testing.T) {
 		var wg sync.WaitGroup
 
 		projectOutputHandler := createProjectCommandOutputHandler(t)
 
-		wg.Add(1)
 		ch := make(chan string)
+
+		// register channel and backfill from buffer
+		// Note: We call this synchronously because otherwise
+		// there could be a race where we are unable to register the channel
+		// before sending messages due to the way we lock our buffer memory cache
+		projectOutputHandler.Register(ctx.PullInfo(), ch)
+
+		wg.Add(1)
+		// read from channel asynchronously
 		go func() {
-			err := projectOutputHandler.Receive(ctx.PullInfo(), ch, func(msg string) error {
-				wg.Done()
-				return nil
-			})
-			Ok(t, err)
+			for msg := range ch {
+				// we are done once we receive the clear message.
+				// prior message doesn't matter for this test.
+				if msg == models.LogStreamingClearMsg {
+					wg.Done()
+				}
+			}
 		}()
 
+		// send regular message followed by clear message
 		projectOutputHandler.Send(ctx, Msg)
-
-		// Wait for the msg to be read.
-		wg.Wait()
-
-		// Send a clear msg
 		projectOutputHandler.Clear(ctx)
+		wg.Wait()
 		close(ch)
 
 		dfProjectOutputHandler, ok := projectOutputHandler.(*handlers.AsyncProjectCommandOutputHandler)
 		assert.True(t, ok)
 
-		// Wait for the clear msg to be received by handle()
-		time.Sleep(1 * time.Second)
 		assert.Empty(t, dfProjectOutputHandler.GetProjectOutputBuffer(ctx.PullInfo()))
 	})
 
-	t.Run("Should Cleanup receiverBuffers receiving WS channel closed", func(t *testing.T) {
+	t.Run("copies buffer to new channels", func(t *testing.T) {
 		var wg sync.WaitGroup
 
 		projectOutputHandler := createProjectCommandOutputHandler(t)
 
-		wg.Add(1)
-		ch := make(chan string)
-		go func() {
-			err := projectOutputHandler.Receive(ctx.PullInfo(), ch, func(msg string) error {
-				wg.Done()
-				return nil
-			})
-			Ok(t, err)
-		}()
-
+		// send first message to populated the buffer
 		projectOutputHandler.Send(ctx, Msg)
 
-		// Wait for the msg to be read.
-		wg.Wait()
-
-		// Close chan to execute cleanup.
-		close(ch)
-		time.Sleep(1 * time.Second)
-
-		dfProjectOutputHandler, ok := projectOutputHandler.(*handlers.AsyncProjectCommandOutputHandler)
-		assert.True(t, ok)
-
-		x := dfProjectOutputHandler.GetReceiverBufferForPull(ctx.PullInfo())
-		assert.Empty(t, x)
-	})
-
-	t.Run("Should copy over existing log messages to new WS channels", func(t *testing.T) {
-		var wg sync.WaitGroup
-
-		projectOutputHandler := createProjectCommandOutputHandler(t)
-
-		wg.Add(1)
 		ch := make(chan string)
-		go func() {
-			err := projectOutputHandler.Receive(ctx.PullInfo(), ch, func(msg string) error {
-				wg.Done()
-				return nil
-			})
-			Ok(t, err)
-		}()
-
-		projectOutputHandler.Send(ctx, Msg)
-
-		// Wait for the msg to be read.
-		wg.Wait()
-
-		// Close channel to close prev connection.
-		// This should close the first go routine with receive call.
-		close(ch)
-
-		ch = make(chan string)
-
-		// Expecting two calls to callback.
-		wg.Add(2)
 
 		receivedMsgs := []string{}
-		go func() {
-			err := projectOutputHandler.Receive(ctx.PullInfo(), ch, func(msg string) error {
-				receivedMsgs = append(receivedMsgs, msg)
-				wg.Done()
-				return nil
-			})
-			Ok(t, err)
-		}()
 
-		// Make sure addChan gets the buffer lock and adds ch to the map.
-		time.Sleep(1 * time.Second)
+		wg.Add(1)
+		// read from channel asynchronously
+		go func() {
+			for msg := range ch {
+				receivedMsgs = append(receivedMsgs, msg)
+
+				// we're only expecting two messages here.
+				if len(receivedMsgs) >= 2 {
+					wg.Done()
+				}
+			}
+		}()
+		// register channel and backfill from buffer
+		// Note: We call this synchronously because otherwise
+		// there could be a race where we are unable to register the channel
+		// before sending messages due to the way we lock our buffer memory cache
+		projectOutputHandler.Register(ctx.PullInfo(), ch)
 
 		projectOutputHandler.Send(ctx, Msg)
-
-		// Wait for the message to be read.
 		wg.Wait()
 		close(ch)
 

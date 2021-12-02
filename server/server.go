@@ -42,6 +42,7 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
+	"github.com/runatlantis/atlantis/server/controllers/websocket"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
@@ -308,7 +309,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var projectCmdOutputHandler handlers.ProjectCommandOutputHandler
 	// When TFE is enabled log streaming is not necessary.
 
-	if userConfig.TFEToken != "" || userConfig.TFEHostname != "" {
+	if userConfig.TFEToken != "" {
 		projectCmdOutputHandler = &handlers.NoopProjectOutputHandler{}
 	} else {
 		projectCmdOutput := make(chan *models.ProjectCmdOutputLine)
@@ -658,15 +659,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand:  deleteLockCommand,
 	}
 
+	wsMux := websocket.NewMultiplexor(
+		logger,
+		controllers.ProjectInfoKeyGenerator{},
+		projectCmdOutputHandler,
+	)
+
 	jobsController := &controllers.JobsController{
-		AtlantisVersion:             config.AtlantisVersion,
-		AtlantisURL:                 parsedURL,
-		Logger:                      logger,
-		ProjectJobsTemplate:         templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate:    templates.ProjectJobsErrorTemplate,
-		Db:                          boltdb,
-		WebsocketHandler:            handlers.NewWebsocketHandler(logger),
-		ProjectCommandOutputHandler: projectCmdOutputHandler,
+		AtlantisVersion:          config.AtlantisVersion,
+		AtlantisURL:              parsedURL,
+		Logger:                   logger,
+		ProjectJobsTemplate:      templates.ProjectJobsTemplate,
+		ProjectJobsErrorTemplate: templates.ProjectJobsErrorTemplate,
+		Db:                       boltdb,
+		WsMux:                    wsMux,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
