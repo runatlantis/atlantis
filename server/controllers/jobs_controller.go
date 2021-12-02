@@ -8,13 +8,13 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
 	stats "github.com/lyft/gostats"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
+	"github.com/runatlantis/atlantis/server/controllers/websocket"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -25,10 +25,20 @@ type JobsController struct {
 	ProjectJobsTemplate      templates.TemplateWriter
 	ProjectJobsErrorTemplate templates.TemplateWriter
 	Db                       *db.BoltDB
+	WsMux                    *websocket.Multiplexor
+	StatsScope               stats.Scope
+}
 
-	WebsocketHandler            handlers.WebsocketHandler
-	ProjectCommandOutputHandler handlers.ProjectCommandOutputHandler
-	StatsScope                  stats.Scope
+type ProjectInfoKeyGenerator struct{}
+
+func (g ProjectInfoKeyGenerator) Generate(r *http.Request) (string, error) {
+	projectInfo, err := newProjectInfo(r)
+
+	if err != nil {
+		return "", errors.Wrap(err, "creating project info")
+	}
+
+	return projectInfo.String(), nil
 }
 
 type pullInfo struct {
@@ -132,37 +142,9 @@ func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) 
 }
 
 func (j *JobsController) getProjectJobsWS(w http.ResponseWriter, r *http.Request) error {
-	projectInfo, err := newProjectInfo(r)
-	if err != nil {
-		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
-		return err
-	}
-
-	c, err := j.WebsocketHandler.Upgrade(w, r, nil)
-	if err != nil {
-		j.Logger.Warn("Failed to upgrade websocket: %s", err)
-		return err
-	}
-
-	// Buffer size set to 1000 to ensure messages get queued (upto 1000) if the receiverCh is not ready to
-	// receive messages before the channel is closed and resources cleaned up.
-	receiver := make(chan string, 1000)
-	j.WebsocketHandler.SetCloseHandler(c, receiver)
-
-	// Add a reader goroutine to listen for socket.close() events.
-	go j.WebsocketHandler.SetReadHandler(c)
-
-	pull := projectInfo.String()
-	err = j.ProjectCommandOutputHandler.Receive(pull, receiver, func(msg string) error {
-		if err := c.WriteMessage(websocket.BinaryMessage, []byte("\r"+msg+"\n")); err != nil {
-			j.Logger.Warn("Failed to write ws message: %s", err)
-			return err
-		}
-		return nil
-	})
+	err := j.WsMux.Handle(w, r)
 
 	if err != nil {
-		j.Logger.Warn("Failed to receive message: %s", err)
 		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
 		return err
 	}

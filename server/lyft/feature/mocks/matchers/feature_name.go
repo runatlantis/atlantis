@@ -5,7 +5,7 @@ import (
 	"github.com/petergtz/pegomock"
 	"reflect"
 
-	feature "github.com/runatlantis/atlantis/server/feature"
+	feature "github.com/runatlantis/atlantis/server/lyft/feature"
 )
 
 func AnyFeatureName() feature.Name {

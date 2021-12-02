@@ -35,11 +35,11 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-	"github.com/runatlantis/atlantis/server/feature"
 	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/lyft/aws"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sns"
 	lyftDecorators "github.com/runatlantis/atlantis/server/lyft/decorators"
+	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/lyft/scheduled"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
@@ -49,6 +49,7 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
+	"github.com/runatlantis/atlantis/server/controllers/websocket"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
@@ -343,12 +344,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCmdOutputHandler = &handlers.NoopProjectOutputHandler{}
 	} else {
 		projectCmdOutput := make(chan *models.ProjectCmdOutputLine)
-		projectCmdOutputHandler = handlers.NewFeatureAwareOutputHandler(
+		projectCmdOutputHandler = handlers.NewInstrumentedProjectCommandOutputHandler(
 			projectCmdOutput,
 			commitStatusUpdater,
 			router,
 			logger,
-			featureAllocator,
 			statsScope.Scope("api"),
 		)
 	}
@@ -744,16 +744,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand:  deleteLockCommand,
 	}
 
+	wsMux := websocket.NewMultiplexor(
+		logger,
+		controllers.ProjectInfoKeyGenerator{},
+		projectCmdOutputHandler,
+	)
+
 	jobsController := &controllers.JobsController{
-		AtlantisVersion:             config.AtlantisVersion,
-		AtlantisURL:                 parsedURL,
-		Logger:                      logger,
-		ProjectJobsTemplate:         templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate:    templates.ProjectJobsErrorTemplate,
-		Db:                          boltdb,
-		WebsocketHandler:            handlers.NewWebsocketHandler(logger),
-		ProjectCommandOutputHandler: projectCmdOutputHandler,
-		StatsScope:                  statsScope.Scope("api"),
+		AtlantisVersion:          config.AtlantisVersion,
+		AtlantisURL:              parsedURL,
+		Logger:                   logger,
+		ProjectJobsTemplate:      templates.ProjectJobsTemplate,
+		ProjectJobsErrorTemplate: templates.ProjectJobsErrorTemplate,
+		Db:                       boltdb,
+		WsMux:                    wsMux,
+		StatsScope:               statsScope.Scope("api"),
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
