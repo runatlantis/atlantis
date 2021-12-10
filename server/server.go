@@ -102,7 +102,6 @@ type Server struct {
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
-	ScheduledExecutorService      *ScheduledExecutorService
 	ProjectCmdOutputHandler       handlers.ProjectCommandOutputHandler
 }
 
@@ -702,7 +701,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
-		ScheduledExecutorService:      scheduledExecutorService,
 		ProjectCmdOutputHandler:       projectCmdOutputHandler,
 	}, nil
 }
@@ -730,7 +728,7 @@ func (s *Server) Start() error {
 		PrintStack: false,
 		StackAll:   false,
 		StackSize:  1024 * 8,
-	}, NewRequestLogger(s))
+	}, NewRequestLogger(s.Logger))
 	n.UseHandler(s.Router)
 
 	defer s.Logger.Flush()
