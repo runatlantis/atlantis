@@ -487,6 +487,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor:   terraformClient,
+			DefaultTFVersion:    defaultTfVersion,
 			CommitStatusUpdater: commitStatusUpdater,
 			AsyncTFExec:         terraformClient,
 		},
