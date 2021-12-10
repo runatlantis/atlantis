@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,7 +38,7 @@ func TestShowStepRunnner(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 
 		When(mockExecutor.RunCommandWithVersion(
-			context, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
+			logger, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
 		)).ThenReturn("success", nil)
 
 		r, err := subject.Run(context, []string{}, path, envs)
@@ -49,8 +48,8 @@ func TestShowStepRunnner(t *testing.T) {
 		actual, _ := os.ReadFile(resultPath)
 
 		actualStr := string(actual)
-		Assert(t, actualStr == "success", fmt.Sprintf("expected '%s' to be success", actualStr))
-		Assert(t, r == "success", fmt.Sprintf("expected '%s' to be success", r))
+		Assert(t, actualStr == "success", "got expected result")
+		Assert(t, r == "success", "returned expected result")
 
 	})
 
@@ -66,7 +65,7 @@ func TestShowStepRunnner(t *testing.T) {
 		}
 
 		When(mockExecutor.RunCommandWithVersion(
-			contextWithVersionOverride, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, v, context.Workspace,
+			logger, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, v, context.Workspace,
 		)).ThenReturn("success", nil)
 
 		r, err := subject.Run(contextWithVersionOverride, []string{}, path, envs)
@@ -83,7 +82,7 @@ func TestShowStepRunnner(t *testing.T) {
 
 	t.Run("failure running command", func(t *testing.T) {
 		When(mockExecutor.RunCommandWithVersion(
-			context, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
+			logger, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
 		)).ThenReturn("success", errors.New("error"))
 
 		_, err := subject.Run(context, []string{}, path, envs)

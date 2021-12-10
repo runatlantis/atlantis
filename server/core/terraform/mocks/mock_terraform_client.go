@@ -4,14 +4,11 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	go_version "github.com/hashicorp/go-version"
 	pegomock "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/core/terraform"
-	"github.com/runatlantis/atlantis/server/events/models"
 	logging "github.com/runatlantis/atlantis/server/logging"
+	"reflect"
+	"time"
 )
 
 type MockClient struct {
@@ -29,11 +26,11 @@ func NewMockClient(options ...pegomock.Option) *MockClient {
 func (mock *MockClient) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockClient) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockClient) RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) (string, error) {
+func (mock *MockClient) RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{ctx, path, args, envs, v, workspace}
+	params := []pegomock.Param{log, path, args, envs, v, workspace}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("RunCommandWithVersion", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -46,16 +43,6 @@ func (mock *MockClient) RunCommandWithVersion(ctx models.ProjectCommandContext, 
 		}
 	}
 	return ret0, ret1
-}
-
-func (mock *MockClient) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockClient().")
-	}
-	outCh := make(chan terraform.Line)
-	inCh := make(chan string)
-
-	return inCh, outCh
 }
 
 func (mock *MockClient) EnsureVersion(log logging.SimpleLogging, v *go_version.Version) error {
@@ -110,8 +97,8 @@ type VerifierMockClient struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockClient) RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) *MockClient_RunCommandWithVersion_OngoingVerification {
-	params := []pegomock.Param{ctx, path, args, envs, v, workspace}
+func (verifier *VerifierMockClient) RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) *MockClient_RunCommandWithVersion_OngoingVerification {
+	params := []pegomock.Param{log, path, args, envs, v, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunCommandWithVersion", params, verifier.timeout)
 	return &MockClient_RunCommandWithVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }

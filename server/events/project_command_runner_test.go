@@ -41,7 +41,6 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
 	mockApplyReqHandler := mocks.NewMockApplyRequirement()
-	mockChannel := make(chan *models.TerraformOutputLine)
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:                     mockLocker,
@@ -51,12 +50,10 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		ApplyStepRunner:            mockApply,
 		RunStepRunner:              mockRun,
 		EnvStepRunner:              &realEnv,
-		PullApprovedChecker:        nil,
 		WorkingDir:                 mockWorkingDir,
 		Webhooks:                   nil,
 		WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
 		AggregateApplyRequirements: mockApplyReqHandler,
-		TerraformOutputChan:        mockChannel,
 	}
 
 	repoDir, cleanup := TempDir(t)
