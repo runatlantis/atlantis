@@ -108,16 +108,15 @@ func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, 
 			lockAcquired = true
 			currLock = newLock
 			return nil
-		} else {
-			// checking if current lock is with the same PR
-			var currLock models.ProjectLock
-			if err := json.Unmarshal(currLockSerialized, &currLock); err != nil {
-				return errors.Wrap(err, "failed to deserialize current lock")
-			}
-			if currLock.Pull.Num == newLock.Pull.Num {
-				lockAcquired = true
-				return nil
-			}
+		}
+		// checking if current lock is with the same PR
+		var currLock models.ProjectLock
+		if err := json.Unmarshal(currLockSerialized, &currLock); err != nil {
+			return errors.Wrap(err, "failed to deserialize current lock")
+		}
+		if currLock.Pull.Num == newLock.Pull.Num {
+			lockAcquired = true
+			return nil
 		}
 
 		// otherwise the lock fails, return to caller the run that's holding the lock
@@ -133,7 +132,9 @@ func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, 
 		if currQueueSerialized == nil {
 			newQueue := []models.ProjectLock{newLock}
 			newQueueSerialized, _ := json.Marshal(newQueue)
-			queueBucket.Put([]byte(key), newQueueSerialized)
+			if err := queueBucket.Put([]byte(key), newQueueSerialized); err != nil {
+				return err
+			}
 			enqueueStatus = models.EnqueueStatus{
 				Status:              models.Enqueued,
 				ProjectLocksInFront: 1,
@@ -157,7 +158,9 @@ func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, 
 		// Not in the queue, add it
 		newQueue := append(currQueue, newLock)
 		newQueueSerialized, _ := json.Marshal(newQueue)
-		queueBucket.Put([]byte(key), newQueueSerialized)
+		if err := queueBucket.Put([]byte(key), newQueueSerialized); err != nil {
+			return err
+		}
 		enqueueStatus = models.EnqueueStatus{
 			Status:              models.Enqueued,
 			ProjectLocksInFront: len(newQueue),

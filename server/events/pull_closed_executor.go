@@ -50,8 +50,8 @@ type PullClosedExecutor struct {
 }
 
 type templatedProject struct {
-	RepoRelDir    string
-	Workspaces    string
+	RepoRelDir string
+	Workspaces string
 }
 
 var pullClosedTemplate = template.Must(template.New("").Parse(
@@ -134,13 +134,13 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 		workspacesStr := fmt.Sprintf("`%s`", strings.Join(workspace, "`, `"))
 		if len(workspace) == 1 {
 			projects = append(projects, templatedProject{
-				RepoRelDir:    p,
-				Workspaces:    "workspace: " + workspacesStr,
+				RepoRelDir: p,
+				Workspaces: "workspace: " + workspacesStr,
 			})
 		} else {
 			projects = append(projects, templatedProject{
-				RepoRelDir:    p,
-				Workspaces:    "workspaces: " + workspacesStr,
+				RepoRelDir: p,
+				Workspaces: "workspaces: " + workspacesStr,
 			})
 
 		}

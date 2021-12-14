@@ -83,21 +83,18 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 	var queue []models.ProjectLock
 	queue, _ = l.Locker.GetQueueByLock(lock.Project, lock.Workspace)
 	var lockDetailQueue []templates.QueueItemIndexData
-
-	if queue != nil {
-		for _, projectLock := range queue {
-			lockDetailQueue = append(lockDetailQueue, templates.QueueItemIndexData{
-				LockPath:      "Not yet acquired",
-				RepoFullName:  projectLock.Project.RepoFullName,
-				PullNum:       projectLock.Pull.Num,
-				Path:          projectLock.Project.Path,
-				Workspace:     projectLock.Workspace,
-				Time:          projectLock.Time,
-				TimeFormatted: projectLock.Time.Format("02-01-2006 15:04:05"),
-				PullUrl:       projectLock.Pull.URL,
-				Author:        projectLock.Pull.Author,
-			})
-		}
+	for _, projectLock := range queue {
+		lockDetailQueue = append(lockDetailQueue, templates.QueueItemIndexData{
+			LockPath:      "Not yet acquired",
+			RepoFullName:  projectLock.Project.RepoFullName,
+			PullNum:       projectLock.Pull.Num,
+			Path:          projectLock.Project.Path,
+			Workspace:     projectLock.Workspace,
+			Time:          projectLock.Time,
+			TimeFormatted: projectLock.Time.Format("02-01-2006 15:04:05"),
+			PullURL:       projectLock.Pull.URL,
+			Author:        projectLock.Pull.Author,
+		})
 	}
 
 	owner, repo := models.SplitRepoFullName(lock.Project.RepoFullName)

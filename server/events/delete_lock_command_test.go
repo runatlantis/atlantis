@@ -22,7 +22,7 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(t),
 	}
-	_, err := dlc.DeleteLock("id")
+	_, _, err := dlc.DeleteLock("id")
 	ErrEquals(t, "err", err)
 }
 
@@ -35,7 +35,7 @@ func TestDeleteLock_None(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(t),
 	}
-	lock, err := dlc.DeleteLock("id")
+	lock, _, err := dlc.DeleteLock("id")
 	Ok(t, err)
 	Assert(t, lock == nil, "lock was not nil")
 }
@@ -49,7 +49,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(t),
 	}
-	lock, err := dlc.DeleteLock("id")
+	lock, _, err := dlc.DeleteLock("id")
 	Ok(t, err)
 	Assert(t, lock != nil, "lock was nil")
 }
@@ -83,7 +83,7 @@ func TestDeleteLock_Success(t *testing.T) {
 		WorkingDirLocker: workingDirLocker,
 		WorkingDir:       workingDir,
 	}
-	lock, err := dlc.DeleteLock("id")
+	lock, _, err := dlc.DeleteLock("id")
 	Ok(t, err)
 	Assert(t, lock != nil, "lock was nil")
 	workingDir.VerifyWasCalledOnce().DeleteForWorkspace(pull.BaseRepo, pull, "workspace")
@@ -100,7 +100,7 @@ func TestDeleteLocksByPull_LockerErr(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(t),
 	}
-	_, err := dlc.DeleteLocksByPull(repoName, pullNum)
+	_, _, err := dlc.DeleteLocksByPull(repoName, pullNum)
 	ErrEquals(t, "err", err)
 }
 
@@ -115,7 +115,7 @@ func TestDeleteLocksByPull_None(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(t),
 	}
-	_, err := dlc.DeleteLocksByPull(repoName, pullNum)
+	_, _, err := dlc.DeleteLocksByPull(repoName, pullNum)
 	Ok(t, err)
 }
 
@@ -130,6 +130,6 @@ func TestDeleteLocksByPull_OldFormat(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(t),
 	}
-	_, err := dlc.DeleteLocksByPull(repoName, pullNum)
+	_, _, err := dlc.DeleteLocksByPull(repoName, pullNum)
 	Ok(t, err)
 }

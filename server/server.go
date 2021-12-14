@@ -786,7 +786,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 				Workspace:     projectLock.Workspace,
 				Time:          projectLock.Time,
 				TimeFormatted: projectLock.Time.Format("02-01-2006 15:04:05"),
-				PullUrl:       projectLock.Pull.URL,
+				PullURL:       projectLock.Pull.URL,
 				Author:        projectLock.Pull.Author,
 			})
 		}

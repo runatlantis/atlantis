@@ -49,7 +49,7 @@ type QueueItemIndexData struct {
 	Workspace     string
 	Time          time.Time
 	TimeFormatted string
-	PullUrl       string
+	PullURL       string
 	Author        string
 }
 
@@ -134,10 +134,10 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 			{{ range .Queue}}
 				<a title=
 "Author: {{.Author}}
-Url: {{.PullUrl}}
+Url: {{.PullURL}}
 Pull Req No.: #{{.PullNum}}
 Time: {{.TimeFormatted}}"
-					href="{{.PullUrl}}">
+					href="{{.PullURL}}">
 					#{{.PullNum}}
 				</a>
 			{{ end }}
@@ -316,7 +316,7 @@ var LockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
 				{{ range .Queue}}
 				<li>
 					<div class="queue-item">
-						<code>Url</code>: <a href="{{.PullUrl}}">{{.PullUrl}}</a>
+						<code>Url</code>: <a href="{{.PullURL}}">{{.PullURL}}</a>
 						</br>
 						<code>Author</code>: {{.Author}}
 						</br>

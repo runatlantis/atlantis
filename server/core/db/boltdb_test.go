@@ -49,13 +49,18 @@ func TestGetQueueByLock(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	b.TryLock(lock)
+	_, _, _, err := b.TryLock(lock)
+	Ok(t, err)
+
 	lock1 := lock
 	lock1.Pull.Num = 2
-	b.TryLock(lock1) // this lock should be queued
+	_, _, _, err = b.TryLock(lock1) // this lock should be queued
+	Ok(t, err)
+
 	lock2 := lock
 	lock2.Pull.Num = 3
-	b.TryLock(lock2) // this lock should be queued
+	_, _, _, err = b.TryLock(lock2) // this lock should be queued
+	Ok(t, err)
 
 	queue, _ := b.GetQueueByLock(lock.Project, lock.Workspace)
 	Equals(t, 2, len(queue))

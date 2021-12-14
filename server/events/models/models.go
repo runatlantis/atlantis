@@ -725,4 +725,3 @@ type DequeueStatus struct {
 	// the PR's lock that should be planned next
 	ProjectLocks []ProjectLock
 }
-
