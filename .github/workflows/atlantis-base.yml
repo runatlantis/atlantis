@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'docker-base/**'
+      - '.github/workflows/atlantis-base.yml'
     branches:
       - "master"
   workflow_dispatch:
@@ -39,7 +40,7 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         context: .
-        platforms: linux/386,linux/amd64,linux/arm/v6
+        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
           ghcr.io/runatlantis/atlantis-base:${{env.TODAY}}
