@@ -1,0 +1,22 @@
+Ran Apply for dir: `.` workspace: `staging`
+
+<details><summary>Show Output</summary>
+
+```diff
+preapply
+
+null_resource.simple:
+null_resource.simple:
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = "fromfile"
+workspace = "staging"
+
+postapply
+
+```
+</details>
+
