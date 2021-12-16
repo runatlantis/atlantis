@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "master"
+      - "docker-multi-platform"
   release:
     types:
       - "published"
