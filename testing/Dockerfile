@@ -1,4 +1,4 @@
-FROM circleci/golang:1.17
+FROM golang:1.17
 
 # Install Terraform
 ENV TERRAFORM_VERSION=1.1.1
