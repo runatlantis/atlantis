@@ -1085,6 +1085,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 		},
 		Logger:                       logger,
+		Scope:                        statsScope,
 		Parser:                       eventParser,
 		CommentParser:                commentParser,
 		GithubWebhookSecret:          nil,

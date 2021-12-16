@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v31/github"
+	stats "github.com/lyft/gostats"
 	. "github.com/petergtz/pegomock"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
@@ -200,6 +201,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	vcsClient := vcsmocks.NewMockClient()
 	e := events_controllers.VCSEventsController{
 		Logger:                       logging.NewNoopLogger(t),
+		Scope:                        stats.NewStore(stats.NewNullSink(), false).Scope("null"),
 		CommentParser:                &events.CommentParser{},
 		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{},
 		Parser:                       &events.EventParser{},
@@ -228,6 +230,7 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	vcsClient := vcsmocks.NewMockClient()
 	e := events_controllers.VCSEventsController{
 		Logger:                       logging.NewNoopLogger(t),
+		Scope:                        stats.NewStore(stats.NewNullSink(), false).Scope("null"),
 		CommentParser:                &events.CommentParser{},
 		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{},
 		Parser:                       &events.EventParser{},
@@ -257,6 +260,7 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	vcsClient := vcsmocks.NewMockClient()
 	e := events_controllers.VCSEventsController{
 		Logger:                 logging.NewNoopLogger(t),
+		Scope:                  stats.NewStore(stats.NewNullSink(), false).Scope("null"),
 		GithubRequestValidator: &events_controllers.DefaultGithubRequestValidator{},
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
@@ -286,6 +290,7 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	vcsClient := vcsmocks.NewMockClient()
 	e := events_controllers.VCSEventsController{
 		Logger:                 logging.NewNoopLogger(t),
+		Scope:                  stats.NewStore(stats.NewNullSink(), false).Scope("null"),
 		GithubRequestValidator: &events_controllers.DefaultGithubRequestValidator{},
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
@@ -413,7 +418,7 @@ func TestPost_GithubPullRequestNotAllowlisted(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	ResponseContains(t, w, http.StatusForbidden, "Ignoring pull request event from non-allowlisted repo")
+	ResponseContains(t, w, http.StatusForbidden, "Pull request event from non-allowlisted repo")
 }
 
 func TestPost_GitlabMergeRequestNotAllowlisted(t *testing.T) {
@@ -432,7 +437,7 @@ func TestPost_GitlabMergeRequestNotAllowlisted(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	ResponseContains(t, w, http.StatusForbidden, "Ignoring pull request event from non-allowlisted repo")
+	ResponseContains(t, w, http.StatusForbidden, "Pull request event from non-allowlisted repo")
 }
 
 func TestPost_GithubPullRequestUnsupportedAction(t *testing.T) {
@@ -484,6 +489,7 @@ func TestPost_AzureDevopsPullRequestIgnoreEvent(t *testing.T) {
 	e := events_controllers.VCSEventsController{
 		TestingMode:                     true,
 		Logger:                          logging.NewNoopLogger(t),
+		Scope:                           stats.NewStore(stats.NewNullSink(), false).Scope("null"),
 		ApplyDisabled:                   false,
 		AzureDevopsWebhookBasicUser:     user,
 		AzureDevopsWebhookBasicPassword: secret,
@@ -648,6 +654,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 				SupportedVCSHosts:    []models.VCSHostType{models.BitbucketServer},
 				VCSClient:            nil,
 				Logger:               logging.NewNoopLogger(t),
+				Scope:                stats.NewStore(stats.NewNullSink(), false).Scope("null"),
 			}
 
 			// Build HTTP request.
@@ -768,6 +775,7 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 	e := events_controllers.VCSEventsController{
 		TestingMode:                  true,
 		Logger:                       logging.NewNoopLogger(t),
+		Scope:                        stats.NewStore(stats.NewNullSink(), false).Scope("null"),
 		GithubRequestValidator:       v,
 		Parser:                       p,
 		CommentParser:                cp,
