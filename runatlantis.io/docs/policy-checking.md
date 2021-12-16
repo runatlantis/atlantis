@@ -64,19 +64,19 @@ policies
   owners:
     users:
       - example-dev
-    policy_sets:
-      - name: example-conf-tests
-        path: /home/atlantis/conftest_policies  # Consider seperate vcs & mount into container
-        source: local
+  policy_sets:
+    - name: example-conf-tests
+      path: /home/atlantis/conftest_policies  # Consider seperate vcs & mount into container
+      source: local
 workflows:
   custom:
     plan:
       steps:
         - init
         - plan
-    policy_check
+    policy_check:
      steps:
-       - policy_check
+       - policy_check:
            extra_args: ["-p /home/atlantis/conftest_policies/", "--all-namespaces"]
 ```
 
