@@ -37,11 +37,9 @@ func NewTeamAllowlistChecker(allowlist string) (*TeamAllowlistChecker, error) {
 // IsCommandAllowedForTeam returns true if the team is allowed to execute the command
 // and false otherwise.
 func (checker *TeamAllowlistChecker) IsCommandAllowedForTeam(team string, command string) bool {
-	t := strings.TrimSpace(team)
-	c := strings.TrimSpace(command)
 	for _, rule := range checker.rules {
 		for key, value := range rule {
-			if (key == wildcard || strings.EqualFold(key, t)) && (value == wildcard || strings.EqualFold(value, c)) {
+			if (key == wildcard || strings.EqualFold(key, team)) && (value == wildcard || strings.EqualFold(value, command)) {
 				return true
 			}
 		}
@@ -52,11 +50,10 @@ func (checker *TeamAllowlistChecker) IsCommandAllowedForTeam(team string, comman
 // IsCommandAllowedForAnyTeam returns true if any of the teams is allowed to execute the command
 // and false otherwise.
 func (checker *TeamAllowlistChecker) IsCommandAllowedForAnyTeam(teams []string, command string) bool {
-	c := strings.TrimSpace(command)
 	if len(teams) == 0 {
 		for _, rule := range checker.rules {
 			for key, value := range rule {
-				if (key == wildcard) && (value == wildcard || strings.EqualFold(value, c)) {
+				if (key == wildcard) && (value == wildcard || strings.EqualFold(value, command)) {
 					return true
 				}
 			}
