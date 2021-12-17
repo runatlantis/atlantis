@@ -1,5 +1,13 @@
+# Stage 1: build artifact
+FROM golang:1.17-alpine AS builder
+
+WORKDIR /app
+COPY . /app
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
+
+# Stage 2
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM ghcr.io/runatlantis/atlantis-base:2021.08.31
+FROM ghcr.io/runatlantis/atlantis-base:2021.12.15 AS base
 
 # install terraform binaries
 ENV DEFAULT_TERRAFORM_VERSION=1.1.1
@@ -35,7 +43,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
 RUN ln -s /usr/local/bin/cft/versions/${DEFAULT_CONFTEST_VERSION}/conftest /usr/local/bin/conftest
 
 # copy binary
-COPY atlantis /usr/local/bin/atlantis
+COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 
 # copy docker entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
