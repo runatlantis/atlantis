@@ -1,3 +1,22 @@
+# v0.17.6
+
+## What's Changed
+
+* docs: clarify maximum version limit by @tomharrisonjr in https://github.com/runatlantis/atlantis/pull/1894
+* fix: allow requests to /healthz without authentication by @wendtek in https://github.com/runatlantis/atlantis/pull/1896
+* docs: document approve_policies command in comment_parser by @dupuy26 in https://github.com/runatlantis/atlantis/pull/1886
+* feat: adds `allowed_regexp_prefixes` parameter to use with the `--enable-regexp-cmd` flag by @bmbferreira in https://github.com/runatlantis/atlantis/pull/1884
+* refactor: Add PullStatusFetcher interface by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1904
+* build(deps): bump github.com/urfave/negroni from 0.3.0 to 1.0.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1922
+* build(deps): bump github.com/xanzy/go-gitlab from 0.51.1 to 0.52.2 by @dependabot in https://github.com/runatlantis/atlantis/pull/1921
+* build(deps): bump github.com/golang-jwt/jwt/v4 from 4.1.0 to 4.2.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1928
+* docs: add clarity and further policy_check examples by @DaveHewy in https://github.com/runatlantis/atlantis/pull/1925
+* build(deps): bump github.com/spf13/viper from 1.9.0 to 1.10.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1934
+* deps: terraform 1.1.1 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1939
+* deps: alpine 3.15 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1941
+* docs: fix policy check documentation examples by @DaveHewy in https://github.com/runatlantis/atlantis/pull/1945
+* docker: make multi-platform atlantis image by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1943
+
 # v0.17.5
 
 ## What's Changed
