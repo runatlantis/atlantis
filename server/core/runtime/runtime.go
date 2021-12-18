@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -55,6 +56,10 @@ type Runner interface {
 	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }
 
+type TerraformState struct {
+	lineage string `json:"lineage"`
+}
+
 // MustConstraint returns a constraint. It panics on error.
 func MustConstraint(constraint string) version.Constraints {
 	c, err := version.NewConstraint(constraint)
@@ -97,4 +102,24 @@ func ProjectNameFromPlanfile(workspace string, filename string) (string, error) 
 	}
 	rawProjName := projMatch[0][1]
 	return strings.Replace(rawProjName, planfileSlashReplace, "/", -1), nil
+}
+
+// IsStateless returns true if current terraform project has no state yet
+func IsStateless(tfExecutor TerraformExec, ctx models.ProjectCommandContext, path string, envs map[string]string) bool {
+	var out string
+	out, _ = tfExecutor.RunCommandWithVersion(
+		ctx.Log,
+		path,
+		[]string{"state", "pull"},
+		envs,
+		ctx.TerraformVersion,
+		ctx.Workspace,
+	)
+	currentState := TerraformState{}
+	err := json.Unmarshal([]byte(out), &currentState)
+	if err != nil {
+		return true
+	}
+
+	return currentState.lineage == ""
 }
