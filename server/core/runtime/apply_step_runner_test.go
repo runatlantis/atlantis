@@ -109,7 +109,7 @@ func TestRun_FailureWithoutStateRemovesPlans(t *testing.T) {
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
 	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
-	ErrEquals(t, "Apply Error", err)
+	ErrEquals(t, "apply has errors below, please re run Atlantis plan to try again \n\n: Apply Error", err)
 
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
 	_, err = os.Stat(planPath)
