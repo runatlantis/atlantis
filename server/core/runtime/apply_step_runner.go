@@ -37,6 +37,8 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 	ctx.Log.Info("starting apply")
 	var out string
 
+	tfHasNoState := IsStateless(a.TerraformExecutor, ctx, path, envs)
+
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
 		args := append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...)
@@ -52,8 +54,15 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 	}
 
 	// If the apply was successful, delete the plan.
-	if err == nil {
-		ctx.Log.Info("apply successful, deleting planfile")
+	if err == nil || tfHasNoState {
+		if err == nil {
+			ctx.Log.Info("apply successful, deleting planfile")
+		} else if tfHasNoState {
+			ctx.Log.Info("apply unsuccessful, but deleting planfile since terraform project has no state yet")
+			// modify comment to instruct users to re run atlantis plan,
+			// preventing the next apply from succeeding on 0 projects since plans were cleared
+			err = errors.Wrap(err, "apply has errors below, please re run Atlantis plan to try again \n\n")
+		}
 		if removeErr := os.Remove(planPath); removeErr != nil {
 			ctx.Log.Warn("failed to delete planfile after successful apply: %s", removeErr)
 		}
