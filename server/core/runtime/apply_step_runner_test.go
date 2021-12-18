@@ -76,6 +76,46 @@ func TestRun_Success(t *testing.T) {
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
 
+func TestRun_FailureWithoutStateRemovesPlans(t *testing.T) {
+	tmpDir, cleanup := TempDir(t)
+	defer cleanup()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	err := os.WriteFile(planPath, nil, 0600)
+	Ok(t, err)
+
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor: terraform,
+	}
+	logger := logging.NewNoopLogger(t)
+
+	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+		Then(func(params []Param) ReturnValues {
+			// This code allows us to return different values depending on the
+			// tf command being run while still using the wildcard matchers above.
+			tfArgs := params[2].([]string)
+			if stringSliceEquals(tfArgs, []string{"state", "pull"}) {
+				return []ReturnValue{"", nil}
+			} else if tfArgs[0] == "apply" {
+				return []ReturnValue{"", errors.New("Apply Error")}
+			} else {
+				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
+			}
+		})
+	_, err = o.Run(models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		EscapedCommentArgs: []string{"comment", "args"},
+	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	ErrEquals(t, "Apply Error", err)
+
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}
+
 func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	// When running for a project, the planfile has a different name.
 	tmpDir, cleanup := TempDir(t)
