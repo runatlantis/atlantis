@@ -19,9 +19,8 @@ const (
 )
 
 var (
-	plusDiffRegex  = regexp.MustCompile(`(?m)^ {2}\+`)
-	tildeDiffRegex = regexp.MustCompile(`(?m)^ {2}~`)
-	minusDiffRegex = regexp.MustCompile(`(?m)^ {2}-`)
+	plusMinusDiffRegex = regexp.MustCompile(`(?m)^(  *)([+-])`)
+	tildeDiffRegex     = regexp.MustCompile(`(?m)^(  *)~`)
 )
 
 type PlanStepRunner struct {
@@ -224,9 +223,8 @@ func (p *PlanStepRunner) flatten(slices [][]string) []string {
 // It also removes the "Refreshing..." preamble.
 func (p *PlanStepRunner) fmtPlanOutput(output string, tfVersion *version.Version) string {
 	output = StripRefreshingFromPlanOutput(output, tfVersion)
-	output = plusDiffRegex.ReplaceAllString(output, "+")
-	output = tildeDiffRegex.ReplaceAllString(output, "~")
-	return minusDiffRegex.ReplaceAllString(output, "-")
+	output = plusMinusDiffRegex.ReplaceAllString(output, "$2$1")
+	return tildeDiffRegex.ReplaceAllString(output, "!$1")
 }
 
 // runRemotePlan runs a terraform command that utilizes the remote operations

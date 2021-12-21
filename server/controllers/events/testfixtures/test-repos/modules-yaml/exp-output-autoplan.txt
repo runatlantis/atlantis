@@ -10,19 +10,19 @@ Ran Plan for 2 projects:
 
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
-+ create
++   create
 
 Terraform will perform the following actions:
 
   # module.null.null_resource.this will be created
-+ resource "null_resource" "this" {
-      + id = (known after apply)
++   resource "null_resource" "this" {
++       id = (known after apply)
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 Changes to Outputs:
-+ var = "staging"
++   var = "staging"
 
 ```
 
@@ -42,19 +42,19 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
-+ create
++   create
 
 Terraform will perform the following actions:
 
   # module.null.null_resource.this will be created
-+ resource "null_resource" "this" {
-      + id = (known after apply)
++   resource "null_resource" "this" {
++       id = (known after apply)
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 Changes to Outputs:
-+ var = "production"
++   var = "production"
 
 ```
 

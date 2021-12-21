@@ -10,13 +10,13 @@ Ran Plan for 2 projects:
 
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
-+ create
++   create
 
 Terraform will perform the following actions:
 
   # null_resource.automerge[0] will be created
-+ resource "null_resource" "automerge" {
-      + id = (known after apply)
++   resource "null_resource" "automerge" {
++       id = (known after apply)
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
@@ -39,13 +39,13 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
-+ create
++   create
 
 Terraform will perform the following actions:
 
   # null_resource.automerge[0] will be created
-+ resource "null_resource" "automerge" {
-      + id = (known after apply)
++   resource "null_resource" "automerge" {
++       id = (known after apply)
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.

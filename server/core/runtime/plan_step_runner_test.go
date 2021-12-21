@@ -520,13 +520,13 @@ Terraform will perform the following actions:
 + null_resource.test[0]
       id: <computed>
 
-  + null_resource.test[1]
++   null_resource.test[1]
       id: <computed>
 
-  ~ aws_security_group_rule.allow_all
+!   aws_security_group_rule.allow_all
       description: "" => "test3"
 
-  - aws_security_group_rule.allow_all
+-   aws_security_group_rule.allow_all
 `
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
@@ -559,22 +559,22 @@ Terraform will perform the following actions:
 	Equals(t, `
 An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
-+ create
-~ update in-place
-- destroy
++   create
+!   update in-place
+-   destroy
 
 Terraform will perform the following actions:
 
 + null_resource.test[0]
       id: <computed>
 
-+ null_resource.test[1]
++   null_resource.test[1]
       id: <computed>
 
-~ aws_security_group_rule.allow_all
+!   aws_security_group_rule.allow_all
       description: "" => "test3"
 
-- aws_security_group_rule.allow_all
+-   aws_security_group_rule.allow_all
 `, actOutput)
 }
 
@@ -781,11 +781,11 @@ locally at this time.
 			Equals(t, `
 An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
-- destroy
+-   destroy
 
 Terraform will perform the following actions:
 
-- null_resource.hi[1]
+-   null_resource.hi[1]
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`, output)
@@ -800,11 +800,11 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, output)
 
 An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
-  - destroy
+-   destroy
 
 Terraform will perform the following actions:
 
-  - null_resource.hi[1]
+-   null_resource.hi[1]
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
@@ -854,11 +854,11 @@ null_resource.hi[1]: Refreshing state... (ID: 6064510335076839362)
 
 An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
-  - destroy
+-   destroy
 
 Terraform will perform the following actions:
 
-  - null_resource.hi[1]
+-   null_resource.hi[1]
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`,
@@ -871,11 +871,11 @@ Plan: 0 to add, 0 to change, 1 to destroy.`,
 		Equals(t, `
 An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
-  - destroy
+-   destroy
 
 Terraform will perform the following actions:
 
-  - null_resource.hi[1]
+-   null_resource.hi[1]
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`, output)
@@ -941,11 +941,11 @@ null_resource.hi[1]: Refreshing state... (ID: 6064510335076839362)
 
 An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
-  - destroy
+-   destroy
 
 Terraform will perform the following actions:
 
-  - null_resource.hi[1]
+-   null_resource.hi[1]
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`
