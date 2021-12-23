@@ -57,7 +57,7 @@ type Runner interface {
 }
 
 type TerraformState struct {
-	lineage string `json:"lineage"`
+	Lineage string `json:"lineage"`
 }
 
 // MustConstraint returns a constraint. It panics on error.
@@ -121,5 +121,5 @@ func IsStateless(tfExecutor TerraformExec, ctx models.ProjectCommandContext, pat
 		return true
 	}
 
-	return currentState.lineage == ""
+	return currentState.Lineage == ""
 }
