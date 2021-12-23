@@ -36,8 +36,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 
 	ctx.Log.Info("starting apply")
 	var out string
-
-	tfHasNoState := IsStateless(a.TerraformExecutor, ctx, path, envs)
+	var tfHasNoState bool
 
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
@@ -47,6 +46,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 			out = a.cleanRemoteApplyOutput(out)
 		}
 	} else {
+		tfHasNoState = IsStateless(a.TerraformExecutor, ctx, path, envs)
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
 		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
