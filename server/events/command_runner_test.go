@@ -23,6 +23,7 @@ import (
 	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	lyft_vcs "github.com/runatlantis/atlantis/server/events/vcs/lyft"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 
@@ -136,9 +137,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		defaultBoltDB,
 	)
 
-	pullReqStatusFetcher := vcs.SQBasedPullStatusFetcher{
-		GithubClient: githubClient,
-	}
+	pullReqStatusFetcher := lyft_vcs.NewSQBasedPullStatusFetcher(githubClient, vcs.NewLyftPullMergeabilityChecker("atlantis"))
 
 	applyCommandRunner = events.NewApplyCommandRunner(
 		vcsClient,
@@ -154,7 +153,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		parallelPoolSize,
 		SilenceNoProjects,
 		false,
-		&pullReqStatusFetcher,
+		pullReqStatusFetcher,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(

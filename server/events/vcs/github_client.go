@@ -16,7 +16,6 @@ package vcs
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -36,10 +35,6 @@ import (
 // by GitHub.
 const (
 	maxCommentLength = 65536
-
-	SubmitQueueReadinessStatusContext = "sq-ready-to-merge"
-	OwnersStatusContext               = "_owners-check"
-	LockValue                         = "lock"
 )
 
 // allows for custom handling of github 404s
@@ -53,12 +48,12 @@ func (p *PullRequestNotFound) Error() string {
 
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
-	user               string
-	client             *github.Client
-	v4MutateClient     *graphql.Client
-	ctx                context.Context
-	logger             logging.SimpleLogging
-	statusTitleMatcher StatusTitleMatcher
+	user                string
+	client              *github.Client
+	v4MutateClient      *graphql.Client
+	ctx                 context.Context
+	logger              logging.SimpleLogging
+	mergeabilityChecker MergeabilityChecker
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -76,7 +71,7 @@ type GithubAppTemporarySecrets struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging, commitStatusPrefix string) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging, mergeabilityChecker MergeabilityChecker) (*GithubClient, error) {
 	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
@@ -116,12 +111,12 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 		return nil, errors.Wrap(err, "getting user")
 	}
 	return &GithubClient{
-		user:               user,
-		client:             client,
-		v4MutateClient:     v4MutateClient,
-		ctx:                context.Background(),
-		logger:             logger,
-		statusTitleMatcher: StatusTitleMatcher{TitlePrefix: commitStatusPrefix},
+		user:                user,
+		client:              client,
+		v4MutateClient:      v4MutateClient,
+		ctx:                 context.Background(),
+		logger:              logger,
+		mergeabilityChecker: mergeabilityChecker,
 	}, nil
 }
 
@@ -301,173 +296,20 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
 	}
-	state := githubPR.GetMergeableState()
-	// We map our mergeable check to when the GitHub merge button is clickable.
-	// This corresponds to the following states:
-	// clean: No conflicts, all requirements satisfied.
-	//        Merging is allowed (green box).
-	// unstable: Failing/pending commit status that is not part of the required
-	//           status checks. Merging is allowed (yellow box).
-	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
-	//            hooks. Merging is allowed (green box).
-	// See: https://github.com/octokit/octokit.net/issues/1763
-	if state != "clean" && state != "unstable" && state != "has_hooks" {
 
-		if state != "blocked" {
-			return false, nil
-		}
-
-		return g.getSupplementalMergeability(repo, pull)
-	}
-	return true, nil
-}
-
-// Checks to make sure that all statuses are passing except the atlantis/apply. If we only rely on GetMergeableState,
-// we can run into issues where if an apply failed, we can never apply again due to mergeability failures.
-func (g *GithubClient) getSupplementalMergeability(repo models.Repo, pull models.PullRequest) (bool, error) {
 	statuses, err := g.GetRepoStatuses(repo, pull)
 
 	if err != nil {
-		return false, errors.Wrapf(err, "fetching repo statuses for repo: %s, and pull number: %d", repo.FullName, pull.Num)
+		return false, errors.Wrap(err, "getting commit statuses")
 	}
 
-	for _, status := range statuses {
-		state := status.GetState()
-
-		if g.statusTitleMatcher.MatchesCommand(status.GetContext(), "apply") ||
-			state == "success" {
-			continue
-		}
-
-		// we either have a failure or a pending status check
-		// hence the PR is not mergeable
-		return false, nil
-	}
-
-	// all our status checks are successful by our definition,
-	return true, nil
-}
-
-// PullIsMergeable returns true if the pull request is mergeable.
-func (g *GithubClient) PullIsSQMergeable(repo models.Repo, pull models.PullRequest, statuses []*github.RepoStatus) (bool, error) {
-	githubPR, err := g.GetPullRequest(repo, pull.Num)
-	if err != nil {
-		return false, errors.Wrap(err, "getting pull request")
-	}
-	state := githubPR.GetMergeableState()
-	// We map our mergeable check to when the GitHub merge button is clickable.
-	// This corresponds to the following states:
-	// clean: No conflicts, all requirements satisfied.
-	//        Merging is allowed (green box).
-	// unstable: Failing/pending commit status that is not part of the required
-	//           status checks. Merging is allowed (yellow box).
-	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
-	//            hooks. Merging is allowed (green box).
-	// See: https://github.com/octokit/octokit.net/issues/1763
-	if state != "clean" && state != "unstable" && state != "has_hooks" {
-
-		//blocked: Blocked by a failing/missing required status check.
-		if state != "blocked" {
-			return false, nil
-		}
-
-		return g.getSubmitQueueMergeability(repo, pull, statuses)
-	}
-	return true, nil
-}
-
-func (g *GithubClient) allCheckRunsPassed(repo models.Repo, sha string) (bool, error) {
-	checks, err := g.getRepoChecks(repo, sha)
+	checks, err := g.GetRepoChecks(repo, pull)
 
 	if err != nil {
-		return false, errors.Wrapf(err, "checking failing check runs for %s/ref/%s", repo.FullName, sha)
+		return false, errors.Wrapf(err, "getting check runs")
 	}
 
-	for _, check := range checks {
-		if check.GetStatus() != "completed" {
-			return false, nil
-		}
-		if check.GetConclusion() != "success" {
-			return false, nil
-		}
-	}
-
-	return true, nil
-}
-
-// Check if the Pull Request is locked with :lock emoji
-func (g *GithubClient) PullIsLocked(repo models.Repo, pull models.PullRequest, statuses []*github.RepoStatus) (bool, error) {
-	for _, status := range statuses {
-		if status.GetContext() != SubmitQueueReadinessStatusContext {
-			continue
-		}
-
-		// When Submit queue status does not have tags assume PR is not locked
-		if status.GetDescription() == "" {
-			return false, nil
-		}
-
-		// Not using struct tags because there's no predefined schema for description.
-		description := make(map[string]interface{})
-		err := json.Unmarshal([]byte(status.GetDescription()), &description)
-		if err != nil {
-			return false, errors.Wrapf(err, "parsing status description for repo: %s, and pull number: %d", repo.FullName, pull.Num)
-		}
-
-		waitingList, ok := description["waiting"]
-		if !ok {
-			// No waiting key means no lock.
-			return false, nil
-		}
-
-		typedWaitingList, ok := waitingList.([]interface{})
-		if !ok {
-			return false, fmt.Errorf("cast failed for %v", waitingList)
-		}
-		for _, item := range typedWaitingList {
-			if item == LockValue {
-				return true, nil
-			}
-		}
-
-		// No waiting key means no lock.
-		return false, nil
-	}
-	// No Lock found.
-	return false, nil
-}
-
-// Checks to make sure that all statuses are passing except the Submit Queue Readiness check and atlantis/apply
-// Additionally checks if the Owners Check has been applied and is successful.
-func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.PullRequest, statuses []*github.RepoStatus) (bool, error) {
-	ownersCheckApplied := false
-	for _, status := range statuses {
-		state := status.GetState()
-		if status.GetContext() == OwnersStatusContext {
-			ownersCheckApplied = true
-		}
-
-		if state == "success" ||
-			g.statusTitleMatcher.MatchesCommand(status.GetContext(), "apply") ||
-			(state == "pending" && status.GetContext() == SubmitQueueReadinessStatusContext) {
-			continue
-		}
-
-		// we either have a failure or a pending status check
-		// hence the PR is not mergeable
-		return false, nil
-	}
-
-	// TODO nishkrishnan: Move this into shared area for upstreaming purposes.
-	checkRunsPassed, err := g.allCheckRunsPassed(repo, pull.HeadCommit)
-
-	if err != nil {
-		return false, errors.Wrapf(err, "fetching check runs for repo: %s, and pull number: %d", repo.FullName, pull.Num)
-	}
-
-	// all our status checks are successful by our definition,
-	// ensure that check runs have all passed and owners check has been applied.
-	return ownersCheckApplied && checkRunsPassed, nil
+	return g.mergeabilityChecker.Check(githubPR, statuses, checks), nil
 }
 
 func (g *GithubClient) GetPullRequestFromName(repoName string, repoOwner string, num int) (*github.PullRequest, error) {
@@ -503,7 +345,7 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 	return g.GetPullRequestFromName(repo.Name, repo.Owner, num)
 }
 
-func (g *GithubClient) getRepoChecks(repo models.Repo, sha string) ([]*github.CheckRun, error) {
+func (g *GithubClient) GetRepoChecks(repo models.Repo, pull models.PullRequest) ([]*github.CheckRun, error) {
 	nextPage := 0
 
 	var results []*github.CheckRun
@@ -519,7 +361,7 @@ func (g *GithubClient) getRepoChecks(repo models.Repo, sha string) ([]*github.Ch
 			opts.Page = nextPage
 		}
 
-		result, response, err := g.client.Checks.ListCheckRunsForRef(g.ctx, repo.Owner, repo.Name, sha, opts)
+		result, response, err := g.client.Checks.ListCheckRunsForRef(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, opts)
 
 		if err != nil {
 			return results, errors.Wrapf(err, "getting check runs for page %d", nextPage)

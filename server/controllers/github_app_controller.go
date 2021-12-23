@@ -56,7 +56,11 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 
 	g.Logger.Debug("Exchanging GitHub app code for app credentials")
 	creds := &vcs.GithubAnonymousCredentials{}
-	client, err := vcs.NewGithubClient(g.GithubHostname, creds, g.Logger, g.GithubStatusName)
+
+	// TODO: unify this in a single inject.go file
+	mergeabilityChecker := vcs.NewLyftPullMergeabilityChecker(g.GithubStatusName)
+	client, err := vcs.NewGithubClient(g.GithubHostname, creds, g.Logger, mergeabilityChecker)
+
 	if err != nil {
 		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return

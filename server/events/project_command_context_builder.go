@@ -134,10 +134,8 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		escapeArgs(commentFlags),
 		contextFlags,
 		ctx.Scope,
+		ctx.PullRequestStatus,
 	)
-
-	// Map the CommandContext PullReqStatus to ProjectCommandContext PullReqStatus.
-	projectCmdContext.PullReqStatus = ctx.PullRequestStatus
 
 	projectCmds = append(projectCmds, projectCmdContext)
 
@@ -190,6 +188,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			escapeArgs(commentFlags),
 			contextFlags,
 			ctx.Scope,
+			ctx.PullRequestStatus,
 		))
 	}
 
@@ -209,6 +208,7 @@ func newProjectCommandContext(ctx *CommandContext,
 	escapedCommentArgs []string,
 	contextFlags *ContextFlags,
 	scope stats.Scope,
+	pullStatus models.PullReqStatus,
 ) models.ProjectCommandContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
@@ -243,7 +243,6 @@ func newProjectCommandContext(ctx *CommandContext,
 		HeadRepo:                  ctx.HeadRepo,
 		Log:                       ctx.Log,
 		Scope:                     scope,
-		PullMergeable:             ctx.PullMergeable,
 		ProjectPlanStatus:         projectPlanStatus,
 		Pull:                      ctx.Pull,
 		ProjectName:               projCfg.Name,
@@ -258,6 +257,7 @@ func newProjectCommandContext(ctx *CommandContext,
 		Workspace:                 projCfg.Workspace,
 		PolicySets:                policySets,
 		Tags:                      projCfg.Tags,
+		PullReqStatus:              pullStatus,
 	}
 }
 

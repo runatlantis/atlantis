@@ -38,6 +38,12 @@ const (
 	LogStreamingClearMsg = "\n-----Starting New Process-----"
 )
 
+type PullReqStatus struct {
+	ApprovalStatus ApprovalStatus
+	Mergeable      bool
+	SQLocked       bool
+}
+
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
@@ -143,12 +149,6 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 			Hostname: cloneURLParsed.Hostname(),
 		},
 	}, nil
-}
-
-type PullReqStatus struct {
-	Approved  ApprovalStatus
-	Mergeable bool
-	SQLocked  bool
 }
 
 type ApprovalStatus struct {
@@ -385,8 +385,6 @@ type ProjectCommandContext struct {
 	Log logging.SimpleLogging
 	// Scope is the scope for reporting stats setup for this context
 	Scope stats.Scope
-	// PullMergeable is true if the pull request for this project is able to be merged.
-	PullMergeable bool
 	// PullReqStatus holds state about the PR that requires additional computation outside models.PullRequest
 	PullReqStatus PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
