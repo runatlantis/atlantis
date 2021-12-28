@@ -160,7 +160,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName models.CommandN
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
-type DefaultProjectCommandRunner struct { //create object and test
+type DefaultProjectCommandRunner struct {
 	Locker                     ProjectLocker
 	LockURLGenerator           LockURLGenerator
 	InitStepRunner             StepRunner

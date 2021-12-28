@@ -413,12 +413,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	pullClosedExecutor := &events.PullClosedExecutor{
-		VCSClient:          vcsClient,
-		Locker:             lockingClient,
-		WorkingDir:         workingDir,
-		Logger:             logger,
-		DB:                 boltdb,
-		PullClosedTemplate: &events.PullClosedEventTemplate{},
+		VCSClient:                vcsClient,
+		Locker:                   lockingClient,
+		WorkingDir:               workingDir,
+		Logger:                   logger,
+		DB:                       boltdb,
+		LogStreamResourceCleaner: projectCmdOutputHandler,
+		PullClosedTemplate:       &events.PullClosedEventTemplate{},
 	}
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
