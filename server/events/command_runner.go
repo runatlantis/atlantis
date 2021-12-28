@@ -116,6 +116,7 @@ type DefaultCommandRunner struct {
 	Drainer                       *Drainer
 	PreWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner
 	PullStatusFetcher             PullStatusFetcher
+	TeamAllowlistChecker          *TeamAllowlistChecker
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -162,6 +163,32 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	autoPlanRunner.Run(ctx, nil)
 }
 
+// commentUserDoesNotHavePermissions comments on the pull request that the user
+// is not allowed to execute the command.
+func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models.Repo, pullNum int, user models.User, cmd *CommentCommand) {
+	errMsg := fmt.Sprintf("```\nError: User @%s does not have permissions to execute '%s' command.\n```", user.Username, cmd.Name.String())
+	if err := c.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
+		c.Logger.Err("unable to comment on pull request: %s", err)
+	}
+}
+
+// checkUserPermissions checks if the user has permissions to execute the command
+func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmd *CommentCommand) (bool, error) {
+	if c.TeamAllowlistChecker == nil || len(c.TeamAllowlistChecker.rules) == 0 {
+		// allowlist restriction is not enabled
+		return true, nil
+	}
+	teams, err := c.VCSClient.GetTeamNamesForUser(repo, user)
+	if err != nil {
+		return false, err
+	}
+	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmd.Name.String())
+	if !ok {
+		return false, nil
+	}
+	return true, nil
+}
+
 // RunCommentCommand executes the command.
 // We take in a pointer for maybeHeadRepo because for some events there isn't
 // enough data to construct the Repo model and callers might want to wait until
@@ -178,6 +205,17 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
+
+	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
+	ok, err := c.checkUserPermissions(baseRepo, user, cmd)
+	if err != nil {
+		c.Logger.Err("Unable to check user permissions: %s", err)
+		return
+	}
+	if !ok {
+		c.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, cmd)
+		return
+	}
 
 	headRepo, pull, err := c.ensureValidRepoMetadata(baseRepo, maybeHeadRepo, maybePull, user, pullNum, log)
 	if err != nil {

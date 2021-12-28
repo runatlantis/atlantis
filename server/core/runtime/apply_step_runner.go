@@ -16,11 +16,17 @@ import (
 // ApplyStepRunner runs `terraform apply`.
 type ApplyStepRunner struct {
 	TerraformExecutor   TerraformExec
+	DefaultTFVersion    *version.Version
 	CommitStatusUpdater StatusUpdater
 	AsyncTFExec         AsyncTFExec
 }
 
 func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	tfVersion := a.DefaultTFVersion
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion
+	}
+
 	if a.hasTargetFlag(ctx, extraArgs) {
 		return "", errors.New("cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan")
 	}

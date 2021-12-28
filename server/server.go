@@ -510,6 +510,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor:   terraformClient,
+			DefaultTFVersion:    defaultTfVersion,
 			CommitStatusUpdater: commitStatusUpdater,
 			AsyncTFExec:         terraformClient,
 		},
@@ -624,6 +625,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		models.VersionCommand:         versionCommandRunner,
 	}
 
+	githubTeamAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
+	if err != nil {
+		return nil, err
+	}
+
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                     vcsClient,
 		GithubPullGetter:              githubClient,
@@ -641,6 +647,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             boltdb,
+		TeamAllowlistChecker:          githubTeamAllowlistChecker,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
