@@ -15,23 +15,21 @@
 package terraform
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
-	"sync"
 
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 
+	"github.com/runatlantis/atlantis/server/core/runtime/cache"
+	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
+	"github.com/runatlantis/atlantis/server/core/terraform/cloud"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/handlers"
@@ -40,9 +38,6 @@ import (
 )
 
 var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
-
-// Setting the buffer size to 10mb
-const BufioScannerBufferSize = 10 * 1024 * 1024
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_terraform_client.go Client
 
@@ -60,29 +55,16 @@ type DefaultClient struct {
 	// defaultVersion is the default version of terraform to use if another
 	// version isn't specified.
 	defaultVersion *version.Version
-	// We will run terraform with the TF_PLUGIN_CACHE_DIR env var set to this
-	// directory inside our data dir.
-	terraformPluginCacheDir string
-	binDir                  string
-	// overrideTF can be used to override the terraform binary during testing
-	// with another binary, ex. echo.
-	overrideTF string
+	binDir         string
 	// downloader downloads terraform versions.
 	downloader      Downloader
 	downloadBaseURL string
-	// versions maps from the string representation of a tf version (ex. 0.11.10)
-	// to the absolute path of that binary on disk (if it exists).
-	// Use versionsLock to control access.
-	versions map[string]string
 
-	// versionsLock is used to ensure versions isn't being concurrently written to.
-	versionsLock *sync.Mutex
+	versionCache   cache.ExecutionVersionCache
+	commandBuilder commandBuilder
 
-	// usePluginCache determines whether or not to set the TF_PLUGIN_CACHE_DIR env var
-	usePluginCache bool
-
-	featureAllocator        feature.Allocator
-	projectCmdOutputHandler handlers.ProjectCommandOutputHandler
+	featureAllocator feature.Allocator
+	*AsyncClient
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_downloader.go Downloader
@@ -102,7 +84,7 @@ type Downloader interface {
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
 // NewClientWithDefaultVersion creates a new terraform client and pre-fetches the default version
-func NewClientWithDefaultVersion(
+func NewClientWithVersionCache(
 	log logging.SimpleLogging,
 	binDir string,
 	cacheDir string,
@@ -113,82 +95,61 @@ func NewClientWithDefaultVersion(
 	tfDownloadURL string,
 	tfDownloader Downloader,
 	usePluginCache bool,
-	fetchAsync bool,
 	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
 	featureAllocator feature.Allocator,
+	versionCache cache.ExecutionVersionCache,
 ) (*DefaultClient, error) {
-	var finalDefaultVersion *version.Version
-	var localVersion *version.Version
-	versions := make(map[string]string)
-	var versionsLock sync.Mutex
+	version, err := getDefaultVersion(defaultVersionStr, defaultVersionFlagName)
 
-	localPath, err := exec.LookPath("terraform")
-	if err != nil && defaultVersionStr == "" {
-		return nil, fmt.Errorf("terraform not found in $PATH. Set --%s or download terraform from https://www.terraform.io/downloads.html", defaultVersionFlagName)
-	}
-	if err == nil {
-		localVersion, err = getVersion(localPath)
-		if err != nil {
-			return nil, err
-		}
-		versions[localVersion.String()] = localPath
-		if defaultVersionStr == "" {
-			// If they haven't set a default version, then whatever they had
-			// locally is now the default.
-			finalDefaultVersion = localVersion
-		}
+	if err != nil {
+		return nil, errors.Wrapf(err, "getting default version")
 	}
 
-	if defaultVersionStr != "" {
-		defaultVersion, err := version.NewVersion(defaultVersionStr)
-		if err != nil {
-			return nil, err
-		}
-		finalDefaultVersion = defaultVersion
-		ensureVersionFunc := func() {
-			// Since ensureVersion might end up downloading terraform,
-			// we call it asynchronously so as to not delay server startup.
-			versionsLock.Lock()
-			_, err := ensureVersion(log, tfDownloader, versions, defaultVersion, binDir, tfDownloadURL)
-			versionsLock.Unlock()
-			if err != nil {
-				log.Err("could not download terraform %s: %s", defaultVersion.String(), err)
-			}
-		}
+	// warm the cache with this version
+	_, err = versionCache.Get(version)
 
-		if fetchAsync {
-			go ensureVersionFunc()
-		} else {
-			ensureVersionFunc()
-		}
+	if err != nil {
+		return nil, errors.Wrapf(err, "getting default terraform version %s", defaultVersionStr)
+	}
+
+	builder := &CommandBuilder{
+		defaultVersion: version,
+		versionCache:   versionCache,
+	}
+
+	if usePluginCache {
+		builder.terraformPluginCacheDir = cacheDir
+	}
+
+	asyncClient := &AsyncClient{
+		projectCmdOutputHandler: projectCmdOutputHandler,
+		commandBuilder:          builder,
 	}
 
 	// If tfeToken is set, we try to create a ~/.terraformrc file.
 	if tfeToken != "" {
 		home, err := homedir.Dir()
 		if err != nil {
-			return nil, errors.Wrap(err, "getting home dir to write ~/.terraformrc file")
+			return nil, errors.Wrap(err, "getting home dir")
 		}
-		if err := generateRCFile(tfeToken, tfeHostname, home); err != nil {
-			return nil, err
+		if err := cloud.GenerateConfigFile(tfeToken, tfeHostname, home); err != nil {
+			return nil, errors.Wrapf(err, "generating Terraform Cloud config file")
 		}
 	}
 	return &DefaultClient{
-		defaultVersion:          finalDefaultVersion,
-		terraformPluginCacheDir: cacheDir,
-		binDir:                  binDir,
-		downloader:              tfDownloader,
-		downloadBaseURL:         tfDownloadURL,
-		versionsLock:            &versionsLock,
-		versions:                versions,
-		usePluginCache:          usePluginCache,
-		featureAllocator:        featureAllocator,
-		projectCmdOutputHandler: projectCmdOutputHandler,
+		defaultVersion:   version,
+		binDir:           binDir,
+		downloader:       tfDownloader,
+		downloadBaseURL:  tfDownloadURL,
+		featureAllocator: featureAllocator,
+		AsyncClient:      asyncClient,
+		commandBuilder:   builder,
+		versionCache:     versionCache,
 	}, nil
 
 }
 
-func NewTestClient(
+func NewE2ETestClient(
 	log logging.SimpleLogging,
 	binDir string,
 	cacheDir string,
@@ -202,7 +163,8 @@ func NewTestClient(
 	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
 	featureAllocator feature.Allocator,
 ) (*DefaultClient, error) {
-	return NewClientWithDefaultVersion(
+	versionCache := cache.NewLocalBinaryCache("terraform")
+	return NewClientWithVersionCache(
 		log,
 		binDir,
 		cacheDir,
@@ -213,20 +175,14 @@ func NewTestClient(
 		tfDownloadURL,
 		tfDownloader,
 		usePluginCache,
-		false,
 		projectCmdOutputHandler,
 		featureAllocator,
+		versionCache,
 	)
 }
 
-// NewClient constructs a terraform client.
-// tfeToken is an optional terraform enterprise token.
-// defaultVersionStr is an optional default terraform version to use unless
-// a specific version is set.
-// defaultVersionFlagName is the name of the flag that sets the default terraform
-// version.
-// tfDownloader is used to download terraform versions.
-// Will asynchronously download the required version if it doesn't exist already.
+
+
 func NewClient(
 	log logging.SimpleLogging,
 	binDir string,
@@ -241,7 +197,17 @@ func NewClient(
 	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
 	featureAllocator feature.Allocator,
 ) (*DefaultClient, error) {
-	return NewClientWithDefaultVersion(
+	loader := VersionLoader{
+		downloader:  tfDownloader,
+		downloadURL: tfDownloadURL,
+	}
+
+	versionCache := cache.NewExecutionVersionLayeredLoadingCache(
+		"terraform",
+		binDir,
+		loader.loadVersion,
+	)
+	return NewClientWithVersionCache(
 		log,
 		binDir,
 		cacheDir,
@@ -252,9 +218,9 @@ func NewClient(
 		tfDownloadURL,
 		tfDownloader,
 		usePluginCache,
-		true,
 		projectCmdOutputHandler,
 		featureAllocator,
+		versionCache,
 	)
 }
 
@@ -269,18 +235,15 @@ func (c *DefaultClient) TerraformBinDir() string {
 	return c.binDir
 }
 
-// See Client.EnsureVersion.
 func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Version) error {
 	if v == nil {
 		v = c.defaultVersion
 	}
 
-	var err error
-	c.versionsLock.Lock()
-	_, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL)
-	c.versionsLock.Unlock()
+	_, err := c.versionCache.Get(v)
+
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "getting version %s", v)
 	}
 
 	return nil
@@ -315,7 +278,7 @@ func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, 
 		return fmt.Sprintf("%s\n", output), err
 	}
 
-	tfCmd, cmd, err := c.prepCmd(ctx.Log, v, workspace, path, args)
+	cmd, err := c.commandBuilder.Build(v, workspace, path, args)
 	if err != nil {
 		return "", err
 	}
@@ -326,59 +289,13 @@ func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, 
 	cmd.Env = envVars
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
+		err = errors.Wrapf(err, "running %q in %q", cmd.String(), path)
 		ctx.Log.Err(err.Error())
 		return ansi.Strip(string(out)), err
 	}
-	ctx.Log.Info("successfully ran %q in %q", tfCmd, path)
+	ctx.Log.Info("successfully ran %q in %q", cmd.String(), path)
 
 	return ansi.Strip(string(out)), nil
-}
-
-// prepCmd builds a ready to execute command based on the version of terraform
-// v, and args. It returns a printable representation of the command that will
-// be run and the actual command.
-func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, workspace string, path string, args []string) (string, *exec.Cmd, error) {
-	if v == nil {
-		v = c.defaultVersion
-	}
-
-	var binPath string
-	if c.overrideTF != "" {
-		// This is only set during testing.
-		binPath = c.overrideTF
-	} else {
-		var err error
-		c.versionsLock.Lock()
-		binPath, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL)
-		c.versionsLock.Unlock()
-		if err != nil {
-			return "", nil, err
-		}
-	}
-
-	// We add custom variables so that if `extra_args` is specified with env
-	// vars then they'll be substituted.
-	envVars := []string{
-		// Will de-emphasize specific commands to run in output.
-		"TF_IN_AUTOMATION=true",
-		// Cache plugins so terraform init runs faster.
-		fmt.Sprintf("WORKSPACE=%s", workspace),
-		fmt.Sprintf("TF_WORKSPACE=%s", workspace),
-		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", v.String()),
-		fmt.Sprintf("DIR=%s", path),
-	}
-	if c.usePluginCache {
-		envVars = append(envVars, fmt.Sprintf("TF_PLUGIN_CACHE_DIR=%s", c.terraformPluginCacheDir))
-	}
-	// Append current Atlantis process's environment variables, ex.
-	// AWS_ACCESS_KEY.
-	envVars = append(envVars, os.Environ()...)
-	tfCmd := fmt.Sprintf("%s %s", binPath, strings.Join(args, " "))
-	cmd := exec.Command("sh", "-c", tfCmd)
-	cmd.Dir = path
-	cmd.Env = envVars
-	return tfCmd, cmd, nil
 }
 
 // Line represents a line that was output from a terraform command.
@@ -389,189 +306,24 @@ type Line struct {
 	Err error
 }
 
-// RunCommandAsync runs terraform with args. It immediately returns an
-// input and output channel. Callers can use the output channel to
-// get the realtime output from the command.
-// Callers can use the input channel to pass stdin input to the command.
-// If any error is passed on the out channel, there will be no
-// further output (so callers are free to exit).
-func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) <-chan Line {
-
-	input := make(chan string)
-	defer close(input)
-
-	return c.RunCommandAsyncWithInput(ctx, path, args, customEnvVars, v, workspace, input)
-}
-func (c *DefaultClient) RunCommandAsyncWithInput(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string, input <-chan string) <-chan Line {
-	outCh := make(chan Line)
-
-	// We start a goroutine to do our work asynchronously and then immediately
-	// return our channels.
-	go func() {
-
-		// Ensure we close our channels when we exit.
-		defer func() {
-			close(outCh)
-		}()
-
-		tfCmd, cmd, err := c.prepCmd(ctx.Log, v, workspace, path, args)
-		if err != nil {
-			ctx.Log.Err(err.Error())
-			outCh <- Line{Err: err}
-			return
-		}
-		stdout, _ := cmd.StdoutPipe()
-		stderr, _ := cmd.StderrPipe()
-		stdin, _ := cmd.StdinPipe()
-		envVars := cmd.Env
-		for key, val := range customEnvVars {
-			envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
-		}
-		cmd.Env = envVars
-
-		ctx.Log.Debug("starting %q in %q", tfCmd, path)
-		err = cmd.Start()
-		if err != nil {
-			err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-			ctx.Log.Err(err.Error())
-			outCh <- Line{Err: err}
-			return
-		}
-
-		// If we get anything on inCh, write it to stdin.
-		// This function will exit when inCh is closed which we do in our defer.
-		go func() {
-			for line := range input {
-				ctx.Log.Debug("writing %q to remote command's stdin", line)
-				_, err := io.WriteString(stdin, line)
-				if err != nil {
-					ctx.Log.Err(errors.Wrapf(err, "writing %q to process", line).Error())
-				}
-			}
-		}()
-
-		// Use a waitgroup to block until our stdout/err copying is complete.
-		wg := new(sync.WaitGroup)
-		wg.Add(2)
-		// Asynchronously copy from stdout/err to outCh.
-		go func() {
-			s := bufio.NewScanner(stdout)
-			buf := []byte{}
-			s.Buffer(buf, BufioScannerBufferSize)
-
-			for s.Scan() {
-				message := s.Text()
-				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, message)
-			}
-			wg.Done()
-		}()
-		go func() {
-			s := bufio.NewScanner(stderr)
-			for s.Scan() {
-				message := s.Text()
-				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, message)
-			}
-			wg.Done()
-		}()
-
-		// Wait for our copying to complete. This *must* be done before
-		// calling cmd.Wait(). (see https://github.com/golang/go/issues/19685)
-		wg.Wait()
-
-		// Wait for the command to complete.
-		err = cmd.Wait()
-
-		// We're done now. Send an error if there was one.
-		if err != nil {
-			err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-			ctx.Log.Err(err.Error())
-			outCh <- Line{Err: err}
-		} else {
-			ctx.Log.Info("successfully ran %q in %q", tfCmd, path)
-		}
-	}()
-
-	return outCh
+type VersionLoader struct {
+	downloader  Downloader
+	downloadURL string
 }
 
-// MustConstraint will parse one or more constraints from the given
-// constraint string. The string must be a comma-separated list of
-// constraints. It panics if there is an error.
-func MustConstraint(v string) version.Constraints {
-	c, err := version.NewConstraint(v)
-	if err != nil {
-		panic(err)
-	}
-	return c
-}
-
-// ensureVersion returns the path to a terraform binary of version v.
-// It will download this version if we don't have it.
-func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string) (string, error) {
-	if binPath, ok := versions[v.String()]; ok {
-		return binPath, nil
-	}
-
-	// This tf version might not yet be in the versions map even though it
-	// exists on disk. This would happen if users have manually added
-	// terraform{version} binaries. In this case we don't want to re-download.
-	binFile := "terraform" + v.String()
-	if binPath, err := exec.LookPath(binFile); err == nil {
-		versions[v.String()] = binPath
-		return binPath, nil
-	}
-
-	// The version might also not be in the versions map if it's in our bin dir.
-	// This could happen if Atlantis was restarted without losing its disk.
-	dest := filepath.Join(binDir, binFile)
-	if _, err := os.Stat(dest); err == nil {
-		versions[v.String()] = dest
-		return dest, nil
-	}
-	log.Info("could not find terraform version %s in PATH or %s, downloading from %s", v.String(), binDir, downloadURL)
-	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
+func (l *VersionLoader) loadVersion(v *version.Version, destPath string) (runtime_models.FilePath, error) {
+	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", l.downloadURL, v.String(), v.String())
 	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
 	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
 	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
-	if err := dl.GetFile(dest, fullSrcURL); err != nil {
-		return "", errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
+	if err := l.downloader.GetFile(destPath, fullSrcURL); err != nil {
+		return runtime_models.LocalFilePath(""), errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
 	}
 
-	log.Info("downloaded terraform %s to %s", v.String(), dest)
-	versions[v.String()] = dest
-	return dest, nil
-}
+	binPath := filepath.Join(destPath, "terraform")
 
-// generateRCFile generates a .terraformrc file containing config for tfeToken
-// and hostname tfeHostname.
-// It will create the file in home/.terraformrc.
-func generateRCFile(tfeToken string, tfeHostname string, home string) error {
-	const rcFilename = ".terraformrc"
-	rcFile := filepath.Join(home, rcFilename)
-	config := fmt.Sprintf(rcFileContents, tfeHostname, tfeToken)
+	return runtime_models.LocalFilePath(binPath), nil
 
-	// If there is already a .terraformrc file and its contents aren't exactly
-	// what we would have written to it, then we error out because we don't
-	// want to overwrite anything.
-	if _, err := os.Stat(rcFile); err == nil {
-		currContents, err := ioutil.ReadFile(rcFile) // nolint: gosec
-		if err != nil {
-			return errors.Wrapf(err, "trying to read %s to ensure we're not overwriting it", rcFile)
-		}
-		if config != string(currContents) {
-			return fmt.Errorf("can't write TFE token to %s because that file has contents that would be overwritten", rcFile)
-		}
-		// Otherwise we don't need to write the file because it already has
-		// what we need.
-		return nil
-	}
-
-	if err := ioutil.WriteFile(rcFile, []byte(config), 0600); err != nil {
-		return errors.Wrapf(err, "writing generated %s file with TFE token to %s", rcFilename, rcFile)
-	}
-	return nil
 }
 
 func isAsyncEligibleCommand(cmd string) bool {
@@ -581,6 +333,28 @@ func isAsyncEligibleCommand(cmd string) bool {
 		}
 	}
 	return false
+}
+
+func getDefaultVersion(overrideVersion string, versionFlagName string) (*version.Version, error) {
+	if overrideVersion != "" {
+		v, err := version.NewVersion(overrideVersion)
+		if err != nil {
+			return nil, errors.Wrapf(err, "parsing version %s", overrideVersion)
+		}
+
+		return v, nil
+	}
+
+	// look for the binary directly on disk and query the version
+	// we shouldn't really be doing this, but don't want to break existing clients.
+	// this implementation assumes that versions in the format our cache assumes
+	// and if thats the case we won't be redownloading the version of this binary to our cache
+	localPath, err := exec.LookPath("terraform")
+	if err != nil {
+		return nil, fmt.Errorf("terraform not found in $PATH. Set --%s or download terraform from https://www.terraform.io/downloads.html", versionFlagName)
+	}
+
+	return getVersion(localPath)
 }
 
 func getVersion(tfBinary string) (*version.Version, error) {
@@ -595,13 +369,6 @@ func getVersion(tfBinary string) (*version.Version, error) {
 	}
 	return version.NewVersion(match[1])
 }
-
-// rcFileContents is a format string to be used with Sprintf that can be used
-// to generate the contents of a ~/.terraformrc file for authenticating with
-// Terraform Enterprise.
-var rcFileContents = `credentials "%s" {
-  token = %q
-}`
 
 type DefaultDownloader struct{}
 

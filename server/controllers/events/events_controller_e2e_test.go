@@ -845,7 +845,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	}
 	featureAllocator, _ := feature.NewStringSourcedAllocator(logger)
 
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, projectCmdOutputHandler, featureAllocator)
+	terraformClient, err := terraform.NewE2ETestClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, projectCmdOutputHandler, featureAllocator)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
