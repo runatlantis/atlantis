@@ -310,6 +310,10 @@ atlantis plan -- -target=resource -var 'foo=bar'
 If you'd like to `apply`, type a comment: `atlantis apply`. You can use the `-d` or `-w` flags to point
 Atlantis at a specific plan. Otherwise it tries to apply the plan for the root directory.
 
+## Real-time logs
+If you wish to see real-time terraform output for your command, there exists a github check for every project in the PR which 
+links to the log-streaming UI. This is a terminal UI where you can view your commands execute in real-time. 
+
 ## Next Steps
 * If things are working as expected you can `Ctrl-C` the `atlantis server` command and the `ngrok` command.
 * Hopefully Atlantis is working with your repo and you're ready to move on to a [production-ready deployment](../docs/deployment.html).
