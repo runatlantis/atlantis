@@ -97,6 +97,9 @@ type Server struct {
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
+	WebAuthentication             bool
+	WebUsername                   string
+	WebPassword                   string
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -156,10 +159,22 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				User:  userConfig.GithubUser,
 				Token: userConfig.GithubToken,
 			}
-		} else if userConfig.GithubAppID != 0 {
+		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKeyFile != "" {
+			privateKey, err := os.ReadFile(userConfig.GithubAppKeyFile)
+			if err != nil {
+				return nil, err
+			}
 			githubCredentials = &vcs.GithubAppCredentials{
 				AppID:    userConfig.GithubAppID,
-				KeyPath:  userConfig.GithubAppKey,
+				Key:      privateKey,
+				Hostname: userConfig.GithubHostname,
+				AppSlug:  userConfig.GithubAppSlug,
+			}
+			githubAppEnabled = true
+		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKey != "" {
+			githubCredentials = &vcs.GithubAppCredentials{
+				AppID:    userConfig.GithubAppID,
+				Key:      []byte(userConfig.GithubAppKey),
 				Hostname: userConfig.GithubHostname,
 				AppSlug:  userConfig.GithubAppSlug,
 			}
@@ -167,7 +182,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger)
+		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger, userConfig.VCSStatusName)
 		if err != nil {
 			return nil, err
 		}
@@ -204,8 +219,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	if userConfig.AzureDevopsUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
+
 		var err error
-		azuredevopsClient, err = vcs.NewAzureDevopsClient("dev.azure.com", userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
+		azuredevopsClient, err = vcs.NewAzureDevopsClient(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
 		if err != nil {
 			return nil, err
 		}
@@ -259,7 +275,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
-	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
+	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: userConfig.VCSStatusName}}
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
 
@@ -296,6 +312,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
 		DisableApply:             userConfig.DisableApply,
 		DisableRepoLocking:       userConfig.DisableRepoLocking,
+		EnableDiffMarkdownFormat: userConfig.EnableDiffMarkdownFormat,
 	}
 
 	boltdb, err := db.New(userConfig.DataDir)
@@ -449,6 +466,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing policy check runner")
 	}
 
+	applyRequirementHandler := &events.AggregateApplyRequirements{
+		WorkingDir: workingDir,
+	}
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		Locker:           projectLocker,
 		LockURLGenerator: router,
@@ -466,6 +487,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor:   terraformClient,
+			DefaultTFVersion:    defaultTfVersion,
 			CommitStatusUpdater: commitStatusUpdater,
 			AsyncTFExec:         terraformClient,
 		},
@@ -477,10 +499,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-		PullApprovedChecker: vcsClient,
-		WorkingDir:          workingDir,
-		Webhooks:            webhooksManager,
-		WorkingDirLocker:    workingDirLocker,
+		WorkingDir:                 workingDir,
+		Webhooks:                   webhooksManager,
+		WorkingDirLocker:           workingDirLocker,
+		AggregateApplyRequirements: applyRequirementHandler,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -525,6 +547,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		boltdb,
 	)
 
+	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
 	applyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,
 		userConfig.DisableApplyAll,
@@ -539,6 +562,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
+		pullReqStatusFetcher,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -573,6 +597,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		models.VersionCommand:         versionCommandRunner,
 	}
 
+	githubTeamAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
+	if err != nil {
+		return nil, err
+	}
+
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                     vcsClient,
 		GithubPullGetter:              githubClient,
@@ -581,6 +610,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
 		EventParser:                   eventParser,
 		Logger:                        logger,
+		GlobalCfg:                     globalCfg,
 		AllowForkPRs:                  userConfig.AllowForkPRs,
 		AllowForkPRsFlag:              config.AllowForkPRsFlag,
 		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,
@@ -589,6 +619,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             boltdb,
+		TeamAllowlistChecker:          githubTeamAllowlistChecker,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -633,8 +664,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubSetupComplete: githubAppEnabled,
 		GithubHostname:      userConfig.GithubHostname,
 		GithubOrg:           userConfig.GithubOrg,
+		GithubStatusName:    userConfig.VCSStatusName,
 	}
-
 	return &Server{
 		AtlantisVersion:               config.AtlantisVersion,
 		AtlantisURL:                   parsedURL,
@@ -654,6 +685,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
+		WebAuthentication:             userConfig.WebBasicAuth,
+		WebUsername:                   userConfig.WebUsername,
+		WebPassword:                   userConfig.WebPassword,
 	}, nil
 }
 
@@ -678,7 +712,7 @@ func (s *Server) Start() error {
 		PrintStack: false,
 		StackAll:   false,
 		StackSize:  1024 * 8,
-	}, NewRequestLogger(s.Logger))
+	}, NewRequestLogger(s))
 	n.UseHandler(s.Router)
 
 	defer s.Logger.Flush()
@@ -788,7 +822,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 func mkSubDir(parentDir string, subDir string) (string, error) {
 	fullDir := filepath.Join(parentDir, subDir)
 	if err := os.MkdirAll(fullDir, 0700); err != nil {
-		return "", errors.Wrapf(err, "unable to creare dir %q", fullDir)
+		return "", errors.Wrapf(err, "unable to create dir %q", fullDir)
 	}
 
 	return fullDir, nil

@@ -18,7 +18,6 @@ package testdrive
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -173,11 +172,11 @@ tunnels:
     proto: http
 `, ngrokAPIURL, atlantisPort)
 
-	ngrokConfigFile, err := ioutil.TempFile("", "")
+	ngrokConfigFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "creating ngrok config file")
 	}
-	err = ioutil.WriteFile(ngrokConfigFile.Name(), []byte(ngrokConfig), 0600)
+	err = os.WriteFile(ngrokConfigFile.Name(), []byte(ngrokConfig), 0600)
 	if err != nil {
 		return errors.Wrap(err, "writing ngrok config file")
 	}
@@ -211,7 +210,7 @@ tunnels:
 	// Start atlantis server.
 	colorstring.Println("=> starting atlantis server")
 	s.Start()
-	tmpDir, err := ioutil.TempDir("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "creating a temporary data directory for Atlantis")
 	}

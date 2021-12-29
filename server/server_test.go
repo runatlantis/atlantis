@@ -16,10 +16,11 @@ package server_test
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ import (
 
 func TestNewServer(t *testing.T) {
 	t.Log("Run through NewServer constructor")
-	tmpDir, err := ioutil.TempDir("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	Ok(t, err)
 	_, err = server.NewServer(server.UserConfig{
 		DataDir:     tmpDir,
@@ -48,7 +49,7 @@ func TestNewServer(t *testing.T) {
 // todo: test what happens if we set different flags. The generated config should be different.
 
 func TestNewServer_InvalidAtlantisURL(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	Ok(t, err)
 	_, err = server.NewServer(server.UserConfig{
 		DataDir:     tmpDir,
@@ -138,7 +139,7 @@ func TestHealthz(t *testing.T) {
 	w := httptest.NewRecorder()
 	s.Healthz(w, req)
 	Equals(t, http.StatusOK, w.Result().StatusCode)
-	body, _ := ioutil.ReadAll(w.Result().Body)
+	body, _ := io.ReadAll(w.Result().Body)
 	Equals(t, "application/json", w.Result().Header["Content-Type"][0])
 	Equals(t,
 		`{

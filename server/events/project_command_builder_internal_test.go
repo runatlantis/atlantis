@@ -1,7 +1,7 @@
 package events
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -66,16 +66,18 @@ workflows:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "",
-				ApplyRequirements:  []string{},
-				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
-				RepoRelDir:         "project1",
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{},
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -116,18 +118,20 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "",
-				ApplyRequirements:  []string{},
-				RepoConfigVersion:  3,
-				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
-				RepoRelDir:         "project1",
-				TerraformVersion:   mustVersion("10.0"),
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{},
+				RepoConfigVersion: 3,
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				TerraformVersion:  mustVersion("10.0"),
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -168,18 +172,20 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "",
-				ApplyRequirements:  []string{"approved", "mergeable"},
-				RepoConfigVersion:  3,
-				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
-				RepoRelDir:         "project1",
-				TerraformVersion:   mustVersion("10.0"),
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{"approved", "mergeable"},
+				RepoConfigVersion: 3,
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				TerraformVersion:  mustVersion("10.0"),
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -228,18 +234,20 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "",
-				ApplyRequirements:  []string{"approved"},
-				RepoConfigVersion:  3,
-				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
-				RepoRelDir:         "project1",
-				TerraformVersion:   mustVersion("10.0"),
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{"approved"},
+				RepoConfigVersion: 3,
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				TerraformVersion:  mustVersion("10.0"),
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{},
@@ -375,18 +383,20 @@ workflows:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "",
-				ApplyRequirements:  []string{},
-				RepoConfigVersion:  3,
-				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
-				RepoRelDir:         "project1",
-				TerraformVersion:   mustVersion("10.0"),
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{},
+				RepoConfigVersion: 3,
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				TerraformVersion:  mustVersion("10.0"),
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -431,18 +441,20 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "",
-				ApplyRequirements:  []string{},
-				RepoConfigVersion:  3,
-				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
-				RepoRelDir:         "project1",
-				TerraformVersion:   mustVersion("10.0"),
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{},
+				RepoConfigVersion: 3,
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				TerraformVersion:  mustVersion("10.0"),
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -490,18 +502,20 @@ workflows:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "",
-				ApplyRequirements:  []string{},
-				RepoConfigVersion:  3,
-				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
-				RepoRelDir:         "project1",
-				TerraformVersion:   mustVersion("10.0"),
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{},
+				RepoConfigVersion: 3,
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				TerraformVersion:  mustVersion("10.0"),
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPlanSteps:  []string{},
 			expApplySteps: []string{},
@@ -533,17 +547,19 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "",
-				ApplyRequirements:  []string{"approved"},
-				RepoConfigVersion:  3,
-				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
-				RepoRelDir:         "project1",
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{"approved"},
+				RepoConfigVersion: 3,
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -571,7 +587,7 @@ projects:
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
-			Ok(t, ioutil.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
+			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &yaml.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:  false,
@@ -583,7 +599,7 @@ projects:
 			Ok(t, err)
 
 			if c.repoCfg != "" {
-				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
 			builder := NewProjectCommandBuilder(
@@ -609,7 +625,9 @@ projects:
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
-						PullMergeable: true,
+						PullRequestStatus: models.PullReqStatus{
+							Mergeable: true,
+						},
 					}, cmd, "", []string{"flag"}, tmp, "project1", "myworkspace", true)
 
 					if c.expErr != "" {
@@ -725,18 +743,20 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logging.NewNoopLogger(t),
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "myproject_1",
-				ApplyRequirements:  []string{},
-				RepoConfigVersion:  3,
-				RePlanCmd:          "atlantis plan -p myproject_1 -- flag",
-				RepoRelDir:         "project1",
-				TerraformVersion:   mustVersion("10.0"),
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "myproject_1",
+				ApplyRequirements: []string{},
+				RepoConfigVersion: 3,
+				RePlanCmd:         "atlantis plan -p myproject_1 -- flag",
+				RepoRelDir:        "project1",
+				TerraformVersion:  mustVersion("10.0"),
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -764,13 +784,13 @@ projects:
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
-			Ok(t, ioutil.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
+			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &yaml.ParserValidator{}
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg(false, false, false))
 			Ok(t, err)
 
 			if c.repoCfg != "" {
-				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
 			builder := NewProjectCommandBuilder(
@@ -795,8 +815,10 @@ projects:
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
-						Log:           logging.NewNoopLogger(t),
-						PullMergeable: true,
+						Log: logging.NewNoopLogger(t),
+						PullRequestStatus: models.PullReqStatus{
+							Mergeable: true,
+						},
 					}, cmd, "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true)
 
 					if c.expErr != "" {
@@ -877,16 +899,18 @@ repos:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "",
-				ApplyRequirements:  []string{},
-				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
-				RepoRelDir:         "project1",
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{},
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPolicyCheckSteps: []string{"show", "policy_check"},
 		},
@@ -932,18 +956,20 @@ workflows:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
-				PullMergeable:      true,
-				Pull:               pull,
-				ProjectName:        "",
-				ApplyRequirements:  []string{},
-				RepoConfigVersion:  3,
-				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
-				RepoRelDir:         "project1",
-				TerraformVersion:   mustVersion("10.0"),
-				User:               models.User{},
-				Verbose:            true,
-				Workspace:          "myworkspace",
-				PolicySets:         emptyPolicySets,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{},
+				RepoConfigVersion: 3,
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				TerraformVersion:  mustVersion("10.0"),
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
 			},
 			expPolicyCheckSteps: []string{"policy_check"},
 		},
@@ -970,7 +996,7 @@ workflows:
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
-			Ok(t, ioutil.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
+			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &yaml.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:  false,
@@ -983,7 +1009,7 @@ workflows:
 			Ok(t, err)
 
 			if c.repoCfg != "" {
-				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
 			builder := NewProjectCommandBuilder(
@@ -1008,7 +1034,9 @@ workflows:
 					Pull: models.PullRequest{
 						BaseRepo: baseRepo,
 					},
-					PullMergeable: true,
+					PullRequestStatus: models.PullReqStatus{
+						Mergeable: true,
+					},
 				}, models.PlanCommand, "", []string{"flag"}, tmp, "project1", "myworkspace", true)
 
 				if c.expErr != "" {

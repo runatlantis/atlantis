@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"errors"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -16,7 +16,7 @@ import (
 
 func TestShowStepRunnner(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	path, _ := ioutil.TempDir("", "")
+	path, _ := os.MkdirTemp("", "")
 	resultPath := filepath.Join(path, "test-default.json")
 	envs := map[string]string{"key": "val"}
 	tfVersion, _ := version.NewVersion("0.12")
@@ -45,7 +45,7 @@ func TestShowStepRunnner(t *testing.T) {
 
 		Ok(t, err)
 
-		actual, _ := ioutil.ReadFile(resultPath)
+		actual, _ := os.ReadFile(resultPath)
 
 		actualStr := string(actual)
 		Assert(t, actualStr == "success", "got expected result")
@@ -72,7 +72,7 @@ func TestShowStepRunnner(t *testing.T) {
 
 		Ok(t, err)
 
-		actual, _ := ioutil.ReadFile(resultPath)
+		actual, _ := os.ReadFile(resultPath)
 
 		actualStr := string(actual)
 		Assert(t, actualStr == "success", "got expected result")

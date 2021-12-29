@@ -41,6 +41,7 @@ const (
 	ADWebhookUserFlag          = "azuredevops-webhook-user"
 	ADTokenFlag                = "azuredevops-token" // nolint: gosec
 	ADUserFlag                 = "azuredevops-user"
+	ADHostnameFlag             = "azuredevops-hostname"
 	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
@@ -61,10 +62,13 @@ const (
 	DisableRepoLockingFlag     = "disable-repo-locking"
 	EnablePolicyChecksFlag     = "enable-policy-checks"
 	EnableRegExpCmdFlag        = "enable-regexp-cmd"
+	EnableDiffMarkdownFormat   = "enable-diff-markdown-format"
 	GHHostnameFlag             = "gh-hostname"
+	GHTeamAllowlistFlag        = "gh-team-allowlist"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
 	GHAppIDFlag                = "gh-app-id"
+	GHAppKeyFlag               = "gh-app-key"
 	GHAppKeyFileFlag           = "gh-app-key-file"
 	GHAppSlugFlag              = "gh-app-slug"
 	GHOrganizationFlag         = "gh-org"
@@ -100,15 +104,20 @@ const (
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
+	WebBasicAuthFlag           = "web-basic-auth"
+	WebUsernameFlag            = "web-username"
+	WebPasswordFlag            = "web-password"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser      = ""
 	DefaultADBasicPassword  = ""
+	DefaultADHostname       = "dev.azure.com"
 	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
 	DefaultGHHostname       = "github.com"
+	DefaultGHTeamAllowlist  = "*:plan,*:apply"
 	DefaultGitlabHostname   = "gitlab.com"
 	DefaultLogLevel         = "info"
 	DefaultParallelPoolSize = 15
@@ -116,6 +125,9 @@ const (
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
 	DefaultVCSStatusName    = "atlantis"
+	DefaultWebBasicAuth     = false
+	DefaultWebUsername      = "atlantis"
+	DefaultWebPassword      = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -136,6 +148,10 @@ var stringFlags = map[string]stringFlag{
 	ADWebhookUserFlag: {
 		description:  "Azure DevOps basic HTTP authentication username for inbound webhooks.",
 		defaultValue: "",
+	},
+	ADHostnameFlag: {
+		description:  "Azure DevOps hostname to support cloud and self hosted instances.",
+		defaultValue: "dev.azure.com",
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
@@ -185,12 +201,28 @@ var stringFlags = map[string]stringFlag{
 		description:  "Hostname of your Github Enterprise installation. If using github.com, no need to set.",
 		defaultValue: DefaultGHHostname,
 	},
+	GHTeamAllowlistFlag: {
+		description: "Comma separated list of key-value pairs representing the GitHub teams and the operations that " +
+			"the members of a particular team are allowed to perform. " +
+			"The format is {team}:{command},{team}:{command}. " +
+			"Valid values for 'command' are 'plan', 'apply' and '*', e.g. 'dev:plan,ops:apply,devops:*'" +
+			"This example gives the users from the 'dev' GitHub team the permissions to execute the 'plan' command, " +
+			"the 'ops' team the permissions to execute the 'apply' command, " +
+			"and allows the 'devops' team to perform any operation. If this argument is not provided, the default value (*:*) " +
+			"will be used and the default behavior will be to not check permissions " +
+			"and to allow users from any team to perform any operation.",
+		defaultValue: DefaultGHTeamAllowlist,
+	},
 	GHUserFlag: {
 		description:  "GitHub username of API user.",
 		defaultValue: "",
 	},
 	GHTokenFlag: {
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
+	},
+	GHAppKeyFlag: {
+		description:  "The GitHub App's private key",
+		defaultValue: "",
 	},
 	GHAppKeyFileFlag: {
 		description:  "A path to a file containing the GitHub App's private key",
@@ -275,6 +307,14 @@ var stringFlags = map[string]stringFlag{
 		description:  "Name used to identify Atlantis for pull request statuses.",
 		defaultValue: DefaultVCSStatusName,
 	},
+	WebUsernameFlag: {
+		description:  "Username used for Web Basic Authentication on Atlantis HTTP Middleware",
+		defaultValue: DefaultWebUsername,
+	},
+	WebPasswordFlag: {
+		description:  "Password used for Web Basic Authentication on Atlantis HTTP Middleware",
+		defaultValue: DefaultWebPassword,
+	},
 }
 
 var boolFlags = map[string]boolFlag{
@@ -314,6 +354,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnableRegExpCmdFlag: {
 		description:  "Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.",
+		defaultValue: false,
+	},
+	EnableDiffMarkdownFormat: {
+		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {
@@ -368,6 +412,10 @@ var boolFlags = map[string]boolFlag{
 	SkipCloneNoChanges: {
 		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
 		defaultValue: false,
+	},
+	WebBasicAuthFlag: {
+		description:  "Switches on or off the Basic Authentication on the HTTP Middleware interface",
+		defaultValue: DefaultWebBasicAuth,
 	},
 }
 var intFlags = map[string]intFlag{
@@ -579,6 +627,9 @@ func (s *ServerCmd) run() error {
 }
 
 func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+	if c.AzureDevOpsHostname == "" {
+		c.AzureDevOpsHostname = DefaultADHostname
+	}
 	if c.AutoplanFileList == "" {
 		c.AutoplanFileList = DefaultAutoplanFileList
 	}
@@ -612,8 +663,17 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.VCSStatusName == "" {
 		c.VCSStatusName = DefaultVCSStatusName
 	}
+	if c.GithubTeamAllowlist == "" {
+		c.GithubTeamAllowlist = DefaultGHTeamAllowlist
+	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname
+	}
+	if c.WebUsername == "" {
+		c.WebUsername = DefaultWebUsername
+	}
+	if c.WebPassword == "" {
+		c.WebPassword = DefaultWebPassword
 	}
 }
 
@@ -634,12 +694,19 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	// The following combinations are valid.
 	// 1. github user and token set
-	// 2. gitlab user and token set
-	// 3. bitbucket user and token set
-	// 4. azuredevops user and token set
-	// 5. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GithubAppID == 0) != (userConfig.GithubAppKey == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+	// 2. github app ID and (key file set or key set)
+	// 3. gitlab user and token set
+	// 4. bitbucket user and token set
+	// 5. azuredevops user and token set
+	// 6. any combination of the above
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+		return vcsErr
+	}
+	if (userConfig.GithubAppID != 0) && ((userConfig.GithubAppKey == "") && (userConfig.GithubAppKeyFile == "")) {
+		return vcsErr
+	}
+	if (userConfig.GithubAppID == 0) && ((userConfig.GithubAppKey != "") || (userConfig.GithubAppKeyFile != "")) {
 		return vcsErr
 	}
 	// At this point, we know that there can't be a single user/token without

@@ -33,15 +33,18 @@ import (
 
 // maxCommentLength is the maximum number of chars allowed in a single comment
 // by GitHub.
-const maxCommentLength = 65536
+const (
+	maxCommentLength = 65536
+)
 
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
-	user           string
-	client         *github.Client
-	v4MutateClient *graphql.Client
-	ctx            context.Context
-	logger         logging.SimpleLogging
+	user               string
+	client             *github.Client
+	v4MutateClient     *graphql.Client
+	ctx                context.Context
+	logger             logging.SimpleLogging
+	statusTitleMatcher StatusTitleMatcher
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -59,7 +62,7 @@ type GithubAppTemporarySecrets struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging, commitStatusPrefix string) (*GithubClient, error) {
 	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
@@ -99,11 +102,12 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 		return nil, errors.Wrap(err, "getting user")
 	}
 	return &GithubClient{
-		user:           user,
-		client:         client,
-		v4MutateClient: v4MutateClient,
-		ctx:            context.Background(),
-		logger:         logger,
+		user:               user,
+		client:             client,
+		v4MutateClient:     v4MutateClient,
+		ctx:                context.Background(),
+		logger:             logger,
+		statusTitleMatcher: StatusTitleMatcher{TitlePrefix: commitStatusPrefix},
 	}, nil
 }
 
@@ -232,7 +236,7 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 }
 
 // PullIsApproved returns true if the pull request was approved.
-func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	nextPage := 0
 	for {
 		opts := github.ListOptions{
@@ -244,11 +248,15 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 		g.logger.Debug("GET /repos/%v/%v/pulls/%d/reviews", repo.Owner, repo.Name, pull.Num)
 		pageReviews, resp, err := g.client.PullRequests.ListReviews(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
 		if err != nil {
-			return false, errors.Wrap(err, "getting reviews")
+			return approvalStatus, errors.Wrap(err, "getting reviews")
 		}
 		for _, review := range pageReviews {
 			if review != nil && review.GetState() == "APPROVED" {
-				return true, nil
+				return models.ApprovalStatus{
+					IsApproved: true,
+					ApprovedBy: *review.User.Login,
+					Date:       *review.SubmittedAt,
+				}, nil
 			}
 		}
 		if resp.NextPage == 0 {
@@ -256,7 +264,7 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 		}
 		nextPage = resp.NextPage
 	}
-	return false, nil
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
@@ -276,8 +284,40 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
+
+		if state != "blocked" {
+			return false, nil
+		}
+
+		return g.getSupplementalMergeability(repo, pull)
+	}
+	return true, nil
+}
+
+// Checks to make sure that all statuses are passing except the atlantis/apply. If we only rely on GetMergeableState,
+// we can run into issues where if an apply failed, we can never apply again due to mergeability failures.
+func (g *GithubClient) getSupplementalMergeability(repo models.Repo, pull models.PullRequest) (bool, error) {
+	statuses, err := g.getRepoStatuses(repo, pull)
+
+	if err != nil {
+		return false, errors.Wrapf(err, "fetching repo statuses for repo: %s, and pull number: %d", repo.FullName, pull.Num)
+	}
+
+	for _, status := range statuses {
+		state := status.GetState()
+
+		if g.statusTitleMatcher.MatchesCommand(status.GetContext(), "apply") ||
+			state == "success" {
+			continue
+
+		}
+
+		// we either have a failure or a pending status check
+		// hence the PR is not mergeable
 		return false, nil
 	}
+
+	// all our status checks are successful by our definition,
 	return true, nil
 }
 
@@ -288,10 +328,14 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 
 	// GitHub has started to return 404's here (#1019) even after they send the webhook.
 	// They've got some eventual consistency issues going on so we're just going
-	// to retry up to 3 times with a 1s sleep.
-	numRetries := 3
-	retryDelay := 1 * time.Second
-	for i := 0; i < numRetries; i++ {
+	// to attempt up to 5 times with exponential backoff.
+	maxAttempts := 5
+	attemptDelay := 0 * time.Second
+	for i := 0; i < maxAttempts; i++ {
+		// First don't sleep, then sleep 1, 3, 7, etc.
+		time.Sleep(attemptDelay)
+		attemptDelay = 2*attemptDelay + 1*time.Second
+
 		pull, _, err = g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
 		if err == nil {
 			return pull, nil
@@ -300,9 +344,40 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 		if !ok || ghErr.Response.StatusCode != 404 {
 			return pull, err
 		}
-		time.Sleep(retryDelay)
 	}
 	return pull, err
+}
+
+func (g *GithubClient) getRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error) {
+	// Get Combined statuses
+
+	nextPage := 0
+
+	var result []*github.RepoStatus
+
+	for {
+		opts := github.ListOptions{
+			// explicit default
+			// https://developer.github.com/v3/repos/statuses/#list-commit-statuses-for-a-reference
+			PerPage: 100,
+		}
+		if nextPage != 0 {
+			opts.Page = nextPage
+		}
+
+		combinedStatus, response, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, &opts)
+		result = append(result, combinedStatus.Statuses...)
+
+		if err != nil {
+			return nil, err
+		}
+		if response.NextPage == 0 {
+			break
+		}
+		nextPage = response.NextPage
+	}
+
+	return result, nil
 }
 
 // UpdateStatus updates the status badge on the pull request.
@@ -377,6 +452,35 @@ func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
 func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil
+}
+
+// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
+// https://developer.github.com/v3/teams/members/#get-team-membership
+func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	var teamNames []string
+	opts := &github.ListOptions{}
+	org := repo.Owner
+	for {
+		teams, resp, err := g.client.Teams.ListTeams(g.ctx, org, opts)
+		if err != nil {
+			return nil, errors.Wrap(err, "retrieving GitHub teams")
+		}
+		for _, t := range teams {
+			membership, _, err := g.client.Teams.GetTeamMembershipBySlug(g.ctx, org, *t.Slug, user.Username)
+			if err != nil {
+				g.logger.Err("Failed to get team membership from GitHub: %s", err)
+			} else if membership != nil {
+				if *membership.State == "active" && (*membership.Role == "member" || *membership.Role == "maintainer") {
+					teamNames = append(teamNames, t.GetName())
+				}
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return teamNames, nil
 }
 
 // ExchangeCode returns a newly created app's info

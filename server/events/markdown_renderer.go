@@ -44,17 +44,19 @@ type MarkdownRenderer struct {
 	DisableApply             bool
 	DisableMarkdownFolding   bool
 	DisableRepoLocking       bool
+	EnableDiffMarkdownFormat bool
 }
 
 // commonData is data that all responses have.
 type commonData struct {
-	Command            string
-	Verbose            bool
-	Log                string
-	PlansDeleted       bool
-	DisableApplyAll    bool
-	DisableApply       bool
-	DisableRepoLocking bool
+	Command                  string
+	Verbose                  bool
+	Log                      string
+	PlansDeleted             bool
+	DisableApplyAll          bool
+	DisableApply             bool
+	DisableRepoLocking       bool
+	EnableDiffMarkdownFormat bool
 }
 
 // errData is data about an error response.
@@ -77,10 +79,11 @@ type resultData struct {
 
 type planSuccessData struct {
 	models.PlanSuccess
-	PlanSummary        string
-	PlanWasDeleted     bool
-	DisableApply       bool
-	DisableRepoLocking bool
+	PlanSummary              string
+	PlanWasDeleted           bool
+	DisableApply             bool
+	DisableRepoLocking       bool
+	EnableDiffMarkdownFormat bool
 }
 
 type policyCheckSuccessData struct {
@@ -99,13 +102,14 @@ type projectResultTmplData struct {
 func (m *MarkdownRenderer) Render(res CommandResult, cmdName models.CommandName, log string, verbose bool, vcsHost models.VCSHostType) string {
 	commandStr := strings.Title(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{
-		Command:            commandStr,
-		Verbose:            verbose,
-		Log:                log,
-		PlansDeleted:       res.PlansDeleted,
-		DisableApplyAll:    m.DisableApplyAll || m.DisableApply,
-		DisableApply:       m.DisableApply,
-		DisableRepoLocking: m.DisableRepoLocking,
+		Command:                  commandStr,
+		Verbose:                  verbose,
+		Log:                      log,
+		PlansDeleted:             res.PlansDeleted,
+		DisableApplyAll:          m.DisableApplyAll || m.DisableApply,
+		DisableApply:             m.DisableApply,
+		DisableRepoLocking:       m.DisableRepoLocking,
+		EnableDiffMarkdownFormat: m.EnableDiffMarkdownFormat,
 	}
 	if res.Error != nil {
 		return m.renderTemplate(unwrappedErrWithLogTmpl, errData{res.Error.Error(), common})
@@ -150,9 +154,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 			})
 		} else if result.PlanSuccess != nil {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking})
+				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			} else {
-				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking})
+				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			}
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
@@ -300,14 +304,14 @@ var multiProjectVersionTmpl = template.Must(template.New("").Funcs(sprig.TxtFunc
 		logTmpl))
 var planSuccessUnwrappedTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
-		"{{.TerraformOutput}}\n" +
+		"{{ if .EnableDiffMarkdownFormat }}{{.DiffMarkdownFormattedTerraformOutput}}{{else}}{{.TerraformOutput}}{{end}}\n" +
 		"```\n\n" + planNextSteps +
 		"{{ if .HasDiverged }}\n\n:warning: The branch we're merging into is ahead, it is recommended to pull new commits first.{{end}}"))
 
 var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 	"<details><summary>Show Output</summary>\n\n" +
 		"```diff\n" +
-		"{{.TerraformOutput}}\n" +
+		"{{ if .EnableDiffMarkdownFormat }}{{.DiffMarkdownFormattedTerraformOutput}}{{else}}{{.TerraformOutput}}{{end}}\n" +
 		"```\n\n" +
 		planNextSteps + "\n" +
 		"</details>" + "\n" +
@@ -367,7 +371,9 @@ var unwrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"{{.Error}}\n" +
 	"```" +
 	"{{ if eq .Command \"Policy Check\" }}" +
-	"\n* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.\n" +
+	"\n* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:\n" +
+	"    * `atlantis approve_policies`\n" +
+	"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.\n" +
 	"{{ end }}"
 var wrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"<details><summary>Show Output</summary>\n\n" +

@@ -49,7 +49,9 @@ func TestRenderErr(t *testing.T) {
 			models.PolicyCheckCommand,
 			err,
 			"**Policy Check Error**\n```\nerr\n```" +
-				"\n* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.\n\n",
+				"\n* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:\n" +
+				"    * `atlantis approve_policies`\n" +
+				"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.\n\n",
 		},
 	}
 
@@ -639,7 +641,9 @@ $$$
 $$$
 error
 $$$
-* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.
+* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:
+    * $atlantis approve_policies$
+* :repeat: Or, address the policy failure by modifying the codebase and re-planning.
 
 
 ---
@@ -2049,6 +2053,286 @@ $$$
 
 	r := events.MarkdownRenderer{}
 	r.DisableRepoLocking = true
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			res := events.CommandResult{
+				ProjectResults: c.ProjectResults,
+			}
+			for _, verbose := range []bool{true, false} {
+				t.Run(c.Description, func(t *testing.T) {
+					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+					if !verbose {
+						Equals(t, expWithBackticks, s)
+					} else {
+						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
+	tfOutput := `An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+~ update in-place
+-/+ destroy and then create replacement
+
+Terraform will perform the following actions:
+
+  # module.redacted.aws_instance.redacted must be replaced
+-/+ resource "aws_instance" "redacted" {
+      ~ ami                          = "ami-redacted" -> "ami-redacted" # forces replacement
+      ~ arn                          = "arn:aws:ec2:us-east-1:redacted:instance/i-redacted" -> (known after apply)
+      ~ associate_public_ip_address  = false -> (known after apply)
+        availability_zone            = "us-east-1b"
+      ~ cpu_core_count               = 4 -> (known after apply)
+      ~ cpu_threads_per_core         = 2 -> (known after apply)
+      - disable_api_termination      = false -> null
+      - ebs_optimized                = false -> null
+        get_password_data            = false
+      - hibernation                  = false -> null
+      + host_id                      = (known after apply)
+        iam_instance_profile         = "remote_redacted_profile"
+      ~ id                           = "i-redacted" -> (known after apply)
+      ~ instance_state               = "running" -> (known after apply)
+        instance_type                = "c5.2xlarge"
+      ~ ipv6_address_count           = 0 -> (known after apply)
+      ~ ipv6_addresses               = [] -> (known after apply)
+        key_name                     = "RedactedRedactedRedacted"
+      - monitoring                   = false -> null
+      + outpost_arn                  = (known after apply)
+      + password_data                = (known after apply)
+      + placement_group              = (known after apply)
+      ~ primary_network_interface_id = "eni-redacted" -> (known after apply)
+      ~ private_dns                  = "ip-redacted.ec2.internal" -> (known after apply)
+      ~ private_ip                   = "redacted" -> (known after apply)
+      + public_dns                   = (known after apply)
+      + public_ip                    = (known after apply)
+      ~ secondary_private_ips        = [] -> (known after apply)
+      ~ security_groups              = [] -> (known after apply)
+        source_dest_check            = true
+        subnet_id                    = "subnet-redacted"
+        tags                         = {
+            "Name" = "redacted-redacted"
+        }
+      ~ tenancy                      = "default" -> (known after apply)
+        user_data                    = "redacted"
+      ~ volume_tags                  = {} -> (known after apply)
+        vpc_security_group_ids       = [
+            "sg-redactedsecuritygroup",
+        ]
+
+      + ebs_block_device {
+          + delete_on_termination = (known after apply)
+          + device_name           = (known after apply)
+          + encrypted             = (known after apply)
+          + iops                  = (known after apply)
+          + kms_key_id            = (known after apply)
+          + snapshot_id           = (known after apply)
+          + volume_id             = (known after apply)
+          + volume_size           = (known after apply)
+          + volume_type           = (known after apply)
+        }
+
+      + ephemeral_block_device {
+          + device_name  = (known after apply)
+          + no_device    = (known after apply)
+          + virtual_name = (known after apply)
+        }
+
+      ~ metadata_options {
+          ~ http_endpoint               = "enabled" -> (known after apply)
+          ~ http_put_response_hop_limit = 1 -> (known after apply)
+          ~ http_tokens                 = "optional" -> (known after apply)
+        }
+
+      + network_interface {
+          + delete_on_termination = (known after apply)
+          + device_index          = (known after apply)
+          + network_interface_id  = (known after apply)
+        }
+
+      ~ root_block_device {
+          ~ delete_on_termination = true -> (known after apply)
+          ~ device_name           = "/dev/sda1" -> (known after apply)
+          ~ encrypted             = false -> (known after apply)
+          ~ iops                  = 600 -> (known after apply)
+          + kms_key_id            = (known after apply)
+          ~ volume_id             = "vol-redacted" -> (known after apply)
+          ~ volume_size           = 200 -> (known after apply)
+          ~ volume_type           = "gp2" -> (known after apply)
+        }
+    }
+
+  # module.redacted.aws_route53_record.redacted_record will be updated in-place
+~ resource "aws_route53_record" "redacted_record" {
+        fqdn    = "redacted.redacted.redacted.io"
+        id      = "redacted_redacted.redacted.redacted.io_A"
+        name    = "redacted.redacted.redacted.io"
+      ~ records = [
+          - "redacted",
+        ] -> (known after apply)
+        ttl     = 300
+        type    = "A"
+        zone_id = "redacted"
+    }
+
+Plan: 1 to add, 1 to change, 1 to destroy.
+`
+	cases := []struct {
+		Description    string
+		Command        models.CommandName
+		ProjectResults []models.ProjectResult
+		VCSHost        models.VCSHostType
+		Expected       string
+	}{
+		{
+			"single successful plan with diff markdown formatted",
+			models.PlanCommand,
+			[]models.ProjectResult{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: tfOutput,
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+				},
+			},
+			models.Github,
+			`Ran Plan for dir: $path$ workspace: $workspace$
+
+<details><summary>Show Output</summary>
+
+$$$diff
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+! update in-place
+-/+ destroy and then create replacement
+
+Terraform will perform the following actions:
+
+  # module.redacted.aws_instance.redacted must be replaced
+-/+ resource "aws_instance" "redacted" {
+!       ami                          = "ami-redacted" -> "ami-redacted" # forces replacement
+!       arn                          = "arn:aws:ec2:us-east-1:redacted:instance/i-redacted" -> (known after apply)
+!       associate_public_ip_address  = false -> (known after apply)
+        availability_zone            = "us-east-1b"
+!       cpu_core_count               = 4 -> (known after apply)
+!       cpu_threads_per_core         = 2 -> (known after apply)
+-       disable_api_termination      = false -> null
+-       ebs_optimized                = false -> null
+        get_password_data            = false
+-       hibernation                  = false -> null
++       host_id                      = (known after apply)
+        iam_instance_profile         = "remote_redacted_profile"
+!       id                           = "i-redacted" -> (known after apply)
+!       instance_state               = "running" -> (known after apply)
+        instance_type                = "c5.2xlarge"
+!       ipv6_address_count           = 0 -> (known after apply)
+!       ipv6_addresses               = [] -> (known after apply)
+        key_name                     = "RedactedRedactedRedacted"
+-       monitoring                   = false -> null
++       outpost_arn                  = (known after apply)
++       password_data                = (known after apply)
++       placement_group              = (known after apply)
+!       primary_network_interface_id = "eni-redacted" -> (known after apply)
+!       private_dns                  = "ip-redacted.ec2.internal" -> (known after apply)
+!       private_ip                   = "redacted" -> (known after apply)
++       public_dns                   = (known after apply)
++       public_ip                    = (known after apply)
+!       secondary_private_ips        = [] -> (known after apply)
+!       security_groups              = [] -> (known after apply)
+        source_dest_check            = true
+        subnet_id                    = "subnet-redacted"
+        tags                         = {
+            "Name" = "redacted-redacted"
+        }
+!       tenancy                      = "default" -> (known after apply)
+        user_data                    = "redacted"
+!       volume_tags                  = {} -> (known after apply)
+        vpc_security_group_ids       = [
+            "sg-redactedsecuritygroup",
+        ]
+
++       ebs_block_device {
++           delete_on_termination = (known after apply)
++           device_name           = (known after apply)
++           encrypted             = (known after apply)
++           iops                  = (known after apply)
++           kms_key_id            = (known after apply)
++           snapshot_id           = (known after apply)
++           volume_id             = (known after apply)
++           volume_size           = (known after apply)
++           volume_type           = (known after apply)
+        }
+
++       ephemeral_block_device {
++           device_name  = (known after apply)
++           no_device    = (known after apply)
++           virtual_name = (known after apply)
+        }
+
+!       metadata_options {
+!           http_endpoint               = "enabled" -> (known after apply)
+!           http_put_response_hop_limit = 1 -> (known after apply)
+!           http_tokens                 = "optional" -> (known after apply)
+        }
+
++       network_interface {
++           delete_on_termination = (known after apply)
++           device_index          = (known after apply)
++           network_interface_id  = (known after apply)
+        }
+
+!       root_block_device {
+!           delete_on_termination = true -> (known after apply)
+!           device_name           = "/dev/sda1" -> (known after apply)
+!           encrypted             = false -> (known after apply)
+!           iops                  = 600 -> (known after apply)
++           kms_key_id            = (known after apply)
+!           volume_id             = "vol-redacted" -> (known after apply)
+!           volume_size           = 200 -> (known after apply)
+!           volume_type           = "gp2" -> (known after apply)
+        }
+    }
+
+  # module.redacted.aws_route53_record.redacted_record will be updated in-place
+! resource "aws_route53_record" "redacted_record" {
+        fqdn    = "redacted.redacted.redacted.io"
+        id      = "redacted_redacted.redacted.redacted.io_A"
+        name    = "redacted.redacted.redacted.io"
+!       records = [
+-           "redacted",
+        ] -> (known after apply)
+        ttl     = 300
+        type    = "A"
+        zone_id = "redacted"
+    }
+
+Plan: 1 to add, 1 to change, 1 to destroy.
+
+$$$
+
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+</details>
+Plan: 1 to add, 1 to change, 1 to destroy.
+
+
+`,
+		},
+	}
+	r := events.MarkdownRenderer{
+		DisableApplyAll:          true,
+		DisableApply:             true,
+		EnableDiffMarkdownFormat: true,
+	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := events.CommandResult{

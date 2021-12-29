@@ -17,6 +17,7 @@ type UserConfig struct {
 	AzureDevopsUser            string `mapstructure:"azuredevops-user"`
 	AzureDevopsWebhookPassword string `mapstructure:"azuredevops-webhook-password"`
 	AzureDevopsWebhookUser     string `mapstructure:"azuredevops-webhook-user"`
+	AzureDevOpsHostname        string `mapstructure:"azuredevops-hostname"`
 	BitbucketBaseURL           string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken             string `mapstructure:"bitbucket-token"`
 	BitbucketUser              string `mapstructure:"bitbucket-user"`
@@ -30,14 +31,17 @@ type UserConfig struct {
 	DisableRepoLocking         bool   `mapstructure:"disable-repo-locking"`
 	EnablePolicyChecksFlag     bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd            bool   `mapstructure:"enable-regexp-cmd"`
+	EnableDiffMarkdownFormat   bool   `mapstructure:"enable-diff-markdown-format"`
 	GithubHostname             string `mapstructure:"gh-hostname"`
 	GithubToken                string `mapstructure:"gh-token"`
 	GithubUser                 string `mapstructure:"gh-user"`
 	GithubWebhookSecret        string `mapstructure:"gh-webhook-secret"`
 	GithubOrg                  string `mapstructure:"gh-org"`
 	GithubAppID                int64  `mapstructure:"gh-app-id"`
-	GithubAppKey               string `mapstructure:"gh-app-key-file"`
+	GithubAppKey               string `mapstructure:"gh-app-key"`
+	GithubAppKeyFile           string `mapstructure:"gh-app-key-file"`
 	GithubAppSlug              string `mapstructure:"gh-app-slug"`
+	GithubTeamAllowlist        string `mapstructure:"gh-team-allowlist"`
 	GitlabHostname             string `mapstructure:"gitlab-hostname"`
 	GitlabToken                string `mapstructure:"gitlab-token"`
 	GitlabUser                 string `mapstructure:"gitlab-user"`
@@ -84,6 +88,9 @@ type UserConfig struct {
 	VCSStatusName          string          `mapstructure:"vcs-status-name"`
 	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
 	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
+	WebBasicAuth           bool            `mapstructure:"web-basic-auth"`
+	WebUsername            string          `mapstructure:"web-username"`
+	WebPassword            string          `mapstructure:"web-password"`
 	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
 }
 

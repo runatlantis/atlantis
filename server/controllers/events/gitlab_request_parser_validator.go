@@ -16,7 +16,7 @@ package events
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	gitlab "github.com/xanzy/go-gitlab"
@@ -68,7 +68,7 @@ func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, 
 
 	// Parse request into a gitlab object based on the object type specified
 	// in the gitlabHeader.
-	bytes, err := ioutil.ReadAll(r.Body)
+	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}

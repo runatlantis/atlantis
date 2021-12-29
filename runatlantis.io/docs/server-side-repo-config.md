@@ -348,6 +348,7 @@ custom workflows.
 ```yaml
 repos:
 - id: /.*/
+  branch: /.*/
   apply_requirements: []
   workflow: default
   allowed_overrides: []
@@ -373,6 +374,7 @@ If you set a workflow with the key `default`, it will override this.
 | Key                           | Type     | Default | Required | Description                                                                                                                                                                                                                                                                                              |
 |-------------------------------|----------|---------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | id                            | string   | none    | yes      | Value can be a regular expression when specified as /&lt;regex&gt;/ or an exact string match. Repo IDs are of the form `{vcs hostname}/{org}/{name}`, ex. `github.com/owner/repo`. Hostname is specified without scheme or port. For Bitbucket Server, {org} is the **name** of the project, not the key. |
+| branch                        | string   | none    | no       | An regex matching pull requests by base branch (the branch the pull request is getting merged into). By default, all branches are matched                                                                                                                                                                 |
 | workflow                      | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                       |
 | apply_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details.                                                                                    |
 | allowed_overrides             | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow` and `delete_source_branch_on_merge`                                                                                                                                      |
