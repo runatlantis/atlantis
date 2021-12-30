@@ -39,9 +39,9 @@ func (p *ShowStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 	showResultFile := filepath.Join(path, ctx.GetShowResultFileName())
 
 	output, err := p.TerraformExecutor.RunCommandWithVersion(
-		ctx.Log,
+		ctx,
 		path,
-		[]string{"show", "-no-color", "-json", filepath.Clean(planFile)},
+		[]string{"show", "-json", filepath.Clean(planFile)},
 		envs,
 		tfVersion,
 		ctx.Workspace,

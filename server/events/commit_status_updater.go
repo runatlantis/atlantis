@@ -43,18 +43,9 @@ type DefaultCommitStatusUpdater struct {
 	TitleBuilder vcs.StatusTitleBuilder
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName models.CommandName) error {
-	src := d.TitleBuilder.Build(cmdName.String())
-	var descripWords string
-	switch status {
-	case models.PendingCommitStatus:
-		descripWords = "in progress..."
-	case models.FailedCommitStatus:
-		descripWords = "failed."
-	case models.SuccessCommitStatus:
-		descripWords = "succeeded."
-	}
-	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), descripWords)
+func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
+	src := d.TitleBuilder.Build(command.String())
+	descrip := fmt.Sprintf("%s %s", strings.Title(command.String()), d.statusDescription(status))
 	return d.Client.UpdateStatus(repo, pull, status, src, descrip, "")
 }
 
@@ -79,10 +70,14 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandCont
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
 	}
-
 	src := d.TitleBuilder.Build(cmdName.String(), vcs.StatusTitleOptions{
 		ProjectName: projectID,
 	})
+	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
+	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
+}
+
+func (d *DefaultCommitStatusUpdater) statusDescription(status models.CommitStatus) string {
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
@@ -92,6 +87,6 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandCont
 	case models.SuccessCommitStatus:
 		descripWords = "succeeded."
 	}
-	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), descripWords)
-	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
+
+	return descripWords
 }

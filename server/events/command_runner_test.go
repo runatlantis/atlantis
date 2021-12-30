@@ -78,7 +78,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
-
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	defaultBoltDB, err := db.New(tmp)
