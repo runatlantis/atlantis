@@ -1,3 +1,86 @@
+# v0.18.0
+
+Feature release of adding capability of streaming terraform logs, also added the capability of supporting tf 1.0.x (which was missed in the v0.17.6 release).
+
+## What's Changed
+
+* deps: terraform 1.1.2 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1952
+* build(deps): bump github.com/spf13/viper from 1.10.0 to 1.10.1 by @dependabot in https://github.com/runatlantis/atlantis/pull/1956
+* Dockerfile: Add support for last Terraform 1.0.x version in AVAILABLE_TERRAFORM_VERSIONS by @javierbeaumont in https://github.com/runatlantis/atlantis/pull/1957
+* feat: add GitHub team allowlist configuration option by @paulerickson in https://github.com/runatlantis/atlantis/pull/1694
+* fix: fallback to default TF version in apply step by @sapslaj in https://github.com/runatlantis/atlantis/pull/1931
+* docs: typo in heading level by @moretea in https://github.com/runatlantis/atlantis/pull/1960
+* docs: clarify example for `--azuredevops-token` flag by @MarkIannucci in https://github.com/runatlantis/atlantis/pull/1712
+* docs: update github docs links by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1964
+* build(deps): bump github.com/hashicorp/go-getter from 1.5.9 to 1.5.10 by @dependabot in https://github.com/runatlantis/atlantis/pull/1961
+* feat: streaming terraform logs in real-time by @Aayyush in https://github.com/runatlantis/atlantis/pull/1937
+
+# v0.17.6
+
+## What's Changed
+
+* docs: clarify maximum version limit by @tomharrisonjr in https://github.com/runatlantis/atlantis/pull/1894
+* fix: allow requests to /healthz without authentication by @wendtek in https://github.com/runatlantis/atlantis/pull/1896
+* docs: document approve_policies command in comment_parser by @dupuy26 in https://github.com/runatlantis/atlantis/pull/1886
+* feat: adds `allowed_regexp_prefixes` parameter to use with the `--enable-regexp-cmd` flag by @bmbferreira in https://github.com/runatlantis/atlantis/pull/1884
+* refactor: Add PullStatusFetcher interface by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1904
+* build(deps): bump github.com/urfave/negroni from 0.3.0 to 1.0.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1922
+* build(deps): bump github.com/xanzy/go-gitlab from 0.51.1 to 0.52.2 by @dependabot in https://github.com/runatlantis/atlantis/pull/1921
+* build(deps): bump github.com/golang-jwt/jwt/v4 from 4.1.0 to 4.2.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1928
+* docs: add clarity and further policy_check examples by @DaveHewy in https://github.com/runatlantis/atlantis/pull/1925
+* build(deps): bump github.com/spf13/viper from 1.9.0 to 1.10.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1934
+* deps: terraform 1.1.1 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1939
+* deps: alpine 3.15 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1941
+* docs: fix policy check documentation examples by @DaveHewy in https://github.com/runatlantis/atlantis/pull/1945
+* docker: make multi-platform atlantis image by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1943
+
+# v0.17.5
+
+## What's Changed
+
+* refactor: move from io/ioutil to io and os package by @Juneezee in https://github.com/runatlantis/atlantis/pull/1843
+* chore: use golang-jwt/jwt to replace dgrijalva/jwt-go by @barn in https://github.com/runatlantis/atlantis/pull/1845
+* fix(azure): allow host to be specified in user_config for on premise installation by @dandcg in https://github.com/runatlantis/atlantis/pull/1860
+* feat: filter out atlantis/apply from mergeability clause by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1856
+* feat: add BasicAuth Support to Atlantis ServeHTTP by @fblgit in https://github.com/runatlantis/atlantis/pull/1777
+* fix(azure): allow correct path to be derived for on premise installation  by @dandcg in https://github.com/runatlantis/atlantis/pull/1863
+* feat: add new bitbucket server webhook event type pr:from_ref_updated(#198) by @kuzm1ch in https://github.com/runatlantis/atlantis/pull/1866
+* Move runtime common under existing runtime package. by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1875
+* feat: use goreleaser to replace the binary-release script by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1873
+
+# v0.17.4
+
+## What's Changed
+
+* build(deps): bump tar from 4.4.15 to 4.4.19 by @dependabot in https://github.com/runatlantis/atlantis/pull/1783
+* build: tf 1.0.6 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1786
+* Bump testing image conftest version to 0.27 by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1787
+* Actually bump testing image conftest version to 0.27 by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1788
+* build: fix testing-env img process by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1789
+* e2e: update dockerfile by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1790
+* build(deps): bump runatlantis/atlantis-base from 2021.06.22 to 2021.08.31 by @dependabot in https://github.com/runatlantis/atlantis/pull/1794
+* build(deps): bump github.com/xanzy/go-gitlab from 0.50.3 to 0.50.4 by @dependabot in https://github.com/runatlantis/atlantis/pull/1795
+* fix a log error typo by @danpilch in https://github.com/runatlantis/atlantis/pull/1796
+* Set ParallelPolicyCheckEnabled to the same value as ParallelPlanEnabled by @msarvar in https://github.com/runatlantis/atlantis/pull/1802
+* docs: Add missing --silence-vcs-status-no-plans flag by @franklad in https://github.com/runatlantis/atlantis/pull/1803
+* build(lint): use revive instead of golint by @minamijoyo in https://github.com/runatlantis/atlantis/pull/1801
+* build(deps): bump github.com/hashicorp/go-getter from 1.5.7 to 1.5.8 by @dependabot in https://github.com/runatlantis/atlantis/pull/1807
+* build(deps): bump go.uber.org/zap from 1.19.0 to 1.19.1 by @dependabot in https://github.com/runatlantis/atlantis/pull/1808
+* docs: add missing the `branch` key in the reference for server side repo config by @minamijoyo in https://github.com/runatlantis/atlantis/pull/1784
+* build: tf 1.0.7 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1811
+* deps: conftest 0.28.0 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1819
+* deps: conftest 0.28.1 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1826
+* build(deps): bump prismjs from 1.24.0 to 1.25.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1823
+* Updating client interface and adding ApprovalStatus model by @Aayyush in https://github.com/runatlantis/atlantis/pull/1827
+* Fix title level by @xiao-pp in https://github.com/runatlantis/atlantis/pull/1822
+* build(deps): bump github.com/xanzy/go-gitlab from 0.50.4 to 0.51.1 by @dependabot in https://github.com/runatlantis/atlantis/pull/1831
+* Add support for deleting a branch on merge in BitBucket Server by @wpbeckwith in https://github.com/runatlantis/atlantis/pull/1792
+* deps: tf 1.0.8 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1837
+* build(deps): bump github.com/spf13/viper from 1.8.1 to 1.9.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1821
+* Document --auto-merge-disabled option by @dupuy26 in https://github.com/runatlantis/atlantis/pull/1838
+* testdrive: update terraformVersion by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1839
+* Improve github pull request call retries by @aristocrates in https://github.com/runatlantis/atlantis/pull/1810
+
 # v0.17.3
 Feature release with a number of improvements related to Gitlab support, a new command, better formatting etc. Some broken features have been fixed in along with some regressions.
 

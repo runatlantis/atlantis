@@ -144,7 +144,10 @@ workflows:
     policy_check:
       steps: []
     apply:
-     steps: []`,
+     steps: []
+allowed_regexp_prefixes:
+- dev/
+- staging/`,
 			exp: raw.RepoCfg{
 				Version:       Int(3),
 				Automerge:     Bool(true),
@@ -176,6 +179,7 @@ workflows:
 						},
 					},
 				},
+				AllowedRegexpPrefixes: []string{"dev/", "staging/"},
 			},
 		},
 	}

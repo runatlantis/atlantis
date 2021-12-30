@@ -86,6 +86,7 @@ atlantis apply -w staging
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use `.` for root.
 * `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w`.
 * `-w workspace` Apply the plan for this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html). If not using Terraform workspaces you can ignore this.
+* `--auto-merge-disabled` Disable [automerge](automerging.html) for this apply command.
 * `--verbose` Append Atlantis log to comment.
 
 ### Additional Terraform flags

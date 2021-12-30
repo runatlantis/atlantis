@@ -33,7 +33,13 @@ import (
 
 const (
 	planfileSlashReplace = "::"
+	LogStreamingClearMsg = "\n-----Starting New Process-----"
 )
+
+type PullReqStatus struct {
+	ApprovalStatus ApprovalStatus
+	Mergeable      bool
+}
 
 // Repo is a VCS repository.
 type Repo struct {
@@ -140,6 +146,12 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 			Hostname: cloneURLParsed.Hostname(),
 		},
 	}, nil
+}
+
+type ApprovalStatus struct {
+	IsApproved bool
+	ApprovedBy string
+	Date       time.Time
 }
 
 // PullRequest is a VCS pull request.
@@ -364,8 +376,8 @@ type ProjectCommandContext struct {
 	HeadRepo Repo
 	// Log is a logger that's been set up for this context.
 	Log logging.SimpleLogging
-	// PullMergeable is true if the pull request for this project is able to be merged.
-	PullMergeable bool
+	// PullReqStatus holds state about the PR that requires additional computation outside models.PullRequest
+	PullReqStatus PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus ProjectPlanStatus
 	// Pull is the pull request we're responding to.
@@ -409,6 +421,23 @@ func (p ProjectCommandContext) GetShowResultFileName() string {
 	}
 	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
 	return fmt.Sprintf("%s-%s.json", projName, p.Workspace)
+}
+
+// Gets a unique identifier for the current pull request as a single string
+func (p ProjectCommandContext) PullInfo() string {
+	return BuildPullInfo(p.BaseRepo.FullName, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
+}
+
+func BuildPullInfo(repoName string, pullNum int, projectName string, relDir string, workspace string) string {
+	projectIdentifier := GetProjectIdentifier(relDir, projectName)
+	return fmt.Sprintf("%s/%d/%s/%s", repoName, pullNum, projectIdentifier, workspace)
+}
+
+func GetProjectIdentifier(relRepoDir string, projectName string) string {
+	if projectName != "" {
+		return projectName
+	}
+	return strings.ReplaceAll(relRepoDir, "/", "-")
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo
@@ -652,6 +681,14 @@ const (
 // ie. policy_check becomes Policy Check
 func (c CommandName) TitleString() string {
 	return strings.Title(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
+}
+
+type ProjectCmdOutputLine struct {
+	ProjectInfo string
+
+	Line string
+
+	ClearBuffBefore bool
 }
 
 // String returns the string representation of c.

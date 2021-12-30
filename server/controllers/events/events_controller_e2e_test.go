@@ -3,7 +3,6 @@ package events_test
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -30,10 +29,12 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -527,7 +528,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 
 			oldLockFilePath, err := filepath.Abs(filepath.Join("testfixtures", "null_provider_lockfile_old_version"))
 			Ok(t, err)
-			oldLockFileContent, err := ioutil.ReadFile(oldLockFilePath)
+			oldLockFileContent, err := os.ReadFile(oldLockFilePath)
 			Ok(t, err)
 
 			if c.LockFileTracked {
@@ -549,7 +550,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			ResponseContains(t, w, 200, "Processing...")
 
 			// check lock file content
-			actualLockFileContent, err := ioutil.ReadFile(fmt.Sprintf("%s/repos/runatlantis/atlantis-tests/2/default/.terraform.lock.hcl", atlantisWorkspace.DataDir))
+			actualLockFileContent, err := os.ReadFile(fmt.Sprintf("%s/repos/runatlantis/atlantis-tests/2/default/.terraform.lock.hcl", atlantisWorkspace.DataDir))
 			Ok(t, err)
 			if c.LockFileTracked {
 				if string(oldLockFileContent) != string(actualLockFileContent) {
@@ -578,7 +579,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			}
 
 			// check lock file content
-			actualLockFileContent, err = ioutil.ReadFile(fmt.Sprintf("%s/repos/runatlantis/atlantis-tests/2/default/.terraform.lock.hcl", atlantisWorkspace.DataDir))
+			actualLockFileContent, err = os.ReadFile(fmt.Sprintf("%s/repos/runatlantis/atlantis-tests/2/default/.terraform.lock.hcl", atlantisWorkspace.DataDir))
 			Ok(t, err)
 			if c.LockFileTracked {
 				if string(oldLockFileContent) != string(actualLockFileContent) {
@@ -726,6 +727,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			userConfig.EnablePolicyChecksFlag = true
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
+
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -734,7 +736,9 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
 			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
-			When(vcsClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
+			When(vcsClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(models.ApprovalStatus{
+				IsApproved: true,
+			}, nil)
 			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 
@@ -810,9 +814,10 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	// Mocks.
 	e2eVCSClient := vcsmocks.NewMockClient()
-	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
+	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}}
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
 
 	// Real dependencies.
 	logger := logging.NewNoopLogger(t)
@@ -827,7 +832,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		GithubUser: "github-user",
 		GitlabUser: "gitlab-user",
 	}
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false)
+	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, projectCmdOutputHandler)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
@@ -935,8 +940,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		Webhooks:         &mockWebhookSender{},
 		WorkingDirLocker: locker,
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
-			PullApprovedChecker: e2eVCSClient,
-			WorkingDir:          workingDir,
+			WorkingDir: workingDir,
 		},
 	}
 
@@ -982,6 +986,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		boltdb,
 	)
 
+	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
+
 	applyCommandRunner := events.NewApplyCommandRunner(
 		e2eVCSClient,
 		false,
@@ -996,6 +1002,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		false,
+		e2ePullReqStatusFetcher,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -1052,10 +1059,12 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		TestingMode:   true,
 		CommandRunner: commandRunner,
 		PullCleaner: &events.PullClosedExecutor{
-			Locker:     lockingClient,
-			VCSClient:  e2eVCSClient,
-			WorkingDir: workingDir,
-			DB:         boltdb,
+			Locker:                   lockingClient,
+			VCSClient:                e2eVCSClient,
+			WorkingDir:               workingDir,
+			DB:                       boltdb,
+			PullClosedTemplate:       &events.PullClosedEventTemplate{},
+			LogStreamResourceCleaner: projectCmdOutputHandler,
 		},
 		Logger:                       logger,
 		Parser:                       eventParser,
@@ -1084,7 +1093,7 @@ func (w *mockWebhookSender) Send(log logging.SimpleLogging, result webhooks.Appl
 }
 
 func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
-	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent.json"))
 	Ok(t, err)
 	requestJSON = []byte(strings.Replace(string(requestJSON), "###comment body###", comment, 1))
 	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
@@ -1095,7 +1104,7 @@ func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
 }
 
 func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
-	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubPullRequestOpenedEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestOpenedEvent.json"))
 	Ok(t, err)
 	// Replace sha with expected sha.
 	requestJSONStr := strings.Replace(string(requestJSON), "c31fd9ea6f557ad2ea659944c3844a059b83bc5d", headSHA, -1)
@@ -1107,7 +1116,7 @@ func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
 }
 
 func GitHubPullRequestClosedEvent(t *testing.T) *http.Request {
-	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubPullRequestClosedEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestClosedEvent.json"))
 	Ok(t, err)
 	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
 	Ok(t, err)
@@ -1217,7 +1226,7 @@ func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir 
 	}
 
 	for _, expFile := range expReplies {
-		exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
+		exp, err := os.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
 		Ok(t, err)
 		expStr := string(exp)
 		// My editor adds a newline to all the files, so if the actual comment
@@ -1235,7 +1244,7 @@ func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir 
 				t.FailNow()
 			} else {
 				actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")
-				err := ioutil.WriteFile(actFile, []byte(act), 0600)
+				err := os.WriteFile(actFile, []byte(act), 0600)
 				Ok(t, err)
 				cwd, err := os.Getwd()
 				Ok(t, err)
