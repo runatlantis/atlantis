@@ -11,7 +11,7 @@ See the instructions for your specific provider below.
 [[toc]]
 
 ## GitHub/GitHub Enterprise
-You can install your webhook at the [organization](https://help.github.com/articles/differences-between-user-and-organization-accounts/) level, or for each individual repository.
+You can install your webhook at the [organization](https://docs.github.com/en/get-started/learning-about-github/types-of-github-accounts) level, or for each individual repository.
 
 ::: tip NOTE
 If only some of the repos in your organization are to be managed by Atlantis, then you
@@ -119,6 +119,6 @@ Repeat the process above until you have webhook subscriptions for the following 
 
 ## Next Steps
 * To verify that Atlantis is receiving your webhooks, create a test pull request
-  to your repo. 
+  to your repo.
 * You should see the request show up in the Atlantis logs at an `INFO` level.
 * You'll now need to configure Atlantis to add your [Provider Credentials](provider-credentials.md)
