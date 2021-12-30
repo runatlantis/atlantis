@@ -262,7 +262,7 @@ atlantis server \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
 
-##### Azure DevOps
+### Azure DevOps
 
 A certificate and private key are required if using Basic authentication for webhooks.
 
