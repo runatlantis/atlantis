@@ -29,7 +29,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
@@ -814,7 +813,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	// Mocks.
 	e2eVCSClient := vcsmocks.NewMockClient()
-	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}}
+	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
 	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()

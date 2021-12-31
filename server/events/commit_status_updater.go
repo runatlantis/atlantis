@@ -28,10 +28,10 @@ import (
 type CommitStatusUpdater interface {
 	// UpdateCombined updates the combined status of the head commit of pull.
 	// A combined status represents all the projects modified in the pull.
-	UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName models.CommandName) error
+	UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error
 	// UpdateCombinedCount updates the combined status to reflect the
 	// numSuccess out of numTotal.
-	UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName models.CommandName, numSuccess int, numTotal int) error
+	UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
 	UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error
@@ -39,21 +39,31 @@ type CommitStatusUpdater interface {
 
 // DefaultCommitStatusUpdater implements CommitStatusUpdater.
 type DefaultCommitStatusUpdater struct {
-	Client       vcs.Client
-	TitleBuilder vcs.StatusTitleBuilder
+	Client vcs.Client
+	// StatusName is the name used to identify Atlantis when creating PR statuses.
+	StatusName string
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
-	src := d.TitleBuilder.Build(command.String())
-	descrip := fmt.Sprintf("%s %s", strings.Title(command.String()), d.statusDescription(status))
+	src := fmt.Sprintf("%s/%s", d.StatusName, command.String())
+	var descripWords string
+	switch status {
+	case models.PendingCommitStatus:
+		descripWords = "in progress..."
+	case models.FailedCommitStatus:
+		descripWords = "failed."
+	case models.SuccessCommitStatus:
+		descripWords = "succeeded."
+	}
+	descrip := fmt.Sprintf("%s %s", strings.Title(command.String()), descripWords)
 	return d.Client.UpdateStatus(repo, pull, status, src, descrip, "")
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName models.CommandName, numSuccess int, numTotal int) error {
-	src := d.TitleBuilder.Build(cmdName.String())
+func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error {
+	src := fmt.Sprintf("%s/%s", d.StatusName, command.String())
 	cmdVerb := "unknown"
 
-	switch cmdName {
+	switch command {
 	case models.PlanCommand:
 		cmdVerb = "planned"
 	case models.PolicyCheckCommand:
@@ -70,14 +80,7 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandCont
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
 	}
-	src := d.TitleBuilder.Build(cmdName.String(), vcs.StatusTitleOptions{
-		ProjectName: projectID,
-	})
-	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
-	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
-}
-
-func (d *DefaultCommitStatusUpdater) statusDescription(status models.CommitStatus) string {
+	src := fmt.Sprintf("%s/%s: %s", d.StatusName, cmdName.String(), projectID)
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
@@ -88,5 +91,6 @@ func (d *DefaultCommitStatusUpdater) statusDescription(status models.CommitStatu
 		descripWords = "succeeded."
 	}
 
-	return descripWords
+	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), descripWords)
+	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
 }
