@@ -72,7 +72,8 @@ module.exports = {
                         'apply-requirements',
                         'checkout-strategy',
                         'terraform-versions',
-                        'terraform-cloud'
+                        'terraform-cloud',
+                        'using-slack-hooks'
                     ]
                 },
                 {
