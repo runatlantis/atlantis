@@ -242,6 +242,42 @@ func TestRunCommentCommand_GithubPullParseErr(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "`Error: extracting required fields from comment data: err`", "")
 }
 
+func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
+	t.Run("nil checker", func(t *testing.T) {
+		vcsClient := setup(t)
+		// by default these are false so don't need to reset
+		ch.TeamAllowlistChecker = nil
+		var pull github.PullRequest
+		modelPull := models.PullRequest{
+			BaseRepo: fixtures.GithubRepo,
+			State:    models.OpenPullState,
+		}
+		When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+		When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+
+		ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.PlanCommand})
+		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(fixtures.GithubRepo, fixtures.User)
+		vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Ran Plan for 0 projects:\n\n\n\n", "plan")
+	})
+
+	t.Run("no rules", func(t *testing.T) {
+		vcsClient := setup(t)
+		// by default these are false so don't need to reset
+		ch.TeamAllowlistChecker = &events.TeamAllowlistChecker{}
+		var pull github.PullRequest
+		modelPull := models.PullRequest{
+			BaseRepo: fixtures.GithubRepo,
+			State:    models.OpenPullState,
+		}
+		When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+		When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+
+		ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.PlanCommand})
+		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(fixtures.GithubRepo, fixtures.User)
+		vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Ran Plan for 0 projects:\n\n\n\n", "plan")
+	})
+}
+
 func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	t.Log("if a command is run on a forked pull request and this is disabled atlantis should" +
 		" comment saying that this is not allowed")

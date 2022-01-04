@@ -13,6 +13,13 @@ func TestNewTeamAllowListChecker(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestNewTeamAllowListCheckerEmpty(t *testing.T) {
+	allowlist := ``
+	checker, err := events.NewTeamAllowlistChecker(allowlist)
+	Ok(t, err)
+	Equals(t, false, checker.HasRules())
+}
+
 func TestIsCommandAllowedForTeam(t *testing.T) {
 	allowlist := `bob:plan, dave:apply, connie:plan, connie:apply`
 	checker, err := events.NewTeamAllowlistChecker(allowlist)

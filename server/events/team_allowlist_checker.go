@@ -34,6 +34,10 @@ func NewTeamAllowlistChecker(allowlist string) (*TeamAllowlistChecker, error) {
 	}, nil
 }
 
+func (checker *TeamAllowlistChecker) HasRules() bool {
+	return len(checker.rules) > 0
+}
+
 // IsCommandAllowedForTeam returns true if the team is allowed to execute the command
 // and false otherwise.
 func (checker *TeamAllowlistChecker) IsCommandAllowedForTeam(team string, command string) bool {
