@@ -235,7 +235,7 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	gitlabState := gitlab.Failed
 	switch state {
 	case models.PendingCommitStatus:
-		gitlabState = gitlab.Pending
+		gitlabState = gitlab.Running
 	case models.FailedCommitStatus:
 		gitlabState = gitlab.Failed
 	case models.SuccessCommitStatus:
