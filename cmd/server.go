@@ -117,7 +117,7 @@ const (
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
 	DefaultGHHostname       = "github.com"
-	DefaultGHTeamAllowlist  = "*:plan,*:apply"
+	DefaultGHTeamAllowlist  = ""
 	DefaultGitlabHostname   = "gitlab.com"
 	DefaultLogLevel         = "info"
 	DefaultParallelPoolSize = 15
