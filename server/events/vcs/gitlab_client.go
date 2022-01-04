@@ -232,7 +232,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 // UpdateStatus updates the build status of a commit.
 func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
-	gitlabState := gitlab.Failed
+	gitlabState := gitlab.Pending
 	switch state {
 	case models.PendingCommitStatus:
 		gitlabState = gitlab.Running
