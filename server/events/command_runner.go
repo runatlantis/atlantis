@@ -174,7 +174,7 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 
 // checkUserPermissions checks if the user has permissions to execute the command
 func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmd *CommentCommand) (bool, error) {
-	if c.TeamAllowlistChecker == nil || len(c.TeamAllowlistChecker.rules) == 0 {
+	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
 		// allowlist restriction is not enabled
 		return true, nil
 	}
