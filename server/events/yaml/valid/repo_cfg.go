@@ -4,6 +4,7 @@ package valid
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 
@@ -58,15 +59,18 @@ func (r RepoCfg) FindProjectByName(name string) *Project {
 // FindProjectsByName returns all projects that match with name.
 func (r RepoCfg) FindProjectsByName(name string) []Project {
 	var ps []Project
-	if isRegexAllowed(name, r.AllowedRegexpPrefixes) {
-		sanitizedName := "^" + name + "$"
-		for _, p := range r.Projects {
-			if p.Name != nil {
-				if match, _ := regexp.MatchString(sanitizedName, *p.Name); match {
-					ps = append(ps, p)
-				}
+	sanitizedName := "^" + name + "$"
+	for _, p := range r.Projects {
+		if p.Name != nil {
+			if match, _ := regexp.MatchString(sanitizedName, *p.Name); match {
+				ps = append(ps, p)
 			}
 		}
+	}
+	// If we found more than one project then we need to make sure that the regex is allowed.
+	if len(ps) > 1 && !isRegexAllowed(name, r.AllowedRegexpPrefixes) {
+		log.Printf("Found more than one project for regex %q. This regex is not on the allow list.", name)
+		return nil
 	}
 	return ps
 }
