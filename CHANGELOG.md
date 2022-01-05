@@ -1,3 +1,18 @@
+# v0.18.1
+
+Maintenance release for bug fixes as well as release multi-platform builds for atlantis docker images.
+
+## What's Changed
+
+* Revert "feat: filter out atlantis/apply from mergeability clause (#18… by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1968
+* build(deps): bump github.com/microcosm-cc/bluemonday from 1.0.16 to 1.0.17 by @dependabot in https://github.com/runatlantis/atlantis/pull/1969
+* fix:include no GitHub allowlist rules by default by @paulerickson in https://github.com/runatlantis/atlantis/pull/1973
+* fix: default permissions for gh-team-allowlist. by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1974
+* docs: documentation for slack integration by @syphernl in https://github.com/runatlantis/atlantis/pull/1972
+* workflows(atlantis-image): fix building and publishing of Docker images by @Tenzer in https://github.com/runatlantis/atlantis/pull/1975
+* fix: allowed regexp prefixes for exact matches by @bmbferreira in https://github.com/runatlantis/atlantis/pull/1962
+* deps: conftest 0.29.0 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1977
+
 # v0.18.0
 
 Feature release of adding capability of streaming terraform logs, also added the capability of supporting tf 1.0.x (which was missed in the v0.17.6 release).
