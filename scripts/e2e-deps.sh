@@ -16,8 +16,8 @@ chmod +x terraform
 cp terraform /go/bin/
 # Download ngrok to create a tunnel to expose atlantis server
 wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
-unzip ngrok-stable-linux-amd64.zip 
-chmod +x ngrok 
+unzip ngrok-stable-linux-amd64.zip
+chmod +x ngrok
 wget https://stedolan.github.io/jq/download/linux64/jq
 chmod +x jq
 # Copy github config file - replace with circleci user later
