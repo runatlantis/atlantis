@@ -85,6 +85,7 @@ type Server struct {
 	AtlantisURL                   *url.URL
 	Router                        *mux.Router
 	Port                          int
+	PostWorkflowHooksCommandRunner *events.DefaultPostWorkflowHooksCommandRunner
 	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
 	CommandRunner                 *events.DefaultCommandRunner
 	Logger                        logging.SimpleLogging
@@ -460,6 +461,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{},
 	}
+	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
+		VCSClient:              vcsClient,
+		GlobalCfg:              globalCfg,
+		WorkingDirLocker:       workingDirLocker,
+		WorkingDir:             workingDir,
+		PostWorkflowHookRunner: runtime.DefaultPostWorkflowHookRunner{},
+	}
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		policyChecksEnabled,
 		validator,
@@ -647,6 +655,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DisableAutoplan:               userConfig.DisableAutoplan,
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:             boltdb,
 		TeamAllowlistChecker:          githubTeamAllowlistChecker,
 	}
@@ -716,6 +725,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisURL:                   parsedURL,
 		Router:                        underlyingRouter,
 		Port:                          userConfig.Port,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		CommandRunner:                 commandRunner,
 		Logger:                        logger,

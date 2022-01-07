@@ -115,6 +115,7 @@ type DefaultCommandRunner struct {
 	CommentCommandRunnerByCmd     map[models.CommandName]CommentCommandRunner
 	Drainer                       *Drainer
 	PreWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner
+	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
 	PullStatusFetcher             PullStatusFetcher
 	TeamAllowlistChecker          *TeamAllowlistChecker
 }
@@ -161,6 +162,12 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	autoPlanRunner := buildCommentCommandRunner(c, models.PlanCommand)
 
 	autoPlanRunner.Run(ctx, nil)
+
+	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx)
+
+	if err != nil {
+		ctx.Log.Err("Error running post-workflow hooks %s.", err)
+	}
 }
 
 // commentUserDoesNotHavePermissions comments on the pull request that the user
@@ -250,6 +257,12 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
 
 	cmdRunner.Run(ctx, cmd)
+
+	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx)
+
+	if err != nil {
+		ctx.Log.Err("Error running post-workflow hooks %s.", err)
+	}
 }
 
 func (c *DefaultCommandRunner) getGithubData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {

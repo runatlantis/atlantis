@@ -1131,11 +1131,17 @@ func TestParseGlobalCfg(t *testing.T) {
 	}
 
 	defaultCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
-	preWorkflowHook := &valid.PreWorkflowHook{
+	preWorkflowHook := &valid.WorkflowHook{
 		StepName:   "run",
 		RunCommand: "custom workflow command",
 	}
-	preWorkflowHooks := []*valid.PreWorkflowHook{preWorkflowHook}
+	preWorkflowHooks := []*valid.WorkflowHook{preWorkflowHook}
+
+	postWorkflowHook := &valid.WorkflowHook{
+		StepName:   "run",
+		RunCommand: "custom workflow command",
+	}
+	postWorkflowHooks := []*valid.WorkflowHook{postWorkflowHook}
 
 	customWorkflow1 := valid.Workflow{
 		Name: "custom1",
@@ -1306,11 +1312,15 @@ repos:
   pre_workflow_hooks:
     - run: custom workflow command
   workflow: custom1
+  post_workflow_hooks:
+    - run: custom workflow command
   allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge]
   allow_custom_workflows: true
 - id: /.*/
   branch: /(master|main)/
   pre_workflow_hooks:
+    - run: custom workflow command
+  post_workflow_hooks:
     - run: custom workflow command
 workflows:
   custom1:
@@ -1345,13 +1355,15 @@ policies:
 						ApplyRequirements:    []string{"approved", "mergeable"},
 						PreWorkflowHooks:     preWorkflowHooks,
 						Workflow:             &customWorkflow1,
+						PostWorkflowHooks:    postWorkflowHooks,
 						AllowedOverrides:     []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
-						IDRegex:          regexp.MustCompile(".*"),
-						BranchRegex:      regexp.MustCompile("(master|main)"),
-						PreWorkflowHooks: preWorkflowHooks,
+						IDRegex:           regexp.MustCompile(".*"),
+						BranchRegex:       regexp.MustCompile("(master|main)"),
+						PreWorkflowHooks:  preWorkflowHooks,
+						PostWorkflowHooks: postWorkflowHooks,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
