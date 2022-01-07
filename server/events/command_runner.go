@@ -111,13 +111,13 @@ type DefaultCommandRunner struct {
 	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to disable error comment
-	SilenceForkPRErrorsFlag       string
-	CommentCommandRunnerByCmd     map[models.CommandName]CommentCommandRunner
-	Drainer                       *Drainer
-	PreWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner
+	SilenceForkPRErrorsFlag        string
+	CommentCommandRunnerByCmd      map[models.CommandName]CommentCommandRunner
+	Drainer                        *Drainer
+	PreWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner
 	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
-	PullStatusFetcher             PullStatusFetcher
-	TeamAllowlistChecker          *TeamAllowlistChecker
+	PullStatusFetcher              PullStatusFetcher
+	TeamAllowlistChecker           *TeamAllowlistChecker
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.

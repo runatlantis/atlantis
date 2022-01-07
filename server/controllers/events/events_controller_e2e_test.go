@@ -599,7 +599,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			}
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(runtimematchers.AnyModelsPreWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -1059,19 +1059,19 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
-		EventParser:                   eventParser,
-		VCSClient:                     e2eVCSClient,
-		GithubPullGetter:              e2eGithubGetter,
-		GitlabMergeRequestGetter:      e2eGitlabGetter,
-		Logger:                        logger,
-		GlobalCfg:                     globalCfg,
-		AllowForkPRs:                  allowForkPRs,
-		AllowForkPRsFlag:              "allow-fork-prs",
-		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
-		Drainer:                       drainer,
-		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		EventParser:                    eventParser,
+		VCSClient:                      e2eVCSClient,
+		GithubPullGetter:               e2eGithubGetter,
+		GitlabMergeRequestGetter:       e2eGitlabGetter,
+		Logger:                         logger,
+		GlobalCfg:                      globalCfg,
+		AllowForkPRs:                   allowForkPRs,
+		AllowForkPRsFlag:               "allow-fork-prs",
+		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
+		Drainer:                        drainer,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:             boltdb,
+		PullStatusFetcher:              boltdb,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
