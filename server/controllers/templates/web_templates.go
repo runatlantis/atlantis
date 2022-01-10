@@ -368,12 +368,7 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <title>atlantis</title>
     <meta name="description" content>
     <meta name="author" content>
-    <link
-       rel="stylesheet"
-       href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.css"
-       integrity="sha256-uTIrmf95e6IHlacC0wpDaPS58eWF314UC7OgdrD6AdU="
-       crossorigin="anonymous"
-    />
+    <link rel="stylesheet" href="/static/css/xterm.css">
     <link rel="stylesheet" href="/static/css/normalize.css">
     <link rel="stylesheet" href="/static/css/skeleton.css">
     <link rel="stylesheet" href="/static/css/custom.css">
@@ -410,10 +405,10 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
   <footer>
   </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/xterm@4.9.0/lib/xterm.js"></script>
-    <script src="https://unpkg.com/xterm-addon-attach@0.6.0/lib/xterm-addon-attach.js"></script>
-    <script src="https://unpkg.com/xterm-addon-fit@0.4.0/lib/xterm-addon-fit.js"></script>
+    <script src="/static/js/jquery-3.5.1.min.js"></script>
+    <script src="/static/js/xterm-4.9.0.js"></script>
+    <script src="/static/js/xterm-addon-attach-0.6.0.js"></script>
+    <script src="/static/js/xterm-addon-fit-0.4.0.js"></script>
 
     <script>
       var term = new Terminal({scrollback: 15000});
@@ -455,12 +450,7 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
     <title>atlantis</title>
     <meta name="description" content>
     <meta name="author" content>
-    <link
-       rel="stylesheet"
-       href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.css"
-       integrity="sha256-uTIrmf95e6IHlacC0wpDaPS58eWF314UC7OgdrD6AdU="
-       crossorigin="anonymous"
-    />
+    <link rel="stylesheet" href="/static/css/xterm.css">
     <link rel="stylesheet" href="/static/css/normalize.css">
     <link rel="stylesheet" href="/static/css/skeleton.css">
     <link rel="stylesheet" href="/static/css/custom.css">
@@ -489,10 +479,10 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
     <footer>
     </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/xterm@4.9.0/lib/xterm.js"></script>
-    <script src="https://unpkg.com/xterm-addon-attach@0.6.0/lib/xterm-addon-attach.js"></script>
-    <script src="https://unpkg.com/xterm-addon-fit@0.4.0/lib/xterm-addon-fit.js"></script>
+    <script src="/static/js/jquery-3.5.1.min.js"></script>
+    <script src="/static/js/xterm-4.9.0.js"></script>
+    <script src="/static/js/xterm-addon-attach-0.6.0.js"></script>
+    <script src="/static/js/xterm-addon-fit-0.4.0.js"></script>
 
     <script>
       var term = new Terminal();

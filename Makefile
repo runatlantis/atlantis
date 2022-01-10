@@ -52,7 +52,7 @@ dev-docker:
 	docker build -f Dockerfile.dev -t atlantis-dev .
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
-	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static
+	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -o bindata_assetfs.go -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static
 
 release: ## Create packages for a release
 	docker run -v $$(pwd):/go/src/github.com/runatlantis/atlantis circleci/golang:1.17 sh -c 'cd /go/src/github.com/runatlantis/atlantis && scripts/binary-release.sh'
