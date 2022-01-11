@@ -7,6 +7,7 @@ command can be run:
 
 * [Approved](#approved) – requires pull requests to be approved by at least one user other than the author
 * [Mergeable](#mergeable) – requires pull requests to be able to be merged
+* [UnDiverged](#undiverged) - requires pull requests to be ahead of the base branch
 
 ## What Happens If The Requirement Is Not Met?
 If the requirement is not met, users will see an error if they try to run `atlantis apply`:
@@ -231,7 +232,7 @@ If you only want some projects/repos to have apply requirements, then you must
 
 
 ### Multiple Requirements
-You can set both `apply` and `mergeable` requirements.
+You can set any or all of `apply`, `mergeable`, and `undiverged` requirements.
 
 ## Who Can Apply?
 Once the apply requirement is satisfied, **anyone** that can comment on the pull
