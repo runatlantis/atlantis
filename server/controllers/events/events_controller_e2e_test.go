@@ -512,6 +512,20 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			},
 			LockFileTracked: false,
 		},
+		{
+			Description:   "Modified .terraform.lock.hcl triggers autoplan ",
+			RepoDir:       "simple-with-lockfile",
+			ModifiedFiles: []string{".terraform.lock.hcl"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis plan",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-plan.txt"},
+			},
+			LockFileTracked: true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -894,7 +908,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		commentParser,
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)

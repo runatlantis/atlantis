@@ -121,8 +121,8 @@ Values are chosen in this order:
   * Accepts a comma separated list, ex. `pattern1,pattern2`.
   * Patterns use the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
   * List of file patterns will be used by both automatic and manually run plans.
-  * When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json` and `terragrunt.hcl` files
-    (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl'`).
+  * When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json`,  `terragrunt.hcl` and `.terraform.lock.hcl` files
+    (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
   * Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
   * A custom [Workflow](repo-level-atlantis-yaml.html#configuring-planning) that uses autoplan `when_modified` will ignore this value.
 
