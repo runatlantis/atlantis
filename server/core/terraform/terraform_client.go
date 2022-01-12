@@ -316,7 +316,7 @@ func (l *VersionLoader) loadVersion(v *version.Version, destPath string) (runtim
 	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
 	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
 	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
-	if err := l.downloader.GetFile(destPath, fullSrcURL); err != nil {
+	if err := l.downloader.GetAny(destPath, fullSrcURL); err != nil {
 		return runtime_models.LocalFilePath(""), errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
 	}
 
