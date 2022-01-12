@@ -552,10 +552,40 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~])`)
 	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
 
-	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1")
-	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
+	// See https://www.terraform.io/docs/language/expressions/strings.html#heredoc-strings
+	// Heredoc lists actually begin with the "-" character, which messes up the colorization. For now, skip over all heredoc.
+	heredocStartRegex := regexp.MustCompile(`.*<<(-|~)?([A-Za-z0-9_]+)$`)
+	var heredocDelimitter string
+	var heredocEndRegex *regexp.Regexp
 
-	return formattedTerraformOutput
+	var formattedTerraformStringBuilder strings.Builder
+	insideHeredocBlock := false
+
+	for _, line := range strings.Split(p.TerraformOutput, "\n") {
+		var formattedLine string
+		if insideHeredocBlock {
+			// For now, let's just treat these lines as-is
+			formattedLine = line
+		} else {
+			formattedLine = diffKeywordRegex.ReplaceAllString(line, "$2$1")
+			formattedLine = diffTildeRegex.ReplaceAllString(formattedLine, "!")
+		}
+
+		formattedTerraformStringBuilder.WriteString(formattedLine + "\n")
+
+		if insideHeredocBlock && heredocEndRegex.MatchString(line) {
+			insideHeredocBlock = false
+			heredocEndRegex = nil
+		} else if !insideHeredocBlock && heredocStartRegex.MatchString(line) {
+			insideHeredocBlock = true
+
+			// We guarantee it'll be the last match since we look for '$'. (1 will match the optional hyphen)
+			heredocDelimitter = heredocStartRegex.FindStringSubmatch(line)[2]
+			heredocEndRegex = regexp.MustCompile(`^( )*` + regexp.QuoteMeta(heredocDelimitter) + `$`)
+		}
+	}
+
+	return strings.TrimSuffix(formattedTerraformStringBuilder.String(), "\n")
 }
 
 // PolicyCheckSuccess is the result of a successful policy check run.

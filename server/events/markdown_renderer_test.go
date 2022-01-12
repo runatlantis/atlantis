@@ -2181,6 +2181,47 @@ Terraform will perform the following actions:
 
 Plan: 1 to add, 1 to change, 1 to destroy.
 `
+
+	tfOutputHeredoc := `An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+~ update in-place
+
+Terraform will perform the following actions:
+
+# module.default.module.kitchen.cabinet[0] will be updated in-place
+  ~ resource "abstract-object" "list-of-items" {
+    ~ data        = {
+        ~ "some-colors"      = <<-EOT
+              - "EOT"
+            + - "yellow"
+          EOT
+        ~ "what-colors"      = <<~EOT
+              - "EOT"
+            + - "yellow"
+          EOT
+        + "is-a"  = "fork"
+        - "this"  = "is removed"
+        ~ "some-utensils"    = <<EOT
+              - "utensils":
+                - "fork"
+                "color": "EOT"
+                "material": "iron"
+            + - "utensils":
+            +   - "spoon"
+            +   "color": "green"
+            +   "material": "wood"
+          EOT
+          # (1 unchanged element hidden)
+      }
+      id          = "some/list-of-items"
+    + another_one = "this is a test"
+      # (1 unchanged attribute hidden)
+
+      # (1 unchanged block hidden)
+  }
+
+Plan: 0 to add, 1 to change, 0 to destroy.
+`
 	cases := []struct {
 		Description    string
 		Command        models.CommandName
@@ -2323,6 +2364,78 @@ $$$
     * $atlantis plan -d path -w workspace$
 </details>
 Plan: 1 to add, 1 to change, 1 to destroy.
+
+
+`,
+		},
+		{
+			"single successful plan with diff markdown formatted",
+			models.PlanCommand,
+			[]models.ProjectResult{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: tfOutputHeredoc,
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+				},
+			},
+			models.Github,
+			`Ran Plan for dir: $path$ workspace: $workspace$
+
+<details><summary>Show Output</summary>
+
+$$$diff
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+! update in-place
+
+Terraform will perform the following actions:
+
+# module.default.module.kitchen.cabinet[0] will be updated in-place
+!   resource "abstract-object" "list-of-items" {
+!     data        = {
+!         "some-colors"      = <<-EOT
+              - "EOT"
+            + - "yellow"
+          EOT
+!         "what-colors"      = <<~EOT
+              - "EOT"
+            + - "yellow"
+          EOT
++         "is-a"  = "fork"
+-         "this"  = "is removed"
+!         "some-utensils"    = <<EOT
+              - "utensils":
+                - "fork"
+                "color": "EOT"
+                "material": "iron"
+            + - "utensils":
+            +   - "spoon"
+            +   "color": "green"
+            +   "material": "wood"
+          EOT
+          # (1 unchanged element hidden)
+      }
+      id          = "some/list-of-items"
++     another_one = "this is a test"
+      # (1 unchanged attribute hidden)
+
+      # (1 unchanged block hidden)
+  }
+
+Plan: 0 to add, 1 to change, 0 to destroy.
+
+$$$
+
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+</details>
+Plan: 0 to add, 1 to change, 0 to destroy.
 
 
 `,
