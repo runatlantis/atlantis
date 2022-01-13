@@ -11,6 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 )
 
 func TestApplyCommandRunner_IsLocked(t *testing.T) {
@@ -46,6 +47,8 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			vcsClient := setup(t)
 
+			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
 			pull := &github.PullRequest{
 				State: github.String("open"),
 			}
@@ -56,6 +59,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			ctx := &events.CommandContext{
 				User:     fixtures.User,
 				Log:      logging.NewNoopLogger(t),
+				Scope:    scopeNull,
 				Pull:     modelPull,
 				HeadRepo: fixtures.GithubRepo,
 				Trigger:  events.Comment,

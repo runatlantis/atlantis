@@ -19,6 +19,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -31,19 +32,21 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-homedir"
+	cfg "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/jobs"
+	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/scheduled"
+	"github.com/uber-go/tally"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
-	stats "github.com/lyft/gostats"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
-	cfgParser "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
@@ -89,7 +92,8 @@ type Server struct {
 	PreWorkflowHooksCommandRunner  *events.DefaultPreWorkflowHooksCommandRunner
 	CommandRunner                  *events.DefaultCommandRunner
 	Logger                         logging.SimpleLogging
-	StatsScope                     stats.Scope
+	StatsScope                     tally.Scope
+	StatsCloser                    io.Closer
 	Locker                         locking.Locker
 	ApplyLocker                    locking.ApplyLocker
 	VCSEventsController            *events_controllers.VCSEventsController
@@ -108,6 +112,7 @@ type Server struct {
 	WebUsername                    string
 	WebPassword                    string
 	ProjectCmdOutputHandler        jobs.ProjectCommandOutputHandler
+	ScheduledExecutorService       *scheduled.ExecutorService
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -145,9 +150,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 
-	statsScope := stats.NewDefaultStore().Scope(userConfig.StatsNamespace)
-	statsScope.Store().AddStatGenerator(stats.NewRuntimeStats(statsScope.Scope("go")))
-
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient vcs.IGithubClient
 	var githubAppEnabled bool
@@ -161,6 +163,40 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.EnablePolicyChecksFlag {
 		logger.Info("Policy Checks are enabled")
 		policyChecksEnabled = true
+	}
+
+	validator := &cfg.ParserValidator{}
+
+	globalCfg := valid.NewGlobalCfgFromArgs(
+		valid.GlobalCfgArgs{
+			AllowRepoCfg:       userConfig.AllowRepoConfig,
+			MergeableReq:       userConfig.RequireMergeable,
+			ApprovedReq:        userConfig.RequireApproval,
+			UnDivergedReq:      userConfig.RequireUnDiverged,
+			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
+		})
+	if userConfig.RepoConfig != "" {
+		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
+		if err != nil {
+			return nil, errors.Wrapf(err, "parsing %s file", userConfig.RepoConfig)
+		}
+	} else if userConfig.RepoConfigJSON != "" {
+		globalCfg, err = validator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
+		if err != nil {
+			return nil, errors.Wrapf(err, "parsing --%s", config.RepoConfigJSONFlag)
+		}
+	}
+
+	// TODO: move this to yaml in a followup
+	globalCfg.Metrics.Statsd = &valid.Statsd{
+		Host: "127.0.0.1",
+		Port: "8125",
+	}
+
+	statsScope, closer, err := metrics.NewScope(globalCfg.Metrics, logger, userConfig.StatsNamespace)
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "instantiating metrics scope")
 	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
@@ -399,37 +435,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DB:               boltdb,
 	}
 
-	validator := &cfgParser.ParserValidator{}
-
-	globalCfg := valid.NewGlobalCfgFromArgs(
-		valid.GlobalCfgArgs{
-			AllowRepoCfg:       userConfig.AllowRepoConfig,
-			MergeableReq:       userConfig.RequireMergeable,
-			ApprovedReq:        userConfig.RequireApproval,
-			UnDivergedReq:      userConfig.RequireUnDiverged,
-			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
-		})
-	if userConfig.RepoConfig != "" {
-		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
-		if err != nil {
-			return nil, errors.Wrapf(err, "parsing %s file", userConfig.RepoConfig)
-		}
-	} else if userConfig.RepoConfigJSON != "" {
-		globalCfg, err = validator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
-		if err != nil {
-			return nil, errors.Wrapf(err, "parsing --%s", config.RepoConfigJSONFlag)
-		}
-	}
-
-	pullClosedExecutor := &events.PullClosedExecutor{
-		VCSClient:                vcsClient,
-		Locker:                   lockingClient,
-		WorkingDir:               workingDir,
-		Logger:                   logger,
-		DB:                       boltdb,
-		LogStreamResourceCleaner: projectCmdOutputHandler,
-		PullClosedTemplate:       &events.PullClosedEventTemplate{},
-	}
+	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
+		statsScope,
+		logger,
+		&events.PullClosedExecutor{
+			Locker:                   lockingClient,
+			WorkingDir:               workingDir,
+			Logger:                   logger,
+			DB:                       boltdb,
+			PullClosedTemplate:       &events.PullClosedEventTemplate{},
+			LogStreamResourceCleaner: projectCmdOutputHandler,
+			VCSClient:                vcsClient,
+		},
+	)
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
@@ -661,7 +679,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		EventParser:                    eventParser,
 		Logger:                         logger,
 		GlobalCfg:                      globalCfg,
-		StatsScope:                     statsScope.Scope("cmd"),
+		StatsScope:                     statsScope.SubScope("cmd"),
 		AllowForkPRs:                   userConfig.AllowForkPRs,
 		AllowForkPRsFlag:               config.AllowForkPRsFlag,
 		SilenceForkPRErrors:            userConfig.SilenceForkPRErrors,
@@ -706,6 +724,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Db:                       boltdb,
 		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
+		StatsScope:               statsScope.SubScope("api"),
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -736,6 +755,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubHostname:      userConfig.GithubHostname,
 		GithubOrg:           userConfig.GithubOrg,
 	}
+	scheduledExecutorService := scheduled.NewExecutorService(
+		statsScope,
+		logger,
+	)
+
 	return &Server{
 		AtlantisVersion:                config.AtlantisVersion,
 		AtlantisURL:                    parsedURL,
@@ -746,6 +770,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommandRunner:                  commandRunner,
 		Logger:                         logger,
 		StatsScope:                     statsScope,
+		StatsCloser:                    closer,
 		Locker:                         lockingClient,
 		ApplyLocker:                    applyLockingClient,
 		VCSEventsController:            eventsController,
@@ -764,6 +789,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebAuthentication:              userConfig.WebBasicAuth,
 		WebUsername:                    userConfig.WebUsername,
 		WebPassword:                    userConfig.WebPassword,
+		ScheduledExecutorService:       scheduledExecutorService,
 	}, nil
 }
 
@@ -801,6 +827,8 @@ func (s *Server) Start() error {
 	// Stop on SIGINTs and SIGTERMs.
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
+	go s.ScheduledExecutorService.Run()
+
 	go func() {
 		s.ProjectCmdOutputHandler.Handle()
 	}()
@@ -826,7 +854,9 @@ func (s *Server) Start() error {
 	s.waitForDrain()
 
 	// flush stats before shutdown
-	s.StatsScope.Store().Flush()
+	if err := s.StatsCloser.Close(); err != nil {
+		s.Logger.Err(err.Error())
+	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
 	if err := server.Shutdown(ctx); err != nil {

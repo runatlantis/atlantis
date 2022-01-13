@@ -1,7 +1,7 @@
 package events
 
 import (
-	"github.com/runatlantis/atlantis/server/events/metrics"
+	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -29,28 +29,30 @@ func RunAndEmitStats(commandName string, ctx models.ProjectCommandContext, execu
 	scope := ctx.Scope
 	logger := ctx.Log
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
-	executionFailure := scope.NewCounter(metrics.ExecutionFailureMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
+	executionFailure := scope.Counter(metrics.ExecutionFailureMetric)
 
 	result := execute(ctx)
 
 	if result.Error != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Error running %s operation: %s", commandName, result.Error.Error())
 		return result
 	}
 
 	if result.Failure != "" {
-		executionFailure.Inc()
+		executionFailure.Inc(1)
 		logger.Err("Failure running %s operation: %s", commandName, result.Failure)
 		return result
 	}
 
-	executionSuccess.Inc()
+	logger.Info("%s success. output available at: %s", commandName, ctx.Pull.URL)
+
+	executionSuccess.Inc(1)
 	return result
 
 }

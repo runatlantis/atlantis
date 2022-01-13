@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
-	stats "github.com/lyft/gostats"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -15,13 +14,14 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	statsScope := stats.NewStore(stats.NewNullSink(), false)
+	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -687,7 +687,7 @@ projects:
 }
 
 func TestBuildProjectCmdCtx_WithRegExpCmdEnabled(t *testing.T) {
-	statsScope := stats.NewStore(stats.NewNullSink(), false)
+	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -812,7 +812,7 @@ projects:
 			}
 
 			logger := logging.NewNoopLogger(t)
-			statsScope := stats.NewStore(stats.NewNullSink(), false)
+			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
 			builder := NewProjectCommandBuilder(
 				false,
@@ -891,7 +891,7 @@ projects:
 
 func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	statsScope := stats.NewStore(stats.NewNullSink(), false)
+	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -1042,7 +1042,7 @@ workflows:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-			statsScope := stats.NewStore(stats.NewNullSink(), false)
+			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
 			builder := NewProjectCommandBuilder(
 				true,

@@ -7,12 +7,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
-	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/uber-go/tally"
 )
 
-func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope stats.Scope) ProjectCommandContextBuilder {
+func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope tally.Scope) ProjectCommandContextBuilder {
 	projectCommandContextBuilder := &DefaultProjectCommandContextBuilder{
 		CommentBuilder: commentBuilder,
 	}
@@ -26,7 +26,7 @@ func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder Com
 
 	return &CommandScopedStatsProjectCommandContextBuilder{
 		ProjectCommandContextBuilder: projectCommandContextBuilder,
-		ProjectCounter:               scope.NewCounter("projects"),
+		ProjectCounter:               scope.Counter("projects"),
 	}
 }
 
@@ -47,7 +47,7 @@ type ProjectCommandContextBuilder interface {
 type CommandScopedStatsProjectCommandContextBuilder struct {
 	ProjectCommandContextBuilder
 	// Conciously making this global since it gets flushed periodically anyways
-	ProjectCounter stats.Counter
+	ProjectCounter tally.Counter
 }
 
 // BuildProjectContext builds the context and injects the appropriate command level scope after the fact.
@@ -59,7 +59,7 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 	repoDir string,
 	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []models.ProjectCommandContext) {
-	cb.ProjectCounter.Inc()
+	cb.ProjectCounter.Inc(1)
 
 	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
 		ctx, cmdName, prjCfg, commentFlags, repoDir, automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose,
@@ -213,7 +213,7 @@ func newProjectCommandContext(ctx *CommandContext,
 	parallelApplyEnabled bool,
 	parallelPlanEnabled bool,
 	verbose bool,
-	scope stats.Scope,
+	scope tally.Scope,
 	pullStatus models.PullReqStatus,
 ) models.ProjectCommandContext {
 
