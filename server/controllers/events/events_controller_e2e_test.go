@@ -48,6 +48,8 @@ type NoopTFDownloader struct{}
 
 var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
 
+var mockPostWorkflowHookRunner *runtimemocks.MockPostWorkflowHookRunner
+
 func (m *NoopTFDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
 	return nil
 }
@@ -425,7 +427,10 @@ func TestGitHubWorkflow(t *testing.T) {
 			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsPreWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+
+			// Let's verify the post-workflow hook was called for each comment including the pull request opened event
+			mockPostWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some post dummy command"), AnyString())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -608,7 +613,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			}
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(runtimematchers.AnyModelsPreWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -869,10 +874,16 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		AllowRepoCfg: true,
 		MergeableReq: false,
 		ApprovedReq:  false,
-		PreWorkflowHooks: []*valid.PreWorkflowHook{
+		PreWorkflowHooks: []*valid.WorkflowHook{
 			{
 				StepName:   "global_hook",
 				RunCommand: "some dummy command",
+			},
+		},
+		PostWorkflowHooks: []*valid.WorkflowHook{
+			{
+				StepName:   "global_hook",
+				RunCommand: "some post dummy command",
 			},
 		},
 		PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
@@ -896,6 +907,16 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: mockPreWorkflowHookRunner,
 	}
+
+	mockPostWorkflowHookRunner = runtimemocks.NewMockPostWorkflowHookRunner()
+	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
+		VCSClient:              e2eVCSClient,
+		GlobalCfg:              globalCfg,
+		WorkingDirLocker:       locker,
+		WorkingDir:             workingDir,
+		PostWorkflowHookRunner: mockPostWorkflowHookRunner,
+	}
+
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		userConfig.EnablePolicyChecksFlag,
 		parser,
@@ -1052,18 +1073,19 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
-		EventParser:                   eventParser,
-		VCSClient:                     e2eVCSClient,
-		GithubPullGetter:              e2eGithubGetter,
-		GitlabMergeRequestGetter:      e2eGitlabGetter,
-		Logger:                        logger,
-		GlobalCfg:                     globalCfg,
-		AllowForkPRs:                  allowForkPRs,
-		AllowForkPRsFlag:              "allow-fork-prs",
-		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
-		Drainer:                       drainer,
-		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
-		PullStatusFetcher:             boltdb,
+		EventParser:                    eventParser,
+		VCSClient:                      e2eVCSClient,
+		GithubPullGetter:               e2eGithubGetter,
+		GitlabMergeRequestGetter:       e2eGitlabGetter,
+		Logger:                         logger,
+		GlobalCfg:                      globalCfg,
+		AllowForkPRs:                   allowForkPRs,
+		AllowForkPRsFlag:               "allow-fork-prs",
+		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
+		Drainer:                        drainer,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		PullStatusFetcher:              boltdb,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
