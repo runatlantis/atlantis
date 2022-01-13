@@ -21,7 +21,8 @@ You can add a post workflow hook to perform custom reporting after all workflows
 have finished.
 
 In this example we use a custom workflow to generate cost estimates for each
-workflow, then create a summary report after all workflows have completed.
+workflow using [Infracost](https://www.infracost.io/docs/integrations/atlantis/), then create a summary report after all workflows have completed.
+
 
 ```yaml
 # repos.yaml
