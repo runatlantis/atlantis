@@ -60,7 +60,7 @@ Example Server Side Repo configuration using `--all-namespaces` and a local src 
 ```
 repos:
   - id: github.com/myorg/example-repo
-policies
+policies:
   owners:
     users:
       - example-dev
