@@ -5,8 +5,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	awsSns "github.com/aws/aws-sdk-go/service/sns"
 	snsApi "github.com/aws/aws-sdk-go/service/sns/snsiface"
-	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/events/metrics"
+	"github.com/uber-go/tally"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_writer.go Writer
@@ -25,10 +25,10 @@ func NewNoopWriter() Writer {
 func NewWriterWithStats(
 	session client.ConfigProvider,
 	topicArn string,
-	scope stats.Scope,
+	scope tally.Scope,
 ) Writer {
 	return &writerWithStats{
-		scope: scope.Scope("aws.sns"),
+		scope: scope.SubScope("aws.sns"),
 		Writer: &writer{
 			client:   awsSns.New(session),
 			topicArn: aws.String(topicArn),
@@ -52,19 +52,19 @@ func (w *writer) Write(payload []byte) error {
 // writerWithStats decorator to track writing to sns topic
 type writerWithStats struct {
 	Writer
-	scope stats.Scope
+	scope tally.Scope
 }
 
 func (w *writerWithStats) Write(payload []byte) error {
-	executionTime := w.scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := w.scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
 	if err := w.Writer.Write(payload); err != nil {
-		w.scope.NewCounter(metrics.ExecutionErrorMetric)
+		w.scope.Counter(metrics.ExecutionErrorMetric).Inc(1)
 		return err
 	}
 
-	w.scope.NewCounter(metrics.ExecutionSuccessMetric)
+	w.scope.Counter(metrics.ExecutionSuccessMetric).Inc(1)
 	return nil
 }
 

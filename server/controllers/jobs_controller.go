@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	stats "github.com/lyft/gostats"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
@@ -16,6 +15,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 )
 
 type JobsController struct {
@@ -26,7 +26,7 @@ type JobsController struct {
 	ProjectJobsErrorTemplate templates.TemplateWriter
 	Db                       *db.BoltDB
 	WsMux                    *websocket.Multiplexor
-	StatsScope               stats.Scope
+	StatsScope               tally.Scope
 }
 
 type ProjectInfoKeyGenerator struct{}
@@ -134,10 +134,10 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 }
 
 func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) {
-	errorCounter := j.StatsScope.Scope("getprojectjobs").NewCounter(metrics.ExecutionErrorMetric)
+	errorCounter := j.StatsScope.SubScope("getprojectjobs").Counter(metrics.ExecutionErrorMetric)
 	err := j.getProjectJobs(w, r)
 	if err != nil {
-		errorCounter.Inc()
+		errorCounter.Inc(1)
 	}
 }
 
@@ -153,14 +153,14 @@ func (j *JobsController) getProjectJobsWS(w http.ResponseWriter, r *http.Request
 }
 
 func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request) {
-	jobsMetric := j.StatsScope.Scope("getprojectjobs")
-	errorCounter := jobsMetric.NewCounter(metrics.ExecutionErrorMetric)
-	executionTime := jobsMetric.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	jobsMetric := j.StatsScope.SubScope("getprojectjobs")
+	errorCounter := jobsMetric.Counter(metrics.ExecutionErrorMetric)
+	executionTime := jobsMetric.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
 	err := j.getProjectJobsWS(w, r)
 	if err != nil {
-		errorCounter.Inc()
+		errorCounter.Inc(1)
 	}
 }
 

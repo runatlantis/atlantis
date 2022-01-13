@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	stats "github.com/lyft/gostats"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/matchers"
@@ -17,6 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -119,7 +119,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope := stats.NewStore(stats.NewLoggingSink(), false)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -384,7 +384,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope := stats.NewStore(stats.NewNullSink(), false)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	for _, c := range cases {
 		// NOTE: we're testing both plan and apply here.
@@ -544,7 +544,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope := stats.NewStore(stats.NewNullSink(), false)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -657,7 +657,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		ApprovedReq:   false,
 		UnDivergedReq: false,
 	}
-	scope := stats.NewStore(stats.NewNullSink(), false)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -741,8 +741,8 @@ projects:
 		ApprovedReq:   false,
 		UnDivergedReq: false,
 	}
-	scope := stats.NewStore(stats.NewNullSink(), false)
 	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -800,7 +800,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope := stats.NewStore(stats.NewNullSink(), false)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	for _, c := range cases {
 		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
@@ -975,7 +975,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope := stats.NewStore(stats.NewNullSink(), false)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -1071,7 +1071,7 @@ projects:
 		ApprovedReq:   false,
 		UnDivergedReq: false,
 	}
-	scope := stats.NewStore(stats.NewNullSink(), false)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1115,7 +1115,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	defer cleanup()
 
 	logger := logging.NewNoopLogger(t)
-	scope := stats.NewStore(stats.NewNullSink(), false)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
@@ -1204,7 +1204,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		ThenReturn(tmpDir, nil)
 
 	logger := logging.NewNoopLogger(t)
-	scope := stats.NewStore(stats.NewNullSink(), false)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg:  false,

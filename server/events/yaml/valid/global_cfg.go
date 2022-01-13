@@ -35,6 +35,16 @@ type GlobalCfg struct {
 	Repos      []Repo
 	Workflows  map[string]Workflow
 	PolicySets PolicySets
+	Metrics    Metrics
+}
+
+type Metrics struct {
+	Statsd *Statsd
+}
+
+type Statsd struct {
+	Port string
+	Host string
 }
 
 // Repo is the final parsed version of server-side repo config.

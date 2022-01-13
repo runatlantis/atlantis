@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v31/github"
-	stats "github.com/lyft/gostats"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
@@ -30,6 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
@@ -49,7 +49,7 @@ type VCSEventsController struct {
 	CommandRunner events.CommandRunner
 	PullCleaner   events.PullCleaner
 	Logger        logging.SimpleLogging
-	Scope         stats.Scope
+	Scope         tally.Scope
 	Parser        events.EventParsing
 	CommentParser events.CommentParsing
 	ApplyDisabled bool
@@ -158,7 +158,7 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
 	logger := e.Logger.With("gh-request-id", githubReqID)
-	scope := e.Scope.Scope("github.event")
+	scope := e.Scope.SubScope("github.event")
 
 	logger.Debug("request valid")
 
@@ -169,10 +169,10 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
 		resp = e.HandleGithubCommentEvent(event, githubReqID, logger)
-		scope = scope.Scope(fmt.Sprintf("comment.%s", *event.Action))
+		scope = scope.SubScope(fmt.Sprintf("comment.%s", *event.Action))
 	case *github.PullRequestEvent:
 		resp = e.HandleGithubPullRequestEvent(logger, event, githubReqID)
-		scope = scope.Scope(fmt.Sprintf("pr.%s", *event.Action))
+		scope = scope.SubScope(fmt.Sprintf("pr.%s", *event.Action))
 	default:
 		resp = HttpResponse{
 			body: fmt.Sprintf("Ignoring unsupported event %s", githubReqID),
@@ -181,13 +181,13 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 
 	if resp.err.code != 0 {
 		logger.Err("error handling gh post code: %d err: %s", resp.err.code, resp.err.err.Error())
-		scope.NewCounter(fmt.Sprintf("error_%d", resp.err.code)).Inc()
+		scope.Counter(fmt.Sprintf("error_%d", resp.err.code)).Inc(1)
 		w.WriteHeader(resp.err.code)
 		fmt.Fprintln(w, resp.err.err.Error())
 		return
 	}
 
-	scope.NewCounter(fmt.Sprintf("success_%d", http.StatusOK)).Inc()
+	scope.Counter(fmt.Sprintf("success_%d", http.StatusOK)).Inc(1)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintln(w, resp.body)
 }

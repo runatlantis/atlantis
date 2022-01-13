@@ -20,12 +20,12 @@ import (
 	"strings"
 	"testing"
 
-	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	lyft_vcs "github.com/runatlantis/atlantis/server/events/vcs/lyft"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 
 	"github.com/google/go-github/v31/github"
 	. "github.com/petergtz/pegomock"
@@ -193,7 +193,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
 
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
-	scope := stats.NewDefaultStore()
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	ch = events.DefaultCommandRunner{
 		VCSClient:                     vcsClient,

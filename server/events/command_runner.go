@@ -18,7 +18,6 @@ import (
 	"strconv"
 
 	"github.com/google/go-github/v31/github"
-	stats "github.com/lyft/gostats"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/metrics"
@@ -28,6 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/recovery"
+	"github.com/uber-go/tally"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
@@ -100,7 +100,7 @@ type DefaultCommandRunner struct {
 	EventParser              EventParsing
 	Logger                   logging.SimpleLogging
 	GlobalCfg                valid.GlobalCfg
-	StatsScope               stats.Scope
+	StatsScope               tally.Scope
 	// AllowForkPRs controls whether we operate on pull requests from forks.
 	AllowForkPRs bool
 	// ParallelPoolSize controls the size of the wait group used to run
@@ -140,9 +140,9 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		log.Err("Unable to fetch pull status, this is likely a bug.", err)
 	}
 
-	scope := c.StatsScope.Scope("autoplan")
-	timer := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer timer.Complete()
+	scope := c.StatsScope.SubScope("autoplan")
+	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer timer.Stop()
 
 	ctx := &CommandContext{
 		User:       user,
@@ -188,13 +188,13 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
 
-	scope := c.StatsScope.Scope("comment")
+	scope := c.StatsScope.SubScope("comment")
 
 	if cmd != nil {
-		scope = scope.Scope(cmd.Name.String())
+		scope = scope.SubScope(cmd.Name.String())
 	}
-	timer := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer timer.Complete()
+	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer timer.Stop()
 
 	headRepo, pull, err := c.ensureValidRepoMetadata(baseRepo, maybeHeadRepo, maybePull, user, pullNum, log)
 	if err != nil {

@@ -3,24 +3,24 @@ package events
 import (
 	"strconv"
 
-	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 )
 
 type InstrumentedPullClosedExecutor struct {
-	scope   stats.Scope
+	scope   tally.Scope
 	log     logging.SimpleLogging
 	cleaner PullCleaner
 }
 
 func NewInstrumentedPullClosedExecutor(
-	scope stats.Scope, log logging.SimpleLogging, cleaner PullCleaner,
+	scope tally.Scope, log logging.SimpleLogging, cleaner PullCleaner,
 ) PullCleaner {
 
 	return &InstrumentedPullClosedExecutor{
-		scope:   scope.Scope("pullclosed.cleanup"),
+		scope:   scope.SubScope("pullclosed.cleanup"),
 		log:     log,
 		cleaner: cleaner,
 	}
@@ -32,22 +32,22 @@ func (e *InstrumentedPullClosedExecutor) CleanUpPull(repo models.Repo, pull mode
 		"pull-num", strconv.Itoa(pull.Num),
 	)
 
-	executionSuccess := e.scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := e.scope.NewCounter(metrics.ExecutionErrorMetric)
-	executionTime := e.scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionSuccess := e.scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := e.scope.Counter(metrics.ExecutionErrorMetric)
+	executionTime := e.scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
 	log.Info("Initiating cleanup of pull data.")
 
 	err := e.cleaner.CleanUpPull(repo, pull)
 
 	if err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		log.Err("error during cleanup of pull data", err)
 		return err
 	}
 
-	executionSuccess.Inc()
+	executionSuccess.Inc(1)
 
 	return nil
 }

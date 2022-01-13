@@ -54,11 +54,9 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
-	github.com/kelseyhightower/envconfig v1.4.1-0.20200624135755-c974cae29cf5 // indirect
 	github.com/klauspost/compress v1.11.2 // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/lusis/slack-test v0.0.0-20190426140909-c40012f20018 // indirect
-	github.com/lyft/gostats v0.4.5
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/mattn/go-colorable v0.0.9 // indirect
 	github.com/mattn/go-isatty v0.0.4 // indirect
@@ -101,7 +99,7 @@ require (
 	github.com/zclconf/go-cty v1.5.1 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.23.0 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
@@ -130,5 +128,10 @@ require (
 require (
 	github.com/antlr/antlr4 v0.0.0-20201206235148-c87e55b61113 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
+	github.com/cactus/go-statsd-client/statsd v0.0.0-20200623234511-94959e3146b2
 	github.com/nikunjy/rules v0.0.0-20200120082459-0b7c4dc9dc86 // indirect
+	github.com/twmb/murmur3 v1.1.6 // indirect
+	github.com/uber-go/tally v3.4.3+incompatible
 )
+
+require github.com/onsi/ginkgo v1.14.0 // indirect

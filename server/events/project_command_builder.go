@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -47,7 +47,7 @@ func NewProjectCommandBuilder(
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	AutoplanFileList string,
-	scope stats.Scope,
+	scope tally.Scope,
 	logger logging.SimpleLogging,
 ) ProjectCommandBuilder {
 	return NewProjectCommandBuilderWithLimit(
@@ -82,7 +82,7 @@ func NewProjectCommandBuilderWithLimit(
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	AutoplanFileList string,
-	scope stats.Scope,
+	scope tally.Scope,
 	logger logging.SimpleLogging,
 	limit int,
 ) ProjectCommandBuilder {

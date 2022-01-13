@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v31/github"
-	stats "github.com/lyft/gostats"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 )
 
 func TestApplyCommandRunner_IsLocked(t *testing.T) {
@@ -48,7 +48,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			logger := logging.NewNoopLogger(t)
 			vcsClient := setup(t)
 
-			scopeNull := stats.NewStore(stats.NewNullSink(), false)
+			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 			pull := &github.PullRequest{
 				State: github.String("open"),

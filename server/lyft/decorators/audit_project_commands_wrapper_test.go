@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	stats "github.com/lyft/gostats"
 	. "github.com/runatlantis/atlantis/testing"
 
 	. "github.com/petergtz/pegomock"
@@ -16,6 +15,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	snsMocks "github.com/runatlantis/atlantis/server/lyft/aws/sns/mocks"
 	"github.com/runatlantis/atlantis/server/lyft/decorators"
+	"github.com/runatlantis/atlantis/server/metrics"
 )
 
 func TestAuditProjectCommandsWrapper(t *testing.T) {
@@ -60,9 +60,13 @@ func TestAuditProjectCommandsWrapper(t *testing.T) {
 				prjRslt.Failure = "oh-no"
 			}
 
+			logger := logging.NewNoopLogger(t)
+
+			scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
 			ctx := models.ProjectCommandContext{
-				Scope:       stats.NewStore(stats.NewNullSink(), false),
-				Log:         logging.NewNoopLogger(t),
+				Scope:       scope,
+				Log:         logger,
 				Steps:       []valid.Step{},
 				ProjectName: "test-project",
 				User: models.User{

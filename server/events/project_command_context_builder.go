@@ -6,19 +6,19 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
-	stats "github.com/lyft/gostats"
+	"github.com/uber-go/tally"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
-func NewProjectCommandContextBulder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope stats.Scope) ProjectCommandContextBuilder {
+func NewProjectCommandContextBulder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope tally.Scope) ProjectCommandContextBuilder {
 	projectCommandContextBuilder := &DefaultProjectCommandContextBuilder{
 		CommentBuilder: commentBuilder,
 	}
 
 	contextBuilderWithStats := &CommandScopedStatsProjectCommandContextBuilder{
 		ProjectCommandContextBuilder: projectCommandContextBuilder,
-		ProjectCounter:               scope.NewCounter("projects"),
+		ProjectCounter:               scope.Counter("projects"),
 	}
 
 	if policyCheckEnabled {
@@ -57,7 +57,7 @@ type ProjectCommandContextBuilder interface {
 type CommandScopedStatsProjectCommandContextBuilder struct {
 	ProjectCommandContextBuilder
 	// Conciously making this global since it gets flushed periodically anyways
-	ProjectCounter stats.Counter
+	ProjectCounter tally.Counter
 }
 
 // BuildProjectContext builds the context and injects the appropriate command level scope after the fact.
@@ -69,7 +69,7 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 	repoDir string,
 	contextFlags *ContextFlags,
 ) (projectCmds []models.ProjectCommandContext) {
-	cb.ProjectCounter.Inc()
+	cb.ProjectCounter.Inc(1)
 
 	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
 		ctx, cmdName, prjCfg, commentFlags, repoDir, contextFlags,
@@ -207,7 +207,7 @@ func newProjectCommandContext(ctx *CommandContext,
 	policySets valid.PolicySets,
 	escapedCommentArgs []string,
 	contextFlags *ContextFlags,
-	scope stats.Scope,
+	scope tally.Scope,
 	pullStatus models.PullReqStatus,
 ) models.ProjectCommandContext {
 

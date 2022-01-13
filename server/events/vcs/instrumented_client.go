@@ -5,15 +5,15 @@ import (
 	"strconv"
 
 	"github.com/google/go-github/v31/github"
-	stats "github.com/lyft/gostats"
+	"github.com/uber-go/tally"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // NewInstrumentedGithubClient creates a client proxy responsible for gathering stats and logging
-func NewInstrumentedGithubClient(client *GithubClient, statsScope stats.Scope, logger logging.SimpleLogging) IGithubClient {
-	scope := statsScope.Scope("github")
+func NewInstrumentedGithubClient(client *GithubClient, statsScope tally.Scope, logger logging.SimpleLogging) IGithubClient {
+	scope := statsScope.SubScope("github")
 
 	instrumentedGHClient := &InstrumentedClient{
 		Client:     client,
@@ -54,29 +54,29 @@ type IGithubClient interface {
 type InstrumentedGithubClient struct {
 	*InstrumentedClient
 	GhClient   *GithubClient
-	StatsScope stats.Scope
+	StatsScope tally.Scope
 	Logger     logging.SimpleLogging
 }
 
 func (c *InstrumentedGithubClient) GetContents(owner, repo, branch, path string) ([]byte, error) {
-	scope := c.StatsScope.Scope("get_contents")
+	scope := c.StatsScope.SubScope("get_contents")
 	logger := c.Logger.WithHistory([]interface{}{
 		"repository", fmt.Sprintf("%s/%s", owner, repo),
 	}...)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	contents, err := c.GhClient.GetContents(owner, repo, branch, path)
 
 	if err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to get contents, error: %s", err.Error())
 	} else {
-		executionSuccess.Inc()
+		executionSuccess.Inc(1)
 	}
 
 	return contents, err
@@ -88,69 +88,70 @@ func (c *InstrumentedGithubClient) GetPullRequest(repo models.Repo, pullNum int)
 }
 
 func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoOwner string, pullNum int) (*github.PullRequest, error) {
-	scope := c.StatsScope.Scope("get_pull_request")
+	scope := c.StatsScope.SubScope("get_pull_request")
 	logger := c.Logger.WithHistory([]interface{}{
 		"repository", fmt.Sprintf("%s/%s", repoOwner, repoName),
 		"pull-num", strconv.Itoa(pullNum),
 	}...)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	pull, err := c.GhClient.GetPullRequestFromName(repoName, repoOwner, pullNum)
 
 	if err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to get pull number for repo, error: %s", err.Error())
 	} else {
-		executionSuccess.Inc()
+		executionSuccess.Inc(1)
 	}
 
 	return pull, err
 }
 
+
 func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.PullRequest) ([]*github.CheckRun, error) {
-	scope := c.StatsScope.Scope("get_repo_checks")
+	scope := c.StatsScope.SubScope("get_repo_checks")
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	statuses, err := c.GhClient.GetRepoChecks(repo, pull)
 
 	if err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to get repo status: %s", err.Error())
 	} else {
-		executionSuccess.Inc()
+		executionSuccess.Inc(1)
 	}
 
 	return statuses, err
 }
 
 func (c *InstrumentedGithubClient) GetRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error) {
-	scope := c.StatsScope.Scope("get_repo_status")
+	scope := c.StatsScope.SubScope("get_repo_status")
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	statuses, err := c.GhClient.GetRepoStatuses(repo, pull)
 
 	if err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to get repo status: %s", err.Error())
 	} else {
-		executionSuccess.Inc()
+		executionSuccess.Inc(1)
 	}
 
 	return statuses, err
@@ -158,151 +159,151 @@ func (c *InstrumentedGithubClient) GetRepoStatuses(repo models.Repo, pull models
 
 type InstrumentedClient struct {
 	Client
-	StatsScope stats.Scope
+	StatsScope tally.Scope
 	Logger     logging.SimpleLogging
 }
 
 func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
-	scope := c.StatsScope.Scope("get_modified_files")
+	scope := c.StatsScope.SubScope("get_modified_files")
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	files, err := c.Client.GetModifiedFiles(repo, pull)
 
 	if err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to get modified files, error: %s", err.Error())
 	} else {
-		executionSuccess.Inc()
+		executionSuccess.Inc(1)
 	}
 
 	return files, err
 
 }
 func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
-	scope := c.StatsScope.Scope("create_comment")
+	scope := c.StatsScope.SubScope("create_comment")
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pullNum)...)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	if err := c.Client.CreateComment(repo, pullNum, comment, command); err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to create comment for command %s, error: %s", command, err.Error())
 		return err
 	}
 
-	executionSuccess.Inc()
+	executionSuccess.Inc(1)
 	return nil
 }
 func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
-	scope := c.StatsScope.Scope("hide_prev_plan_comments")
+	scope := c.StatsScope.SubScope("hide_prev_plan_comments")
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pullNum)...)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	if err := c.Client.HidePrevCommandComments(repo, pullNum, command); err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to hide previous %s comments, error: %s", command, err.Error())
 		return err
 	}
 
-	executionSuccess.Inc()
+	executionSuccess.Inc(1)
 	return nil
 
 }
 func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
-	scope := c.StatsScope.Scope("pull_is_approved")
+	scope := c.StatsScope.SubScope("pull_is_approved")
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	approvalStatus, err := c.Client.PullIsApproved(repo, pull)
 
 	if err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to check pull approval status, error: %s", err.Error())
 	} else {
-		executionSuccess.Inc()
+		executionSuccess.Inc(1)
 	}
 
 	return approvalStatus, err
 
 }
 func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
-	scope := c.StatsScope.Scope("pull_is_mergeable")
+	scope := c.StatsScope.SubScope("pull_is_mergeable")
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	mergeable, err := c.Client.PullIsMergeable(repo, pull)
 
 	if err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to check pull mergeable status, error: %s", err.Error())
 	} else {
-		executionSuccess.Inc()
+		executionSuccess.Inc(1)
 	}
 
 	return mergeable, err
 }
 
 func (c *InstrumentedClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
-	scope := c.StatsScope.Scope("update_status")
+	scope := c.StatsScope.SubScope("update_status")
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	if err := c.Client.UpdateStatus(repo, pull, state, src, description, url); err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to update status at url: %s, error: %s", url, err.Error())
 		return err
 	}
 
-	executionSuccess.Inc()
+	executionSuccess.Inc(1)
 	return nil
 
 }
 func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	scope := c.StatsScope.Scope("merge_pull")
+	scope := c.StatsScope.SubScope("merge_pull")
 	logger := c.Logger.WithHistory("pull-num", pull.Num)
 
-	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
-	defer executionTime.Complete()
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
 
-	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
-	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
 	if err := c.Client.MergePull(pull, pullOptions); err != nil {
-		executionError.Inc()
+		executionError.Inc(1)
 		logger.Err("Unable to merge pull, error: %s", err.Error())
 	}
 
-	executionSuccess.Inc()
+	executionSuccess.Inc(1)
 	return nil
 
 }

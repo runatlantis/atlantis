@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-version"
-	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -384,7 +384,7 @@ type ProjectCommandContext struct {
 	// Log is a logger that's been set up for this context.
 	Log logging.SimpleLogging
 	// Scope is the scope for reporting stats setup for this context
-	Scope stats.Scope
+	Scope tally.Scope
 	// PullReqStatus holds state about the PR that requires additional computation outside models.PullRequest
 	PullReqStatus PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
@@ -440,7 +440,7 @@ func (p ProjectCommandContext) ProjectCloneDir() string {
 // SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
 // instead of a pointer since we want scopes to mirror our function stack
 func (p ProjectCommandContext) SetScope(scope string) {
-	p.Scope = p.Scope.Scope(scope) //nolint
+	p.Scope = p.Scope.SubScope(scope) //nolint
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
