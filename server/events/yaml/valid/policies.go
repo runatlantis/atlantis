@@ -1,6 +1,8 @@
 package valid
 
 import (
+	"strings"
+
 	"github.com/hashicorp/go-version"
 )
 
@@ -35,7 +37,7 @@ func (p *PolicySets) HasPolicies() bool {
 
 func (p *PolicySets) IsOwner(username string) bool {
 	for _, uname := range p.Owners.Users {
-		if uname == username {
+		if strings.EqualFold(uname, username) {
 			return true
 		}
 	}
