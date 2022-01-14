@@ -197,12 +197,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
-	// TODO: move this to yaml in a followup
-	globalCfg.Metrics.Statsd = &valid.Statsd{
-		Host: "127.0.0.1",
-		Port: "8125",
-	}
-
 	statsScope, closer, err := metrics.NewScope(globalCfg.Metrics, logger, userConfig.StatsNamespace)
 
 	if err != nil {

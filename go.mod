@@ -134,4 +134,7 @@ require (
 	github.com/uber-go/tally v3.4.3+incompatible
 )
 
-require github.com/onsi/ginkgo v1.14.0 // indirect
+require (
+	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
+	github.com/onsi/ginkgo v1.14.0 // indirect
+)
