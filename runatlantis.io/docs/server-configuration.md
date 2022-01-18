@@ -364,7 +364,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-team-allowlist="myteam:plan, secteam:apply"
   ```
-  Comma-separated list of GitHub team and permission pairs.  By default, any team can plan and apply.
+  Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
 
 * ### `--gitlab-hostname`
   ```bash
