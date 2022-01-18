@@ -437,7 +437,10 @@ func GetProjectIdentifier(relRepoDir string, projectName string) string {
 	if projectName != "" {
 		return projectName
 	}
-	return strings.ReplaceAll(relRepoDir, "/", "-")
+	// Replace directory separator / with -
+	// Replace . with _ to ensure projects with no project name and root dir set to "." have a valid URL
+	replacer := strings.NewReplacer("/", "-", ".", "_")
+	return replacer.Replace(relRepoDir)
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo
