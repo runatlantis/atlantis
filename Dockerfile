@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
 FROM ghcr.io/runatlantis/atlantis-base:2021.12.15 AS base
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=1.1.3
+ENV DEFAULT_TERRAFORM_VERSION=1.1.4
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 1.0.11 ${DEFAULT_TERRAFORM_VERSION}" && \
