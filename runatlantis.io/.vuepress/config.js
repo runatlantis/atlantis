@@ -41,7 +41,6 @@ module.exports = {
         sidebar: {
             '/logs/': [
                 '',
-                'streaming-logs'
             ],
             '/guide/': [
                 '',
