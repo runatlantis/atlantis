@@ -20,9 +20,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -118,6 +120,50 @@ type ProjectCommandRunner interface {
 	ProjectVersionCommandRunner
 }
 
+// ProjectOutputWrapper is a decorator that creates a new PR status check per project.
+// The status contains a url that outputs current progress of the terraform plan/apply command.
+type ProjectOutputWrapper struct {
+	ProjectCommandRunner
+	ProjectCmdOutputHandler handlers.ProjectCommandOutputHandler
+}
+
+func (p *ProjectOutputWrapper) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
+	// Reset the buffer when running the plan. We only need to do this for plan,
+	// apply is a continuation of the same workflow
+	p.ProjectCmdOutputHandler.Clear(ctx)
+	return p.updateProjectPRStatus(models.PlanCommand, ctx, p.ProjectCommandRunner.Plan)
+}
+
+func (p *ProjectOutputWrapper) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
+	return p.updateProjectPRStatus(models.ApplyCommand, ctx, p.ProjectCommandRunner.Apply)
+}
+
+func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName models.CommandName, ctx models.ProjectCommandContext, execute func(ctx models.ProjectCommandContext) models.ProjectResult) models.ProjectResult {
+	// Create a PR status to track project's plan status. The status will
+	// include a link to view the progress of atlantis plan command in real
+	// time
+	if err := p.ProjectCmdOutputHandler.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus); err != nil {
+		ctx.Log.Err("updating project PR status", err)
+	}
+
+	// ensures we are differentiating between project level command and overall command
+	result := execute(ctx)
+
+	if result.Error != nil || result.Failure != "" {
+		if err := p.ProjectCmdOutputHandler.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus); err != nil {
+			ctx.Log.Err("updating project PR status", err)
+		}
+
+		return result
+	}
+
+	if err := p.ProjectCmdOutputHandler.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus); err != nil {
+		ctx.Log.Err("updating project PR status", err)
+	}
+
+	return result
+}
+
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
 	Locker                     ProjectLocker
@@ -131,6 +177,7 @@ type DefaultProjectCommandRunner struct {
 	RunStepRunner              CustomStepRunner
 	EnvStepRunner              EnvStepRunner
 	MultiEnvStepRunner         MultiEnvStepRunner
+	PullApprovedChecker        runtime.PullApprovedChecker
 	WorkingDir                 WorkingDir
 	Webhooks                   WebhooksSender
 	WorkingDirLocker           WorkingDirLocker
@@ -318,6 +365,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	}
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
+
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -360,6 +408,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 	defer unlockFn()
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
 		Workspace: ctx.Workspace,
 		User:      ctx.User,
@@ -368,9 +417,11 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		Success:   err == nil,
 		Directory: ctx.RepoRelDir,
 	})
+
 	if err != nil {
 		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
+
 	return strings.Join(outputs, "\n"), "", nil
 }
 
@@ -404,6 +455,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext
 
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
 	var outputs []string
+
 	envs := make(map[string]string)
 	for _, step := range steps {
 		var out string

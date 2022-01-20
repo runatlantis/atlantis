@@ -44,7 +44,7 @@ func TestRunVersionStep(t *testing.T) {
 
 	t.Run("ensure runs", func(t *testing.T) {
 		_, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
-		terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, []string{"version"}, map[string]string(nil), tfVersion, "default")
+		terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, []string{"version"}, map[string]string(nil), tfVersion, "default")
 		Ok(t, err)
 	})
 }

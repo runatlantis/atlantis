@@ -54,7 +54,7 @@ projects:
   terraform_version: v0.11.0
   delete_source_branch_on_merge: true
   autoplan:
-    when_modified: ["*.tf", "../modules/**.tf"]
+    when_modified: ["*.tf", "../modules/**/*.tf"]
     enabled: true
   apply_requirements: [mergeable, approved]
   workflow: myworkflow
@@ -71,6 +71,9 @@ workflows:
       steps:
       - run: echo hi
       - apply
+allowed_regexp_prefixes:
+- dev/
+- staging/
 ```
 
 ## Use Cases
@@ -194,6 +197,7 @@ automerge:
 delete_source_branch_on_merge:
 projects:
 workflows:
+allowed_regexp_prefixes:
 ```
 | Key                           | Type                                                     | Default | Required | Description                                                 |
 |-------------------------------|----------------------------------------------------------|---------|----------|-------------------------------------------------------------|
@@ -202,6 +206,7 @@ workflows:
 | delete_source_branch_on_merge | bool                                                     | `false` | no       | Automatically deletes the source branch on merge            |
 | projects                      | array[[Project](repo-level-atlantis-yaml.html#project)]  | `[]`    | no       | Lists the projects in this repo                             |
 | workflows<br />*(restricted)* | map[string: [Workflow](custom-workflows.html#reference)] | `{}`    | no       | Custom workflows                                            |
+| allowed_regexp_prefixes       | array[string]                                            | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.html#enable-regexp-cmd) flag is used
 
 ### Project
 ```yaml
@@ -223,7 +228,7 @@ workflow: myworkflow
 | autoplan                               | [Autoplan](#autoplan) | none        | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.html).                                                                                               |
 | delete_source_branch_on_merge          | bool                  | `false`     | no       | Automatically deletes the source branch on merge                                                                                                                                                                      |
 | terraform_version                      | string                | none        | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                          |
-| apply_requirements<br />*(restricted)* | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details. |
+| apply_requirements<br />*(restricted)* | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Apply Requirements](apply-requirements.html) for more details. |
 | workflow <br />*(restricted)*          | string                | none        | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                          |
 
 ::: tip

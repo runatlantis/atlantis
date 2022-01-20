@@ -2,7 +2,7 @@ package events_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -132,7 +132,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
@@ -155,12 +155,14 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
-				PullMergeable: true,
-				Log:           logger,
+				PullRequestStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Log: logger,
 			})
 			Ok(t, err)
 			Equals(t, len(c.exp), len(ctxs))
@@ -394,7 +396,7 @@ projects:
 				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 				if c.AtlantisYAML != "" {
-					err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+					err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 					Ok(t, err)
 				}
 
@@ -417,7 +419,7 @@ projects:
 					&events.CommentParser{},
 					false,
 					true,
-					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				)
 
 				var actCtxs []models.ProjectCommandContext
@@ -545,7 +547,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
@@ -568,7 +570,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -655,7 +657,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&events.CommentParser{},
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -703,7 +705,7 @@ projects:
 - dir: .
   workspace: staging
 `
-	err := ioutil.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	err := os.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
 	Ok(t, err)
 
 	When(workingDir.Clone(
@@ -735,7 +737,7 @@ projects:
 		&events.CommentParser{},
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	ctx := &events.CommandContext{
@@ -810,7 +812,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				&events.CommentParser{},
 				false,
 				false,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 			)
 
 			var actCtxs []models.ProjectCommandContext
@@ -989,7 +991,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -1052,17 +1054,19 @@ projects:
 		&events.CommentParser{},
 		true,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	var actCtxs []models.ProjectCommandContext
 	var err error
 	actCtxs, err = builder.BuildAutoplanCommands(&events.CommandContext{
-		HeadRepo:      models.Repo{},
-		Pull:          models.PullRequest{},
-		User:          models.User{},
-		Log:           logger,
-		PullMergeable: true,
+		HeadRepo: models.Repo{},
+		Pull:     models.PullRequest{},
+		User:     models.User{},
+		Log:      logger,
+		PullRequestStatus: models.PullReqStatus{
+			Mergeable: true,
+		},
 	})
 	Ok(t, err)
 	Equals(t, 0, len(actCtxs))
@@ -1104,12 +1108,14 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		&events.CommentParser{},
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
-		PullMergeable: true,
-		Log:           logger,
+		PullRequestStatus: models.PullReqStatus{
+			Mergeable: true,
+		},
+		Log: logger,
 	})
 
 	Ok(t, err)
@@ -1180,7 +1186,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		&events.CommentParser{},
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	ctxs, err := builder.BuildVersionCommands(

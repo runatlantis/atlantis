@@ -232,7 +232,7 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 }
 
 // PullIsApproved returns true if the pull request was approved.
-func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	nextPage := 0
 	for {
 		opts := github.ListOptions{
@@ -244,11 +244,15 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 		g.logger.Debug("GET /repos/%v/%v/pulls/%d/reviews", repo.Owner, repo.Name, pull.Num)
 		pageReviews, resp, err := g.client.PullRequests.ListReviews(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
 		if err != nil {
-			return false, errors.Wrap(err, "getting reviews")
+			return approvalStatus, errors.Wrap(err, "getting reviews")
 		}
 		for _, review := range pageReviews {
 			if review != nil && review.GetState() == "APPROVED" {
-				return true, nil
+				return models.ApprovalStatus{
+					IsApproved: true,
+					ApprovedBy: *review.User.Login,
+					Date:       *review.SubmittedAt,
+				}, nil
 			}
 		}
 		if resp.NextPage == 0 {
@@ -256,7 +260,7 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 		}
 		nextPage = resp.NextPage
 	}
-	return false, nil
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
@@ -288,10 +292,14 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 
 	// GitHub has started to return 404's here (#1019) even after they send the webhook.
 	// They've got some eventual consistency issues going on so we're just going
-	// to retry up to 3 times with a 1s sleep.
-	numRetries := 3
-	retryDelay := 1 * time.Second
-	for i := 0; i < numRetries; i++ {
+	// to attempt up to 5 times with exponential backoff.
+	maxAttempts := 5
+	attemptDelay := 0 * time.Second
+	for i := 0; i < maxAttempts; i++ {
+		// First don't sleep, then sleep 1, 3, 7, etc.
+		time.Sleep(attemptDelay)
+		attemptDelay = 2*attemptDelay + 1*time.Second
+
 		pull, _, err = g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
 		if err == nil {
 			return pull, nil
@@ -300,7 +308,6 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 		if !ok || ghErr.Response.StatusCode != 404 {
 			return pull, err
 		}
-		time.Sleep(retryDelay)
 	}
 	return pull, err
 }
@@ -377,6 +384,35 @@ func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
 func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil
+}
+
+// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
+// https://developer.github.com/v3/teams/members/#get-team-membership
+func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	var teamNames []string
+	opts := &github.ListOptions{}
+	org := repo.Owner
+	for {
+		teams, resp, err := g.client.Teams.ListTeams(g.ctx, org, opts)
+		if err != nil {
+			return nil, errors.Wrap(err, "retrieving GitHub teams")
+		}
+		for _, t := range teams {
+			membership, _, err := g.client.Teams.GetTeamMembershipBySlug(g.ctx, org, *t.Slug, user.Username)
+			if err != nil {
+				g.logger.Err("Failed to get team membership from GitHub: %s", err)
+			} else if membership != nil {
+				if *membership.State == "active" && (*membership.Role == "member" || *membership.Role == "maintainer") {
+					teamNames = append(teamNames, t.GetName())
+				}
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return teamNames, nil
 }
 
 // ExchangeCode returns a newly created app's info

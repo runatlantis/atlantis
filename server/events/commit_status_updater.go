@@ -90,6 +90,7 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandCont
 	case models.SuccessCommitStatus:
 		descripWords = "succeeded."
 	}
+
 	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), descripWords)
 	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
 }
