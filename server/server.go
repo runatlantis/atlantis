@@ -103,6 +103,9 @@ type Server struct {
 	SSLCertFile                    string
 	SSLKeyFile                     string
 	Drainer                        *events.Drainer
+	WebAuthentication              bool
+	WebUsername                    string
+	WebPassword                    string
 	ProjectCmdOutputHandler        handlers.ProjectCommandOutputHandler
 }
 
@@ -744,6 +747,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SSLCertFile:                    userConfig.SSLCertFile,
 		Drainer:                        drainer,
 		ProjectCmdOutputHandler:        projectCmdOutputHandler,
+		WebAuthentication:              userConfig.WebBasicAuth,
+		WebUsername:                    userConfig.WebUsername,
+		WebPassword:                    userConfig.WebPassword,
 	}, nil
 }
 
@@ -771,7 +777,7 @@ func (s *Server) Start() error {
 		PrintStack: false,
 		StackAll:   false,
 		StackSize:  1024 * 8,
-	}, NewRequestLogger(s.Logger))
+	}, NewRequestLogger(s))
 	n.UseHandler(s.Router)
 
 	defer s.Logger.Flush()
