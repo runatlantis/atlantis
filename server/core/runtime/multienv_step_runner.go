@@ -35,7 +35,9 @@ func (r *MultiEnvStepRunner) Run(ctx models.ProjectCommandContext, command strin
 		if err == nil {
 			ctx.Log.Debug("No error in run step")
 			if callerResult.Success {
+				ctx.Log.Debug("callerResult.Success is true")
 				if len(callerResult.Result) > 0 {
+					ctx.Log.Debug("callerResult.Result has elements")
 					var sb strings.Builder
 					sb.WriteString("Dynamic environment variables added:\n")
 					for _, item := range callerResult.Result {
@@ -52,7 +54,7 @@ func (r *MultiEnvStepRunner) Run(ctx models.ProjectCommandContext, command strin
 			ctx.Log.Debug("Error3: %s", callerResult.ErrorMessage)
 			return callerResult.ErrorMessage, nil
 		}
-		ctx.Log.Debug("Error2 xxxxx : %s", err)
+		ctx.Log.Debug("Error2: %s", err)
 		return "Parsing the json result of the multienv step failed, json content: " + res, err
 	}
 	ctx.Log.Debug("Error1")
