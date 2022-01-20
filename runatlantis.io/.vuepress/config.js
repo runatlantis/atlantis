@@ -35,9 +35,14 @@ module.exports = {
             {text: 'Home', link: '/'},
             {text: 'Guide', link: '/guide/'},
             {text: 'Docs', link: '/docs/'},
+            {text: 'Streaming Logs', link: '/logs/'},
             {text: 'Blog', link: 'https://medium.com/runatlantis'}
         ],
         sidebar: {
+            '/logs/': [
+                '',
+                'streaming-logs'
+            ],
             '/guide/': [
                 '',
                 'test-drive',
