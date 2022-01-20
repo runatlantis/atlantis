@@ -52,7 +52,7 @@ func (r *MultiEnvStepRunner) Run(ctx models.ProjectCommandContext, command strin
 			ctx.Log.Debug("Error3: %s", callerResult.ErrorMessage)
 			return callerResult.ErrorMessage, nil
 		}
-		ctx.Log.Debug("Error2: %s", res)
+		ctx.Log.Debug("Error2: %s : %s", res, err)
 		return "Parsing the json result of the multienv step failed, json content: " + res, err
 	}
 	ctx.Log.Debug("Error1")
