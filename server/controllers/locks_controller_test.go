@@ -227,7 +227,7 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(nil, errors.New("err"))
+	When(dlc.DeleteLock("id")).ThenReturn(nil, nil, errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -243,7 +243,7 @@ func TestDeleteLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 404")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(nil, nil)
+	When(dlc.DeleteLock("id")).ThenReturn(nil, nil, nil)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -260,7 +260,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	RegisterMockTestingT(t)
 	cp := vcsmocks.NewMockClient()
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{}, nil)
+	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{}, nil, nil)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -296,7 +296,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			Path:         projectPath,
 			RepoFullName: repoName,
 		},
-	}, nil)
+	}, nil, nil)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	db, err := db.New(tmp)
@@ -347,7 +347,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{FullName: "owner/repo"},
 		},
-	}, nil)
+	}, nil, nil)
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
@@ -388,7 +388,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 			Path:         "path",
 			RepoFullName: "owner/repo",
 		},
-	}, nil)
+	}, nil, nil)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	db, err := db.New(tmp)

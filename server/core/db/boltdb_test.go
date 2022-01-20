@@ -256,14 +256,14 @@ func TestLockingExistingLock(t *testing.T) {
 		Equals(t, newLock, currLock)
 	}
 
-	t.Log("...not succeed if the new project only has a different pullNum")
+	t.Log("...succeed if the new project has a different pullNum, the locking attempt will be queued")
 	{
 		newLock := lock
 		newLock.Pull.Num = lock.Pull.Num + 1
-		acquired, currLock, _, err := b.TryLock(newLock)
+		acquired, _, enqueueStatus, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, false, acquired)
-		Equals(t, currLock.Pull.Num, pullNum)
+		Equals(t, 1, enqueueStatus.ProjectLocksInFront)
 	}
 }
 
