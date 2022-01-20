@@ -65,13 +65,13 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 				TerraformVersion: tfVersion,
 				ProjectName:      c.ProjectName,
 			}
-			value, err := multiEnvStepRunner.Run(ctx, c.Command, c.Value, tmpDir, map[string]string(nil))
+			value, err := multiEnvStepRunner.Run(ctx, c.Command, tmpDir, map[string]string(nil))
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return
 			}
 			Ok(t, err)
-			Equals(t, c.ExpValue, value)
+			Equals(t, c.ExpOut, value)
 		})
 	}
 }
