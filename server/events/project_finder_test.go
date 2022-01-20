@@ -14,7 +14,6 @@
 package events_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,7 +45,7 @@ func setupTmpRepos(t *testing.T) {
 	//   modules/
 	//     main.tf
 	var err error
-	nestedModules1, err = ioutil.TempDir("", "")
+	nestedModules1, err = os.MkdirTemp("", "")
 	Ok(t, err)
 	err = os.MkdirAll(filepath.Join(nestedModules1, "project1/modules"), 0700)
 	Ok(t, err)
@@ -78,7 +77,7 @@ func setupTmpRepos(t *testing.T) {
 	//    main.tf
 	//  project2/
 	//    main.tf
-	topLevelModules, err = ioutil.TempDir("", "")
+	topLevelModules, err = os.MkdirTemp("", "")
 	Ok(t, err)
 	for _, path := range []string{"modules", "project1", "project2"} {
 		err = os.MkdirAll(filepath.Join(topLevelModules, path), 0700)
@@ -93,7 +92,7 @@ func setupTmpRepos(t *testing.T) {
 	//   staging.tfvars
 	//   production.tfvars
 	//   global-env-config.auto.tfvars.json
-	envDir, err = ioutil.TempDir("", "")
+	envDir, err = os.MkdirTemp("", "")
 	Ok(t, err)
 	err = os.MkdirAll(filepath.Join(envDir, "env"), 0700)
 	Ok(t, err)
@@ -107,7 +106,7 @@ func TestDetermineProjects(t *testing.T) {
 	noopLogger := logging.NewNoopLogger(t)
 	setupTmpRepos(t)
 
-	defaultAutoplanFileList := "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
+	defaultAutoplanFileList := "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 
 	cases := []struct {
 		description      string
@@ -248,6 +247,13 @@ func TestDetermineProjects(t *testing.T) {
 			[]string{"project1"},
 			topLevelModules,
 			"**/*.yml,!project2/*.yml",
+		},
+		{
+			"Should not ignore .terraform.lock.hcl files",
+			[]string{"project1/.terraform.lock.hcl"},
+			[]string{"project1"},
+			nestedModules1,
+			defaultAutoplanFileList,
 		},
 	}
 	for _, c := range cases {

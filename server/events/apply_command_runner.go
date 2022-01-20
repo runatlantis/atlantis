@@ -21,6 +21,7 @@ func NewApplyCommandRunner(
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
+	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
 		vcsClient:                  vcsClient,
@@ -36,21 +37,23 @@ func NewApplyCommandRunner(
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		pullReqStatusFetcher:       pullReqStatusFetcher,
 	}
 }
 
 type ApplyCommandRunner struct {
-	DisableApplyAll     bool
-	DB                  *db.BoltDB
-	locker              locking.ApplyLockChecker
-	vcsClient           vcs.Client
-	commitStatusUpdater CommitStatusUpdater
-	prjCmdBuilder       ProjectApplyCommandBuilder
-	prjCmdRunner        ProjectApplyCommandRunner
-	autoMerger          *AutoMerger
-	pullUpdater         *PullUpdater
-	dbUpdater           *DBUpdater
-	parallelPoolSize    int
+	DisableApplyAll      bool
+	DB                   *db.BoltDB
+	locker               locking.ApplyLockChecker
+	vcsClient            vcs.Client
+	commitStatusUpdater  CommitStatusUpdater
+	prjCmdBuilder        ProjectApplyCommandBuilder
+	prjCmdRunner         ProjectApplyCommandRunner
+	autoMerger           *AutoMerger
+	pullUpdater          *PullUpdater
+	dbUpdater            *DBUpdater
+	parallelPoolSize     int
+	pullReqStatusFetcher vcs.PullReqStatusFetcher
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects bool
@@ -98,16 +101,15 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	// We do this here because when we set a "Pending" status, if users have
 	// required the Atlantis status checks to pass, then we've now changed
 	// the mergeability status of the pull request.
-	ctx.PullMergeable, err = a.vcsClient.PullIsMergeable(baseRepo, pull)
+	// This sets the approved, mergeable, and sqlocked status in the context.
+	ctx.PullRequestStatus, err = a.pullReqStatusFetcher.FetchPullStatus(baseRepo, pull)
 	if err != nil {
 		// On error we continue the request with mergeable assumed false.
 		// We want to continue because not all apply's will need this status,
 		// only if they rely on the mergeability requirement.
-		ctx.PullMergeable = false
-		ctx.Log.Warn("unable to get mergeable status: %s. Continuing with mergeable assumed false", err)
+		// All PullRequestStatus fields are set to false by default when error.
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
 	}
-
-	ctx.Log.Info("pull request mergeable status: %t", ctx.PullMergeable)
 
 	var projectCmds []models.ProjectCommandContext
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)

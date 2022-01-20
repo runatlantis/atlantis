@@ -74,7 +74,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		t.Run(c.Command, func(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
-			ctx := models.PreWorkflowHookCommandContext{
+			ctx := models.WorkflowHookCommandContext{
 				BaseRepo: models.Repo{
 					Name:  "basename",
 					Owner: "baseowner",

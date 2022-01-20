@@ -4,6 +4,7 @@ package valid
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 
@@ -22,6 +23,7 @@ type RepoCfg struct {
 	ParallelPlan              bool
 	ParallelPolicyCheck       bool
 	DeleteSourceBranchOnMerge *bool
+	AllowedRegexpPrefixes     []string
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
@@ -65,7 +67,24 @@ func (r RepoCfg) FindProjectsByName(name string) []Project {
 			}
 		}
 	}
+	// If we found more than one project then we need to make sure that the regex is allowed.
+	if len(ps) > 1 && !isRegexAllowed(name, r.AllowedRegexpPrefixes) {
+		log.Printf("Found more than one project for regex %q. This regex is not on the allow list.", name)
+		return nil
+	}
 	return ps
+}
+
+func isRegexAllowed(name string, allowedRegexpPrefixes []string) bool {
+	if len(allowedRegexpPrefixes) == 0 {
+		return true
+	}
+	for _, allowedRegexPrefix := range allowedRegexpPrefixes {
+		if strings.HasPrefix(name, allowedRegexPrefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in

@@ -2,7 +2,6 @@ package yaml_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -68,7 +67,7 @@ func TestParseRepoCfg_FileDoesNotExist(t *testing.T) {
 func TestParseRepoCfg_BadPermissions(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
-	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), nil, 0000)
+	err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), nil, 0000)
 	Ok(t, err)
 
 	r := yaml.ParserValidator{}
@@ -103,7 +102,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			confPath := filepath.Join(tmpDir, "atlantis.yaml")
-			err := ioutil.WriteFile(confPath, []byte(c.input), 0600)
+			err := os.WriteFile(confPath, []byte(c.input), 0600)
 			Ok(t, err)
 			r := yaml.ParserValidator{}
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "")
@@ -1068,7 +1067,7 @@ workflows:
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
+			err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
 			Ok(t, err)
 
 			r := yaml.ParserValidator{}
@@ -1096,7 +1095,7 @@ projects:
   workflow: custom
 workflows:
   custom: ~`
-	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(repoCfg), 0600)
+	err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(repoCfg), 0600)
 	Ok(t, err)
 
 	r := yaml.ParserValidator{}
@@ -1132,11 +1131,17 @@ func TestParseGlobalCfg(t *testing.T) {
 	}
 
 	defaultCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
-	preWorkflowHook := &valid.PreWorkflowHook{
+	preWorkflowHook := &valid.WorkflowHook{
 		StepName:   "run",
 		RunCommand: "custom workflow command",
 	}
-	preWorkflowHooks := []*valid.PreWorkflowHook{preWorkflowHook}
+	preWorkflowHooks := []*valid.WorkflowHook{preWorkflowHook}
+
+	postWorkflowHook := &valid.WorkflowHook{
+		StepName:   "run",
+		RunCommand: "custom workflow command",
+	}
+	postWorkflowHooks := []*valid.WorkflowHook{postWorkflowHook}
 
 	customWorkflow1 := valid.Workflow{
 		Name: "custom1",
@@ -1307,11 +1312,15 @@ repos:
   pre_workflow_hooks:
     - run: custom workflow command
   workflow: custom1
+  post_workflow_hooks:
+    - run: custom workflow command
   allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge]
   allow_custom_workflows: true
 - id: /.*/
   branch: /(master|main)/
   pre_workflow_hooks:
+    - run: custom workflow command
+  post_workflow_hooks:
     - run: custom workflow command
 workflows:
   custom1:
@@ -1346,13 +1355,15 @@ policies:
 						ApplyRequirements:    []string{"approved", "mergeable"},
 						PreWorkflowHooks:     preWorkflowHooks,
 						Workflow:             &customWorkflow1,
+						PostWorkflowHooks:    postWorkflowHooks,
 						AllowedOverrides:     []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
-						IDRegex:          regexp.MustCompile(".*"),
-						BranchRegex:      regexp.MustCompile("(master|main)"),
-						PreWorkflowHooks: preWorkflowHooks,
+						IDRegex:           regexp.MustCompile(".*"),
+						BranchRegex:       regexp.MustCompile("(master|main)"),
+						PreWorkflowHooks:  preWorkflowHooks,
+						PostWorkflowHooks: postWorkflowHooks,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1474,7 +1485,7 @@ workflows:
 			tmp, cleanup := TempDir(t)
 			defer cleanup()
 			path := filepath.Join(tmp, "conf.yaml")
-			Ok(t, ioutil.WriteFile(path, []byte(c.input), 0600))
+			Ok(t, os.WriteFile(path, []byte(c.input), 0600))
 
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:  false,
@@ -1735,8 +1746,8 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
     apply:
       steps:
       - run: %s`, c.in, c.in)
-			Ok(t, ioutil.WriteFile(v2Path, []byte("version: 2\n"+cfg), 0600))
-			Ok(t, ioutil.WriteFile(v3Path, []byte("version: 3\n"+cfg), 0600))
+			Ok(t, os.WriteFile(v2Path, []byte("version: 2\n"+cfg), 0600))
+			Ok(t, os.WriteFile(v3Path, []byte("version: 3\n"+cfg), 0600))
 
 			p := &yaml.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{

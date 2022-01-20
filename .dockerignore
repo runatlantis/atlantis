@@ -1,3 +1,8 @@
 *
+!cmd/
+!server/
+!testdrive/
+!main.go
+!go.mod
+!go.sum
 !docker-entrypoint.sh
-!atlantis

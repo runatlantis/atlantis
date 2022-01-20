@@ -2,13 +2,14 @@ package terraform
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/events/models"
+	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -24,7 +25,7 @@ func TestGenerateRCFile_WritesFile(t *testing.T) {
 	expContents := `credentials "hostname" {
   token = "token"
 }`
-	actContents, err := ioutil.ReadFile(filepath.Join(tmp, ".terraformrc"))
+	actContents, err := os.ReadFile(filepath.Join(tmp, ".terraformrc"))
 	Ok(t, err)
 	Equals(t, expContents, string(actContents))
 }
@@ -36,7 +37,7 @@ func TestGenerateRCFile_WillNotOverwrite(t *testing.T) {
 	defer cleanup()
 
 	rcFile := filepath.Join(tmp, ".terraformrc")
-	err := ioutil.WriteFile(rcFile, []byte("contents"), 0600)
+	err := os.WriteFile(rcFile, []byte("contents"), 0600)
 	Ok(t, err)
 
 	actErr := generateRCFile("token", "hostname", tmp)
@@ -54,7 +55,7 @@ func TestGenerateRCFile_NoErrIfContentsSame(t *testing.T) {
 	contents := `credentials "app.terraform.io" {
   token = "token"
 }`
-	err := ioutil.WriteFile(rcFile, []byte(contents), 0600)
+	err := os.WriteFile(rcFile, []byte(contents), 0600)
 	Ok(t, err)
 
 	err = generateRCFile("token", "app.terraform.io", tmp)
@@ -68,7 +69,7 @@ func TestGenerateRCFile_ErrIfCannotRead(t *testing.T) {
 	defer cleanup()
 
 	rcFile := filepath.Join(tmp, ".terraformrc")
-	err := ioutil.WriteFile(rcFile, []byte("can't see me!"), 0000)
+	err := os.WriteFile(rcFile, []byte("can't see me!"), 0000)
 	Ok(t, err)
 
 	expErr := fmt.Sprintf("trying to read %s to ensure we're not overwriting it: open %s: permission denied", rcFile, rcFile)
@@ -89,12 +90,32 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
+	logger := logging.NewNoopLogger(t)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
+	ctx := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
 	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
 		usePluginCache:          true,
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
 	args := []string{
@@ -104,8 +125,8 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	log := logging.NewNoopLogger(t)
-	out, err := client.RunCommandWithVersion(log, tmp, args, map[string]string{}, nil, "workspace")
+	customEnvVars := map[string]string{}
+	out, err := client.RunCommandWithVersion(ctx, tmp, args, customEnvVars, nil, "workspace")
 	Ok(t, err)
 	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
 	Equals(t, exp, out)
@@ -116,11 +137,31 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
+	logger := logging.NewNoopLogger(t)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
+	ctx := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
 	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
 	args := []string{
@@ -129,8 +170,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 		"exit",
 		"1",
 	}
-	log := logging.NewNoopLogger(t)
-	out, err := client.RunCommandWithVersion(log, tmp, args, map[string]string{}, nil, "workspace")
+	out, err := client.RunCommandWithVersion(ctx, tmp, args, map[string]string{}, nil, "workspace")
 	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
 	// Test that we still get our output.
 	Equals(t, "dying\n", out)
@@ -140,12 +180,32 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
+	logger := logging.NewNoopLogger(t)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
+	ctx := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
 	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
 		usePluginCache:          true,
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
 	args := []string{
@@ -155,8 +215,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	log := logging.NewNoopLogger(t)
-	_, outCh := client.RunCommandAsync(log, tmp, args, map[string]string{}, nil, "workspace")
+	_, outCh := client.RunCommandAsync(ctx, tmp, args, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -168,11 +227,31 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
+	logger := logging.NewNoopLogger(t)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
+	ctx := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
 	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "cat",
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	filename := filepath.Join(tmp, "data")
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -185,8 +264,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		_, err = f.WriteString(s)
 		Ok(t, err)
 	}
-	log := logging.NewNoopLogger(t)
-	_, outCh := client.RunCommandAsync(log, tmp, []string{filename}, map[string]string{}, nil, "workspace")
+	_, outCh := client.RunCommandAsync(ctx, tmp, []string{filename}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -197,14 +275,33 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
+	logger := logging.NewNoopLogger(t)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
+	ctx := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
 	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	log := logging.NewNoopLogger(t)
-	_, outCh := client.RunCommandAsync(log, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
+	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -215,14 +312,33 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
+	logger := logging.NewNoopLogger(t)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
+	ctx := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
 	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	log := logging.NewNoopLogger(t)
-	_, outCh := client.RunCommandAsync(log, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
+	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
@@ -234,14 +350,34 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
+	logger := logging.NewNoopLogger(t)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
+	ctx := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
 	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "read",
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	log := logging.NewNoopLogger(t)
-	inCh, outCh := client.RunCommandAsync(log, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
+
+	inCh, outCh := client.RunCommandAsync(ctx, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
 	inCh <- "echo me\n"
 
 	out, err := waitCh(outCh)
