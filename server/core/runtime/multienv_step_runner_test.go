@@ -22,7 +22,7 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 	}{
 		{
 			Command: `echo '{"Success": true, "errorMessage":"", "Result":[{"name":"TF_VAR_REPODEFINEDVARIABLE_ONE","value":"value1"}]}'`,
-			ExpOut:  "",
+			ExpOut:  "Dynamic environment variables added:\nTF_VAR_REPODEFINEDVARIABLE_ONE\n",
 			Version: "v1.2.3",
 		},
 	}
