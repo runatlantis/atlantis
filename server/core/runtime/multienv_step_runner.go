@@ -40,7 +40,9 @@ func (r *MultiEnvStepRunner) Run(ctx models.ProjectCommandContext, command strin
 						envs[item.Name] = item.Value
 						sb.WriteString(item.Name)
 						sb.WriteString("\n")
+						ctx.Log.Debug("Environment variable added: %s", item.Name)
 					}
+					ctx.Log.Debug("All dynamic environment variables added.")
 					return sb.String(), nil
 				}
 				return "No dynamic environment variable added", nil
