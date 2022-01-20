@@ -33,6 +33,7 @@ import (
 
 const (
 	planfileSlashReplace = "::"
+	LogStreamingClearMsg = "\n-----Starting New Process-----"
 )
 
 type PullReqStatus struct {
@@ -422,6 +423,23 @@ func (p ProjectCommandContext) GetShowResultFileName() string {
 	return fmt.Sprintf("%s-%s.json", projName, p.Workspace)
 }
 
+// Gets a unique identifier for the current pull request as a single string
+func (p ProjectCommandContext) PullInfo() string {
+	return BuildPullInfo(p.BaseRepo.FullName, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
+}
+
+func BuildPullInfo(repoName string, pullNum int, projectName string, relDir string, workspace string) string {
+	projectIdentifier := GetProjectIdentifier(relDir, projectName)
+	return fmt.Sprintf("%s/%d/%s/%s", repoName, pullNum, projectIdentifier, workspace)
+}
+
+func GetProjectIdentifier(relRepoDir string, projectName string) string {
+	if projectName != "" {
+		return projectName
+	}
+	return strings.ReplaceAll(relRepoDir, "/", "-")
+}
+
 // SplitRepoFullName splits a repo full name up into its owner and repo
 // name segments. If the repoFullName is malformed, may return empty
 // strings for owner or repo.
@@ -665,6 +683,14 @@ func (c CommandName) TitleString() string {
 	return strings.Title(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
 }
 
+type ProjectCmdOutputLine struct {
+	ProjectInfo string
+
+	Line string
+
+	ClearBuffBefore bool
+}
+
 // String returns the string representation of c.
 func (c CommandName) String() string {
 	switch c {
@@ -684,9 +710,9 @@ func (c CommandName) String() string {
 	return ""
 }
 
-// PreWorkflowHookCommandContext defines the context for a pre_worklfow_hooks that will
+// WorkflowHookCommandContext defines the context for a pre and post worklfow_hooks that will
 // be executed before workflows.
-type PreWorkflowHookCommandContext struct {
+type WorkflowHookCommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
 	// HeadRepo is the repository that is getting merged into the BaseRepo.

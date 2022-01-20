@@ -121,8 +121,8 @@ Values are chosen in this order:
   * Accepts a comma separated list, ex. `pattern1,pattern2`.
   * Patterns use the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
   * List of file patterns will be used by both automatic and manually run plans.
-  * When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json` and `terragrunt.hcl` files
-    (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl'`).
+  * When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json`,  `terragrunt.hcl` and `.terraform.lock.hcl` files
+    (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
   * Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
   * A custom [Workflow](repo-level-atlantis-yaml.html#configuring-planning) that uses autoplan `when_modified` will ignore this value.
 
@@ -155,7 +155,7 @@ Values are chosen in this order:
 
 * ### `--azuredevops-token`
   ```bash
-  atlantis server --azuredevops-token="username@example.com"
+  atlantis server --azuredevops-token="RandomStringProducedByAzureDevOps"
   ```
   Azure DevOps token of API user. Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN
   environment variable.
@@ -309,7 +309,7 @@ Values are chosen in this order:
   # or (recommended)
   ATLANTIS_GH_WEBHOOK_SECRET='secret' atlantis server
   ```
-  Secret used to validate GitHub webhooks (see [https://developer.github.com/webhooks/securing/](https://docs.github.com/en/free-pro-team@latest/developers/webhooks-and-events/securing-your-webhooks)).
+  Secret used to validate GitHub webhooks (see [https://developer.github.com/webhooks/securing/](https://docs.github.com/en/developers/webhooks-and-events/webhooks/securing-your-webhooks)).
 
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub.
@@ -326,7 +326,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-app-id="00000"
   ```
-  GitHub app ID. If set, GitHub authentication will be performed as [an installation](https://developer.github.com/v3/apps/installations/).
+  GitHub app ID. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/reference/apps#installations).
 
   ::: tip
   A GitHub app can be created by starting Atlantis first, then pointing your browser at
@@ -348,23 +348,23 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-app-key-file="path/to/app-key.pem"
   ```
-  Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://developer.github.com/v3/apps/installations/).
+  Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/reference/apps#installations).
 
 - ### `--gh-app-key`
   ```bash
-  atlantis server --gh-app-key="-----BEGIN RSA PRIVATE KEY-----(...)" 
+  atlantis server --gh-app-key="-----BEGIN RSA PRIVATE KEY-----(...)"
   ```
   The PEM encoded private key for the GitHub App.
 
   ::: warning SECURITY WARNING
   The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gh-app-key-file` to mitigate that risk.
   :::
-- 
+-
 - ### `--gh-team-allowlist`
   ```bash
   atlantis server --gh-team-allowlist="myteam:plan, secteam:apply"
   ```
-  Comma-separated list of GitHub team and permission pairs.  By default, any team can plan and apply.
+  Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
 
 * ### `--gitlab-hostname`
   ```bash

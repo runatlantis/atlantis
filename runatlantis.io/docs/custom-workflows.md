@@ -128,19 +128,19 @@ workflows:
   myworkflow:
     plan:
       steps:
-      - run: terraform init -input=false -no-color
+      - run: terraform init -input=false
       
       # If you're using workspaces you need to select the workspace using the
       # $WORKSPACE environment variable.
-      - run: terraform workspace select -no-color $WORKSPACE
+      - run: terraform workspace select $WORKSPACE
       
       # You MUST output the plan using -out $PLANFILE because Atlantis expects
       # plans to be in a specific location.
-      - run: terraform plan -input=false -refresh -no-color -out $PLANFILE
+      - run: terraform plan -input=false -refresh -out $PLANFILE
     apply:
       steps:
       # Again, you must use the $PLANFILE environment variable.
-      - run: terraform apply -no-color $PLANFILE
+      - run: terraform apply $PLANFILE
 ```
 
 ### Terragrunt
@@ -176,14 +176,14 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt plan -no-color -out=$PLANFILE
-      - run: terragrunt show -no-color -json $PLANFILE > $SHOWFILE
+      - run: terragrunt plan -out=$PLANFILE
+      - run: terragrunt show -json $PLANFILE > $SHOWFILE
     apply:
       steps:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt apply -no-color $PLANFILE
+      - run: terragrunt apply $PLANFILE
 ```
 
 If using the repo's `atlantis.yaml` file you would use the following config:
@@ -201,13 +201,13 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt plan -no-color -out $PLANFILE
+      - run: terragrunt plan -out $PLANFILE
     apply:
       steps:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt apply -no-color $PLANFILE
+      - run: terragrunt apply $PLANFILE
 ```
 
 **NOTE:** If using the repo's `atlantis.yaml` file, you will need to specify each directory that is a Terragrunt project.

@@ -164,6 +164,48 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "Always find exact matches even if the prefix is not allowed",
+			nameRegex:   ".*",
+			input: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:              ".",
+						Name:             String("prod_terragrunt_myproject"),
+						Workspace:        "myworkspace",
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							Enabled:      false,
+						},
+						ApplyRequirements: []string{"approved"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"myworkflow": {
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
+					},
+				},
+				AllowedRegexpPrefixes: []string{"dev", "staging"},
+			},
+			expProjects: []valid.Project{
+				{
+					Dir:              ".",
+					Name:             String("prod_terragrunt_myproject"),
+					Workspace:        "myworkspace",
+					TerraformVersion: tfVersion,
+					Autoplan: valid.Autoplan{
+						WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+						Enabled:      false,
+					},
+					ApplyRequirements: []string{"approved"},
+				},
+			},
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {

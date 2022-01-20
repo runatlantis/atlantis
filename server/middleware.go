@@ -30,7 +30,7 @@ func NewRequestLogger(s *Server) *RequestLogger {
 	}
 }
 
-// RequestLogger logs requests and their response codes
+// RequestLogger logs requests and their response codes.
 // as well as handle the basicauth on the requests
 type RequestLogger struct {
 	logger            logging.SimpleLogging

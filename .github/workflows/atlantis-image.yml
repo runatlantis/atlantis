@@ -49,7 +49,7 @@ jobs:
     - name: populate release version
       if: ${{ github.event_name == 'release'}}
       run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-    - name: Build and push atlantis:$RELEASE_VERSION image
+    - name: Build and push atlantis:${{ env.RELEASE_VERSION }} image
       if: ${{ github.event_name == 'release'}}
       uses: docker/build-push-action@v2
       with:
@@ -57,5 +57,5 @@ jobs:
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
-          ghcr.io/runatlantis/atlantis:$RELEASE_VERSION
+          ghcr.io/runatlantis/atlantis:${{ env.RELEASE_VERSION }}
           ghcr.io/runatlantis/atlantis:latest

@@ -34,6 +34,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -46,6 +47,8 @@ var userConfig server.UserConfig
 type NoopTFDownloader struct{}
 
 var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
+
+var mockPostWorkflowHookRunner *runtimemocks.MockPostWorkflowHookRunner
 
 func (m *NoopTFDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
 	return nil
@@ -424,7 +427,10 @@ func TestGitHubWorkflow(t *testing.T) {
 			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsPreWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+
+			// Let's verify the post-workflow hook was called for each comment including the pull request opened event
+			mockPostWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some post dummy command"), AnyString())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -511,6 +517,20 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			},
 			LockFileTracked: false,
 		},
+		{
+			Description:   "Modified .terraform.lock.hcl triggers autoplan ",
+			RepoDir:       "simple-with-lockfile",
+			ModifiedFiles: []string{".terraform.lock.hcl"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis plan",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-plan.txt"},
+			},
+			LockFileTracked: true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -593,7 +613,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			}
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(runtimematchers.AnyModelsPreWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -813,9 +833,10 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	// Mocks.
 	e2eVCSClient := vcsmocks.NewMockClient()
-	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}}
+	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
 
 	// Real dependencies.
 	logger := logging.NewNoopLogger(t)
@@ -830,7 +851,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		GithubUser: "github-user",
 		GitlabUser: "gitlab-user",
 	}
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false)
+	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, projectCmdOutputHandler)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
@@ -853,10 +874,16 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		AllowRepoCfg: true,
 		MergeableReq: false,
 		ApprovedReq:  false,
-		PreWorkflowHooks: []*valid.PreWorkflowHook{
+		PreWorkflowHooks: []*valid.WorkflowHook{
 			{
 				StepName:   "global_hook",
 				RunCommand: "some dummy command",
+			},
+		},
+		PostWorkflowHooks: []*valid.WorkflowHook{
+			{
+				StepName:   "global_hook",
+				RunCommand: "some post dummy command",
 			},
 		},
 		PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
@@ -880,6 +907,16 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: mockPreWorkflowHookRunner,
 	}
+
+	mockPostWorkflowHookRunner = runtimemocks.NewMockPostWorkflowHookRunner()
+	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
+		VCSClient:              e2eVCSClient,
+		GlobalCfg:              globalCfg,
+		WorkingDirLocker:       locker,
+		WorkingDir:             workingDir,
+		PostWorkflowHookRunner: mockPostWorkflowHookRunner,
+	}
+
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		userConfig.EnablePolicyChecksFlag,
 		parser,
@@ -892,7 +929,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		commentParser,
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
@@ -1036,18 +1073,19 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
-		EventParser:                   eventParser,
-		VCSClient:                     e2eVCSClient,
-		GithubPullGetter:              e2eGithubGetter,
-		GitlabMergeRequestGetter:      e2eGitlabGetter,
-		Logger:                        logger,
-		GlobalCfg:                     globalCfg,
-		AllowForkPRs:                  allowForkPRs,
-		AllowForkPRsFlag:              "allow-fork-prs",
-		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
-		Drainer:                       drainer,
-		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
-		PullStatusFetcher:             boltdb,
+		EventParser:                    eventParser,
+		VCSClient:                      e2eVCSClient,
+		GithubPullGetter:               e2eGithubGetter,
+		GitlabMergeRequestGetter:       e2eGitlabGetter,
+		Logger:                         logger,
+		GlobalCfg:                      globalCfg,
+		AllowForkPRs:                   allowForkPRs,
+		AllowForkPRsFlag:               "allow-fork-prs",
+		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
+		Drainer:                        drainer,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		PullStatusFetcher:              boltdb,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
@@ -1057,10 +1095,12 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		TestingMode:   true,
 		CommandRunner: commandRunner,
 		PullCleaner: &events.PullClosedExecutor{
-			Locker:     lockingClient,
-			VCSClient:  e2eVCSClient,
-			WorkingDir: workingDir,
-			DB:         boltdb,
+			Locker:                   lockingClient,
+			VCSClient:                e2eVCSClient,
+			WorkingDir:               workingDir,
+			DB:                       boltdb,
+			PullClosedTemplate:       &events.PullClosedEventTemplate{},
+			LogStreamResourceCleaner: projectCmdOutputHandler,
 		},
 		Logger:                       logger,
 		Parser:                       eventParser,

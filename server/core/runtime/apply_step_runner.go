@@ -22,11 +22,6 @@ type ApplyStepRunner struct {
 }
 
 func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	tfVersion := a.DefaultTFVersion
-	if ctx.TerraformVersion != nil {
-		tfVersion = ctx.TerraformVersion
-	}
-
 	if a.hasTargetFlag(ctx, extraArgs) {
 		return "", errors.New("cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan")
 	}
@@ -45,16 +40,16 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
-		args := append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...)
-		out, err = a.runRemoteApply(ctx, args, path, planPath, tfVersion, envs)
+		args := append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...)
+		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion, envs)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
 		}
 	} else {
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
-		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
-		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, args, envs, tfVersion, ctx.Workspace)
+		args := append(append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
+		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, ctx.TerraformVersion, ctx.Workspace)
 	}
 
 	// If the apply was successful, delete the plan.
@@ -137,7 +132,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx.Log, filepath.Clean(path), applyArgs, envs, tfVersion, ctx.Workspace)
+	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), applyArgs, envs, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string
