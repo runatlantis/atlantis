@@ -21,7 +21,7 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 		Version     string
 	}{
 		{
-			Command: "echo {\"Success\": \"true\", \"ErrorMessage\":\"\", \"Result\":[{\"name\":\"TF_VAR_REPODEFINEDVARIABLE_ONE\",\"value\":\"value1\"}]}",
+			Command: `echo {"Success": "true", "ErrorMessage":"", "Result":[{"name":"TF_VAR_REPODEFINEDVARIABLE_ONE","value":"value1"}]}`,
 			ExpOut:  "",
 			Version: "v1.2.3",
 		},
