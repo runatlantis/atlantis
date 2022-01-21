@@ -52,15 +52,15 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 					t.Logf("forcing retry %q", r.RequestURI)
 					http.Error(w, "not found", http.StatusNotFound)
 					return
-				} else {
-					// decrement numCalls to force one retry on page 2 as well
-					numCalls--
-					// We write a header that means there's an additional page.
-					w.Header().Add("Link", `<https://api.github.com/resource?page=2>; rel="next",
-      <https://api.github.com/resource?page=2>; rel="last"`)
-					w.Write([]byte(firstResp)) // nolint: errcheck
-					return
 				}
+				// decrement numCalls to force one retry on page 2 as well
+				numCalls--
+				// We write a header that means there's an additional page.
+				w.Header().Add("Link", `<https://api.github.com/resource?page=2>; rel="next",
+      <https://api.github.com/resource?page=2>; rel="last"`)
+				w.Write([]byte(firstResp)) // nolint: errcheck
+				return
+
 				// The second should hit this URL.
 			case "/api/v3/repos/owner/repo/pulls/1/files?page=2&per_page=300":
 				if numCalls < maxCalls {
@@ -68,9 +68,9 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 					t.Logf("forcing retry %q", r.RequestURI)
 					http.Error(w, "not found", http.StatusNotFound)
 					return
-				} else {
-					w.Write([]byte(secondResp)) // nolint: errcheck
 				}
+				w.Write([]byte(secondResp)) // nolint: errcheck
+
 			default:
 				t.Errorf("got unexpected request at %q", r.RequestURI)
 				http.Error(w, "not found", http.StatusNotFound)
