@@ -898,12 +898,13 @@ func mkSubDir(parentDir string, subDir string) (string, error) {
 
 // Healthz returns the health check response. It always returns a 200 currently.
 func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
-	data := []byte(`{
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(healthzData) // nolint: errcheck
+}
+
+var healthzData = []byte(`{
   "status": "ok"
 }`)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(data) // nolint: errcheck
-}
 
 // ParseAtlantisURL parses the user-passed atlantis URL to ensure it is valid
 // and we can use it in our templates.
