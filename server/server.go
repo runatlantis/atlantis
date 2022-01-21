@@ -17,7 +17,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -899,16 +898,9 @@ func mkSubDir(parentDir string, subDir string) (string, error) {
 
 // Healthz returns the health check response. It always returns a 200 currently.
 func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
-	data, err := json.MarshalIndent(&struct {
-		Status string `json:"status"`
-	}{
-		Status: "ok",
-	}, "", "  ")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error creating status json response: %s", err)
-		return
-	}
+	data := []byte(`{
+  "status": "ok"
+}`)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data) // nolint: errcheck
 }
