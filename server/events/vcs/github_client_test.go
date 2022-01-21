@@ -40,19 +40,37 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 ]`
 	firstResp := fmt.Sprintf(respTemplate, "file1.txt")
 	secondResp := fmt.Sprintf(respTemplate, "file2.txt")
+	maxCalls := 2
+	numCalls := 0
 	testServer := httptest.NewTLSServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
 			// The first request should hit this URL.
-			case "/api/v3/repos/owner/repo/pulls/1/files?per_page=300":
-				// We write a header that means there's an additional page.
-				w.Header().Add("Link", `<https://api.github.com/resource?page=2>; rel="next",
+			case "/api/v3/repos/owner/repo/pulls/1/files?page=1&per_page=300":
+				if numCalls < maxCalls {
+					numCalls++
+					t.Logf("forcing retry %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				} else {
+					// decrement numCalls to force one retry on page 2 as well
+					numCalls--
+					// We write a header that means there's an additional page.
+					w.Header().Add("Link", `<https://api.github.com/resource?page=2>; rel="next",
       <https://api.github.com/resource?page=2>; rel="last"`)
-				w.Write([]byte(firstResp)) // nolint: errcheck
-				return
+					w.Write([]byte(firstResp)) // nolint: errcheck
+					return
+				}
 				// The second should hit this URL.
 			case "/api/v3/repos/owner/repo/pulls/1/files?page=2&per_page=300":
-				w.Write([]byte(secondResp)) // nolint: errcheck
+				if numCalls < maxCalls {
+					numCalls++
+					t.Logf("forcing retry %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				} else {
+					w.Write([]byte(secondResp)) // nolint: errcheck
+				}
 			default:
 				t.Errorf("got unexpected request at %q", r.RequestURI)
 				http.Error(w, "not found", http.StatusNotFound)
@@ -105,7 +123,7 @@ func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
 			// The first request should hit this URL.
-			case "/api/v3/repos/owner/repo/pulls/1/files?per_page=300":
+			case "/api/v3/repos/owner/repo/pulls/1/files?page=1&per_page=300":
 				w.Write([]byte(resp)) // nolint: errcheck
 				return
 			default:
@@ -864,7 +882,7 @@ func TestGithubClient_SplitComments(t *testing.T) {
 }
 
 // Test that we retry the get pull request call if it 404s.
-func TestGithubClient_Retry404(t *testing.T) {
+func TestGithubClient_GetPullRequestRetry404(t *testing.T) {
 	var numCalls = 0
 
 	testServer := httptest.NewTLSServer(

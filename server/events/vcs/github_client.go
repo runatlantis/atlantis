@@ -60,19 +60,19 @@ type GithubAppTemporarySecrets struct {
 
 // NewGithubClient returns a valid GitHub client.
 func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging) (*GithubClient, error) {
-	transport, err := credentials.Client()
+	credentialedClient, err := credentials.Client()
 	if err != nil {
-		return nil, errors.Wrap(err, "error initializing github authentication transport")
+		return nil, errors.Wrap(err, "error initializing github authentication client")
 	}
 
 	var graphqlURL string
 	var client *github.Client
 	if hostname == "github.com" {
-		client = github.NewClient(transport)
+		client = github.NewClient(credentialedClient)
 		graphqlURL = "https://api.github.com/graphql"
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
-		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport)
+		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), credentialedClient)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +88,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 	// shurcooL's libraries completely.
 	v4MutateClient := graphql.NewClient(
 		graphqlURL,
-		transport,
+		credentialedClient,
 		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
 	)
 
@@ -111,19 +111,40 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 // relative to the repo root, e.g. parent/child/file.txt.
 func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
-	nextPage := 0
+	nextPage := 1
 	for {
 		opts := github.ListOptions{
+			Page:    nextPage,
 			PerPage: 300,
 		}
-		if nextPage != 0 {
-			opts.Page = nextPage
+
+		g.logger.Debug("GET /repos/%v/%v/pulls/%d/files&page=%d", repo.Owner, repo.Name, pull.Num, opts.Page)
+
+		var err error
+		var resp *github.Response
+		var pageFiles []*github.CommitFile
+
+		// Similar to GetPullRequest:
+		// GitHub has started to return 404's here (#1019) even after they send the webhook.
+		// They've got some eventual consistency issues going on so we're just going
+		// to attempt up to 5 times with exponential backoff.
+		maxAttempts := 5
+		attemptDelay := 0 * time.Second
+		for i := 0; i < maxAttempts; i++ {
+			// First don't sleep, then sleep 1, 3, 7, etc.
+			time.Sleep(attemptDelay)
+			attemptDelay = 2*attemptDelay + 1*time.Second
+
+			pageFiles, resp, err = g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
+			if err == nil {
+				break
+			}
+			ghErr, ok := err.(*github.ErrorResponse)
+			if !ok || ghErr.Response.StatusCode != 404 {
+				return files, err
+			}
 		}
-		g.logger.Debug("GET /repos/%v/%v/pulls/%d/files", repo.Owner, repo.Name, pull.Num)
-		pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
-		if err != nil {
-			return files, err
-		}
+
 		for _, f := range pageFiles {
 			files = append(files, f.GetFilename())
 
