@@ -115,3 +115,23 @@ func TestGenerateProjectJobURL_ShouldGenerateURLWithDirectoryAndWorkspaceWhenPro
 
 	Equals(t, expectedURL, gotURL)
 }
+
+func TestGenerateProjectJobURL_ShouldGenerateURLWhenWorkingDiSetToBase(t *testing.T) {
+	router := setupJobsRouter(t)
+	ctx := models.ProjectCommandContext{
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				Owner: "test-owner",
+				Name:  "test-repo",
+			},
+			Num: 1,
+		},
+		RepoRelDir: ".",
+		Workspace:  "default",
+	}
+	expectedURL := "http://localhost:4141/jobs/test-owner/test-repo/1/_/default"
+	gotURL, err := router.GenerateProjectJobURL(ctx)
+	Ok(t, err)
+
+	Equals(t, expectedURL, gotURL)
+}
