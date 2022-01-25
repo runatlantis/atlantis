@@ -408,6 +408,75 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		}
 	}
 
+	if err := g.validateDependencies(rCfg); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateDependencies will return an error if a dependency does not exist or circular dependencies are found
+func (g GlobalCfg) validateDependencies(rCfg RepoCfg) error {
+	projectDependencies := make(map[string][]string)
+	for _, p := range rCfg.Projects {
+		projectDependencies[p.Dir] = make([]string, len(p.DependsOn))
+		copy(projectDependencies[p.Dir], p.DependsOn)
+	}
+
+	// Validate dependency names
+	for p, dl := range projectDependencies {
+		for _, d := range dl {
+			if _, ok := projectDependencies[d]; !ok {
+				return fmt.Errorf("invalid dependency %q found in project %q", d, p)
+			}
+		}
+	}
+
+	// Validate there aren't any circular dependencies.
+	// Remove projects without dependencies. Repeat until no further changes are done.
+	// If there aren't any circular dependencies, the projectDependencies map will be empty afterwards
+	changed := true
+	for changed {
+		changed = false
+		for p, dl := range projectDependencies {
+			for i := len(dl) - 1; i >= 0; i-- {
+				// if the dependency is not in the project map anymore, remove it from this project's dependency list
+				if _, ok := projectDependencies[dl[i]]; !ok {
+					dl = append(dl[:i], dl[i+1:]...)
+					changed = true
+				}
+			}
+			projectDependencies[p] = dl
+			if len(dl) == 0 {
+				delete(projectDependencies, p)
+				changed = true
+			}
+		}
+	}
+
+	if len(projectDependencies) > 0 {
+		// There's at least one circular dependency chain.
+		// Find the first project in the chain and return an error
+
+		for _, p := range rCfg.Projects {
+			if _, ok := projectDependencies[p.Dir]; !ok {
+				continue
+			}
+
+			path := []string{p.Dir}
+			visited := make(map[string]bool)
+			for p, _ := range projectDependencies {
+				visited[p] = false
+			}
+			for !visited[path[len(path)-1]] {
+				visited[path[len(path)-1]] = true
+
+				path = append(path, projectDependencies[path[len(path)-1]][0])
+			}
+			return fmt.Errorf("circular dependencies found in projects: %s", strings.Join(path, " -> "))
+		}
+	}
+
 	return nil
 }
 

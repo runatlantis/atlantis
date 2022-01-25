@@ -402,6 +402,31 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			repoID: "github.com/owner/repo",
 			expErr: "",
 		},
+		"dependencies are valid": {
+			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}),
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:       "project_1",
+						DependsOn: []string{"project_2"},
+					},
+					{
+						Dir:       "project_2",
+						DependsOn: []string{"project_3"},
+					},
+					{
+						Dir:       "project_3",
+						DependsOn: []string{},
+					},
+				},
+			},
+			expErr: "",
+		},
 		"workflow not allowed": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
 				AllowRepoCfg:  false,
@@ -550,6 +575,56 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			},
 			repoID: "github.com/owner/repo",
 			expErr: "workflow \"doesntexist\" is not defined anywhere",
+		},
+		"circular dependencies are not allowed": {
+			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}),
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:       "project_1",
+						DependsOn: []string{"project_3"},
+					},
+					{
+						Dir:       "project_2",
+						DependsOn: []string{"project_1"},
+					},
+					{
+						Dir:       "project_3",
+						DependsOn: []string{"project_2", "project_4"},
+					},
+					{
+						Dir:       "project_4",
+						DependsOn: []string{},
+					},
+				},
+			},
+			expErr: "circular dependencies found in projects: project_1 -> project_3 -> project_2 -> project_1",
+		},
+		"invalid dependency name is not allowed": {
+			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}),
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:       "project_1",
+						DependsOn: []string{"project_2"},
+					},
+					{
+						Dir:       "project_2",
+						DependsOn: []string{"project_3"},
+					},
+				},
+			},
+			expErr: "invalid dependency \"project_3\" found in project \"project_2\"",
 		},
 	}
 	for name, c := range cases {
