@@ -404,26 +404,6 @@ func TestFeatureAwareRunCommentCommandRunner_CommentWhenEnabled(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "⚠️ WARNING ⚠️\n\n You have bypassed all apply requirements for this PR 🚀 . This can have unpredictable consequences 🙏🏽 and should only be used in an emergency 🆘 .\n\n 𝐓𝐡𝐢𝐬 𝐚𝐜𝐭𝐢𝐨𝐧 𝐰𝐢𝐥𝐥 𝐛𝐞 𝐚𝐮𝐝𝐢𝐭𝐞𝐝.\n", "")
 }
 
-func TestFeatureAwareRunCommentCommandRunner_NoCommentWhenDisabled(t *testing.T) {
-	t.Log("if \"atlantis apply --force\" is run and this is disabled atlantis should" +
-		" not comment with a warning")
-	vcsClient := setup(t)
-	allocator := fmocks.NewMockAllocator()
-
-	fa = events.FeatureAwareCommandRunner{
-		CommandRunner:    &ch,
-		VCSClient:        vcsClient,
-		Logger:           logger,
-		FeatureAllocator: allocator,
-	}
-
-	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
-	When(allocator.ShouldAllocate(feature.ForceApply, "runatlantis/atlantis")).ThenReturn(false, nil)
-
-	fa.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &events.CommentCommand{Name: models.ApplyCommand, ForceApply: true})
-	vcsClient.VerifyWasCalled(Never()).CreateComment(fixtures.GithubRepo, modelPull.Num, "⚠️ WARNING ⚠️\n\n You have bypassed all apply requirements for this PR 🚀 . This can have unpredictable consequences 🙏🏽 and should only be used in an emergency 🆘 .\n\n 𝐓𝐡𝐢𝐬 𝐚𝐜𝐭𝐢𝐨𝐧 𝐰𝐢𝐥𝐥 𝐛𝐞 𝐚𝐮𝐝𝐢𝐭𝐞𝐝.\n", "")
-}
-
 func TestRunCommentCommand_DisableDisableAutoplan(t *testing.T) {
 	t.Log("if \"DisableAutoplan is true\" are disabled and we are silencing return and do not comment with error")
 	setup(t)
