@@ -1,21 +1,23 @@
-# Real-time Atlantis logs
+# Real-time logs
 
 ## Getting Started
 Atlantis supports streaming terraform logs in real time by default. Currently, only two commands are supported
 
-### atlantis plan 
-When a user runs atlantis plan in their PR, Atlantis will add a atlantis/plan status check for all the projects as shown below: 
+* terraform init
+* terraform plan
+* terraform apply
+
+::: warning as of now, custom workflow outputs and other terraform commands are not supported
+
+In order to view real-time terraform logs, a user can navigate through the *details* section of a given project's plan or apply status check.
+
 ![Plan Command](./images/plan.png)
 
-The user can then navigate to the log-streaming UI by navigating to the link in the github check for their project. This will open up a new tab which shows the terraform logs of their operation in real time. 
+This will link to the atlantis UI which provides real-time logging in addition to native terraform syntax highlighting.
+
 ![Plan Output](./images/plan_output.png)
 
-### atlantis apply
-When a user runs atlantis apply in their PR, Atlantis will add a atlantis/apply status check for all the projects as shown below: 
-![Apply Command](./images/apply.png)
-
-The user can then navigate to the log-streaming UI by navigating to the link in the github check for their project. This will open up a new tab which shows the terraform logs of their operation in real time. 
-![Apply Output](./images/apply_output.png)
+::: warning As of now the logs are currently stored in memory and cleared when a given pull request is closed, so this link shouldn't be persisted anywhere.
 
 ## Future Work 
 In the future, users will also be able to persist the logs into a storage backend of their choice. 
