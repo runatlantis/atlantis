@@ -586,6 +586,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		HidePrevPlanComments: userConfig.HidePrevPlanComments,
 		VCSClient:            vcsClient,
 		MarkdownRenderer:     markdownRenderer,
+		GlobalCfg:            globalCfg,
 	}
 
 	autoMerger := &events.AutoMerger{

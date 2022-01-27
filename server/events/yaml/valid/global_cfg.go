@@ -63,6 +63,7 @@ type Repo struct {
 	AllowedOverrides          []string
 	AllowCustomWorkflows      *bool
 	DeleteSourceBranchOnMerge *bool
+	TemplateOverrides         map[string]string
 }
 
 type MergedProjectCfg struct {
