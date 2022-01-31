@@ -478,6 +478,11 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 		return
 	}
 
+	if resource.Comment.IsDeleted != nil && *resource.Comment.IsDeleted {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since atlantis does not handle comment deletion events; %s", azuredevopsReqID)
+		return
+	}
+
 	if resource.Comment.Content == nil {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since the comment's content is missing; %s", azuredevopsReqID)
 		return
