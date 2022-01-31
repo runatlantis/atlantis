@@ -863,13 +863,14 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	if parent != nil {
 		owner = parent.GetName()
 	} else {
-
 		if strings.Contains(uri.Host, "visualstudio.com") {
 			owner = strings.Split(uri.Host, ".")[0]
-		} else if strings.Contains(uri.Host, "dev.azure.com") {
+		} else if strings.Contains(uri.Host, "dev.azure.com") && strings.Contains(uri.Path, "/") {
 			owner = strings.Split(uri.Path, "/")[1]
-		} else {
+		} else if strings.Contains(uri.Path, "/") {
 			owner = strings.Split(uri.Path, "/")[1] // to support owner for self hosted
+		} else {
+			return models.Repo{}, fmt.Errorf("Failed to determine ADO owner from repo URL: %v", uri)
 		}
 	}
 
