@@ -374,7 +374,7 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		BaseRepo:   baseRepo,
 	}
 	user = models.User{
-		Username: *event.Actor.Nickname,
+		Username: *event.Actor.AccountID,
 	}
 	return
 }
