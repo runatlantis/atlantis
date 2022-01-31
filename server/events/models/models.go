@@ -425,7 +425,11 @@ func (p ProjectCommandContext) GetShowResultFileName() string {
 
 // Gets a unique identifier for the current pull request as a single string
 func (p ProjectCommandContext) PullInfo() string {
-	return BuildPullInfo(p.BaseRepo.FullName, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
+	normalizedOwner := strings.ReplaceAll(p.BaseRepo.Owner, "/", "-")
+	normalizedName := strings.ReplaceAll(p.BaseRepo.Name, "/", "-")
+	projectRepo := fmt.Sprintf("%s/%s", normalizedOwner, normalizedName)
+
+	return BuildPullInfo(projectRepo, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
 }
 
 func BuildPullInfo(repoName string, pullNum int, projectName string, relDir string, workspace string) string {

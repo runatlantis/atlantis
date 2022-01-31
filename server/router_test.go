@@ -155,3 +155,23 @@ func TestGenerateProjectJobURL_ShouldGenerateURLWhenNestedRepo(t *testing.T) {
 
 	Equals(t, expectedURL, gotURL)
 }
+
+func TestGenerateProjectJobURL_ShouldGenerateURLWhenNestedOwner(t *testing.T) {
+	router := setupJobsRouter(t)
+	ctx := models.ProjectCommandContext{
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				Owner: "test-owner/sub-proj",
+				Name:  "test-repo/sub-repo",
+			},
+			Num: 1,
+		},
+		RepoRelDir: "ops/terraform/test-root",
+		Workspace:  "default",
+	}
+	expectedURL := "http://localhost:4141/jobs/test-owner-sub-proj/test-repo-sub-repo/1/ops-terraform-test-root/default"
+	gotURL, err := router.GenerateProjectJobURL(ctx)
+	Ok(t, err)
+
+	Equals(t, expectedURL, gotURL)
+}
