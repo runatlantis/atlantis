@@ -33,7 +33,6 @@ import (
 
 const (
 	planfileSlashReplace = "::"
-	LogStreamingClearMsg = "\n-----Starting New Process-----"
 )
 
 type PullReqStatus struct {
@@ -412,6 +411,8 @@ type ProjectCommandContext struct {
 	PolicySets valid.PolicySets
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
+	// UUID for atlantis logs
+	JobID string
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
@@ -688,14 +689,6 @@ const (
 // ie. policy_check becomes Policy Check
 func (c CommandName) TitleString() string {
 	return strings.Title(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
-}
-
-type ProjectCmdOutputLine struct {
-	ProjectInfo string
-
-	Line string
-
-	ClearBuffBefore bool
 }
 
 // String returns the string representation of c.

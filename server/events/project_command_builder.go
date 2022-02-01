@@ -54,7 +54,7 @@ func NewProjectCommandBuilder(
 		SkipCloneNoChanges: skipCloneNoChanges,
 		EnableRegExpCmd:    EnableRegExpCmd,
 		AutoplanFileList:   AutoplanFileList,
-		ProjectCommandContextBuilder: NewProjectCommandContextBulder(
+		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
 		),

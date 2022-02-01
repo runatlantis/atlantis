@@ -5,6 +5,7 @@ package mocks
 
 import (
 	pegomock "github.com/petergtz/pegomock"
+	handlers "github.com/runatlantis/atlantis/server/handlers"
 	"reflect"
 	"time"
 )
@@ -24,7 +25,7 @@ func NewMockResourceCleaner(options ...pegomock.Option) *MockResourceCleaner {
 func (mock *MockResourceCleaner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockResourceCleaner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockResourceCleaner) CleanUp(_param0 string) {
+func (mock *MockResourceCleaner) CleanUp(_param0 handlers.PullContext) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockResourceCleaner().")
 	}
@@ -69,7 +70,7 @@ type VerifierMockResourceCleaner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockResourceCleaner) CleanUp(_param0 string) *MockResourceCleaner_CleanUp_OngoingVerification {
+func (verifier *VerifierMockResourceCleaner) CleanUp(_param0 handlers.PullContext) *MockResourceCleaner_CleanUp_OngoingVerification {
 	params := []pegomock.Param{_param0}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CleanUp", params, verifier.timeout)
 	return &MockResourceCleaner_CleanUp_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -80,17 +81,17 @@ type MockResourceCleaner_CleanUp_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockResourceCleaner_CleanUp_OngoingVerification) GetCapturedArguments() string {
+func (c *MockResourceCleaner_CleanUp_OngoingVerification) GetCapturedArguments() handlers.PullContext {
 	_param0 := c.GetAllCapturedArguments()
 	return _param0[len(_param0)-1]
 }
 
-func (c *MockResourceCleaner_CleanUp_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+func (c *MockResourceCleaner_CleanUp_OngoingVerification) GetAllCapturedArguments() (_param0 []handlers.PullContext) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
+		_param0 = make([]handlers.PullContext, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(string)
+			_param0[u] = param.(handlers.PullContext)
 		}
 	}
 	return

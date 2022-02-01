@@ -83,13 +83,13 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 
 	if pullStatus != nil {
 		for _, project := range pullStatus.Projects {
-			normalizedOwner := strings.ReplaceAll(pullStatus.Pull.BaseRepo.Owner, "/", "-")
-			normalizedName := strings.ReplaceAll(pullStatus.Pull.BaseRepo.Name, "/", "-")
-			projectRepo := fmt.Sprintf("%s/%s", normalizedOwner, normalizedName)
-
-			projectKey := models.BuildPullInfo(projectRepo, pull.Num, project.ProjectName, project.RepoRelDir, project.Workspace)
-
-			p.LogStreamResourceCleaner.CleanUp(projectKey)
+			jobContext := handlers.PullContext{
+				PullNum:     pull.Num,
+				Repo:        pull.BaseRepo.Name,
+				Workspace:   project.Workspace,
+				ProjectName: project.ProjectName,
+			}
+			p.LogStreamResourceCleaner.CleanUp(jobContext)
 		}
 	}
 

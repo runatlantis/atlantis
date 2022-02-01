@@ -316,7 +316,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.TFEToken != "" {
 		projectCmdOutputHandler = &handlers.NoopProjectOutputHandler{}
 	} else {
-		projectCmdOutput := make(chan *models.ProjectCmdOutputLine)
+		projectCmdOutput := make(chan *handlers.ProjectCmdOutputLine)
 		projectCmdOutputHandler = handlers.NewAsyncProjectCommandOutputHandler(
 			projectCmdOutput,
 			commitStatusUpdater,
@@ -681,7 +681,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	wsMux := websocket.NewMultiplexor(
 		logger,
-		controllers.ProjectInfoKeyGenerator{},
+		controllers.JobIDKeyGenerator{},
 		projectCmdOutputHandler,
 	)
 
@@ -693,6 +693,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectJobsErrorTemplate: templates.ProjectJobsErrorTemplate,
 		Db:                       boltdb,
 		WsMux:                    wsMux,
+		KeyGenerator:             controllers.JobIDKeyGenerator{},
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -768,8 +769,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/jobs/{org}/{repo}/{pull}/{project}/{workspace}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
-	s.Router.HandleFunc("/jobs/{org}/{repo}/{pull}/{project}/{workspace}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
+	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
+	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
