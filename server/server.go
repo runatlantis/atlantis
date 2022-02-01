@@ -17,7 +17,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -81,28 +80,32 @@ const (
 
 // Server runs the Atlantis web server.
 type Server struct {
-	AtlantisVersion               string
-	AtlantisURL                   *url.URL
-	Router                        *mux.Router
-	Port                          int
-	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
-	CommandRunner                 *events.DefaultCommandRunner
-	Logger                        logging.SimpleLogging
-	Locker                        locking.Locker
-	ApplyLocker                   locking.ApplyLocker
-	VCSEventsController           *events_controllers.VCSEventsController
-	GithubAppController           *controllers.GithubAppController
-	LocksController               *controllers.LocksController
-	StatusController              *controllers.StatusController
-	JobsController                *controllers.JobsController
-	IndexTemplate                 templates.TemplateWriter
-	LockDetailTemplate            templates.TemplateWriter
-	ProjectJobsTemplate           templates.TemplateWriter
-	ProjectJobsErrorTemplate      templates.TemplateWriter
-	SSLCertFile                   string
-	SSLKeyFile                    string
-	Drainer                       *events.Drainer
-	ProjectCmdOutputHandler       handlers.ProjectCommandOutputHandler
+	AtlantisVersion                string
+	AtlantisURL                    *url.URL
+	Router                         *mux.Router
+	Port                           int
+	PostWorkflowHooksCommandRunner *events.DefaultPostWorkflowHooksCommandRunner
+	PreWorkflowHooksCommandRunner  *events.DefaultPreWorkflowHooksCommandRunner
+	CommandRunner                  *events.DefaultCommandRunner
+	Logger                         logging.SimpleLogging
+	Locker                         locking.Locker
+	ApplyLocker                    locking.ApplyLocker
+	VCSEventsController            *events_controllers.VCSEventsController
+	GithubAppController            *controllers.GithubAppController
+	LocksController                *controllers.LocksController
+	StatusController               *controllers.StatusController
+	JobsController                 *controllers.JobsController
+	IndexTemplate                  templates.TemplateWriter
+	LockDetailTemplate             templates.TemplateWriter
+	ProjectJobsTemplate            templates.TemplateWriter
+	ProjectJobsErrorTemplate       templates.TemplateWriter
+	SSLCertFile                    string
+	SSLKeyFile                     string
+	Drainer                        *events.Drainer
+	WebAuthentication              bool
+	WebUsername                    string
+	WebPassword                    string
+	ProjectCmdOutputHandler        handlers.ProjectCommandOutputHandler
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -460,6 +463,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{},
 	}
+	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
+		VCSClient:              vcsClient,
+		GlobalCfg:              globalCfg,
+		WorkingDirLocker:       workingDirLocker,
+		WorkingDir:             workingDir,
+		PostWorkflowHookRunner: runtime.DefaultPostWorkflowHookRunner{},
+	}
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		policyChecksEnabled,
 		validator,
@@ -632,23 +642,24 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
-		VCSClient:                     vcsClient,
-		GithubPullGetter:              githubClient,
-		GitlabMergeRequestGetter:      gitlabClient,
-		AzureDevopsPullGetter:         azuredevopsClient,
-		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
-		EventParser:                   eventParser,
-		Logger:                        logger,
-		GlobalCfg:                     globalCfg,
-		AllowForkPRs:                  userConfig.AllowForkPRs,
-		AllowForkPRsFlag:              config.AllowForkPRsFlag,
-		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,
-		SilenceForkPRErrorsFlag:       config.SilenceForkPRErrorsFlag,
-		DisableAutoplan:               userConfig.DisableAutoplan,
-		Drainer:                       drainer,
-		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
-		PullStatusFetcher:             boltdb,
-		TeamAllowlistChecker:          githubTeamAllowlistChecker,
+		VCSClient:                      vcsClient,
+		GithubPullGetter:               githubClient,
+		GitlabMergeRequestGetter:       gitlabClient,
+		AzureDevopsPullGetter:          azuredevopsClient,
+		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
+		EventParser:                    eventParser,
+		Logger:                         logger,
+		GlobalCfg:                      globalCfg,
+		AllowForkPRs:                   userConfig.AllowForkPRs,
+		AllowForkPRsFlag:               config.AllowForkPRsFlag,
+		SilenceForkPRErrors:            userConfig.SilenceForkPRErrors,
+		SilenceForkPRErrorsFlag:        config.SilenceForkPRErrorsFlag,
+		DisableAutoplan:                userConfig.DisableAutoplan,
+		Drainer:                        drainer,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		PullStatusFetcher:              boltdb,
+		TeamAllowlistChecker:           githubTeamAllowlistChecker,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -712,28 +723,32 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 	return &Server{
-		AtlantisVersion:               config.AtlantisVersion,
-		AtlantisURL:                   parsedURL,
-		Router:                        underlyingRouter,
-		Port:                          userConfig.Port,
-		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
-		CommandRunner:                 commandRunner,
-		Logger:                        logger,
-		Locker:                        lockingClient,
-		ApplyLocker:                   applyLockingClient,
-		VCSEventsController:           eventsController,
-		GithubAppController:           githubAppController,
-		LocksController:               locksController,
-		JobsController:                jobsController,
-		StatusController:              statusController,
-		IndexTemplate:                 templates.IndexTemplate,
-		LockDetailTemplate:            templates.LockTemplate,
-		ProjectJobsTemplate:           templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate:      templates.ProjectJobsErrorTemplate,
-		SSLKeyFile:                    userConfig.SSLKeyFile,
-		SSLCertFile:                   userConfig.SSLCertFile,
-		Drainer:                       drainer,
-		ProjectCmdOutputHandler:       projectCmdOutputHandler,
+		AtlantisVersion:                config.AtlantisVersion,
+		AtlantisURL:                    parsedURL,
+		Router:                         underlyingRouter,
+		Port:                           userConfig.Port,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		CommandRunner:                  commandRunner,
+		Logger:                         logger,
+		Locker:                         lockingClient,
+		ApplyLocker:                    applyLockingClient,
+		VCSEventsController:            eventsController,
+		GithubAppController:            githubAppController,
+		LocksController:                locksController,
+		JobsController:                 jobsController,
+		StatusController:               statusController,
+		IndexTemplate:                  templates.IndexTemplate,
+		LockDetailTemplate:             templates.LockTemplate,
+		ProjectJobsTemplate:            templates.ProjectJobsTemplate,
+		ProjectJobsErrorTemplate:       templates.ProjectJobsErrorTemplate,
+		SSLKeyFile:                     userConfig.SSLKeyFile,
+		SSLCertFile:                    userConfig.SSLCertFile,
+		Drainer:                        drainer,
+		ProjectCmdOutputHandler:        projectCmdOutputHandler,
+		WebAuthentication:              userConfig.WebBasicAuth,
+		WebUsername:                    userConfig.WebUsername,
+		WebPassword:                    userConfig.WebPassword,
 	}, nil
 }
 
@@ -761,7 +776,7 @@ func (s *Server) Start() error {
 		PrintStack: false,
 		StackAll:   false,
 		StackSize:  1024 * 8,
-	}, NewRequestLogger(s.Logger))
+	}, NewRequestLogger(s))
 	n.UseHandler(s.Router)
 
 	defer s.Logger.Flush()
@@ -883,19 +898,13 @@ func mkSubDir(parentDir string, subDir string) (string, error) {
 
 // Healthz returns the health check response. It always returns a 200 currently.
 func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
-	data, err := json.MarshalIndent(&struct {
-		Status string `json:"status"`
-	}{
-		Status: "ok",
-	}, "", "  ")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error creating status json response: %s", err)
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(data) // nolint: errcheck
+	w.Write(healthzData) // nolint: errcheck
 }
+
+var healthzData = []byte(`{
+  "status": "ok"
+}`)
 
 // ParseAtlantisURL parses the user-passed atlantis URL to ensure it is valid
 // and we can use it in our templates.

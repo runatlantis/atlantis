@@ -16,7 +16,7 @@ require (
 	github.com/aws/aws-sdk-go v1.31.15 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
-	github.com/bradleyfalzon/ghinstallation/v2 v2.0.3
+	github.com/bradleyfalzon/ghinstallation/v2 v2.0.4
 	github.com/briandowns/spinner v0.0.0-20170614154858-48dbb65d7bd5
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -41,7 +41,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-getter v1.5.10
+	github.com/hashicorp/go-getter v1.5.11
 	github.com/hashicorp/go-retryablehttp v0.6.8 // indirect
 	github.com/hashicorp/go-safetemp v1.0.0 // indirect
 	github.com/hashicorp/go-version v1.4.0
@@ -122,7 +122,7 @@ require (
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
-	github.com/google/go-github/v39 v39.1.0 // indirect
+	github.com/google/go-github/v41 v41.0.0 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 )

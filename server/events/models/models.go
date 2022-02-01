@@ -425,7 +425,11 @@ func (p ProjectCommandContext) GetShowResultFileName() string {
 
 // Gets a unique identifier for the current pull request as a single string
 func (p ProjectCommandContext) PullInfo() string {
-	return BuildPullInfo(p.BaseRepo.FullName, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
+	normalizedOwner := strings.ReplaceAll(p.BaseRepo.Owner, "/", "-")
+	normalizedName := strings.ReplaceAll(p.BaseRepo.Name, "/", "-")
+	projectRepo := fmt.Sprintf("%s/%s", normalizedOwner, normalizedName)
+
+	return BuildPullInfo(projectRepo, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
 }
 
 func BuildPullInfo(repoName string, pullNum int, projectName string, relDir string, workspace string) string {
@@ -437,7 +441,10 @@ func GetProjectIdentifier(relRepoDir string, projectName string) string {
 	if projectName != "" {
 		return projectName
 	}
-	return strings.ReplaceAll(relRepoDir, "/", "-")
+	// Replace directory separator / with -
+	// Replace . with _ to ensure projects with no project name and root dir set to "." have a valid URL
+	replacer := strings.NewReplacer("/", "-", ".", "_")
+	return replacer.Replace(relRepoDir)
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo
@@ -740,9 +747,9 @@ func (c CommandName) String() string {
 	return ""
 }
 
-// PreWorkflowHookCommandContext defines the context for a pre_worklfow_hooks that will
+// WorkflowHookCommandContext defines the context for a pre and post worklfow_hooks that will
 // be executed before workflows.
-type PreWorkflowHookCommandContext struct {
+type WorkflowHookCommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
 	// HeadRepo is the repository that is getting merged into the BaseRepo.

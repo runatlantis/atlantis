@@ -82,9 +82,8 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - Double-check you added `/events` to the end of your URL.
 - Set **Secret** to the Webhook Secret you generated previously
   - **NOTE** If you're adding a webhook to multiple repositories, each repository will need to use the **same** secret.
-- Under **Repository** select **Push**
-- Under **Pull Request**, select: Opened, Modified, Merged, Declined, Deleted and Comment added
-- Click **Save**<img src="../guide/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;">
+- Under **Pull Request**, select: Opened, Source branch updated, Merged, Declined, Deleted and Comment added
+- Click **Save**<img src="../guide/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 600px;">
 - See [Next Steps](#next-steps)
 
 ## Azure DevOps

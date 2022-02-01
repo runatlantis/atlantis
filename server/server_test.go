@@ -147,6 +147,25 @@ func TestHealthz(t *testing.T) {
 }`, string(body))
 }
 
+type mockRW struct{}
+
+var _ http.ResponseWriter = mockRW{}
+var mh = http.Header{}
+
+func (w mockRW) WriteHeader(int)           {}
+func (w mockRW) Write([]byte) (int, error) { return 0, nil }
+func (w mockRW) Header() http.Header       { return mh }
+
+var w = mockRW{}
+var s = &server.Server{}
+
+func BenchmarkHealthz(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		s.Healthz(w, nil)
+	}
+}
+
 func TestParseAtlantisURL(t *testing.T) {
 	cases := []struct {
 		In     string

@@ -54,7 +54,7 @@ projects:
   terraform_version: v0.11.0
   delete_source_branch_on_merge: true
   autoplan:
-    when_modified: ["*.tf", "../modules/**.tf"]
+    when_modified: ["*.tf", "../modules/**/*.tf"]
     enabled: true
   apply_requirements: [mergeable, approved]
   workflow: myworkflow

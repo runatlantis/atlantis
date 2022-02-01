@@ -64,6 +64,7 @@ var applyLockChecker *lockingmocks.MockApplyLockChecker
 var applyCommandRunner *events.ApplyCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
+var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
@@ -186,22 +187,27 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 
 	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
 
+	postWorkflowHooksCommandRunner = mocks.NewMockPostWorkflowHooksCommandRunner()
+
+	When(postWorkflowHooksCommandRunner.RunPostHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
+
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
 
 	ch = events.DefaultCommandRunner{
-		VCSClient:                     vcsClient,
-		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
-		EventParser:                   eventParsing,
-		GithubPullGetter:              githubGetter,
-		GitlabMergeRequestGetter:      gitlabGetter,
-		AzureDevopsPullGetter:         azuredevopsGetter,
-		Logger:                        logger,
-		GlobalCfg:                     globalCfg,
-		AllowForkPRs:                  false,
-		AllowForkPRsFlag:              "allow-fork-prs-flag",
-		Drainer:                       drainer,
-		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
-		PullStatusFetcher:             defaultBoltDB,
+		VCSClient:                      vcsClient,
+		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
+		EventParser:                    eventParsing,
+		GithubPullGetter:               githubGetter,
+		GitlabMergeRequestGetter:       gitlabGetter,
+		AzureDevopsPullGetter:          azuredevopsGetter,
+		Logger:                         logger,
+		GlobalCfg:                      globalCfg,
+		AllowForkPRs:                   false,
+		AllowForkPRsFlag:               "allow-fork-prs-flag",
+		Drainer:                        drainer,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		PullStatusFetcher:              defaultBoltDB,
 	}
 	return vcsClient
 }

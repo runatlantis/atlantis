@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -43,8 +44,8 @@ func (r *Router) GenerateProjectJobURL(ctx models.ProjectCommandContext) (string
 	pull := ctx.Pull
 	projectIdentifier := models.GetProjectIdentifier(ctx.RepoRelDir, ctx.ProjectName)
 	jobURL, err := r.Underlying.Get(r.ProjectJobsViewRouteName).URL(
-		"org", pull.BaseRepo.Owner,
-		"repo", pull.BaseRepo.Name,
+		"org", strings.ReplaceAll(pull.BaseRepo.Owner, "/", "-"),
+		"repo", strings.ReplaceAll(pull.BaseRepo.Name, "/", "-"), // Account for nested repo names repo/sub-repo
 		"pull", fmt.Sprintf("%d", pull.Num),
 		"project", projectIdentifier,
 		"workspace", ctx.Workspace,

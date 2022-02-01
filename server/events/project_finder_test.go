@@ -106,7 +106,7 @@ func TestDetermineProjects(t *testing.T) {
 	noopLogger := logging.NewNoopLogger(t)
 	setupTmpRepos(t)
 
-	defaultAutoplanFileList := "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
+	defaultAutoplanFileList := "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 
 	cases := []struct {
 		description      string
@@ -247,6 +247,13 @@ func TestDetermineProjects(t *testing.T) {
 			[]string{"project1"},
 			topLevelModules,
 			"**/*.yml,!project2/*.yml",
+		},
+		{
+			"Should not ignore .terraform.lock.hcl files",
+			[]string{"project1/.terraform.lock.hcl"},
+			[]string{"project1"},
+			nestedModules1,
+			defaultAutoplanFileList,
 		},
 	}
 	for _, c := range cases {
