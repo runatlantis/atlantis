@@ -369,7 +369,7 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		URL:        *event.PullRequest.Links.HTML.HREF,
 		HeadBranch: *event.PullRequest.Source.Branch.Name,
 		BaseBranch: *event.PullRequest.Destination.Branch.Name,
-		Author:     *event.Actor.Nickname,
+		Author:     *event.Actor.AccountID,
 		State:      prState,
 		BaseRepo:   baseRepo,
 	}

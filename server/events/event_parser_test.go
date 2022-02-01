@@ -769,7 +769,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
 		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
 		BaseBranch: "master",
-		Author:     "lkysow",
+		Author:     "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -855,7 +855,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/16",
 		HeadBranch: "Luke/maintf-edited-online-with-bitbucket-1560433073473",
 		BaseBranch: "master",
-		Author:     "Luke",
+		Author:     "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
