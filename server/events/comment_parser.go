@@ -25,7 +25,7 @@ import (
 
 	"github.com/flynn-archive/go-shlex"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/spf13/pflag"
 )
 

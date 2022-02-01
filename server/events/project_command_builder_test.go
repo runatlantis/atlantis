@@ -13,7 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -145,7 +145,7 @@ projects:
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -409,7 +409,7 @@ projects:
 
 				builder := events.NewProjectCommandBuilder(
 					false,
-					&yaml.ParserValidator{},
+					&config.ParserValidator{},
 					&events.DefaultProjectFinder{},
 					vcsClient,
 					workingDir,
@@ -560,7 +560,7 @@ projects:
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -647,7 +647,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,
@@ -727,7 +727,7 @@ projects:
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,
@@ -802,7 +802,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -981,7 +981,7 @@ projects:
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -1044,7 +1044,7 @@ projects:
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		vcsClient,
 		workingDir,
@@ -1098,7 +1098,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 
 	builder := events.NewProjectCommandBuilder(
 		true,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		vcsClient,
 		workingDir,
@@ -1176,7 +1176,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,

@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/core/config"
 )
 
 const (
@@ -31,7 +31,7 @@ const (
 
 func NewProjectCommandBuilder(
 	policyChecksSupported bool,
-	parserValidator *yaml.ParserValidator,
+	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
 	vcsClient vcs.Client,
 	workingDir WorkingDir,
@@ -106,7 +106,7 @@ type ProjectCommandBuilder interface {
 // This class combines the data from the comment and any atlantis.yaml file or
 // Atlantis server config and then generates a set of contexts.
 type DefaultProjectCommandBuilder struct {
-	ParserValidator              *yaml.ParserValidator
+	ParserValidator              *config.ParserValidator
 	ProjectFinder                ProjectFinder
 	VCSClient                    vcs.Client
 	WorkingDir                   WorkingDir

@@ -52,7 +52,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
-	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/static"
 	"github.com/urfave/cli"
@@ -394,7 +394,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DB:               boltdb,
 	}
 
-	validator := &yaml.ParserValidator{}
+	validator := &config.ParserValidator{}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(
 		valid.GlobalCfgArgs{

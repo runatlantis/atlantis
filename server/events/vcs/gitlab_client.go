@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/core/config"
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
