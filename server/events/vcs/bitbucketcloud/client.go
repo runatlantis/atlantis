@@ -179,6 +179,11 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 		url = b.AtlantisURL
 	}
 
+	// Ensure key has at most 40 characters
+	if len(src) > 37 {
+		src = src[:37] + "..."
+	}
+
 	bodyBytes, err := json.Marshal(map[string]string{
 		"key":         src,
 		"url":         url,
