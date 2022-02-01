@@ -2,8 +2,8 @@ package events
 
 import (
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/raw"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/raw"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
 //go:generate pegomock generate -m --package mocks -o mocks/mock_apply_handler.go ApplyRequirement

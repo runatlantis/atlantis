@@ -17,7 +17,7 @@ import (
 	"fmt"
 
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
 var Pull = models.PullRequest{

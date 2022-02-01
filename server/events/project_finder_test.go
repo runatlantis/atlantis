@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )

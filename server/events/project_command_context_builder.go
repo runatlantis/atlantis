@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
 func NewProjectCommandContextBulder(policyCheckEnabled bool, commentBuilder CommentBuilder) ProjectCommandContextBuilder {

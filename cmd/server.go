@@ -25,7 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

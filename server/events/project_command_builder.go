@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"

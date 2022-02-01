@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
 )
 

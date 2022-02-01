@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
 const (

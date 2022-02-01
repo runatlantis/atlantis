@@ -11,7 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"

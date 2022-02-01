@@ -32,7 +32,7 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/handlers"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
