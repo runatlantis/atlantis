@@ -2197,8 +2197,14 @@ Terraform will perform the following actions:
           EOT
         ~ "what-colors"      = <<~EOT
               - "EOT"
-            + - "yellow"
+            + - "blue"
+            ~ - "red"
           EOT
+        - "no-colors"        = <<~EOT
+              - "EOT"
+              - "blue"
+              - "red"
+          EOT -> null
         + "is-a"  = "fork"
         - "this"  = "is removed"
         ~ "some-utensils"    = <<EOT
@@ -2404,8 +2410,14 @@ Terraform will perform the following actions:
           EOT
 !         "what-colors"      = <<~EOT
               - "EOT"
-            + - "yellow"
+            + - "blue"
+            ~ - "red"
           EOT
+-         "no-colors"        = <<~EOT
+              - "EOT"
+              - "blue"
+              - "red"
+          EOT -> null
 +         "is-a"  = "fork"
 -         "this"  = "is removed"
 !         "some-utensils"    = <<EOT

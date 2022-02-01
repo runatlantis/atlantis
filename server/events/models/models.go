@@ -588,7 +588,7 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 
 			// We guarantee it'll be the last match since we look for '$'. (1 will match the optional hyphen)
 			heredocDelimitter = heredocStartRegex.FindStringSubmatch(line)[2]
-			heredocEndRegex = regexp.MustCompile(`^( )*` + regexp.QuoteMeta(heredocDelimitter) + `$`)
+			heredocEndRegex = regexp.MustCompile(`^( )*` + regexp.QuoteMeta(heredocDelimitter) + `( -> null)?$`)
 		}
 	}
 
