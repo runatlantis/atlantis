@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"unicode/utf8"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -180,8 +181,8 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 	}
 
 	// Ensure key has at most 40 characters
-	if len(src) > 37 {
-		src = src[:37] + "..."
+	if utf8.RuneCountInString(src) > 40 {
+		src = fmt.Sprintf("%.37s...", src)
 	}
 
 	bodyBytes, err := json.Marshal(map[string]string{
