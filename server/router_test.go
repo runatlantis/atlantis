@@ -1,13 +1,16 @@
 package server_test
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRouter_GenerateLockURL(t *testing.T) {
@@ -67,7 +70,7 @@ func setupJobsRouter(t *testing.T) *server.Router {
 	Ok(t, err)
 
 	underlyingRouter := mux.NewRouter()
-	underlyingRouter.HandleFunc("/jobs/{org}/{repo}/{pull}/{project}/{workspace}", func(_ http.ResponseWriter, _ *http.Request) {}).Methods("GET").Name("project-jobs-detail")
+	underlyingRouter.HandleFunc("/jobs/{job-id}", func(_ http.ResponseWriter, _ *http.Request) {}).Methods("GET").Name("project-jobs-detail")
 
 	return &server.Router{
 		AtlantisURL:              atlantisURL,
@@ -76,27 +79,20 @@ func setupJobsRouter(t *testing.T) *server.Router {
 	}
 }
 
-func TestGenerateProjectJobURL_ShouldGenerateURLWithProjectNameWhenProjectNameSpecified(t *testing.T) {
+func TestGenerateProjectJobURL_ShouldGenerateURLWhenJobIDSpecified(t *testing.T) {
 	router := setupJobsRouter(t)
+	jobID := uuid.New().String()
 	ctx := models.ProjectCommandContext{
-		Pull: models.PullRequest{
-			BaseRepo: models.Repo{
-				Owner: "test-owner",
-				Name:  "test-repo",
-			},
-			Num: 1,
-		},
-		ProjectName: "test-project",
-		Workspace:   "default",
+		JobID: jobID,
 	}
-	expectedURL := "http://localhost:4141/jobs/test-owner/test-repo/1/test-project/default"
+	expectedURL := fmt.Sprintf("http://localhost:4141/jobs/%s", jobID)
 	gotURL, err := router.GenerateProjectJobURL(ctx)
 	Ok(t, err)
 
 	Equals(t, expectedURL, gotURL)
 }
 
-func TestGenerateProjectJobURL_ShouldGenerateURLWithDirectoryAndWorkspaceWhenProjectNameNotSpecified(t *testing.T) {
+func TestGenerateProjectJobURL_ShouldReturnErrorWhenJobIDNotSpecified(t *testing.T) {
 	router := setupJobsRouter(t)
 	ctx := models.ProjectCommandContext{
 		Pull: models.PullRequest{
@@ -106,12 +102,10 @@ func TestGenerateProjectJobURL_ShouldGenerateURLWithDirectoryAndWorkspaceWhenPro
 			},
 			Num: 1,
 		},
-		RepoRelDir: "ops/terraform/test-root",
-		Workspace:  "default",
+		RepoRelDir: "ops/terraform/",
 	}
-	expectedURL := "http://localhost:4141/jobs/test-owner/test-repo/1/ops-terraform-test-root/default"
+	expectedErrString := "no job id in ctx"
 	gotURL, err := router.GenerateProjectJobURL(ctx)
-	Ok(t, err)
-
-	Equals(t, expectedURL, gotURL)
+	assert.EqualError(t, err, expectedErrString)
+	Equals(t, "", gotURL)
 }

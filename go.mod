@@ -36,7 +36,7 @@ require (
 	github.com/google/go-github/v29 v29.0.2 // indirect
 	github.com/google/go-github/v31 v31.0.0
 	github.com/google/go-querystring v1.0.0 // indirect
-	github.com/google/uuid v1.1.2-0.20200519141726-cb32006e483f
+	github.com/google/uuid v1.3.0
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gorilla/mux v1.8.0

@@ -200,7 +200,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		prjJobURLGenerator := handlermocks.NewMockProjectJobURLGenerator()
 
 		// Create Log streaming resources
-		prjCmdOutput := make(chan *models.ProjectCmdOutputLine)
+		prjCmdOutput := make(chan *handlers.ProjectCmdOutputLine)
 		prjCmdOutHandler := handlers.NewAsyncProjectCommandOutputHandler(prjCmdOutput, prjStatusUpdater, prjJobURLGenerator, logger)
 		ctx := models.ProjectCommandContext{
 			BaseRepo:    fixtures.GithubRepo,

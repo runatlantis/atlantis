@@ -83,13 +83,13 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 
 	if pullStatus != nil {
 		for _, project := range pullStatus.Projects {
-			// TODO [ORCA-943]: Set projectName to "<dir>/<workspace>" when project name is not set.
-			// Upstream atlantis only requires project name to be set if there's more than one project
-			// with same dir and workspace. If a project name has not been set, we'll use the dir and
-			// workspace to build project key.
-			// Source: https://www.runatlantis.io/docs/repo-level-atlantis-yaml.html#reference
-			projectKey := models.BuildPullInfo(pullStatus.Pull.BaseRepo.FullName, pull.Num, project.ProjectName, project.RepoRelDir, project.Workspace)
-			p.LogStreamResourceCleaner.CleanUp(projectKey)
+			jobContext := handlers.PullContext{
+				PullNum:     pull.Num,
+				Repo:        pull.BaseRepo.Name,
+				Workspace:   project.Workspace,
+				ProjectName: project.ProjectName,
+			}
+			p.LogStreamResourceCleaner.CleanUp(jobContext)
 		}
 	}
 

@@ -5,15 +5,14 @@ import (
 	"sync"
 	"testing"
 
+	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/handlers/mocks"
 	"github.com/runatlantis/atlantis/server/handlers/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/stretchr/testify/assert"
-
-	. "github.com/petergtz/pegomock"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func createTestProjectCmdContext(t *testing.T) models.ProjectCommandContext {
@@ -32,6 +31,7 @@ func createTestProjectCmdContext(t *testing.T) models.ProjectCommandContext {
 			HeadBranch: "master",
 			BaseBranch: "master",
 			Author:     "test-user",
+			HeadCommit: "234r232432",
 		},
 		User: models.User{
 			Username: "test-user",
@@ -40,12 +40,13 @@ func createTestProjectCmdContext(t *testing.T) models.ProjectCommandContext {
 		Workspace:   "myworkspace",
 		RepoRelDir:  "test-dir",
 		ProjectName: "test-project",
+		JobID:       "1234",
 	}
 }
 
 func createProjectCommandOutputHandler(t *testing.T) handlers.ProjectCommandOutputHandler {
 	logger := logging.NewNoopLogger(t)
-	prjCmdOutputChan := make(chan *models.ProjectCmdOutputLine)
+	prjCmdOutputChan := make(chan *handlers.ProjectCmdOutputLine)
 	projectStatusUpdater := mocks.NewMockProjectStatusUpdater()
 	projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
 	prjCmdOutputHandler := handlers.NewAsyncProjectCommandOutputHandler(
@@ -77,7 +78,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.PullInfo(), ch)
+		projectOutputHandler.Register(ctx.JobID, ch)
 
 		wg.Add(1)
 
@@ -94,45 +95,6 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		close(ch)
 
 		Equals(t, expectedMsg, Msg)
-	})
-
-	t.Run("clear buffer", func(t *testing.T) {
-		var wg sync.WaitGroup
-
-		projectOutputHandler := createProjectCommandOutputHandler(t)
-
-		
-
-		ch := make(chan string)
-
-		// register channel and backfill from buffer
-		// Note: We call this synchronously because otherwise
-		// there could be a race where we are unable to register the channel
-		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.PullInfo(), ch)
-
-		wg.Add(1)
-		// read from channel asynchronously
-		go func() {
-			for msg := range ch {
-				// we are done once we receive the clear message.
-				// prior message doesn't matter for this test.
-				if msg == models.LogStreamingClearMsg {
-					wg.Done()
-				}
-			}
-		}()
-
-		// send regular message followed by clear message
-		projectOutputHandler.Send(ctx, Msg)
-		projectOutputHandler.Clear(ctx)
-		wg.Wait()
-		close(ch)
-
-		dfProjectOutputHandler, ok := projectOutputHandler.(*handlers.AsyncProjectCommandOutputHandler)
-		assert.True(t, ok)
-
-		assert.Empty(t, dfProjectOutputHandler.GetProjectOutputBuffer(ctx.PullInfo()))
 	})
 
 	t.Run("copies buffer to new channels", func(t *testing.T) {
@@ -163,7 +125,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.PullInfo(), ch)
+		projectOutputHandler.Register(ctx.JobID, ch)
 
 		projectOutputHandler.Send(ctx, Msg)
 		wg.Wait()
@@ -179,7 +141,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 	t.Run("update project status with project jobs url", func(t *testing.T) {
 		RegisterMockTestingT(t)
 		logger := logging.NewNoopLogger(t)
-		prjCmdOutputChan := make(chan *models.ProjectCmdOutputLine)
+		prjCmdOutputChan := make(chan *handlers.ProjectCmdOutputLine)
 		projectStatusUpdater := mocks.NewMockProjectStatusUpdater()
 		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
 		prjCmdOutputHandler := handlers.NewAsyncProjectCommandOutputHandler(
@@ -199,7 +161,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 	t.Run("update project status with project jobs url error", func(t *testing.T) {
 		RegisterMockTestingT(t)
 		logger := logging.NewNoopLogger(t)
-		prjCmdOutputChan := make(chan *models.ProjectCmdOutputLine)
+		prjCmdOutputChan := make(chan *handlers.ProjectCmdOutputLine)
 		projectStatusUpdater := mocks.NewMockProjectStatusUpdater()
 		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
 		prjCmdOutputHandler := handlers.NewAsyncProjectCommandOutputHandler(
@@ -212,5 +174,49 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn("url-to-project-jobs", errors.New("some error"))
 		err := prjCmdOutputHandler.SetJobURLWithStatus(ctx, models.PlanCommand, models.PendingCommitStatus)
 		assert.Error(t, err)
+	})
+
+	// Close all jobs for a PR when clean up
+	t.Run("clean up all jobs when PR is closed", func(t *testing.T) {
+		var wg sync.WaitGroup
+		projectOutputHandler := createProjectCommandOutputHandler(t)
+
+		ch := make(chan string)
+
+		// register channel and backfill from buffer
+		// Note: We call this synchronously because otherwise
+		// there could be a race where we are unable to register the channel
+		// before sending messages due to the way we lock our buffer memory cache
+		projectOutputHandler.Register(ctx.JobID, ch)
+
+		wg.Add(1)
+
+		// read from channel
+		go func() {
+			for msg := range ch {
+				if msg == "Complete" {
+					wg.Done()
+				}
+			}
+		}()
+
+		projectOutputHandler.Send(ctx, Msg)
+		projectOutputHandler.Send(ctx, "Complete")
+
+		pullContext := handlers.PullContext{
+			PullNum:     ctx.Pull.Num,
+			Repo:        ctx.BaseRepo.Name,
+			ProjectName: ctx.ProjectName,
+			Workspace:   ctx.Workspace,
+		}
+		projectOutputHandler.CleanUp(pullContext)
+
+		// Check all the resources are cleaned up.
+		dfProjectOutputHandler, ok := projectOutputHandler.(*handlers.AsyncProjectCommandOutputHandler)
+		assert.True(t, ok)
+
+		assert.Empty(t, dfProjectOutputHandler.GetProjectOutputBuffer(ctx.JobID))
+		assert.Empty(t, dfProjectOutputHandler.GetReceiverBufferForPull(ctx.JobID))
+		assert.Empty(t, dfProjectOutputHandler.GetJobIdMapForPullContext(pullContext))
 	})
 }

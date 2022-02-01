@@ -4,14 +4,15 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
-	"github.com/uber-go/tally"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/uber-go/tally"
 )
 
-func NewProjectCommandContextBulder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope tally.Scope) ProjectCommandContextBuilder {
+func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope tally.Scope) ProjectCommandContextBuilder {
 	projectCommandContextBuilder := &DefaultProjectCommandContextBuilder{
 		CommentBuilder: commentBuilder,
 	}
@@ -257,7 +258,8 @@ func newProjectCommandContext(ctx *CommandContext,
 		Workspace:                 projCfg.Workspace,
 		PolicySets:                policySets,
 		Tags:                      projCfg.Tags,
-		PullReqStatus:              pullStatus,
+		PullReqStatus:             pullStatus,
+		JobID:                     uuid.New().String(),
 	}
 }
 

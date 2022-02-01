@@ -1,15 +1,36 @@
 package handlers
 
 import (
+	"sync"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"sync"
 )
+
+type PullContext struct {
+	PullNum     int
+	Repo        string
+	ProjectName string
+	Workspace   string
+}
+
+type JobContext struct {
+	PullContext
+	HeadCommit string
+}
+
+type ProjectCmdOutputLine struct {
+	JobID string
+
+	JobContext JobContext
+
+	Line string
+}
 
 // AsyncProjectCommandOutputHandler is a handler to transport terraform client
 // outputs to the front end.
 type AsyncProjectCommandOutputHandler struct {
-	projectCmdOutput chan *models.ProjectCmdOutputLine
+	projectCmdOutput chan *ProjectCmdOutputLine
 
 	projectOutputBuffers     map[string][]string
 	projectOutputBuffersLock sync.RWMutex
@@ -21,6 +42,9 @@ type AsyncProjectCommandOutputHandler struct {
 	projectJobURLGenerator ProjectJobURLGenerator
 
 	logger logging.SimpleLogging
+
+	// Tracks all the jobs for a pull request which is used for clean up after a pull request is closed.
+	pullToJobMapping sync.Map
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_job_url_generator.go ProjectJobURLGenerator
@@ -41,18 +65,15 @@ type ProjectStatusUpdater interface {
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_output_handler.go ProjectCommandOutputHandler
 
 type ProjectCommandOutputHandler interface {
-	// Clear clears the buffer from previous terraform output lines
-	Clear(ctx models.ProjectCommandContext)
-
 	// Send will enqueue the msg and wait for Handle() to receive the message.
 	Send(ctx models.ProjectCommandContext, msg string)
 
 	// Register registers a channel and blocks until it is caught up. Callers should call this asynchronously when attempting
 	// to read the channel in the same goroutine
-	Register(projectInfo string, receiver chan string)
+	Register(jobID string, receiver chan string)
 
 	// Deregister removes a channel from successive updates and closes it.
-	Deregister(projectInfo string, receiver chan string)
+	Deregister(jobID string, receiver chan string)
 
 	// Listens for msg from channel
 	Handle()
@@ -67,11 +88,11 @@ type ProjectCommandOutputHandler interface {
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_resource_cleaner.go ResourceCleaner
 
 type ResourceCleaner interface {
-	CleanUp(pull string)
+	CleanUp(pullContext PullContext)
 }
 
 func NewAsyncProjectCommandOutputHandler(
-	projectCmdOutput chan *models.ProjectCmdOutputLine,
+	projectCmdOutput chan *ProjectCmdOutputLine,
 	projectStatusUpdater ProjectStatusUpdater,
 	projectJobURLGenerator ProjectJobURLGenerator,
 	logger logging.SimpleLogging,
@@ -83,34 +104,41 @@ func NewAsyncProjectCommandOutputHandler(
 		projectStatusUpdater:   projectStatusUpdater,
 		projectJobURLGenerator: projectJobURLGenerator,
 		projectOutputBuffers:   map[string][]string{},
+		pullToJobMapping:       sync.Map{},
 	}
 }
 
 func (p *AsyncProjectCommandOutputHandler) Send(ctx models.ProjectCommandContext, msg string) {
-	p.projectCmdOutput <- &models.ProjectCmdOutputLine{
-		ProjectInfo: ctx.PullInfo(),
-		Line:        msg,
+	p.projectCmdOutput <- &ProjectCmdOutputLine{
+		JobID: ctx.JobID,
+		JobContext: JobContext{
+			HeadCommit: ctx.Pull.HeadCommit,
+			PullContext: PullContext{
+				PullNum:     ctx.Pull.Num,
+				Repo:        ctx.BaseRepo.Name,
+				ProjectName: ctx.ProjectName,
+				Workspace:   ctx.Workspace,
+			},
+		},
+		Line: msg,
 	}
 }
 
-func (p *AsyncProjectCommandOutputHandler) Register(projectInfo string, receiver chan string) {
-	p.addChan(receiver, projectInfo)
+func (p *AsyncProjectCommandOutputHandler) Register(jobID string, receiver chan string) {
+	p.addChan(receiver, jobID)
 }
 
 func (p *AsyncProjectCommandOutputHandler) Handle() {
 	for msg := range p.projectCmdOutput {
-		if msg.ClearBuffBefore {
-			p.clearLogLines(msg.ProjectInfo)
+		// Add job to pullToJob mapping
+		if _, ok := p.pullToJobMapping.Load(msg.JobContext.PullContext); !ok {
+			p.pullToJobMapping.Store(msg.JobContext.PullContext, map[string]bool{})
 		}
-		p.writeLogLine(msg.ProjectInfo, msg.Line)
-	}
-}
+		value, _ := p.pullToJobMapping.Load(msg.JobContext.PullContext)
+		jobMapping := value.(map[string]bool)
+		jobMapping[msg.JobID] = true
 
-func (p *AsyncProjectCommandOutputHandler) Clear(ctx models.ProjectCommandContext) {
-	p.projectCmdOutput <- &models.ProjectCmdOutputLine{
-		ProjectInfo:     ctx.PullInfo(),
-		Line:            models.LogStreamingClearMsg,
-		ClearBuffBefore: true,
+		p.writeLogLine(msg.JobID, msg.Line)
 	}
 }
 
@@ -123,15 +151,9 @@ func (p *AsyncProjectCommandOutputHandler) SetJobURLWithStatus(ctx models.Projec
 	return p.projectStatusUpdater.UpdateProject(ctx, cmdName, status, url)
 }
 
-func (p *AsyncProjectCommandOutputHandler) clearLogLines(pull string) {
-	p.projectOutputBuffersLock.Lock()
-	delete(p.projectOutputBuffers, pull)
-	p.projectOutputBuffersLock.Unlock()
-}
-
-func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, pull string) {
+func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string) {
 	p.projectOutputBuffersLock.RLock()
-	buffer := p.projectOutputBuffers[pull]
+	buffer := p.projectOutputBuffers[jobID]
 	p.projectOutputBuffersLock.RUnlock()
 
 	for _, line := range buffer {
@@ -141,17 +163,17 @@ func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, pull string) 
 	// add the channel to our registry after we backfill the contents of the buffer,
 	// to prevent new messages coming in interleaving with this backfill.
 	p.receiverBuffersLock.Lock()
-	if p.receiverBuffers[pull] == nil {
-		p.receiverBuffers[pull] = map[chan string]bool{}
+	if p.receiverBuffers[jobID] == nil {
+		p.receiverBuffers[jobID] = map[chan string]bool{}
 	}
-	p.receiverBuffers[pull][ch] = true
+	p.receiverBuffers[jobID][ch] = true
 	p.receiverBuffersLock.Unlock()
 }
 
 //Add log line to buffer and send to all current channels
-func (p *AsyncProjectCommandOutputHandler) writeLogLine(pull string, line string) {
+func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line string) {
 	p.receiverBuffersLock.Lock()
-	for ch := range p.receiverBuffers[pull] {
+	for ch := range p.receiverBuffers[jobID] {
 		select {
 		case ch <- line:
 		default:
@@ -161,51 +183,61 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(pull string, line string
 			// 2. Client does not close the conn and the closeHandler() is not executed -> the
 			// 		receiverChan will be blocking for N number of messages (equal to buffer size)
 			// 		before we delete the channel and clean up the resources.
-			delete(p.receiverBuffers[pull], ch)
+			delete(p.receiverBuffers[jobID], ch)
 		}
 	}
 	p.receiverBuffersLock.Unlock()
 
-	// No need to write to projectOutputBuffers if clear msg.
-	if line == models.LogStreamingClearMsg {
-		return
-	}
-
 	p.projectOutputBuffersLock.Lock()
-	if p.projectOutputBuffers[pull] == nil {
-		p.projectOutputBuffers[pull] = []string{}
+	if p.projectOutputBuffers[jobID] == nil {
+		p.projectOutputBuffers[jobID] = []string{}
 	}
-	p.projectOutputBuffers[pull] = append(p.projectOutputBuffers[pull], line)
+	p.projectOutputBuffers[jobID] = append(p.projectOutputBuffers[jobID], line)
 	p.projectOutputBuffersLock.Unlock()
 }
 
 //Remove channel, so client no longer receives Terraform output
-func (p *AsyncProjectCommandOutputHandler) Deregister(pull string, ch chan string) {
-	p.logger.Debug("Removing channel for %s", pull)
+func (p *AsyncProjectCommandOutputHandler) Deregister(jobID string, ch chan string) {
+	p.logger.Debug("Removing channel for %s", jobID)
 	p.receiverBuffersLock.Lock()
-	delete(p.receiverBuffers[pull], ch)
+	delete(p.receiverBuffers[jobID], ch)
 	p.receiverBuffersLock.Unlock()
 }
 
-func (p *AsyncProjectCommandOutputHandler) GetReceiverBufferForPull(pull string) map[chan string]bool {
-	return p.receiverBuffers[pull]
+func (p *AsyncProjectCommandOutputHandler) GetReceiverBufferForPull(jobID string) map[chan string]bool {
+	return p.receiverBuffers[jobID]
 }
 
-func (p *AsyncProjectCommandOutputHandler) GetProjectOutputBuffer(pull string) []string {
-	return p.projectOutputBuffers[pull]
+func (p *AsyncProjectCommandOutputHandler) GetProjectOutputBuffer(jobID string) []string {
+	return p.projectOutputBuffers[jobID]
 }
 
-func (p *AsyncProjectCommandOutputHandler) CleanUp(pull string) {
-	p.projectOutputBuffersLock.Lock()
-	delete(p.projectOutputBuffers, pull)
-	p.projectOutputBuffersLock.Unlock()
+func (p *AsyncProjectCommandOutputHandler) GetJobIdMapForPullContext(pullContext PullContext) map[string]bool {
+	if value, ok := p.pullToJobMapping.Load(pullContext); ok {
+		return value.(map[string]bool)
+	}
+	return nil
+}
 
-	// Only delete the pull record from receiver buffers.
-	// WS channel will be closed when the user closes the browser tab
-	// in closeHanlder().
-	p.receiverBuffersLock.Lock()
-	delete(p.receiverBuffers, pull)
-	p.receiverBuffersLock.Unlock()
+func (p *AsyncProjectCommandOutputHandler) CleanUp(pullContext PullContext) {
+	if value, ok := p.pullToJobMapping.Load(pullContext); ok {
+		jobMapping := value.(map[string]bool)
+		for jobID := range jobMapping {
+			p.projectOutputBuffersLock.Lock()
+			delete(p.projectOutputBuffers, jobID)
+			p.projectOutputBuffersLock.Unlock()
+
+			// Only delete the pull record from receiver buffers.
+			// WS channel will be closed when the user closes the browser tab
+			// in closeHanlder().
+			p.receiverBuffersLock.Lock()
+			delete(p.receiverBuffers, jobID)
+			p.receiverBuffersLock.Unlock()
+		}
+
+		// Remove job mapping
+		p.pullToJobMapping.Delete(pullContext)
+	}
 }
 
 // NoopProjectOutputHandler is a mock that doesn't do anything
@@ -214,18 +246,15 @@ type NoopProjectOutputHandler struct{}
 func (p *NoopProjectOutputHandler) Send(ctx models.ProjectCommandContext, msg string) {
 }
 
-func (p *NoopProjectOutputHandler) Register(projectInfo string, receiver chan string)   {}
-func (p *NoopProjectOutputHandler) Deregister(projectInfo string, receiver chan string) {}
+func (p *NoopProjectOutputHandler) Register(jobID string, receiver chan string)   {}
+func (p *NoopProjectOutputHandler) Deregister(jobID string, receiver chan string) {}
 
 func (p *NoopProjectOutputHandler) Handle() {
-}
-
-func (p *NoopProjectOutputHandler) Clear(ctx models.ProjectCommandContext) {
 }
 
 func (p *NoopProjectOutputHandler) SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error {
 	return nil
 }
 
-func (p *NoopProjectOutputHandler) CleanUp(pull string) {
+func (p *NoopProjectOutputHandler) CleanUp(pullContext PullContext) {
 }

@@ -126,7 +126,6 @@ type ProjectOutputWrapper struct {
 func (p *ProjectOutputWrapper) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
 	// Reset the buffer when running the plan. We only need to do this for plan,
 	// apply is a continuation of the same workflow
-	p.ProjectCmdOutputHandler.Clear(ctx)
 	return p.updateProjectPRStatus(models.PlanCommand, ctx, p.ProjectCommandRunner.Plan)
 }
 
