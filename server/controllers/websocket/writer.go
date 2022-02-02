@@ -31,18 +31,6 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 		return errors.Wrap(err, "upgrading websocket connection")
 	}
 
-	conn.SetCloseHandler(func(code int, text string) error {
-		// Close the channnel after websocket connection closed.
-		// Will gracefully exit the ProjectCommandOutputHandler.Register() call and cleanup.
-		// is it good practice to close at the receiver? Probably not, we should figure out a better
-		// way to handle this case
-		close(input)
-		return nil
-	})
-
-	// Add a reader goroutine to listen for socket.close() events.
-	go w.setReadHandler(conn)
-
 	// block on reading our input channel
 	for msg := range input {
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte("\r"+msg+"\n")); err != nil {
@@ -51,20 +39,9 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 		}
 	}
 
-	return nil
-}
-
-func (w *Writer) setReadHandler(c *websocket.Conn) {
-	for {
-		_, _, err := c.ReadMessage()
-		if err != nil {
-			// CloseGoingAway (1001) when a browser tab is closed.
-			// Expected behaviour since we have a CloseHandler(), log warning if not a CloseGoingAway
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				w.log.Warn("Failed to read WS message: %s", err)
-			}
-			return
-		}
+	// close ws conn after input channel is closed
+	if err = conn.Close(); err != nil {
+		w.log.Warn("Failed to close ws connection: %s", err)
 	}
-
+	return nil
 }

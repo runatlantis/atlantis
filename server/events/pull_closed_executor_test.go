@@ -210,7 +210,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		}
 
 		go prjCmdOutHandler.Handle()
-		prjCmdOutHandler.Send(ctx, "Test Message")
+		prjCmdOutHandler.Send(ctx, "Test Message", false)
 
 		// Create boltdb and add pull request.
 		var lockBucket = "bucket"
