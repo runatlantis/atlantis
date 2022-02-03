@@ -293,6 +293,13 @@ func TestRenderProjectResults(t *testing.T) {
 			"Ran Plan for 0 projects:\n\n\n\n",
 		},
 		{
+			"approve policies",
+			models.ApprovePoliciesCommand,
+			[]models.ProjectResult{},
+			models.Github,
+			"Approved Policies for 0 projects:\n\n\n\n",
+		},
+		{
 			"single successful plan",
 			models.PlanCommand,
 			[]models.ProjectResult{

@@ -336,7 +336,7 @@ var singleProjectVersionSuccessTmpl string
 //go:embed templates/singleProjectVersionUnsuccessful.tmpl
 var singleProjectVersionUnsuccessfulTmpl string
 
-//go:embed templates/singleProjectVersionUnsuccessful.tmpl
+//go:embed templates/approveAllProjects.tmpl
 var approveAllProjectsTmpl string
 
 //go:embed templates/multiProjectPlan.tmpl
