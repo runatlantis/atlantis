@@ -720,38 +720,6 @@ projects:
 			destroyFlagSet: true,
 			expError:       "",
 		},
-		{
-			description: "test dependency loop",
-			AtlantisYAML: `
-version: 3
-projects:
-- autoplan:
-    enabled: true
-    when_modified:
-    - '*.hcl'
-    - '*.tf*'
-    - ../1/terragrunt.hcl
-  dir: dependency-test/2
-- autoplan:
-    enabled: true
-    when_modified:
-    - '*.hcl'
-    - '*.tf*'
-    - ../2/terragrunt.hcl
-  dir: dependency-test/3
-- autoplan:
-    enabled: true
-    when_modified:
-    - '*.hcl'
-    - '*.tf*'
-    - ../3/terragrunt.hcl
-  dir: dependency-test/1
-`,
-			modified:       []string{"dependency-test/1/terragrunt.hcl", "dependency-test/2/terragrunt.hcl", "dependency-test/3/terragrunt.hcl"},
-			expProjPaths:   []string{},
-			destroyFlagSet: false,
-			expError:       "topological sort failed",
-		},
 	}
 
 	for _, c := range cases {
