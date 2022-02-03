@@ -7,11 +7,11 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	"github.com/runatlantis/atlantis/server/core/config"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
