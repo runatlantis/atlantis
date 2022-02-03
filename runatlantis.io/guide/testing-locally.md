@@ -311,7 +311,7 @@ If you'd like to `apply`, type a comment: `atlantis apply`. You can use the `-d`
 Atlantis at a specific plan. Otherwise it tries to apply the plan for the root directory.
 
 ## Real-time logs
-The [real-time terraform output](/logs/README.md) for your command can be found by clicking into the status check for a given project in a PR which
+The real-time terraform output for your command can be found by clicking into the status check for a given project in a PR which
 links to the log-streaming UI. This is a terminal UI where you can view your commands executing in real-time. 
 
 ## Next Steps
