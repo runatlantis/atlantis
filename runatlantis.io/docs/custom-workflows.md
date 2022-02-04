@@ -164,7 +164,7 @@ If using the server `repos.yaml` file, you would use the following config:
 
 ```yaml
 # repos.yaml
-# Specify TERRAGRUNT_TFPATH environment variable to accomodate setting --default-tf-version
+# Specify TERRAGRUNT_TFPATH environment variable to accommodate setting --default-tf-version
 # Generate json plan via terragrunt for policy checks
 repos:
 - id: "/.*/"

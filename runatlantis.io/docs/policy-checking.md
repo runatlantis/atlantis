@@ -66,7 +66,7 @@ policies:
       - example-dev
   policy_sets:
     - name: example-conf-tests
-      path: /home/atlantis/conftest_policies  # Consider seperate vcs & mount into container
+      path: /home/atlantis/conftest_policies  # Consider separate vcs & mount into container
       source: local
 workflows:
   custom:

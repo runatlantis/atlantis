@@ -81,7 +81,7 @@ could be stolen. Enable SSL/HTTPS using the `--ssl-cert-file` and `--ssl-key-fil
 flags.
 
 ### Enable Authentication on Atlantis Web Server
-It is very reccomended to enable authentication in the web service. Enable BasicAuth using the `--web-basic-auth=true` and setup a username and a password using `--web-username=yourUsername` and `--web-password=yourPassword` flags.
+It is very recommended to enable authentication in the web service. Enable BasicAuth using the `--web-basic-auth=true` and setup a username and a password using `--web-username=yourUsername` and `--web-password=yourPassword` flags.
 
 You can also pass these as environment variables `ATLANTIS_WEB_BASIC_AUTH=true` `ATLANTIS_WEB_USERNAME=yourUsername` and `ATLANTIS_WEB_PASSWORD=yourPassword`. 
 
