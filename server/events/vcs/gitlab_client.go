@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/core/config"
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
@@ -360,7 +360,7 @@ func MustConstraint(constraint string) version.Constraints {
 func (g *GitlabClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	opt := gitlab.GetRawFileOptions{Ref: gitlab.String(pull.HeadBranch)}
 
-	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, yaml.AtlantisYAMLFilename, &opt)
+	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, config.AtlantisYAMLFilename, &opt)
 	if resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil
 	}

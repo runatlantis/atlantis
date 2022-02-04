@@ -11,7 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	snsMocks "github.com/runatlantis/atlantis/server/lyft/aws/sns/mocks"
 	"github.com/runatlantis/atlantis/server/lyft/decorators"

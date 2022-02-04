@@ -2,7 +2,7 @@ package events
 
 import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
 type PullUpdater struct {

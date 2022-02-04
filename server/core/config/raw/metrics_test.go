@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/events/yaml/raw"
+	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 )

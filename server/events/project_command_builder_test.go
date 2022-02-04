@@ -2,19 +2,19 @@ package events_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
@@ -134,7 +134,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
@@ -147,7 +147,7 @@ projects:
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -402,7 +402,7 @@ projects:
 				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 				if c.AtlantisYAML != "" {
-					err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+					err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 					Ok(t, err)
 				}
 
@@ -415,7 +415,7 @@ projects:
 
 				builder := events.NewProjectCommandBuilder(
 					false,
-					&yaml.ParserValidator{},
+					&config.ParserValidator{},
 					&events.DefaultProjectFinder{},
 					vcsClient,
 					workingDir,
@@ -557,7 +557,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
@@ -570,7 +570,7 @@ projects:
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -661,7 +661,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,
@@ -722,7 +722,7 @@ projects:
 - dir: .
   workspace: staging
 `
-	err := ioutil.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	err := os.WriteFile(filepath.Join(repoDir, config.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
 	Ok(t, err)
 
 	When(workingDir.Clone(
@@ -746,7 +746,7 @@ projects:
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,
@@ -825,7 +825,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -925,7 +925,7 @@ projects:
 			"project1": map[string]interface{}{
 				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
 			},
-			yaml.AtlantisYAMLFilename: atlantisYamlContent,
+			config.AtlantisYAMLFilename: atlantisYamlContent,
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
 		Exp: map[string][]int{
@@ -938,7 +938,7 @@ projects:
 			"project1": map[string]interface{}{
 				"main.tf": nil,
 			},
-			yaml.AtlantisYAMLFilename: atlantisYamlContent,
+			config.AtlantisYAMLFilename: atlantisYamlContent,
 		},
 		ModifiedFiles: []string{"project1/main.tf"},
 		Exp: map[string][]int{
@@ -1008,7 +1008,7 @@ projects:
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -1075,7 +1075,7 @@ projects:
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		vcsClient,
 		workingDir,
@@ -1133,7 +1133,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 
 	builder := events.NewProjectCommandBuilder(
 		true,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		vcsClient,
 		workingDir,
@@ -1215,7 +1215,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,

@@ -1,4 +1,4 @@
-package yaml_test
+package config_test
 
 import (
 	"fmt"
@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -25,7 +25,7 @@ var globalCfgArgs = valid.GlobalCfgArgs{
 var globalCfg = valid.NewGlobalCfgFromArgs(globalCfgArgs)
 
 func TestHasRepoCfg_DirDoesNotExist(t *testing.T) {
-	r := yaml.ParserValidator{}
+	r := config.ParserValidator{}
 	exists, err := r.HasRepoCfg("/not/exist")
 	Ok(t, err)
 	Equals(t, false, exists)
@@ -34,7 +34,7 @@ func TestHasRepoCfg_DirDoesNotExist(t *testing.T) {
 func TestHasRepoCfg_FileDoesNotExist(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
-	r := yaml.ParserValidator{}
+	r := config.ParserValidator{}
 	exists, err := r.HasRepoCfg(tmpDir)
 	Ok(t, err)
 	Equals(t, false, exists)
@@ -46,13 +46,13 @@ func TestHasRepoCfg_InvalidFileExtension(t *testing.T) {
 	_, err := os.Create(filepath.Join(tmpDir, "atlantis.yml"))
 	Ok(t, err)
 
-	r := yaml.ParserValidator{}
+	r := config.ParserValidator{}
 	_, err = r.HasRepoCfg(tmpDir)
 	ErrContains(t, "found \"atlantis.yml\" as config file; rename using the .yaml extension - \"atlantis.yaml\"", err)
 }
 
 func TestParseRepoCfg_DirDoesNotExist(t *testing.T) {
-	r := yaml.ParserValidator{}
+	r := config.ParserValidator{}
 	_, err := r.ParseRepoCfg("/not/exist", globalCfg, "")
 	Assert(t, os.IsNotExist(err), "exp not exist err")
 }
@@ -60,7 +60,7 @@ func TestParseRepoCfg_DirDoesNotExist(t *testing.T) {
 func TestParseRepoCfg_FileDoesNotExist(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
-	r := yaml.ParserValidator{}
+	r := config.ParserValidator{}
 	_, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
 	Assert(t, os.IsNotExist(err), "exp not exist err")
 }
@@ -71,7 +71,7 @@ func TestParseRepoCfg_BadPermissions(t *testing.T) {
 	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), nil, 0000)
 	Ok(t, err)
 
-	r := yaml.ParserValidator{}
+	r := config.ParserValidator{}
 	_, err = r.ParseRepoCfg(tmpDir, globalCfg, "")
 	ErrContains(t, "unable to read atlantis.yaml file: ", err)
 }
@@ -105,7 +105,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 			confPath := filepath.Join(tmpDir, "atlantis.yaml")
 			err := ioutil.WriteFile(confPath, []byte(c.input), 0600)
 			Ok(t, err)
-			r := yaml.ParserValidator{}
+			r := config.ParserValidator{}
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "")
 			ErrContains(t, c.expErr, err)
 			globalCfgArgs := valid.GlobalCfgArgs{
@@ -1071,7 +1071,7 @@ workflows:
 			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
 			Ok(t, err)
 
-			r := yaml.ParserValidator{}
+			r := config.ParserValidator{}
 			act, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
@@ -1099,7 +1099,7 @@ workflows:
 	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(repoCfg), 0600)
 	Ok(t, err)
 
-	r := yaml.ParserValidator{}
+	r := config.ParserValidator{}
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg:  false,
 		MergeableReq:  false,
@@ -1112,7 +1112,7 @@ workflows:
 }
 
 func TestParseGlobalCfg_NotExist(t *testing.T) {
-	r := yaml.ParserValidator{}
+	r := config.ParserValidator{}
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg:  false,
 		MergeableReq:  false,
@@ -1470,7 +1470,7 @@ workflows:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			r := yaml.ParserValidator{}
+			r := config.ParserValidator{}
 			tmp, cleanup := TempDir(t)
 			defer cleanup()
 			path := filepath.Join(tmp, "conf.yaml")
@@ -1671,7 +1671,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			pv := &yaml.ParserValidator{}
+			pv := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:  false,
 				MergeableReq:  false,
@@ -1738,7 +1738,7 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
 			Ok(t, ioutil.WriteFile(v2Path, []byte("version: 2\n"+cfg), 0600))
 			Ok(t, ioutil.WriteFile(v3Path, []byte("version: 3\n"+cfg), 0600))
 
-			p := &yaml.ParserValidator{}
+			p := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:  true,
 				MergeableReq:  false,
