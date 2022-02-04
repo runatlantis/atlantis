@@ -60,13 +60,14 @@ Example Server Side Repo configuration using `--all-namespaces` and a local src 
 ```
 repos:
   - id: github.com/myorg/example-repo
+    workflow: custom
 policies:
   owners:
     users:
       - example-dev
   policy_sets:
     - name: example-conf-tests
-      path: /home/atlantis/conftest_policies  # Consider seperate vcs & mount into container
+      path: /home/atlantis/conftest_policies  # Consider separate vcs & mount into container
       source: local
 workflows:
   custom:
@@ -75,9 +76,9 @@ workflows:
         - init
         - plan
     policy_check:
-     steps:
-       - policy_check:
-           extra_args: ["-p /home/atlantis/conftest_policies/", "--all-namespaces"]
+      steps:
+        - policy_check:
+            extra_args: ["-p /home/atlantis/conftest_policies/", "--all-namespaces"]
 ```
 
 ### Step 3: Write the policy
