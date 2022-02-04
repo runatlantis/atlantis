@@ -85,6 +85,6 @@ It is very reccomended to enable authentication in the web service. Enable Basic
 
 You can also pass these as environment variables `ATLANTIS_WEB_BASIC_AUTH=true` `ATLANTIS_WEB_USERNAME=yourUsername` and `ATLANTIS_WEB_PASSWORD=yourPassword`. 
 
-::tip Tip
+:::tip Tip
 We do encourage the usage of complex passwords in order to prevent basic bruteforcing attacks.
 :::
