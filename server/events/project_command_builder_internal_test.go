@@ -789,9 +789,9 @@ projects:
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
-			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
+			Ok(t, ioutil.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg(false, false, false))
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}))
 			Ok(t, err)
 
 			if c.repoCfg != "" {

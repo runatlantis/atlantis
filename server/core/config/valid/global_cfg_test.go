@@ -46,6 +46,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			},
 		},
 	}
+
 	baseCfg := valid.GlobalCfg{
 		Repos: []valid.Repo{
 			{
@@ -155,9 +156,9 @@ func TestNewGlobalCfg(t *testing.T) {
 				UnDivergedReq: c.unDivergedReq,
 			}
 			act := valid.NewGlobalCfgFromArgs(globalCfgArgs)
-
 			// For each test, we change our expected cfg based on the parameters.
-			exp := deepcopy.Copy(baseCfg).(valid.GlobalCfg)
+			var exp valid.GlobalCfg
+			exp = deepcopy.Copy(baseCfg).(valid.GlobalCfg)
 			exp.Repos[0].IDRegex = regexp.MustCompile(".*") // deepcopy doesn't copy the regex.
 			exp.Repos[0].BranchRegex = regexp.MustCompile(".*")
 
@@ -173,6 +174,159 @@ func TestNewGlobalCfg(t *testing.T) {
 			}
 			if c.unDivergedReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "undiverged")
+			}
+
+			Equals(t, exp, act)
+
+			// Have to hand-compare regexes because Equals doesn't do it.
+			for i, actRepo := range act.Repos {
+				expRepo := exp.Repos[i]
+				if expRepo.IDRegex != nil {
+					Assert(t, expRepo.IDRegex.String() == actRepo.IDRegex.String(),
+						"%q != %q for repos[%d]", expRepo.IDRegex.String(), actRepo.IDRegex.String(), i)
+				}
+				if expRepo.BranchRegex != nil {
+					Assert(t, expRepo.BranchRegex.String() == actRepo.BranchRegex.String(),
+						"%q != %q for repos[%d]", expRepo.BranchRegex.String(), actRepo.BranchRegex.String(), i)
+				}
+			}
+		})
+	}
+}
+
+func TestPlatformModeNewGlobalCfg(t *testing.T) {
+	expDefaultWorkflow := valid.Workflow{
+		Name: "default",
+		Apply: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "apply",
+				},
+			},
+		},
+		PolicyCheck: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "show",
+				},
+				{
+					StepName: "policy_check",
+				},
+			},
+		},
+		Plan: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "init",
+				},
+				{
+					StepName: "plan",
+				},
+			},
+		},
+	}
+
+	expDefaultPRWorkflow := valid.Workflow{
+		Name: "default",
+		PolicyCheck: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "show",
+				},
+				{
+					StepName: "policy_check",
+				},
+			},
+		},
+		Plan: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:  "init",
+					ExtraArgs: []string{"-lock=false"},
+				},
+				{
+					StepName:  "plan",
+					ExtraArgs: []string{"-lock=false"},
+				},
+			},
+		},
+	}
+	expDefaultDeploymentWorkflow := valid.Workflow{
+		Name: "default",
+		Apply: valid.Stage{
+			Steps: []valid.Step{
+				{
+
+					StepName: "apply",
+				},
+			},
+		},
+		Plan: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "init",
+				},
+				{
+					StepName: "plan",
+				},
+			},
+		},
+	}
+	baseCfg := valid.GlobalCfg{
+		Repos: []valid.Repo{
+			{
+				IDRegex:                   regexp.MustCompile(".*"),
+				BranchRegex:               regexp.MustCompile(".*"),
+				ApplyRequirements:         []string{},
+				Workflow:                  &expDefaultWorkflow,
+				PullRequestWorkflow:       &expDefaultPRWorkflow,
+				DeploymentWorkflow:        &expDefaultDeploymentWorkflow,
+				AllowedWorkflows:          []string{},
+				AllowedOverrides:          []string{},
+				AllowCustomWorkflows:      Bool(false),
+				DeleteSourceBranchOnMerge: Bool(false),
+			},
+		},
+		Workflows: map[string]valid.Workflow{
+			"default": expDefaultWorkflow,
+		},
+		PullRequestWorkflows: map[string]valid.Workflow{
+			"default": expDefaultPRWorkflow,
+		},
+		DeploymentWorkflows: map[string]valid.Workflow{
+			"default": expDefaultDeploymentWorkflow,
+		},
+	}
+
+	cases := []struct {
+		allowRepoCfg bool
+	}{
+		{
+			allowRepoCfg: false,
+		},
+		{
+			allowRepoCfg: true,
+		},
+	}
+
+	for _, c := range cases {
+		caseName := fmt.Sprintf("allow_repo: %t",
+			c.allowRepoCfg)
+		t.Run(caseName, func(t *testing.T) {
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:        c.allowRepoCfg,
+				PlatformModeEnabled: true,
+			}
+			act := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+
+			// For each test, we change our expected cfg based on the parameters.
+			exp := deepcopy.Copy(baseCfg).(valid.GlobalCfg)
+			exp.Repos[0].IDRegex = regexp.MustCompile(".*") // deepcopy doesn't copy the regex.
+			exp.Repos[0].BranchRegex = regexp.MustCompile(".*")
+
+			if c.allowRepoCfg {
+				exp.Repos[0].AllowCustomWorkflows = Bool(true)
+				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow", "delete_source_branch_on_merge", "pull_request_workflow", "deployment_workflow"}
 			}
 
 			Equals(t, exp, act)
@@ -694,6 +848,7 @@ func TestGlobalCfg_MergeProjectCfg(t *testing.T) {
 	cases := map[string]struct {
 		gCfg          string
 		repoID        string
+		platformMode  bool
 		proj          valid.Project
 		repoWorkflows map[string]valid.Workflow
 		exp           valid.MergedProjectCfg
@@ -824,6 +979,44 @@ repos:
 				PolicySets:      emptyPolicySets,
 			},
 		},
+		"merge platform mode default config": {
+			platformMode: true,
+			gCfg:         "",
+			repoID:       "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:       "mydir",
+				Workspace: "myworkspace",
+				Name:      String("myname"),
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{".tf"},
+					Enabled:      true,
+				},
+			},
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{},
+				Workflow: valid.Workflow{
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultPlanStage,
+				},
+				PullRequestWorkflow: valid.Workflow{
+					Name:        "default",
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultLocklessPlanStage,
+				},
+				DeploymentWorkflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
+				},
+				RepoRelDir:      "mydir",
+				Workspace:       "myworkspace",
+				Name:            "myname",
+				AutoplanEnabled: true,
+				PolicySets:      emptyPolicySets,
+			},
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -835,20 +1028,22 @@ repos:
 				Ok(t, ioutil.WriteFile(path, []byte(c.gCfg), 0600))
 				var err error
 				globalCfgArgs := valid.GlobalCfgArgs{
-					AllowRepoCfg:  false,
-					MergeableReq:  false,
-					ApprovedReq:   false,
-					UnDivergedReq: false,
+					AllowRepoCfg:        false,
+					MergeableReq:        false,
+					ApprovedReq:         false,
+					UnDivergedReq:       false,
+					PlatformModeEnabled: c.platformMode,
 				}
 
 				global, err = (&config.ParserValidator{}).ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 				Ok(t, err)
 			} else {
 				globalCfgArgs := valid.GlobalCfgArgs{
-					AllowRepoCfg:  false,
-					MergeableReq:  false,
-					ApprovedReq:   false,
-					UnDivergedReq: false,
+					AllowRepoCfg:        false,
+					MergeableReq:        false,
+					ApprovedReq:         false,
+					UnDivergedReq:       false,
+					PlatformModeEnabled: c.platformMode,
 				}
 				global = valid.NewGlobalCfgFromArgs(globalCfgArgs)
 			}
