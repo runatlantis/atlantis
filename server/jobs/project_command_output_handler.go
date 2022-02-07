@@ -221,7 +221,7 @@ func (p *AsyncProjectCommandOutputHandler) GetProjectOutputBuffer(jobID string) 
 	return p.projectOutputBuffers[jobID]
 }
 
-func (p *AsyncProjectCommandOutputHandler) GetJobIdMapForPull(pullInfo PullInfo) map[string]bool {
+func (p *AsyncProjectCommandOutputHandler) GetJobIDMapForPull(pullInfo PullInfo) map[string]bool {
 	if value, ok := p.pullToJobMapping.Load(pullInfo); ok {
 		return value.(map[string]bool)
 	}

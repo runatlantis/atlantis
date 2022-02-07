@@ -173,7 +173,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		assert.Empty(t, dfProjectOutputHandler.GetProjectOutputBuffer(ctx.JobID))
 		assert.Empty(t, dfProjectOutputHandler.GetReceiverBufferForPull(ctx.JobID))
-		assert.Empty(t, dfProjectOutputHandler.GetJobIdMapForPull(pullContext))
+		assert.Empty(t, dfProjectOutputHandler.GetJobIDMapForPull(pullContext))
 	})
 
 	t.Run("mark operation status complete and close conn buffers for the job", func(t *testing.T) {
@@ -189,7 +189,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		// read from channel
 		go func() {
-			for _ = range ch {
+			for range ch {
 			}
 		}()
 
@@ -233,17 +233,17 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Wait for the handler to process the message
 		time.Sleep(10 * time.Millisecond)
 
-		ch_2 := make(chan string)
+		ch2 := make(chan string)
 		opComplete := make(chan bool)
 
 		// buffer channel will be closed immediately after logs are streamed
 		go func() {
-			for _ = range ch_2 {
+			for _ = range ch2 {
 			}
 			opComplete <- true
 		}()
 
-		projectOutputHandler.Register(ctx.JobID, ch_2)
+		projectOutputHandler.Register(ctx.JobID, ch2)
 
 		assert.True(t, <-opComplete)
 	})
