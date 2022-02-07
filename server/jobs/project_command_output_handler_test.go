@@ -223,7 +223,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		// read from channel
 		go func() {
-			for _ = range ch {
+			for range ch {
 			}
 		}()
 
@@ -238,7 +238,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		// buffer channel will be closed immediately after logs are streamed
 		go func() {
-			for _ = range ch2 {
+			for range ch2 {
 			}
 			opComplete <- true
 		}()
