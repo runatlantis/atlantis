@@ -11,7 +11,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
-	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	fmocks "github.com/runatlantis/atlantis/server/lyft/feature/mocks"
@@ -37,7 +37,7 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion(t *testing.T) {
 		},
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	asyncClient := &AsyncClient{
 		projectCmdOutputHandler: projectCmdOutputHandler,
 		commandBuilder:          mockBuilder,
@@ -69,7 +69,7 @@ func TestVersionLoader_buildsURL(t *testing.T) {
 	mockDownloader := mocks.NewMockDownloader()
 
 	subject := VersionLoader{
-		downloader: mockDownloader,
+		downloader:  mockDownloader,
 		downloadURL: "https://releases.hashicorp.com",
 	}
 
@@ -112,7 +112,7 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion_Error(t *testing.T) {
 		},
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	asyncClient := &AsyncClient{
 		projectCmdOutputHandler: projectCmdOutputHandler,
 		commandBuilder:          mockBuilder,

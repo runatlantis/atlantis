@@ -32,7 +32,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform/cloud"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
-	"github.com/runatlantis/atlantis/server/handlers"
+	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 )
@@ -95,7 +95,7 @@ func NewClientWithVersionCache(
 	tfDownloadURL string,
 	tfDownloader Downloader,
 	usePluginCache bool,
-	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 	featureAllocator feature.Allocator,
 	versionCache cache.ExecutionVersionCache,
 ) (*DefaultClient, error) {
@@ -160,7 +160,7 @@ func NewE2ETestClient(
 	tfDownloadURL string,
 	tfDownloader Downloader,
 	usePluginCache bool,
-	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 	featureAllocator feature.Allocator,
 ) (*DefaultClient, error) {
 	versionCache := cache.NewLocalBinaryCache("terraform")
@@ -181,8 +181,6 @@ func NewE2ETestClient(
 	)
 }
 
-
-
 func NewClient(
 	log logging.SimpleLogging,
 	binDir string,
@@ -194,7 +192,7 @@ func NewClient(
 	tfDownloadURL string,
 	tfDownloader Downloader,
 	usePluginCache bool,
-	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 	featureAllocator feature.Allocator,
 ) (*DefaultClient, error) {
 	loader := VersionLoader{

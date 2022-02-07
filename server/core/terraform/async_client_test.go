@@ -11,7 +11,8 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
-	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
+
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -30,7 +31,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	}
 
 	mockBuilder := mocks.NewMockcommandBuilder()
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	client := &AsyncClient{
 		projectCmdOutputHandler: projectCmdOutputHandler,
 		commandBuilder:          mockBuilder,
@@ -57,7 +58,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	client := &AsyncClient{
 		projectCmdOutputHandler: projectCmdOutputHandler,
 		commandBuilder:          mockBuilder,
@@ -104,7 +105,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	client := &AsyncClient{
 		projectCmdOutputHandler: projectCmdOutputHandler,
 		commandBuilder:          mockBuilder,
@@ -127,10 +128,10 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	ctx := models.ProjectCommandContext{
-		Log:                logger,
+		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	client := &AsyncClient{
 		projectCmdOutputHandler: projectCmdOutputHandler,
 		commandBuilder:          mockBuilder,
@@ -154,10 +155,10 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	ctx := models.ProjectCommandContext{
-		Log:                logger,
+		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	client := &AsyncClient{
 		projectCmdOutputHandler: projectCmdOutputHandler,
 		commandBuilder:          mockBuilder,

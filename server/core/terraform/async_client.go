@@ -9,14 +9,14 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/handlers"
+	"github.com/runatlantis/atlantis/server/jobs"
 )
 
 // Setting the buffer size to 10mb
 const BufioScannerBufferSize = 10 * 1024 * 1024
 
 type AsyncClient struct {
-	projectCmdOutputHandler handlers.ProjectCommandOutputHandler
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler
 	commandBuilder          commandBuilder
 }
 

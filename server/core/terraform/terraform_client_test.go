@@ -24,7 +24,7 @@ import (
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/models"
-	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	fmocks "github.com/runatlantis/atlantis/server/lyft/feature/mocks"
@@ -36,7 +36,7 @@ import (
 func TestNewClient_NoTF(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	defer cleanup()
 
 	// Set PATH to only include our empty directory.
@@ -55,7 +55,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 	fakeBinOut := "Terraform v0.11.10\n"
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	ctx := models.ProjectCommandContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
@@ -89,7 +89,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	fakeBinOut := "Terraform v0.11.10\n"
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	ctx := models.ProjectCommandContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
@@ -121,7 +121,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 func TestNewClient_BadVersion(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	_, binDir, cacheDir, cleanup := mkSubDirs(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	defer cleanup()
 	allocator := fmocks.NewMockAllocator()
 

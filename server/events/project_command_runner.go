@@ -24,7 +24,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
-	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 )
@@ -118,22 +117,37 @@ type ProjectCommandRunner interface {
 	ProjectVersionCommandRunner
 }
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_job_url_setter.go JobURLSetter
+
+type JobURLSetter interface {
+	// SetJobURLWithStatus sets the commit status for the project represented by
+	// ctx and updates the status with and url to a job.
+	SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error
+}
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
+
+type JobMessageSender interface {
+	Send(ctx models.ProjectCommandContext, msg string, operationComplete bool)
+}
+
 // ProjectOutputWrapper is a decorator that creates a new PR status check per project.
 // The status contains a url that outputs current progress of the terraform plan/apply command.
 type ProjectOutputWrapper struct {
 	ProjectCommandRunner
-	ProjectCmdOutputHandler handlers.ProjectCommandOutputHandler
+	JobMessageSender JobMessageSender
+	JobURLSetter     JobURLSetter
 }
 
 func (p *ProjectOutputWrapper) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
 	result := p.updateProjectPRStatus(models.PlanCommand, ctx, p.ProjectCommandRunner.Plan)
-	p.ProjectCmdOutputHandler.Send(ctx, "", OperationComplete)
+	p.JobMessageSender.Send(ctx, "", OperationComplete)
 	return result
 }
 
 func (p *ProjectOutputWrapper) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
 	result := p.updateProjectPRStatus(models.ApplyCommand, ctx, p.ProjectCommandRunner.Apply)
-	p.ProjectCmdOutputHandler.Send(ctx, "", OperationComplete)
+	p.JobMessageSender.Send(ctx, "", OperationComplete)
 	return result
 }
 
@@ -141,7 +155,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName models.CommandN
 	// Create a PR status to track project's plan status. The status will
 	// include a link to view the progress of atlantis plan command in real
 	// time
-	if err := p.ProjectCmdOutputHandler.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus); err != nil {
+	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus); err != nil {
 		ctx.Log.Err("updating project PR status", err)
 	}
 
@@ -149,14 +163,14 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName models.CommandN
 	result := execute(ctx)
 
 	if result.Error != nil || result.Failure != "" {
-		if err := p.ProjectCmdOutputHandler.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus); err != nil {
+		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus); err != nil {
 			ctx.Log.Err("updating project PR status", err)
 		}
 
 		return result
 	}
 
-	if err := p.ProjectCmdOutputHandler.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus); err != nil {
+	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus); err != nil {
 		ctx.Log.Err("updating project PR status", err)
 	}
 

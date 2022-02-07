@@ -1,16 +1,12 @@
-package handlers_test
+package jobs_test
 
 import (
-	"errors"
 	"sync"
 	"testing"
 	"time"
 
-	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/handlers"
-	"github.com/runatlantis/atlantis/server/handlers/mocks"
-	"github.com/runatlantis/atlantis/server/handlers/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/assert"
@@ -45,15 +41,11 @@ func createTestProjectCmdContext(t *testing.T) models.ProjectCommandContext {
 	}
 }
 
-func createProjectCommandOutputHandler(t *testing.T) handlers.ProjectCommandOutputHandler {
+func createProjectCommandOutputHandler(t *testing.T) jobs.ProjectCommandOutputHandler {
 	logger := logging.NewNoopLogger(t)
-	prjCmdOutputChan := make(chan *handlers.ProjectCmdOutputLine)
-	projectStatusUpdater := mocks.NewMockProjectStatusUpdater()
-	projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
-	prjCmdOutputHandler := handlers.NewAsyncProjectCommandOutputHandler(
+	prjCmdOutputChan := make(chan *jobs.ProjectCmdOutputLine)
+	prjCmdOutputHandler := jobs.NewAsyncProjectCommandOutputHandler(
 		prjCmdOutputChan,
-		projectStatusUpdater,
-		projectJobURLGenerator,
 		logger,
 	)
 
@@ -139,44 +131,6 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		}
 	})
 
-	t.Run("update project status with project jobs url", func(t *testing.T) {
-		RegisterMockTestingT(t)
-		logger := logging.NewNoopLogger(t)
-		prjCmdOutputChan := make(chan *handlers.ProjectCmdOutputLine)
-		projectStatusUpdater := mocks.NewMockProjectStatusUpdater()
-		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
-		prjCmdOutputHandler := handlers.NewAsyncProjectCommandOutputHandler(
-			prjCmdOutputChan,
-			projectStatusUpdater,
-			projectJobURLGenerator,
-			logger,
-		)
-
-		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn("url-to-project-jobs", nil)
-		err := prjCmdOutputHandler.SetJobURLWithStatus(ctx, models.PlanCommand, models.PendingCommitStatus)
-		Ok(t, err)
-
-		projectStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, "url-to-project-jobs")
-	})
-
-	t.Run("update project status with project jobs url error", func(t *testing.T) {
-		RegisterMockTestingT(t)
-		logger := logging.NewNoopLogger(t)
-		prjCmdOutputChan := make(chan *handlers.ProjectCmdOutputLine)
-		projectStatusUpdater := mocks.NewMockProjectStatusUpdater()
-		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
-		prjCmdOutputHandler := handlers.NewAsyncProjectCommandOutputHandler(
-			prjCmdOutputChan,
-			projectStatusUpdater,
-			projectJobURLGenerator,
-			logger,
-		)
-
-		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn("url-to-project-jobs", errors.New("some error"))
-		err := prjCmdOutputHandler.SetJobURLWithStatus(ctx, models.PlanCommand, models.PendingCommitStatus)
-		assert.Error(t, err)
-	})
-
 	t.Run("clean up all jobs when PR is closed", func(t *testing.T) {
 		var wg sync.WaitGroup
 		projectOutputHandler := createProjectCommandOutputHandler(t)
@@ -203,7 +157,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		projectOutputHandler.Send(ctx, Msg, false)
 		projectOutputHandler.Send(ctx, "Complete", false)
 
-		pullContext := handlers.PullContext{
+		pullContext := jobs.PullInfo{
 			PullNum:     ctx.Pull.Num,
 			Repo:        ctx.BaseRepo.Name,
 			ProjectName: ctx.ProjectName,
@@ -212,12 +166,12 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		projectOutputHandler.CleanUp(pullContext)
 
 		// Check all the resources are cleaned up.
-		dfProjectOutputHandler, ok := projectOutputHandler.(*handlers.AsyncProjectCommandOutputHandler)
+		dfProjectOutputHandler, ok := projectOutputHandler.(*jobs.AsyncProjectCommandOutputHandler)
 		assert.True(t, ok)
 
 		assert.Empty(t, dfProjectOutputHandler.GetProjectOutputBuffer(ctx.JobID))
 		assert.Empty(t, dfProjectOutputHandler.GetReceiverBufferForPull(ctx.JobID))
-		assert.Empty(t, dfProjectOutputHandler.GetJobIdMapForPullContext(pullContext))
+		assert.Empty(t, dfProjectOutputHandler.GetJobIdMapForPull(pullContext))
 	})
 
 	t.Run("mark operation status complete and close conn buffers for the job", func(t *testing.T) {
@@ -243,7 +197,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Wait for the handler to process the message
 		time.Sleep(10 * time.Millisecond)
 
-		dfProjectOutputHandler, ok := projectOutputHandler.(*handlers.AsyncProjectCommandOutputHandler)
+		dfProjectOutputHandler, ok := projectOutputHandler.(*jobs.AsyncProjectCommandOutputHandler)
 		assert.True(t, ok)
 
 		outputBuffer := dfProjectOutputHandler.GetProjectOutputBuffer(ctx.JobID)

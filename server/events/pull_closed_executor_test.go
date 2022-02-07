@@ -21,7 +21,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	bolt "go.etcd.io/bbolt"
 
-	"github.com/runatlantis/atlantis/server/handlers"
+	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/petergtz/pegomock"
@@ -32,7 +32,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
 	loggermocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -196,12 +195,10 @@ func TestCleanUpLogStreaming(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	t.Run("Should Clean Up Log Streaming Resources When PR is closed", func(t *testing.T) {
-		prjStatusUpdater := handlermocks.NewMockProjectStatusUpdater()
-		prjJobURLGenerator := handlermocks.NewMockProjectJobURLGenerator()
 
 		// Create Log streaming resources
-		prjCmdOutput := make(chan *handlers.ProjectCmdOutputLine)
-		prjCmdOutHandler := handlers.NewAsyncProjectCommandOutputHandler(prjCmdOutput, prjStatusUpdater, prjJobURLGenerator, logger)
+		prjCmdOutput := make(chan *jobs.ProjectCmdOutputLine)
+		prjCmdOutHandler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutput, logger)
 		ctx := models.ProjectCommandContext{
 			BaseRepo:    fixtures.GithubRepo,
 			Pull:        fixtures.Pull,
@@ -283,7 +280,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		Equals(t, expectedComment, comment)
 
 		// Assert log streaming resources are cleaned up.
-		dfPrjCmdOutputHandler := prjCmdOutHandler.(*handlers.AsyncProjectCommandOutputHandler)
+		dfPrjCmdOutputHandler := prjCmdOutHandler.(*jobs.AsyncProjectCommandOutputHandler)
 		assert.Empty(t, dfPrjCmdOutputHandler.GetProjectOutputBuffer(ctx.PullInfo()))
 		assert.Empty(t, dfPrjCmdOutputHandler.GetReceiverBufferForPull(ctx.PullInfo()))
 	})
