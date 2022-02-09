@@ -36,6 +36,19 @@ type GlobalCfg struct {
 	Workflows  map[string]Workflow
 	PolicySets PolicySets
 	Metrics    Metrics
+	Jobs       Jobs
+}
+
+type Jobs struct {
+	StorageBackend *StorageBackend
+}
+
+type StorageBackend struct {
+	S3 *S3
+}
+
+type S3 struct {
+	BucketName string
 }
 
 type Metrics struct {
