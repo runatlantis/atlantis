@@ -9,7 +9,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
-	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -91,7 +91,7 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
@@ -138,7 +138,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
@@ -181,7 +181,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
@@ -228,7 +228,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
@@ -276,7 +276,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
@@ -313,7 +313,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
@@ -351,7 +351,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := models.ProjectCommandContext{
 		Log:                logger,

@@ -29,8 +29,14 @@ import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/handlers"
+	"github.com/runatlantis/atlantis/server/jobs"
 )
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_resource_cleaner.go ResourceCleaner
+
+type ResourceCleaner interface {
+	CleanUp(pullInfo jobs.PullInfo)
+}
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
 
@@ -50,7 +56,7 @@ type PullClosedExecutor struct {
 	Logger                   logging.SimpleLogging
 	DB                       *db.BoltDB
 	PullClosedTemplate       PullCleanupTemplate
-	LogStreamResourceCleaner handlers.ResourceCleaner
+	LogStreamResourceCleaner ResourceCleaner
 }
 
 type templatedProject struct {
@@ -83,13 +89,13 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 
 	if pullStatus != nil {
 		for _, project := range pullStatus.Projects {
-			normalizedOwner := strings.ReplaceAll(pullStatus.Pull.BaseRepo.Owner, "/", "-")
-			normalizedName := strings.ReplaceAll(pullStatus.Pull.BaseRepo.Name, "/", "-")
-			projectRepo := fmt.Sprintf("%s/%s", normalizedOwner, normalizedName)
-
-			projectKey := models.BuildPullInfo(projectRepo, pull.Num, project.ProjectName, project.RepoRelDir, project.Workspace)
-
-			p.LogStreamResourceCleaner.CleanUp(projectKey)
+			jobContext := jobs.PullInfo{
+				PullNum:     pull.Num,
+				Repo:        pull.BaseRepo.Name,
+				Workspace:   project.Workspace,
+				ProjectName: project.ProjectName,
+			}
+			p.LogStreamResourceCleaner.CleanUp(jobContext)
 		}
 	}
 
