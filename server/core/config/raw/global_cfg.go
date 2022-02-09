@@ -15,7 +15,8 @@ type GlobalCfg struct {
 	Repos      []Repo              `yaml:"repos" json:"repos"`
 	Workflows  map[string]Workflow `yaml:"workflows" json:"workflows"`
 	PolicySets PolicySets          `yaml:"policies" json:"policies"`
-	Metrics    Metrics            `yaml:"metrics" json:"metrics"`
+	Metrics    Metrics             `yaml:"metrics" json:"metrics"`
+	Jobs       Jobs                `yaml:"jobs" json:"jobs"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
@@ -37,6 +38,7 @@ func (g GlobalCfg) Validate() error {
 		validation.Field(&g.Repos),
 		validation.Field(&g.Workflows),
 		validation.Field(&g.Metrics),
+		validation.Field(&g.Jobs),
 	)
 	if err != nil {
 		return err
@@ -133,6 +135,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 		Workflows:  workflows,
 		PolicySets: g.PolicySets.ToValid(),
 		Metrics:    g.Metrics.ToValid(),
+		Jobs:       g.Jobs.ToValid(),
 	}
 }
 
