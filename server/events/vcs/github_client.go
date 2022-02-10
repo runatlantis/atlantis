@@ -303,6 +303,8 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		return false, errors.Wrap(err, "getting pull request")
 	}
 	state := githubPR.GetMergeableState()
+	status, _ := g.GetCombinedStatus(repo, githubPR.GetHead().GetSHA())
+
 	// We map our mergeable check to when the GitHub merge button is clickable.
 	// This corresponds to the following states:
 	// clean: No conflicts, all requirements satisfied.
@@ -312,9 +314,22 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
+	//
+	// We should not dismiss the PR if the only our "atlantis/apply" status is pending/failing
+	if state == "blocked" {
+		for _, s := range status.Statuses {
+			if s.GetContext() != "atlantis/apply" && s.GetState() != "success" {
+				// If any other status is pending/failing mark as non-mergeable
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
 		return false, nil
 	}
+
 	return true, nil
 }
 
@@ -343,6 +358,14 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 		}
 	}
 	return pull, err
+}
+
+func (g *GithubClient) GetCombinedStatus(repo models.Repo, ref string) (*github.CombinedStatus, error) {
+	opts := github.ListOptions{
+		PerPage: 300,
+	}
+	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, ref, &opts)
+	return status, err
 }
 
 // UpdateStatus updates the status badge on the pull request.
