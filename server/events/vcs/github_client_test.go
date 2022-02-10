@@ -478,41 +478,56 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	cases := []struct {
 		state        string
 		expMergeable bool
+		useStatus    bool
 	}{
 		{
 			"dirty",
+			false,
 			false,
 		},
 		{
 			"unknown",
 			false,
+			false,
 		},
 		{
 			"blocked",
+			true,
+			true,
+		},
+		{
+			"blocked",
+			false,
 			false,
 		},
 		{
 			"behind",
 			false,
+			false,
 		},
 		{
 			"random",
+			false,
 			false,
 		},
 		{
 			"unstable",
 			true,
+			false,
 		},
 		{
 			"has_hooks",
 			true,
+			false,
 		},
 		{
 			"clean",
 			true,
+			false,
 		},
 		{
 			"",
+			false,
 			false,
 		},
 	}
@@ -530,11 +545,24 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 				1,
 			)
 
+			var statusBytes []byte
+			var err error
+			if c.useStatus {
+				statusBytes, err = os.ReadFile("fixtures/github-commit-status-full.json")
+			} else {
+				statusBytes, err = os.ReadFile("fixtures/github-commit-status-empty.json")
+			}
+			Ok(t, err)
+			statusJson := string(statusBytes)
+
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					case "/api/v3/repos/owner/repo/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
+						return
+					case "/api/v3/repos/owner/repo/commits/6dcb09b5b57875f334f61aebed695e2e4193db5e/status?per_page=300":
+						w.Write([]byte(statusJson)) // nolint: errcheck
 						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
