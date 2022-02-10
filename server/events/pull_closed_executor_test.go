@@ -14,12 +14,11 @@
 package events_test
 
 import (
-	"io/ioutil"
-	"testing"
-
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/db"
 	bolt "go.etcd.io/bbolt"
+	"io/ioutil"
+	"testing"
 
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/stretchr/testify/assert"

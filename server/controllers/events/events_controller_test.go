@@ -17,14 +17,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"testing"
-
 	"github.com/google/go-github/v31/github"
 	. "github.com/petergtz/pegomock"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
@@ -38,6 +30,13 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
 )
 
 const githubHeader = "X-Github-Event"
@@ -363,7 +362,7 @@ func TestPost_GitlabCommentSuccess(t *testing.T) {
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
 
-	cr.VerifyWasCalledOnce().RunCommentCommand(models.Repo{}, &models.Repo{}, nil, models.User{}, 0, nil)
+	cr.VerifyWasCalledOnce().RunCommentCommand(matchers.AnyModelsRepo(), matchers.AnyPtrToModelsRepo(), matchers.AnyPtrToModelsPullRequest(), matchers.AnyModelsUser(), EqInt(0), matchers.AnyPtrToEventsCommentCommand(), matchers.AnyTimeTime())
 }
 
 func TestPost_GithubCommentSuccess(t *testing.T) {
@@ -381,8 +380,7 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
-
-	cr.VerifyWasCalledOnce().RunCommentCommand(baseRepo, nil, nil, user, 1, &cmd)
+	cr.VerifyWasCalledOnce().RunCommentCommand(matchers.EqModelsRepo(baseRepo), matchers.AnyPtrToModelsRepo(), matchers.AnyPtrToModelsPullRequest(), matchers.EqModelsUser(user), EqInt(1), matchers.EqPtrToEventsCommentCommand(&cmd), matchers.AnyTimeTime())
 }
 
 func TestPost_GithubPullRequestInvalid(t *testing.T) {
@@ -768,7 +766,7 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 			w := httptest.NewRecorder()
 			e.Post(w, req)
 			ResponseContains(t, w, http.StatusOK, "Processing...")
-			cr.VerifyWasCalledOnce().RunAutoplanCommand(models.Repo{}, models.Repo{}, models.PullRequest{State: models.ClosedPullState}, models.User{})
+			cr.VerifyWasCalledOnce().RunAutoplanCommand(matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.EqModelsPullRequest(models.PullRequest{State: models.ClosedPullState}), matchers.AnyModelsUser(), matchers.AnyTimeTime())
 		})
 	}
 }

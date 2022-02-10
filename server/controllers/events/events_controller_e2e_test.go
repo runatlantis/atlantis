@@ -392,7 +392,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			userConfig = server.UserConfig{}
 			userConfig.DisableApply = c.DisableApply
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace, _ := setupE2E(t, c.RepoDir)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace, _, staleCommandChecker := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -402,6 +402,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			w := httptest.NewRecorder()
 			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToEventsCommandContext())).ThenReturn(false)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -530,7 +531,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			userConfig = server.UserConfig{}
 			userConfig.DisableApply = true
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace, _ := setupE2E(t, c.RepoDir)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace, _, staleCommandChecker := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -552,6 +553,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			w := httptest.NewRecorder()
 			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToEventsCommandContext())).ThenReturn(false)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -735,7 +737,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			userConfig = server.UserConfig{}
 			userConfig.EnablePolicyChecksFlag = true
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace, githubClient := setupE2E(t, c.RepoDir)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace, githubClient, staleCommandChecker := setupE2E(t, c.RepoDir)
 
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
@@ -752,6 +754,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			When(githubClient.GetRepoChecks(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]*github.CheckRun{}, nil)
 			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToEventsCommandContext())).ThenReturn(false)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -811,7 +814,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 	}
 }
 
-func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace, *vcsmocks.MockIGithubClient) {
+func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace, *vcsmocks.MockIGithubClient, *mocks.MockStaleCommandChecker) {
 	allowForkPRs := false
 	dataDir, binDir, cacheDir, cleanup := mkSubDirs(t)
 	defer cleanup()
@@ -1054,7 +1057,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		models.UnlockCommand:          unlockCommandRunner,
 		models.VersionCommand:         versionCommandRunner,
 	}
-
+	staleCommandChecker := mocks.NewMockStaleCommandChecker()
 	commandRunner := &events.DefaultCommandRunner{
 		EventParser:                   eventParser,
 		VCSClient:                     e2eVCSClient,
@@ -1069,6 +1072,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             boltdb,
+		StaleCommandChecker:           staleCommandChecker,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
@@ -1097,7 +1101,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab, models.Github, models.BitbucketCloud},
 		VCSClient:                    e2eVCSClient,
 	}
-	return ctrl, e2eVCSClient, e2eGithubGetter, workingDir, e2eMockGithubClient
+	return ctrl, e2eVCSClient, e2eGithubGetter, workingDir, e2eMockGithubClient, staleCommandChecker
 }
 
 type mockLockURLGenerator struct{}

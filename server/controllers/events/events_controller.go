@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v31/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
@@ -299,10 +300,16 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 			},
 		}
 	}
-
+	eventTimestamp := time.Now()
+	githubComment := event.Comment
+	if githubComment != nil && githubComment.CreatedAt != nil {
+		eventTimestamp = *githubComment.CreatedAt
+	} else {
+		e.Scope.Counter("github_comment_missing_timestamp").Inc(1)
+	}
 	// We pass in nil for maybeHeadRepo because the head repo data isn't
 	// available in the GithubIssueComment event.
-	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, pullNum, event.Comment.GetBody(), models.Github)
+	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, pullNum, event.Comment.GetBody(), models.Github, eventTimestamp)
 }
 
 // HandleBitbucketCloudCommentEvent handles comment events from Bitbucket.
@@ -312,7 +319,8 @@ func (e *VCSEventsController) HandleBitbucketCloudCommentEvent(w http.ResponseWr
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud)
+	eventTimestamp := time.Now()
+	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud, eventTimestamp)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -333,7 +341,8 @@ func (e *VCSEventsController) HandleBitbucketServerCommentEvent(w http.ResponseW
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud)
+	eventTimestamp := time.Now()
+	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud, eventTimestamp)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -355,7 +364,8 @@ func (e *VCSEventsController) handleBitbucketCloudPullRequestEvent(w http.Respon
 	}
 	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType)
 	e.Logger.Info("identified event as type %q", pullEventType.String())
-	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType)
+	eventTimestamp := time.Now()
+	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType, eventTimestamp)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -377,7 +387,8 @@ func (e *VCSEventsController) handleBitbucketServerPullRequestEvent(w http.Respo
 	}
 	pullEventType := e.Parser.GetBitbucketServerPullEventType(eventType)
 	e.Logger.Info("identified event as type %q", pullEventType.String())
-	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType)
+	eventTimestamp := time.Now()
+	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType, eventTimestamp)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -407,10 +418,17 @@ func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.Simple
 		}
 	}
 	logger.Debug("identified event as type %q", pullEventType.String())
-	return e.handlePullRequestEvent(logger, baseRepo, headRepo, pull, user, pullEventType)
+	eventTimestamp := time.Now()
+	githubPullRequest := pullEvent.PullRequest
+	if githubPullRequest != nil && githubPullRequest.UpdatedAt != nil {
+		eventTimestamp = *githubPullRequest.UpdatedAt
+	} else {
+		e.Scope.Counter("github_pr_missing_timestamp").Inc(1)
+	}
+	return e.handlePullRequestEvent(logger, baseRepo, headRepo, pull, user, pullEventType, eventTimestamp)
 }
 
-func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType) HttpResponse {
+func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType, timestamp time.Time) HttpResponse {
 	if !e.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
 		// If the repo isn't allowlisted and we receive an opened pull request
 		// event we comment back on the pull request that the repo isn't
@@ -439,10 +457,10 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 		// We use a goroutine so that this function returns and the connection is
 		// closed.
 		if !e.TestingMode {
-			go e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
+			go e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user, timestamp)
 		} else {
 			// When testing we want to wait for everything to complete.
-			e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
+			e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user, timestamp)
 		}
 		return HttpResponse{
 			body: "Processing...",
@@ -504,7 +522,8 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, nil, user, event.MergeRequest.IID, event.ObjectAttributes.Note, models.Gitlab)
+	eventTimestamp := time.Now()
+	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, nil, user, event.MergeRequest.IID, event.ObjectAttributes.Note, models.Gitlab, eventTimestamp)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -518,7 +537,7 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 	e.respond(w, lvl, code, msg)
 }
 
-func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, vcsHost models.VCSHostType) HttpResponse {
+func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, vcsHost models.VCSHostType, timestamp time.Time) HttpResponse {
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -565,10 +584,10 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		// Respond with success and then actually execute the command asynchronously.
 		// We use a goroutine so that this function returns and the connection is
 		// closed.
-		go e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command)
+		go e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command, timestamp)
 	} else {
 		// When testing we want to wait for everything to complete.
-		e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command)
+		e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command, timestamp)
 	}
 
 	return HttpResponse{
@@ -586,7 +605,8 @@ func (e *VCSEventsController) HandleGitlabMergeRequestEvent(w http.ResponseWrite
 		return
 	}
 	e.Logger.Info("identified event as type %q", pullEventType.String())
-	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType)
+	eventTimestamp := time.Now()
+	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType, eventTimestamp)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -629,7 +649,8 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull request repository field: %s; %s", err, azuredevopsReqID)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, nil, nil, user, resource.PullRequest.GetPullRequestID(), string(strippedComment), models.AzureDevops)
+	eventTimestamp := time.Now()
+	resp := e.handleCommentEvent(e.Logger, baseRepo, nil, nil, user, resource.PullRequest.GetPullRequestID(), string(strippedComment), models.AzureDevops, eventTimestamp)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -670,7 +691,8 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseW
 		return
 	}
 	e.Logger.Info("identified event as type %q", pullEventType.String())
-	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType)
+	eventTimestamp := time.Now()
+	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType, eventTimestamp)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug

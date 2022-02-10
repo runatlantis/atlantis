@@ -469,6 +469,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 
 	maybeStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
+	Assert(t, maybeStatus.UpdatedAt != 0, "status should have a new time set")
 	Equals(t, pull, maybeStatus.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
 		{
@@ -573,6 +574,7 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 
 	status, err := b.GetPullStatus(pull)
 	Ok(t, err)
+	Assert(t, status.UpdatedAt != 0, "status should have a new time set")
 	Equals(t, pull, status.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
 		{
@@ -616,7 +618,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			},
 		},
 	}
-	_, err := b.UpdatePullWithResults(
+	initialStatus, err := b.UpdatePullWithResults(
 		pull,
 		[]models.ProjectResult{
 			{
@@ -626,6 +628,9 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			},
 		})
 	Ok(t, err)
+	initialTimestamp := initialStatus.UpdatedAt
+	Assert(t, initialTimestamp != 0, "status should have a new time set")
+	time.Sleep(1 * time.Second)
 
 	pull.HeadCommit = "newsha"
 	status, err := b.UpdatePullWithResults(pull,
@@ -642,6 +647,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 
 	maybeStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
+	Assert(t, maybeStatus.UpdatedAt > initialTimestamp, "new timestamp %v should be after old %v", maybeStatus.UpdatedAt, initialTimestamp)
 	Equals(t, pull, maybeStatus.Pull)
 	Equals(t, []models.ProjectStatus{
 		{
@@ -679,7 +685,7 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 			},
 		},
 	}
-	_, err := b.UpdatePullWithResults(
+	initialStatus, err := b.UpdatePullWithResults(
 		pull,
 		[]models.ProjectResult{
 			{
@@ -708,6 +714,9 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 			},
 		})
 	Ok(t, err)
+	initialTimestamp := initialStatus.UpdatedAt
+	Assert(t, initialTimestamp != 0, "status should have a new time set")
+	time.Sleep(1 * time.Second)
 
 	updateStatus, err := b.UpdatePullWithResults(pull,
 		[]models.ProjectResult{
@@ -739,6 +748,7 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 	// Test both the pull state returned from the update call *and* the getCommandLock
 	// call.
 	for _, s := range []models.PullStatus{updateStatus, *getStatus} {
+		Assert(t, s.UpdatedAt > initialTimestamp, "new timestamp should be after old")
 		Equals(t, pull, s.Pull)
 		Equals(t, []models.ProjectStatus{
 			{
