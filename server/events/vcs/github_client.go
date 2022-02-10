@@ -304,13 +304,18 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	//
 	// We should not dismiss the PR if the only our "atlantis/apply" status is pending/failing
 	if state == "blocked" {
+		applyStatus := false
 		for _, s := range status.Statuses {
+			if strings.Contains(s.GetContext(), "atlantis/apply") {
+				applyStatus = true
+				continue
+			}
 			if s.GetContext() != "atlantis/apply" && s.GetState() != "success" {
 				// If any other status is pending/failing mark as non-mergeable
 				return false, nil
 			}
 		}
-		return true, nil
+		return applyStatus, nil
 	}
 
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
