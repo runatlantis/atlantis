@@ -14,6 +14,7 @@ func NewApplyCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
 	prjCmdRunner ProjectApplyCommandRunner,
+	planCmdRunner *PlanCommandRunner,
 	autoMerger *AutoMerger,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
@@ -30,6 +31,7 @@ func NewApplyCommandRunner(
 		commitStatusUpdater:        commitStatusUpdater,
 		prjCmdBuilder:              prjCommandBuilder,
 		prjCmdRunner:               prjCmdRunner,
+		planCmdRunner:              planCmdRunner,
 		autoMerger:                 autoMerger,
 		pullUpdater:                pullUpdater,
 		dbUpdater:                  dbUpdater,
@@ -49,6 +51,7 @@ type ApplyCommandRunner struct {
 	commitStatusUpdater  CommitStatusUpdater
 	prjCmdBuilder        ProjectApplyCommandBuilder
 	prjCmdRunner         ProjectApplyCommandRunner
+	planCmdRunner        *PlanCommandRunner
 	autoMerger           *AutoMerger
 	pullUpdater          *PullUpdater
 	dbUpdater            *DBUpdater
@@ -159,8 +162,22 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 
 	a.updateCommitStatus(ctx, pullStatus)
 
-	if a.autoMerger.automergeEnabled(projectCmds) && !cmd.AutoMergeDisabled {
-		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds))
+	needsPlan := false
+	for _, p := range pullStatus.Projects {
+		if p.Status == models.PendingDependencyApplied {
+			needsPlan = true
+			break
+		}
+	}
+
+	if needsPlan && a.planCmdRunner != nil {
+		ctx.Trigger = Auto
+		ctx.PullStatus = &pullStatus
+		a.planCmdRunner.Run(ctx, nil)
+	} else {
+		if a.autoMerger.automergeEnabled(projectCmds) && !cmd.AutoMergeDisabled {
+			a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds))
+		}
 	}
 }
 

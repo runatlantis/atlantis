@@ -593,6 +593,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		projectOutputWrapper,
+		planCommandRunner,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
