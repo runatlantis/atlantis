@@ -35,9 +35,13 @@ module.exports = {
             {text: 'Home', link: '/'},
             {text: 'Guide', link: '/guide/'},
             {text: 'Docs', link: '/docs/'},
+            {text: 'Streaming Logs', link: '/logs/'},
             {text: 'Blog', link: 'https://medium.com/runatlantis'}
         ],
         sidebar: {
+            '/logs/': [
+                '',
+            ],
             '/guide/': [
                 '',
                 'test-drive',
@@ -65,6 +69,7 @@ module.exports = {
                         'server-configuration',
                         'server-side-repo-config',
                         'pre-workflow-hooks',
+                        'post-workflow-hooks',
                         'policy-checking',
                         'custom-workflows',
                         'repo-level-atlantis-yaml',
@@ -72,7 +77,8 @@ module.exports = {
                         'apply-requirements',
                         'checkout-strategy',
                         'terraform-versions',
-                        'terraform-cloud'
+                        'terraform-cloud',
+                        'using-slack-hooks'
                     ]
                 },
                 {

@@ -24,27 +24,24 @@ import (
 	"github.com/Laisky/graphql"
 	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
-	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/shurcooL/githubv4"
 )
 
 // maxCommentLength is the maximum number of chars allowed in a single comment
 // by GitHub.
-const (
-	maxCommentLength = 65536
-)
+const maxCommentLength = 65536
 
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
-	user               string
-	client             *github.Client
-	v4MutateClient     *graphql.Client
-	ctx                context.Context
-	logger             logging.SimpleLogging
-	statusTitleMatcher StatusTitleMatcher
+	user           string
+	client         *github.Client
+	v4MutateClient *graphql.Client
+	ctx            context.Context
+	logger         logging.SimpleLogging
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -62,7 +59,7 @@ type GithubAppTemporarySecrets struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging, commitStatusPrefix string) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging) (*GithubClient, error) {
 	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
@@ -102,12 +99,11 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 		return nil, errors.Wrap(err, "getting user")
 	}
 	return &GithubClient{
-		user:               user,
-		client:             client,
-		v4MutateClient:     v4MutateClient,
-		ctx:                context.Background(),
-		logger:             logger,
-		statusTitleMatcher: StatusTitleMatcher{TitlePrefix: commitStatusPrefix},
+		user:           user,
+		client:         client,
+		v4MutateClient: v4MutateClient,
+		ctx:            context.Background(),
+		logger:         logger,
 	}, nil
 }
 
@@ -116,6 +112,8 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 	nextPage := 0
+
+listloop:
 	for {
 		opts := github.ListOptions{
 			PerPage: 300,
@@ -123,24 +121,42 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 		if nextPage != 0 {
 			opts.Page = nextPage
 		}
-		g.logger.Debug("GET /repos/%v/%v/pulls/%d/files", repo.Owner, repo.Name, pull.Num)
-		pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
-		if err != nil {
-			return files, err
-		}
-		for _, f := range pageFiles {
-			files = append(files, f.GetFilename())
+		// GitHub has started to return 404's sometimes. They've got some
+		// eventual consistency issues going on so we're just going to attempt
+		// up to 5 times for each page with exponential backoff.
+		maxAttempts := 5
+		attemptDelay := 0 * time.Second
+		for i := 0; i < maxAttempts; i++ {
+			// First don't sleep, then sleep 1, 3, 7, etc.
+			time.Sleep(attemptDelay)
+			attemptDelay = 2*attemptDelay + 1*time.Second
 
-			// If the file was renamed, we'll want to run plan in the directory
-			// it was moved from as well.
-			if f.GetStatus() == "renamed" {
-				files = append(files, f.GetPreviousFilename())
+			g.logger.Debug("[attempt %d] GET /repos/%v/%v/pulls/%d/files", i+1, repo.Owner, repo.Name, pull.Num)
+			pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
+			if err != nil {
+				ghErr, ok := err.(*github.ErrorResponse)
+				if ok && ghErr.Response.StatusCode == 404 {
+					// (hopefully) transient 404, retry after backoff
+					continue
+				}
+				// something else, give up
+				return files, err
 			}
-		}
-		if resp.NextPage == 0 {
+			for _, f := range pageFiles {
+				files = append(files, f.GetFilename())
+
+				// If the file was renamed, we'll want to run plan in the directory
+				// it was moved from as well.
+				if f.GetStatus() == "renamed" {
+					files = append(files, f.GetPreviousFilename())
+				}
+			}
+			if resp.NextPage == 0 {
+				break listloop
+			}
+			nextPage = resp.NextPage
 			break
 		}
-		nextPage = resp.NextPage
 	}
 	return files, nil
 }
@@ -284,40 +300,8 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
-
-		if state != "blocked" {
-			return false, nil
-		}
-
-		return g.getSupplementalMergeability(repo, pull)
-	}
-	return true, nil
-}
-
-// Checks to make sure that all statuses are passing except the atlantis/apply. If we only rely on GetMergeableState,
-// we can run into issues where if an apply failed, we can never apply again due to mergeability failures.
-func (g *GithubClient) getSupplementalMergeability(repo models.Repo, pull models.PullRequest) (bool, error) {
-	statuses, err := g.getRepoStatuses(repo, pull)
-
-	if err != nil {
-		return false, errors.Wrapf(err, "fetching repo statuses for repo: %s, and pull number: %d", repo.FullName, pull.Num)
-	}
-
-	for _, status := range statuses {
-		state := status.GetState()
-
-		if g.statusTitleMatcher.MatchesCommand(status.GetContext(), "apply") ||
-			state == "success" {
-			continue
-
-		}
-
-		// we either have a failure or a pending status check
-		// hence the PR is not mergeable
 		return false, nil
 	}
-
-	// all our status checks are successful by our definition,
 	return true, nil
 }
 
@@ -346,38 +330,6 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 		}
 	}
 	return pull, err
-}
-
-func (g *GithubClient) getRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error) {
-	// Get Combined statuses
-
-	nextPage := 0
-
-	var result []*github.RepoStatus
-
-	for {
-		opts := github.ListOptions{
-			// explicit default
-			// https://developer.github.com/v3/repos/statuses/#list-commit-statuses-for-a-reference
-			PerPage: 100,
-		}
-		if nextPage != 0 {
-			opts.Page = nextPage
-		}
-
-		combinedStatus, response, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, &opts)
-		result = append(result, combinedStatus.Statuses...)
-
-		if err != nil {
-			return nil, err
-		}
-		if response.NextPage == 0 {
-			break
-		}
-		nextPage = response.NextPage
-	}
-
-	return result, nil
 }
 
 // UpdateStatus updates the status badge on the pull request.
@@ -454,6 +406,48 @@ func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 	return fmt.Sprintf("#%d", pull.Num), nil
 }
 
+// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
+// https://docs.github.com/en/graphql/reference/objects#organization
+func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	orgName := repo.Owner
+	variables := map[string]interface{}{
+		"orgName":    githubv4.String(orgName),
+		"userLogins": []githubv4.String{githubv4.String(user.Username)},
+		"teamCursor": (*githubv4.String)(nil),
+	}
+	var q struct {
+		Organization struct {
+			Teams struct {
+				Edges []struct {
+					Node struct {
+						Name string
+					}
+				}
+				PageInfo struct {
+					EndCursor   githubv4.String
+					HasNextPage bool
+				}
+			} `graphql:"teams(first:100, after: $teamCursor, userLogins: $userLogins)"`
+		} `graphql:"organization(login: $orgName)"`
+	}
+	var teamNames []string
+	ctx := context.Background()
+	for {
+		err := g.v4MutateClient.Query(ctx, &q, variables)
+		if err != nil {
+			return nil, err
+		}
+		for _, edge := range q.Organization.Teams.Edges {
+			teamNames = append(teamNames, edge.Node.Name)
+		}
+		if !q.Organization.Teams.PageInfo.HasNextPage {
+			break
+		}
+		variables["teamCursor"] = githubv4.NewString(q.Organization.Teams.PageInfo.EndCursor)
+	}
+	return teamNames, nil
+}
+
 // ExchangeCode returns a newly created app's info
 func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, error) {
 	ctx := context.Background()
@@ -474,7 +468,7 @@ func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, er
 // if BaseRepo had one repo config file, its content will placed on the second return value
 func (g *GithubClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	opt := github.RepositoryContentGetOptions{Ref: pull.HeadBranch}
-	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, yaml.AtlantisYAMLFilename, &opt)
+	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, config.AtlantisYAMLFilename, &opt)
 
 	if resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil

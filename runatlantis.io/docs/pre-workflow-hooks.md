@@ -6,7 +6,7 @@ workflows](custom-workflows.html#custom-run-command) in several ways.
 
 1. Pre workflow hooks do not require for repository configuration to be
    present. This be utilized to [dynamically generate repo configs](pre-workflow-hooks.html#dynamic-repo-config-generation).
-2. Pre workflow hooks are ran outside of Atlantis commands. Which means
+2. Pre workflow hooks are run outside of Atlantis commands. Which means
    they do not surface their output back to the PR as a comment.
 
 [[toc]]
@@ -31,8 +31,8 @@ repos:
       pre_workflow_hooks:
         - run: ./repo-config-generator.sh
 ```
-### Reference
-#### Custom `run` Command
+## Reference
+### Custom `run` Command
 This is very similar to [custom workflow run
 command](custom-workflows.html#custom-run-command). 
 ```yaml

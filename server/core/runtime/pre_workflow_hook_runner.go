@@ -10,12 +10,12 @@ import (
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
 type PreWorkflowHookRunner interface {
-	Run(ctx models.PreWorkflowHookCommandContext, command string, path string) (string, error)
+	Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, error)
 }
 
 type DefaultPreWorkflowHookRunner struct{}
 
-func (wh DefaultPreWorkflowHookRunner) Run(ctx models.PreWorkflowHookCommandContext, command string, path string) (string, error) {
+func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, error) {
 	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
 

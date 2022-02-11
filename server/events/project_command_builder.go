@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/yaml"
 )
 
 const (
@@ -31,7 +31,7 @@ const (
 
 func NewProjectCommandBuilder(
 	policyChecksSupported bool,
-	parserValidator *yaml.ParserValidator,
+	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
 	vcsClient vcs.Client,
 	workingDir WorkingDir,
@@ -54,7 +54,7 @@ func NewProjectCommandBuilder(
 		SkipCloneNoChanges: skipCloneNoChanges,
 		EnableRegExpCmd:    EnableRegExpCmd,
 		AutoplanFileList:   AutoplanFileList,
-		ProjectCommandContextBuilder: NewProjectCommandContextBulder(
+		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
 		),
@@ -106,7 +106,7 @@ type ProjectCommandBuilder interface {
 // This class combines the data from the comment and any atlantis.yaml file or
 // Atlantis server config and then generates a set of contexts.
 type DefaultProjectCommandBuilder struct {
-	ParserValidator              *yaml.ParserValidator
+	ParserValidator              *config.ParserValidator
 	ProjectFinder                ProjectFinder
 	VCSClient                    vcs.Client
 	WorkingDir                   WorkingDir
@@ -180,15 +180,15 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
 		hasRepoCfg, repoCfgData, err := p.VCSClient.DownloadRepoConfigFile(ctx.Pull)
 		if err != nil {
-			return nil, errors.Wrapf(err, "downloading %s", yaml.AtlantisYAMLFilename)
+			return nil, errors.Wrapf(err, "downloading %s", config.AtlantisYAMLFilename)
 		}
 
 		if hasRepoCfg {
 			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID())
 			if err != nil {
-				return nil, errors.Wrapf(err, "parsing %s", yaml.AtlantisYAMLFilename)
+				return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 			}
-			ctx.Log.Info("successfully parsed remote %s file", yaml.AtlantisYAMLFilename)
+			ctx.Log.Info("successfully parsed remote %s file", config.AtlantisYAMLFilename)
 			matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "")
 			if err != nil {
 				return nil, err
@@ -223,7 +223,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	// Parse config file if it exists.
 	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {
-		return nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
+		return nil, errors.Wrapf(err, "looking for %s file in %q", config.AtlantisYAMLFilename, repoDir)
 	}
 
 	var projCtxs []models.ProjectCommandContext
@@ -233,9 +233,9 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		// should be planed.
 		repoCfg, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID())
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing %s", yaml.AtlantisYAMLFilename)
+			return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 		}
-		ctx.Log.Info("successfully parsed %s file", yaml.AtlantisYAMLFilename)
+		ctx.Log.Info("successfully parsed %s file", config.AtlantisYAMLFilename)
 		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
 		if err != nil {
 			return nil, err
@@ -263,7 +263,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	} else {
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.
-		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
+		ctx.Log.Info("found no %s file", config.AtlantisYAMLFilename)
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList)
 		if err != nil {
 			return nil, errors.Wrapf(err, "finding modified projects: %s", modifiedFiles)
@@ -343,12 +343,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName string, dir string, workspace string, repoDir string) (projectsCfg []valid.Project, repoCfg *valid.RepoCfg, err error) {
 	hasConfigFile, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {
-		err = errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
+		err = errors.Wrapf(err, "looking for %s file in %q", config.AtlantisYAMLFilename, repoDir)
 		return
 	}
 	if !hasConfigFile {
 		if projectName != "" {
-			err = fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
+			err = fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", config.AtlantisYAMLFilename)
 			return
 		}
 		return
@@ -372,7 +372,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 			}
 		}
 		if len(projectsCfg) == 0 {
-			err = fmt.Errorf("no project with name %q is defined in %s", projectName, yaml.AtlantisYAMLFilename)
+			err = fmt.Errorf("no project with name %q is defined in %s", projectName, config.AtlantisYAMLFilename)
 			return
 		}
 		return
@@ -383,7 +383,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 		return
 	}
 	if len(projCfgs) > 1 {
-		err = fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", yaml.AtlantisYAMLFilename, dir, workspace)
+		err = fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", config.AtlantisYAMLFilename, dir, workspace)
 		return
 	}
 	projectsCfg = projCfgs
