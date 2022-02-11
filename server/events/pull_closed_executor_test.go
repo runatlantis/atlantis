@@ -266,7 +266,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 				Workspace: "default",
 			},
 		}
-		When(locker.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(locks, nil)
+		When(locker.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(locks, models.DequeueStatus{ProjectLocks: nil}, nil)
 
 		// Clean up.
 		err = pullClosedExecutor.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
