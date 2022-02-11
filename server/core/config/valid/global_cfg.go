@@ -69,6 +69,7 @@ type MergedProjectCfg struct {
 	RepoCfgVersion            int
 	PolicySets                PolicySets
 	DeleteSourceBranchOnMerge bool
+	DependsOn                 []string
 }
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.

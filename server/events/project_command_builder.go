@@ -71,6 +71,9 @@ type ProjectPlanCommandBuilder interface {
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
 	BuildPlanCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	// GroupProjectCmdsByDependency returns a grouping of models.ProjectCommandContext based on
+	// the dependency hierarchy
+	GroupProjectCmdsByDependency(cmds []models.ProjectCommandContext) [][]models.ProjectCommandContext
 }
 
 type ProjectApplyCommandBuilder interface {
@@ -120,6 +123,78 @@ type DefaultProjectCommandBuilder struct {
 	EnableDiffMarkdownFormat     bool
 }
 
+// See ProjectCommandBuilder.GroupProjectCmdsByDependency.
+func (p *DefaultProjectCommandBuilder) GroupProjectCmdsByDependency(cmds []models.ProjectCommandContext) [][]models.ProjectCommandContext {
+	cmdCache := make(map[string]*models.ProjectCommandContext)
+	for i, _ := range cmds {
+		cmdCache[cmds[i].RepoRelDir] = &cmds[i]
+	}
+	groups := [][]models.ProjectCommandContext{{}}
+	groupsCache := []map[string]bool{{}}
+
+	jobs := make([]models.ProjectCommandContext, len(cmds))
+	copy(jobs, cmds)
+
+	for len(jobs) > 0 {
+		cmd := jobs[0]
+		if len(cmd.DependsOn) == 0 {
+			// If a project doesn't have any dependencies (it's a leaf node)
+			// it can be planned/applied in the first group
+			groups[0] = append(groups[0], cmd)
+			groupsCache[0][cmd.RepoRelDir] = true
+			jobs = jobs[1:]
+			continue
+		}
+
+		depsFound := 0
+		gIdx := 0
+		for _, dep := range cmd.DependsOn {
+			if _, ok := cmdCache[dep.RepoRelDir]; !ok {
+				// the dependency is not in the list of changed projects so we can ignore it
+				depsFound++
+				continue
+			}
+
+			// This project has dependencies, try to find them all in the groups.
+			// If this project's dependencies are not in a group, this means
+			// their dependencies haven't been added yet, etc... projects without
+			// dependencies must be added to a group first.
+			//
+			// If all of this project's dependencies are found in a group,
+			// then this project needs to be added to the group index after
+			// the dependency with the highest index.
+			//
+			// depA is in groups[0]
+			// depB is in groups[1]
+			// the current project goes into groups[2]
+			for group := range groupsCache {
+				if _, ok := groupsCache[group][dep.RepoRelDir]; ok {
+					depsFound++
+					if group >= gIdx {
+						gIdx = group + 1
+					}
+				}
+			}
+		}
+
+		if depsFound == len(cmd.DependsOn) {
+			if gIdx > len(groups)-1 {
+				groups = append(groups, []models.ProjectCommandContext{})
+				groupsCache = append(groupsCache, map[string]bool{})
+			}
+
+			groups[gIdx] = append(groups[gIdx], cmd)
+			groupsCache[gIdx][cmd.RepoRelDir] = true
+		} else {
+			jobs = append(jobs, cmd)
+		}
+
+		jobs = jobs[1:]
+	}
+
+	return groups
+}
+
 // See ProjectCommandBuilder.BuildAutoplanCommands.
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
 	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false)
@@ -165,6 +240,28 @@ func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *CommandContext,
 	}
 	pac, err := p.buildProjectVersionCommand(ctx, cmd)
 	return pac, err
+}
+
+func (p *DefaultProjectCommandBuilder) resolveDependencies(projects []valid.Project, projCtxs []models.ProjectCommandContext) []models.ProjectCommandContext {
+	projCache := make(map[string]*valid.Project)
+	for i, _ := range projects {
+		projCache[projects[i].Dir] = &projects[i]
+	}
+
+	ctxCache := make(map[string]*models.ProjectCommandContext)
+	for i, _ := range projCtxs {
+		ctxCache[projCtxs[i].RepoRelDir] = &projCtxs[i]
+	}
+
+	for i, ctx := range projCtxs {
+		for _, dep := range projCache[ctx.RepoRelDir].DependsOn {
+			if _, ok := ctxCache[dep]; ok {
+				projCtxs[i].DependsOn = append(projCtxs[i].DependsOn, ctxCache[dep])
+			}
+		}
+	}
+
+	return projCtxs
 }
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
@@ -242,6 +339,13 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		}
 		ctx.Log.Info("%d projects are to be planned based on their when_modified config", len(matchingProjects))
 
+		if repoCfg.CascadeDependencies {
+			// If a project has been modified, cascade down the dependency tree
+			// and include all dependent projects
+			matchingProjects = p.ProjectFinder.CascadeDependencies(matchingProjects, repoCfg)
+			ctx.Log.Info("%d projects are to be planned after cascading dependencies", len(matchingProjects))
+		}
+
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
@@ -260,6 +364,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 					verbose,
 				)...)
 		}
+		projCtxs = p.resolveDependencies(matchingProjects, projCtxs)
 	} else {
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.

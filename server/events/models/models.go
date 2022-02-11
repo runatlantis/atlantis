@@ -413,6 +413,8 @@ type ProjectCommandContext struct {
 	DeleteSourceBranchOnMerge bool
 	// UUID for atlantis logs
 	JobID string
+
+	DependsOn []*ProjectCommandContext
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result

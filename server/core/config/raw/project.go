@@ -28,6 +28,7 @@ type Project struct {
 	Autoplan                  *Autoplan `yaml:"autoplan,omitempty"`
 	ApplyRequirements         []string  `yaml:"apply_requirements,omitempty"`
 	DeleteSourceBranchOnMerge *bool     `yaml:"delete_source_branch_on_merge,omitempty"`
+	DependsOn                 []string  `yaml:"depends_on,omitempty"`
 }
 
 func (p Project) Validate() error {
@@ -91,6 +92,8 @@ func (p Project) ToValid() valid.Project {
 	if p.DeleteSourceBranchOnMerge != nil {
 		v.DeleteSourceBranchOnMerge = p.DeleteSourceBranchOnMerge
 	}
+
+	v.DependsOn = p.DependsOn
 
 	return v
 }

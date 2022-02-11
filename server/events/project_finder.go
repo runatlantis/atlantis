@@ -38,6 +38,8 @@ type ProjectFinder interface {
 	// based on modifiedFiles and the repo's config.
 	// absRepoDir is the path to the cloned repo on disk.
 	DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
+	// CascadeDependencies returns the list of projects recursively including their dependents
+	CascadeDependencies(projects []valid.Project, config valid.RepoCfg) []valid.Project
 }
 
 // ignoredFilenameFragments contains filename fragments to ignore while looking at changes
@@ -77,6 +79,39 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 	}
 	log.Info("there are %d modified project(s) at path(s): %v",
 		len(projects), strings.Join(exists, ", "))
+	return projects
+}
+
+// See ProjectFinder.CascadeDependencies
+func (p *DefaultProjectFinder) CascadeDependencies(projects []valid.Project, config valid.RepoCfg) []valid.Project {
+	// Create some maps to avoid loops of loops of loops
+	projCache := make(map[string]valid.Project)
+	for _, project := range projects {
+		projCache[project.Dir] = project
+	}
+	confProj := make(map[string]valid.Project)
+	for _, project := range config.Projects {
+		confProj[project.Dir] = project
+	}
+
+	jobs := make([]valid.Project, len(projects))
+	copy(jobs, projects)
+
+	// For each modified project, ensure its dependents are also included
+	for len(jobs) > 0 {
+		for _, dep := range jobs[0].DependsOn {
+			// Only add the project if it's not already added
+			// This is to avoid duplication with multiple dependencies
+			// converging onto the same leaf node
+			if _, ok := projCache[dep]; !ok {
+				projects = append(projects, confProj[dep])
+				jobs = append(jobs, confProj[dep])
+				projCache[dep] = confProj[dep]
+			}
+		}
+		jobs = jobs[1:]
+	}
+
 	return projects
 }
 

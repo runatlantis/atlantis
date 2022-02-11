@@ -33,6 +33,7 @@ type RepoCfg struct {
 	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
 	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
 	AllowedRegexpPrefixes     []string            `yaml:"allowed_regexp_prefixes,omitempty"`
+	CascadeDependencies       bool                `yaml:"cascade_dependencies,omitempty""`
 }
 
 func (r RepoCfg) Validate() error {
@@ -89,5 +90,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		ParallelPolicyCheck:       parallelPlan,
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 		AllowedRegexpPrefixes:     r.AllowedRegexpPrefixes,
+		CascadeDependencies:       r.CascadeDependencies,
 	}
 }

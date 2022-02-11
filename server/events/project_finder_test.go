@@ -514,3 +514,69 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestCascadeDependencies(t *testing.T) {
+	cases := []struct {
+		description  string
+		projects     []valid.Project
+		config       valid.RepoCfg
+		expProjPaths []string
+	}{
+		{
+			description: "Projects without dependencies should not cascade",
+			projects: []valid.Project{
+				{Dir: "project1"},
+			},
+			config: valid.RepoCfg{
+				CascadeDependencies: true,
+				Projects: []valid.Project{
+					{Dir: "project1"},
+					{Dir: "project2"},
+					{Dir: "project3", DependsOn: []string{"project2"}},
+				},
+			},
+			expProjPaths: []string{"project1"},
+		},
+		{
+			description: "Projects should not cascade when CascadeDependencies is false",
+			projects: []valid.Project{
+				{Dir: "project1"},
+			},
+			config: valid.RepoCfg{
+				CascadeDependencies: false,
+				Projects: []valid.Project{
+					{Dir: "project1", DependsOn: []string{"project3"}},
+					{Dir: "project2"},
+					{Dir: "project3", DependsOn: []string{"project2"}},
+				},
+			},
+			expProjPaths: []string{"project1"},
+		},
+		{
+			description: "Projects should cascade all the way down",
+			projects: []valid.Project{
+				{Dir: "project1", DependsOn: []string{"project3"}},
+			},
+			config: valid.RepoCfg{
+				CascadeDependencies: true,
+				Projects: []valid.Project{
+					{Dir: "project1", DependsOn: []string{"project3"}},
+					{Dir: "project2"},
+					{Dir: "project3", DependsOn: []string{"project2"}},
+				},
+			},
+			expProjPaths: []string{"project1", "project3", "project2"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			pf := events.DefaultProjectFinder{}
+			projects := pf.CascadeDependencies(c.projects, c.config)
+			Equals(t, len(c.expProjPaths), len(projects))
+			for i, proj := range projects {
+				Equals(t, c.expProjPaths[i], proj.Dir)
+			}
+		})
+	}
+}
