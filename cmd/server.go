@@ -24,8 +24,8 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -64,6 +64,7 @@ const (
 	EnableRegExpCmdFlag        = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat   = "enable-diff-markdown-format"
 	GHHostnameFlag             = "gh-hostname"
+	GHTeamAllowlistFlag        = "gh-team-allowlist"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
 	GHAppIDFlag                = "gh-app-id"
@@ -111,7 +112,7 @@ const (
 	DefaultADBasicUser      = ""
 	DefaultADBasicPassword  = ""
 	DefaultADHostname       = "dev.azure.com"
-	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
+	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
@@ -198,6 +199,17 @@ var stringFlags = map[string]stringFlag{
 	GHHostnameFlag: {
 		description:  "Hostname of your Github Enterprise installation. If using github.com, no need to set.",
 		defaultValue: DefaultGHHostname,
+	},
+	GHTeamAllowlistFlag: {
+		description: "Comma separated list of key-value pairs representing the GitHub teams and the operations that " +
+			"the members of a particular team are allowed to perform. " +
+			"The format is {team}:{command},{team}:{command}. " +
+			"Valid values for 'command' are 'plan', 'apply' and '*', e.g. 'dev:plan,ops:apply,devops:*'" +
+			"This example gives the users from the 'dev' GitHub team the permissions to execute the 'plan' command, " +
+			"the 'ops' team the permissions to execute the 'apply' command, " +
+			"and allows the 'devops' team to perform any operation. If this argument is not provided, the default value (*:*) " +
+			"will be used and the default behavior will be to not check permissions " +
+			"and to allow users from any team to perform any operation.",
 	},
 	GHUserFlag: {
 		description:  "GitHub username of API user.",

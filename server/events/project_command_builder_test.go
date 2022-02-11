@@ -8,13 +8,13 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -132,7 +132,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 			if c.AtlantisYAML != "" {
-				err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
@@ -145,7 +145,7 @@ projects:
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -155,7 +155,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
@@ -396,7 +396,7 @@ projects:
 				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 				if c.AtlantisYAML != "" {
-					err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+					err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 					Ok(t, err)
 				}
 
@@ -409,7 +409,7 @@ projects:
 
 				builder := events.NewProjectCommandBuilder(
 					false,
-					&yaml.ParserValidator{},
+					&config.ParserValidator{},
 					&events.DefaultProjectFinder{},
 					vcsClient,
 					workingDir,
@@ -419,7 +419,7 @@ projects:
 					&events.CommentParser{},
 					false,
 					true,
-					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				)
 
 				var actCtxs []models.ProjectCommandContext
@@ -547,7 +547,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
-				err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
@@ -560,7 +560,7 @@ projects:
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -570,7 +570,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -647,7 +647,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,
@@ -657,7 +657,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&events.CommentParser{},
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -705,7 +705,7 @@ projects:
 - dir: .
   workspace: staging
 `
-	err := os.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	err := os.WriteFile(filepath.Join(repoDir, config.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
 	Ok(t, err)
 
 	When(workingDir.Clone(
@@ -727,7 +727,7 @@ projects:
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,
@@ -737,7 +737,7 @@ projects:
 		&events.CommentParser{},
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	ctx := &events.CommandContext{
@@ -802,7 +802,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -812,7 +812,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				&events.CommentParser{},
 				false,
 				false,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 			)
 
 			var actCtxs []models.ProjectCommandContext
@@ -899,7 +899,7 @@ projects:
 			"project1": map[string]interface{}{
 				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
 			},
-			yaml.AtlantisYAMLFilename: atlantisYamlContent,
+			config.AtlantisYAMLFilename: atlantisYamlContent,
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
 		Exp: map[string][]int{
@@ -912,7 +912,7 @@ projects:
 			"project1": map[string]interface{}{
 				"main.tf": nil,
 			},
-			yaml.AtlantisYAMLFilename: atlantisYamlContent,
+			config.AtlantisYAMLFilename: atlantisYamlContent,
 		},
 		ModifiedFiles: []string{"project1/main.tf"},
 		Exp: map[string][]int{
@@ -981,7 +981,7 @@ projects:
 
 			builder := events.NewProjectCommandBuilder(
 				false,
-				&yaml.ParserValidator{},
+				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
@@ -991,7 +991,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -1044,7 +1044,7 @@ projects:
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		vcsClient,
 		workingDir,
@@ -1054,7 +1054,7 @@ projects:
 		&events.CommentParser{},
 		true,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	var actCtxs []models.ProjectCommandContext
@@ -1098,7 +1098,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 
 	builder := events.NewProjectCommandBuilder(
 		true,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		vcsClient,
 		workingDir,
@@ -1108,7 +1108,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		&events.CommentParser{},
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
@@ -1176,7 +1176,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 
 	builder := events.NewProjectCommandBuilder(
 		false,
-		&yaml.ParserValidator{},
+		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,
@@ -1186,7 +1186,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		&events.CommentParser{},
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
 	ctxs, err := builder.BuildVersionCommands(

@@ -1,3 +1,82 @@
+# v0.18.2
+
+## What's Changed
+
+* deps: terraform 1.1.3 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1982
+* deps: conftest 0.30.0 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1983
+* build(deps): bump github.com/xanzy/go-gitlab from 0.52.2 to 0.54.3 by @dependabot in https://github.com/runatlantis/atlantis/pull/1986
+* build(deps): bump github.com/hashicorp/go-version from 1.3.0 to 1.4.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1987
+* build(deps): bump go.uber.org/zap from 1.19.1 to 1.20.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1988
+* docs: document `undiverged` apply requirement in more places by @fishpen0 in https://github.com/runatlantis/atlantis/pull/1992
+* fix: fix autoplan when .terraform.lock.hcl is modifed by @gezb in https://github.com/runatlantis/atlantis/pull/1991
+* feat: add XTerm JS to the server static files by @Ka1wa in https://github.com/runatlantis/atlantis/pull/1985
+* feat: post workflow hooks by @tim775 in https://github.com/runatlantis/atlantis/pull/1990
+* docs: add colon to policy checking yaml by @williamlord-wise in https://github.com/runatlantis/atlantis/pull/1996
+* docs: include infracost ref in post-workflow-hooks by @ilamtap in https://github.com/runatlantis/atlantis/pull/1997
+* fix(docs): update screenshot for Bitbucket server webhook configuration by @kuzm1ch in https://github.com/runatlantis/atlantis/pull/1995
+* fix: make IsOwner policy check case-insensitive by @edbighead in https://github.com/runatlantis/atlantis/pull/1989
+* build(deps): bump github.com/bradleyfalzon/ghinstallation/v2 from 2.0.3 to 2.0.4 by @dependabot in https://github.com/runatlantis/atlantis/pull/2004
+* build(deps): bump github.com/hashicorp/go-getter from 1.5.10 to 1.5.11 by @dependabot in https://github.com/runatlantis/atlantis/pull/2003
+* docs: fix incorrect wildcard and more precise instruction to --gh-team-allowlist option. by @keitap in https://github.com/runatlantis/atlantis/pull/2005
+* fix: support for terraform workspaces by @bschaeffer in https://github.com/runatlantis/atlantis/pull/2006
+* deps: terraform 1.1.4 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/2011
+* fix: add back basic auth support by @Aayyush in https://github.com/runatlantis/atlantis/pull/2008
+* chore: improve `/healthz` endpoint performance by @inkel in https://github.com/runatlantis/atlantis/pull/2014
+* fix: Update GenerateProjectJobURL to account for nested repo names by @Aayyush in https://github.com/runatlantis/atlantis/pull/2012
+* fix: broken Log Streaming URL when working directory is set to "./"  by @Aayyush in https://github.com/runatlantis/atlantis/pull/2015
+* fix: retry /files/ requests to github by @iainlane in https://github.com/runatlantis/atlantis/pull/2002
+
+# v0.18.1
+
+Maintenance release for bug fixes as well as release multi-platform builds for atlantis docker images.
+
+## What's Changed
+
+* Revert "feat: filter out atlantis/apply from mergeability clause (#18… by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1968
+* build(deps): bump github.com/microcosm-cc/bluemonday from 1.0.16 to 1.0.17 by @dependabot in https://github.com/runatlantis/atlantis/pull/1969
+* fix:include no GitHub allowlist rules by default by @paulerickson in https://github.com/runatlantis/atlantis/pull/1973
+* fix: default permissions for gh-team-allowlist. by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1974
+* docs: documentation for slack integration by @syphernl in https://github.com/runatlantis/atlantis/pull/1972
+* workflows(atlantis-image): fix building and publishing of Docker images by @Tenzer in https://github.com/runatlantis/atlantis/pull/1975
+* fix: allowed regexp prefixes for exact matches by @bmbferreira in https://github.com/runatlantis/atlantis/pull/1962
+* deps: conftest 0.29.0 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1977
+
+# v0.18.0
+
+Feature release of adding capability of streaming terraform logs, also added the capability of supporting tf 1.0.x (which was missed in the v0.17.6 release).
+
+## What's Changed
+
+* deps: terraform 1.1.2 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1952
+* build(deps): bump github.com/spf13/viper from 1.10.0 to 1.10.1 by @dependabot in https://github.com/runatlantis/atlantis/pull/1956
+* Dockerfile: Add support for last Terraform 1.0.x version in AVAILABLE_TERRAFORM_VERSIONS by @javierbeaumont in https://github.com/runatlantis/atlantis/pull/1957
+* feat: add GitHub team allowlist configuration option by @paulerickson in https://github.com/runatlantis/atlantis/pull/1694
+* fix: fallback to default TF version in apply step by @sapslaj in https://github.com/runatlantis/atlantis/pull/1931
+* docs: typo in heading level by @moretea in https://github.com/runatlantis/atlantis/pull/1960
+* docs: clarify example for `--azuredevops-token` flag by @MarkIannucci in https://github.com/runatlantis/atlantis/pull/1712
+* docs: update github docs links by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1964
+* build(deps): bump github.com/hashicorp/go-getter from 1.5.9 to 1.5.10 by @dependabot in https://github.com/runatlantis/atlantis/pull/1961
+* feat: streaming terraform logs in real-time by @Aayyush in https://github.com/runatlantis/atlantis/pull/1937
+
+# v0.17.6
+
+## What's Changed
+
+* docs: clarify maximum version limit by @tomharrisonjr in https://github.com/runatlantis/atlantis/pull/1894
+* fix: allow requests to /healthz without authentication by @wendtek in https://github.com/runatlantis/atlantis/pull/1896
+* docs: document approve_policies command in comment_parser by @dupuy26 in https://github.com/runatlantis/atlantis/pull/1886
+* feat: adds `allowed_regexp_prefixes` parameter to use with the `--enable-regexp-cmd` flag by @bmbferreira in https://github.com/runatlantis/atlantis/pull/1884
+* refactor: Add PullStatusFetcher interface by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1904
+* build(deps): bump github.com/urfave/negroni from 0.3.0 to 1.0.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1922
+* build(deps): bump github.com/xanzy/go-gitlab from 0.51.1 to 0.52.2 by @dependabot in https://github.com/runatlantis/atlantis/pull/1921
+* build(deps): bump github.com/golang-jwt/jwt/v4 from 4.1.0 to 4.2.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1928
+* docs: add clarity and further policy_check examples by @DaveHewy in https://github.com/runatlantis/atlantis/pull/1925
+* build(deps): bump github.com/spf13/viper from 1.9.0 to 1.10.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1934
+* deps: terraform 1.1.1 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1939
+* deps: alpine 3.15 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1941
+* docs: fix policy check documentation examples by @DaveHewy in https://github.com/runatlantis/atlantis/pull/1945
+* docker: make multi-platform atlantis image by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1943
+
 # v0.17.5
 
 ## What's Changed

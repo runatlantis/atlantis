@@ -60,6 +60,10 @@ repos:
   # pre_workflow_hooks defines arbitrary list of scripts to execute before workflow execution.
   pre_workflow_hooks: 
     - run: my-pre-workflow-hook-command arg1
+  
+  # post_workflow_hooks defines arbitrary list of scripts to execute after workflow execution.
+  post_workflow_hooks: 
+    - run: my-post-workflow-hook-command arg1
 
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
@@ -179,6 +183,21 @@ repos:
 ```
 See [Pre Workflow Hooks](pre-workflow-hooks.html) for more details on writing
 pre workflow hooks.
+
+### Running Scripts After Atlantis Workflows
+If you want to run scripts that would execute after Atlantis runs default or
+custom workflows, you can create a `post-workflow-hooks`:
+
+```yaml
+repos:
+  - id: /.*/
+    post_workflow_hooks:
+      - run: my custom command
+      - run: |
+          my bash script inline
+```
+See [Post Workflow Hooks](post-workflow-hooks.html) for more details on writing
+post workflow hooks.
 
 ### Change The Default Atlantis Workflow
 If you want to change the default commands that Atlantis runs during `plan` and `apply`
@@ -376,7 +395,7 @@ If you set a workflow with the key `default`, it will override this.
 | id                            | string   | none    | yes      | Value can be a regular expression when specified as /&lt;regex&gt;/ or an exact string match. Repo IDs are of the form `{vcs hostname}/{org}/{name}`, ex. `github.com/owner/repo`. Hostname is specified without scheme or port. For Bitbucket Server, {org} is the **name** of the project, not the key. |
 | branch                        | string   | none    | no       | An regex matching pull requests by base branch (the branch the pull request is getting merged into). By default, all branches are matched                                                                                                                                                                 |
 | workflow                      | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                       |
-| apply_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details.                                                                                    |
+| apply_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Apply Requirements](apply-requirements.html) for more details.                                                                                    |
 | allowed_overrides             | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow` and `delete_source_branch_on_merge`                                                                                                                                      |
 | allowed_workflows             | []string | none    | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                        |
 | allow_custom_workflows        | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                       |

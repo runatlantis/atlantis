@@ -45,7 +45,7 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
-	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, envs, tfVersion, ctx.Workspace)
+	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfVersion, ctx.Workspace)
 	if p.isRemoteOpsErr(output, err) {
 		ctx.Log.Debug("detected that this project is using TFE remote ops")
 		return p.remotePlan(ctx, extraArgs, path, tfVersion, planFile, envs)
@@ -69,7 +69,7 @@ func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
 // operations.
 func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs []string, path string, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
 	argList := [][]string{
-		{"plan", "-input=false", "-refresh", "-no-color"},
+		{"plan", "-input=false", "-refresh"},
 		extraArgs,
 		ctx.EscapedCommentArgs,
 	}
@@ -124,7 +124,7 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 	// already in the right workspace then no need to switch. This will save us
 	// about ten seconds. This command is only available in > 0.10.
 	if !runningZeroPointNine {
-		workspaceShowOutput, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "show"}, envs, tfVersion, ctx.Workspace)
+		workspaceShowOutput, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "show"}, envs, tfVersion, ctx.Workspace)
 		if err != nil {
 			return err
 		}
@@ -139,11 +139,11 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 	// To do this we can either select and catch the error or use list and then
 	// look for the workspace. Both commands take the same amount of time so
 	// that's why we're running select here.
-	_, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "select", "-no-color", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
+	_, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "select", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
 	if err != nil {
 		// If terraform workspace select fails we run terraform workspace
 		// new to create a new workspace automatically.
-		out, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "new", "-no-color", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
+		out, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "new", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
 		if err != nil {
 			return fmt.Errorf("%s: %s", err, out)
 		}
@@ -167,7 +167,7 @@ func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArg
 	argList := [][]string{
 		// NOTE: we need to quote the plan filename because Bitbucket Server can
 		// have spaces in its repo owner names.
-		{"plan", "-input=false", "-refresh", "-no-color", "-out", fmt.Sprintf("%q", planFile)},
+		{"plan", "-input=false", "-refresh", "-out", fmt.Sprintf("%q", planFile)},
 		tfVars,
 		extraArgs,
 		ctx.EscapedCommentArgs,
@@ -252,7 +252,7 @@ func (p *PlanStepRunner) runRemotePlan(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx.Log, filepath.Clean(path), cmdArgs, envs, tfVersion, ctx.Workspace)
+	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string
