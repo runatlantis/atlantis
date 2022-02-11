@@ -141,6 +141,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		planCommandRunner,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,

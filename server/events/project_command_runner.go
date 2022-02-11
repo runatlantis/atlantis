@@ -362,6 +362,15 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	}
 	defer unlockFn()
 
+	// Ensure all dependencies have been planned / applied
+	for _, depCtx := range ctx.DependsOn {
+		if depCtx.ProjectPlanStatus != models.AppliedPlanStatus {
+			ctx.ProjectPlanStatus = models.PendingDependencyApplied
+			// todo : jw : const
+			return nil, fmt.Sprint("pending dependency"), nil
+		}
+	}
+
 	// Clone is idempotent so okay to run even if the repo was already cloned.
 	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {

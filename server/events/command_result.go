@@ -39,3 +39,40 @@ func (c CommandResult) HasErrors() bool {
 	}
 	return false
 }
+
+func (c CommandResult) HasPendingDependencies() bool {
+	for _, r := range c.ProjectResults {
+		if r.PlanStatus() == models.PendingDependencyApplied {
+			return true
+		}
+	}
+	return false
+}
+
+func (c CommandResult) HasProjectResult(cmd models.ProjectCommandContext) bool {
+	for _, r := range c.ProjectResults {
+		if r.RepoRelDir == cmd.RepoRelDir {
+			return true
+		}
+	}
+	return false
+}
+
+func (c CommandResult) Merge(result CommandResult) CommandResult {
+	failure := c.Failure
+	if failure == "" && result.Failure != "" {
+		failure = result.Failure
+	}
+
+	err := c.Error
+	if err == nil && result.Error != nil {
+		err = result.Error
+	}
+
+	return CommandResult{
+		Error:          err,
+		Failure:        failure,
+		ProjectResults: append(c.ProjectResults, result.ProjectResults...),
+		PlansDeleted:   c.PlansDeleted || result.PlansDeleted,
+	}
+}

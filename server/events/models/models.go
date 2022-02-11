@@ -498,7 +498,12 @@ func (p ProjectResult) PlanStatus() ProjectPlanStatus {
 		if p.Error != nil {
 			return ErroredPlanStatus
 		} else if p.Failure != "" {
-			return ErroredPlanStatus
+			switch p.Failure {
+			case "pending dependency":
+				return PendingDependencyApplied
+			default:
+				return ErroredPlanStatus
+			}
 		}
 		return PlannedPlanStatus
 	case PolicyCheckCommand, ApprovePoliciesCommand:
@@ -642,6 +647,9 @@ const (
 	// PassedPolicyCheckStatus means that there was an unapplied plan that was
 	// discarded due to a project being unlocked
 	PassedPolicyCheckStatus
+	// PendingDependencyApplied means that this project has a dependency that has
+	// not yet been applied
+	PendingDependencyApplied
 )
 
 // String returns a string representation of the status.

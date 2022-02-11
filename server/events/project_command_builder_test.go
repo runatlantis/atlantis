@@ -1212,3 +1212,84 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	Equals(t, "project2", ctxs[3].RepoRelDir)
 	Equals(t, "workspace2", ctxs[3].Workspace)
 }
+
+func TestGroupProjectsByDependency(t *testing.T) {
+	cases := []struct {
+		description  string
+		projects     []valid.Project
+		expProjPaths [][]string
+	}{
+		{
+			description: "Projects with no dependencies should result in 1 group",
+			projects: []valid.Project{
+				{Dir: "project1"},
+				{Dir: "project2"},
+				{Dir: "project3"},
+			},
+			expProjPaths: [][]string{
+				{"project1", "project2", "project3"},
+			},
+		},
+		{
+			description: "Multiple dependencies in the same group",
+			projects: []valid.Project{
+				{Dir: "project1"},
+				{Dir: "project2"},
+				{Dir: "project3", DependsOn: []string{"project1", "project2"}},
+			},
+			expProjPaths: [][]string{
+				{"project1", "project2"},
+				{"project3"},
+			},
+		},
+		{
+			description: "Multiple trees",
+			projects: []valid.Project{
+				{Dir: "projectA1"},
+				{Dir: "projectA2", DependsOn: []string{"projectA1"}},
+				{Dir: "projectA3", DependsOn: []string{"projectA2", "leaf"}},
+
+				{Dir: "projectB1"},
+				{Dir: "projectB2", DependsOn: []string{"projectB1"}},
+				{Dir: "projectB3", DependsOn: []string{"projectB2", "leaf"}},
+
+				{Dir: "projectC1", DependsOn: []string{"projectB2"}},
+
+				{Dir: "leaf"},
+			},
+			expProjPaths: [][]string{
+				{"projectA1", "projectB1", "leaf"},
+				{"projectA2", "projectB2"},
+				{"projectC1", "projectA3", "projectB3"},
+			},
+		},
+		{
+			description: "mid tree",
+			projects: []valid.Project{
+				{Dir: "projectA2", DependsOn: []string{"projectA1"}},
+				{Dir: "projectA3", DependsOn: []string{"projectA2"}},
+			},
+			expProjPaths: [][]string{
+				{"projectA2"},
+				{"projectA3"},
+			},
+		},
+	}
+
+	_ = cases
+	t.Fatal("not implemented")
+
+	//for _, c := range cases {
+	//	t.Run(c.description, func(t *testing.T) {
+	//		pf := events.DefaultProjectFinder{}
+	//		groups := pf.GroupProjectsByDependency(c.projects)
+	//		Equals(t, len(c.expProjPaths), len(groups)) // Number of groups
+	//		for g, projects := range groups {
+	//			Equals(t, len(c.expProjPaths[g]), len(projects)) // Number of projects in group
+	//			for proj := range projects {
+	//				Equals(t, projects[proj].Dir, c.expProjPaths[g][proj])
+	//			}
+	//		}
+	//	})
+	//}
+}

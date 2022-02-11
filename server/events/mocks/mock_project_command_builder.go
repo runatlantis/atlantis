@@ -64,6 +64,21 @@ func (mock *MockProjectCommandBuilder) BuildPlanCommands(ctx *events.CommandCont
 	return ret0, ret1
 }
 
+func (mock *MockProjectCommandBuilder) GroupProjectCmdsByDependency(cmds []models.ProjectCommandContext) [][]models.ProjectCommandContext {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
+	}
+	params := []pegomock.Param{cmds}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GroupProjectCmdsByDependency", params, []reflect.Type{reflect.TypeOf((*[][]models.ProjectCommandContext)(nil)).Elem()})
+	var ret0 [][]models.ProjectCommandContext
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].([][]models.ProjectCommandContext)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockProjectCommandBuilder) BuildApplyCommands(ctx *events.CommandContext, comment *events.CommentCommand) ([]models.ProjectCommandContext, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
@@ -211,6 +226,33 @@ func (c *MockProjectCommandBuilder_BuildPlanCommands_OngoingVerification) GetAll
 		_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(*events.CommentCommand)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockProjectCommandBuilder) GroupProjectCmdsByDependency(cmds []models.ProjectCommandContext) *MockProjectCommandBuilder_GroupProjectCmdsByDependency_OngoingVerification {
+	params := []pegomock.Param{cmds}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GroupProjectCmdsByDependency", params, verifier.timeout)
+	return &MockProjectCommandBuilder_GroupProjectCmdsByDependency_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandBuilder_GroupProjectCmdsByDependency_OngoingVerification struct {
+	mock              *MockProjectCommandBuilder
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandBuilder_GroupProjectCmdsByDependency_OngoingVerification) GetCapturedArguments() []models.ProjectCommandContext {
+	cmds := c.GetAllCapturedArguments()
+	return cmds[len(cmds)-1]
+}
+
+func (c *MockProjectCommandBuilder_GroupProjectCmdsByDependency_OngoingVerification) GetAllCapturedArguments() (_param0 [][]models.ProjectCommandContext) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([][]models.ProjectCommandContext, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.([]models.ProjectCommandContext)
 		}
 	}
 	return
