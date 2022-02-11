@@ -42,7 +42,7 @@ func (c CommandResult) HasErrors() bool {
 
 func (c CommandResult) HasPendingDependencies() bool {
 	for _, r := range c.ProjectResults {
-		if r.PlanStatus() == models.PendingDependencyApplied {
+		if r.PlanStatus() == models.PendingDependencyAppliedStatus {
 			return true
 		}
 	}

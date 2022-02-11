@@ -365,9 +365,8 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	// Ensure all dependencies have been planned / applied
 	for _, depCtx := range ctx.DependsOn {
 		if depCtx.ProjectPlanStatus != models.AppliedPlanStatus {
-			ctx.ProjectPlanStatus = models.PendingDependencyApplied
-			// todo : jw : const
-			return nil, fmt.Sprint("pending dependency"), nil
+			ctx.ProjectPlanStatus = models.PendingDependencyAppliedStatus
+			return nil, models.PendingDependencyAppliedStatusMessage, nil
 		}
 	}
 

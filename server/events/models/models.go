@@ -499,8 +499,8 @@ func (p ProjectResult) PlanStatus() ProjectPlanStatus {
 			return ErroredPlanStatus
 		} else if p.Failure != "" {
 			switch p.Failure {
-			case "pending dependency":
-				return PendingDependencyApplied
+			case PendingDependencyAppliedStatusMessage:
+				return PendingDependencyAppliedStatus
 			default:
 				return ErroredPlanStatus
 			}
@@ -647,10 +647,12 @@ const (
 	// PassedPolicyCheckStatus means that there was an unapplied plan that was
 	// discarded due to a project being unlocked
 	PassedPolicyCheckStatus
-	// PendingDependencyApplied means that this project has a dependency that has
+	// PendingDependencyAppliedStatus means that this project has a dependency that has
 	// not yet been applied
-	PendingDependencyApplied
+	PendingDependencyAppliedStatus
 )
+
+const PendingDependencyAppliedStatusMessage = "Pending dependencies to be applied first"
 
 // String returns a string representation of the status.
 func (p ProjectPlanStatus) String() string {
@@ -669,6 +671,8 @@ func (p ProjectPlanStatus) String() string {
 		return "policy_check_errored"
 	case PassedPolicyCheckStatus:
 		return "policy_check_passed"
+	case PendingDependencyAppliedStatus:
+		return "pending_dependency_applied"
 	default:
 		panic("missing String() impl for ProjectPlanStatus")
 	}

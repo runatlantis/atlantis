@@ -108,50 +108,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 		ctx.Log.Warn("unable to update apply commit status: %s", err)
 	}
 
-	var result CommandResult
-	groups := p.prjCmdBuilder.GroupProjectCmdsByDependency(projectCmds)
-	for i, groupCmds := range groups {
-		// Always plan all projects in case a new commit is
-		// made which changes a dependency
-		var groupResult CommandResult
-		// Only run commands in parallel if enabled
-		if p.isParallelEnabled(groupCmds) {
-			ctx.Log.Info("Running plans in parallel")
-			groupResult = runProjectCmdsParallel(groupCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
-		} else {
-			groupResult = runProjectCmds(groupCmds, p.prjCmdRunner.Plan)
-		}
-		result = result.Merge(groupResult)
-
-		if groupResult.HasPendingDependencies() {
-			for _, pendingGroup := range groups[i:] {
-				for _, cmd := range pendingGroup {
-					err = p.workingDir.DeleteForWorkspace(ctx.HeadRepo, ctx.PullStatus.Pull, cmd.Workspace)
-					if err != nil {
-						ctx.Log.Err("error deleting plan for project with pending dependencies: %w", err)
-					}
-					if result.HasProjectResult(cmd) {
-						continue
-					}
-					result = result.Merge(CommandResult{
-						ProjectResults: []models.ProjectResult{
-							{
-								Command:    models.PlanCommand,
-								RepoRelDir: cmd.RepoRelDir,
-								Workspace:  cmd.Workspace,
-								// todo : jw : const
-								Failure:     "pending dependency",
-								ProjectName: cmd.ProjectName,
-							},
-						},
-					})
-				}
-			}
-
-			break
-		}
-	}
-
+	result := p.runProjectCmds(ctx, projectCmds)
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		p.deletePlans(ctx)
@@ -225,52 +182,7 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 		ctx.Log.Warn("unable to update apply commit status: %s", err)
 	}
 
-	var result CommandResult
-	groups := p.prjCmdBuilder.GroupProjectCmdsByDependency(projectCmds)
-
-	// todo : jw : extract to func for runAutoplan() to also use
-	for i, groupCmds := range groups {
-		// Always plan all projects in case a new commit is
-		// made which changes a dependency
-		var groupResult CommandResult
-		// Only run commands in parallel if enabled
-		if p.isParallelEnabled(groupCmds) {
-			ctx.Log.Info("Running plans in parallel")
-			groupResult = runProjectCmdsParallel(groupCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
-		} else {
-			groupResult = runProjectCmds(groupCmds, p.prjCmdRunner.Plan)
-		}
-		result = result.Merge(groupResult)
-
-		if groupResult.HasPendingDependencies() {
-			for _, pendingGroup := range groups[i:] {
-				for _, cmd := range pendingGroup {
-					err = p.workingDir.DeleteForWorkspace(ctx.HeadRepo, ctx.PullStatus.Pull, cmd.Workspace)
-					if err != nil {
-						ctx.Log.Err("error deleting plan for project with pending dependencies: %w", err)
-					}
-					if result.HasProjectResult(cmd) {
-						continue
-					}
-					result = result.Merge(CommandResult{
-						ProjectResults: []models.ProjectResult{
-							{
-								Command:    models.PlanCommand,
-								RepoRelDir: cmd.RepoRelDir,
-								Workspace:  cmd.Workspace,
-								// todo : jw : const
-								Failure:     "pending dependency",
-								ProjectName: cmd.ProjectName,
-							},
-						},
-					})
-				}
-			}
-
-			break
-		}
-	}
-
+	result := p.runProjectCmds(ctx, projectCmds)
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		p.deletePlans(ctx)
@@ -297,6 +209,53 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 		ctx.Log.Info("Running policy check for %s", cmd.String())
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	}
+}
+
+func (p *PlanCommandRunner) runProjectCmds(ctx *CommandContext, projectCmds []models.ProjectCommandContext) CommandResult {
+	var result CommandResult
+	groups := p.prjCmdBuilder.GroupProjectCmdsByDependency(projectCmds)
+
+	for i, groupCmds := range groups {
+		// Always plan all projects in case a new commit is
+		// made which changes a dependency
+		var groupResult CommandResult
+		// Only run commands in parallel if enabled
+		if p.isParallelEnabled(groupCmds) {
+			ctx.Log.Info("Running plans in parallel")
+			groupResult = runProjectCmdsParallel(groupCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
+		} else {
+			groupResult = runProjectCmds(groupCmds, p.prjCmdRunner.Plan)
+		}
+		result = result.Merge(groupResult)
+
+		if groupResult.HasPendingDependencies() {
+			for _, pendingGroup := range groups[i:] {
+				for _, cmd := range pendingGroup {
+					err := p.workingDir.DeleteForWorkspace(ctx.HeadRepo, ctx.PullStatus.Pull, cmd.Workspace)
+					if err != nil {
+						ctx.Log.Err("error deleting plan for project with pending dependencies: %w", err)
+					}
+					if result.HasProjectResult(cmd) {
+						continue
+					}
+					result = result.Merge(CommandResult{
+						ProjectResults: []models.ProjectResult{
+							{
+								Command:     models.PlanCommand,
+								RepoRelDir:  cmd.RepoRelDir,
+								Workspace:   cmd.Workspace,
+								Failure:     models.PendingDependencyAppliedStatusMessage,
+								ProjectName: cmd.ProjectName,
+							},
+						},
+					})
+				}
+			}
+
+			break
+		}
+	}
+	return result
 }
 
 func (p *PlanCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {

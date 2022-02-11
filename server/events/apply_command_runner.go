@@ -164,7 +164,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 
 	needsPlan := false
 	for _, p := range pullStatus.Projects {
-		if p.Status == models.PendingDependencyApplied {
+		if p.Status == models.PendingDependencyAppliedStatus {
 			needsPlan = true
 			break
 		}
