@@ -90,7 +90,7 @@ func TestSingleQueue(t *testing.T) {
 	Equals(t, 1, enqueueStatus.ProjectLocksInFront)
 
 	thirdLock := lock
-	secondLock.Pull.Num = pullNum + 2
+	thirdLock.Pull.Num = pullNum + 2
 	lockAcquired, _, enqueueStatus, err = b.TryLock(thirdLock)
 	Ok(t, err)
 	Equals(t, false, lockAcquired)
