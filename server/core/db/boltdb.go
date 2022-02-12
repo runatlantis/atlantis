@@ -87,8 +87,7 @@ func NewWithDB(db *bolt.DB, bucket string, globalBucket string) (*BoltDB, error)
 }
 
 // TryLock attempts to create a new lock. If the lock is
-// acquired, it will return true, the lock returned which will be newLock,
-// and the enqueue status will be null.
+// acquired, it will return true, the lock returned which will be newLock.
 // If the lock is not acquired, it will return false, the current
 // lock that is preventing this lock from being acquired, and the enqueue status.
 func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, models.EnqueueStatus, error) {

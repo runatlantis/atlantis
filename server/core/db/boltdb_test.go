@@ -66,6 +66,61 @@ func TestGetQueueByLock(t *testing.T) {
 	Equals(t, 2, len(queue))
 }
 
+func TestSingleQueue(t *testing.T) {
+	t.Log("locking should return correct EnqueueStatus for a single queue")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	lockAcquired, _, enqueueStatus, err := b.TryLock(lock)
+	Ok(t, err)
+	Equals(t, true, lockAcquired)
+
+	secondLock := lock
+	secondLock.Pull.Num = pullNum + 1
+	lockAcquired, _, enqueueStatus, err = b.TryLock(secondLock)
+	Ok(t, err)
+	Equals(t, false, lockAcquired)
+	Equals(t, models.Enqueued, enqueueStatus.Status)
+	Equals(t, 1, enqueueStatus.ProjectLocksInFront)
+
+	lockAcquired, _, enqueueStatus, err = b.TryLock(secondLock)
+	Ok(t, err)
+	Equals(t, false, lockAcquired)
+	Equals(t, models.AlreadyInTheQueue, enqueueStatus.Status)
+	Equals(t, 1, enqueueStatus.ProjectLocksInFront)
+
+	thirdLock := lock
+	secondLock.Pull.Num = pullNum + 2
+	lockAcquired, _, enqueueStatus, err = b.TryLock(thirdLock)
+	Ok(t, err)
+	Equals(t, false, lockAcquired)
+	Equals(t, models.Enqueued, enqueueStatus.Status)
+	Equals(t, 2, enqueueStatus.ProjectLocksInFront)
+}
+
+func TestMultipleQueues(t *testing.T) {
+	t.Log("locking should return correct EnqueueStatus for multiple queues")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	lockAcquired, _, enqueueStatus, err := b.TryLock(lock)
+	Ok(t, err)
+	Equals(t, true, lockAcquired)
+
+	lockInDifferentWorkspace := lock
+	lockInDifferentWorkspace.Workspace = "different-workspace"
+	lockAcquired, _, enqueueStatus, err = b.TryLock(lockInDifferentWorkspace)
+	Ok(t, err)
+	Equals(t, true, lockAcquired)
+
+	secondLock := lock
+	secondLock.Pull.Num = pullNum + 1
+	lockAcquired, _, enqueueStatus, err = b.TryLock(secondLock)
+	Ok(t, err)
+	Equals(t, false, lockAcquired)
+	Equals(t, 1, enqueueStatus.ProjectLocksInFront)
+}
+
 func TestLockCommandNotSet(t *testing.T) {
 	t.Log("retrieving apply lock when there are none should return empty LockCommand")
 	db, b := newTestDB()
