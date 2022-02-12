@@ -1,3 +1,4 @@
+*.txt.act
 .idea
 ./atlantis
 *.iml

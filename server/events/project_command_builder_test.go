@@ -1276,20 +1276,25 @@ func TestGroupProjectsByDependency(t *testing.T) {
 		},
 	}
 
-	_ = cases
-	t.Fatal("not implemented")
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			prjCmdBuilder := events.DefaultProjectCommandBuilder{}
+			var projCtxs []models.ProjectCommandContext
+			for _, prj := range c.projects {
+				projCtxs = append(projCtxs, models.ProjectCommandContext{
+					RepoRelDir: prj.Dir,
+				})
+			}
+			projCtxs = prjCmdBuilder.ResolveDependencies(c.projects, projCtxs)
+			groups := prjCmdBuilder.GroupProjectCmdsByDependency(projCtxs)
 
-	//for _, c := range cases {
-	//	t.Run(c.description, func(t *testing.T) {
-	//		pf := events.DefaultProjectFinder{}
-	//		groups := pf.GroupProjectsByDependency(c.projects)
-	//		Equals(t, len(c.expProjPaths), len(groups)) // Number of groups
-	//		for g, projects := range groups {
-	//			Equals(t, len(c.expProjPaths[g]), len(projects)) // Number of projects in group
-	//			for proj := range projects {
-	//				Equals(t, projects[proj].Dir, c.expProjPaths[g][proj])
-	//			}
-	//		}
-	//	})
-	//}
+			Equals(t, len(c.expProjPaths), len(groups)) // Number of groups
+			for g, projects := range groups {
+				Equals(t, len(c.expProjPaths[g]), len(projects)) // Number of projects in group
+				for proj := range projects {
+					Equals(t, projects[proj].RepoRelDir, c.expProjPaths[g][proj])
+				}
+			}
+		})
+	}
 }

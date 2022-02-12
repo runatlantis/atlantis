@@ -1030,6 +1030,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		planCommandRunner,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,

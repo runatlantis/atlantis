@@ -466,7 +466,7 @@ func (g GlobalCfg) validateDependencies(rCfg RepoCfg) error {
 
 			path := []string{p.Dir}
 			visited := make(map[string]bool)
-			for p, _ := range projectDependencies {
+			for p := range projectDependencies {
 				visited[p] = false
 			}
 			for !visited[path[len(path)-1]] {

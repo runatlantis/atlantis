@@ -537,15 +537,18 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
+	projects := []models.ProjectCommandContext{
+		{
+			CommandName: models.PlanCommand,
+		},
+		{
+			CommandName: models.PlanCommand,
+		},
+	}
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
-		ThenReturn([]models.ProjectCommandContext{
-			{
-				CommandName: models.PlanCommand,
-			},
-			{
-				CommandName: models.PlanCommand,
-			},
-		}, nil)
+		ThenReturn(projects, nil)
+	When(projectCommandBuilder.GroupProjectCmdsByDependency(matchers.AnySliceOfModelsProjectCommandContext())).
+		ThenReturn([][]models.ProjectCommandContext{projects})
 	callCount := 0
 	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
 		if callCount == 0 {

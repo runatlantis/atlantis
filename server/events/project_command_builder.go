@@ -126,7 +126,7 @@ type DefaultProjectCommandBuilder struct {
 // See ProjectCommandBuilder.GroupProjectCmdsByDependency.
 func (p *DefaultProjectCommandBuilder) GroupProjectCmdsByDependency(cmds []models.ProjectCommandContext) [][]models.ProjectCommandContext {
 	cmdCache := make(map[string]*models.ProjectCommandContext)
-	for i, _ := range cmds {
+	for i := range cmds {
 		cmdCache[cmds[i].RepoRelDir] = &cmds[i]
 	}
 	groups := [][]models.ProjectCommandContext{{}}
@@ -242,14 +242,14 @@ func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *CommandContext,
 	return pac, err
 }
 
-func (p *DefaultProjectCommandBuilder) resolveDependencies(projects []valid.Project, projCtxs []models.ProjectCommandContext) []models.ProjectCommandContext {
+func (p *DefaultProjectCommandBuilder) ResolveDependencies(projects []valid.Project, projCtxs []models.ProjectCommandContext) []models.ProjectCommandContext {
 	projCache := make(map[string]*valid.Project)
-	for i, _ := range projects {
+	for i := range projects {
 		projCache[projects[i].Dir] = &projects[i]
 	}
 
 	ctxCache := make(map[string]*models.ProjectCommandContext)
-	for i, _ := range projCtxs {
+	for i := range projCtxs {
 		ctxCache[projCtxs[i].RepoRelDir] = &projCtxs[i]
 	}
 
@@ -364,7 +364,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 					verbose,
 				)...)
 		}
-		projCtxs = p.resolveDependencies(matchingProjects, projCtxs)
+		projCtxs = p.ResolveDependencies(matchingProjects, projCtxs)
 	} else {
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.
