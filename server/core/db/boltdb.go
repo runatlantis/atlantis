@@ -175,7 +175,6 @@ func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, 
 	return lockAcquired, currLock, enqueueStatus, nil
 }
 
-// TODO(ghais) refactor to a better place
 func findPullRequest(locks []models.ProjectLock, pullRequestNumber int) int {
 	for i := range locks {
 		if locks[i].Pull.Num == pullRequestNumber {
@@ -191,7 +190,6 @@ func findPullRequest(locks []models.ProjectLock, pullRequestNumber int) int {
 // If there is a lock, then it will delete it, and then return a pointer
 // to the deleted lock.
 func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error) {
-	// TODO monikma extend the tests
 	var lock models.ProjectLock
 	var dequeuedLock *models.ProjectLock
 	foundLock := false

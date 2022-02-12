@@ -71,13 +71,13 @@ func TestSingleQueue(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	lockAcquired, _, enqueueStatus, err := b.TryLock(lock)
+	lockAcquired, _, _, err := b.TryLock(lock)
 	Ok(t, err)
 	Equals(t, true, lockAcquired)
 
 	secondLock := lock
 	secondLock.Pull.Num = pullNum + 1
-	lockAcquired, _, enqueueStatus, err = b.TryLock(secondLock)
+	lockAcquired, _, enqueueStatus, err := b.TryLock(secondLock)
 	Ok(t, err)
 	Equals(t, false, lockAcquired)
 	Equals(t, models.Enqueued, enqueueStatus.Status)
@@ -103,19 +103,19 @@ func TestMultipleQueues(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	lockAcquired, _, enqueueStatus, err := b.TryLock(lock)
+	lockAcquired, _, _, err := b.TryLock(lock)
 	Ok(t, err)
 	Equals(t, true, lockAcquired)
 
 	lockInDifferentWorkspace := lock
 	lockInDifferentWorkspace.Workspace = "different-workspace"
-	lockAcquired, _, enqueueStatus, err = b.TryLock(lockInDifferentWorkspace)
+	lockAcquired, _, _, err = b.TryLock(lockInDifferentWorkspace)
 	Ok(t, err)
 	Equals(t, true, lockAcquired)
 
 	secondLock := lock
 	secondLock.Pull.Num = pullNum + 1
-	lockAcquired, _, enqueueStatus, err = b.TryLock(secondLock)
+	lockAcquired, _, enqueueStatus, err := b.TryLock(secondLock)
 	Ok(t, err)
 	Equals(t, false, lockAcquired)
 	Equals(t, 1, enqueueStatus.ProjectLocksInFront)
@@ -480,6 +480,57 @@ func TestUnlockByPullMatching(t *testing.T) {
 	ls, err = b.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
+}
+
+func TestDequeueAfterUnlock(t *testing.T) {
+	t.Log("Unlocking should dequeue and grant lock to the next ProjectLock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	// first lock acquired
+	_, _, _, err := b.TryLock(lock)
+	Ok(t, err)
+
+	// second lock enqueued
+	new := lock
+	new.Pull.Num = pullNum + 1
+	_, _, _, err = b.TryLock(new)
+	Ok(t, err)
+
+	// third lock enqueued
+	new2 := lock
+	new2.Pull.Num = pullNum + 2
+	_, _, _, err = b.TryLock(new2)
+	Ok(t, err)
+	queue, err := b.GetQueueByLock(lock.Project, lock.Workspace)
+	Ok(t, err)
+	Equals(t, 2, len(queue))
+	Equals(t, new.Pull, queue[0].Pull)
+	Equals(t, new2.Pull, queue[1].Pull)
+
+	// first lock unlocked -> second lock dequeued and lock acquired
+	_, dequeuedLock, err := b.Unlock(lock.Project, lock.Workspace)
+	Ok(t, err)
+	queue, err = b.GetQueueByLock(lock.Project, lock.Workspace)
+	Ok(t, err)
+	Equals(t, new, *dequeuedLock)
+	Equals(t, 1, len(queue))
+	Equals(t, new2.Pull, queue[0].Pull)
+
+	// second lock unlocked -> third lock dequeued and lock acquired
+	_, dequeuedLock, err = b.Unlock(new.Project, new.Workspace)
+	Ok(t, err)
+	Equals(t, new2, *dequeuedLock)
+
+	// third lock unlocked -> no more locks in the queue
+	_, dequeuedLock, err = b.Unlock(new2.Project, new2.Workspace)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), dequeuedLock)
+}
+
+func TestDequeueAfterUnlockByPull(t *testing.T) {
+	t.Log("unlocking by pull should dequeue and grant lock to all dequeued ProjectLocks")
+
 }
 
 func TestGetLockNotThere(t *testing.T) {
