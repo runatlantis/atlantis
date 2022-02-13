@@ -530,7 +530,32 @@ func TestDequeueAfterUnlock(t *testing.T) {
 
 func TestDequeueAfterUnlockByPull(t *testing.T) {
 	t.Log("unlocking by pull should dequeue and grant lock to all dequeued ProjectLocks")
+	db, b := newTestDB()
+	defer cleanupDB(db)
 
+	_, _, _, err := b.TryLock(lock)
+	Ok(t, err)
+
+	lock2 := lock
+	lock2.Workspace = "different-workspace"
+	_, _, _, err = b.TryLock(lock2)
+	Ok(t, err)
+
+	lock3 := lock
+	lock3.Pull.Num = pullNum + 1
+	_, _, _, err = b.TryLock(lock3)
+	Ok(t, err)
+
+	lock4 := lock
+	lock4.Workspace = "different-workspace"
+	lock3.Pull.Num = pullNum + 1
+	_, _, _, err = b.TryLock(lock4)
+	Ok(t, err)
+
+	_, dequeueStatus, err := b.UnlockByPull(project.RepoFullName, pullNum)
+	Ok(t, err)
+
+	Equals(t, 2, len(dequeueStatus.ProjectLocks))
 }
 
 func TestGetLockNotThere(t *testing.T) {
