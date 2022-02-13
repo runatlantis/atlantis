@@ -483,7 +483,7 @@ func TestUnlockByPullMatching(t *testing.T) {
 }
 
 func TestDequeueAfterUnlock(t *testing.T) {
-	t.Log("Unlocking should dequeue and grant lock to the next ProjectLock")
+	t.Log("unlocking should dequeue and grant lock to the next ProjectLock")
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
