@@ -35,7 +35,7 @@ require (
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/go-github/v31 v31.0.0
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/uuid v1.1.2-0.20200519141726-cb32006e483f // indirect
+	github.com/google/uuid v1.1.2-0.20200519141726-cb32006e483f
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gorilla/mux v1.8.0
@@ -99,7 +99,7 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.20.0
+	go.uber.org/zap v1.21.0
 	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
 	golang.org/x/sys v0.0.0-20211210111614-af8b64212486 // indirect
