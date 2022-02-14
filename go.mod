@@ -35,7 +35,7 @@ require (
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/go-github/v31 v31.0.0
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/uuid v1.1.2-0.20200519141726-cb32006e483f // indirect
+	github.com/google/uuid v1.1.2-0.20200519141726-cb32006e483f
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gorilla/mux v1.8.0
@@ -59,7 +59,7 @@ require (
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mcdafydd/go-azuredevops v0.12.1
-	github.com/microcosm-cc/bluemonday v1.0.17
+	github.com/microcosm-cc/bluemonday v1.0.18
 	github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
