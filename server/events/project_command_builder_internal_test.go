@@ -7,11 +7,11 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
@@ -588,7 +588,7 @@ projects:
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
-			parser := &yaml.ParserValidator{}
+			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:  false,
 				MergeableReq:  false,
@@ -657,6 +657,9 @@ projects:
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
 					ctx.PolicySets = emptyPolicySets
+
+					// Job ID cannot be compared since its generated at random
+					ctx.JobID = ""
 
 					Equals(t, c.expCtx, ctx)
 					// Equals() doesn't compare TF version properly so have to
@@ -785,7 +788,7 @@ projects:
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
-			parser := &yaml.ParserValidator{}
+			parser := &config.ParserValidator{}
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg(false, false, false))
 			Ok(t, err)
 
@@ -849,6 +852,10 @@ projects:
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
 					ctx.PolicySets = emptyPolicySets
+
+					// Job ID cannot be compared since its generated at random
+					ctx.JobID = ""
+
 					Equals(t, c.expCtx, ctx)
 					// Equals() doesn't compare TF version properly so have to
 					// use .String().
@@ -997,7 +1004,7 @@ workflows:
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
-			parser := &yaml.ParserValidator{}
+			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:  false,
 				MergeableReq:  false,
@@ -1063,6 +1070,9 @@ workflows:
 				// Init fields we couldn't in our cases map.
 				c.expCtx.Steps = expSteps
 				ctx.PolicySets = emptyPolicySets
+
+				// Job ID cannot be compared since its generated at random
+				ctx.JobID = ""
 
 				Equals(t, c.expCtx, ctx)
 				// Equals() doesn't compare TF version properly so have to

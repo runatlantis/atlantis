@@ -5,7 +5,7 @@ package mocks
 
 import (
 	pegomock "github.com/petergtz/pegomock"
-	valid "github.com/runatlantis/atlantis/server/events/yaml/valid"
+	valid "github.com/runatlantis/atlantis/server/core/config/valid"
 	"reflect"
 	"time"
 )

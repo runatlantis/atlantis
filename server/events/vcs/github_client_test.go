@@ -907,3 +907,49 @@ func TestGithubClient_Retry404(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 3, numCalls)
 }
+
+// Test that we retry the get pull request files call if it 404s.
+func TestGithubClient_Retry404Files(t *testing.T) {
+	var numCalls = 0
+
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			switch r.Method + " " + r.RequestURI {
+			case "GET /api/v3/repos/runatlantis/atlantis/pulls/1/files?per_page=300":
+				defer r.Body.Close() // nolint: errcheck
+				numCalls++
+				if numCalls < 3 {
+					w.WriteHeader(404)
+				} else {
+					w.WriteHeader(200)
+				}
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, logging.NewNoopLogger(t))
+	Ok(t, err)
+	defer disableSSLVerification()()
+	repo := models.Repo{
+		FullName:          "runatlantis/atlantis",
+		Owner:             "runatlantis",
+		Name:              "atlantis",
+		CloneURL:          "",
+		SanitizedCloneURL: "",
+		VCSHost: models.VCSHost{
+			Type:     models.Github,
+			Hostname: "github.com",
+		},
+	}
+	pr := models.PullRequest{Num: 1}
+	_, err = client.GetModifiedFiles(repo, pr)
+	Ok(t, err)
+	Equals(t, 3, numCalls)
+}

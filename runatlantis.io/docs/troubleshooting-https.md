@@ -14,7 +14,7 @@ the file passed to `--ssl-cert-file` should be the concatenation of the server's
 
 If you have this error when specifying a TLS cert with a key: 
 ```
-[EROR] server.go:413 server: Tls: private key does not match public key
+[ERROR] server.go:413 server: Tls: private key does not match public key
 ```
 
 Check that the locally signed certificate authority is prepended to the self signed certificate.

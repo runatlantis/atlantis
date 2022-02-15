@@ -17,7 +17,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -32,9 +31,9 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-	"github.com/runatlantis/atlantis/server/handlers"
+	"github.com/runatlantis/atlantis/server/jobs"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -43,6 +42,7 @@ import (
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
+	cfgParser "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
@@ -53,7 +53,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
-	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/static"
 	"github.com/urfave/cli"
@@ -106,7 +105,7 @@ type Server struct {
 	WebAuthentication              bool
 	WebUsername                    string
 	WebPassword                    string
-	ProjectCmdOutputHandler        handlers.ProjectCommandOutputHandler
+	ProjectCmdOutputHandler        jobs.ProjectCommandOutputHandler
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -311,17 +310,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Underlying:                underlyingRouter,
 	}
 
-	var projectCmdOutputHandler handlers.ProjectCommandOutputHandler
+	var projectCmdOutputHandler jobs.ProjectCommandOutputHandler
 	// When TFE is enabled log streaming is not necessary.
 
 	if userConfig.TFEToken != "" {
-		projectCmdOutputHandler = &handlers.NoopProjectOutputHandler{}
+		projectCmdOutputHandler = &jobs.NoopProjectOutputHandler{}
 	} else {
-		projectCmdOutput := make(chan *models.ProjectCmdOutputLine)
-		projectCmdOutputHandler = handlers.NewAsyncProjectCommandOutputHandler(
+		projectCmdOutput := make(chan *jobs.ProjectCmdOutputLine)
+		projectCmdOutputHandler = jobs.NewAsyncProjectCommandOutputHandler(
 			projectCmdOutput,
-			commitStatusUpdater,
-			router,
 			logger,
 		)
 	}
@@ -395,7 +392,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DB:               boltdb,
 	}
 
-	validator := &yaml.ParserValidator{}
+	validator := &cfgParser.ParserValidator{}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(
 		valid.GlobalCfgArgs{
@@ -559,8 +556,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectOutputWrapper := &events.ProjectOutputWrapper{
-		ProjectCmdOutputHandler: projectCmdOutputHandler,
-		ProjectCommandRunner:    projectCommandRunner,
+		JobMessageSender:     projectCmdOutputHandler,
+		ProjectCommandRunner: projectCommandRunner,
+		JobURLSetter:         jobs.NewJobURLSetter(router, commitStatusUpdater),
 	}
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
@@ -685,7 +683,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	wsMux := websocket.NewMultiplexor(
 		logger,
-		controllers.ProjectInfoKeyGenerator{},
+		controllers.JobIDKeyGenerator{},
 		projectCmdOutputHandler,
 	)
 
@@ -697,6 +695,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectJobsErrorTemplate: templates.ProjectJobsErrorTemplate,
 		Db:                       boltdb,
 		WsMux:                    wsMux,
+		KeyGenerator:             controllers.JobIDKeyGenerator{},
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -772,8 +771,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/jobs/{org}/{repo}/{pull}/{project}/{workspace}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
-	s.Router.HandleFunc("/jobs/{org}/{repo}/{pull}/{project}/{workspace}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
+	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
+	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
@@ -902,19 +901,13 @@ func mkSubDir(parentDir string, subDir string) (string, error) {
 
 // Healthz returns the health check response. It always returns a 200 currently.
 func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
-	data, err := json.MarshalIndent(&struct {
-		Status string `json:"status"`
-	}{
-		Status: "ok",
-	}, "", "  ")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error creating status json response: %s", err)
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(data) // nolint: errcheck
+	w.Write(healthzData) // nolint: errcheck
 }
+
+var healthzData = []byte(`{
+  "status": "ok"
+}`)
 
 // ParseAtlantisURL parses the user-passed atlantis URL to ensure it is valid
 // and we can use it in our templates.

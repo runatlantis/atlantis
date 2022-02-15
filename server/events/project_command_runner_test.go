@@ -21,14 +21,14 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	tmocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
+	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -188,12 +188,14 @@ func TestProjectOutputWrapper(t *testing.T) {
 			var prjResult models.ProjectResult
 			var expCommitStatus models.CommitStatus
 
-			mockProjectCommandOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+			mockJobURLSetter := eventmocks.NewMockJobURLSetter()
+			mockJobMessageSender := eventmocks.NewMockJobMessageSender()
 			mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
 			runner := &events.ProjectOutputWrapper{
-				ProjectCmdOutputHandler: mockProjectCommandOutputHandler,
-				ProjectCommandRunner:    mockProjectCommandRunner,
+				JobURLSetter:         mockJobURLSetter,
+				JobMessageSender:     mockJobMessageSender,
+				ProjectCommandRunner: mockProjectCommandRunner,
 			}
 
 			if c.Success {
@@ -224,8 +226,8 @@ func TestProjectOutputWrapper(t *testing.T) {
 				runner.Apply(ctx)
 			}
 
-			mockProjectCommandOutputHandler.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus)
-			mockProjectCommandOutputHandler.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus)
+			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus)
+			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus)
 
 			switch c.CommandName {
 			case models.PlanCommand:

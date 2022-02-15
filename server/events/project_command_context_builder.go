@@ -4,13 +4,14 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
-func NewProjectCommandContextBulder(policyCheckEnabled bool, commentBuilder CommentBuilder) ProjectCommandContextBuilder {
+func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder) ProjectCommandContextBuilder {
 	projectCommandContextBuilder := &DefaultProjectCommandContextBuilder{
 		CommentBuilder: commentBuilder,
 	}
@@ -217,6 +218,7 @@ func newProjectCommandContext(ctx *CommandContext,
 		Workspace:                  projCfg.Workspace,
 		PolicySets:                 policySets,
 		PullReqStatus:              pullStatus,
+		JobID:                      uuid.New().String(),
 	}
 }
 

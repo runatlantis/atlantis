@@ -24,9 +24,9 @@ import (
 	"github.com/Laisky/graphql"
 	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
-	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/shurcooL/githubv4"
 )
@@ -112,6 +112,8 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 	nextPage := 0
+
+listloop:
 	for {
 		opts := github.ListOptions{
 			PerPage: 300,
@@ -119,24 +121,42 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 		if nextPage != 0 {
 			opts.Page = nextPage
 		}
-		g.logger.Debug("GET /repos/%v/%v/pulls/%d/files", repo.Owner, repo.Name, pull.Num)
-		pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
-		if err != nil {
-			return files, err
-		}
-		for _, f := range pageFiles {
-			files = append(files, f.GetFilename())
+		// GitHub has started to return 404's sometimes. They've got some
+		// eventual consistency issues going on so we're just going to attempt
+		// up to 5 times for each page with exponential backoff.
+		maxAttempts := 5
+		attemptDelay := 0 * time.Second
+		for i := 0; i < maxAttempts; i++ {
+			// First don't sleep, then sleep 1, 3, 7, etc.
+			time.Sleep(attemptDelay)
+			attemptDelay = 2*attemptDelay + 1*time.Second
 
-			// If the file was renamed, we'll want to run plan in the directory
-			// it was moved from as well.
-			if f.GetStatus() == "renamed" {
-				files = append(files, f.GetPreviousFilename())
+			g.logger.Debug("[attempt %d] GET /repos/%v/%v/pulls/%d/files", i+1, repo.Owner, repo.Name, pull.Num)
+			pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
+			if err != nil {
+				ghErr, ok := err.(*github.ErrorResponse)
+				if ok && ghErr.Response.StatusCode == 404 {
+					// (hopefully) transient 404, retry after backoff
+					continue
+				}
+				// something else, give up
+				return files, err
 			}
-		}
-		if resp.NextPage == 0 {
+			for _, f := range pageFiles {
+				files = append(files, f.GetFilename())
+
+				// If the file was renamed, we'll want to run plan in the directory
+				// it was moved from as well.
+				if f.GetStatus() == "renamed" {
+					files = append(files, f.GetPreviousFilename())
+				}
+			}
+			if resp.NextPage == 0 {
+				break listloop
+			}
+			nextPage = resp.NextPage
 			break
 		}
-		nextPage = resp.NextPage
 	}
 	return files, nil
 }
@@ -387,30 +407,43 @@ func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-// https://developer.github.com/v3/teams/members/#get-team-membership
+// https://docs.github.com/en/graphql/reference/objects#organization
 func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
-	var teamNames []string
-	opts := &github.ListOptions{}
-	org := repo.Owner
-	for {
-		teams, resp, err := g.client.Teams.ListTeams(g.ctx, org, opts)
-		if err != nil {
-			return nil, errors.Wrap(err, "retrieving GitHub teams")
-		}
-		for _, t := range teams {
-			membership, _, err := g.client.Teams.GetTeamMembershipBySlug(g.ctx, org, *t.Slug, user.Username)
-			if err != nil {
-				g.logger.Err("Failed to get team membership from GitHub: %s", err)
-			} else if membership != nil {
-				if *membership.State == "active" && (*membership.Role == "member" || *membership.Role == "maintainer") {
-					teamNames = append(teamNames, t.GetName())
+	orgName := repo.Owner
+	variables := map[string]interface{}{
+		"orgName":    githubv4.String(orgName),
+		"userLogins": []githubv4.String{githubv4.String(user.Username)},
+		"teamCursor": (*githubv4.String)(nil),
+	}
+	var q struct {
+		Organization struct {
+			Teams struct {
+				Edges []struct {
+					Node struct {
+						Name string
+					}
 				}
-			}
+				PageInfo struct {
+					EndCursor   githubv4.String
+					HasNextPage bool
+				}
+			} `graphql:"teams(first:100, after: $teamCursor, userLogins: $userLogins)"`
+		} `graphql:"organization(login: $orgName)"`
+	}
+	var teamNames []string
+	ctx := context.Background()
+	for {
+		err := g.v4MutateClient.Query(ctx, &q, variables)
+		if err != nil {
+			return nil, err
 		}
-		if resp.NextPage == 0 {
+		for _, edge := range q.Organization.Teams.Edges {
+			teamNames = append(teamNames, edge.Node.Name)
+		}
+		if !q.Organization.Teams.PageInfo.HasNextPage {
 			break
 		}
-		opts.Page = resp.NextPage
+		variables["teamCursor"] = githubv4.NewString(q.Organization.Teams.PageInfo.EndCursor)
 	}
 	return teamNames, nil
 }
@@ -435,7 +468,7 @@ func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, er
 // if BaseRepo had one repo config file, its content will placed on the second return value
 func (g *GithubClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	opt := github.RepositoryContentGetOptions{Ref: pull.HeadBranch}
-	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, yaml.AtlantisYAMLFilename, &opt)
+	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, config.AtlantisYAMLFilename, &opt)
 
 	if resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil
