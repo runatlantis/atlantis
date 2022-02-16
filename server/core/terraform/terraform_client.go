@@ -438,7 +438,7 @@ func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string,
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, message, false)
+				c.projectCmdOutputHandler.Send(ctx, message)
 			}
 			wg.Done()
 		}()
@@ -447,7 +447,7 @@ func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string,
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, message, false)
+				c.projectCmdOutputHandler.Send(ctx, message)
 			}
 			wg.Done()
 		}()

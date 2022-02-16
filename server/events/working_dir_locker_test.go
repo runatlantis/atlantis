@@ -32,7 +32,7 @@ func TestTryLock(t *testing.T) {
 
 	// Now another lock for the same repo, workspace, and pull should fail
 	_, err = locker.TryLock(repo, 1, workspace, "")
-	ErrEquals(t, "The default workspace is currently locked by another"+
+	ErrEquals(t, "The default workspace at path  is currently locked by another"+
 		" command that is running for this pull request.\n"+
 		"Wait until the previous command is complete and try again.", err)
 

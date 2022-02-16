@@ -348,6 +348,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Underlying:                underlyingRouter,
 	}
 
+	jobStore := jobs.NewJobStore(
+		jobs.NewStorageBackend(globalCfg.Jobs),
+	)
+
 	var projectCmdOutputHandler jobs.ProjectCommandOutputHandler
 	// When TFE is enabled log streaming is not necessary.
 
@@ -358,6 +362,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCmdOutputHandler = jobs.NewAsyncProjectCommandOutputHandler(
 			projectCmdOutput,
 			logger,
+			jobStore,
 		)
 	}
 
@@ -575,9 +580,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectOutputWrapper := &events.ProjectOutputWrapper{
-		JobMessageSender:     projectCmdOutputHandler,
 		ProjectCommandRunner: projectCommandRunner,
 		JobURLSetter:         jobs.NewJobURLSetter(router, commitStatusUpdater),
+		JobCloser:            projectCmdOutputHandler,
 	}
 	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
 		ProjectCommandRunner: projectOutputWrapper,
@@ -704,6 +709,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand:  deleteLockCommand,
 	}
 
+	// No Storage backend configured for now
 	wsMux := websocket.NewMultiplexor(
 		logger,
 		controllers.JobIDKeyGenerator{},
