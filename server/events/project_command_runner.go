@@ -125,29 +125,30 @@ type JobURLSetter interface {
 	SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_job_closer.go JobCloser
 
-type JobMessageSender interface {
-	Send(ctx models.ProjectCommandContext, msg string, operationComplete bool)
+// Job Closer closes a job by marking op complete and clearing up buffers if logs are successfully persisted
+type JobCloser interface {
+	CloseJob(jobID string)
 }
 
 // ProjectOutputWrapper is a decorator that creates a new PR status check per project.
 // The status contains a url that outputs current progress of the terraform plan/apply command.
 type ProjectOutputWrapper struct {
 	ProjectCommandRunner
-	JobMessageSender JobMessageSender
-	JobURLSetter     JobURLSetter
+	JobURLSetter JobURLSetter
+	JobCloser    JobCloser
 }
 
 func (p *ProjectOutputWrapper) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
 	result := p.updateProjectPRStatus(models.PlanCommand, ctx, p.ProjectCommandRunner.Plan)
-	p.JobMessageSender.Send(ctx, "", OperationComplete)
+	p.JobCloser.CloseJob(ctx.JobID)
 	return result
 }
 
 func (p *ProjectOutputWrapper) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
 	result := p.updateProjectPRStatus(models.ApplyCommand, ctx, p.ProjectCommandRunner.Apply)
-	p.JobMessageSender.Send(ctx, "", OperationComplete)
+	p.JobCloser.CloseJob(ctx.JobID)
 	return result
 }
 

@@ -93,7 +93,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx models.ProjectCommandContext,
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, message, false)
+				c.projectCmdOutputHandler.Send(ctx, message)
 			}
 			wg.Done()
 		}()
@@ -102,7 +102,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx models.ProjectCommandContext,
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, message, false)
+				c.projectCmdOutputHandler.Send(ctx, message)
 			}
 			wg.Done()
 		}()

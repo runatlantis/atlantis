@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -18,8 +17,6 @@ type PartitionKeyGenerator interface {
 // and is responsible for registering/deregistering new buffers
 type PartitionRegistry interface {
 	Register(key string, buffer chan string)
-	Deregister(key string, buffer chan string)
-	IsKeyExists(key string) bool
 }
 
 // Multiplexor is responsible for handling the data transfer between the storage layer
@@ -53,18 +50,15 @@ func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 		return errors.Wrapf(err, "generating partition key")
 	}
 
-	// check if the job ID exists before registering receiver
-	if !m.registry.IsKeyExists(key) {
-		return fmt.Errorf("invalid key: %s", key)
-	}
-
 	// Buffer size set to 1000 to ensure messages get queued.
 	// TODO: make buffer size configurable
 	buffer := make(chan string, 1000)
 
+	// Note: Here we register the key without checking if the job exists because
+	// if the job DNE, the job is marked complete and we close the ws conn immediately
+
 	// spinning up a goroutine for this since we are attempting to block on the read side.
 	go m.registry.Register(key, buffer)
-	defer m.registry.Deregister(key, buffer)
 
 	return errors.Wrapf(m.writer.Write(w, r, buffer), "writing to ws %s", key)
 }

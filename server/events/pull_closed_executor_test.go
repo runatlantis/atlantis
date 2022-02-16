@@ -31,6 +31,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	loggermocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -197,7 +198,8 @@ func TestCleanUpLogStreaming(t *testing.T) {
 
 		// Create Log streaming resources
 		prjCmdOutput := make(chan *jobs.ProjectCmdOutputLine)
-		prjCmdOutHandler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutput, logger)
+		storageBackend := jobmocks.NewMockStorageBackend()
+		prjCmdOutHandler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutput, logger, jobs.NewJobStore(storageBackend))
 		ctx := models.ProjectCommandContext{
 			BaseRepo:    fixtures.GithubRepo,
 			Pull:        fixtures.Pull,
@@ -206,7 +208,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		}
 
 		go prjCmdOutHandler.Handle()
-		prjCmdOutHandler.Send(ctx, "Test Message", false)
+		prjCmdOutHandler.Send(ctx, "Test Message")
 
 		// Create boltdb and add pull request.
 		var lockBucket = "bucket"
@@ -280,7 +282,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 
 		// Assert log streaming resources are cleaned up.
 		dfPrjCmdOutputHandler := prjCmdOutHandler.(*jobs.AsyncProjectCommandOutputHandler)
-		assert.Empty(t, dfPrjCmdOutputHandler.GetProjectOutputBuffer(ctx.PullInfo()))
+		assert.Empty(t, dfPrjCmdOutputHandler.GetJob(ctx.PullInfo()).Output)
 		assert.Empty(t, dfPrjCmdOutputHandler.GetReceiverBufferForPull(ctx.PullInfo()))
 	})
 }

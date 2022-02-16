@@ -189,12 +189,12 @@ func TestProjectOutputWrapper(t *testing.T) {
 			var expCommitStatus models.CommitStatus
 
 			mockJobURLSetter := eventmocks.NewMockJobURLSetter()
-			mockJobMessageSender := eventmocks.NewMockJobMessageSender()
+			mockJobCloser := eventmocks.NewMockJobCloser()
 			mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
 			runner := &events.ProjectOutputWrapper{
 				JobURLSetter:         mockJobURLSetter,
-				JobMessageSender:     mockJobMessageSender,
+				JobCloser:            mockJobCloser,
 				ProjectCommandRunner: mockProjectCommandRunner,
 			}
 
