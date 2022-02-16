@@ -53,13 +53,16 @@ func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		user, pass, ok := r.BasicAuth()
 		if ok {
 			r.SetBasicAuth(user, pass)
-			l.logger.Debug("user(md5): %s / pass(md5): %s >> url: %s", md5.Sum([]byte(user), md5.Sum([]byte(pass), r.URL.RequestURI())
+			l.logger.Debug("user(md5): %s / pass(md5): %s >> url: %s", md5.Sum([]byte(user)),
+				md5.Sum([]byte(pass)), r.URL.RequestURI())
 			if user == l.WebUsername && pass == l.WebPassword {
-				l.logger.Debug("[VALID] user(md5): %s / pass(md5): %s >> url: %s", md5.Sum([]byte(user), md5.Sum([]byte(pass), r.URL.RequestURI())
+				l.logger.Debug("[VALID] user(md5): %s / pass(md5): %s >> url: %s", md5.Sum([]byte(user)),
+					md5.Sum([]byte(pass)), r.URL.RequestURI())
 				allowed = true
 			} else {
 				allowed = false
-				l.logger.Info("[INVALID] user(md5): %s / pass(md5): %s >> url: %s", md5.Sum([]byte(user), md5.Sum([]byte(pass), r.URL.RequestURI())
+				l.logger.Info("[INVALID] user(md5): %s / pass(md5): %s >> url: %s", md5.Sum([]byte(user)),
+					md5.Sum([]byte(pass)), r.URL.RequestURI())
 			}
 		}
 	}
