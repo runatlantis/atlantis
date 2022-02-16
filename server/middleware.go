@@ -14,11 +14,11 @@
 package server
 
 import (
-	"crypto/md5"
 	"net/http"
 
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/urfave/negroni"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // NewRequestLogger creates a RequestLogger.
@@ -30,6 +30,8 @@ func NewRequestLogger(s *Server) *RequestLogger {
 		s.WebPassword,
 	}
 }
+
+const redacted = "[REDACTED]"
 
 // RequestLogger logs requests and their response codes.
 // as well as handle the basicauth on the requests
@@ -43,6 +45,10 @@ type RequestLogger struct {
 // ServeHTTP implements the middleware function. It logs all requests at DEBUG level.
 func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	l.logger.Debug("%s %s – from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
+	var (
+		hashUser, hashPass []byte
+		err                error
+	)
 	allowed := false
 	if !l.WebAuthentication ||
 		r.URL.Path == "/events" ||
@@ -51,18 +57,25 @@ func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		allowed = true
 	} else {
 		user, pass, ok := r.BasicAuth()
+		hashUser, err = hashData([]byte(user))
+		if err != nil {
+			l.logger.Debug("unable to hash username, defaulting to %s", redacted)
+			hashUser = []byte(redacted)
+		}
+		hashPass, err = hashData([]byte(pass))
+		if err != nil {
+			l.logger.Debug("unable to hash password, defaulting to %s", redacted)
+			hashPass = []byte(redacted)
+		}
 		if ok {
 			r.SetBasicAuth(user, pass)
-			l.logger.Debug("user(md5): %s / pass(md5): %s >> url: %s", md5.Sum([]byte(user)),
-				md5.Sum([]byte(pass)), r.URL.RequestURI())
+			l.logger.Debug("user(hash): %s / pass(hash): %s >> url: %s", string(hashUser), string(hashPass), r.URL.RequestURI())
 			if user == l.WebUsername && pass == l.WebPassword {
-				l.logger.Debug("[VALID] user(md5): %s / pass(md5): %s >> url: %s", md5.Sum([]byte(user)),
-					md5.Sum([]byte(pass)), r.URL.RequestURI())
+				l.logger.Debug("[VALID] user(hash): %s / pass(hash): %s >> url: %s", string(hashUser), string(hashPass), r.URL.RequestURI())
 				allowed = true
 			} else {
 				allowed = false
-				l.logger.Info("[INVALID] user(md5): %s / pass(md5): %s >> url: %s", md5.Sum([]byte(user)),
-					md5.Sum([]byte(pass)), r.URL.RequestURI())
+				l.logger.Info("[INVALID] user(hash): %s / pass(hash): %s >> url: %s", string(hashUser), string(hashPass), r.URL.RequestURI())
 			}
 		}
 	}
@@ -73,4 +86,12 @@ func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		next(rw, r)
 	}
 	l.logger.Debug("%s %s – respond HTTP %d", r.Method, r.URL.RequestURI(), rw.(negroni.ResponseWriter).Status())
+}
+
+func hashData(data []byte) ([]byte, error) {
+	hashed, err := bcrypt.GenerateFromPassword(data, bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	return hashed, nil
 }
