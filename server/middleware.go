@@ -53,11 +53,11 @@ func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		if ok {
 			r.SetBasicAuth(user, pass)
 			if user == l.WebUsername && pass == l.WebPassword {
-				l.logger.Debug("[VALID] log in: %s >> url: %s", r.URL.RequestURI())
+				l.logger.Debug("[VALID] log in: >> url: %s", r.URL.RequestURI())
 				allowed = true
 			} else {
 				allowed = false
-				l.logger.Info("[INVALID] log in attempt: %s >> url: %s", r.URL.RequestURI())
+				l.logger.Info("[INVALID] log in attempt: >> url: %s", r.URL.RequestURI())
 			}
 		}
 	}
