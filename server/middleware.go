@@ -30,8 +30,6 @@ func NewRequestLogger(s *Server) *RequestLogger {
 	}
 }
 
-const redacted = "[REDACTED]"
-
 // RequestLogger logs requests and their response codes.
 // as well as handle the basicauth on the requests
 type RequestLogger struct {
