@@ -548,7 +548,7 @@ func TestDequeueAfterUnlockByPull(t *testing.T) {
 
 	lock4 := lock
 	lock4.Workspace = "different-workspace"
-	lock3.Pull.Num = pullNum + 1
+	lock4.Pull.Num = pullNum + 1
 	_, _, _, err = b.TryLock(lock4)
 	Ok(t, err)
 
