@@ -386,7 +386,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 				},
 			},
 			repoID: "github.com/owner/repo",
-			expErr: "workflow 'forbidden' is not allowed for this repo",
+			expErr: "workflow \"forbidden\" is not allowed for this repo",
 		},
 		"repo uses workflow that is defined server side but not allowed (without custom workflows)": {
 			gCfg: valid.GlobalCfg{
@@ -419,7 +419,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 				},
 			},
 			repoID: "github.com/owner/repo",
-			expErr: "workflow 'forbidden' is not allowed for this repo",
+			expErr: "workflow \"forbidden\" is not allowed for this repo",
 		},
 		"repo uses workflow that is defined in both places with same name (without custom workflows)": {
 			gCfg: valid.GlobalCfg{
@@ -1024,28 +1024,21 @@ repos:
 			tmp, cleanup := TempDir(t)
 			defer cleanup()
 			var global valid.GlobalCfg
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:        false,
+				MergeableReq:        false,
+				ApprovedReq:         false,
+				UnDivergedReq:       false,
+				PlatformModeEnabled: c.platformMode,
+			}
+
 			if c.gCfg != "" {
 				path := filepath.Join(tmp, "config.yaml")
 				Ok(t, ioutil.WriteFile(path, []byte(c.gCfg), 0600))
 				var err error
-				globalCfgArgs := valid.GlobalCfgArgs{
-					AllowRepoCfg:        false,
-					MergeableReq:        false,
-					ApprovedReq:         false,
-					UnDivergedReq:       false,
-					PlatformModeEnabled: c.platformMode,
-				}
-
 				global, err = (&config.ParserValidator{}).ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 				Ok(t, err)
 			} else {
-				globalCfgArgs := valid.GlobalCfgArgs{
-					AllowRepoCfg:        false,
-					MergeableReq:        false,
-					ApprovedReq:         false,
-					UnDivergedReq:       false,
-					PlatformModeEnabled: c.platformMode,
-				}
 				global = valid.NewGlobalCfgFromArgs(globalCfgArgs)
 			}
 

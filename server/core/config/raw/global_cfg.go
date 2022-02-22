@@ -41,7 +41,7 @@ type Repo struct {
 
 func (g GlobalCfg) GetWorkflowNames() []string {
 	names := make([]string, 0)
-	for name, _ := range g.Workflows {
+	for name := range g.Workflows {
 		names = append(names, name)
 	}
 	return names
@@ -49,7 +49,7 @@ func (g GlobalCfg) GetWorkflowNames() []string {
 
 func (g GlobalCfg) GetPullRequestWorkflowNames() []string {
 	names := make([]string, 0)
-	for name, _ := range g.PullRequestWorkflows {
+	for name := range g.PullRequestWorkflows {
 		names = append(names, name)
 	}
 	return names
@@ -57,7 +57,7 @@ func (g GlobalCfg) GetPullRequestWorkflowNames() []string {
 
 func (g GlobalCfg) GetDeploymentWorkflowNames() []string {
 	names := make([]string, 0)
-	for name, _ := range g.DeploymentWorkflows {
+	for name := range g.DeploymentWorkflows {
 		names = append(names, name)
 	}
 	return names
