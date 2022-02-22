@@ -9,7 +9,9 @@ import (
 type workflowType string
 
 const (
-	DefaultWorkflowType workflowType = "workflow"
+	DefaultWorkflowType     workflowType = "workflow"
+	PullRequestWorkflowType workflowType = "pull_request_workflow"
+	DeploymentWorkflowType  workflowType = "deployment_workflow"
 )
 
 type Project struct {
@@ -44,6 +46,12 @@ func (p Project) ValidateAllowedOverrides(allowedOverrides []string) error {
 	if p.WorkflowName != nil && !sliceContains(allowedOverrides, WorkflowKey) {
 		return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", WorkflowKey, AllowedOverridesKey, WorkflowKey)
 	}
+	if p.PullRequestWorkflowName != nil && !sliceContains(allowedOverrides, PullRequestWorkflowKey) {
+		return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", PullRequestWorkflowKey, AllowedOverridesKey, PullRequestWorkflowKey)
+	}
+	if p.DeploymentWorkflowName != nil && !sliceContains(allowedOverrides, DeploymentWorkflowKey) {
+		return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", DeploymentWorkflowKey, AllowedOverridesKey, DeploymentWorkflowKey)
+	}
 	if p.ApplyRequirements != nil && !sliceContains(allowedOverrides, ApplyRequirementsKey) {
 		return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ApplyRequirementsKey, AllowedOverridesKey, ApplyRequirementsKey)
 	}
@@ -59,6 +67,10 @@ func (p Project) getWorkflowName(workflowType workflowType) *string {
 	switch workflowType {
 	case DefaultWorkflowType:
 		name = p.WorkflowName
+	case PullRequestWorkflowType:
+		name = p.PullRequestWorkflowName
+	case DeploymentWorkflowType:
+		name = p.DeploymentWorkflowName
 	}
 	return name
 }
@@ -67,8 +79,24 @@ func (p Project) ValidateWorkflow(repoWorkflows map[string]Workflow, globalWorkf
 	return p.validateWorkflowForType(DefaultWorkflowType, repoWorkflows, globalWorkflows)
 }
 
+func (p Project) ValidatePRWorkflow(globalWorkflows map[string]Workflow) error {
+	return p.validateWorkflowForType(PullRequestWorkflowType, map[string]Workflow{}, globalWorkflows)
+}
+
+func (p Project) ValidateDeploymentWorkflow(globalWorkflows map[string]Workflow) error {
+	return p.validateWorkflowForType(DeploymentWorkflowType, map[string]Workflow{}, globalWorkflows)
+}
+
 func (p Project) ValidateWorkflowAllowed(allowedWorkflows []string) error {
 	return p.validateWorkflowAllowedForType(DefaultWorkflowType, allowedWorkflows)
+}
+
+func (p Project) ValidatePRWorkflowAllowed(allowedWorkflows []string) error {
+	return p.validateWorkflowAllowedForType(PullRequestWorkflowType, allowedWorkflows)
+}
+
+func (p Project) ValidateDeploymentWorkflowAllowed(allowedWorkflows []string) error {
+	return p.validateWorkflowAllowedForType(DeploymentWorkflowType, allowedWorkflows)
 }
 
 func (p Project) validateWorkflowForType(

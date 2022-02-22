@@ -79,6 +79,115 @@ func TestProject_ValidateWorkflow(t *testing.T) {
 	}
 }
 
+func TestProject_ValidateDeploymentWorkflow(t *testing.T) {
+	defaultWorklfow := valid.Workflow{
+		Name: "default",
+	}
+	customWorkflow := valid.Workflow{
+		Name: "custom",
+	}
+	undefinedWorkflowName := "undefined"
+	cases := map[string]struct {
+		globalWorkflows map[string]valid.Workflow
+		project         valid.Project
+		expErr          string
+	}{
+		"failed validation with undefined workflow": {
+			globalWorkflows: map[string]valid.Workflow{
+				"default": defaultWorklfow,
+			},
+			project: valid.Project{
+				DeploymentWorkflowName: &undefinedWorkflowName,
+			},
+			expErr: "deployment_workflow \"undefined\" is not defined anywhere",
+		},
+		"workflow defined in global config": {
+			globalWorkflows: map[string]valid.Workflow{
+				"default": defaultWorklfow,
+				"custom":  customWorkflow,
+			},
+			project: valid.Project{
+				DeploymentWorkflowName: &customWorkflow.Name,
+			},
+		},
+		"missing workflow name is valid": {
+			globalWorkflows: map[string]valid.Workflow{
+				"default": defaultWorklfow,
+				"custom":  customWorkflow,
+			},
+			project: valid.Project{
+				DeploymentWorkflowName: nil,
+			},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			actErr := c.project.ValidateDeploymentWorkflow(c.globalWorkflows)
+			if c.expErr == "" {
+				Ok(t, actErr)
+			} else {
+				ErrEquals(t, c.expErr, actErr)
+			}
+		})
+	}
+}
+
+func TestProject_ValidatePRWorkflow(t *testing.T) {
+	defaultWorklfow := valid.Workflow{
+		Name: "default",
+	}
+	customWorkflow := valid.Workflow{
+		Name: "custom",
+	}
+	undefinedWorkflowName := "undefined"
+
+	cases := map[string]struct {
+		globalWorkflows map[string]valid.Workflow
+		project         valid.Project
+		expErr          string
+	}{
+		"failed validation with undefined workflow": {
+			globalWorkflows: map[string]valid.Workflow{
+				"default": defaultWorklfow,
+			},
+			project: valid.Project{
+				PullRequestWorkflowName: &undefinedWorkflowName,
+			},
+			expErr: "pull_request_workflow \"undefined\" is not defined anywhere",
+		},
+		"workflow defined in global config": {
+			globalWorkflows: map[string]valid.Workflow{
+				"default": defaultWorklfow,
+				"custom":  customWorkflow,
+			},
+			project: valid.Project{
+				PullRequestWorkflowName: &customWorkflow.Name,
+			},
+		},
+		"missing workflow name is valid": {
+			globalWorkflows: map[string]valid.Workflow{
+				"default": defaultWorklfow,
+				"custom":  customWorkflow,
+			},
+			project: valid.Project{
+				PullRequestWorkflowName: nil,
+			},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			actErr := c.project.ValidatePRWorkflow(c.globalWorkflows)
+			if c.expErr == "" {
+				Ok(t, actErr)
+			} else {
+				ErrEquals(t, c.expErr, actErr)
+			}
+		})
+	}
+}
+
 func TestProject_ValidateWorkflowAllowed(t *testing.T) {
 	undefinedWorkflowName := "undefined"
 	customWorkflowName := "custom"
@@ -120,6 +229,91 @@ func TestProject_ValidateWorkflowAllowed(t *testing.T) {
 		})
 	}
 }
+
+func TestProject_ValidatePRWorkflowAllowed(t *testing.T) {
+	undefinedWorkflowName := "undefined"
+	customWorkflowName := "custom"
+
+	cases := map[string]struct {
+		allowedWorkflows []string
+		project          valid.Project
+		expErr           string
+	}{
+		"failed validation with undefined workflow": {
+			allowedWorkflows: []string{"custom"},
+			project: valid.Project{
+				PullRequestWorkflowName: &undefinedWorkflowName,
+			},
+			expErr: "pull_request_workflow \"undefined\" is not allowed for this repo",
+		},
+		"workflow is allowed": {
+			allowedWorkflows: []string{"custom"},
+			project: valid.Project{
+				PullRequestWorkflowName: &customWorkflowName,
+			},
+		},
+		"missing workflow name is valid": {
+			allowedWorkflows: []string{"custom"},
+			project: valid.Project{
+				PullRequestWorkflowName: nil,
+			},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			actErr := c.project.ValidatePRWorkflowAllowed(c.allowedWorkflows)
+			if c.expErr == "" {
+				Ok(t, actErr)
+			} else {
+				ErrEquals(t, c.expErr, actErr)
+			}
+		})
+	}
+}
+
+func TestProject_ValidateDeploymentWorkflowAllowed(t *testing.T) {
+	undefinedWorkflowName := "undefined"
+	customWorkflowName := "custom"
+
+	cases := map[string]struct {
+		allowedWorkflows []string
+		project          valid.Project
+		expErr           string
+	}{
+		"failed validation with undefined workflow": {
+			allowedWorkflows: []string{"custom"},
+			project: valid.Project{
+				DeploymentWorkflowName: &undefinedWorkflowName,
+			},
+			expErr: "deployment_workflow \"undefined\" is not allowed for this repo",
+		},
+		"workflow is allowed": {
+			allowedWorkflows: []string{"custom"},
+			project: valid.Project{
+				DeploymentWorkflowName: &customWorkflowName,
+			},
+		},
+		"missing workflow name is valid": {
+			allowedWorkflows: []string{"custom"},
+			project: valid.Project{
+				DeploymentWorkflowName: nil,
+			},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			actErr := c.project.ValidateDeploymentWorkflowAllowed(c.allowedWorkflows)
+			if c.expErr == "" {
+				Ok(t, actErr)
+			} else {
+				ErrEquals(t, c.expErr, actErr)
+			}
+		})
+	}
+}
+
 func TestProject_ValidateAllowedOverrides(t *testing.T) {
 	workflowName := "custom"
 	deleteSourceBranch := true
@@ -136,6 +330,20 @@ func TestProject_ValidateAllowedOverrides(t *testing.T) {
 			},
 			expErr: "repo config not allowed to set 'workflow' key: server-side config needs 'allowed_overrides: [workflow]'",
 		},
+		"pull_request_workflow is not allowed override": {
+			allowedOverrides: []string{},
+			project: valid.Project{
+				PullRequestWorkflowName: &workflowName,
+			},
+			expErr: "repo config not allowed to set 'pull_request_workflow' key: server-side config needs 'allowed_overrides: [pull_request_workflow]'",
+		},
+		"deployment_workflow is not allowed override": {
+			allowedOverrides: []string{},
+			project: valid.Project{
+				DeploymentWorkflowName: &workflowName,
+			},
+			expErr: "repo config not allowed to set 'deployment_workflow' key: server-side config needs 'allowed_overrides: [deployment_workflow]'",
+		},
 		"apply_requirements is not allowed override": {
 			allowedOverrides: []string{},
 			project: valid.Project{
@@ -151,19 +359,23 @@ func TestProject_ValidateAllowedOverrides(t *testing.T) {
 			expErr: "repo config not allowed to set 'delete_source_branch_on_merge' key: server-side config needs 'allowed_overrides: [delete_source_branch_on_merge]'",
 		},
 		"no errors when allowed override": {
-			allowedOverrides: []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"},
+			allowedOverrides: []string{"apply_requirements", "deployment_workflow", "pull_request_workflow", "workflow", "delete_source_branch_on_merge"},
 			project: valid.Project{
 				DeleteSourceBranchOnMerge: &deleteSourceBranch,
 				ApplyRequirements:         []string{"mergeable"},
+				DeploymentWorkflowName:    &workflowName,
 				WorkflowName:              &workflowName,
+				PullRequestWorkflowName:   &workflowName,
 			},
 		},
 		"no errors if override attributes nil": {
-			allowedOverrides: []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"},
+			allowedOverrides: []string{"apply_requirements", "deployment_workflow", "pull_request_workflow", "workflow", "delete_source_branch_on_merge"},
 			project: valid.Project{
 				DeleteSourceBranchOnMerge: nil,
 				ApplyRequirements:         nil,
+				DeploymentWorkflowName:    nil,
 				WorkflowName:              nil,
+				PullRequestWorkflowName:   nil,
 			},
 		},
 	}

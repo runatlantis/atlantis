@@ -298,7 +298,24 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				}
 				log.Debug("overriding server-defined %s with repo-specified workflow: %q", WorkflowKey, workflow.Name)
 			}
+		case PullRequestWorkflowKey:
+			if proj.PullRequestWorkflowName != nil {
+				name := *proj.PullRequestWorkflowName
+				if w, ok := g.PullRequestWorkflows[name]; ok {
+					pullRequestWorkflow = w
+				}
+			}
 
+			log.Debug("overriding server-defined %s with repo-specified pull_request_workflow: %q", PullRequestWorkflowKey, workflow.Name)
+		case DeploymentWorkflowKey:
+			if proj.DeploymentWorkflowName != nil {
+				name := *proj.DeploymentWorkflowName
+				if w, ok := g.DeploymentWorkflows[name]; ok {
+					deploymentWorkflow = w
+				}
+			}
+
+			log.Debug("overriding server-defined %s with repo-specified deployment_workflow: %q", DeploymentWorkflowKey, workflow.Name)
 		case DeleteSourceBranchOnMergeKey:
 			//We check whether the server configured value and repo-root level
 			//config is different. If it is then we change to the more granular.

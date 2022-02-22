@@ -35,6 +35,8 @@ type Project struct {
 	Dir                       *string           `yaml:"dir,omitempty"`
 	Workspace                 *string           `yaml:"workspace,omitempty"`
 	Workflow                  *string           `yaml:"workflow,omitempty"`
+	PullRequestWorkflowName   *string           `yaml:"pull_request_workflow,omitempty"`
+	DeploymentWorkflowName    *string           `yaml:"deployment_workflow,omitempty"`
 	TerraformVersion          *string           `yaml:"terraform_version,omitempty"`
 	Autoplan                  *Autoplan         `yaml:"autoplan,omitempty"`
 	ApplyRequirements         []string          `yaml:"apply_requirements,omitempty"`
@@ -86,6 +88,8 @@ func (p Project) ToValid() valid.Project {
 	}
 
 	v.WorkflowName = p.Workflow
+	v.PullRequestWorkflowName = p.PullRequestWorkflowName
+	v.DeploymentWorkflowName = p.DeploymentWorkflowName
 	if p.TerraformVersion != nil {
 		v.TerraformVersion, _ = version.NewVersion(*p.TerraformVersion)
 	}

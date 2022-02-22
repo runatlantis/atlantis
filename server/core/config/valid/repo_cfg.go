@@ -145,6 +145,50 @@ func (r RepoCfg) ValidateWorkflows(
 	return nil
 }
 
+// ValidatePRWorkflows ensures that all projects with custom
+// pull_request workflow names exists either on server level config
+// Additionally it validates that workflow is allowed to be defined
+func (r RepoCfg) ValidatePRWorkflows(workflows map[string]Workflow, allowedWorkflows []string) error {
+	for _, p := range r.Projects {
+		if err := p.ValidatePRWorkflow(workflows); err != nil {
+			return err
+		}
+	}
+  
+	if len(allowedWorkflows) == 0 {
+		return nil
+	}
+
+	for _, p := range r.Projects {
+		if err := p.ValidatePRWorkflowAllowed(allowedWorkflows); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ValidateDeploymentWorkflows ensures that all projects with custom
+// deployment workflow names exists either on server level config
+// Additionally it validates that workflow is allowed to be defined
+func (r RepoCfg) ValidateDeploymentWorkflows(workflows map[string]Workflow, allowedWorkflows []string) error {
+	for _, p := range r.Projects {
+		if err := p.ValidateDeploymentWorkflow(workflows); err != nil {
+			return err
+		}
+	}
+
+	if len(allowedWorkflows) == 0 {
+		return nil
+	}
+
+	for _, p := range r.Projects {
+		if err := p.ValidateDeploymentWorkflowAllowed(allowedWorkflows); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type Autoplan struct {
 	WhenModified []string
 	Enabled      bool
