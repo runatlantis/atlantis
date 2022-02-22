@@ -12,31 +12,63 @@ import (
 
 // GlobalCfg is the raw schema for server-side repo config.
 type GlobalCfg struct {
-	Repos      []Repo              `yaml:"repos" json:"repos"`
-	Workflows  map[string]Workflow `yaml:"workflows" json:"workflows"`
-	PolicySets PolicySets          `yaml:"policies" json:"policies"`
-	Metrics    Metrics             `yaml:"metrics" json:"metrics"`
-	Jobs       Jobs                `yaml:"jobs" json:"jobs"`
+	Repos                []Repo               `yaml:"repos" json:"repos"`
+	Workflows            Workflows            `yaml:"workflows" json:"workflows"`
+	PullRequestWorkflows PullRequestWorkflows `yaml:"pull_request_workflows" json:"pull_request_workflows"`
+	DeploymentWorkflows  DeploymentWorkflows  `yaml:"deployment_workflows" json:"deployment_workflows"`
+	PolicySets           PolicySets           `yaml:"policies" json:"policies"`
+	Metrics              Metrics              `yaml:"metrics" json:"metrics"`
+	Jobs                 Jobs                 `yaml:"jobs" json:"jobs"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
 type Repo struct {
-	ID                        string            `yaml:"id" json:"id"`
-	Branch                    string            `yaml:"branch" json:"branch"`
-	ApplyRequirements         []string          `yaml:"apply_requirements" json:"apply_requirements"`
-	PreWorkflowHooks          []PreWorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
-	Workflow                  *string           `yaml:"workflow,omitempty" json:"workflow,omitempty"`
-	AllowedWorkflows          []string          `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
-	AllowedOverrides          []string          `yaml:"allowed_overrides" json:"allowed_overrides"`
-	AllowCustomWorkflows      *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
-	DeleteSourceBranchOnMerge *bool             `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
-	TemplateOverrides         map[string]string `yaml:"template_overrides,omitempty" json:"template_overrides,omitempty"`
+	ID                          string            `yaml:"id" json:"id"`
+	Branch                      string            `yaml:"branch" json:"branch"`
+	ApplyRequirements           []string          `yaml:"apply_requirements" json:"apply_requirements"`
+	PreWorkflowHooks            []PreWorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
+	Workflow                    *string           `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	PullRequestWorkflow         *string           `yaml:"pull_request_workflow,omitempty" json:"pull_request_workflow,omitempty"`
+	DeploymentWorkflow          *string           `yaml:"deployment_workflow,omitempty" json:"deployment_workflow,omitempty"`
+	AllowedWorkflows            []string          `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
+	AllowedPullRequestWorkflows []string          `yaml:"allowed_pull_request_workflows,omitempty" json:"allowed_pull_request_workflows,omitempty"`
+	AllowedDeploymentWorkflows  []string          `yaml:"allowed_deployment_workflows,omitempty" json:"allowed_deployment_workflows,omitempty"`
+	AllowedOverrides            []string          `yaml:"allowed_overrides" json:"allowed_overrides"`
+	AllowCustomWorkflows        *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
+	DeleteSourceBranchOnMerge   *bool             `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
+	TemplateOverrides           map[string]string `yaml:"template_overrides,omitempty" json:"template_overrides,omitempty"`
+}
+
+func (g GlobalCfg) GetWorkflowNames() []string {
+	names := make([]string, 0)
+	for name, _ := range g.Workflows {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (g GlobalCfg) GetPullRequestWorkflowNames() []string {
+	names := make([]string, 0)
+	for name, _ := range g.PullRequestWorkflows {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (g GlobalCfg) GetDeploymentWorkflowNames() []string {
+	names := make([]string, 0)
+	for name, _ := range g.DeploymentWorkflows {
+		names = append(names, name)
+	}
+	return names
 }
 
 func (g GlobalCfg) Validate() error {
 	err := validation.ValidateStruct(&g,
 		validation.Field(&g.Repos),
 		validation.Field(&g.Workflows),
+		validation.Field(&g.PullRequestWorkflows),
+		validation.Field(&g.DeploymentWorkflows),
 		validation.Field(&g.Metrics),
 		validation.Field(&g.Jobs),
 	)
@@ -46,54 +78,36 @@ func (g GlobalCfg) Validate() error {
 
 	// Check that all workflows referenced by repos are actually defined.
 	for _, repo := range g.Repos {
-		if repo.Workflow == nil {
-			continue
+		if err := validateWorkflow(repo.Workflow, g.GetWorkflowNames()); err != nil {
+			return err
 		}
-		name := *repo.Workflow
-		if name == valid.DefaultWorkflowName {
-			// The 'default' workflow will always be defined.
-			continue
+
+		if err := validateWorkflow(repo.PullRequestWorkflow, g.GetPullRequestWorkflowNames()); err != nil {
+			return err
 		}
-		found := false
-		for w := range g.Workflows {
-			if w == name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("workflow %q is not defined", name)
+
+		if err := validateWorkflow(repo.DeploymentWorkflow, g.GetDeploymentWorkflowNames()); err != nil {
+			return err
 		}
 	}
 
 	// Check that all allowed workflows are defined
 	for _, repo := range g.Repos {
-		if repo.AllowedWorkflows == nil {
-			continue
+		if err := validateAllowedWorkflows(repo.AllowedWorkflows, g.GetWorkflowNames()); err != nil {
+			return err
 		}
-		for _, name := range repo.AllowedWorkflows {
-			if name == valid.DefaultWorkflowName {
-				// The 'default' workflow will always be defined.
-				continue
-			}
-			found := false
-			for w := range g.Workflows {
-				if w == name {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("workflow %q is not defined", name)
-			}
+		if err := validateAllowedWorkflows(repo.AllowedPullRequestWorkflows, g.GetPullRequestWorkflowNames()); err != nil {
+			return err
+		}
+		if err := validateAllowedWorkflows(repo.AllowedDeploymentWorkflows, g.GetDeploymentWorkflowNames()); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 
 func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
-	workflows := make(map[string]valid.Workflow)
-
 	// assumes: globalcfg is always initialized with one repo .*
 	applyReqs := defaultCfg.Repos[0].ApplyRequirements
 
@@ -107,36 +121,59 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 		}
 	}
 
-	for k, v := range g.Workflows {
-		validatedWorkflow := v.ToValid(k)
-		workflows[k] = validatedWorkflow
-		if k == valid.DefaultWorkflowName {
-			// Handle the special case where they're redefining the default
-			// workflow. In this case, our default repo config references
-			// the "old" default workflow and so needs to be redefined.
-			defaultCfg.Repos[0].Workflow = &validatedWorkflow
-		}
+	defaultRepo := &defaultCfg.Repos[0]
+	validWorkflows := g.Workflows.ToValid(defaultCfg)
+	var validPullRequestWorkflows, validDeploymentWorkflows map[string]valid.Workflow
+	if defaultCfg.PlatformModeEnabled() {
+		validPullRequestWorkflows = g.PullRequestWorkflows.ToValid(defaultCfg)
+		validDeploymentWorkflows = g.DeploymentWorkflows.ToValid(defaultCfg)
 	}
-	// Merge in defaults without overriding.
-	for k, v := range defaultCfg.Workflows {
-		if _, ok := workflows[k]; !ok {
-			workflows[k] = v
-		}
+
+	// Handle the special case where they're redefining the default
+	// workflow. In this case, our default repo config references
+	// the "old" default workflow and so needs to be redefined.
+	if w, ok := validWorkflows[valid.DefaultWorkflowName]; ok {
+		defaultRepo.Workflow = &w
+	}
+	if w, ok := validPullRequestWorkflows[valid.DefaultWorkflowName]; ok {
+		defaultRepo.PullRequestWorkflow = &w
+	}
+	if w, ok := validDeploymentWorkflows[valid.DefaultWorkflowName]; ok {
+		defaultRepo.DeploymentWorkflow = &w
 	}
 
 	var repos []valid.Repo
 	for _, r := range g.Repos {
-		repos = append(repos, r.ToValid(workflows, globalApplyReqs))
+		validRepo := r.ToValid(
+			validWorkflows,
+			validPullRequestWorkflows,
+			validDeploymentWorkflows,
+			globalApplyReqs,
+		)
+
+		repos = append(repos, validRepo)
 	}
 	repos = append(defaultCfg.Repos, repos...)
 
 	return valid.GlobalCfg{
-		Repos:      repos,
-		Workflows:  workflows,
-		PolicySets: g.PolicySets.ToValid(),
-		Metrics:    g.Metrics.ToValid(),
-		Jobs:       g.Jobs.ToValid(),
+		WorkflowMode:         defaultCfg.WorkflowMode,
+		Repos:                repos,
+		Workflows:            validWorkflows,
+		PullRequestWorkflows: validPullRequestWorkflows,
+		DeploymentWorkflows:  validDeploymentWorkflows,
+		PolicySets:           g.PolicySets.ToValid(),
+		Metrics:              g.Metrics.ToValid(),
+		Jobs:                 g.Jobs.ToValid(),
 	}
+}
+
+func (g GlobalCfg) toValidWorkflows(workflows map[string]Workflow) map[string]valid.Workflow {
+	validWorkflows := make(map[string]valid.Workflow)
+	for k, v := range workflows {
+		validatedWorkflow := v.ToValid(k)
+		validWorkflows[k] = validatedWorkflow
+	}
+	return validWorkflows
 }
 
 // HasRegexID returns true if r is configured with a regex id instead of an
@@ -172,7 +209,11 @@ func (r Repo) Validate() error {
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey {
+			if o != valid.ApplyRequirementsKey &&
+				o != valid.WorkflowKey &&
+				o != valid.DeleteSourceBranchOnMergeKey &&
+				o != valid.PullRequestWorkflowKey &&
+				o != valid.DeploymentWorkflowKey {
 				return fmt.Errorf("%q is not a valid override, only %q, %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey)
 			}
 		}
@@ -196,11 +237,18 @@ func (r Repo) Validate() error {
 		validation.Field(&r.AllowedOverrides, validation.By(overridesValid)),
 		validation.Field(&r.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
+		validation.Field(&r.PullRequestWorkflow, validation.By(workflowExists)),
+		validation.Field(&r.DeploymentWorkflow, validation.By(workflowExists)),
 		validation.Field(&r.DeleteSourceBranchOnMerge, validation.By(deleteSourceBranchOnMergeValid)),
 	)
 }
 
-func (r Repo) ToValid(workflows map[string]valid.Workflow, globalApplyReqs []string) valid.Repo {
+func (r Repo) ToValid(
+	workflows map[string]valid.Workflow,
+	pullRequestWorkflows map[string]valid.Workflow,
+	deploymentWorkflows map[string]valid.Workflow,
+	globalApplyReqs []string,
+) valid.Repo {
 	var id string
 	var idRegex *regexp.Regexp
 	if r.HasRegexID() {
@@ -226,6 +274,22 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow, globalApplyReqs []str
 		workflow = &ptr
 	}
 
+	var pullRequestWorkflow *valid.Workflow
+	if r.PullRequestWorkflow != nil {
+		// This key is guaranteed to exist because we test for it in
+		// ParserValidator.validateRepoWorkflows.
+		ptr := pullRequestWorkflows[*r.PullRequestWorkflow]
+		pullRequestWorkflow = &ptr
+	}
+
+	var deploymentWorkflow *valid.Workflow
+	if r.DeploymentWorkflow != nil {
+		// This key is guaranteed to exist because we test for it in
+		// ParserValidator.validateRepoWorkflows.
+		ptr := deploymentWorkflows[*r.DeploymentWorkflow]
+		deploymentWorkflow = &ptr
+	}
+
 	var preWorkflowHooks []*valid.PreWorkflowHook
 	if len(r.PreWorkflowHooks) > 0 {
 		for _, hook := range r.PreWorkflowHooks {
@@ -249,16 +313,61 @@ OUTER:
 	}
 
 	return valid.Repo{
-		ID:                        id,
-		IDRegex:                   idRegex,
-		BranchRegex:               branchRegex,
-		ApplyRequirements:         mergedApplyReqs,
-		PreWorkflowHooks:          preWorkflowHooks,
-		Workflow:                  workflow,
-		AllowedWorkflows:          r.AllowedWorkflows,
-		AllowedOverrides:          r.AllowedOverrides,
-		AllowCustomWorkflows:      r.AllowCustomWorkflows,
-		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
-		TemplateOverrides:         r.TemplateOverrides,
+		ID:                          id,
+		IDRegex:                     idRegex,
+		BranchRegex:                 branchRegex,
+		ApplyRequirements:           mergedApplyReqs,
+		PreWorkflowHooks:            preWorkflowHooks,
+		Workflow:                    workflow,
+		PullRequestWorkflow:         pullRequestWorkflow,
+		DeploymentWorkflow:          deploymentWorkflow,
+		AllowedWorkflows:            r.AllowedWorkflows,
+		AllowedPullRequestWorkflows: r.AllowedPullRequestWorkflows,
+		AllowedDeploymentWorkflows:  r.AllowedDeploymentWorkflows,
+		AllowedOverrides:            r.AllowedOverrides,
+		AllowCustomWorkflows:        r.AllowCustomWorkflows,
+		DeleteSourceBranchOnMerge:   r.DeleteSourceBranchOnMerge,
+		TemplateOverrides:           r.TemplateOverrides,
 	}
+}
+
+func validateWorkflow(workflow *string, workflowNames []string) error {
+	if workflow == nil {
+		return nil
+	}
+
+	name := *workflow
+	if name == valid.DefaultWorkflowName {
+		// The 'default' workflow will always be defined.
+		return nil
+	}
+
+	for _, w := range workflowNames {
+		if w == name {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("workflow %q is not defined", name)
+}
+
+func validateAllowedWorkflows(allowedWorkflows []string, workflowNames []string) error {
+	if allowedWorkflows == nil {
+		return nil
+	}
+
+	for _, name := range allowedWorkflows {
+		if name == valid.DefaultWorkflowName {
+			// The 'default' workflow will always be defined.
+			continue
+		}
+		for _, w := range workflowNames {
+			if w == name {
+				return nil
+			}
+		}
+		return fmt.Errorf("workflow %q is not defined", name)
+	}
+
+	return nil
 }

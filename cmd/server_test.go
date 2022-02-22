@@ -107,6 +107,7 @@ var testFlags = map[string]interface{}{
 	WriteGitCredsFlag:            true,
 	LyftAuditJobsSnsTopicArnFlag: "",
 	DisableAutoplanFlag:          true,
+	EnablePlatformModeFlag:       false,
 	EnablePolicyChecksFlag:       false,
 	EnableRegExpCmdFlag:          false,
 	EnableDiffMarkdownFormat:     false,

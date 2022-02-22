@@ -178,12 +178,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	globalCfg := valid.NewGlobalCfgFromArgs(
 		valid.GlobalCfgArgs{
-			AllowRepoCfg:       userConfig.AllowRepoConfig,
-			MergeableReq:       userConfig.RequireMergeable,
-			ApprovedReq:        userConfig.RequireApproval,
-			UnDivergedReq:      userConfig.RequireUnDiverged,
-			SQUnLockedReq:      userConfig.RequireSQUnlocked,
-			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
+			AllowRepoCfg:        userConfig.AllowRepoConfig,
+			MergeableReq:        userConfig.RequireMergeable,
+			ApprovedReq:         userConfig.RequireApproval,
+			UnDivergedReq:       userConfig.RequireUnDiverged,
+			SQUnLockedReq:       userConfig.RequireSQUnlocked,
+			PolicyCheckEnabled:  userConfig.EnablePolicyChecksFlag,
+			PlatformModeEnabled: userConfig.EnablePlatformMode,
 		})
 	if userConfig.RepoConfig != "" {
 		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)

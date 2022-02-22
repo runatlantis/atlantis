@@ -273,6 +273,7 @@ func TestPlatformModeNewGlobalCfg(t *testing.T) {
 		},
 	}
 	baseCfg := valid.GlobalCfg{
+		WorkflowMode: valid.PlatformWorkflowMode,
 		Repos: []valid.Repo{
 			{
 				IDRegex:                   regexp.MustCompile(".*"),

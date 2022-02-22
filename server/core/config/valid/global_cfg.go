@@ -31,8 +31,16 @@ const DeleteSourceBranchOnMergeKey = "delete_source_branch_on_merge"
 // requirements in the config and removing the flag to enable policy checking.
 var NonOverrideableApplyReqs []string = []string{PoliciesPassedApplyReq}
 
+type WorkflowModeType int
+
+const (
+	DefaultWorkflowMode WorkflowModeType = iota
+	PlatformWorkflowMode
+)
+
 // GlobalCfg is the final parsed version of server-side repo config.
 type GlobalCfg struct {
+	WorkflowMode         WorkflowModeType
 	Repos                []Repo
 	Workflows            map[string]Workflow
 	PullRequestWorkflows map[string]Workflow
@@ -193,12 +201,15 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	}
 
 	globalCfg := GlobalCfg{
+		WorkflowMode: DefaultWorkflowMode,
 		Workflows: map[string]Workflow{
 			DefaultWorkflowName: defaultWorkflow,
 		},
 	}
 
 	if args.PlatformModeEnabled {
+		globalCfg.WorkflowMode = PlatformWorkflowMode
+
 		// defaultPullRequstWorkflow is only used in platform mode. By default it does not
 		// support apply stage, and plan stage run with -lock=false flag
 		pullRequestWorkflow := Workflow{
@@ -231,6 +242,10 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	globalCfg.Repos = []Repo{repo}
 
 	return globalCfg
+}
+
+func (g GlobalCfg) PlatformModeEnabled() bool {
+	return g.WorkflowMode == PlatformWorkflowMode
 }
 
 // MergeProjectCfg merges proj and rCfg with the global config to return a

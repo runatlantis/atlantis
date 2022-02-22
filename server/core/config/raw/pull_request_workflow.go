@@ -5,16 +5,16 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
-type Workflows map[string]Workflow
+type PullRequestWorkflows map[string]PullRequestWorkflow
 
-func (w Workflows) ToValid(defaultCfg valid.GlobalCfg) map[string]valid.Workflow {
+func (w PullRequestWorkflows) ToValid(defaultCfg valid.GlobalCfg) map[string]valid.Workflow {
 	validWorkflows := make(map[string]valid.Workflow)
 	for k, v := range w {
 		validWorkflows[k] = v.ToValid(k)
 	}
 
 	// Merge in defaults without overriding.
-	for k, v := range defaultCfg.Workflows {
+	for k, v := range defaultCfg.PullRequestWorkflows {
 		if _, ok := validWorkflows[k]; !ok {
 			validWorkflows[k] = v
 		}
@@ -23,21 +23,19 @@ func (w Workflows) ToValid(defaultCfg valid.GlobalCfg) map[string]valid.Workflow
 	return validWorkflows
 }
 
-type Workflow struct {
-	Apply       *Stage `yaml:"apply,omitempty" json:"apply,omitempty"`
+type PullRequestWorkflow struct {
 	Plan        *Stage `yaml:"plan,omitempty" json:"plan,omitempty"`
 	PolicyCheck *Stage `yaml:"policy_check,omitempty" json:"policy_check,omitempty"`
 }
 
-func (w Workflow) Validate() error {
+func (w PullRequestWorkflow) Validate() error {
 	return validation.ValidateStruct(&w,
-		validation.Field(&w.Apply),
 		validation.Field(&w.Plan),
 		validation.Field(&w.PolicyCheck),
 	)
 }
 
-func (w Workflow) toValidStage(stage *Stage, defaultStage valid.Stage) valid.Stage {
+func (w PullRequestWorkflow) toValidStage(stage *Stage, defaultStage valid.Stage) valid.Stage {
 	if stage == nil || stage.Steps == nil {
 		return defaultStage
 	}
@@ -45,13 +43,12 @@ func (w Workflow) toValidStage(stage *Stage, defaultStage valid.Stage) valid.Sta
 	return stage.ToValid()
 }
 
-func (w Workflow) ToValid(name string) valid.Workflow {
+func (w PullRequestWorkflow) ToValid(name string) valid.Workflow {
 	v := valid.Workflow{
 		Name: name,
 	}
 
-	v.Apply = w.toValidStage(w.Apply, valid.DefaultApplyStage)
-	v.Plan = w.toValidStage(w.Plan, valid.DefaultPlanStage)
+	v.Plan = w.toValidStage(w.Plan, valid.DefaultLocklessPlanStage)
 	v.PolicyCheck = w.toValidStage(w.PolicyCheck, valid.DefaultPolicyCheckStage)
 
 	return v

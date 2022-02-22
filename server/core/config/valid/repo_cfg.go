@@ -16,6 +16,8 @@ type RepoCfg struct {
 	Version                   int
 	Projects                  []Project
 	Workflows                 map[string]Workflow
+	PullRequestWorkflows      map[string]Workflow
+	DeploymentWorkflows       map[string]Workflow
 	PolicySets                PolicySets
 	Automerge                 bool
 	ParallelApply             bool

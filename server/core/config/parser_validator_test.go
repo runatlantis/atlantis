@@ -1513,6 +1513,319 @@ workflows:
 	}
 }
 
+func TestParseGlobalCfg_PlatformMode(t *testing.T) {
+	globalCfgArgs := valid.GlobalCfgArgs{
+		PlatformModeEnabled: true,
+	}
+
+	defaultCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	preWorkflowHook := &valid.PreWorkflowHook{
+		StepName:   "run",
+		RunCommand: "custom workflow command",
+	}
+	preWorkflowHooks := []*valid.PreWorkflowHook{preWorkflowHook}
+
+	customPlan1 := valid.Stage{
+		Steps: []valid.Step{
+			{
+				StepName:   "run",
+				RunCommand: "custom command",
+			},
+			{
+				StepName:  "init",
+				ExtraArgs: []string{"extra", "args"},
+			},
+			{
+				StepName: "plan",
+			},
+		},
+	}
+	customPolicyCheck1 := valid.Stage{
+		Steps: []valid.Step{
+			{
+				StepName:   "run",
+				RunCommand: "custom command",
+			},
+			{
+				StepName:  "plan",
+				ExtraArgs: []string{"extra", "args"},
+			},
+			{
+				StepName: "policy_check",
+			},
+		},
+	}
+	customApply1 := valid.Stage{
+		Steps: []valid.Step{
+			{
+				StepName:   "run",
+				RunCommand: "custom command",
+			},
+			{
+				StepName: "apply",
+			},
+		},
+	}
+
+	customPulRequestWorkflow1 := valid.Workflow{
+		Name:        "custom1",
+		Plan:        customPlan1,
+		PolicyCheck: customPolicyCheck1,
+	}
+
+	customDeploymentWorkflow1 := valid.Workflow{
+		Name:  "custom1",
+		Plan:  customPlan1,
+		Apply: customApply1,
+	}
+
+	conftestVersion, _ := version.NewVersion("v1.0.0")
+	defaultWorkflow := globalCfg.Workflows["default"]
+
+	cases := map[string]struct {
+		input  string
+		expErr string
+		exp    valid.GlobalCfg
+	}{
+		"pull_request_workflows don't support apply": {
+			input: `
+pull_request_workflows:
+  default:
+    apply:
+      steps:
+        - run: custom
+`,
+			expErr: "yaml: unmarshal errors:\n  line 4: field apply not found in type raw.PullRequestWorkflow",
+		},
+		"deployment_workflows don't support policy_checks": {
+			input: `
+deployment_workflows:
+  default:
+    policy_check:
+      steps:
+        - run: custom
+`,
+			expErr: "yaml: unmarshal errors:\n  line 4: field policy_check not found in type raw.DeploymentWorkflow",
+		},
+		"all keys specified": {
+			input: `
+repos:
+- id: github.com/owner/repo
+  pre_workflow_hooks:
+    - run: custom workflow command
+  pull_request_workflow: custom1
+  deployment_workflow: custom1
+  allowed_overrides: [apply_requirements, pull_request_workflow, deployment_workflow, workflow, delete_source_branch_on_merge]
+  allow_custom_workflows: true
+- id: /.*/
+  branch: /(master|main)/
+  pre_workflow_hooks:
+    - run: custom workflow command
+pull_request_workflows:
+  custom1:
+    plan:
+      steps:
+      - run: custom command
+      - init:
+          extra_args: [extra, args]
+      - plan
+    policy_check:
+      steps:
+      - run: custom command
+      - plan:
+          extra_args: [extra, args]
+      - policy_check
+deployment_workflows:
+  custom1:
+    plan:
+      steps:
+      - run: custom command
+      - init:
+          extra_args: [extra, args]
+      - plan
+    apply:
+      steps:
+      - run: custom command
+      - apply
+policies:
+  conftest_version: v1.0.0
+  policy_sets:
+    - name: good-policy
+      path: rel/path/to/policy
+      source: local
+`,
+			exp: valid.GlobalCfg{
+				WorkflowMode: valid.PlatformWorkflowMode,
+				Repos: []valid.Repo{
+					defaultCfg.Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						PreWorkflowHooks:     preWorkflowHooks,
+						PullRequestWorkflow:  &customPulRequestWorkflow1,
+						DeploymentWorkflow:   &customDeploymentWorkflow1,
+						AllowedOverrides:     []string{"apply_requirements", "pull_request_workflow", "deployment_workflow", "workflow", "delete_source_branch_on_merge"},
+						AllowCustomWorkflows: Bool(true),
+					},
+					{
+						IDRegex:          regexp.MustCompile(".*"),
+						BranchRegex:      regexp.MustCompile("(master|main)"),
+						PreWorkflowHooks: preWorkflowHooks,
+					},
+				},
+				Workflows: defaultCfg.Workflows,
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.PullRequestWorkflows["default"],
+					"custom1": customPulRequestWorkflow1,
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.DeploymentWorkflows["default"],
+					"custom1": customDeploymentWorkflow1,
+				},
+				PolicySets: valid.PolicySets{
+					Version: conftestVersion,
+					PolicySets: []valid.PolicySet{
+						{
+							Name:   "good-policy",
+							Path:   "rel/path/to/policy",
+							Source: valid.LocalPolicySet,
+						},
+					},
+				},
+			},
+		},
+		"redefine default platform workflows": {
+			input: `
+pull_request_workflows:
+  default:
+    plan:
+      steps:
+      - run: custom
+    policy_check:
+      steps: []
+deployment_workflows:
+  default:
+    plan:
+      steps: []
+    apply:
+      steps:
+      - run: custom
+`,
+			exp: valid.GlobalCfg{
+				WorkflowMode: valid.PlatformWorkflowMode,
+				Repos: []valid.Repo{
+					{
+						IDRegex:           regexp.MustCompile(".*"),
+						BranchRegex:       regexp.MustCompile(".*"),
+						ApplyRequirements: []string{},
+						Workflow:          &defaultWorkflow,
+						PullRequestWorkflow: &valid.Workflow{
+							Name: "default",
+							Apply: valid.Stage{
+								Steps: nil,
+							},
+							PolicyCheck: valid.Stage{
+								Steps: nil,
+							},
+							Plan: valid.Stage{
+								Steps: []valid.Step{
+									{
+										StepName:   "run",
+										RunCommand: "custom",
+									},
+								},
+							},
+						},
+						DeploymentWorkflow: &valid.Workflow{
+							Name: "default",
+							Apply: valid.Stage{
+								Steps: []valid.Step{
+									{
+										StepName:   "run",
+										RunCommand: "custom",
+									},
+								},
+							},
+							PolicyCheck: valid.Stage{
+								Steps: nil,
+							},
+							Plan: valid.Stage{
+								Steps: nil,
+							},
+						},
+						AllowedWorkflows:          []string{},
+						AllowedOverrides:          []string{},
+						AllowCustomWorkflows:      Bool(false),
+						DeleteSourceBranchOnMerge: Bool(false),
+					},
+				},
+				Workflows: defaultCfg.Workflows,
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": {
+						Name: "default",
+						Plan: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:   "run",
+									RunCommand: "custom",
+								},
+							},
+						},
+					},
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": {
+						Name: "default",
+						Apply: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:   "run",
+									RunCommand: "custom",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := &config.ParserValidator{}
+			tmp, cleanup := TempDir(t)
+			defer cleanup()
+			path := filepath.Join(tmp, "conf.yaml")
+			Ok(t, ioutil.WriteFile(path, []byte(c.input), 0600))
+
+			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+
+			if c.expErr != "" {
+				expErr := strings.Replace(c.expErr, "<tmp>", path, -1)
+				ErrEquals(t, expErr, err)
+				return
+			}
+			Ok(t, err)
+
+			if !act.PolicySets.HasPolicies() {
+				c.exp.PolicySets = act.PolicySets
+			}
+
+			Equals(t, c.exp, act)
+			// Have to hand-compare regexes because Equals doesn't do it.
+			for i, actRepo := range act.Repos {
+				expRepo := c.exp.Repos[i]
+				if expRepo.IDRegex != nil {
+					Assert(t, expRepo.IDRegex.String() == actRepo.IDRegex.String(),
+						"%q != %q for repos[%d]", expRepo.IDRegex.String(), actRepo.IDRegex.String(), i)
+				}
+				if expRepo.BranchRegex != nil {
+					Assert(t, expRepo.BranchRegex.String() == actRepo.BranchRegex.String(),
+						"%q != %q for repos[%d]", expRepo.BranchRegex.String(), actRepo.BranchRegex.String(), i)
+				}
+			}
+		})
+	}
+}
+
 // Test that if we pass in JSON strings everything should parse fine.
 func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 	customWorkflow := valid.Workflow{
@@ -1554,6 +1867,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
+	globalCfgArgs := valid.GlobalCfgArgs{}
 
 	cases := map[string]struct {
 		json   string
@@ -1566,12 +1880,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 		},
 		"empty object": {
 			json: "{}",
-			exp: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}),
+			exp:  valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		},
 		"setting all keys": {
 			json: `
@@ -1625,12 +1934,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 `,
 			exp: valid.GlobalCfg{
 				Repos: []valid.Repo{
-					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						AllowRepoCfg:  false,
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
-					}).Repos[0],
+					valid.NewGlobalCfgFromArgs(globalCfgArgs).Repos[0],
 					{
 						IDRegex:              regexp.MustCompile(".*"),
 						ApplyRequirements:    []string{"mergeable", "approved"},
@@ -1648,13 +1952,8 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"default": valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						AllowRepoCfg:  false,
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
-					}).Workflows["default"],
-					"custom": customWorkflow,
+					"default": valid.NewGlobalCfgFromArgs(globalCfgArgs).Workflows["default"],
+					"custom":  customWorkflow,
 				},
 				PolicySets: valid.PolicySets{
 					Version: conftestVersion,
@@ -1679,6 +1978,212 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				UnDivergedReq: false,
 			}
 			cfg, err := pv.ParseGlobalCfgJSON(c.json, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			if c.expErr != "" {
+				ErrEquals(t, c.expErr, err)
+				return
+			}
+			Ok(t, err)
+
+			if !cfg.PolicySets.HasPolicies() {
+				c.exp.PolicySets = cfg.PolicySets
+			}
+
+			Equals(t, c.exp, cfg)
+		})
+	}
+}
+
+// Test that if we pass in JSON strings everything should parse fine.
+func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
+	customPullRequestWorkflow := valid.Workflow{
+		Name: "custom",
+		Plan: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "init",
+				},
+				{
+					StepName:  "plan",
+					ExtraArgs: []string{"extra", "args"},
+				},
+				{
+					StepName:   "run",
+					RunCommand: "custom plan",
+				},
+			},
+		},
+		PolicyCheck: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "plan",
+				},
+				{
+					StepName:   "run",
+					RunCommand: "custom policy_check",
+				},
+			},
+		},
+	}
+
+	customDeploymentWorkflow := valid.Workflow{
+		Name: "custom",
+		Plan: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "init",
+				},
+				{
+					StepName:  "plan",
+					ExtraArgs: []string{"extra", "args"},
+				},
+				{
+					StepName:   "run",
+					RunCommand: "custom plan",
+				},
+			},
+		},
+		Apply: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:   "run",
+					RunCommand: "my custom command",
+				},
+			},
+		},
+	}
+
+	conftestVersion, _ := version.NewVersion("v1.0.0")
+	globalCfgArgs := valid.GlobalCfgArgs{PlatformModeEnabled: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+
+	cases := map[string]struct {
+		json   string
+		exp    valid.GlobalCfg
+		expErr string
+	}{
+		"empty string": {
+			json:   "",
+			expErr: "unexpected end of JSON input",
+		},
+		"empty object": {
+			json: "{}",
+			exp:  globalCfg,
+		},
+		"setting all keys": {
+			json: `
+{
+  "repos": [
+    {
+      "id": "/.*/",
+      "pull_request_workflow": "custom",
+      "deployment_workflow": "custom",
+      "allowed_pull_request_workflows": ["custom"],
+      "allowed_deployment_workflows": ["custom"],
+      "allowed_overrides": ["pull_request_workflow", "deployment_workflow"],
+      "allow_custom_workflows": true
+    },
+    {
+      "id": "github.com/owner/repo"
+    }
+  ],
+  "pull_request_workflows": {
+    "custom": {
+      "plan": {
+        "steps": [
+          "init",
+          {"plan": {"extra_args": ["extra", "args"]}},
+          {"run": "custom plan"}
+        ]
+      },
+      "policy_check": {
+        "steps": [
+          "plan",
+          {"run": "custom policy_check"}
+        ]
+      }
+    }
+  },
+  "deployment_workflows": {
+    "custom": {
+      "plan": {
+        "steps": [
+          "init",
+          {"plan": {"extra_args": ["extra", "args"]}},
+          {"run": "custom plan"}
+        ]
+      },
+      "apply": {
+        "steps": [
+          {"run": "my custom command"}
+        ]
+      }
+    }
+  },
+  "policies": {
+    "conftest_version": "v1.0.0",
+    "policy_sets": [
+      {
+        "name": "good-policy",
+        "source": "local",
+        "path": "rel/path/to/policy"
+      }
+    ]
+  }
+}
+`,
+			exp: valid.GlobalCfg{
+				WorkflowMode: valid.PlatformWorkflowMode,
+				Repos: []valid.Repo{
+					globalCfg.Repos[0],
+					{
+						IDRegex: regexp.MustCompile(".*"),
+						// ApplyRequirements:           []string{"mergeable", "approved"},
+						PullRequestWorkflow:         &customPullRequestWorkflow,
+						DeploymentWorkflow:          &customDeploymentWorkflow,
+						AllowedPullRequestWorkflows: []string{"custom"},
+						AllowedDeploymentWorkflows:  []string{"custom"},
+						AllowedOverrides:            []string{"pull_request_workflow", "deployment_workflow"},
+						AllowCustomWorkflows:        Bool(true),
+					},
+					{
+						ID:                          "github.com/owner/repo",
+						IDRegex:                     nil,
+						ApplyRequirements:           nil,
+						AllowedOverrides:            nil,
+						AllowedPullRequestWorkflows: nil,
+						AllowedDeploymentWorkflows:  nil,
+						AllowCustomWorkflows:        nil,
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"default": globalCfg.Workflows["default"],
+				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": globalCfg.PullRequestWorkflows["default"],
+					"custom":  customPullRequestWorkflow,
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": globalCfg.DeploymentWorkflows["default"],
+					"custom":  customDeploymentWorkflow,
+				},
+				PolicySets: valid.PolicySets{
+					Version: conftestVersion,
+					PolicySets: []valid.PolicySet{
+						{
+							Name:   "good-policy",
+							Path:   "rel/path/to/policy",
+							Source: valid.LocalPolicySet,
+						},
+					},
+				},
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			pv := &config.ParserValidator{}
+
+			cfg, err := pv.ParseGlobalCfgJSON(c.json, globalCfg)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
