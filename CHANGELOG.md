@@ -1,3 +1,26 @@
+# v0.18.3
+
+## What's Changed
+
+* Fix URL generation by @PertsevRoman in https://github.com/runatlantis/atlantis/pull/2021
+* deps: terraform 1.1.5 by @lazzurs in https://github.com/runatlantis/atlantis/pull/2042
+* docs: update devops PR link by @chenrui333 in https://github.com/runatlantis/atlantis/pull/2033
+* Moving config files to core/config by @msarvar in https://github.com/runatlantis/atlantis/pull/2036
+* docs: fix policy example with custom workflow by @aliscott in https://github.com/runatlantis/atlantis/pull/2049
+* docs: fix some typos by @ocaisa in https://github.com/runatlantis/atlantis/pull/2048
+* fix: get user teams with GitHub GraphQL API by @raymondchen625 in https://github.com/runatlantis/atlantis/pull/2045
+* build(deps): bump github.com/xanzy/go-gitlab from 0.54.3 to 0.54.4 by @dependabot in https://github.com/runatlantis/atlantis/pull/2050
+* docs: add user facing documentation for real-time logs by @Aayyush in https://github.com/runatlantis/atlantis/pull/1963
+* feat: Use UUIDs to identify log streaming jobs by @Aayyush in https://github.com/runatlantis/atlantis/pull/2051
+* build(deps): bump ajv from 6.5.1 to 6.12.6 by @dependabot in https://github.com/runatlantis/atlantis/pull/2060
+* build(deps): bump github.com/xanzy/go-gitlab from 0.54.4 to 0.55.1 by @dependabot in https://github.com/runatlantis/atlantis/pull/2061
+* build(deps): bump github.com/golang-jwt/jwt/v4 from 4.2.0 to 4.3.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/2062
+* build(deps): bump github.com/microcosm-cc/bluemonday from 1.0.17 to 1.0.18 by @dependabot in https://github.com/runatlantis/atlantis/pull/2063
+* build(deps): bump go.uber.org/zap from 1.20.0 to 1.21.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/2064
+* deps: tf 1.1.6 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/2071
+* Removing web credentials from debug log by @pkaramol in https://github.com/runatlantis/atlantis/pull/2072
+* build(deps): bump github.com/gorilla/websocket from 1.4.2 to 1.5.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/2077
+
 # v0.18.2
 
 ## What's Changed
