@@ -19,6 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/logging"
+	temporalCmd "github.com/runatlantis/atlantis/server/lyft/temporal/cmd"
 	"github.com/spf13/viper"
 )
 
@@ -43,6 +44,8 @@ func main() {
 	}
 	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
 	testdrive := &cmd.TestdriveCmd{}
+	cmd.RootCmd.AddCommand(temporalCmd.NewWorkerCmd(temporalCmd.WorkerConfig{}))
+	cmd.RootCmd.AddCommand(temporalCmd.NewServerCmd())
 	cmd.RootCmd.AddCommand(server.Init())
 	cmd.RootCmd.AddCommand(version.Init())
 	cmd.RootCmd.AddCommand(testdrive.Init())
