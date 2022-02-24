@@ -677,7 +677,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		boltdb,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
