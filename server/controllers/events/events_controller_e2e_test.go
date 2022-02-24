@@ -1019,7 +1019,6 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		boltdb,
 		parallelPoolSize,
 		silenceNoProjects,
 		false,

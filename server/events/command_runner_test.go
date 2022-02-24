@@ -151,7 +151,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		defaultBoltDB,
 		parallelPoolSize,
 		SilenceNoProjects,
 		false,
@@ -530,7 +529,6 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
 	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -578,7 +576,6 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
 	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -625,7 +622,6 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
 	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -682,7 +678,6 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
 	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -762,7 +757,6 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
 	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
 	pull := fixtures.Pull
 	pull.BaseRepo = fixtures.GithubRepo
 	_, err = boltDB.UpdatePullWithResults(pull, []models.ProjectResult{
