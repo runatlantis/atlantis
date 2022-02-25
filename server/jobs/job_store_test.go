@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/jobs/mocks"
-	"github.com/runatlantis/atlantis/server/jobs/mocks/matchers"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/petergtz/pegomock"
@@ -138,12 +137,36 @@ func TestJobStore_UpdateJobStatus(t *testing.T) {
 
 		// Setup storage backend
 		storageBackend := mocks.NewMockStorageBackend()
-		When(storageBackend.Write(AnyString(), matchers.AnySliceOfString())).ThenReturn(false, storageBackendErr)
+		When(storageBackend.Write(AnyString(), AnyStringSlice())).ThenReturn(false, storageBackendErr)
 		jobStore := jobs.NewTestJobStore(storageBackend, jobsMap)
 		err := jobStore.SetJobCompleteStatus(jobID, jobs.Complete)
 
 		// Assert storage backend error
 		assert.EqualError(t, err, expecterErr.Error())
+
+		// Assert the job is in memory
+		jobInMem, err := jobStore.Get(jobID)
+		Ok(t, err)
+		assert.Equal(t, jobInMem.Output, job.Output)
+		assert.Equal(t, job.Status, jobs.Complete)
+	})
+
+	t.Run("retain job in memory when storage backend not configured", func(t *testing.T) {
+		// Create new job and add it to store
+		jobID := "1234"
+		job := &jobs.Job{
+			Output: []string{"a"},
+			Status: jobs.Processing,
+		}
+		jobsMap := make(map[string]*jobs.Job)
+		jobsMap[jobID] = job
+
+		// Setup storage backend
+		storageBackend := &jobs.NoopStorageBackend{}
+		jobStore := jobs.NewTestJobStore(storageBackend, jobsMap)
+		err := jobStore.SetJobCompleteStatus(jobID, jobs.Complete)
+
+		assert.Nil(t, err)
 
 		// Assert the job is in memory
 		jobInMem, err := jobStore.Get(jobID)
@@ -164,7 +187,7 @@ func TestJobStore_UpdateJobStatus(t *testing.T) {
 
 		// Setup storage backend
 		storageBackend := mocks.NewMockStorageBackend()
-		When(storageBackend.Write(AnyString(), matchers.AnySliceOfString())).ThenReturn(true, nil)
+		When(storageBackend.Write(AnyString(), AnyStringSlice())).ThenReturn(true, nil)
 
 		jobStore := jobs.NewTestJobStore(storageBackend, jobsMap)
 		err := jobStore.SetJobCompleteStatus(jobID, jobs.Complete)

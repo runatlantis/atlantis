@@ -29,6 +29,21 @@ func (s StorageBackend) Validate() error {
 	)
 }
 
+// Switch through all possible storage backends and set the non-nil one as the
+// confgured backend
+func (s *StorageBackend) ToValid() valid.StorageBackend {
+	switch {
+	case s.S3 != nil:
+		return valid.StorageBackend{
+			BackendConfig: &valid.S3{
+				BucketName: s.S3.BucketName,
+			},
+		}
+	default:
+		return valid.StorageBackend{}
+	}
+}
+
 func (s S3) Validate() error {
 	return validation.ValidateStruct(&s,
 		validation.Field(&s.BucketName, validation.Required),
@@ -36,15 +51,12 @@ func (s S3) Validate() error {
 }
 
 func (j *Jobs) ToValid() valid.Jobs {
-	if j.StorageBackend != nil {
-		return valid.Jobs{
-			StorageBackend: &valid.StorageBackend{
-				S3: &valid.S3{
-					BucketName: j.StorageBackend.S3.BucketName,
-				},
-			},
-		}
+	if j.StorageBackend == nil {
+		return valid.Jobs{}
 	}
 
-	return valid.Jobs{}
+	storageBackend := j.StorageBackend.ToValid()
+	return valid.Jobs{
+		StorageBackend: &storageBackend,
+	}
 }

@@ -138,7 +138,7 @@ func (j *LayeredJobStore) SetJobCompleteStatus(jobID string, status JobStatus) e
 		return errors.Wrapf(err, "error persisting job: %s", jobID)
 	}
 
-	// Clear output buffers if successfully persisted
+	// Only remove from memory if logs are persisted successfully
 	if ok {
 		delete(j.jobs, jobID)
 	}
