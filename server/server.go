@@ -767,11 +767,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand:  deleteLockCommand,
 	}
 
-	// No Storage backend configured for now
-	wsMux := websocket.NewMultiplexor(
-		logger,
-		controllers.JobIDKeyGenerator{},
-		projectCmdOutputHandler,
+	projectJobsScope := statsScope.SubScope("getprojectjobs")
+
+	wsMux := websocket.NewInstrumentedMultiplexor(
+		websocket.NewMultiplexor(
+			logger,
+			controllers.JobIDKeyGenerator{},
+			projectCmdOutputHandler,
+		),
+		projectJobsScope,
 	)
 
 	jobsController := &controllers.JobsController{
@@ -782,7 +786,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectJobsErrorTemplate: templates.ProjectJobsErrorTemplate,
 		Db:                       boltdb,
 		WsMux:                    wsMux,
-		StatsScope:               statsScope.SubScope("api"),
+		StatsScope:               projectJobsScope,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 	}
 

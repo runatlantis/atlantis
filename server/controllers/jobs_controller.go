@@ -32,7 +32,7 @@ type JobsController struct {
 	ProjectJobsTemplate      templates.TemplateWriter
 	ProjectJobsErrorTemplate templates.TemplateWriter
 	Db                       *db.BoltDB
-	WsMux                    *websocket.Multiplexor
+	WsMux                    websocket.Multiplexor
 	StatsScope               tally.Scope
 	KeyGenerator             JobIDKeyGenerator
 }
@@ -60,7 +60,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 }
 
 func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) {
-	errorCounter := j.StatsScope.SubScope("getprojectjobs").Counter(metrics.ExecutionErrorMetric)
+	errorCounter := j.StatsScope.SubScope("api").Counter(metrics.ExecutionErrorMetric)
 	err := j.getProjectJobs(w, r)
 	if err != nil {
 		errorCounter.Inc(1)
@@ -79,7 +79,7 @@ func (j *JobsController) getProjectJobsWS(w http.ResponseWriter, r *http.Request
 }
 
 func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request) {
-	jobsMetric := j.StatsScope.SubScope("getprojectjobs")
+	jobsMetric := j.StatsScope.SubScope("api")
 	errorCounter := jobsMetric.Counter(metrics.ExecutionErrorMetric)
 	executionTime := jobsMetric.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
