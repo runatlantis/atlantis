@@ -20,6 +20,8 @@
 * deps: tf 1.1.6 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/2071
 * Removing web credentials from debug log by @pkaramol in https://github.com/runatlantis/atlantis/pull/2072
 * build(deps): bump github.com/gorilla/websocket from 1.4.2 to 1.5.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/2077
+* build(deps): bump prismjs from 1.25.0 to 1.27.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/2086
+* fix(web-templates): use CleanedBasePath for static content by @jvrplmlmn in https://github.com/runatlantis/atlantis/pull/2079
 
 # v0.18.2
 
