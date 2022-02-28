@@ -23,6 +23,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -56,7 +57,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
 		RepoRelDir: ".",
@@ -90,7 +91,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	fakeBinOut := "Terraform v0.11.10\n"
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
 		RepoRelDir: ".",

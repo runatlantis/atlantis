@@ -3,6 +3,7 @@ package sqs
 import (
 	"context"
 	"fmt"
+
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/uber-go/tally"
 )

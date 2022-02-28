@@ -30,7 +30,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime/cache"
 	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform/cloud"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -45,7 +45,7 @@ type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
 	// workspace which should be set as an environment variable.
-	RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
@@ -248,7 +248,7 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 }
 
 // See Client.RunCommandWithVersion.
-func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
+func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
 	shouldAllocate, err := c.featureAllocator.ShouldAllocate(feature.LogStreaming, ctx.BaseRepo.FullName)
 
 	if err != nil {

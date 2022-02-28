@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
 	"reflect"
+
+	"github.com/petergtz/pegomock"
 
 	locking "github.com/runatlantis/atlantis/server/core/locking"
 )

@@ -22,6 +22,7 @@ import (
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -52,7 +53,7 @@ type CommandRunner interface {
 // StaleCommandChecker handles checks to validate if current command is stale and can be dropped.
 type StaleCommandChecker interface {
 	// CommandIsStale returns true if currentEventTimestamp is earlier than timestamp set in DB's latest pull model.
-	CommandIsStale(ctx *CommandContext) bool
+	CommandIsStale(ctx *command.Context) bool
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
@@ -81,12 +82,12 @@ type GitlabMergeRequestGetter interface {
 
 // CommentCommandRunner runs individual command workflows.
 type CommentCommandRunner interface {
-	Run(*CommandContext, *CommentCommand)
+	Run(*command.Context, *CommentCommand)
 }
 
 func buildCommentCommandRunner(
 	cmdRunner *DefaultCommandRunner,
-	cmdName models.CommandName,
+	cmdName command.Name,
 ) CommentCommandRunner {
 	// panic here, we want to fail fast and hard since
 	// this would be an internal service configuration error.
@@ -125,7 +126,7 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to disable error comment
 	SilenceForkPRErrorsFlag       string
-	CommentCommandRunnerByCmd     map[models.CommandName]CommentCommandRunner
+	CommentCommandRunnerByCmd     map[command.Name]CommentCommandRunner
 	Drainer                       *Drainer
 	PreWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner
 	PullStatusFetcher             PullStatusFetcher
@@ -135,7 +136,7 @@ type DefaultCommandRunner struct {
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment, models.PlanCommand.String()); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment, command.Plan.String()); commentErr != nil {
 			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
 		return
@@ -154,14 +155,14 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
-	ctx := &CommandContext{
+	ctx := &command.Context{
 		User:             user,
 		Log:              log,
 		Scope:            scope,
 		Pull:             pull,
 		HeadRepo:         headRepo,
 		PullStatus:       status,
-		Trigger:          Auto,
+		Trigger:          command.AutoTrigger,
 		TriggerTimestamp: timestamp,
 	}
 	if !c.validateCtxAndComment(ctx) {
@@ -178,10 +179,10 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, models.PlanCommand)
+		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
 	}
 
-	autoPlanRunner := buildCommentCommandRunner(c, models.PlanCommand)
+	autoPlanRunner := buildCommentCommandRunner(c, command.Plan)
 
 	autoPlanRunner.Run(ctx, nil)
 }
@@ -222,13 +223,13 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		log.Err("Unable to fetch pull status, this is likely a bug.", err)
 	}
 
-	ctx := &CommandContext{
+	ctx := &command.Context{
 		User:             user,
 		Log:              log,
 		Pull:             pull,
 		PullStatus:       status,
 		HeadRepo:         headRepo,
-		Trigger:          Comment,
+		Trigger:          command.CommentTrigger,
 		Scope:            scope,
 		TriggerTimestamp: timestamp,
 	}
@@ -343,7 +344,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	return
 }
 
-func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
+func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context) bool {
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
 		if c.SilenceForkPRErrors {
 			return false
@@ -398,7 +399,6 @@ type FeatureAwareCommandRunner struct {
 }
 
 func (f *FeatureAwareCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand, timestamp time.Time) {
-
 	if cmd.ForceApply {
 		warningMessage := "⚠️ WARNING ⚠️\n\n You have bypassed all apply requirements for this PR 🚀 . This can have unpredictable consequences 🙏🏽 and should only be used in an emergency 🆘 .\n\n 𝐓𝐡𝐢𝐬 𝐚𝐜𝐭𝐢𝐨𝐧 𝐰𝐢𝐥𝐥 𝐛𝐞 𝐚𝐮𝐝𝐢𝐭𝐞𝐝.\n"
 		if commentErr := f.VCSClient.CreateComment(baseRepo, pullNum, warningMessage, ""); commentErr != nil {

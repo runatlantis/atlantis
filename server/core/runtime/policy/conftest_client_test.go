@@ -15,7 +15,7 @@ import (
 	models_mocks "github.com/runatlantis/atlantis/server/core/runtime/models/mocks"
 	conftest_mocks "github.com/runatlantis/atlantis/server/core/runtime/policy/mocks"
 	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -159,7 +159,7 @@ func TestRun(t *testing.T) {
 		Name:   policySetName2,
 	}
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		PolicySets: valid.PolicySets{
 			PolicySets: []valid.PolicySet{
 				policySet1,

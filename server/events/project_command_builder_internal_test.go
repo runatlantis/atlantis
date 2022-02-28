@@ -10,6 +10,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -38,7 +39,7 @@ func TestBuildProjectCmdCtx(t *testing.T) {
 		globalCfg     string
 		repoCfg       string
 		expErr        string
-		expCtx        models.ProjectCommandContext
+		expCtx        command.ProjectContext
 		expPlanSteps  []string
 		expApplySteps []string
 	}{
@@ -59,7 +60,7 @@ workflows:
       steps:
       - apply`,
 			repoCfg: "",
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -111,7 +112,7 @@ projects:
     when_modified: [../modules/**/*.tf]
   terraform_version: v10.0
   `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -165,7 +166,7 @@ projects:
     when_modified: [../modules/**/*.tf]
   terraform_version: v10.0
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -227,7 +228,7 @@ projects:
     when_modified: [../modules/**/*.tf]
   terraform_version: v10.0
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -376,7 +377,7 @@ workflows:
       steps:
       - apply
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -434,7 +435,7 @@ projects:
   terraform_version: v10.0
   workflow: custom
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -495,7 +496,7 @@ workflows:
     apply:
       steps: []
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -540,7 +541,7 @@ projects:
 - dir: project1
   workspace: myworkspace
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -620,9 +621,9 @@ projects:
 			}
 
 			// We run a test for each type of command.
-			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
+			for _, cmd := range []command.Name{command.Plan, command.Apply} {
 				t.Run(cmd.String(), func(t *testing.T) {
-					ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+					ctxs, err := builder.buildProjectCommandCtx(&command.Context{
 						Log: logger,
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
@@ -643,9 +644,9 @@ projects:
 					// Construct expected steps.
 					var stepNames []string
 					switch cmd {
-					case models.PlanCommand:
+					case command.Plan:
 						stepNames = c.expPlanSteps
-					case models.ApplyCommand:
+					case command.Apply:
 						stepNames = c.expApplySteps
 					}
 					var expSteps []valid.Step
@@ -693,7 +694,7 @@ func TestBuildProjectCmdCtx_WithRegExpCmdEnabled(t *testing.T) {
 		globalCfg     string
 		repoCfg       string
 		expErr        string
-		expCtx        models.ProjectCommandContext
+		expCtx        command.ProjectContext
 		expPlanSteps  []string
 		expApplySteps []string
 	}{
@@ -740,7 +741,7 @@ projects:
     when_modified: [../modules/**/*.tf]
   terraform_version: v10.0
   `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -p myproject_1",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -815,9 +816,9 @@ projects:
 			}
 
 			// We run a test for each type of command, again specific projects
-			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
+			for _, cmd := range []command.Name{command.Plan, command.Apply} {
 				t.Run(cmd.String(), func(t *testing.T) {
-					ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+					ctxs, err := builder.buildProjectCommandCtx(&command.Context{
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
@@ -839,9 +840,9 @@ projects:
 					// Construct expected steps.
 					var stepNames []string
 					switch cmd {
-					case models.PlanCommand:
+					case command.Plan:
 						stepNames = c.expPlanSteps
-					case models.ApplyCommand:
+					case command.Apply:
 						stepNames = c.expApplySteps
 					}
 					var expSteps []valid.Step
@@ -890,7 +891,7 @@ func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
 		globalCfg           string
 		repoCfg             string
 		expErr              string
-		expCtx              models.ProjectCommandContext
+		expCtx              command.ProjectContext
 		expPolicyCheckSteps []string
 	}{
 		// Test that if we've set global defaults and no project config
@@ -901,7 +902,7 @@ repos:
 - id: /.*/
 `,
 			repoCfg: "",
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -958,7 +959,7 @@ workflows:
       steps:
       - policy_check
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -1040,9 +1041,9 @@ workflows:
 				AutoplanFileList: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			}
 
-			cmd := models.PolicyCheckCommand
+			cmd := command.PolicyCheck
 			t.Run(cmd.String(), func(t *testing.T) {
-				ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+				ctxs, err := builder.buildProjectCommandCtx(&command.Context{
 					Log: logger,
 					Pull: models.PullRequest{
 						BaseRepo: baseRepo,
@@ -1050,7 +1051,7 @@ workflows:
 					PullRequestStatus: models.PullReqStatus{
 						Mergeable: true,
 					},
-				}, models.PlanCommand, "", []string{"flag"}, tmp, "project1", "myworkspace", true, false)
+				}, command.Plan, "", []string{"flag"}, tmp, "project1", "myworkspace", true, false)
 
 				if c.expErr != "" {
 					ErrEquals(t, c.expErr, err)

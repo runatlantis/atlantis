@@ -2,13 +2,15 @@ package decorators_test
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/core/runtime"
-	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/decorators"
@@ -99,7 +101,7 @@ func TestRun_DestroyPlan(t *testing.T) {
 			stepRunner := decorators.DestroyPlanStepRunnerWrapper{
 				StepRunner: &planStepRunner,
 			}
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				Log:                logger,
 				Workspace:          "workspace",
 				RepoRelDir:         ".",

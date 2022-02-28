@@ -5,10 +5,10 @@ import (
 	"strconv"
 
 	"github.com/google/go-github/v31/github"
-	"github.com/uber-go/tally"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 )
 
 // NewInstrumentedGithubClient creates a client proxy responsible for gathering stats and logging
@@ -111,7 +111,6 @@ func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoO
 
 	return pull, err
 }
-
 
 func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.PullRequest) ([]*github.CheckRun, error) {
 	scope := c.StatsScope.SubScope("get_repo_checks")

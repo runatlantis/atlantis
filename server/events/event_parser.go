@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-github/v31/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
@@ -36,7 +37,7 @@ const usagesCols = 90
 // PullCommand is a command to run on a pull request.
 type PullCommand interface {
 	// CommandName is the name of the command we're running.
-	CommandName() models.CommandName
+	CommandName() command.Name
 	// IsVerbose is true if the output of this command should be verbose.
 	IsVerbose() bool
 	// IsAutoplan is true if this is an autoplan command vs. a comment command.
@@ -48,8 +49,8 @@ type PullCommand interface {
 type PolicyCheckCommand struct{}
 
 // CommandName is policy_check.
-func (c PolicyCheckCommand) CommandName() models.CommandName {
-	return models.PolicyCheckCommand
+func (c PolicyCheckCommand) CommandName() command.Name {
+	return command.PolicyCheck
 }
 
 // IsVerbose is false for policy_check commands.
@@ -67,8 +68,8 @@ func (c PolicyCheckCommand) IsAutoplan() bool {
 type AutoplanCommand struct{}
 
 // CommandName is plan.
-func (c AutoplanCommand) CommandName() models.CommandName {
-	return models.PlanCommand
+func (c AutoplanCommand) CommandName() command.Name {
+	return command.Plan
 }
 
 // IsVerbose is false for autoplan commands.
@@ -90,7 +91,7 @@ type CommentCommand struct {
 	// ex. atlantis plan -- -target=resource
 	Flags []string
 	// Name is the name of the command the comment specified.
-	Name models.CommandName
+	Name command.Name
 	// AutoMergeDisabled is true if the command should not automerge after apply.
 	AutoMergeDisabled bool
 	// Verbose is true if the command should output verbosely.
@@ -114,7 +115,7 @@ func (c CommentCommand) IsForSpecificProject() bool {
 }
 
 // CommandName returns the name of this command.
-func (c CommentCommand) CommandName() models.CommandName {
+func (c CommentCommand) CommandName() command.Name {
 	return c.Name
 }
 
@@ -134,7 +135,7 @@ func (c CommentCommand) String() string {
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name models.CommandName, verbose, forceApply, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, verbose, forceApply, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {

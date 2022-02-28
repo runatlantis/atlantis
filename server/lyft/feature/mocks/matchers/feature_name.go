@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
 	"reflect"
+
+	"github.com/petergtz/pegomock"
 
 	feature "github.com/runatlantis/atlantis/server/lyft/feature"
 )

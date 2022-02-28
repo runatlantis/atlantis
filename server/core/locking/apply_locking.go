@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_apply_lock_checker.go ApplyLockChecker
@@ -60,7 +60,7 @@ func (c *ApplyClient) LockApply() (ApplyCommandLock, error) {
 		return response, errors.New("DisableApplyFlag is set; Apply commands are locked globally until flag is unset")
 	}
 
-	applyCmdLock, err := c.backend.LockCommand(models.ApplyCommand, time.Now())
+	applyCmdLock, err := c.backend.LockCommand(command.Apply, time.Now())
 	if err != nil {
 		return response, err
 	}
@@ -80,7 +80,7 @@ func (c *ApplyClient) UnlockApply() error {
 		return errors.New("apply commands are disabled until DisableApply flag is unset")
 	}
 
-	err := c.backend.UnlockCommand(models.ApplyCommand)
+	err := c.backend.UnlockCommand(command.Apply)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (c *ApplyClient) CheckApplyLock() (ApplyCommandLock, error) {
 		}, nil
 	}
 
-	applyCmdLock, err := c.backend.CheckCommandLock(models.ApplyCommand)
+	applyCmdLock, err := c.backend.CheckCommandLock(command.Apply)
 	if err != nil {
 		return response, err
 	}

@@ -8,6 +8,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -16,9 +17,9 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func createTestProjectCmdContext(t *testing.T) models.ProjectCommandContext {
+func createTestProjectCmdContext(t *testing.T) command.ProjectContext {
 	logger := logging.NewNoopLogger(t)
-	return models.ProjectCommandContext{
+	return command.ProjectContext{
 		BaseRepo: models.Repo{
 			Name:  "test-repo",
 			Owner: "test-org",

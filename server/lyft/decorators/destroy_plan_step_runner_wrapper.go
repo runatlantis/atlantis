@@ -2,7 +2,7 @@ package decorators
 
 import (
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 const Deprecated = "deprecated"
@@ -12,7 +12,7 @@ type DestroyPlanStepRunnerWrapper struct {
 	events.StepRunner
 }
 
-func (d *DestroyPlanStepRunnerWrapper) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (d *DestroyPlanStepRunnerWrapper) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	// DestroyPlan tag is true when the Terraform client should construct a destroy plan given a repo config.
 	if ctx.Tags[Deprecated] == Destroy {
 		extraArgs = append(extraArgs, Destroy)

@@ -1,8 +1,9 @@
 package cache
 
 import (
-	"github.com/hashicorp/go-version"
 	"os/exec"
+
+	"github.com/hashicorp/go-version"
 )
 
 func NewLocalBinaryCache(binaryName string) ExecutionVersionCache {

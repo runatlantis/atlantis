@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -35,7 +35,7 @@ type ProjectCmdOutputLine struct {
 
 type ProjectCommandOutputHandler interface {
 	// Send will enqueue the msg and wait for Handle() to receive the message.
-	Send(ctx models.ProjectCommandContext, msg string)
+	Send(ctx command.ProjectContext, msg string)
 
 	// Listens for msg from channel
 	Handle()
@@ -82,7 +82,7 @@ func NewAsyncProjectCommandOutputHandler(
 	}
 }
 
-func (p *AsyncProjectCommandOutputHandler) Send(ctx models.ProjectCommandContext, msg string) {
+func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg string) {
 	p.projectCmdOutput <- &ProjectCmdOutputLine{
 		JobID: ctx.JobID,
 		JobInfo: JobInfo{
@@ -191,7 +191,7 @@ func (p *AsyncProjectCommandOutputHandler) GetJobIdMapForPull(pullInfo PullInfo)
 // NoopProjectOutputHandler is a mock that doesn't do anything
 type NoopProjectOutputHandler struct{}
 
-func (p *NoopProjectOutputHandler) Send(ctx models.ProjectCommandContext, msg string) {
+func (p *NoopProjectOutputHandler) Send(ctx command.ProjectContext, msg string) {
 }
 
 func (p *NoopProjectOutputHandler) Handle() {

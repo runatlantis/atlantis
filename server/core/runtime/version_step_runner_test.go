@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -16,7 +17,7 @@ func TestRunVersionStep(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	workspace := "default"
 
-	context := models.ProjectCommandContext{
+	context := command.ProjectContext{
 		Log:                logger,
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,

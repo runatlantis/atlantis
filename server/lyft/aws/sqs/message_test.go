@@ -2,6 +2,9 @@ package sqs_test
 
 import (
 	"bytes"
+	"net/http"
+	"net/url"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	. "github.com/petergtz/pegomock"
@@ -11,8 +14,6 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/uber-go/tally"
-	"net/http"
-	"net/url"
 
 	"testing"
 )

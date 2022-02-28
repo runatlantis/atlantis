@@ -4,11 +4,12 @@
 package mocks
 
 import (
-	go_version "github.com/hashicorp/go-version"
-	pegomock "github.com/petergtz/pegomock"
 	exec "os/exec"
 	"reflect"
 	"time"
+
+	go_version "github.com/hashicorp/go-version"
+	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockcommandBuilder struct {

@@ -2,11 +2,12 @@ package sqs
 
 import (
 	"context"
+	"sync"
+
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/uber-go/tally"
-	"sync"
 )
 
 const (

@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	feature "github.com/runatlantis/atlantis/server/lyft/feature"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	feature "github.com/runatlantis/atlantis/server/lyft/feature"
 )
 
 type MockAllocator struct {

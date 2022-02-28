@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	types "github.com/aws/aws-sdk-go-v2/service/sqs/types"
-	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 	"time"
+
+	types "github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockMessageProcessor struct {

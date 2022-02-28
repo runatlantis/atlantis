@@ -23,15 +23,16 @@ import (
 	_ "embed"
 
 	"github.com/Masterminds/sprig/v3"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 var (
-	planCommandTitle            = models.PlanCommand.TitleString()
-	applyCommandTitle           = models.ApplyCommand.TitleString()
-	policyCheckCommandTitle     = models.PolicyCheckCommand.TitleString()
-	approvePoliciesCommandTitle = models.ApprovePoliciesCommand.TitleString()
-	versionCommandTitle         = models.VersionCommand.TitleString()
+	planCommandTitle            = command.Plan.TitleString()
+	applyCommandTitle           = command.Apply.TitleString()
+	policyCheckCommandTitle     = command.PolicyCheck.TitleString()
+	approvePoliciesCommandTitle = command.ApprovePolicies.TitleString()
+	versionCommandTitle         = command.Version.TitleString()
 	// maxUnwrappedLines is the maximum number of lines the Terraform output
 	// can be before we wrap it in an expandable template.
 	maxUnwrappedLines = 12
@@ -102,7 +103,7 @@ type projectResultTmplData struct {
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res CommandResult, cmdName models.CommandName, log string, verbose bool, vcsHost models.VCSHostType, templateOverrides map[string]string) string {
+func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType, templateOverrides map[string]string) string {
 	commandStr := strings.Title(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{
 		Command:                  commandStr,
@@ -123,7 +124,7 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName models.CommandName,
 	return m.renderProjectResults(res.ProjectResults, common, vcsHost, templateOverrides)
 }
 
-func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, common commonData, vcsHost models.VCSHostType, templateOverrides map[string]string) string {
+func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult, common commonData, vcsHost models.VCSHostType, templateOverrides map[string]string) string {
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 	numPolicyCheckSuccesses := 0

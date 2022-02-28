@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 type SizeLimitedProjectCommandBuilder struct {
@@ -12,7 +12,7 @@ type SizeLimitedProjectCommandBuilder struct {
 	ProjectCommandBuilder
 }
 
-func (b *SizeLimitedProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
+func (b *SizeLimitedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
 	projects, err := b.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
 
 	if err != nil {
@@ -22,7 +22,7 @@ func (b *SizeLimitedProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandCon
 	return projects, b.CheckAgainstLimit(projects)
 }
 
-func (b *SizeLimitedProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (b *SizeLimitedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
 	projects, err := b.ProjectCommandBuilder.BuildPlanCommands(ctx, comment)
 
 	if err != nil {
@@ -32,13 +32,13 @@ func (b *SizeLimitedProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext
 	return projects, b.CheckAgainstLimit(projects)
 }
 
-func (b *SizeLimitedProjectCommandBuilder) CheckAgainstLimit(projects []models.ProjectCommandContext) error {
+func (b *SizeLimitedProjectCommandBuilder) CheckAgainstLimit(projects []command.ProjectContext) error {
 
-	var planCommands []models.ProjectCommandContext
+	var planCommands []command.ProjectContext
 
 	for _, project := range projects {
 
-		if project.CommandName == models.PlanCommand {
+		if project.CommandName == command.Plan {
 			planCommands = append(planCommands, project)
 		}
 	}

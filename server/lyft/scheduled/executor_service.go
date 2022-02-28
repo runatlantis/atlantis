@@ -2,12 +2,6 @@ package scheduled
 
 import (
 	"context"
-	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/metrics"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
 	"io"
 	"os"
 	"os/signal"
@@ -16,6 +10,13 @@ import (
 	"syscall"
 	"text/template"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/metrics"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 )
 
 type ExecutorService struct {

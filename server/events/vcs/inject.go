@@ -29,11 +29,11 @@ func newValidChecksFilters() []ValidChecksFilter {
 }
 
 func newSupplementalMergeabilityChecker(
-	statusFilters []ValidStatusFilter, 
+	statusFilters []ValidStatusFilter,
 	checksFilters []ValidChecksFilter,
 ) MergeabilityChecker {
 	return &SupplementalMergabilityChecker{
-		statusFilter: statusFilters,
+		statusFilter:  statusFilters,
 		checksFilters: checksFilters,
 	}
 }

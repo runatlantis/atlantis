@@ -3,8 +3,8 @@ package matchers
 
 import (
 	"reflect"
+
 	"github.com/petergtz/pegomock"
-	
 )
 
 func AnySliceOfByte() []byte {

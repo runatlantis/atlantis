@@ -8,10 +8,11 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	snsMocks "github.com/runatlantis/atlantis/server/lyft/aws/sns/mocks"
 	"github.com/runatlantis/atlantis/server/lyft/decorators"
@@ -50,7 +51,7 @@ func TestAuditProjectCommandsWrapper(t *testing.T) {
 				ProjectCommandRunner: projectCmdRunnerMock,
 			}
 
-			prjRslt := models.ProjectResult{}
+			prjRslt := command.ProjectResult{}
 
 			if c.Error {
 				prjRslt.Error = errors.New("oh-no")
@@ -64,7 +65,7 @@ func TestAuditProjectCommandsWrapper(t *testing.T) {
 
 			scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				Scope:       scope,
 				Log:         logger,
 				Steps:       []valid.Step{},

@@ -10,7 +10,7 @@ import (
 
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 
 	"github.com/runatlantis/atlantis/server/logging"
@@ -26,7 +26,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	echoCommand := exec.Command("sh", "-c", "echo hello")
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log: logger,
 	}
 
@@ -54,7 +54,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	workspace := "workspace"
 	logger := logging.NewNoopLogger(t)
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
@@ -101,7 +101,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
@@ -127,7 +127,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	echoCommand := exec.Command("sh", "-c", "echo dying && exit 1")
 	logger := logging.NewNoopLogger(t)
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
@@ -154,7 +154,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	echoCommand := exec.Command("sh", "-c", "read a && echo $a")
 	logger := logging.NewNoopLogger(t)
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()

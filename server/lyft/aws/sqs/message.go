@@ -3,10 +3,11 @@ package sqs
 import (
 	"bufio"
 	"bytes"
+	"net/http"
+
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/pkg/errors"
 	"github.com/uber-go/tally"
-	"net/http"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_sqs_message_handler.go MessageProcessor

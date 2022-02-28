@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
 	"reflect"
+
+	"github.com/petergtz/pegomock"
 
 	types "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )

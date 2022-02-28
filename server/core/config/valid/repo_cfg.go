@@ -154,7 +154,7 @@ func (r RepoCfg) ValidatePRWorkflows(workflows map[string]Workflow, allowedWorkf
 			return err
 		}
 	}
-  
+
 	if len(allowedWorkflows) == 0 {
 		return nil
 	}

@@ -6,6 +6,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -37,7 +38,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 		Projects: []models.ProjectStatus{},
 	}
 
-	commandCtx := &events.CommandContext{
+	commandCtx := &command.Context{
 		Log:        logging.NewNoopLogger(t),
 		PullStatus: pullStatus,
 	}
@@ -64,7 +65,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			Verbose:                   false,
 			ForceApply:                false,
 		}
-		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", contextFlags)
+		result := subject.BuildProjectContext(commandCtx, command.Plan, projCfg, []string{}, "some/dir", contextFlags)
 
 		assert.Equal(t, models.ErroredPolicyCheckStatus, result[0].ProjectPlanStatus)
 	})
@@ -92,7 +93,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			ForceApply:                false,
 		}
 
-		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", contextFlags)
+		result := subject.BuildProjectContext(commandCtx, command.Plan, projCfg, []string{}, "some/dir", contextFlags)
 
 		assert.Equal(t, models.ErroredPolicyCheckStatus, result[0].ProjectPlanStatus)
 	})
@@ -119,7 +120,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			Verbose:                   false,
 			ForceApply:                false,
 		}
-		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", contextFlags)
+		result := subject.BuildProjectContext(commandCtx, command.Plan, projCfg, []string{}, "some/dir", contextFlags)
 
 		assert.True(t, result[0].ParallelApplyEnabled)
 		assert.False(t, result[0].ParallelPlanEnabled)

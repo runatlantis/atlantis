@@ -25,6 +25,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	tmocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
@@ -82,7 +83,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	expEnvs := map[string]string{
 		"name": "value",
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{
@@ -133,7 +134,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 func TestProjectOutputWrapper(t *testing.T) {
 	RegisterMockTestingT(t)
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{
@@ -149,43 +150,43 @@ func TestProjectOutputWrapper(t *testing.T) {
 		Failure     bool
 		Error       bool
 		Success     bool
-		CommandName models.CommandName
+		CommandName command.Name
 	}{
 		{
 			Description: "plan success",
 			Success:     true,
-			CommandName: models.PlanCommand,
+			CommandName: command.Plan,
 		},
 		{
 			Description: "plan failure",
 			Failure:     true,
-			CommandName: models.PlanCommand,
+			CommandName: command.Plan,
 		},
 		{
 			Description: "plan error",
 			Error:       true,
-			CommandName: models.PlanCommand,
+			CommandName: command.Plan,
 		},
 		{
 			Description: "apply success",
 			Success:     true,
-			CommandName: models.ApplyCommand,
+			CommandName: command.Apply,
 		},
 		{
 			Description: "apply failure",
 			Failure:     true,
-			CommandName: models.ApplyCommand,
+			CommandName: command.Apply,
 		},
 		{
 			Description: "apply error",
 			Error:       true,
-			CommandName: models.ApplyCommand,
+			CommandName: command.Apply,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			var prjResult models.ProjectResult
+			var prjResult command.ProjectResult
 			var expCommitStatus models.CommitStatus
 
 			mockJobURLSetter := eventmocks.NewMockJobURLSetter()
@@ -199,18 +200,18 @@ func TestProjectOutputWrapper(t *testing.T) {
 			}
 
 			if c.Success {
-				prjResult = models.ProjectResult{
+				prjResult = command.ProjectResult{
 					PlanSuccess:  &models.PlanSuccess{},
 					ApplySuccess: "exists",
 				}
 				expCommitStatus = models.SuccessCommitStatus
 			} else if c.Failure {
-				prjResult = models.ProjectResult{
+				prjResult = command.ProjectResult{
 					Failure: "failure",
 				}
 				expCommitStatus = models.FailedCommitStatus
 			} else if c.Error {
-				prjResult = models.ProjectResult{
+				prjResult = command.ProjectResult{
 					Error: errors.New("error"),
 				}
 				expCommitStatus = models.FailedCommitStatus
@@ -220,9 +221,9 @@ func TestProjectOutputWrapper(t *testing.T) {
 			When(mockProjectCommandRunner.Apply(matchers.AnyModelsProjectCommandContext())).ThenReturn(prjResult)
 
 			switch c.CommandName {
-			case models.PlanCommand:
+			case command.Plan:
 				runner.Plan(ctx)
-			case models.ApplyCommand:
+			case command.Apply:
 				runner.Apply(ctx)
 			}
 
@@ -230,9 +231,9 @@ func TestProjectOutputWrapper(t *testing.T) {
 			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus)
 
 			switch c.CommandName {
-			case models.PlanCommand:
+			case command.Plan:
 				mockProjectCommandRunner.VerifyWasCalledOnce().Plan(ctx)
-			case models.ApplyCommand:
+			case command.Apply:
 				mockProjectCommandRunner.VerifyWasCalledOnce().Apply(ctx)
 			}
 		})
@@ -246,7 +247,7 @@ func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir: mockWorkingDir,
 	}
-	ctx := models.ProjectCommandContext{}
+	ctx := command.ProjectContext{}
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn("", os.ErrNotExist)
 
 	res := runner.Apply(ctx)
@@ -266,7 +267,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 		},
 		Webhooks: mockSender,
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		ApplyRequirements: []string{"approved"},
 		PullReqStatus: models.PullReqStatus{
 			ApprovalStatus: models.ApprovalStatus{
@@ -294,7 +295,7 @@ func TestDefaultProjectCommandRunner_ForceOverridesApplyReqs(t *testing.T) {
 		},
 		Webhooks: mockSender,
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		PullReqStatus: models.PullReqStatus{
 			ApprovalStatus: models.ApprovalStatus{
 				IsApproved: false,
@@ -326,7 +327,7 @@ func TestFeatureAwareProjectCommandRunner_ForceOverrideWhenEnabled(t *testing.T)
 	featureAwareRunner := &events.FeatureAwareProjectCommandRunner{
 		ProjectCommandRunner: runner,
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		ApplyRequirements: []string{"approved"},
 		ForceApply:        true,
 		PullReqStatus: models.PullReqStatus{
@@ -355,7 +356,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 			WorkingDir: mockWorkingDir,
 		},
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		PullReqStatus: models.PullReqStatus{
 			Mergeable: false,
 		},
@@ -380,7 +381,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 			WorkingDir: mockWorkingDir,
 		},
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		ApplyRequirements: []string{"undiverged"},
 	}
 	tmp, cleanup := TempDir(t)
@@ -506,7 +507,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				AnyString(),
 			)).ThenReturn(repoDir, nil)
 
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
 				Steps:             c.steps,
 				Workspace:         "default",
@@ -578,7 +579,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		AnyString(),
 	)).ThenReturn(repoDir, nil)
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{
@@ -647,7 +648,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		LockKey:      "lock-key",
 	}, nil)
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{

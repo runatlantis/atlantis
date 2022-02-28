@@ -22,6 +22,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 	bolt "go.etcd.io/bbolt"
@@ -48,7 +49,7 @@ func TestLockCommandNotSet(t *testing.T) {
 	t.Log("retrieving apply lock when there are none should return empty LockCommand")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	exists, err := b.CheckCommandLock(models.ApplyCommand)
+	exists, err := b.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Assert(t, exists == nil, "exp nil")
 }
@@ -58,10 +59,10 @@ func TestLockCommandEnabled(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 	timeNow := time.Now()
-	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	_, err := b.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	config, err := b.CheckCommandLock(models.ApplyCommand)
+	config, err := b.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Equals(t, true, config.IsLocked())
 }
@@ -71,10 +72,10 @@ func TestLockCommandFail(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 	timeNow := time.Now()
-	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	_, err := b.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	_, err = b.LockCommand(models.ApplyCommand, timeNow)
+	_, err = b.LockCommand(command.Apply, timeNow)
 	ErrEquals(t, "db transaction failed: lock already exists", err)
 }
 
@@ -83,17 +84,17 @@ func TestUnlockCommandDisabled(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 	timeNow := time.Now()
-	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	_, err := b.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	config, err := b.CheckCommandLock(models.ApplyCommand)
+	config, err := b.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Equals(t, true, config.IsLocked())
 
-	err = b.UnlockCommand(models.ApplyCommand)
+	err = b.UnlockCommand(command.Apply)
 	Ok(t, err)
 
-	config, err = b.CheckCommandLock(models.ApplyCommand)
+	config, err = b.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Assert(t, config == nil, "exp nil object")
 }
@@ -102,7 +103,7 @@ func TestUnlockCommandFail(t *testing.T) {
 	t.Log("setting the apply lock")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	err := b.UnlockCommand(models.ApplyCommand)
+	err := b.UnlockCommand(command.Apply)
 	ErrEquals(t, "db transaction failed: no lock exists", err)
 }
 
@@ -110,7 +111,7 @@ func TestMixedLocksPresent(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 	timeNow := time.Now()
-	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	_, err := b.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
 	_, _, err = b.TryLock(lock)
@@ -457,9 +458,9 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 	}
 	status, err := b.UpdatePullWithResults(
 		pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
-				Command:    models.PlanCommand,
+				Command:    command.Plan,
 				RepoRelDir: ".",
 				Workspace:  "default",
 				Failure:    "failure",
@@ -509,7 +510,7 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 	}
 	_, err := b.UpdatePullWithResults(
 		pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
@@ -555,7 +556,7 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 	}
 	_, err := b.UpdatePullWithResults(
 		pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
@@ -620,7 +621,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 	}
 	initialStatus, err := b.UpdatePullWithResults(
 		pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
@@ -634,7 +635,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 
 	pull.HeadCommit = "newsha"
 	status, err := b.UpdatePullWithResults(pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
 				RepoRelDir:   ".",
 				Workspace:    "staging",
@@ -687,22 +688,22 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 	}
 	initialStatus, err := b.UpdatePullWithResults(
 		pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
-				Command:    models.PlanCommand,
+				Command:    command.Plan,
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
 				Failure:    "failure",
 			},
 			{
-				Command:     models.PlanCommand,
+				Command:     command.Plan,
 				RepoRelDir:  "projectname",
 				Workspace:   "default",
 				ProjectName: "projectname",
 				Failure:     "failure",
 			},
 			{
-				Command:    models.PlanCommand,
+				Command:    command.Plan,
 				RepoRelDir: "staythesame",
 				Workspace:  "default",
 				PlanSuccess: &models.PlanSuccess{
@@ -719,22 +720,22 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	updateStatus, err := b.UpdatePullWithResults(pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
-				Command:      models.ApplyCommand,
+				Command:      command.Apply,
 				RepoRelDir:   "mergeme",
 				Workspace:    "default",
 				ApplySuccess: "applied!",
 			},
 			{
-				Command:     models.ApplyCommand,
+				Command:     command.Apply,
 				RepoRelDir:  "projectname",
 				Workspace:   "default",
 				ProjectName: "projectname",
 				Error:       errors.New("apply error"),
 			},
 			{
-				Command:      models.ApplyCommand,
+				Command:      command.Apply,
 				RepoRelDir:   "newresult",
 				Workspace:    "default",
 				ApplySuccess: "success!",

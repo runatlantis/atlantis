@@ -8,7 +8,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
@@ -26,14 +26,14 @@ type AsyncClient struct {
 // Callers can use the input channel to pass stdin input to the command.
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
-func (c *AsyncClient) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) <-chan Line {
+func (c *AsyncClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) <-chan Line {
 
 	input := make(chan string)
 	defer close(input)
 
 	return c.RunCommandAsyncWithInput(ctx, path, args, customEnvVars, v, workspace, input)
 }
-func (c *AsyncClient) RunCommandAsyncWithInput(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string, input <-chan string) <-chan Line {
+func (c *AsyncClient) RunCommandAsyncWithInput(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string, input <-chan string) <-chan Line {
 	outCh := make(chan Line)
 
 	// We start a goroutine to do our work asynchronously and then immediately

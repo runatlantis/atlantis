@@ -1,13 +1,15 @@
 package events_test
 
 import (
+	"testing"
+	"time"
+
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/uber-go/tally"
-	"testing"
-	"time"
 )
 
 func TestStaleCommandHandler_CommandIsStale(t *testing.T) {
@@ -40,7 +42,7 @@ func TestStaleCommandHandler_CommandIsStale(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
-			ctx := &events.CommandContext{
+			ctx := &command.Context{
 				TriggerTimestamp: c.CommandTimestamp,
 				PullStatus:       &c.PullStatus,
 			}
@@ -60,7 +62,7 @@ func TestStaleCommandHandler_CommandIsStale_NilPullModel(t *testing.T) {
 	staleCommandHandler := &events.StaleCommandHandler{
 		StaleStatsScope: testScope,
 	}
-	Assert(t, staleCommandHandler.CommandIsStale(&events.CommandContext{}) == false,
+	Assert(t, staleCommandHandler.CommandIsStale(&command.Context{}) == false,
 		"CommandIsStale returned value should be false")
 	Assert(t, len(testScope.Snapshot().Counters()) == 0, "no counters should have started")
 }

@@ -5,8 +5,8 @@ import (
 
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
-	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -15,24 +15,24 @@ func TestSizeLimitedProjectCommandBuilder_autoplan(t *testing.T) {
 
 	delegate := mocks.NewMockProjectCommandBuilder()
 
-	ctx := &events.CommandContext{}
+	ctx := &command.Context{}
 
-	project1 := models.ProjectCommandContext{
+	project1 := command.ProjectContext{
 		ProjectName: "test1",
-		CommandName: models.PlanCommand,
+		CommandName: command.Plan,
 	}
 
-	project2 := models.ProjectCommandContext{
+	project2 := command.ProjectContext{
 		ProjectName: "test2",
-		CommandName: models.PlanCommand,
+		CommandName: command.Plan,
 	}
 
-	project3 := models.ProjectCommandContext{
+	project3 := command.ProjectContext{
 		ProjectName: "test1",
-		CommandName: models.PolicyCheckCommand,
+		CommandName: command.PolicyCheck,
 	}
 
-	expectedResult := []models.ProjectCommandContext{project1, project2}
+	expectedResult := []command.ProjectContext{project1, project2}
 
 	t.Run("Limit Defined and Breached", func(t *testing.T) {
 		subject := &events.SizeLimitedProjectCommandBuilder{
@@ -87,7 +87,7 @@ Please break this pull request into smaller batches and try again.`, err)
 			ProjectCommandBuilder: delegate,
 		}
 
-		resultWithPolicyCheckCommand := []models.ProjectCommandContext{project1, project2, project3}
+		resultWithPolicyCheckCommand := []command.ProjectContext{project1, project2, project3}
 
 		When(delegate.BuildAutoplanCommands(ctx)).ThenReturn(resultWithPolicyCheckCommand, nil)
 
@@ -104,21 +104,21 @@ func TestSizeLimitedProjectCommandBuilder_planComment(t *testing.T) {
 
 	delegate := mocks.NewMockProjectCommandBuilder()
 
-	ctx := &events.CommandContext{}
+	ctx := &command.Context{}
 
 	comment := &events.CommentCommand{}
 
-	project1 := models.ProjectCommandContext{
+	project1 := command.ProjectContext{
 		ProjectName: "test1",
-		CommandName: models.PlanCommand,
+		CommandName: command.Plan,
 	}
 
-	project2 := models.ProjectCommandContext{
+	project2 := command.ProjectContext{
 		ProjectName: "test2",
-		CommandName: models.PlanCommand,
+		CommandName: command.Plan,
 	}
 
-	expectedResult := []models.ProjectCommandContext{project1, project2}
+	expectedResult := []command.ProjectContext{project1, project2}
 
 	t.Run("Limit Defined and Breached", func(t *testing.T) {
 		subject := &events.SizeLimitedProjectCommandBuilder{
