@@ -96,7 +96,7 @@ module.exports = {
                     ]
                 },
                 {
-                    title: 'Streaming Atlantis logs',
+                    title: 'Real-time Terraform Logs',
                     collapsable: true,
                     children: [
                         'streaming-logs'
