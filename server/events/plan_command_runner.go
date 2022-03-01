@@ -231,7 +231,7 @@ func (p *PlanCommandRunner) runProjectCmds(ctx *CommandContext, projectCmds []mo
 		if groupResult.HasPendingDependencies() {
 			for _, pendingGroup := range groups[i:] {
 				for _, cmd := range pendingGroup {
-					err := p.workingDir.DeleteForWorkspace(ctx.HeadRepo, ctx.PullStatus.Pull, cmd.Workspace)
+					err := p.workingDir.DeleteForWorkspace(ctx.HeadRepo, ctx.Pull, cmd.Workspace)
 					if err != nil {
 						ctx.Log.Err("error deleting plan for project with pending dependencies: %w", err)
 					}
