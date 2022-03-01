@@ -743,11 +743,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StaleCommandChecker:           staleCommandChecker,
 	}
 
-	featureAwareCommandRunner := &events.FeatureAwareCommandRunner{
-		CommandRunner:    commandRunner,
-		FeatureAllocator: featureAllocator,
-		VCSClient:        vcsClient,
-		Logger:           logger,
+	forceApplyCommandRunner := &events.ForceApplyCommandRunner{
+		CommandRunner: commandRunner,
+		VCSClient:     vcsClient,
+		Logger:        logger,
 	}
 
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
@@ -792,7 +791,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
-		CommandRunner:                   featureAwareCommandRunner,
+		CommandRunner:                   forceApplyCommandRunner,
 		PullCleaner:                     pullClosedExecutor,
 		Parser:                          eventParser,
 		CommentParser:                   commentParser,
