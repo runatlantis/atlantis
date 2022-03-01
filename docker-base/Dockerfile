@@ -17,14 +17,19 @@ RUN addgroup atlantis && \
     chmod g=u /home/atlantis/ && \
     chmod g=u /etc/passwd
 
-# Install dumb-init and gosu.
+# Install dumb-init, gosu and git-lfs.
 ENV DUMB_INIT_VERSION=1.2.5
-ENV GOSU_VERSION=1.12
-RUN apk add --no-cache ca-certificates gnupg curl git git-lfs unzip bash openssh libcap openssl && \
+ENV GOSU_VERSION=1.14
+ENV GIT_LFS_VERSION=3.1.2
+RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap openssl && \
     curl -L -s --output /bin/dumb-init "https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_x86_64" && \
     chmod +x /bin/dumb-init && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
+    curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-amd64-v${GIT_LFS_VERSION}.tar.gz" && \
+    tar -xf git-lfs.tar.gz && \
+    chmod +x git-lfs && \
+    mv git-lfs /usr/bin/git-lfs && \
     curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" && \
     curl -L -s --output gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64.asc" && \
     for server in $(shuf -e ipv4.pool.sks-keyservers.net \
