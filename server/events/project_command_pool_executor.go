@@ -4,17 +4,17 @@ import (
 	"sync"
 
 	"github.com/remeh/sizedwaitgroup"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
-type prjCmdRunnerFunc func(ctx models.ProjectCommandContext) models.ProjectResult
+type prjCmdRunnerFunc func(ctx command.ProjectContext) command.ProjectResult
 
 func runProjectCmdsParallel(
-	cmds []models.ProjectCommandContext,
+	cmds []command.ProjectContext,
 	runnerFunc prjCmdRunnerFunc,
 	poolSize int,
-) CommandResult {
-	var results []models.ProjectResult
+) command.Result {
+	var results []command.ProjectResult
 	mux := &sync.Mutex{}
 
 	wg := sizedwaitgroup.New(poolSize)
@@ -35,18 +35,18 @@ func runProjectCmdsParallel(
 	}
 
 	wg.Wait()
-	return CommandResult{ProjectResults: results}
+	return command.Result{ProjectResults: results}
 }
 
 func runProjectCmds(
-	cmds []models.ProjectCommandContext,
+	cmds []command.ProjectContext,
 	runnerFunc prjCmdRunnerFunc,
-) CommandResult {
-	var results []models.ProjectResult
+) command.Result {
+	var results []command.ProjectResult
 	for _, pCmd := range cmds {
 		res := runnerFunc(pCmd)
 
 		results = append(results, res)
 	}
-	return CommandResult{ProjectResults: results}
+	return command.Result{ProjectResults: results}
 }

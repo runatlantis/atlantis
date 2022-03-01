@@ -52,6 +52,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
@@ -651,12 +652,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 	)
 
-	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
-		models.PlanCommand:            planCommandRunner,
-		models.ApplyCommand:           applyCommandRunner,
-		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
-		models.UnlockCommand:          unlockCommandRunner,
-		models.VersionCommand:         versionCommandRunner,
+	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
+		command.Plan:            planCommandRunner,
+		command.Apply:           applyCommandRunner,
+		command.ApprovePolicies: approvePoliciesCommandRunner,
+		command.Unlock:          unlockCommandRunner,
+		command.Version:         versionCommandRunner,
 	}
 
 	githubTeamAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
