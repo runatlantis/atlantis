@@ -391,7 +391,7 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
 
   <body>
     <section class="header">
-    <a title="atlantis" href="/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
     <p class="title-heading"><strong></strong></p>
     </section>
@@ -461,7 +461,7 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
   <body>
     <div class="container">
       <section class="header">
-      <a title="atlantis" href="/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
+      <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
       <p class="title-heading">atlantis</p>
       <p class="title-heading"><strong></strong></p>
       </section>
@@ -561,7 +561,7 @@ var GithubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").
 <body>
 <div class="container">
   <section class="header">
-    <a title="atlantis" href="/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
 
     <p class="js-discard-success"><strong>
