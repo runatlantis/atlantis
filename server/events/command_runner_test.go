@@ -265,7 +265,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 		When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 
-		ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.PlanCommand})
+		ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Plan})
 		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(fixtures.GithubRepo, fixtures.User)
 		vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Ran Plan for 0 projects:\n\n\n\n", "plan")
 	})
@@ -282,7 +282,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 		When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 
-		ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.PlanCommand})
+		ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Plan})
 		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(fixtures.GithubRepo, fixtures.User)
 		vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Ran Plan for 0 projects:\n\n\n\n", "plan")
 	})

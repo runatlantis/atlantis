@@ -128,7 +128,7 @@ type JobURLSetter interface {
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
 
 type JobMessageSender interface {
-	Send(ctx models.ProjectCommandContext, msg string, operationComplete bool)
+	Send(ctx command.ProjectContext, msg string, operationComplete bool)
 }
 
 // ProjectOutputWrapper is a decorator that creates a new PR status check per project.

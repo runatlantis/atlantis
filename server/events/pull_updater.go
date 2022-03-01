@@ -4,7 +4,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
->>>>>>> d10ec3fd (Moved CommandContext and CommandResult to models (#193))
 
 type PullUpdater struct {
 	HidePrevPlanComments bool

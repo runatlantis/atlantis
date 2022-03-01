@@ -60,7 +60,7 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull model
 	return d.Client.UpdateStatus(repo, pull, status, src, descrip, "")
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName models.CommandName, numSuccess int, numTotal int) error {
+func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
 	src := fmt.Sprintf("%s/%s", d.StatusName, cmdName.String())
 	cmdVerb := "unknown"
 
