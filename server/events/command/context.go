@@ -6,12 +6,12 @@ import (
 	"github.com/uber-go/tally"
 )
 
-// CommandTrigger represents the how the command was triggered
-type CommandTrigger int
+// Trigger represents the how the command was triggered
+type Trigger int
 
 const (
 	// Commands that are automatically triggered (ie. automatic plans)
-	AutoTrigger CommandTrigger = iota
+	AutoTrigger Trigger = iota
 
 	// Commands that are triggered by comments (ie. atlantis plan)
 	CommentTrigger
@@ -36,5 +36,5 @@ type Context struct {
 
 	PullStatus *models.PullStatus
 
-	Trigger CommandTrigger
+	Trigger Trigger
 }

@@ -62,7 +62,7 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 `
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-	ctx := comment.ProjectContext{
+	ctx := command.ProjectContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
 		RepoRelDir: ".",
@@ -99,7 +99,7 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-	ctx := comment.ProjectContext{
+	ctx := command.ProjectContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
 		RepoRelDir: ".",
@@ -204,7 +204,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-	ctx := comment.ProjectContext{
+	ctx := command.ProjectContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
 		RepoRelDir: ".",
@@ -257,7 +257,7 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 	RegisterMockTestingT(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-	ctx := comment.ProjectContext{
+	ctx := command.ProjectContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
 		RepoRelDir: ".",
