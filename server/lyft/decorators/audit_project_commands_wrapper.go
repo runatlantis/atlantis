@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -39,12 +38,12 @@ type AuditProjectCommandWrapper struct {
 }
 
 func (p *AuditProjectCommandWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
-	id := uuid.New()
+	id := ctx.JobID
 	startTime := strconv.FormatInt(time.Now().Unix(), 10)
 
 	atlantisJobEvent := &AtlantisJobEvent{
 		Version:        1,
-		ID:             id.String(),
+		ID:             id,
 		RootName:       ctx.ProjectName,
 		JobType:        AtlantisApplyJob,
 		Repository:     ctx.BaseRepo.FullName,
