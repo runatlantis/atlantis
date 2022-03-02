@@ -26,14 +26,20 @@ ENV GIT_LFS_VERSION=3.1.2
 RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap && \
     # Install packages needed for building dependencies.
     apk add --no-cache --virtual .build-deps gnupg openssl && \
-    curl -L -s --output /bin/dumb-init "https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_x86_64" && \
-    chmod +x /bin/dumb-init && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
+
+    # dumb-init
+    curl -L -s --output /bin/dumb-init "https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_x86_64" && \
+    chmod +x /bin/dumb-init && \
+
+    # git-lfs
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-amd64-v${GIT_LFS_VERSION}.tar.gz" && \
     tar -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
+
+    # gosu
     curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" && \
     curl -L -s --output gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64.asc" && \
     for server in $(shuf -e ipv4.pool.sks-keyservers.net \
@@ -46,6 +52,8 @@ RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap && \
     gpg --batch --verify gosu.asc gosu && \
     chmod +x gosu && \
     cp gosu /bin && \
+
+    # Cleanup
     cd /tmp && \
     rm -rf /tmp/build && \
     gpgconf --kill dirmngr && \
