@@ -21,7 +21,11 @@ RUN addgroup atlantis && \
 ENV DUMB_INIT_VERSION=1.2.5
 ENV GOSU_VERSION=1.14
 ENV GIT_LFS_VERSION=3.1.2
-RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap openssl && \
+
+# Install packages needed for running Atlantis.
+RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap && \
+    # Install packages needed for building dependencies.
+    apk add --no-cache --virtual .build-deps gnupg openssl && \
     curl -L -s --output /bin/dumb-init "https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_x86_64" && \
     chmod +x /bin/dumb-init && \
     mkdir -p /tmp/build && \
@@ -46,7 +50,7 @@ RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap 
     rm -rf /tmp/build && \
     gpgconf --kill dirmngr && \
     gpgconf --kill gpg-agent && \
-    apk del gnupg openssl && \
+    apk del .build-deps && \
     rm -rf /root/.gnupg && \
     rm -rf /var/cache/apk/*
 
