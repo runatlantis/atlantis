@@ -5,7 +5,10 @@ Maintenance release for security patches with atlantis-base image
 ## What's Changed
 
 * fix(web-templates): use CleanedBasePath for titles by @jvrplmlmn in https://github.com/runatlantis/atlantis/pull/2091
-* build(deps): bump atlantis-base image for CVE patches in https://github.com/runatlantis/atlantis/pull/2088
+* build(deps): bump runatlantis/atlantis-base from 2021.12.15 to 2022.03.02
+* docker: bump git-lfs and gosu dependencies by @hi-artem in https://github.com/runatlantis/atlantis/pull/2096
+* fix(docker): fix base image for multi-platform build by @Tenzer in https://github.com/runatlantis/atlantis/pull/2099
+* fix(docker): fix installation of git-lfs in armv7 image by @Tenzer in https://github.com/runatlantis/atlantis/pull/2100
 
 # v0.18.3
 
