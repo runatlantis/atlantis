@@ -1,9 +1,12 @@
 # Stage 1: build artifact
-FROM golang:1.17-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.17-alpine AS builder
 
 WORKDIR /app
 COPY . /app
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
+
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w" -v -o atlantis .
 
 # Stage 2
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
