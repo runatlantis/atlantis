@@ -17,22 +17,16 @@ RUN addgroup atlantis && \
     chmod g=u /home/atlantis/ && \
     chmod g=u /etc/passwd
 
-# Install dumb-init, gosu and git-lfs.
-ENV DUMB_INIT_VERSION=1.2.5
+# Install gosu and git-lfs.
 ENV GOSU_VERSION=1.14
 ENV GIT_LFS_VERSION=3.1.2
 
 # Install packages needed for running Atlantis.
-RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap && \
+RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap dumb-init && \
     # Install packages needed for building dependencies.
     apk add --no-cache --virtual .build-deps gnupg openssl && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
-
-    # dumb-init
-    curl -L -s --output /bin/dumb-init "https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_x86_64" && \
-    chmod +x /bin/dumb-init && \
-    dumb-init --version && \
 
     # git-lfs
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-amd64-v${GIT_LFS_VERSION}.tar.gz" && \
