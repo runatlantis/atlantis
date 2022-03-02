@@ -16,7 +16,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # Stage 2
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM --platform=$BUILDPLATFORM ghcr.io/runatlantis/atlantis-base:2022.03.02 AS base
+FROM --platform=$BUILDPLATFORM ghcr.io/runatlantis/atlantis-base:dev AS base
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM
