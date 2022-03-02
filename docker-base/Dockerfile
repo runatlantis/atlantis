@@ -51,8 +51,7 @@ RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap && \
     gpgconf --kill dirmngr && \
     gpgconf --kill gpg-agent && \
     apk del .build-deps && \
-    rm -rf /root/.gnupg && \
-    rm -rf /var/cache/apk/*
+    rm -rf /root/.gnupg
 
 # Set up nsswitch.conf for Go's "netgo" implementation
 # - https://github.com/golang/go/blob/go1.9.1/src/net/conf.go#L194-L275
