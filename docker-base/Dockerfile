@@ -17,31 +17,18 @@ RUN addgroup atlantis && \
     chmod g=u /home/atlantis/ && \
     chmod g=u /etc/passwd
 
-# Install gosu and git-lfs.
+# Install gosu.
 ENV GOSU_VERSION=1.14
-ENV GIT_LFS_VERSION=3.1.2
 
 # Automatically populated with the architecture the image is being built for.
 ARG TARGETPLATFORM
 
 # Install packages needed for running Atlantis.
-RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap dumb-init && \
+RUN apk add --no-cache ca-certificates curl git git-lfs unzip bash openssh libcap dumb-init && \
     # Install packages needed for building dependencies.
     apk add --no-cache --virtual .build-deps gnupg openssl && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
-
-    # git-lfs
-    case ${TARGETPLATFORM} in \
-        "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
-        "linux/arm64") GIT_LFS_ARCH=arm64 ;; \
-        "linux/arm/v7") GIT_LFS_ARCH=arm ;; \
-    esac && \
-    curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
-    tar -xf git-lfs.tar.gz && \
-    chmod +x git-lfs && \
-    mv git-lfs /usr/bin/git-lfs && \
-    git-lfs --version && \
 
     # gosu
     case ${TARGETPLATFORM} in \
