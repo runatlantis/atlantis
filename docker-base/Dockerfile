@@ -32,12 +32,14 @@ RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap && \
     # dumb-init
     curl -L -s --output /bin/dumb-init "https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_x86_64" && \
     chmod +x /bin/dumb-init && \
+    dumb-init --version && \
 
     # git-lfs
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-amd64-v${GIT_LFS_VERSION}.tar.gz" && \
     tar -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
+    git-lfs --version && \
 
     # gosu
     curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" && \
@@ -52,6 +54,7 @@ RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap && \
     gpg --batch --verify gosu.asc gosu && \
     chmod +x gosu && \
     cp gosu /bin && \
+    gosu --version && \
 
     # Cleanup
     cd /tmp && \
