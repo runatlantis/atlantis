@@ -1,3 +1,12 @@
+# v0.18.4
+
+Maintenance release for security patches with atlantis-base image
+
+## What's Changed
+
+* fix(web-templates): use CleanedBasePath for titles by @jvrplmlmn in https://github.com/runatlantis/atlantis/pull/2091
+* build(deps): bump atlantis-base image for CVE patches in https://github.com/runatlantis/atlantis/pull/2088
+
 # v0.18.3
 
 ## What's Changed
