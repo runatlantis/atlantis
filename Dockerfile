@@ -9,19 +9,27 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
 FROM ghcr.io/runatlantis/atlantis-base:2022.03.02 AS base
 
+# Get the architecture the image is being built for
+ARG TARGETPLATFORM
+
 # install terraform binaries
 ENV DEFAULT_TERRAFORM_VERSION=1.1.6
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 1.0.11 ${DEFAULT_TERRAFORM_VERSION}" && \
+    case ${TARGETPLATFORM} in \
+        "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
+        "linux/arm64") TERRAFORM_ARCH=arm64 ;; \
+        "linux/arm/v7") TERRAFORM_ARCH=arm ;; \
+    esac && \
     for VERSION in ${AVAILABLE_TERRAFORM_VERSIONS}; do \
-        curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_amd64.zip && \
+        curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip && \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_SHA256SUMS && \
-        sed -n "/terraform_${VERSION}_linux_amd64.zip/p" terraform_${VERSION}_SHA256SUMS | sha256sum -c && \
+        sed -n "/terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip/p" terraform_${VERSION}_SHA256SUMS | sha256sum -c && \
         mkdir -p /usr/local/bin/tf/versions/${VERSION} && \
-        unzip terraform_${VERSION}_linux_amd64.zip -d /usr/local/bin/tf/versions/${VERSION} && \
+        unzip terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip -d /usr/local/bin/tf/versions/${VERSION} && \
         ln -s /usr/local/bin/tf/versions/${VERSION}/terraform /usr/local/bin/terraform${VERSION} && \
-        rm terraform_${VERSION}_linux_amd64.zip && \
+        rm terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip && \
         rm terraform_${VERSION}_SHA256SUMS; \
     done && \
     ln -s /usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform /usr/local/bin/terraform
