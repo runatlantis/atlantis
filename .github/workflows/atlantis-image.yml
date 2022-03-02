@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'master'
+      - 'fix-docker-image-issue'
     tags:
       - 'v*.*.*'
   workflow_dispatch:
