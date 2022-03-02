@@ -39,8 +39,13 @@ RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap dumb-i
     git-lfs --version && \
 
     # gosu
-    curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" && \
-    curl -L -s --output gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64.asc" && \
+    case ${TARGETPLATFORM} in \
+        "linux/amd64") GOSU_ARCH=amd64 ;; \
+        "linux/arm64") GOSU_ARCH=arm64 ;; \
+        "linux/arm/v7") GOSU_ARCH=armhf ;; \
+    esac && \
+    curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" && \
+    curl -L -s --output gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" && \
     for server in $(shuf -e ipv4.pool.sks-keyservers.net \
                             hkp://p80.pool.sks-keyservers.net:80 \
                             keyserver.ubuntu.com \
