@@ -13,7 +13,7 @@ FROM ghcr.io/runatlantis/atlantis-base:2022.03.02 AS base
 ENV DEFAULT_TERRAFORM_VERSION=1.1.6
 
 # In the official Atlantis image we only have the latest of each Terraform version.
-RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 1.0.11 ${DEFAULT_TERRAFORM_VERSION}" && \
+RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 1.0.11 ${DEFAULT_TERRAFORM_VERSION}" && \
     for VERSION in ${AVAILABLE_TERRAFORM_VERSIONS}; do \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_amd64.zip && \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_SHA256SUMS && \
