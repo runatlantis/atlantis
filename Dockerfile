@@ -6,7 +6,13 @@ COPY . /app
 
 ARG TARGETOS
 ARG TARGETARCH
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w" -v -o atlantis .
+RUN case ${TARGETPLATFORM} in \
+         "linux/amd64")  GOARCH=amd64  ;; \
+         "linux/arm64")  GOARCH=arm64  ;; \
+         "linux/arm/v7") GOARCH=arm GOARM=6  ;; \
+    esac && \
+    printf "Building atlantis for arch ${GOARCH}\n" && \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$GOARCH go build -trimpath -ldflags "-s -w" -v -o atlantis .
 
 # Stage 2
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.

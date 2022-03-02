@@ -44,7 +44,7 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         context: .
-        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        platforms: linux/arm64,linux/amd64,linux/arm/v7
         push: true
         tags: |
           ghcr.io/runatlantis/atlantis:dev
