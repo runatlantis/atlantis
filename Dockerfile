@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags 
 
 # Stage 2
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM ghcr.io/runatlantis/atlantis-base:2022.03.02 AS base
+FROM --platform=$BUILDPLATFORM ghcr.io/runatlantis/atlantis-base:2022.03.02 AS base
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM
