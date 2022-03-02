@@ -37,14 +37,20 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 1.0.11 $
 ENV DEFAULT_CONFTEST_VERSION=0.30.0
 
 RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
+    case ${TARGETPLATFORM} in \
+        "linux/amd64") CONFTEST_ARCH=x86_64 ;; \
+        "linux/arm64") CONFTEST_ARCH=arm64 ;; \
+        # There is currently no compiled version of conftest for armv7
+        "linux/arm/v7") CONFTEST_ARCH=x86_64 ;; \
+    esac && \
     for VERSION in ${AVAILABLE_CONFTEST_VERSIONS}; do \
-        curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_x86_64.tar.gz && \
+        curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz && \
         curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/checksums.txt && \
-        sed -n "/conftest_${VERSION}_Linux_x86_64.tar.gz/p" checksums.txt | sha256sum -c && \
+        sed -n "/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz/p" checksums.txt | sha256sum -c && \
         mkdir -p /usr/local/bin/cft/versions/${VERSION} && \
-        tar -C  /usr/local/bin/cft/versions/${VERSION} -xzf conftest_${VERSION}_Linux_x86_64.tar.gz && \
+        tar -C /usr/local/bin/cft/versions/${VERSION} -xzf conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz && \
         ln -s /usr/local/bin/cft/versions/${VERSION}/conftest /usr/local/bin/conftest${VERSION} && \
-        rm conftest_${VERSION}_Linux_x86_64.tar.gz && \
+        rm conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz && \
         rm checksums.txt; \
     done
 
