@@ -1,6 +1,5 @@
 # Real-time logs
 
-## Getting Started
 Atlantis supports streaming terraform logs in real time by default. Currently, only two commands are supported
 
 * terraform init
