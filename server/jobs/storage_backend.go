@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/graymeta/stow"
@@ -29,7 +30,47 @@ type storageBackend struct {
 }
 
 func (s *storageBackend) Read(key string) ([]string, error) {
-	return []string{}, nil
+	logs := []string{}
+	readContainerFn := func(item stow.Item, err error) error {
+		if err != nil {
+			return errors.Wrapf(err, "reading item: %s at location: %s", item.Name(), s.location)
+		}
+
+		// Skip if not right item
+		if item.Name() != key {
+			return nil
+		}
+
+		r, err := item.Open()
+		if err != nil {
+			return errors.Wrapf(err, "building reader for item: %s at location: %s", item.Name(), s.location)
+		}
+
+		buf := new(strings.Builder)
+		_, err = io.Copy(buf, r)
+		if err != nil {
+			return errors.Wrapf(err, "building buffer for item: %s at location: %s", item.Name(), s.location)
+		}
+
+		logs = strings.Split(buf.String(), "\n")
+		return nil
+	}
+
+	readLocationFn := func(container stow.Container, err error) error {
+		if err != nil {
+			return errors.Wrapf(err, "reading containers at location: %s", s.location)
+		}
+
+		// Skip if not right container
+		if container.Name() != s.containerName {
+			return nil
+		}
+
+		return stow.Walk(container, key, PageSize, readContainerFn)
+	}
+
+	err := stow.WalkContainers(s.location, s.containerName, PageSize, readLocationFn)
+	return logs, err
 }
 
 func (s *storageBackend) Write(key string, logs []string) (bool, error) {
