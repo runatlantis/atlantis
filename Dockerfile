@@ -7,7 +7,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
 
 # Stage 2
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM ghcr.io/runatlantis/atlantis-base:2022.03.02 AS base
+FROM ghcr.io/runatlantis/atlantis-base:2022.03.03 AS base
 
 # install terraform binaries
 ENV DEFAULT_TERRAFORM_VERSION=1.1.6
