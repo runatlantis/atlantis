@@ -7,6 +7,7 @@ on:
       - '.github/workflows/atlantis-base.yml'
     branches:
       - "master"
+      - "fix-docker-image-issue-take2"
   workflow_dispatch:
 
 defaults:
@@ -38,14 +39,13 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-    - run: echo "TODAY=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
+    # - run: echo "TODAY=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
 
-    - name: Build and push atlantis-base:${{env.TODAY}} image
+    - name: Build and push atlantis-base:dev image
       uses: docker/build-push-action@v2
       with:
         context: docker-base
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
-          ghcr.io/runatlantis/atlantis-base:${{env.TODAY}}
-          ghcr.io/runatlantis/atlantis-base:latest
+          ghcr.io/runatlantis/atlantis-base:dev
