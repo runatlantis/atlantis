@@ -1,7 +1,7 @@
 # v0.18.5
 
 Maintenance release:
-- Drop Dockerhub support
+- Drop Dockerhub support (#2103)
 - fixing the most recent multiplatform image build issue. (#2104)
 
 ## What's Changed
