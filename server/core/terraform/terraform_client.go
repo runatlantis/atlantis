@@ -249,15 +249,9 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 
 // See Client.RunCommandWithVersion.
 func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
-	shouldAllocate, err := c.featureAllocator.ShouldAllocate(feature.LogStreaming, ctx.BaseRepo.FullName)
-
-	if err != nil {
-		ctx.Log.Err("unable to allocate for feature: %s, error: %s", feature.LogStreaming, err)
-	}
-
 	// if the feature is enabled, we use the async workflow else we default to the original sync workflow
 	// Don't stream terraform show output to outCh
-	if shouldAllocate && isAsyncEligibleCommand(args[0]) {
+	if len(args) > 0 && isAsyncEligibleCommand(args[0]) {
 		outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
 
 		var lines []string

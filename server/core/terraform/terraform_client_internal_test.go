@@ -14,7 +14,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/lyft/feature"
 	fmocks "github.com/runatlantis/atlantis/server/lyft/feature/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -50,7 +49,6 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion(t *testing.T) {
 		AsyncClient:      asyncClient,
 		featureAllocator: allocator,
 	}
-	When(allocator.ShouldAllocate(feature.LogStreaming, "owner/repo")).ThenReturn(false, nil)
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(echoCommand, nil)
 
 	customEnvVars := map[string]string{}
@@ -126,7 +124,6 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion_Error(t *testing.T) {
 		featureAllocator: allocator,
 	}
 
-	When(allocator.ShouldAllocate(feature.LogStreaming, "owner/repo")).ThenReturn(false, nil)
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(echoCommand, nil)
 	out, err := client.RunCommandWithVersion(ctx, path, args, map[string]string{}, nil, workspace)
 	ErrEquals(t, fmt.Sprintf(`running "/bin/sh -c echo dying && exit 1" in %q: exit status 1`, path), err)
