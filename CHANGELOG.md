@@ -1,3 +1,15 @@
+# v0.18.5
+
+Maintenance release:
+- Drop Dockerhub support (#2103)
+- fixing the most recent multiplatform image build issue. (#2104)
+
+## What's Changed
+
+* ci: drop circleci docker hub update by @chenrui333 in https://github.com/runatlantis/atlantis/pull/2102
+* fix(docker): fix docker runtime issue by @chenrui333 in https://github.com/runatlantis/atlantis/pull/2106
+* deps: tf 1.1.7 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/2108
+
 # v0.18.4
 
 Maintenance release for security patches with atlantis-base image
