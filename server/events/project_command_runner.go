@@ -130,7 +130,7 @@ type JobURLSetter interface {
 
 // Job Closer closes a job by marking op complete and clearing up buffers if logs are successfully persisted
 type JobCloser interface {
-	CloseJob(jobID string)
+	CloseJob(jobID string, repo models.Repo)
 }
 
 // ProjectOutputWrapper is a decorator that creates a new PR status check per project.
@@ -143,13 +143,13 @@ type ProjectOutputWrapper struct {
 
 func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectResult {
 	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
-	p.JobCloser.CloseJob(ctx.JobID)
+	p.JobCloser.CloseJob(ctx.JobID, ctx.BaseRepo)
 	return result
 }
 
 func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
 	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
-	p.JobCloser.CloseJob(ctx.JobID)
+	p.JobCloser.CloseJob(ctx.JobID, ctx.BaseRepo)
 	return result
 }
 

@@ -4,10 +4,10 @@
 package mocks
 
 import (
+	pegomock "github.com/petergtz/pegomock"
+	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
-
-	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockJobCloser struct {
@@ -25,11 +25,11 @@ func NewMockJobCloser(options ...pegomock.Option) *MockJobCloser {
 func (mock *MockJobCloser) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockJobCloser) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockJobCloser) CloseJob(_param0 string) {
+func (mock *MockJobCloser) CloseJob(_param0 string, _param1 models.Repo) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockJobCloser().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{_param0, _param1}
 	pegomock.GetGenericMockFrom(mock).Invoke("CloseJob", params, []reflect.Type{})
 }
 
@@ -70,8 +70,8 @@ type VerifierMockJobCloser struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockJobCloser) CloseJob(_param0 string) *MockJobCloser_CloseJob_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockJobCloser) CloseJob(_param0 string, _param1 models.Repo) *MockJobCloser_CloseJob_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CloseJob", params, verifier.timeout)
 	return &MockJobCloser_CloseJob_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -81,17 +81,21 @@ type MockJobCloser_CloseJob_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockJobCloser_CloseJob_OngoingVerification) GetCapturedArguments() string {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+func (c *MockJobCloser_CloseJob_OngoingVerification) GetCapturedArguments() (string, models.Repo) {
+	_param0, _param1 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
-func (c *MockJobCloser_CloseJob_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+func (c *MockJobCloser_CloseJob_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.Repo) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
+		}
+		_param1 = make([]models.Repo, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.Repo)
 		}
 	}
 	return

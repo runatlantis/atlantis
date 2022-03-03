@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -48,7 +49,7 @@ type ProjectCommandOutputHandler interface {
 	CleanUp(pullInfo PullInfo)
 
 	// Persists job to storage backend and marks operation complete
-	CloseJob(jobID string)
+	CloseJob(jobID string, repo models.Repo)
 }
 
 // AsyncProjectCommandOutputHandler is a handler to transport terraform client
@@ -58,7 +59,7 @@ type AsyncProjectCommandOutputHandler struct {
 	projectCmdOutput chan *ProjectCmdOutputLine
 
 	// Storage for jobs
-	jobStore JobStore
+	JobStore JobStore
 
 	// Registry to track active connections for a job
 	receiverRegistry ReceiverRegistry
@@ -77,7 +78,7 @@ func NewAsyncProjectCommandOutputHandler(
 		projectCmdOutput: projectCmdOutput,
 		logger:           logger,
 		pullToJobMapping: sync.Map{},
-		jobStore:         jobStore,
+		JobStore:         jobStore,
 		receiverRegistry: NewReceiverRegistry(),
 	}
 }
@@ -119,13 +120,16 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 		}
 
 		// Append new log to the output buffer for the job
-		p.jobStore.AppendOutput(msg.JobID, msg.Line)
+		err := p.JobStore.AppendOutput(msg.JobID, msg.Line)
+		if err != nil {
+			p.logger.Warn("appending log: %s for job: %s", msg.Line, msg.JobID, err)
+		}
 	}
 }
 
 func (p *AsyncProjectCommandOutputHandler) Register(jobID string, connection chan string) {
-	job, err := p.jobStore.Get(jobID)
-	if err != nil {
+	job, err := p.JobStore.Get(jobID)
+	if err != nil || job == nil {
 		p.logger.Err(fmt.Sprintf("getting job: %s", jobID), err)
 		return
 	}
@@ -145,12 +149,12 @@ func (p *AsyncProjectCommandOutputHandler) Register(jobID string, connection cha
 	p.receiverRegistry.AddReceiver(jobID, connection)
 }
 
-func (p *AsyncProjectCommandOutputHandler) CloseJob(jobID string) {
+func (p *AsyncProjectCommandOutputHandler) CloseJob(jobID string, repo models.Repo) {
 	// Close active connections and remove receivers from registry
 	p.receiverRegistry.CloseAndRemoveReceiversForJob(jobID)
 
 	// Update job status and persist to storage if configured
-	if err := p.jobStore.SetJobCompleteStatus(jobID, Complete); err != nil {
+	if err := p.JobStore.SetJobCompleteStatus(jobID, repo.FullName, Complete); err != nil {
 		p.logger.Err("updating jobs status to complete", err)
 	}
 }
@@ -160,7 +164,7 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 		jobMapping := value.(map[string]bool)
 		for jobID := range jobMapping {
 			// Clear output buffer for the job
-			p.jobStore.RemoveJob(jobID)
+			p.JobStore.RemoveJob(jobID)
 
 			// Close connections and clear registry for the job
 			p.receiverRegistry.CloseAndRemoveReceiversForJob(jobID)
@@ -174,11 +178,6 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 // Helper methods for testing
 func (p *AsyncProjectCommandOutputHandler) GetReceiverBufferForPull(jobID string) map[chan string]bool {
 	return p.receiverRegistry.GetReceivers(jobID)
-}
-
-func (p *AsyncProjectCommandOutputHandler) GetJob(jobID string) Job {
-	job, _ := p.jobStore.Get(jobID)
-	return job
 }
 
 func (p *AsyncProjectCommandOutputHandler) GetJobIdMapForPull(pullInfo PullInfo) map[string]bool {
@@ -202,5 +201,5 @@ func (p *NoopProjectOutputHandler) Register(jobID string, receiver chan string) 
 func (p *NoopProjectOutputHandler) CleanUp(pullInfo PullInfo) {
 }
 
-func (p *NoopProjectOutputHandler) CloseJob(jobID string) {
+func (p *NoopProjectOutputHandler) CloseJob(jobID string, repo models.Repo) {
 }

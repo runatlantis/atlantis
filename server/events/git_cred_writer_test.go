@@ -19,6 +19,7 @@ func TestWriteGitCreds_WriteFile(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
+	logger := logging.NewNoopLogger(t)
 	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
@@ -39,6 +40,7 @@ func TestWriteGitCreds_Appends(t *testing.T) {
 	err := ioutil.WriteFile(credsFile, []byte("contents"), 0600)
 	Ok(t, err)
 
+	logger := logging.NewNoopLogger(t)
 	err = events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
@@ -59,6 +61,7 @@ func TestWriteGitCreds_NoModification(t *testing.T) {
 	err := ioutil.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
+	logger := logging.NewNoopLogger(t)
 	err = events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 	actContents, err := ioutil.ReadFile(filepath.Join(tmp, ".git-credentials"))
@@ -76,6 +79,7 @@ func TestWriteGitCreds_ReplaceApp(t *testing.T) {
 	err := ioutil.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
+	logger := logging.NewNoopLogger(t)
 	err = events.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
 	expContets := "line1\nhttps://x-access-token:token@github.com\nline2"
@@ -94,6 +98,7 @@ func TestWriteGitCreds_AppendApp(t *testing.T) {
 	err := ioutil.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
+	logger := logging.NewNoopLogger(t)
 	err = events.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
 	expContets := "https://x-access-token:token@github.com"
@@ -112,6 +117,7 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 	err := ioutil.WriteFile(credsFile, []byte("can't see me!"), 0000)
 	Ok(t, err)
 
+	logger := logging.NewNoopLogger(t)
 	expErr := fmt.Sprintf("open %s: permission denied", credsFile)
 	actErr := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	ErrContains(t, expErr, actErr)
@@ -130,6 +136,7 @@ func TestWriteGitCreds_ConfigureGitCredentialHelper(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
+	logger := logging.NewNoopLogger(t)
 	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
@@ -144,6 +151,7 @@ func TestWriteGitCreds_ConfigureGitUrlOverride(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
+	logger := logging.NewNoopLogger(t)
 	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 

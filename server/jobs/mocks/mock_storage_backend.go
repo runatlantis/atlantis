@@ -44,11 +44,11 @@ func (mock *MockStorageBackend) Read(_param0 string) ([]string, error) {
 	return ret0, ret1
 }
 
-func (mock *MockStorageBackend) Write(_param0 string, _param1 []string) (bool, error) {
+func (mock *MockStorageBackend) Write(_param0 string, _param1 []string, _param2 string) (bool, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockStorageBackend().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{_param0, _param1, _param2}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Write", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 bool
 	var ret1 error
@@ -127,8 +127,8 @@ func (c *MockStorageBackend_Read_OngoingVerification) GetAllCapturedArguments() 
 	return
 }
 
-func (verifier *VerifierMockStorageBackend) Write(_param0 string, _param1 []string) *MockStorageBackend_Write_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockStorageBackend) Write(_param0 string, _param1 []string, _param2 string) *MockStorageBackend_Write_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1, _param2}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Write", params, verifier.timeout)
 	return &MockStorageBackend_Write_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -138,12 +138,12 @@ type MockStorageBackend_Write_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockStorageBackend_Write_OngoingVerification) GetCapturedArguments() (string, []string) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+func (c *MockStorageBackend_Write_OngoingVerification) GetCapturedArguments() (string, []string, string) {
+	_param0, _param1, _param2 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
 }
 
-func (c *MockStorageBackend_Write_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]string) {
+func (c *MockStorageBackend_Write_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]string, _param2 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(c.methodInvocations))
@@ -153,6 +153,10 @@ func (c *MockStorageBackend_Write_OngoingVerification) GetAllCapturedArguments()
 		_param1 = make([][]string, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.([]string)
+		}
+		_param2 = make([]string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
 		}
 	}
 	return
