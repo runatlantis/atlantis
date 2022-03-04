@@ -62,7 +62,7 @@ func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.Proj
 		result = runProjectCmds(cmds, p.prjCmdRunner.PolicyCheck)
 	}
 
-	p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
+	p.pullUpdater.UpdatePull(ctx, PolicyCheckCommand{}, result)
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {

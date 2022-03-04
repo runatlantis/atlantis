@@ -8,26 +8,26 @@ import (
 	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
-func AnyModelsUser() models.User {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(models.User))(nil)).Elem()))
-	var nullValue models.User
+func AnyModelsRepo() models.Repo {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(models.Repo))(nil)).Elem()))
+	var nullValue models.Repo
 	return nullValue
 }
 
-func EqModelsUser(value models.User) models.User {
+func EqModelsRepo(value models.Repo) models.Repo {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue models.User
+	var nullValue models.Repo
 	return nullValue
 }
 
-func NotEqModelsUser(value models.User) models.User {
+func NotEqModelsRepo(value models.Repo) models.Repo {
 	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
-	var nullValue models.User
+	var nullValue models.Repo
 	return nullValue
 }
 
-func ModelsUserThat(matcher pegomock.ArgumentMatcher) models.User {
+func ModelsRepoThat(matcher pegomock.ArgumentMatcher) models.Repo {
 	pegomock.RegisterMatcher(matcher)
-	var nullValue models.User
+	var nullValue models.Repo
 	return nullValue
 }

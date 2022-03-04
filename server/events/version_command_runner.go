@@ -52,7 +52,7 @@ func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		result = runProjectCmds(projectCmds, v.prjCmdRunner.Version)
 	}
 
-	v.pullUpdater.updatePull(ctx, cmd, result)
+	v.pullUpdater.UpdatePull(ctx, cmd, result)
 }
 
 func (v *VersionCommandRunner) isParallelEnabled(cmds []command.ProjectContext) bool {

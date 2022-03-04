@@ -75,7 +75,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		p.pullUpdater.updatePull(ctx, AutoplanCommand{}, command.Result{Error: err})
+		p.pullUpdater.UpdatePull(ctx, AutoplanCommand{}, command.Result{Error: err})
 		return
 	}
 
@@ -121,7 +121,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		result.PlansDeleted = true
 	}
 
-	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
+	p.pullUpdater.UpdatePull(ctx, AutoplanCommand{}, result)
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
@@ -160,7 +160,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+		p.pullUpdater.UpdatePull(ctx, cmd, command.Result{Error: err})
 		return
 	}
 
@@ -195,7 +195,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		result.PlansDeleted = true
 	}
 
-	p.pullUpdater.updatePull(
+	p.pullUpdater.UpdatePull(
 		ctx,
 		cmd,
 		result)

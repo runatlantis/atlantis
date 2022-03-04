@@ -13,7 +13,7 @@ type PullUpdater struct {
 	GlobalCfg            valid.GlobalCfg
 }
 
-func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res command.Result) {
+func (c *PullUpdater) UpdatePull(ctx *command.Context, cmd PullCommand, res command.Result) {
 	// Log if we got any errors or failures.
 	if res.Error != nil {
 		ctx.Log.Err(res.Error.Error())
