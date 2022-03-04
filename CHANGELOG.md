@@ -1,3 +1,15 @@
+# v0.19.0
+
+Feature release for:
+- multi-arch docker images
+- add `pending` status for apply
+
+## What's Changed
+
+* docs: moving streaming logs section from top-level navigation to docs by @Aayyush in https://github.com/runatlantis/atlantis/pull/2066
+* fix(docker): Multi-arch Docker images, attempt two by @Tenzer in https://github.com/runatlantis/atlantis/pull/2114
+* feat: add a pending status for apply when running plan command by @AndreZiviani in https://github.com/runatlantis/atlantis/pull/2053
+
 # v0.18.5
 
 Maintenance release:
