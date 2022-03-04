@@ -1,4 +1,4 @@
-#!/bin/dumb-init /bin/sh
+#!/usr/bin/dumb-init /bin/sh
 set -e
 
 # Modified: https://github.com/hashicorp/docker-consul/blob/2c2873f9d619220d1eef0bc46ec78443f55a10b5/0.X/docker-entrypoint.sh

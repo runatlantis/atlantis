@@ -9,19 +9,27 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
 FROM ghcr.io/runatlantis/atlantis-base:2022.03.03 AS base
 
+# Get the architecture the image is being built for
+ARG TARGETPLATFORM
+
 # install terraform binaries
 ENV DEFAULT_TERRAFORM_VERSION=1.1.7
 
 # In the official Atlantis image we only have the latest of each Terraform version.
-RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 1.0.11 ${DEFAULT_TERRAFORM_VERSION}" && \
+RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 1.0.11 ${DEFAULT_TERRAFORM_VERSION}" && \
+    case ${TARGETPLATFORM} in \
+        "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
+        "linux/arm64") TERRAFORM_ARCH=arm64 ;; \
+        "linux/arm/v7") TERRAFORM_ARCH=arm ;; \
+    esac && \
     for VERSION in ${AVAILABLE_TERRAFORM_VERSIONS}; do \
-        curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_amd64.zip && \
+        curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip && \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_SHA256SUMS && \
-        sed -n "/terraform_${VERSION}_linux_amd64.zip/p" terraform_${VERSION}_SHA256SUMS | sha256sum -c && \
+        sed -n "/terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip/p" terraform_${VERSION}_SHA256SUMS | sha256sum -c && \
         mkdir -p /usr/local/bin/tf/versions/${VERSION} && \
-        unzip terraform_${VERSION}_linux_amd64.zip -d /usr/local/bin/tf/versions/${VERSION} && \
+        unzip terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip -d /usr/local/bin/tf/versions/${VERSION} && \
         ln -s /usr/local/bin/tf/versions/${VERSION}/terraform /usr/local/bin/terraform${VERSION} && \
-        rm terraform_${VERSION}_linux_amd64.zip && \
+        rm terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip && \
         rm terraform_${VERSION}_SHA256SUMS; \
     done && \
     ln -s /usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform /usr/local/bin/terraform
@@ -29,14 +37,20 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.15 0.12.31 0.13.7 0.1
 ENV DEFAULT_CONFTEST_VERSION=0.30.0
 
 RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
+    case ${TARGETPLATFORM} in \
+        "linux/amd64") CONFTEST_ARCH=x86_64 ;; \
+        "linux/arm64") CONFTEST_ARCH=arm64 ;; \
+        # There is currently no compiled version of conftest for armv7
+        "linux/arm/v7") CONFTEST_ARCH=x86_64 ;; \
+    esac && \
     for VERSION in ${AVAILABLE_CONFTEST_VERSIONS}; do \
-        curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_x86_64.tar.gz && \
+        curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz && \
         curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/checksums.txt && \
-        sed -n "/conftest_${VERSION}_Linux_x86_64.tar.gz/p" checksums.txt | sha256sum -c && \
+        sed -n "/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz/p" checksums.txt | sha256sum -c && \
         mkdir -p /usr/local/bin/cft/versions/${VERSION} && \
-        tar -C  /usr/local/bin/cft/versions/${VERSION} -xzf conftest_${VERSION}_Linux_x86_64.tar.gz && \
+        tar -C /usr/local/bin/cft/versions/${VERSION} -xzf conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz && \
         ln -s /usr/local/bin/cft/versions/${VERSION}/conftest /usr/local/bin/conftest${VERSION} && \
-        rm conftest_${VERSION}_Linux_x86_64.tar.gz && \
+        rm conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz && \
         rm checksums.txt; \
     done
 
