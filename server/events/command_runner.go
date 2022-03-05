@@ -79,6 +79,8 @@ type GitlabMergeRequestGetter interface {
 	GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error)
 }
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_command_runner.go CommentCommandRunner
+
 // CommentCommandRunner runs individual command workflows.
 type CommentCommandRunner interface {
 	Run(*command.Context, *CommentCommand)

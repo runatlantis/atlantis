@@ -38,6 +38,7 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/lyft/aws"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sns"
+	lyftCommands "github.com/runatlantis/atlantis/server/lyft/command"
 	lyftDecorators "github.com/runatlantis/atlantis/server/lyft/decorators"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/lyft/scheduled"
@@ -58,6 +59,9 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/command/apply"
+	"github.com/runatlantis/atlantis/server/events/command/plan"
+	"github.com/runatlantis/atlantis/server/events/command/policies"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
@@ -713,10 +717,34 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 	)
 
+	featuredPlanRunner := lyftCommands.NewPlatformModeFeatureRunner(
+		featureAllocator,
+		userConfig.EnablePlatformMode,
+		logger,
+		plan.NewRunner(vcsClient),
+		planCommandRunner,
+	)
+
+	featuredApplyRunner := lyftCommands.NewPlatformModeFeatureRunner(
+		featureAllocator,
+		userConfig.EnablePlatformMode,
+		logger,
+		apply.NewRunner(vcsClient),
+		applyCommandRunner,
+	)
+
+	featuredPolicyCheckRunner := lyftCommands.NewPlatformModeFeatureRunner(
+		featureAllocator,
+		userConfig.EnablePlatformMode,
+		logger,
+		policies.NewRunner(vcsClient),
+		approvePoliciesCommandRunner,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
-		command.Plan:            planCommandRunner,
-		command.Apply:           applyCommandRunner,
-		command.ApprovePolicies: approvePoliciesCommandRunner,
+		command.Plan:            featuredPlanRunner,
+		command.Apply:           featuredApplyRunner,
+		command.ApprovePolicies: featuredPolicyCheckRunner,
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
 	}

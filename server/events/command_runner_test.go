@@ -391,7 +391,7 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "**Error:** Running `atlantis apply` without flags is disabled. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags.", "apply")
 }
 
-func TestFeatureAwareRunCommentCommandRunner_CommentWhenEnabled(t *testing.T) {
+func TestForceApplyRunCommentCommandRunner_CommentWhenEnabled(t *testing.T) {
 	t.Log("if \"atlantis apply --force\" is run and this is enabled atlantis should" +
 		" comment with a warning")
 	vcsClient := setup(t)
