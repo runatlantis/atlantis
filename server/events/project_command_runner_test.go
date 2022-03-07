@@ -82,7 +82,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	expEnvs := map[string]string{
 		"name": "value",
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{
@@ -133,7 +133,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 func TestProjectOutputWrapper(t *testing.T) {
 	RegisterMockTestingT(t)
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{
@@ -216,8 +216,8 @@ func TestProjectOutputWrapper(t *testing.T) {
 				expCommitStatus = models.FailedCommitStatus
 			}
 
-			When(mockProjectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(prjResult)
-			When(mockProjectCommandRunner.Apply(matchers.AnyModelsProjectCommandContext())).ThenReturn(prjResult)
+			When(mockProjectCommandRunner.Plan(matchers.AnyPtrToModelsProjectCommandContext())).ThenReturn(prjResult)
+			When(mockProjectCommandRunner.Apply(matchers.AnyPtrToModelsProjectCommandContext())).ThenReturn(prjResult)
 
 			switch c.CommandName {
 			case models.PlanCommand:
@@ -246,7 +246,7 @@ func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir: mockWorkingDir,
 	}
-	ctx := models.ProjectCommandContext{}
+	ctx := &models.ProjectCommandContext{}
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn("", os.ErrNotExist)
 
 	res := runner.Apply(ctx)
@@ -264,7 +264,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 			WorkingDir: mockWorkingDir,
 		},
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		ApplyRequirements: []string{"approved"},
 	}
 	tmp, cleanup := TempDir(t)
@@ -286,7 +286,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 			WorkingDir: mockWorkingDir,
 		},
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		PullReqStatus: models.PullReqStatus{
 			Mergeable: false,
 		},
@@ -311,7 +311,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 			WorkingDir: mockWorkingDir,
 		},
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		ApplyRequirements: []string{"undiverged"},
 	}
 	tmp, cleanup := TempDir(t)
@@ -438,7 +438,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				AnyString(),
 			)).ThenReturn(repoDir, nil)
 
-			ctx := models.ProjectCommandContext{
+			ctx := &models.ProjectCommandContext{
 				Log:               logging.NewNoopLogger(t),
 				Steps:             c.steps,
 				Workspace:         "default",
@@ -510,7 +510,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		AnyString(),
 	)).ThenReturn(repoDir, nil)
 
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{
@@ -576,7 +576,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		LockKey:      "lock-key",
 	}, nil)
 
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{

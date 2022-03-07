@@ -21,7 +21,7 @@ func TestRun(t *testing.T) {
 	workdir := "/path"
 	executablePath := "some/path/conftest"
 
-	context := models.ProjectCommandContext{
+	context := &models.ProjectCommandContext{
 		Log:                logger,
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,

@@ -30,7 +30,7 @@ type VersionCommandRunner struct {
 
 func (v *VersionCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	var err error
-	var projectCmds []models.ProjectCommandContext
+	var projectCmds []*models.ProjectCommandContext
 	projectCmds, err = v.prjCmdBuilder.BuildVersionCommands(ctx, cmd)
 	if err != nil {
 		ctx.Log.Warn("Error %s", err)
@@ -53,6 +53,6 @@ func (v *VersionCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	v.pullUpdater.updatePull(ctx, cmd, result)
 }
 
-func (v *VersionCommandRunner) isParallelEnabled(cmds []models.ProjectCommandContext) bool {
+func (v *VersionCommandRunner) isParallelEnabled(cmds []*models.ProjectCommandContext) bool {
 	return len(cmds) > 0 && cmds[0].ParallelPolicyCheckEnabled
 }

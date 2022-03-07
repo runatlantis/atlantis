@@ -114,7 +114,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
-	var projectCmds []models.ProjectCommandContext
+	var projectCmds []*models.ProjectCommandContext
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 
 	if err != nil {
@@ -187,7 +187,7 @@ func (a *ApplyCommandRunner) IsLocked() (bool, error) {
 	return lock.Locked, err
 }
 
-func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []models.ProjectCommandContext) bool {
+func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []*models.ProjectCommandContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelApplyEnabled
 }
 

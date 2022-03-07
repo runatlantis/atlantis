@@ -211,7 +211,7 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 	}
 }
 
-func (p *PlanCommandRunner) runProjectCmds(ctx *CommandContext, projectCmds []models.ProjectCommandContext) CommandResult {
+func (p *PlanCommandRunner) runProjectCmds(ctx *CommandContext, projectCmds []*models.ProjectCommandContext) CommandResult {
 	var result CommandResult
 	groups := p.prjCmdBuilder.GroupProjectCmdsByDependency(projectCmds)
 
@@ -219,42 +219,20 @@ func (p *PlanCommandRunner) runProjectCmds(ctx *CommandContext, projectCmds []mo
 		// Always plan all projects in case a new commit is
 		// made which changes a dependency
 		var groupResult CommandResult
-		// Only run commands in parallel if enabled
+		ctx.Log.Info("Running plans for group %d", i)
 		if p.isParallelEnabled(groupCmds) {
-			ctx.Log.Info("Running plans in parallel")
+			ctx.Log.Debug("Running plans in parallel")
 			groupResult = runProjectCmdsParallel(groupCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 		} else {
+			ctx.Log.Debug("Running plans sequentially")
 			groupResult = runProjectCmds(groupCmds, p.prjCmdRunner.Plan)
 		}
+		//for r, res := range groupResult.ProjectResults {
+		//	groups[i][r].ProjectPlanStatus = res.PlanStatus()
+		//}
 		result = result.Merge(groupResult)
-
-		if groupResult.HasPendingDependencies() {
-			for _, pendingGroup := range groups[i:] {
-				for _, cmd := range pendingGroup {
-					err := p.workingDir.DeleteForWorkspace(ctx.HeadRepo, ctx.Pull, cmd.Workspace)
-					if err != nil {
-						ctx.Log.Err("error deleting plan for project with pending dependencies: %w", err)
-					}
-					if result.HasProjectResult(cmd) {
-						continue
-					}
-					result = result.Merge(CommandResult{
-						ProjectResults: []models.ProjectResult{
-							{
-								Command:     models.PlanCommand,
-								RepoRelDir:  cmd.RepoRelDir,
-								Workspace:   cmd.Workspace,
-								Failure:     models.PendingDependencyAppliedStatusMessage,
-								ProjectName: cmd.ProjectName,
-							},
-						},
-					})
-				}
-			}
-
-			break
-		}
 	}
+
 	return result
 }
 
@@ -306,24 +284,24 @@ func (p *PlanCommandRunner) deletePlans(ctx *CommandContext) {
 
 func (p *PlanCommandRunner) partitionProjectCmds(
 	ctx *CommandContext,
-	cmds []models.ProjectCommandContext,
+	cmds []*models.ProjectCommandContext,
 ) (
-	projectCmds []models.ProjectCommandContext,
-	policyCheckCmds []models.ProjectCommandContext,
+	projectCmds []*models.ProjectCommandContext,
+	policyCheckCmds []*models.ProjectCommandContext,
 ) {
-	for _, cmd := range cmds {
-		switch cmd.CommandName {
+	for i, _ := range cmds {
+		switch cmds[i].CommandName {
 		case models.PlanCommand:
-			projectCmds = append(projectCmds, cmd)
+			projectCmds = append(projectCmds, cmds[i])
 		case models.PolicyCheckCommand:
-			policyCheckCmds = append(policyCheckCmds, cmd)
+			policyCheckCmds = append(policyCheckCmds, cmds[i])
 		default:
-			ctx.Log.Err("%s is not supported", cmd.CommandName)
+			ctx.Log.Err("%s is not supported", cmds[i].CommandName)
 		}
 	}
 	return
 }
 
-func (p *PlanCommandRunner) isParallelEnabled(projectCmds []models.ProjectCommandContext) bool {
+func (p *PlanCommandRunner) isParallelEnabled(projectCmds []*models.ProjectCommandContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
 }

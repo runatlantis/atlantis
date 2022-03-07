@@ -422,7 +422,7 @@ projects:
 					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				)
 
-				var actCtxs []models.ProjectCommandContext
+				var actCtxs []*models.ProjectCommandContext
 				var err error
 				if cmdName == models.PlanCommand {
 					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
@@ -815,7 +815,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 			)
 
-			var actCtxs []models.ProjectCommandContext
+			var actCtxs []*models.ProjectCommandContext
 			var err error
 			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
 				Log: logger,
@@ -1057,7 +1057,7 @@ projects:
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	)
 
-	var actCtxs []models.ProjectCommandContext
+	var actCtxs []*models.ProjectCommandContext
 	var err error
 	actCtxs, err = builder.BuildAutoplanCommands(&events.CommandContext{
 		HeadRepo: models.Repo{},
@@ -1279,9 +1279,9 @@ func TestGroupProjectsByDependency(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			prjCmdBuilder := events.DefaultProjectCommandBuilder{}
-			var projCtxs []models.ProjectCommandContext
+			var projCtxs []*models.ProjectCommandContext
 			for _, prj := range c.projects {
-				projCtxs = append(projCtxs, models.ProjectCommandContext{
+				projCtxs = append(projCtxs, &models.ProjectCommandContext{
 					RepoRelDir: prj.Dir,
 				})
 			}

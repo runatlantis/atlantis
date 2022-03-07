@@ -170,7 +170,7 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 		t.Run(c.expSrc, func(t *testing.T) {
 			client := mocks.NewMockClient()
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
-			err := s.UpdateProject(models.ProjectCommandContext{
+			err := s.UpdateProject(&models.ProjectCommandContext{
 				ProjectName: c.projectName,
 				RepoRelDir:  c.repoRelDir,
 				Workspace:   c.workspace,
@@ -228,7 +228,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 		t.Run(c.expDescrip, func(t *testing.T) {
 			client := mocks.NewMockClient()
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
-			err := s.UpdateProject(models.ProjectCommandContext{
+			err := s.UpdateProject(&models.ProjectCommandContext{
 				RepoRelDir: ".",
 				Workspace:  "default",
 			},
@@ -246,7 +246,7 @@ func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) 
 	RegisterMockTestingT(t)
 	client := mocks.NewMockClient()
 	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "custom"}
-	err := s.UpdateProject(models.ProjectCommandContext{
+	err := s.UpdateProject(&models.ProjectCommandContext{
 		RepoRelDir: ".",
 		Workspace:  "default",
 	},

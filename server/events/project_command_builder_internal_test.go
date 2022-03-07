@@ -37,7 +37,7 @@ func TestBuildProjectCmdCtx(t *testing.T) {
 		globalCfg     string
 		repoCfg       string
 		expErr        string
-		expCtx        models.ProjectCommandContext
+		expCtx        *models.ProjectCommandContext
 		expPlanSteps  []string
 		expApplySteps []string
 	}{
@@ -58,7 +58,7 @@ workflows:
       steps:
       - apply`,
 			repoCfg: "",
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -110,7 +110,7 @@ projects:
     when_modified: [../modules/**/*.tf]
   terraform_version: v10.0
   `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -164,7 +164,7 @@ projects:
     when_modified: [../modules/**/*.tf]
   terraform_version: v10.0
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -226,7 +226,7 @@ projects:
     when_modified: [../modules/**/*.tf]
   terraform_version: v10.0
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -375,7 +375,7 @@ workflows:
       steps:
       - apply
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -433,7 +433,7 @@ projects:
   terraform_version: v10.0
   workflow: custom
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -494,7 +494,7 @@ workflows:
     apply:
       steps: []
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -539,7 +539,7 @@ projects:
 - dir: project1
   workspace: myworkspace
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -691,7 +691,7 @@ func TestBuildProjectCmdCtx_WithRegExpCmdEnabled(t *testing.T) {
 		globalCfg     string
 		repoCfg       string
 		expErr        string
-		expCtx        models.ProjectCommandContext
+		expCtx        *models.ProjectCommandContext
 		expPlanSteps  []string
 		expApplySteps []string
 	}{
@@ -738,7 +738,7 @@ projects:
     when_modified: [../modules/**/*.tf]
   terraform_version: v10.0
   `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -p myproject_1",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -887,7 +887,7 @@ func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
 		globalCfg           string
 		repoCfg             string
 		expErr              string
-		expCtx              models.ProjectCommandContext
+		expCtx              *models.ProjectCommandContext
 		expPolicyCheckSteps []string
 	}{
 		// Test that if we've set global defaults and no project config
@@ -898,7 +898,7 @@ repos:
 - id: /.*/
 `,
 			repoCfg: "",
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
@@ -955,7 +955,7 @@ workflows:
       steps:
       - policy_check
 `,
-			expCtx: models.ProjectCommandContext{
+			expCtx: &models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},

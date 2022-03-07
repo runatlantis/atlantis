@@ -15,7 +15,7 @@ type InitStepRunner struct {
 	DefaultTFVersion  *version.Version
 }
 
-func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (i *InitStepRunner) Run(ctx *models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	lockFileName := ".terraform.lock.hcl"
 	terraformLockfilePath := filepath.Join(path, lockFileName)
 	terraformLockFileTracked, err := common.IsFileTracked(path, lockFileName)

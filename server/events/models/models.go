@@ -505,6 +505,9 @@ func (p ProjectResult) PlanStatus() ProjectPlanStatus {
 				return ErroredPlanStatus
 			}
 		}
+		if p.PlanSuccess.IsUpToDate() {
+			return AppliedPlanStatus
+		}
 		return PlannedPlanStatus
 	case PolicyCheckCommand, ApprovePoliciesCommand:
 		if p.Error != nil {

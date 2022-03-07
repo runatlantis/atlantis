@@ -31,7 +31,7 @@ type PolicyCheckCommandRunner struct {
 	silenceVCSStatusNoProjects bool
 }
 
-func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.ProjectCommandContext) {
+func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []*models.ProjectCommandContext) {
 	if len(cmds) == 0 {
 		ctx.Log.Info("no projects to run policy_check in")
 		if !p.silenceVCSStatusNoProjects {
@@ -86,6 +86,6 @@ func (p *PolicyCheckCommandRunner) updateCommitStatus(ctx *CommandContext, pullS
 	}
 }
 
-func (p *PolicyCheckCommandRunner) isParallelEnabled(cmds []models.ProjectCommandContext) bool {
+func (p *PolicyCheckCommandRunner) isParallelEnabled(cmds []*models.ProjectCommandContext) bool {
 	return len(cmds) > 0 && cmds[0].ParallelPolicyCheckEnabled
 }

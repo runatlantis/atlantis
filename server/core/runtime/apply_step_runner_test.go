@@ -28,7 +28,7 @@ func TestRun_NoDir(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: nil,
 	}
-	_, err := o.Run(models.ProjectCommandContext{
+	_, err := o.Run(&models.ProjectCommandContext{
 		RepoRelDir: ".",
 		Workspace:  "workspace",
 	}, nil, "/nonexistent/path", map[string]string(nil))
@@ -41,7 +41,7 @@ func TestRun_NoPlanFile(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: nil,
 	}
-	_, err := o.Run(models.ProjectCommandContext{
+	_, err := o.Run(&models.ProjectCommandContext{
 		RepoRelDir: ".",
 		Workspace:  "workspace",
 	}, nil, tmpDir, map[string]string(nil))
@@ -54,7 +54,7 @@ func TestRun_Success(t *testing.T) {
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
 	err := ioutil.WriteFile(planPath, nil, 0600)
 	logger := logging.NewNoopLogger(t)
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
@@ -68,7 +68,7 @@ func TestRun_Success(t *testing.T) {
 		TerraformExecutor: terraform,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyPtrToModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
@@ -86,7 +86,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	err := ioutil.WriteFile(planPath, nil, 0600)
 
 	logger := logging.NewNoopLogger(t)
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -101,7 +101,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 		TerraformExecutor: terraform,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyPtrToModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
@@ -120,7 +120,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 	tfVersion, _ := version.NewVersion("0.11.0")
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
@@ -134,7 +134,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 		TerraformExecutor: terraform,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyPtrToModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
@@ -209,7 +209,7 @@ func TestRun_UsingTarget(t *testing.T) {
 				TerraformExecutor: terraform,
 			}
 
-			output, err := step.Run(models.ProjectCommandContext{
+			output, err := step.Run(&models.ProjectCommandContext{
 				Log:                logger,
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
@@ -253,7 +253,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		CommitStatusUpdater: updater,
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log:                logging.NewNoopLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
@@ -315,7 +315,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 
-	output, err := o.Run(models.ProjectCommandContext{
+	output, err := o.Run(&models.ProjectCommandContext{
 		Log:                logging.NewNoopLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
@@ -370,7 +370,7 @@ type remoteApplyMock struct {
 }
 
 // RunCommandAsync fakes out running terraform async.
-func (r *remoteApplyMock) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+func (r *remoteApplyMock) RunCommandAsync(ctx *models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
 	r.CalledArgs = args
 
 	in := make(chan string)

@@ -168,6 +168,6 @@ func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest,
 func (m *MockCSU) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
 	return nil
 }
-func (m *MockCSU) UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error {
+func (m *MockCSU) UpdateProject(ctx *models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error {
 	return nil
 }

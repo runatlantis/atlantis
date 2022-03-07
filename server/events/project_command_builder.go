@@ -66,33 +66,33 @@ func NewProjectCommandBuilder(
 type ProjectPlanCommandBuilder interface {
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
-	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
+	BuildAutoplanCommands(ctx *CommandContext) ([]*models.ProjectCommandContext, error)
 	// BuildPlanCommands builds project plan commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildPlanCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	BuildPlanCommands(ctx *CommandContext, comment *CommentCommand) ([]*models.ProjectCommandContext, error)
 	// GroupProjectCmdsByDependency returns a grouping of models.ProjectCommandContext based on
 	// the dependency hierarchy
-	GroupProjectCmdsByDependency(cmds []models.ProjectCommandContext) [][]models.ProjectCommandContext
+	GroupProjectCmdsByDependency(cmds []*models.ProjectCommandContext) [][]*models.ProjectCommandContext
 }
 
 type ProjectApplyCommandBuilder interface {
 	// BuildApplyCommands builds project Apply commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildApplyCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	BuildApplyCommands(ctx *CommandContext, comment *CommentCommand) ([]*models.ProjectCommandContext, error)
 }
 
 type ProjectApprovePoliciesCommandBuilder interface {
 	// BuildApprovePoliciesCommands builds project PolicyCheck commands for this ctx and comment.
-	BuildApprovePoliciesCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	BuildApprovePoliciesCommands(ctx *CommandContext, comment *CommentCommand) ([]*models.ProjectCommandContext, error)
 }
 
 type ProjectVersionCommandBuilder interface {
 	// BuildVersionCommands builds project Version commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildVersionCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	BuildVersionCommands(ctx *CommandContext, comment *CommentCommand) ([]*models.ProjectCommandContext, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
@@ -124,15 +124,15 @@ type DefaultProjectCommandBuilder struct {
 }
 
 // See ProjectCommandBuilder.GroupProjectCmdsByDependency.
-func (p *DefaultProjectCommandBuilder) GroupProjectCmdsByDependency(cmds []models.ProjectCommandContext) [][]models.ProjectCommandContext {
+func (p *DefaultProjectCommandBuilder) GroupProjectCmdsByDependency(cmds []*models.ProjectCommandContext) [][]*models.ProjectCommandContext {
 	cmdCache := make(map[string]*models.ProjectCommandContext)
 	for i := range cmds {
-		cmdCache[cmds[i].RepoRelDir] = &cmds[i]
+		cmdCache[cmds[i].RepoRelDir] = cmds[i]
 	}
-	groups := [][]models.ProjectCommandContext{{}}
+	groups := [][]*models.ProjectCommandContext{{}}
 	groupsCache := []map[string]bool{{}}
 
-	jobs := make([]models.ProjectCommandContext, len(cmds))
+	jobs := make([]*models.ProjectCommandContext, len(cmds))
 	copy(jobs, cmds)
 
 	for len(jobs) > 0 {
@@ -150,7 +150,7 @@ func (p *DefaultProjectCommandBuilder) GroupProjectCmdsByDependency(cmds []model
 		gIdx := 0
 		for _, dep := range cmd.DependsOn {
 			if _, ok := cmdCache[dep.RepoRelDir]; !ok {
-				// the dependency is not in the list of changed projects so we can ignore it
+				// the dependency is not in the list of changed projects, so we can ignore it
 				depsFound++
 				continue
 			}
@@ -179,7 +179,7 @@ func (p *DefaultProjectCommandBuilder) GroupProjectCmdsByDependency(cmds []model
 
 		if depsFound == len(cmd.DependsOn) {
 			if gIdx > len(groups)-1 {
-				groups = append(groups, []models.ProjectCommandContext{})
+				groups = append(groups, []*models.ProjectCommandContext{})
 				groupsCache = append(groupsCache, map[string]bool{})
 			}
 
@@ -196,12 +196,12 @@ func (p *DefaultProjectCommandBuilder) GroupProjectCmdsByDependency(cmds []model
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
-func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]*models.ProjectCommandContext, error) {
 	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false)
 	if err != nil {
 		return nil, err
 	}
-	var autoplanEnabled []models.ProjectCommandContext
+	var autoplanEnabled []*models.ProjectCommandContext
 	for _, projCtx := range projCtxs {
 		if !projCtx.AutoplanEnabled {
 			ctx.Log.Debug("ignoring project at dir %q, workspace: %q because autoplan is disabled", projCtx.RepoRelDir, projCtx.Workspace)
@@ -213,7 +213,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 }
 
 // See ProjectCommandBuilder.BuildPlanCommands.
-func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cmd *CommentCommand) ([]*models.ProjectCommandContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose)
 	}
@@ -222,7 +222,7 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cm
 }
 
 // See ProjectCommandBuilder.BuildApplyCommands.
-func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, cmd *CommentCommand) ([]*models.ProjectCommandContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommands(ctx, cmd)
 	}
@@ -230,11 +230,11 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 	return pac, err
 }
 
-func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *CommandContext, cmd *CommentCommand) ([]*models.ProjectCommandContext, error) {
 	return p.buildAllProjectCommands(ctx, cmd)
 }
 
-func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *CommandContext, cmd *CommentCommand) ([]*models.ProjectCommandContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommands(ctx, cmd)
 	}
@@ -242,21 +242,21 @@ func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *CommandContext,
 	return pac, err
 }
 
-func (p *DefaultProjectCommandBuilder) ResolveDependencies(projects []valid.Project, projCtxs []models.ProjectCommandContext) []models.ProjectCommandContext {
+func (p *DefaultProjectCommandBuilder) ResolveDependencies(projects []valid.Project, projCtxs []*models.ProjectCommandContext) []*models.ProjectCommandContext {
 	projCache := make(map[string]*valid.Project)
 	for i := range projects {
 		projCache[projects[i].Dir] = &projects[i]
 	}
 
 	ctxCache := make(map[string]*models.ProjectCommandContext)
-	for i := range projCtxs {
-		ctxCache[projCtxs[i].RepoRelDir] = &projCtxs[i]
+	for _, ctx := range projCtxs {
+		ctxCache[ctx.RepoRelDir] = ctx
 	}
 
-	for i, ctx := range projCtxs {
+	for _, ctx := range projCtxs {
 		for _, dep := range projCache[ctx.RepoRelDir].DependsOn {
 			if _, ok := ctxCache[dep]; ok {
-				projCtxs[i].DependsOn = append(projCtxs[i].DependsOn, ctxCache[dep])
+				ctx.DependsOn = append(ctx.DependsOn, ctxCache[dep])
 			}
 		}
 	}
@@ -266,7 +266,7 @@ func (p *DefaultProjectCommandBuilder) ResolveDependencies(projects []valid.Proj
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
 // modified in this ctx.
-func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]*models.ProjectCommandContext, error) {
 	// We'll need the list of modified files.
 	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
@@ -293,7 +293,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 			ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
 			if len(matchingProjects) == 0 {
 				ctx.Log.Info("skipping repo clone since no project was modified")
-				return []models.ProjectCommandContext{}, nil
+				return []*models.ProjectCommandContext{}, nil
 			}
 			// NOTE: We discard this work here and end up doing it again after
 			// cloning to ensure all the return values are set properly with
@@ -323,7 +323,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		return nil, errors.Wrapf(err, "looking for %s file in %q", config.AtlantisYAMLFilename, repoDir)
 	}
 
-	var projCtxs []models.ProjectCommandContext
+	var projCtxs []*models.ProjectCommandContext
 
 	if hasRepoCfg {
 		// If there's a repo cfg then we'll use it to figure out which projects
@@ -399,13 +399,13 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 
 // buildProjectPlanCommand builds a plan context for a single project.
 // cmd must be for only one project.
-func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandContext, cmd *CommentCommand) ([]*models.ProjectCommandContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
 
-	var pcc []models.ProjectCommandContext
+	var pcc []*models.ProjectCommandContext
 	ctx.Log.Debug("building plan command")
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
@@ -497,7 +497,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 
 // buildAllProjectCommands builds contexts for a command for every project that has
 // pending plans in this ctx.
-func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]*models.ProjectCommandContext, error) {
 	// Lock all dirs in this pull request (instead of a single dir) because we
 	// don't know how many dirs we'll need to run the command in.
 	unlockFn, err := p.WorkingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
@@ -523,7 +523,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *CommandConte
 		return nil, err
 	}
 
-	var cmds []models.ProjectCommandContext
+	var cmds []*models.ProjectCommandContext
 	for _, plan := range plans {
 		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
 		if err != nil {
@@ -536,13 +536,13 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *CommandConte
 
 // buildProjectApplyCommand builds an apply command for the single project
 // identified by cmd.
-func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandContext, cmd *CommentCommand) ([]*models.ProjectCommandContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
 
-	var projCtx []models.ProjectCommandContext
+	var projCtx []*models.ProjectCommandContext
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
 		return projCtx, err
@@ -577,13 +577,13 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 
 // buildProjectVersionCommand builds a version command for the single project
 // identified by cmd.
-func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *CommandContext, cmd *CommentCommand) ([]*models.ProjectCommandContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
 
-	var projCtx []models.ProjectCommandContext
+	var projCtx []*models.ProjectCommandContext
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
 		return projCtx, err
@@ -625,13 +625,13 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	repoDir string,
 	repoRelDir string,
 	workspace string,
-	verbose bool) ([]models.ProjectCommandContext, error) {
+	verbose bool) ([]*models.ProjectCommandContext, error) {
 
 	matchingProjects, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
 	if err != nil {
-		return []models.ProjectCommandContext{}, err
+		return []*models.ProjectCommandContext{}, err
 	}
-	var projCtxs []models.ProjectCommandContext
+	var projCtxs []*models.ProjectCommandContext
 	var projCfg valid.MergedProjectCfg
 	automerge := DefaultAutomergeEnabled
 	parallelApply := DefaultParallelApplyEnabled
@@ -684,7 +684,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	}
 
 	if err := p.validateWorkspaceAllowed(repoCfgPtr, repoRelDir, workspace); err != nil {
-		return []models.ProjectCommandContext{}, err
+		return []*models.ProjectCommandContext{}, err
 	}
 
 	return projCtxs, nil

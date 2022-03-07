@@ -25,7 +25,7 @@ func NewMockApplyRequirement(options ...pegomock.Option) *MockApplyRequirement {
 func (mock *MockApplyRequirement) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockApplyRequirement) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockApplyRequirement) ValidateProject(_param0 string, _param1 models.ProjectCommandContext) (string, error) {
+func (mock *MockApplyRequirement) ValidateProject(_param0 string, _param1 *models.ProjectCommandContext) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockApplyRequirement().")
 	}
@@ -81,7 +81,7 @@ type VerifierMockApplyRequirement struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockApplyRequirement) ValidateProject(_param0 string, _param1 models.ProjectCommandContext) *MockApplyRequirement_ValidateProject_OngoingVerification {
+func (verifier *VerifierMockApplyRequirement) ValidateProject(_param0 string, _param1 *models.ProjectCommandContext) *MockApplyRequirement_ValidateProject_OngoingVerification {
 	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ValidateProject", params, verifier.timeout)
 	return &MockApplyRequirement_ValidateProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -92,21 +92,21 @@ type MockApplyRequirement_ValidateProject_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockApplyRequirement_ValidateProject_OngoingVerification) GetCapturedArguments() (string, models.ProjectCommandContext) {
+func (c *MockApplyRequirement_ValidateProject_OngoingVerification) GetCapturedArguments() (string, *models.ProjectCommandContext) {
 	_param0, _param1 := c.GetAllCapturedArguments()
 	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
-func (c *MockApplyRequirement_ValidateProject_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.ProjectCommandContext) {
+func (c *MockApplyRequirement_ValidateProject_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []*models.ProjectCommandContext) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]models.ProjectCommandContext, len(c.methodInvocations))
+		_param1 = make([]*models.ProjectCommandContext, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.ProjectCommandContext)
+			_param1[u] = param.(*models.ProjectCommandContext)
 		}
 	}
 	return

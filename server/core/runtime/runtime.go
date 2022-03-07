@@ -25,7 +25,7 @@ const (
 // TerraformExec brings the interface from TerraformClient into this package
 // without causing circular imports.
 type TerraformExec interface {
-	RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(ctx *models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
 	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
 }
 
@@ -40,19 +40,19 @@ type AsyncTFExec interface {
 	// Callers can use the input channel to pass stdin input to the command.
 	// If any error is passed on the out channel, there will be no
 	// further output (so callers are free to exit).
-	RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line)
+	RunCommandAsync(ctx *models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line)
 }
 
 // StatusUpdater brings the interface from CommitStatusUpdater into this package
 // without causing circular imports.
 type StatusUpdater interface {
-	UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error
+	UpdateProject(ctx *models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 // Runner mirrors events.StepRunner as a way to bring it into this package
 type Runner interface {
-	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error)
+	Run(ctx *models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }
 
 // MustConstraint returns a constraint. It panics on error.

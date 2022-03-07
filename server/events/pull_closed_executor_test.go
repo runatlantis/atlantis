@@ -197,7 +197,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		// Create Log streaming resources
 		prjCmdOutput := make(chan *jobs.ProjectCmdOutputLine)
 		prjCmdOutHandler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutput, logger)
-		ctx := models.ProjectCommandContext{
+		ctx := &models.ProjectCommandContext{
 			BaseRepo:    fixtures.GithubRepo,
 			Pull:        fixtures.Pull,
 			ProjectName: *fixtures.Project.Name,

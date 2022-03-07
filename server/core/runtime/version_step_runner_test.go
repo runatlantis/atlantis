@@ -16,7 +16,7 @@ func TestRunVersionStep(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	workspace := "default"
 
-	context := models.ProjectCommandContext{
+	context := &models.ProjectCommandContext{
 		Log:                logger,
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,

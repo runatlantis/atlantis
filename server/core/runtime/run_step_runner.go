@@ -19,7 +19,7 @@ type RunStepRunner struct {
 	TerraformBinDir string
 }
 
-func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, path string, envs map[string]string) (string, error) {
+func (r *RunStepRunner) Run(ctx *models.ProjectCommandContext, command string, path string, envs map[string]string) (string, error) {
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion

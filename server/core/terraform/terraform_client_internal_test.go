@@ -93,7 +93,7 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -140,7 +140,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -183,7 +183,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -230,7 +230,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -278,7 +278,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -315,7 +315,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -353,7 +353,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",

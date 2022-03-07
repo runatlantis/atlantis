@@ -159,7 +159,7 @@ func TestRun(t *testing.T) {
 		Name:   policySetName2,
 	}
 
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		PolicySets: valid.PolicySets{
 			PolicySets: []valid.PolicySet{
 				policySet1,

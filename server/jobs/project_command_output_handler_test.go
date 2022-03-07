@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createTestProjectCmdContext(t *testing.T) models.ProjectCommandContext {
+func createTestProjectCmdContext(t *testing.T) *models.ProjectCommandContext {
 	logger := logging.NewNoopLogger(t)
-	return models.ProjectCommandContext{
+	return &models.ProjectCommandContext{
 		BaseRepo: models.Repo{
 			Name:  "test-repo",
 			Owner: "test-org",

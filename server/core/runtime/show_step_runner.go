@@ -29,7 +29,7 @@ type ShowStepRunner struct {
 	DefaultTFVersion  *version.Version
 }
 
-func (p *ShowStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (p *ShowStepRunner) Run(ctx *models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	tfVersion := p.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion

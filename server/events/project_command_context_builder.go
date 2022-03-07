@@ -35,7 +35,7 @@ type ProjectCommandContextBuilder interface {
 		commentFlags []string,
 		repoDir string,
 		automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
-	) []models.ProjectCommandContext
+	) []*models.ProjectCommandContext
 }
 
 type DefaultProjectCommandContextBuilder struct {
@@ -49,7 +49,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	commentFlags []string,
 	repoDir string,
 	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
-) (projectCmds []models.ProjectCommandContext) {
+) (projectCmds []*models.ProjectCommandContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
 
 	var steps []valid.Step
@@ -106,7 +106,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	commentFlags []string,
 	repoDir string,
 	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
-) (projectCmds []models.ProjectCommandContext) {
+) (projectCmds []*models.ProjectCommandContext) {
 	ctx.Log.Debug("PolicyChecks are enabled")
 
 	// If TerraformVersion not defined in config file look for a
@@ -171,7 +171,7 @@ func newProjectCommandContext(ctx *CommandContext,
 	parallelPlanEnabled bool,
 	verbose bool,
 	pullStatus models.PullReqStatus,
-) models.ProjectCommandContext {
+) *models.ProjectCommandContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
 
@@ -191,7 +191,7 @@ func newProjectCommandContext(ctx *CommandContext,
 		}
 	}
 
-	return models.ProjectCommandContext{
+	return &models.ProjectCommandContext{
 		CommandName:                cmd,
 		ApplyCmd:                   applyCmd,
 		BaseRepo:                   ctx.Pull.BaseRepo,

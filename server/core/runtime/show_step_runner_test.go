@@ -21,7 +21,7 @@ func TestShowStepRunnner(t *testing.T) {
 	resultPath := filepath.Join(path, "test-default.json")
 	envs := map[string]string{"key": "val"}
 	tfVersion, _ := version.NewVersion("0.12")
-	context := models.ProjectCommandContext{
+	context := &models.ProjectCommandContext{
 		Workspace:   "default",
 		ProjectName: "test",
 		Log:         logger,
@@ -58,7 +58,7 @@ func TestShowStepRunnner(t *testing.T) {
 
 		v, _ := version.NewVersion("0.13.0")
 
-		contextWithVersionOverride := models.ProjectCommandContext{
+		contextWithVersionOverride := &models.ProjectCommandContext{
 			Workspace:        "default",
 			ProjectName:      "test",
 			Log:              logger,

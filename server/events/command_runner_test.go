@@ -426,7 +426,7 @@ func TestRunCommentCommand_DisableDisableAutoplan(t *testing.T) {
 	defer func() { ch.DisableAutoplan = false }()
 
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
-		ThenReturn([]models.ProjectCommandContext{
+		ThenReturn([]*models.ProjectCommandContext{
 			{
 				CommandName: models.PlanCommand,
 			},
@@ -537,7 +537,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	projects := []models.ProjectCommandContext{
+	projects := []*models.ProjectCommandContext{
 		{
 			CommandName: models.PlanCommand,
 		},
@@ -547,10 +547,10 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	}
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
 		ThenReturn(projects, nil)
-	When(projectCommandBuilder.GroupProjectCmdsByDependency(matchers.AnySliceOfModelsProjectCommandContext())).
-		ThenReturn([][]models.ProjectCommandContext{projects})
+	When(projectCommandBuilder.GroupProjectCmdsByDependency(matchers.AnySliceOfPtrToModelsProjectCommandContext())).
+		ThenReturn([][]*models.ProjectCommandContext{projects})
 	callCount := 0
-	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
+	When(projectCommandRunner.Plan(matchers.AnyPtrToModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
 		if callCount == 0 {
 			// The first call, we return a successful result.
 			callCount++
@@ -599,7 +599,7 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 
-	When(projectCommandBuilder.BuildApprovePoliciesCommands(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn([]models.ProjectCommandContext{
+	When(projectCommandBuilder.BuildApprovePoliciesCommands(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn([]*models.ProjectCommandContext{
 		{
 			CommandName: models.ApprovePoliciesCommand,
 		},
@@ -645,7 +645,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 
-	When(projectCommandBuilder.BuildApprovePoliciesCommands(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn([]models.ProjectCommandContext{
+	When(projectCommandBuilder.BuildApprovePoliciesCommands(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn([]*models.ProjectCommandContext{
 		{
 			CommandName: models.ApprovePoliciesCommand,
 			PolicySets: valid.PolicySets{
@@ -657,7 +657,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	}, nil)
 
 	When(workingDir.GetPullDir(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(tmp, nil)
-	When(projectCommandRunner.ApprovePolicies(matchers.AnyModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
+	When(projectCommandRunner.ApprovePolicies(matchers.AnyPtrToModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
 		return ReturnValues{
 			models.ProjectResult{
 				Command:            models.PolicyCheckCommand,
@@ -715,7 +715,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 
 	When(projectCommandBuilder.BuildApplyCommands(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).Then(func(args []Param) ReturnValues {
 		return ReturnValues{
-			[]models.ProjectCommandContext{
+			[]*models.ProjectCommandContext{
 				{
 					CommandName:       models.ApplyCommand,
 					ProjectName:       "default",

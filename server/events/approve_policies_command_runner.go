@@ -86,7 +86,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentComm
 	a.updateCommitStatus(ctx, pullStatus)
 }
 
-func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *CommandContext, prjCmds []models.ProjectCommandContext) (result CommandResult) {
+func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *CommandContext, prjCmds []*models.ProjectCommandContext) (result CommandResult) {
 	// Check if vcs user is in the owner list of the PolicySets. All projects
 	// share the same Owners list at this time so no reason to iterate over each
 	// project.

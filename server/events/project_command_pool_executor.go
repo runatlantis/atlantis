@@ -7,10 +7,10 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-type prjCmdRunnerFunc func(ctx models.ProjectCommandContext) models.ProjectResult
+type prjCmdRunnerFunc func(ctx *models.ProjectCommandContext) models.ProjectResult
 
 func runProjectCmdsParallel(
-	cmds []models.ProjectCommandContext,
+	cmds []*models.ProjectCommandContext,
 	runnerFunc prjCmdRunnerFunc,
 	poolSize int,
 ) CommandResult {
@@ -39,7 +39,7 @@ func runProjectCmdsParallel(
 }
 
 func runProjectCmds(
-	cmds []models.ProjectCommandContext,
+	cmds []*models.ProjectCommandContext,
 	runnerFunc prjCmdRunnerFunc,
 ) CommandResult {
 	var results []models.ProjectResult

@@ -82,7 +82,7 @@ func setupJobsRouter(t *testing.T) *server.Router {
 func TestGenerateProjectJobURL_ShouldGenerateURLWhenJobIDSpecified(t *testing.T) {
 	router := setupJobsRouter(t)
 	jobID := uuid.New().String()
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		JobID: jobID,
 	}
 	expectedURL := fmt.Sprintf("http://localhost:4141/jobs/%s", jobID)
@@ -94,7 +94,7 @@ func TestGenerateProjectJobURL_ShouldGenerateURLWhenJobIDSpecified(t *testing.T)
 
 func TestGenerateProjectJobURL_ShouldReturnErrorWhenJobIDNotSpecified(t *testing.T) {
 	router := setupJobsRouter(t)
-	ctx := models.ProjectCommandContext{
+	ctx := &models.ProjectCommandContext{
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{
 				Owner: "test-owner",

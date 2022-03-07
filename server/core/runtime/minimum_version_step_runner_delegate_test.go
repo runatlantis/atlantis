@@ -32,7 +32,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			delegate:         mockDelegate,
 		}
 
-		ctx := models.ProjectCommandContext{}
+		ctx := &models.ProjectCommandContext{}
 
 		When(mockDelegate.Run(ctx, extraArgs, path, envs)).ThenReturn(expectedOut, nil)
 
@@ -54,7 +54,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			delegate:         mockDelegate,
 		}
 
-		ctx := models.ProjectCommandContext{
+		ctx := &models.ProjectCommandContext{
 			TerraformVersion: tfVersion12,
 		}
 
@@ -78,7 +78,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			delegate:         mockDelegate,
 		}
 
-		ctx := models.ProjectCommandContext{}
+		ctx := &models.ProjectCommandContext{}
 
 		output, err := subject.Run(
 			ctx,
@@ -100,7 +100,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			delegate:         mockDelegate,
 		}
 
-		ctx := models.ProjectCommandContext{
+		ctx := &models.ProjectCommandContext{
 			TerraformVersion: tfVersion11,
 		}
 
