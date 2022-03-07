@@ -193,6 +193,7 @@ type DefaultProjectCommandRunner struct {
 	Webhooks                   WebhooksSender
 	WorkingDirLocker           WorkingDirLocker
 	AggregateApplyRequirements ApplyRequirement
+	PendingPlanFinder          *DefaultPendingPlanFinder
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -366,6 +367,12 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx *models.ProjectCommandContext) 
 	for _, depCtx := range ctx.DependsOn {
 		if depCtx.ProjectPlanStatus != models.AppliedPlanStatus {
 			ctx.ProjectPlanStatus = models.PendingDependencyAppliedStatus
+			// Make sure there aren't any existing plans for the project.
+			// This could happen if there's a change to a dependency after the project has been planned
+			err = p.PendingPlanFinder.DeletePlans(ctx.RepoRelDir)
+			if err != nil {
+				ctx.Log.Err("error deleting plan for project %s pending dependencies: %v", ctx.RepoRelDir, err)
+			}
 			return nil, models.PendingDependencyAppliedStatusMessage, nil
 		}
 	}

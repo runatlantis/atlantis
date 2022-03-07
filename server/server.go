@@ -535,6 +535,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Webhooks:                   webhooksManager,
 		WorkingDirLocker:           workingDirLocker,
 		AggregateApplyRequirements: applyRequirementHandler,
+		PendingPlanFinder:          pendingPlanFinder,
 	}
 
 	dbUpdater := &events.DBUpdater{
