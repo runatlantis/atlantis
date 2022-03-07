@@ -28,12 +28,11 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
 const (
 	planfileSlashReplace = "::"
-	LogStreamingClearMsg = "\n-----Starting New Process-----"
 )
 
 type PullReqStatus struct {
@@ -412,6 +411,8 @@ type ProjectCommandContext struct {
 	PolicySets valid.PolicySets
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
+	// UUID for atlantis logs
+	JobID string
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
@@ -425,7 +426,11 @@ func (p ProjectCommandContext) GetShowResultFileName() string {
 
 // Gets a unique identifier for the current pull request as a single string
 func (p ProjectCommandContext) PullInfo() string {
-	return BuildPullInfo(p.BaseRepo.FullName, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
+	normalizedOwner := strings.ReplaceAll(p.BaseRepo.Owner, "/", "-")
+	normalizedName := strings.ReplaceAll(p.BaseRepo.Name, "/", "-")
+	projectRepo := fmt.Sprintf("%s/%s", normalizedOwner, normalizedName)
+
+	return BuildPullInfo(projectRepo, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
 }
 
 func BuildPullInfo(repoName string, pullNum int, projectName string, relDir string, workspace string) string {
@@ -684,14 +689,6 @@ const (
 // ie. policy_check becomes Policy Check
 func (c CommandName) TitleString() string {
 	return strings.Title(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
-}
-
-type ProjectCmdOutputLine struct {
-	ProjectInfo string
-
-	Line string
-
-	ClearBuffBefore bool
 }
 
 // String returns the string representation of c.
