@@ -24,9 +24,9 @@ import (
 	"github.com/Laisky/graphql"
 	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
-	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/shurcooL/githubv4"
 )
@@ -290,6 +290,8 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		return false, errors.Wrap(err, "getting pull request")
 	}
 	state := githubPR.GetMergeableState()
+	status, _ := g.GetCombinedStatus(repo, githubPR.GetHead().GetSHA())
+
 	// We map our mergeable check to when the GitHub merge button is clickable.
 	// This corresponds to the following states:
 	// clean: No conflicts, all requirements satisfied.
@@ -299,9 +301,27 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
+	//
+	// We should not dismiss the PR if the only our "atlantis/apply" status is pending/failing
+	if state == "blocked" {
+		applyStatus := false
+		for _, s := range status.Statuses {
+			if strings.Contains(s.GetContext(), "atlantis/apply") {
+				applyStatus = true
+				continue
+			}
+			if s.GetContext() != "atlantis/apply" && s.GetState() != "success" {
+				// If any other status is pending/failing mark as non-mergeable
+				return false, nil
+			}
+		}
+		return applyStatus, nil
+	}
+
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
 		return false, nil
 	}
+
 	return true, nil
 }
 
@@ -330,6 +350,14 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 		}
 	}
 	return pull, err
+}
+
+func (g *GithubClient) GetCombinedStatus(repo models.Repo, ref string) (*github.CombinedStatus, error) {
+	opts := github.ListOptions{
+		PerPage: 300,
+	}
+	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, ref, &opts)
+	return status, err
 }
 
 // UpdateStatus updates the status badge on the pull request.
@@ -407,30 +435,43 @@ func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-// https://developer.github.com/v3/teams/members/#get-team-membership
+// https://docs.github.com/en/graphql/reference/objects#organization
 func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
-	var teamNames []string
-	opts := &github.ListOptions{}
-	org := repo.Owner
-	for {
-		teams, resp, err := g.client.Teams.ListTeams(g.ctx, org, opts)
-		if err != nil {
-			return nil, errors.Wrap(err, "retrieving GitHub teams")
-		}
-		for _, t := range teams {
-			membership, _, err := g.client.Teams.GetTeamMembershipBySlug(g.ctx, org, *t.Slug, user.Username)
-			if err != nil {
-				g.logger.Err("Failed to get team membership from GitHub: %s", err)
-			} else if membership != nil {
-				if *membership.State == "active" && (*membership.Role == "member" || *membership.Role == "maintainer") {
-					teamNames = append(teamNames, t.GetName())
+	orgName := repo.Owner
+	variables := map[string]interface{}{
+		"orgName":    githubv4.String(orgName),
+		"userLogins": []githubv4.String{githubv4.String(user.Username)},
+		"teamCursor": (*githubv4.String)(nil),
+	}
+	var q struct {
+		Organization struct {
+			Teams struct {
+				Edges []struct {
+					Node struct {
+						Name string
+					}
 				}
-			}
+				PageInfo struct {
+					EndCursor   githubv4.String
+					HasNextPage bool
+				}
+			} `graphql:"teams(first:100, after: $teamCursor, userLogins: $userLogins)"`
+		} `graphql:"organization(login: $orgName)"`
+	}
+	var teamNames []string
+	ctx := context.Background()
+	for {
+		err := g.v4MutateClient.Query(ctx, &q, variables)
+		if err != nil {
+			return nil, err
 		}
-		if resp.NextPage == 0 {
+		for _, edge := range q.Organization.Teams.Edges {
+			teamNames = append(teamNames, edge.Node.Name)
+		}
+		if !q.Organization.Teams.PageInfo.HasNextPage {
 			break
 		}
-		opts.Page = resp.NextPage
+		variables["teamCursor"] = githubv4.NewString(q.Organization.Teams.PageInfo.EndCursor)
 	}
 	return teamNames, nil
 }
@@ -455,7 +496,7 @@ func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, er
 // if BaseRepo had one repo config file, its content will placed on the second return value
 func (g *GithubClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	opt := github.RepositoryContentGetOptions{Ref: pull.HeadBranch}
-	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, yaml.AtlantisYAMLFilename, &opt)
+	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, config.AtlantisYAMLFilename, &opt)
 
 	if resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil

@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -18,6 +19,7 @@ type PartitionKeyGenerator interface {
 type PartitionRegistry interface {
 	Register(key string, buffer chan string)
 	Deregister(key string, buffer chan string)
+	IsKeyExists(key string) bool
 }
 
 // Multiplexor is responsible for handling the data transfer between the storage layer
@@ -49,6 +51,11 @@ func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 
 	if err != nil {
 		return errors.Wrapf(err, "generating partition key")
+	}
+
+	// check if the job ID exists before registering receiver
+	if !m.registry.IsKeyExists(key) {
+		return fmt.Errorf("invalid key: %s", key)
 	}
 
 	// Buffer size set to 1000 to ensure messages get queued.

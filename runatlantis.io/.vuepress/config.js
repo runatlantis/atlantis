@@ -96,6 +96,13 @@ module.exports = {
                     ]
                 },
                 {
+                    title: 'Real-time Terraform Logs',
+                    collapsable: true,
+                    children: [
+                        'streaming-logs'
+                    ]
+                },
+                {
                     title: 'Troubleshooting',
                     collapsable: true,
                     children: [

@@ -2,12 +2,16 @@ name: linter
 
 on: [pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   golangci-lint:
     name: runner / golangci-lint
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: golangci-lint
       uses: reviewdog/action-golangci-lint@v2
       with:
@@ -20,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
+        uses: actions/checkout@v3
       - name: revive
         uses: reviewdog/action-golangci-lint@v2
         with:
@@ -34,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
+        uses: actions/checkout@v3
       - name: errcheck
         uses: reviewdog/action-golangci-lint@v2
         with:

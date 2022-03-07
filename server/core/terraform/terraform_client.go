@@ -33,7 +33,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
-	"github.com/runatlantis/atlantis/server/handlers"
+	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -79,7 +79,7 @@ type DefaultClient struct {
 	// usePluginCache determines whether or not to set the TF_PLUGIN_CACHE_DIR env var
 	usePluginCache bool
 
-	projectCmdOutputHandler handlers.ProjectCommandOutputHandler
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_downloader.go Downloader
@@ -111,7 +111,7 @@ func NewClientWithDefaultVersion(
 	tfDownloader Downloader,
 	usePluginCache bool,
 	fetchAsync bool,
-	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 ) (*DefaultClient, error) {
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
@@ -194,7 +194,7 @@ func NewTestClient(
 	tfDownloadURL string,
 	tfDownloader Downloader,
 	usePluginCache bool,
-	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 ) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
@@ -231,7 +231,7 @@ func NewClient(
 	tfDownloadURL string,
 	tfDownloader Downloader,
 	usePluginCache bool,
-	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 ) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
@@ -437,7 +437,7 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, message)
+				c.projectCmdOutputHandler.Send(ctx, message, false)
 			}
 			wg.Done()
 		}()
@@ -446,7 +446,7 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, message)
+				c.projectCmdOutputHandler.Send(ctx, message, false)
 			}
 			wg.Done()
 		}()

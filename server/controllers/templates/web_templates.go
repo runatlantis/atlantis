@@ -357,7 +357,6 @@ type ProjectJobData struct {
 	AtlantisVersion string
 	ProjectPath     string
 	CleanedBasePath string
-	ClearMsg        string
 }
 
 var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
@@ -368,11 +367,11 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <title>atlantis</title>
     <meta name="description" content>
     <meta name="author" content>
-    <link rel="stylesheet" href="/static/css/xterm.css">
-    <link rel="stylesheet" href="/static/css/normalize.css">
-    <link rel="stylesheet" href="/static/css/skeleton.css">
-    <link rel="stylesheet" href="/static/css/custom.css">
-    <link rel="icon" type="image/png" href="/static/images/atlantis-icon.png">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
+    <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
     <style>
       #terminal {
         position: fixed;
@@ -392,7 +391,7 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
 
   <body>
     <section class="header">
-    <a title="atlantis" href="/"><img class="hero" src="/static/images/atlantis-icon_512.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
     <p class="title-heading"><strong></strong></p>
     </section>
@@ -405,10 +404,10 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
   <footer>
   </footer>
 
-    <script src="/static/js/jquery-3.5.1.min.js"></script>
-    <script src="/static/js/xterm-4.9.0.js"></script>
-    <script src="/static/js/xterm-addon-attach-0.6.0.js"></script>
-    <script src="/static/js/xterm-addon-fit-0.4.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-4.9.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.6.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
 
     <script>
       var term = new Terminal({scrollback: 15000});
@@ -417,13 +416,9 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
         document.location.host +
         document.location.pathname +
         "/ws");
-      socket.onmessage = function(event) {
-        var msg = String.fromCharCode.apply(null, new Uint8Array(event.data))
-        if (msg.trim() === "-----Starting New Process-----") {
-          term.clear()
-          return 
-        }
-      }
+      window.addEventListener("unload", function(event) {
+        websocket.close();
+      })
       var attachAddon = new AttachAddon.AttachAddon(socket);
       var fitAddon = new FitAddon.FitAddon();
       term.loadAddon(attachAddon);
@@ -450,11 +445,11 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
     <title>atlantis</title>
     <meta name="description" content>
     <meta name="author" content>
-    <link rel="stylesheet" href="/static/css/xterm.css">
-    <link rel="stylesheet" href="/static/css/normalize.css">
-    <link rel="stylesheet" href="/static/css/skeleton.css">
-    <link rel="stylesheet" href="/static/css/custom.css">
-    <link rel="icon" type="image/png" href="/static/images/atlantis-icon.png">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
+    <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
     <style>
       #terminal {
         width: 100%;
@@ -466,7 +461,7 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
   <body>
     <div class="container">
       <section class="header">
-      <a title="atlantis" href="/"><img class="hero" src="/static/images/atlantis-icon_512.png"/></a>
+      <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
       <p class="title-heading">atlantis</p>
       <p class="title-heading"><strong></strong></p>
       </section>
@@ -479,10 +474,10 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
     <footer>
     </footer>
 
-    <script src="/static/js/jquery-3.5.1.min.js"></script>
-    <script src="/static/js/xterm-4.9.0.js"></script>
-    <script src="/static/js/xterm-addon-attach-0.6.0.js"></script>
-    <script src="/static/js/xterm-addon-fit-0.4.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-4.9.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.6.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
 
     <script>
       var term = new Terminal();
@@ -523,9 +518,9 @@ var GithubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").
   <meta name="description" content="">
   <meta name="author" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/static/css/normalize.css">
-  <link rel="stylesheet" href="/static/css/skeleton.css">
-  <link rel="stylesheet" href="/static/css/custom.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
   <style>
 
     form {
@@ -560,13 +555,13 @@ var GithubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").
       width: 80%;
     }
   </style>
-  <link rel="icon" type="image/png" href="/static/images/atlantis-icon.png">
-  <script src="/static/js/jquery-3.5.1.min.js"></script>
+  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
+  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
 </head>
 <body>
 <div class="container">
   <section class="header">
-    <a title="atlantis" href="/"><img class="hero" src="/static/images/atlantis-icon_512.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
 
     <p class="js-discard-success"><strong>
