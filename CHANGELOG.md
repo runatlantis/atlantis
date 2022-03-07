@@ -2,6 +2,8 @@
 
 Bug fix release, most importantly fixing the wrong version number associated with v0.19.0.
 
+And it also contains fixes for `bitbucketcloud` and `gitlab`.
+
 ## What's Changed
 
 * build(deps): bump actions/checkout from 2 to 3 by @dependabot in https://github.com/runatlantis/atlantis/pull/2119
