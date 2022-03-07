@@ -4,6 +4,15 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
+type Mode int
+
+const (
+	Default Mode = iota
+	Gateway
+	Hybrid
+	Worker
+)
+
 // UserConfig holds config values passed in by the user.
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
@@ -98,6 +107,9 @@ type UserConfig struct {
 	Webhooks                 []WebhookConfig `mapstructure:"webhooks"`
 	WriteGitCreds            bool            `mapstructure:"write-git-creds"`
 	LyftAuditJobsSnsTopicArn string          `mapstructure:"lyft-audit-jobs-sns-topic-arn"`
+	LyftGatewaySnsTopicArn   string          `mapstructure:"lyft-gateway-sns-topic-arn"`
+	LyftMode                 string          `mapstructure:"lyft-mode"`
+	LyftWorkerQueueURL       string          `mapstructure:"lyft-worker-queue-url"`
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed
@@ -114,4 +126,19 @@ func (u UserConfig) ToLogLevel() logging.LogLevel {
 		return logging.Error
 	}
 	return logging.Info
+}
+
+// ToLyftMode returns mode type to run atlantis on.
+func (u UserConfig) ToLyftMode() Mode {
+	switch u.LyftMode {
+	case "default":
+		return Default
+	case "gateway":
+		return Gateway
+	case "hybrid":
+		return Hybrid
+	case "worker":
+		return Worker
+	}
+	return Default
 }

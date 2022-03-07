@@ -44,3 +44,44 @@ func TestUserConfig_ToLogLevel(t *testing.T) {
 		})
 	}
 }
+
+func TestUserConfig_ToLyftMode(t *testing.T) {
+	cases := []struct {
+		userMode string
+		expMode  server.Mode
+	}{
+		{
+			"default",
+			server.Default,
+		},
+		{
+			"gateway",
+			server.Gateway,
+		},
+		{
+			"hybrid",
+			server.Hybrid,
+		},
+		{
+			"worker",
+			server.Worker,
+		},
+		{
+			"unknown",
+			server.Default,
+		},
+		{
+			"",
+			server.Default,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.userMode, func(t *testing.T) {
+			u := server.UserConfig{
+				LyftMode: c.userMode,
+			}
+			Equals(t, c.expMode, u.ToLyftMode())
+		})
+	}
+}

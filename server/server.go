@@ -38,9 +38,11 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/lyft/aws"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sns"
+	"github.com/runatlantis/atlantis/server/lyft/aws/sqs"
 	lyftCommands "github.com/runatlantis/atlantis/server/lyft/command"
 	lyftDecorators "github.com/runatlantis/atlantis/server/lyft/decorators"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
+	"github.com/runatlantis/atlantis/server/lyft/gateway"
 	"github.com/runatlantis/atlantis/server/lyft/scheduled"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/uber-go/tally"
@@ -106,7 +108,7 @@ type Server struct {
 	StatsCloser                   io.Closer
 	Locker                        locking.Locker
 	ApplyLocker                   locking.ApplyLocker
-	VCSEventsController           *events_controllers.VCSEventsController
+	VCSPostHandler                sqs.VCSPostHandler
 	GithubAppController           *controllers.GithubAppController
 	LocksController               *controllers.LocksController
 	StatusController              *controllers.StatusController
@@ -120,6 +122,8 @@ type Server struct {
 	Drainer                       *events.Drainer
 	ScheduledExecutorService      *scheduled.ExecutorService
 	ProjectCmdOutputHandler       jobs.ProjectCommandOutputHandler
+	Context                       context.Context
+	LyftMode                      Mode
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -817,28 +821,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatsScope:               projectJobsScope,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 	}
-
-	eventsController := &events_controllers.VCSEventsController{
-		CommandRunner:                   forceApplyCommandRunner,
-		PullCleaner:                     pullClosedExecutor,
-		Parser:                          eventParser,
-		CommentParser:                   commentParser,
-		Logger:                          logger,
-		Scope:                           statsScope,
-		ApplyDisabled:                   userConfig.DisableApply,
-		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
-		GithubRequestValidator:          &events_controllers.DefaultGithubRequestValidator{},
-		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{},
-		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
-		RepoAllowlistChecker:            repoAllowlist,
-		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
-		SupportedVCSHosts:               supportedVCSHosts,
-		VCSClient:                       vcsClient,
-		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
-		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
-		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
-		AzureDevopsRequestValidator:     &events_controllers.DefaultAzureDevopsRequestValidator{},
-	}
 	githubAppController := &controllers.GithubAppController{
 		AtlantisURL:         parsedURL,
 		Logger:              logger,
@@ -885,11 +867,90 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		rawGithubClient,
 	)
 
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
+	gatewaySnsWriter := sns.NewWriterWithStats(session, userConfig.LyftGatewaySnsTopicArn, statsScope)
+	autoplanValidator := &gateway.AutoplanValidator{
+		Logger:                        logger,
+		Scope:                         statsScope.SubScope("validator"),
+		VCSClient:                     vcsClient,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		Drainer:                       drainer,
+		GlobalCfg:                     globalCfg,
+		AllowForkPRs:                  userConfig.AllowForkPRs,
+		AllowForkPRsFlag:              config.AllowForkPRsFlag,
+		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,
+		SilenceForkPRErrorsFlag:       config.SilenceForkPRErrorsFlag,
+		CommitStatusUpdater:           commitStatusUpdater,
+		PrjCmdBuilder:                 projectCommandBuilder,
+		PullUpdater:                   pullUpdater,
+	}
+	gatewayEventsController := &gateway.VCSEventsController{
+		Logger:                 logger,
+		Scope:                  statsScope,
+		Parser:                 eventParser,
+		CommentParser:          commentParser,
+		GithubWebhookSecret:    []byte(userConfig.GithubWebhookSecret),
+		GithubRequestValidator: &events_controllers.DefaultGithubRequestValidator{},
+		RepoAllowlistChecker:   repoAllowlist,
+		SilenceAllowlistErrors: userConfig.SilenceAllowlistErrors,
+		VCSClient:              vcsClient,
+		SNSWriter:              gatewaySnsWriter,
+		AutoplanValidator:      autoplanValidator,
+	}
+	defaultEventsController := &events_controllers.VCSEventsController{
+		CommandRunner:                   forceApplyCommandRunner,
+		PullCleaner:                     pullClosedExecutor,
+		Parser:                          eventParser,
+		CommentParser:                   commentParser,
+		Logger:                          logger,
+		Scope:                           statsScope,
+		ApplyDisabled:                   userConfig.DisableApply,
+		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
+		GithubRequestValidator:          &events_controllers.DefaultGithubRequestValidator{},
+		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{},
+		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
+		RepoAllowlistChecker:            repoAllowlist,
+		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
+		SupportedVCSHosts:               supportedVCSHosts,
+		VCSClient:                       vcsClient,
+		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
+		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
+		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
+		AzureDevopsRequestValidator:     &events_controllers.DefaultAzureDevopsRequestValidator{},
+	}
+	var vcsPostHandler sqs.VCSPostHandler
+	lyftMode := userConfig.ToLyftMode()
+	//TODO: remove logs after testing is complete
+	switch lyftMode {
+	case Default: // default eventsController handles POST
+		vcsPostHandler = defaultEventsController
+		logger.Info("running Atlantis in default mode")
+	case Gateway: // gateway eventsController handles POST
+		vcsPostHandler = gatewayEventsController
+		logger.With("sns", userConfig.LyftGatewaySnsTopicArn).Info("running Atlantis in gateway mode")
+	case Hybrid: // gateway eventsController handles POST, and SQS worker is set up to handle messages via default eventsController
+		vcsPostHandler = gatewayEventsController
+		worker, err := sqs.NewGatewaySQSWorker(statsScope, userConfig.LyftWorkerQueueURL, defaultEventsController)
+		if err != nil {
+			return nil, errors.Wrapf(err, "setting up sqs handler for hybrid mode")
+		}
+		worker.Work(ctx)
+		logger.With("queue", userConfig.LyftWorkerQueueURL, "sns", userConfig.LyftGatewaySnsTopicArn).Info("running Atlantis in hybrid mode")
+	case Worker: // an SQS worker is set up to handle messages via default eventsController
+		worker, err := sqs.NewGatewaySQSWorker(statsScope, userConfig.LyftWorkerQueueURL, defaultEventsController)
+		if err != nil {
+			return nil, errors.Wrapf(err, "setting up sqs handler for worker mode")
+		}
+		worker.Work(ctx)
+		logger.With("queue", userConfig.LyftWorkerQueueURL).Info("running Atlantis in worker mode")
+	}
+
 	return &Server{
 		AtlantisVersion:               config.AtlantisVersion,
 		AtlantisURL:                   parsedURL,
 		Router:                        underlyingRouter,
 		Port:                          userConfig.Port,
+		Context:                       ctx,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		CommandRunner:                 commandRunner,
 		Logger:                        logger,
@@ -897,7 +958,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatsCloser:                   closer,
 		Locker:                        lockingClient,
 		ApplyLocker:                   applyLockingClient,
-		VCSEventsController:           eventsController,
+		VCSPostHandler:                vcsPostHandler,
 		GithubAppController:           githubAppController,
 		LocksController:               locksController,
 		JobsController:                jobsController,
@@ -911,6 +972,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:                       drainer,
 		ScheduledExecutorService:      scheduledExecutorService,
 		ProjectCmdOutputHandler:       projectCmdOutputHandler,
+		LyftMode:                      lyftMode,
 	}, nil
 }
 
@@ -922,16 +984,20 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
-	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
+	if s.LyftMode != Worker {
+		s.Router.HandleFunc("/events", s.VCSPostHandler.Post).Methods("POST")
+	}
+	if s.LyftMode != Gateway {
+		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
+		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
+		s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
+		s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
+			Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
+		s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
+		s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
+	}
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
-	s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
-	s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
-	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
-	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
-		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
-	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
@@ -979,8 +1045,7 @@ func (s *Server) Start() error {
 		s.Logger.Err(err.Error())
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(s.Context); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
 	}
 	return nil

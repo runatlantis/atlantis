@@ -112,6 +112,9 @@ const (
 	TFETokenFlag                 = "tfe-token"
 	WriteGitCredsFlag            = "write-git-creds"
 	LyftAuditJobsSnsTopicArnFlag = "lyft-audit-jobs-sns-topic-arn"
+	LyftGatewaySnsTopicArnFlag   = "lyft-gateway-sns-topic-arn"
+	LyftModeFlag                 = "lyft-mode"
+	LyftWorkerQueueUrlFlag       = "lyft-worker-queue-url"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser      = ""
@@ -310,6 +313,22 @@ var stringFlags = map[string]stringFlag{
 	},
 	LyftAuditJobsSnsTopicArnFlag: {
 		description:  "Provide SNS topic ARN to publish apply workflow's status. Sns topic is used for auditing purposes",
+		defaultValue: "",
+	},
+	LyftGatewaySnsTopicArnFlag: {
+		description:  "Provide SNS topic ARN to publish GH events to atlantis worker. Sns topic is used in gateway proxy mode",
+		defaultValue: "",
+	},
+	LyftModeFlag: {
+		description: "Specifies which mode to run atlantis in. If not set, will assume the default mode. Available modes:\n" +
+			"default: Runs atlantis with default event handler that processes events within same.\n" +
+			"gateway: Runs atlantis with gateway event handler that publishes events through sns.\n" +
+			"worker:  Runs atlantis with a sqs handler that polls for events in the queue to process.\n" +
+			"hybrid:  Runs atlantis with both a gateway event handler and sqs handler to perform both gateway and worker behaviors.",
+		defaultValue: "",
+	},
+	LyftWorkerQueueUrlFlag: {
+		description:  "Provide queue of AWS SQS queue for atlantis work to pull GH events from and process.",
 		defaultValue: "",
 	},
 }
