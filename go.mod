@@ -39,7 +39,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli v1.22.5
 	github.com/urfave/negroni v1.0.0
-	github.com/xanzy/go-gitlab v0.55.1
+	github.com/xanzy/go-gitlab v0.58.0
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.21.0
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
