@@ -102,7 +102,7 @@ func staticCssCustomCss() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static/css/custom.css", size: 6946, mode: os.FileMode(420), modTime: time.Unix(1641777138, 0)}
+	info := bindataFileInfo{name: "static/css/custom.css", size: 6946, mode: os.FileMode(420), modTime: time.Unix(1635422826, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -122,7 +122,7 @@ func staticCssNormalizeCss() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static/css/normalize.css", size: 7797, mode: os.FileMode(420), modTime: time.Unix(1641777138, 0)}
+	info := bindataFileInfo{name: "static/css/normalize.css", size: 7797, mode: os.FileMode(420), modTime: time.Unix(1635422826, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -142,7 +142,7 @@ func staticCssSkeletonCss() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static/css/skeleton.css", size: 11452, mode: os.FileMode(420), modTime: time.Unix(1641777138, 0)}
+	info := bindataFileInfo{name: "static/css/skeleton.css", size: 11452, mode: os.FileMode(420), modTime: time.Unix(1635422826, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -162,7 +162,7 @@ func staticCssXtermCss() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static/css/xterm.css", size: 4077, mode: os.FileMode(420), modTime: time.Unix(1588609078, 0)}
+	info := bindataFileInfo{name: "static/css/xterm.css", size: 4077, mode: os.FileMode(420), modTime: time.Unix(1643624040, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -182,7 +182,7 @@ func staticImagesAtlantisIconPng() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static/images/atlantis-icon.png", size: 4238, mode: os.FileMode(420), modTime: time.Unix(1641777138, 0)}
+	info := bindataFileInfo{name: "static/images/atlantis-icon.png", size: 4238, mode: os.FileMode(420), modTime: time.Unix(1635422826, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -202,7 +202,7 @@ func staticImagesAtlantisIcon_512Png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static/images/atlantis-icon_512.png", size: 49782, mode: os.FileMode(420), modTime: time.Unix(1641777138, 0)}
+	info := bindataFileInfo{name: "static/images/atlantis-icon_512.png", size: 49782, mode: os.FileMode(420), modTime: time.Unix(1635422826, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -222,7 +222,7 @@ func staticJsJquery351MinJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static/js/jquery-3.5.1.min.js", size: 89476, mode: os.FileMode(420), modTime: time.Unix(1641777138, 0)}
+	info := bindataFileInfo{name: "static/js/jquery-3.5.1.min.js", size: 89476, mode: os.FileMode(420), modTime: time.Unix(1635422826, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -242,7 +242,7 @@ func staticJsXterm490Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static/js/xterm-4.9.0.js", size: 299239, mode: os.FileMode(420), modTime: time.Unix(1641787410, 0)}
+	info := bindataFileInfo{name: "static/js/xterm-4.9.0.js", size: 299239, mode: os.FileMode(420), modTime: time.Unix(1643624040, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -262,7 +262,7 @@ func staticJsXtermAddonAttach060Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static/js/xterm-addon-attach-0.6.0.js", size: 3651, mode: os.FileMode(420), modTime: time.Unix(1641787403, 0)}
+	info := bindataFileInfo{name: "static/js/xterm-addon-attach-0.6.0.js", size: 3651, mode: os.FileMode(420), modTime: time.Unix(1643624040, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -282,7 +282,7 @@ func staticJsXtermAddonFit040Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static/js/xterm-addon-fit-0.4.0.js", size: 3621, mode: os.FileMode(420), modTime: time.Unix(1641787399, 0)}
+	info := bindataFileInfo{name: "static/js/xterm-addon-fit-0.4.0.js", size: 3621, mode: os.FileMode(420), modTime: time.Unix(1643624040, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
