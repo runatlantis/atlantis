@@ -14,6 +14,7 @@ import (
 )
 
 const PageSize = 100
+const OutputPrefix = "output"
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_storage_backend.go StorageBackend
 
@@ -66,6 +67,9 @@ type storageBackend struct {
 }
 
 func (s *storageBackend) Read(key string) (logs []string, err error) {
+
+	// Read from  /output directory
+	key = fmt.Sprintf("%s/%s", OutputPrefix, key)
 	readContainerFn := func(item stow.Item, err error) error {
 		if err != nil {
 			return errors.Wrapf(err, "reading item: %s", item.Name())
@@ -110,8 +114,10 @@ func (s *storageBackend) Read(key string) (logs []string, err error) {
 }
 
 func (s *storageBackend) Write(key string, logs []string, _ string) (bool, error) {
-	containerFound := false
+	// Write to /output directory
+	key = fmt.Sprintf("%s/%s", OutputPrefix, key)
 
+	containerFound := false
 	logString := strings.Join(logs, "\n")
 	size := int64(len(logString))
 	reader := strings.NewReader(logString)
