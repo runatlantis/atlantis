@@ -23,7 +23,7 @@ func TestJobURLSetter(t *testing.T) {
 		url := "url-to-project-jobs"
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
 
-		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn(url, nil)
+		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqPtrToModelsProjectCommandContext(ctx))).ThenReturn(url, nil)
 		When(projectStatusUpdater.UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, url)).ThenReturn(nil)
 		err := jobURLSetter.SetJobURLWithStatus(ctx, models.PlanCommand, models.PendingCommitStatus)
 		Ok(t, err)
@@ -37,7 +37,7 @@ func TestJobURLSetter(t *testing.T) {
 		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
 
-		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn("url-to-project-jobs", errors.New("some error"))
+		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqPtrToModelsProjectCommandContext(ctx))).ThenReturn("url-to-project-jobs", errors.New("some error"))
 		err := jobURLSetter.SetJobURLWithStatus(ctx, models.PlanCommand, models.PendingCommitStatus)
 		assert.Error(t, err)
 	})

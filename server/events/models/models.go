@@ -549,6 +549,14 @@ type PlanSuccess struct {
 	HasDiverged bool
 }
 
+func (p *PlanSuccess) IsUpToDate() bool {
+	if p == nil {
+		return false
+	}
+	r := regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
+	return r.FindString(p.TerraformOutput) != ""
+}
+
 // Summary extracts one line summary of plan changes from TerraformOutput.
 func (p *PlanSuccess) Summary() string {
 	note := ""

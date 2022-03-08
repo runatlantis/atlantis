@@ -216,6 +216,7 @@ func (p *PlanCommandRunner) runProjectCmds(ctx *CommandContext, projectCmds []*m
 	groups := p.prjCmdBuilder.GroupProjectCmdsByDependency(projectCmds)
 
 	for i, groupCmds := range groups {
+		// TODO : jw: make this configurable
 		// Always plan all projects in case a new commit is
 		// made which changes a dependency
 		var groupResult CommandResult
@@ -289,7 +290,7 @@ func (p *PlanCommandRunner) partitionProjectCmds(
 	projectCmds []*models.ProjectCommandContext,
 	policyCheckCmds []*models.ProjectCommandContext,
 ) {
-	for i, _ := range cmds {
+	for i := range cmds {
 		switch cmds[i].CommandName {
 		case models.PlanCommand:
 			projectCmds = append(projectCmds, cmds[i])
