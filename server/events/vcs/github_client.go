@@ -102,7 +102,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 	)
 	httpClient := oauth2.NewClient(context.Background(), src)
 	// Use the client from shurcooL's githubv4 library for queries.
-	v4QueryClient := githubv4.NewClient(httpClient)
+	v4QueryClient := githubv4.NewEnterpriseClient(graphqlURL, httpClient)
 
 	user, err := credentials.GetUser()
 	logger.Debug("GH User: %s", user)
