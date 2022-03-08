@@ -12,6 +12,7 @@ import (
 )
 
 const PageSize = 100
+const OutputPrefix = "output"
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_storage_backend.go StorageBackend
 
@@ -29,8 +30,10 @@ type storageBackend struct {
 	containerName string
 }
 
-func (s *storageBackend) Read(key string) ([]string, error) {
-	logs := []string{}
+func (s *storageBackend) Read(key string) (logs []string, err error) {
+
+	// Read from  /output directory
+	key = fmt.Sprintf("%s/%s", OutputPrefix, key)
 	readContainerFn := func(item stow.Item, err error) error {
 		if err != nil {
 			return errors.Wrapf(err, "reading item: %s at location: %s", item.Name(), s.location)
@@ -69,13 +72,15 @@ func (s *storageBackend) Read(key string) ([]string, error) {
 		return stow.Walk(container, key, PageSize, readContainerFn)
 	}
 
-	err := stow.WalkContainers(s.location, s.containerName, PageSize, readLocationFn)
+	err = stow.WalkContainers(s.location, s.containerName, PageSize, readLocationFn)
 	return logs, err
 }
 
 func (s *storageBackend) Write(key string, logs []string) (bool, error) {
-	containerFound := false
+	// Write to /output directory
+	key = fmt.Sprintf("%s/%s", OutputPrefix, key)
 
+	containerFound := false
 	logString := strings.Join(logs, "\n")
 	size := int64(len(logString))
 	reader := strings.NewReader(logString)
