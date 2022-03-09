@@ -981,3 +981,49 @@ func TestGithubClient_Retry404Files(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 3, numCalls)
 }
+
+// GetTeamNamesForUser returns a list of team names for a user.
+func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	// Mocked GraphQL response for two teams
+	resp := `{
+		"data":{
+		  "organization": {
+			"teams":{
+				"edges":[
+					{"node":{"name":"frontend-developers"}},
+					{"node":{"name":"employees"}}
+				],
+				"pageInfo":{
+					"endCursor":"Y3Vyc29yOnYyOpHOAFMoLQ==",
+					"hasNextPage":false
+				}
+			}
+		}
+	  }
+	}`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/graphql":
+				w.Write([]byte(resp)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, logger)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	teams, err := client.GetTeamNamesForUser(models.Repo{
+		Owner: "testrepo",
+	}, models.User{
+		Username: "testuser",
+	})
+	Ok(t, err)
+	Equals(t, []string{"frontend-developers", "employees"}, teams)
+}
