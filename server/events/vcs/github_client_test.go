@@ -1006,7 +1006,7 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
 			case "/api/graphql":
-				w.Write([]byte(resp))
+				w.Write([]byte(resp)) // nolint: errcheck
 			default:
 				t.Errorf("got unexpected request at %q", r.RequestURI)
 				http.Error(w, "not found", http.StatusNotFound)
