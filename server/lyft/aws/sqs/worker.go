@@ -2,17 +2,16 @@ package sqs
 
 import (
 	"context"
-	"sync"
-
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/uber-go/tally"
+	"sync"
 )
 
 const (
-	msgSubScope = "msg"
-
 	ProcessMessageMetricName = "process"
 	ReceiveMessageMetricName = "receive"
 	DeleteMessageMetricName  = "delete"
@@ -26,17 +25,15 @@ type Worker struct {
 	Queue            Queue
 	QueueURL         string
 	MessageProcessor MessageProcessor
-	Scope            tally.Scope
+	Logger           logging.SimpleLogging
 }
 
-// TODO: initialize SQS worker in server.go upon creation of worker/hybrid modes
-
-func NewGatewaySQSWorker(scope tally.Scope, queueURL string, postHandler VCSPostHandler) (*Worker, error) {
-	cfg, err := config.LoadDefaultConfig(context.Background())
+func NewGatewaySQSWorker(scope tally.Scope, logger logging.SimpleLogging, queueURL string, postHandler VCSPostHandler, ctx context.Context) (*Worker, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error loading aws config for sqs worker")
 	}
-	scope = scope.SubScope("aws.sqs")
+	scope = scope.SubScope("aws.sqs.msg")
 	sqsQueueWrapper := &QueueWithStats{
 		Queue:    sqs.NewFromConfig(cfg),
 		Scope:    scope,
@@ -47,24 +44,25 @@ func NewGatewaySQSWorker(scope tally.Scope, queueURL string, postHandler VCSPost
 		VCSEventMessageProcessor: VCSEventMessageProcessor{
 			PostHandler: postHandler,
 		},
-		Scope: scope.SubScope(msgSubScope).SubScope(ProcessMessageMetricName),
+		Scope: scope.SubScope(ProcessMessageMetricName),
 	}
 
 	return &Worker{
 		Queue:            sqsQueueWrapper,
 		QueueURL:         queueURL,
 		MessageProcessor: handler,
-		Scope:            scope.SubScope(msgSubScope),
+		Logger:           logger,
 	}, nil
 }
 
 func (w *Worker) Work(ctx context.Context) {
 	messages := make(chan types.Message)
-	// Used to synchronize stopping message retrivial and processing
+	// Used to synchronize stopping message retrieval and processing
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		w.Logger.Info("start processing sqs messages")
 		w.processMessage(ctx, messages)
 	}()
 	request := &sqs.ReceiveMessageInput{
@@ -72,6 +70,7 @@ func (w *Worker) Work(ctx context.Context) {
 		MaxNumberOfMessages: 10, //max number of batch-able messages
 		WaitTimeSeconds:     20, //max duration long polling
 	}
+	w.Logger.Info("start receiving sqs messages")
 	w.receiveMessages(ctx, messages, request)
 	wg.Wait()
 }
@@ -81,10 +80,12 @@ func (w *Worker) receiveMessages(ctx context.Context, messages chan types.Messag
 		select {
 		case <-ctx.Done():
 			close(messages)
+			w.Logger.Info("closed sqs messages channel")
 			return
 		default:
 			response, err := w.Queue.ReceiveMessage(ctx, request)
 			if err != nil {
+				w.Logger.With("err", err).Warn("unable to receive sqs message")
 				continue
 			}
 			for _, message := range response.Messages {
@@ -99,6 +100,7 @@ func (w *Worker) processMessage(ctx context.Context, messages chan types.Message
 	for message := range messages {
 		err := w.MessageProcessor.ProcessMessage(message)
 		if err != nil {
+			w.Logger.With("err", err).Err("unable to process sqs message")
 			continue
 		}
 
@@ -107,5 +109,8 @@ func (w *Worker) processMessage(ctx context.Context, messages chan types.Message
 			QueueUrl:      &w.QueueURL,
 			ReceiptHandle: message.ReceiptHandle,
 		})
+		if err != nil {
+			w.Logger.With("err", err).Warn("unable to delete processed sqs message")
+		}
 	}
 }

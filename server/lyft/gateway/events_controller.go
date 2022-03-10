@@ -12,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sns"
 	"github.com/uber-go/tally"
+	"io/ioutil"
 	"net/http"
 )
 
@@ -78,10 +79,10 @@ func (g *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	var resp HttpResponse
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
-		resp = g.HandleGithubCommentEvent(event, r)
+		resp = g.HandleGithubCommentEvent(event, r, payload)
 		scope = scope.SubScope(fmt.Sprintf("comment.%s", *event.Action))
 	case *github.PullRequestEvent:
-		resp = g.HandleGithubPullRequestEvent(event, r)
+		resp = g.HandleGithubPullRequestEvent(event, r, payload)
 		scope = scope.SubScope(fmt.Sprintf("pr.%s", *event.Action))
 	default:
 		resp = HttpResponse{
@@ -102,7 +103,7 @@ func (g *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 
 // HandleGithubCommentEvent handles comment events from GitHub where Atlantis
 // commands can come from. It's exported to make testing easier.
-func (g *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommentEvent, r *http.Request) HttpResponse {
+func (g *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommentEvent, r *http.Request, payload []byte) HttpResponse {
 	if event.GetAction() != "created" {
 		return HttpResponse{
 			body: fmt.Sprintf("Ignoring comment event since action was not created"),
@@ -121,10 +122,10 @@ func (g *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 	}
 	// We pass in nil for maybeHeadRepo because the head repo data isn't
 	// available in the GithubIssueComment event.
-	return g.handleCommentEvent(baseRepo, pullNum, event.Comment.GetBody(), models.Github, r)
+	return g.handleCommentEvent(baseRepo, pullNum, event.Comment.GetBody(), models.Github, r, payload)
 }
 
-func (g *VCSEventsController) handleCommentEvent(baseRepo models.Repo, pullNum int, comment string, vcsHost models.VCSHostType, r *http.Request) HttpResponse {
+func (g *VCSEventsController) handleCommentEvent(baseRepo models.Repo, pullNum int, comment string, vcsHost models.VCSHostType, r *http.Request, payload []byte) HttpResponse {
 	parseResult := g.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -164,7 +165,7 @@ func (g *VCSEventsController) handleCommentEvent(baseRepo models.Repo, pullNum i
 			body: "Commenting back on pull request",
 		}
 	}
-	if err := g.SendToWorker(r); err != nil {
+	if err := g.SendToWorker(r, payload); err != nil {
 		g.Logger.With("err", err).Err("failed to send comment request to Atlantis worker")
 		return HttpResponse{
 			body: err.Error(),
@@ -179,7 +180,7 @@ func (g *VCSEventsController) handleCommentEvent(baseRepo models.Repo, pullNum i
 	}
 }
 
-func (g *VCSEventsController) HandleGithubPullRequestEvent(pullEvent *github.PullRequestEvent, r *http.Request) HttpResponse {
+func (g *VCSEventsController) HandleGithubPullRequestEvent(pullEvent *github.PullRequestEvent, r *http.Request, payload []byte) HttpResponse {
 	pull, pullEventType, baseRepo, headRepo, user, err := g.Parser.ParseGithubPullEvent(pullEvent)
 	if err != nil {
 		wrapped := errors.Wrapf(err, "Error parsing pull data: %s", err)
@@ -191,10 +192,10 @@ func (g *VCSEventsController) HandleGithubPullRequestEvent(pullEvent *github.Pul
 			},
 		}
 	}
-	return g.handlePullRequestEvent(baseRepo, headRepo, pull, user, pullEventType, r)
+	return g.handlePullRequestEvent(baseRepo, headRepo, pull, user, pullEventType, r, payload)
 }
 
-func (g *VCSEventsController) handlePullRequestEvent(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType, request *http.Request) HttpResponse {
+func (g *VCSEventsController) handlePullRequestEvent(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType, request *http.Request, payload []byte) HttpResponse {
 	if !g.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
 		// If the repo isn't allowlisted and we receive an opened pull request
 		// event we comment back on the pull request that the repo isn't
@@ -216,13 +217,13 @@ func (g *VCSEventsController) handlePullRequestEvent(baseRepo models.Repo, headR
 	case models.OpenedPullEvent, models.UpdatedPullEvent:
 		// If the pull request was opened or updated, we perform a pseudo-autoplan to determine if tf changes exist.
 		// If it exists, then we will forward request to the worker.
-		go g.handleOpenPullEvent(baseRepo, headRepo, pull, user, request)
+		go g.handleOpenPullEvent(baseRepo, headRepo, pull, user, request, payload)
 		return HttpResponse{
 			body: "Processing...",
 		}
 	case models.ClosedPullEvent:
 		// If the pull request was closed, we route to worker to handle deleting locks.
-		if err := g.SendToWorker(request); err != nil {
+		if err := g.SendToWorker(request, payload); err != nil {
 			return HttpResponse{
 				body: err.Error(),
 				err: HttpError{
@@ -240,21 +241,35 @@ func (g *VCSEventsController) handlePullRequestEvent(baseRepo models.Repo, headR
 	return HttpResponse{}
 }
 
-func (g *VCSEventsController) handleOpenPullEvent(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, request *http.Request) {
+func (g *VCSEventsController) handleOpenPullEvent(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, request *http.Request, payload []byte) {
 	if hasTerraformChanges := g.AutoplanValidator.InstrumentedIsValid(baseRepo, headRepo, pull, user); hasTerraformChanges {
-		if err := g.SendToWorker(request); err != nil {
+		if err := g.SendToWorker(request, payload); err != nil {
 			g.Logger.With("err", err).Err("failed to send autoplan request to Atlantis worker")
 		}
 	}
 }
 
-func (g *VCSEventsController) SendToWorker(r *http.Request) error {
-	buffer := bytes.NewBuffer([]byte{})
-	if err := r.Write(buffer); err != nil {
-		return errors.Wrap(err, "marshalling gateway request to buffer")
+func (g *VCSEventsController) SendToWorker(r *http.Request, body []byte) error {
+	err := r.Body.Close()
+	if err != nil {
+		return errors.Wrap(err, "closing request body")
 	}
-	if err := g.SNSWriter.Write(buffer.Bytes()); err != nil {
-		return errors.Wrap(err, "marshalling gateway request to buffer")
+	bodyBuffer := bytes.NewBuffer(body)
+	copiedRequest := http.Request{
+		Method:           r.Method,
+		URL:              r.URL,
+		Header:           r.Header,
+		Body:             ioutil.NopCloser(bodyBuffer),
+		ContentLength:    r.ContentLength,
+		TransferEncoding: r.TransferEncoding,
+		Host:             r.Host,
+	}
+	requestBuffer := bytes.NewBuffer([]byte{})
+	if err := copiedRequest.Write(requestBuffer); err != nil {
+		return errors.Wrap(err, "marshalling gateway request into buffer")
+	}
+	if err := g.SNSWriter.Write(requestBuffer.Bytes()); err != nil {
+		return errors.Wrap(err, "writing gateway request to SNS topic")
 	}
 	return nil
 }

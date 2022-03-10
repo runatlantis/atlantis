@@ -5,6 +5,7 @@ import (
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sqs"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sqs/mocks"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sqs/mocks/matchers"
@@ -86,7 +87,7 @@ func TestWorker_Success(t *testing.T) {
 		Queue:            queue,
 		QueueURL:         "testUrl",
 		MessageProcessor: handler,
-		Scope:            testScope,
+		Logger:           logging.NewNoopLogger(t),
 	}
 
 	wg.Add(1)
@@ -124,7 +125,7 @@ func TestWorker_Error(t *testing.T) {
 		Queue:            queue,
 		QueueURL:         "testUrl",
 		MessageProcessor: handler,
-		Scope:            testScope,
+		Logger:           logging.NewNoopLogger(t),
 	}
 
 	wg.Add(1)
@@ -169,7 +170,7 @@ func TestWorker_HandlerError(t *testing.T) {
 		Queue:            queue,
 		QueueURL:         "testUrl",
 		MessageProcessor: handler,
-		Scope:            testScope,
+		Logger:           logging.NewNoopLogger(t),
 	}
 
 	wg.Add(1)

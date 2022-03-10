@@ -258,7 +258,7 @@ func TestPost_GithubCommentFailure(t *testing.T) {
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	sns.VerifyWasCalledOnce().Write(sns_matchers.AnySliceOfByte())
-	ResponseContains(t, w, http.StatusBadRequest, "marshalling gateway request to buffer: err")
+	ResponseContains(t, w, http.StatusBadRequest, "writing gateway request to SNS topic: err")
 }
 
 func TestPost_GithubIgnorePR(t *testing.T) {

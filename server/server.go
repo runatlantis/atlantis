@@ -122,8 +122,8 @@ type Server struct {
 	Drainer                       *events.Drainer
 	ScheduledExecutorService      *scheduled.ExecutorService
 	ProjectCmdOutputHandler       jobs.ProjectCommandOutputHandler
-	Context                       context.Context
 	LyftMode                      Mode
+	CancelWorker                  context.CancelFunc
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -867,7 +867,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		rawGithubClient,
 	)
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
+	ctx, cancel := context.WithCancel(context.Background())
 	gatewaySnsWriter := sns.NewWriterWithStats(session, userConfig.LyftGatewaySnsTopicArn, statsScope)
 	autoplanValidator := &gateway.AutoplanValidator{
 		Logger:                        logger,
@@ -930,18 +930,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		logger.With("sns", userConfig.LyftGatewaySnsTopicArn).Info("running Atlantis in gateway mode")
 	case Hybrid: // gateway eventsController handles POST, and SQS worker is set up to handle messages via default eventsController
 		vcsPostHandler = gatewayEventsController
-		worker, err := sqs.NewGatewaySQSWorker(statsScope, userConfig.LyftWorkerQueueURL, defaultEventsController)
+		worker, err := sqs.NewGatewaySQSWorker(statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController, ctx)
 		if err != nil {
+			logger.With("err", err).Err("unable to set up worker")
+			cancel()
 			return nil, errors.Wrapf(err, "setting up sqs handler for hybrid mode")
 		}
-		worker.Work(ctx)
+		go worker.Work(ctx)
 		logger.With("queue", userConfig.LyftWorkerQueueURL, "sns", userConfig.LyftGatewaySnsTopicArn).Info("running Atlantis in hybrid mode")
 	case Worker: // an SQS worker is set up to handle messages via default eventsController
-		worker, err := sqs.NewGatewaySQSWorker(statsScope, userConfig.LyftWorkerQueueURL, defaultEventsController)
+		worker, err := sqs.NewGatewaySQSWorker(statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController, ctx)
 		if err != nil {
+			cancel()
 			return nil, errors.Wrapf(err, "setting up sqs handler for worker mode")
 		}
-		worker.Work(ctx)
+		go worker.Work(ctx)
 		logger.With("queue", userConfig.LyftWorkerQueueURL).Info("running Atlantis in worker mode")
 	}
 
@@ -950,7 +953,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisURL:                   parsedURL,
 		Router:                        underlyingRouter,
 		Port:                          userConfig.Port,
-		Context:                       ctx,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		CommandRunner:                 commandRunner,
 		Logger:                        logger,
@@ -973,6 +975,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ScheduledExecutorService:      scheduledExecutorService,
 		ProjectCmdOutputHandler:       projectCmdOutputHandler,
 		LyftMode:                      lyftMode,
+		CancelWorker:                  cancel,
 	}, nil
 }
 
@@ -1037,6 +1040,12 @@ func (s *Server) Start() error {
 	}()
 	<-stop
 
+	// Shutdown sqs polling. Any received messages being processed will either succeed/fail depending on if drainer started.
+	if s.LyftMode == Hybrid || s.LyftMode == Worker {
+		s.Logger.Warn("Received interrupt. Shutting down the sqs handler")
+		s.CancelWorker()
+	}
+
 	s.Logger.Warn("Received interrupt. Waiting for in-progress operations to complete")
 	s.waitForDrain()
 
@@ -1045,7 +1054,8 @@ func (s *Server) Start() error {
 		s.Logger.Err(err.Error())
 	}
 
-	if err := server.Shutdown(s.Context); err != nil {
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
+	if err := server.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
 	}
 	return nil
