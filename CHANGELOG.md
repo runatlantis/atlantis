@@ -1,3 +1,12 @@
+# v0.19.2
+
+Bug fix release for github and update docs to reflect the docker registry support change.
+
+## What's Changed
+
+* fix: fix unmarshall error in graphql call by @raymondchen625 in https://github.com/runatlantis/atlantis/pull/2128
+* docs: update docker registry link to ghcr by @marceloboeira in https://github.com/runatlantis/atlantis/pull/2130
+
 # v0.19.1
 
 Bug fix release, most importantly fixing the wrong version number associated with v0.19.0.
