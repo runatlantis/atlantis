@@ -43,6 +43,7 @@ type AutoplanValidator struct {
 	CommitStatusUpdater        events.CommitStatusUpdater
 	PrjCmdBuilder              events.ProjectPlanCommandBuilder
 	PullUpdater                *events.PullUpdater
+	WorkingDir                 events.WorkingDir
 }
 
 func (r *AutoplanValidator) isValid(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) (bool, error) {
@@ -78,8 +79,16 @@ func (r *AutoplanValidator) isValid(baseRepo models.Repo, headRepo models.Repo, 
 		if statusErr := r.CommitStatusUpdater.UpdateCombined(baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
+		// If error happened after clone was made, we should clean it up here too
+		if cloneErr := r.WorkingDir.Delete(baseRepo, pull); cloneErr != nil {
+			ctx.Log.With("err", cloneErr).Warn("unable to delete clone after autoplan failed")
+		}
 		r.PullUpdater.UpdatePull(ctx, events.AutoplanCommand{}, command.Result{Error: err})
 		return false, errors.Wrap(err, "Failed building autoplan commands")
+	}
+	// Delete repo clone generated to validate plan
+	if err := r.WorkingDir.Delete(baseRepo, pull); err != nil {
+		return false, errors.Wrap(err, "Failed deleting cloned repo")
 	}
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")

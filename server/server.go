@@ -883,6 +883,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater:           commitStatusUpdater,
 		PrjCmdBuilder:                 projectCommandBuilder,
 		PullUpdater:                   pullUpdater,
+		WorkingDir:                    workingDir,
 	}
 	gatewayEventsController := &gateway.VCSEventsController{
 		Logger:                 logger,
