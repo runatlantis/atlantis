@@ -10,7 +10,7 @@ jobs:
     - run: make check-lint
   e2e:
     docker:
-    - image: circleci/golang:1.17 # If you update this, update it in the Makefile too
+    - image: cimg/go:1.18 # If you update this, update it in the Makefile too
       environment:
         # This version of TF will be downloaded before Atlantis is started.
         # We do this instead of setting --default-tf-version because setting
