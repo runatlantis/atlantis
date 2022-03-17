@@ -1,8 +1,8 @@
 package events
 
 import (
-	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/metrics"
 )
 
 type InstrumentedProjectCommandRunner struct {
