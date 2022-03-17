@@ -20,11 +20,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 
 	"github.com/google/go-github/v31/github"
 	. "github.com/petergtz/pegomock"
