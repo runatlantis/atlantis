@@ -138,14 +138,14 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 	e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request")
 }
 
-type HttpError struct {
+type HTTPError struct {
 	err  error
 	code int
 }
 
-type HttpResponse struct {
+type HTTPResponse struct {
 	body string
-	err  HttpError
+	err  HTTPError
 }
 
 func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Request) {
@@ -164,7 +164,7 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 
 	event, _ := github.ParseWebHook(github.WebHookType(r), payload)
 
-	var resp HttpResponse
+	var resp HTTPResponse
 
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
@@ -174,7 +174,7 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 		resp = e.HandleGithubPullRequestEvent(logger, event, githubReqID)
 		scope = scope.SubScope(fmt.Sprintf("pr.%s", *event.Action))
 	default:
-		resp = HttpResponse{
+		resp = HTTPResponse{
 			body: fmt.Sprintf("Ignoring unsupported event %s", githubReqID),
 		}
 	}
@@ -280,9 +280,9 @@ func (e *VCSEventsController) handleAzureDevopsPost(w http.ResponseWriter, r *ht
 
 // HandleGithubCommentEvent handles comment events from GitHub where Atlantis
 // commands can come from. It's exported to make testing easier.
-func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommentEvent, githubReqID string, logger logging.SimpleLogging) HttpResponse {
+func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommentEvent, githubReqID string, logger logging.SimpleLogging) HTTPResponse {
 	if event.GetAction() != "created" {
-		return HttpResponse{
+		return HTTPResponse{
 			body: fmt.Sprintf("Ignoring comment event since action was not created %s", githubReqID),
 		}
 	}
@@ -291,9 +291,9 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 
 	wrapped := errors.Wrapf(err, "Failed parsing event: %s", githubReqID)
 	if err != nil {
-		return HttpResponse{
+		return HTTPResponse{
 			body: wrapped.Error(),
-			err: HttpError{
+			err: HTTPError{
 				code: http.StatusBadRequest,
 				err:  wrapped,
 			},
@@ -394,13 +394,13 @@ func (e *VCSEventsController) handleBitbucketServerPullRequestEvent(w http.Respo
 // HandleGithubPullRequestEvent will delete any locks associated with the pull
 // request if the event is a pull request closed event. It's exported to make
 // testing easier.
-func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.SimpleLogging, pullEvent *github.PullRequestEvent, githubReqID string) HttpResponse {
+func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.SimpleLogging, pullEvent *github.PullRequestEvent, githubReqID string) HTTPResponse {
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGithubPullEvent(pullEvent)
 	if err != nil {
 		wrapped := errors.Wrapf(err, "Error parsing pull data: %s %s", err, githubReqID)
-		return HttpResponse{
+		return HTTPResponse{
 			body: wrapped.Error(),
-			err: HttpError{
+			err: HTTPError{
 				code: http.StatusBadRequest,
 				err:  wrapped,
 			},
@@ -410,7 +410,7 @@ func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.Simple
 	return e.handlePullRequestEvent(logger, baseRepo, headRepo, pull, user, pullEventType)
 }
 
-func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType) HttpResponse {
+func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType) HTTPResponse {
 	if !e.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
 		// If the repo isn't allowlisted and we receive an opened pull request
 		// event we comment back on the pull request that the repo isn't
@@ -420,11 +420,11 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 			e.commentNotAllowlisted(baseRepo, pull.Num)
 		}
 
-		err := errors.New(fmt.Sprintf("Pull request event from non-allowlisted repo \"%s/%s\"", baseRepo.VCSHost.Hostname, baseRepo.FullName))
+		err := errors.Errorf("Pull request event from non-allowlisted repo \"%s/%s\"", baseRepo.VCSHost.Hostname, baseRepo.FullName)
 
-		return HttpResponse{
+		return HTTPResponse{
 			body: err.Error(),
-			err: HttpError{
+			err: HTTPError{
 				code: http.StatusForbidden,
 				err:  err,
 			},
@@ -444,31 +444,31 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 			// When testing we want to wait for everything to complete.
 			e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
 		}
-		return HttpResponse{
+		return HTTPResponse{
 			body: "Processing...",
 		}
 	case models.ClosedPullEvent:
 		// If the pull request was closed, we delete locks.
 		if err := e.PullCleaner.CleanUpPull(baseRepo, pull); err != nil {
-			return HttpResponse{
+			return HTTPResponse{
 				body: err.Error(),
-				err: HttpError{
+				err: HTTPError{
 					code: http.StatusForbidden,
 					err:  err,
 				},
 			}
 		}
 		logger.Info("deleted locks and workspace for repo %s, pull %d", baseRepo.FullName, pull.Num)
-		return HttpResponse{
+		return HTTPResponse{
 			body: "Pull request cleaned successfully",
 		}
 	case models.OtherPullEvent:
 		// Else we ignore the event.
-		return HttpResponse{
+		return HTTPResponse{
 			body: "Ignoring non-actionable pull request event",
 		}
 	}
-	return HttpResponse{}
+	return HTTPResponse{}
 }
 
 func (e *VCSEventsController) handleGitlabPost(w http.ResponseWriter, r *http.Request) {
@@ -518,7 +518,7 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 	e.respond(w, lvl, code, msg)
 }
 
-func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, vcsHost models.VCSHostType) HttpResponse {
+func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, vcsHost models.VCSHostType) HTTPResponse {
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -526,7 +526,7 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		if len(truncated) > truncateLen {
 			truncated = comment[:truncateLen] + "..."
 		}
-		return HttpResponse{
+		return HTTPResponse{
 			body: fmt.Sprintf("Ignoring non-command comment: %q", truncated),
 		}
 	}
@@ -538,9 +538,9 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		e.commentNotAllowlisted(baseRepo, pullNum)
 
 		err := errors.New("Repo not allowlisted")
-		return HttpResponse{
+		return HTTPResponse{
 			body: err.Error(),
-			err: HttpError{
+			err: HTTPError{
 				err:  err,
 				code: http.StatusForbidden,
 			},
@@ -555,7 +555,7 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		if err := e.VCSClient.CreateComment(baseRepo, pullNum, parseResult.CommentResponse, ""); err != nil {
 			logger.Err("unable to comment on pull request: %s", err)
 		}
-		return HttpResponse{
+		return HTTPResponse{
 			body: "Commenting back on pull request",
 		}
 	}
@@ -571,7 +571,7 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command)
 	}
 
-	return HttpResponse{
+	return HTTPResponse{
 		body: "Processing...",
 	}
 }

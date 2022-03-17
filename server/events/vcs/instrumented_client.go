@@ -5,10 +5,10 @@ import (
 	"strconv"
 
 	"github.com/google/go-github/v31/github"
-	"github.com/uber-go/tally"
-	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/uber-go/tally"
 )
 
 // NewInstrumentedGithubClient creates a client proxy responsible for gathering stats and logging
@@ -47,7 +47,7 @@ type IGithubClient interface {
 type InstrumentedGithubClient struct {
 	*InstrumentedClient
 	PullRequestGetter GithubPullRequestGetter
-	StatsScope tally.Scope
+	StatsScope        tally.Scope
 	Logger            logging.SimpleLogging
 }
 

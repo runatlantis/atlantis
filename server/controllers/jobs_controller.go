@@ -51,11 +51,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 		CleanedBasePath: j.AtlantisURL.Path,
 	}
 
-	if err = j.ProjectJobsTemplate.Execute(w, viewData); err != nil {
-		return err
-	}
-
-	return nil
+	return j.ProjectJobsTemplate.Execute(w, viewData)
 }
 
 func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) {

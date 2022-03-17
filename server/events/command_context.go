@@ -40,8 +40,8 @@ type CommandContext struct {
 	Pull     models.PullRequest
 	Scope    tally.Scope
 	// User is the user that triggered this command.
-	User  models.User
-	Log   logging.SimpleLogging
+	User models.User
+	Log  logging.SimpleLogging
 
 	// Current PR state
 	PullRequestStatus models.PullReqStatus

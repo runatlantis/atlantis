@@ -917,7 +917,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		WorkingDir:             workingDir,
 		PostWorkflowHookRunner: mockPostWorkflowHookRunner,
 	}
-	statsScope, _, err := metrics.NewLoggingScope(logger, "atlantis")
+	statsScope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		userConfig.EnablePolicyChecksFlag,
