@@ -3,9 +3,9 @@ package events
 import (
 	"strconv"
 
-	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/uber-go/tally"
 )
 
