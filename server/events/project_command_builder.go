@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config"
@@ -29,6 +31,43 @@ const (
 	DefaultDeleteSourceBranchOnMerge = false
 )
 
+func NewInstrumentedProjectCommandBuilder(
+	policyChecksSupported bool,
+	parserValidator *config.ParserValidator,
+	projectFinder ProjectFinder,
+	vcsClient vcs.Client,
+	workingDir WorkingDir,
+	workingDirLocker WorkingDirLocker,
+	globalCfg valid.GlobalCfg,
+	pendingPlanFinder *DefaultPendingPlanFinder,
+	commentBuilder CommentBuilder,
+	skipCloneNoChanges bool,
+	EnableRegExpCmd bool,
+	AutoplanFileList string,
+	scope tally.Scope,
+	logger logging.SimpleLogging,
+) *InstrumentedProjectCommandBuilder {
+	return &InstrumentedProjectCommandBuilder{
+		ProjectCommandBuilder: NewProjectCommandBuilder(
+			policyChecksSupported,
+			parserValidator,
+			projectFinder,
+			vcsClient,
+			workingDir,
+			workingDirLocker,
+			globalCfg,
+			pendingPlanFinder,
+			commentBuilder,
+			skipCloneNoChanges,
+			EnableRegExpCmd,
+			AutoplanFileList,
+			scope,
+			logger,
+		),
+		Logger: logger,
+	}
+}
+
 func NewProjectCommandBuilder(
 	policyChecksSupported bool,
 	parserValidator *config.ParserValidator,
@@ -42,8 +81,10 @@ func NewProjectCommandBuilder(
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	AutoplanFileList string,
+	scope tally.Scope,
+	logger logging.SimpleLogging,
 ) *DefaultProjectCommandBuilder {
-	projectCommandBuilder := &DefaultProjectCommandBuilder{
+	return &DefaultProjectCommandBuilder{
 		ParserValidator:    parserValidator,
 		ProjectFinder:      projectFinder,
 		VCSClient:          vcsClient,
@@ -57,10 +98,9 @@ func NewProjectCommandBuilder(
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
+			scope,
 		),
 	}
-
-	return projectCommandBuilder
 }
 
 type ProjectPlanCommandBuilder interface {

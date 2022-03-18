@@ -24,6 +24,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 
 	"github.com/google/go-github/v31/github"
 	. "github.com/petergtz/pegomock"
@@ -192,6 +193,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	When(postWorkflowHooksCommandRunner.RunPostHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
 
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	ch = events.DefaultCommandRunner{
 		VCSClient:                      vcsClient,
@@ -201,6 +203,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		GitlabMergeRequestGetter:       gitlabGetter,
 		AzureDevopsPullGetter:          azuredevopsGetter,
 		Logger:                         logger,
+		StatsScope:                     scope,
 		GlobalCfg:                      globalCfg,
 		AllowForkPRs:                   false,
 		AllowForkPRsFlag:               "allow-fork-prs-flag",

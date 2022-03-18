@@ -36,6 +36,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -916,6 +917,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		WorkingDir:             workingDir,
 		PostWorkflowHookRunner: mockPostWorkflowHookRunner,
 	}
+	statsScope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		userConfig.EnablePolicyChecksFlag,
@@ -930,6 +932,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		statsScope,
+		logger,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
@@ -1079,6 +1083,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		GitlabMergeRequestGetter:       e2eGitlabGetter,
 		Logger:                         logger,
 		GlobalCfg:                      globalCfg,
+		StatsScope:                     statsScope,
 		AllowForkPRs:                   allowForkPRs,
 		AllowForkPRsFlag:               "allow-fork-prs",
 		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
@@ -1103,6 +1108,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 		},
 		Logger:                       logger,
+		Scope:                        statsScope,
 		Parser:                       eventParser,
 		CommentParser:                commentParser,
 		GithubWebhookSecret:          nil,

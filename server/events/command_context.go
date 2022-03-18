@@ -15,6 +15,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 )
 
 // CommandTrigger represents the how the command was triggered
@@ -37,6 +38,7 @@ type CommandContext struct {
 	// See https://help.github.com/articles/about-pull-request-merges/.
 	HeadRepo models.Repo
 	Pull     models.PullRequest
+	Scope    tally.Scope
 	// User is the user that triggered this command.
 	User models.User
 	Log  logging.SimpleLogging
