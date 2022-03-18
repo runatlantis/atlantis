@@ -600,6 +600,12 @@ Values are chosen in this order:
   ```
   File containing x509 private key matching `--ssl-cert-file`.
 
+* ### `--stats-namespace`
+  ```bash
+  atlantis server --stats-namespace="myatlantis"
+  ```
+  Namespace for emitting stats/metrics. See (stats.html#Metrics/Stats)
+
 * ### `--tf-download-url`
   ```bash
   atlantis server --tf-download-url="https://releases.company.com"
