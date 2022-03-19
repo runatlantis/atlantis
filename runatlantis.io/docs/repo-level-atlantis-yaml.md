@@ -88,6 +88,44 @@ projects:
 This will stop Atlantis automatically running plan when `project1/` is updated
 in a pull request.
 
+Note:
+
+* When using `atlantis.yaml` to disable Autoplanning without listing other directories that should have Aitoplanning enabled, this will effectivly stop planning for all directories.
+
+Example:
+
+given the following project structure:
+```
+.
+├── project1
+│   └── main.tf
+└── project2
+    └── main.tf
+```
+if you add the following to `atlantis.yaml`:
+
+```yaml
+version: 3
+projects:
+- dir: project1
+  autoplan:
+    enabled: false
+```
+Autoplanning will not only stop for `project1`, rather Atlantis will ignore `project2` as well.
+
+So if you want to disable Autoplanning for `project1` and enable it for `project2` you have to explicitly state that and your config should be: 
+
+```yaml
+version: 3
+projects:
+- dir: project1
+  autoplan:
+    enabled: false
+- dir: project2
+  autoplan:
+    enabled: true
+```
+
 ### Configuring Planning
 
 Given the directory structure:
