@@ -53,20 +53,20 @@ type CommandScopedStatsProjectCommandContextBuilder struct {
 
 // BuildProjectContext builds the context and injects the appropriate command level scope after the fact.
 func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
-	ctx *CommandContext,
-	cmdName models.CommandName,
+	ctx *command.Context,
+	cmdName command.Name,
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
 	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
-) (projectCmds []models.ProjectCommandContext) {
+) (projectCmds []command.ProjectContext) {
 	cb.ProjectCounter.Inc(1)
 
 	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
 		ctx, cmdName, prjCfg, commentFlags, repoDir, automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose,
 	)
 
-	projectCmds = []models.ProjectCommandContext{}
+	projectCmds = []command.ProjectContext{}
 
 	for _, cmd := range cmds {
 
