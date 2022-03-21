@@ -589,7 +589,7 @@ projects:
 			ctxs, err := builder.BuildPlanCommands(
 				&command.Context{
 					Log:   logger,
-					Scope: score,
+					Scope: scope,
 				},
 				&events.CommentCommand{
 					RepoRelDir:  "",
