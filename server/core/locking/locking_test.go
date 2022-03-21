@@ -24,6 +24,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -184,9 +185,9 @@ func TestGetLock_NoOpLocker(t *testing.T) {
 
 func TestApplyLocker(t *testing.T) {
 	RegisterMockTestingT(t)
-	applyLock := &models.CommandLock{
-		CommandName: models.ApplyCommand,
-		LockMetadata: models.LockMetadata{
+	applyLock := &command.Lock{
+		CommandName: command.Apply,
+		LockMetadata: command.LockMetadata{
 			UnixTime: time.Now().Unix(),
 		},
 	}

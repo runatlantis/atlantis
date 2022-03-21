@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 // RunStepRunner runs custom commands.
@@ -19,7 +19,7 @@ type RunStepRunner struct {
 	TerraformBinDir string
 }
 
-func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, path string, envs map[string]string) (string, error) {
+func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string) (string, error) {
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion

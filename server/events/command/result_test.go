@@ -1,40 +1,40 @@
-package events_test
+package command_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestCommandResult_HasErrors(t *testing.T) {
 	cases := map[string]struct {
-		cr  events.CommandResult
+		cr  command.Result
 		exp bool
 	}{
 		"error": {
-			cr: events.CommandResult{
+			cr: command.Result{
 				Error: errors.New("err"),
 			},
 			exp: true,
 		},
 		"failure": {
-			cr: events.CommandResult{
+			cr: command.Result{
 				Failure: "failure",
 			},
 			exp: true,
 		},
 		"empty results list": {
-			cr: events.CommandResult{
-				ProjectResults: []models.ProjectResult{},
+			cr: command.Result{
+				ProjectResults: []command.ProjectResult{},
 			},
 			exp: false,
 		},
 		"successful plan": {
-			cr: events.CommandResult{
-				ProjectResults: []models.ProjectResult{
+			cr: command.Result{
+				ProjectResults: []command.ProjectResult{
 					{
 						PlanSuccess: &models.PlanSuccess{},
 					},
@@ -43,8 +43,8 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			exp: false,
 		},
 		"successful apply": {
-			cr: events.CommandResult{
-				ProjectResults: []models.ProjectResult{
+			cr: command.Result{
+				ProjectResults: []command.ProjectResult{
 					{
 						ApplySuccess: "success",
 					},
@@ -53,8 +53,8 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			exp: false,
 		},
 		"single errored project": {
-			cr: events.CommandResult{
-				ProjectResults: []models.ProjectResult{
+			cr: command.Result{
+				ProjectResults: []command.ProjectResult{
 					{
 						Error: errors.New("err"),
 					},
@@ -63,8 +63,8 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			exp: true,
 		},
 		"single failed project": {
-			cr: events.CommandResult{
-				ProjectResults: []models.ProjectResult{
+			cr: command.Result{
+				ProjectResults: []command.ProjectResult{
 					{
 						Failure: "failure",
 					},
@@ -73,8 +73,8 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			exp: true,
 		},
 		"two successful projects": {
-			cr: events.CommandResult{
-				ProjectResults: []models.ProjectResult{
+			cr: command.Result{
+				ProjectResults: []command.ProjectResult{
 					{
 						PlanSuccess: &models.PlanSuccess{},
 					},
@@ -86,8 +86,8 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			exp: false,
 		},
 		"one successful, one failed project": {
-			cr: events.CommandResult{
-				ProjectResults: []models.ProjectResult{
+			cr: command.Result{
+				ProjectResults: []command.ProjectResult{
 					{
 						PlanSuccess: &models.PlanSuccess{},
 					},

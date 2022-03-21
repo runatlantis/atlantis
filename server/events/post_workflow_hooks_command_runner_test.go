@@ -9,6 +9,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
@@ -44,7 +45,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 	var newPull = fixtures.Pull
 	newPull.BaseRepo = fixtures.GithubRepo
 
-	ctx := &events.CommandContext{
+	ctx := &command.Context{
 		Pull:     newPull,
 		HeadRepo: fixtures.GithubRepo,
 		User:     fixtures.User,
