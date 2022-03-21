@@ -19,6 +19,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	assetfs "github.com/elazarl/go-bindata-assetfs"
+	"github.com/runatlantis/atlantis/server/static"
 	"io"
 	"io/ioutil"
 	"log"
@@ -47,7 +49,6 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/uber-go/tally"
 
-	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
@@ -71,7 +72,6 @@ import (
 	lyft_vcs "github.com/runatlantis/atlantis/server/events/vcs/lyft"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/static"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
 )
@@ -942,6 +942,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	case Worker: // an SQS worker is set up to handle messages via default eventsController
 		worker, err := sqs.NewGatewaySQSWorker(statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController, ctx)
 		if err != nil {
+			logger.With("err", err).Err("unable to set up worker")
 			cancel()
 			return nil, errors.Wrapf(err, "setting up sqs handler for worker mode")
 		}
@@ -982,16 +983,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 // Start creates the routes and starts serving traffic.
 func (s *Server) Start() error {
-	s.Router.HandleFunc("/", s.Index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
-		return r.URL.Path == "/" || r.URL.Path == "/index.html"
-	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
-	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	if s.LyftMode != Worker {
 		s.Router.HandleFunc("/events", s.VCSPostHandler.Post).Methods("POST")
 	}
 	if s.LyftMode != Gateway {
+		s.Router.HandleFunc("/", s.Index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
+			return r.URL.Path == "/" || r.URL.Path == "/index.html"
+		})
+		s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
 		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
 		s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
