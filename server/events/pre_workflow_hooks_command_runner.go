@@ -47,7 +47,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 
 	log.Debug("pre-hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
+	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace, DefaultRepoRelDir)
 	if err != nil {
 		return err
 	}
