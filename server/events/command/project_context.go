@@ -93,7 +93,7 @@ type ProjectContext struct {
 
 // SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
 // instead of a pointer since we want scopes to mirror our function stack
-func (p Context) SetScope(scope string) {
+func (p ProjectContext) SetScope(scope string) {
 	p.Scope = p.Scope.SubScope(scope) //nolint
 }
 
