@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -10,7 +11,7 @@ import (
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_post_workflows_hooks_command_runner.go PostWorkflowHooksCommandRunner
 
 type PostWorkflowHooksCommandRunner interface {
-	RunPostHooks(ctx *CommandContext) error
+	RunPostHooks(ctx *command.Context) error
 }
 
 // DefaultPostWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
@@ -24,7 +25,7 @@ type DefaultPostWorkflowHooksCommandRunner struct {
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
 func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
-	ctx *CommandContext,
+	ctx *command.Context,
 ) error {
 	pull := ctx.Pull
 	baseRepo := pull.BaseRepo

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -228,7 +229,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 			},
 		},
 		123,
-		models.PlanCommand.TitleString(),
+		command.Plan.TitleString(),
 	)
 	Ok(t, err)
 	Equals(t, 2, len(gotMinimizeCalls))
@@ -317,7 +318,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 			},
 		},
 		123,
-		models.PlanCommand.TitleString(),
+		command.Plan.TitleString(),
 	)
 	Ok(t, err)
 	Equals(t, 3, len(gotMinimizeCalls))
@@ -876,7 +877,7 @@ func TestGithubClient_SplitComments(t *testing.T) {
 	}
 	// create an extra long string
 	comment := strings.Repeat("a", 65537)
-	err = client.CreateComment(repo, pull.Num, comment, models.PlanCommand.String())
+	err = client.CreateComment(repo, pull.Num, comment, command.Plan.String())
 	Ok(t, err)
 	err = client.CreateComment(repo, pull.Num, comment, "")
 	Ok(t, err)
@@ -887,7 +888,7 @@ func TestGithubClient_SplitComments(t *testing.T) {
 	secondSplit := strings.ToLower(body[0])
 
 	Equals(t, 4, len(githubComments))
-	Assert(t, strings.Contains(firstSplit, models.PlanCommand.String()), fmt.Sprintf("comment should contain the command name but was %q", firstSplit))
+	Assert(t, strings.Contains(firstSplit, command.Plan.String()), fmt.Sprintf("comment should contain the command name but was %q", firstSplit))
 	Assert(t, strings.Contains(secondSplit, "continued from previous comment"), fmt.Sprintf("comment should contain no reference to the command name but was %q", secondSplit))
 }
 

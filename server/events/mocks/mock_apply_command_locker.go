@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	events "github.com/runatlantis/atlantis/server/events"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 type MockApplyCommandLocker struct {
@@ -25,7 +26,7 @@ func NewMockApplyCommandLocker(options ...pegomock.Option) *MockApplyCommandLock
 func (mock *MockApplyCommandLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockApplyCommandLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockApplyCommandLocker) IsDisabled(ctx *events.CommandContext) bool {
+func (mock *MockApplyCommandLocker) IsDisabled(ctx *command.Context) bool {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockApplyCommandLocker().")
 	}
@@ -77,7 +78,7 @@ type VerifierMockApplyCommandLocker struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockApplyCommandLocker) IsDisabled(ctx *events.CommandContext) *MockApplyCommandLocker_IsDisabled_OngoingVerification {
+func (verifier *VerifierMockApplyCommandLocker) IsDisabled(ctx *command.Context) *MockApplyCommandLocker_IsDisabled_OngoingVerification {
 	params := []pegomock.Param{ctx}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "IsDisabled", params, verifier.timeout)
 	return &MockApplyCommandLocker_IsDisabled_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -88,17 +89,17 @@ type MockApplyCommandLocker_IsDisabled_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockApplyCommandLocker_IsDisabled_OngoingVerification) GetCapturedArguments() *events.CommandContext {
+func (c *MockApplyCommandLocker_IsDisabled_OngoingVerification) GetCapturedArguments() *command.Context {
 	ctx := c.GetAllCapturedArguments()
 	return ctx[len(ctx)-1]
 }
 
-func (c *MockApplyCommandLocker_IsDisabled_OngoingVerification) GetAllCapturedArguments() (_param0 []*events.CommandContext) {
+func (c *MockApplyCommandLocker_IsDisabled_OngoingVerification) GetAllCapturedArguments() (_param0 []*command.Context) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*events.CommandContext, len(c.methodInvocations))
+		_param0 = make([]*command.Context, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(*events.CommandContext)
+			_param0[u] = param.(*command.Context)
 		}
 	}
 	return

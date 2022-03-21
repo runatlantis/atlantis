@@ -3,7 +3,7 @@ package jobs
 import (
 	"sync"
 
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -52,7 +52,7 @@ type AsyncProjectCommandOutputHandler struct {
 
 type ProjectCommandOutputHandler interface {
 	// Send will enqueue the msg and wait for Handle() to receive the message.
-	Send(ctx models.ProjectCommandContext, msg string, operationComplete bool)
+	Send(ctx command.ProjectContext, msg string, operationComplete bool)
 
 	// Register registers a channel and blocks until it is caught up. Callers should call this asynchronously when attempting
 	// to read the channel in the same goroutine
@@ -90,7 +90,7 @@ func (p *AsyncProjectCommandOutputHandler) IsKeyExists(key string) bool {
 	return ok
 }
 
-func (p *AsyncProjectCommandOutputHandler) Send(ctx models.ProjectCommandContext, msg string, operationComplete bool) {
+func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg string, operationComplete bool) {
 	p.projectCmdOutput <- &ProjectCmdOutputLine{
 		JobID: ctx.JobID,
 		JobInfo: JobInfo{
@@ -249,7 +249,7 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 // NoopProjectOutputHandler is a mock that doesn't do anything
 type NoopProjectOutputHandler struct{}
 
-func (p *NoopProjectOutputHandler) Send(ctx models.ProjectCommandContext, msg string, isOperationComplete bool) {
+func (p *NoopProjectOutputHandler) Send(ctx command.ProjectContext, msg string, isOperationComplete bool) {
 }
 
 func (p *NoopProjectOutputHandler) Register(jobID string, receiver chan string)   {}

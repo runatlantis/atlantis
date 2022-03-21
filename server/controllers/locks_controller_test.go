@@ -22,6 +22,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
+	"github.com/runatlantis/atlantis/server/events/command"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -302,9 +303,9 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	db, err := db.New(tmp)
 	Ok(t, err)
 	// Seed the DB with a successful plan for that project (that is later discarded).
-	_, err = db.UpdatePullWithResults(pull, []models.ProjectResult{
+	_, err = db.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
-			Command:    models.PlanCommand,
+			Command:    command.Plan,
 			RepoRelDir: projectPath,
 			Workspace:  workspaceName,
 			PlanSuccess: &models.PlanSuccess{
