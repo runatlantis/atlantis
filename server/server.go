@@ -37,11 +37,13 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/lyft/aws"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sns"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sqs"
 	lyftCommands "github.com/runatlantis/atlantis/server/lyft/command"
+	lyftRuntime "github.com/runatlantis/atlantis/server/lyft/core/runtime"
 	lyftDecorators "github.com/runatlantis/atlantis/server/lyft/decorators"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/lyft/gateway"
@@ -58,7 +60,6 @@ import (
 	cfgParser "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -504,11 +505,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
-	runStepRunner := &runtime.RunStepRunner{
-		TerraformExecutor: terraformClient,
-		DefaultTFVersion:  defaultTfVersion,
-		TerraformBinDir:   terraformClient.TerraformBinDir(),
-	}
+
 	drainer := &events.Drainer{}
 	statusController := &controllers.StatusController{
 		Logger:  logger,
@@ -538,24 +535,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		logger,
 		userConfig.MaxProjectsPerPR,
 	)
-
-	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "initializing show step runner")
-	}
-
-	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
-		defaultTfVersion,
-		policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
-	)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "initializing policy check runner")
-	}
-
 	applyRequirementHandler := &events.AggregateApplyRequirements{
 		WorkingDir: workingDir,
+	}
+
+	initStepRunner := &runtime.InitStepRunner{
+		TerraformExecutor: terraformClient,
+		DefaultTFVersion:  defaultTfVersion,
 	}
 
 	planStepRunner := &runtime.PlanStepRunner{
@@ -564,38 +550,66 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater: commitStatusUpdater,
 		AsyncTFExec:         terraformClient,
 	}
-	destroyPlanStepRunnerWrapper := &lyftDecorators.DestroyPlanStepRunnerWrapper{
+
+	destroyPlanStepRunner := &lyftRuntime.DestroyPlanStepRunner{
 		StepRunner: planStepRunner,
 	}
 
-	projectCommandRunner := &events.DefaultProjectCommandRunner{
-		Locker:           projectLocker,
-		LockURLGenerator: router,
-		InitStepRunner: &runtime.InitStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTfVersion,
-		},
-		PlanStepRunner:        destroyPlanStepRunnerWrapper,
-		ShowStepRunner:        showStepRunner,
-		PolicyCheckStepRunner: policyCheckRunner,
-		ApplyStepRunner: &runtime.ApplyStepRunner{
-			TerraformExecutor:   terraformClient,
-			CommitStatusUpdater: commitStatusUpdater,
-			AsyncTFExec:         terraformClient,
-		},
-		RunStepRunner: runStepRunner,
-		EnvStepRunner: &runtime.EnvStepRunner{
-			RunStepRunner: runStepRunner,
-		},
-		VersionStepRunner: &runtime.VersionStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTfVersion,
-		},
-		WorkingDir:                 workingDir,
-		Webhooks:                   webhooksManager,
-		WorkingDirLocker:           workingDirLocker,
-		AggregateApplyRequirements: applyRequirementHandler,
+	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing show step runner")
 	}
+
+	conftestExecutor := policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{})
+	policyCheckStepRunner, err := runtime.NewPolicyCheckStepRunner(
+		defaultTfVersion,
+		conftestExecutor,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing policy check runner")
+	}
+
+	applyStepRunner := &runtime.ApplyStepRunner{
+		TerraformExecutor:   terraformClient,
+		CommitStatusUpdater: commitStatusUpdater,
+		AsyncTFExec:         terraformClient,
+	}
+
+	versionStepRunner := &runtime.VersionStepRunner{
+		TerraformExecutor: terraformClient,
+		DefaultTFVersion:  defaultTfVersion,
+	}
+
+	runStepRunner := &runtime.RunStepRunner{
+		TerraformExecutor: terraformClient,
+		DefaultTFVersion:  defaultTfVersion,
+		TerraformBinDir:   binDir,
+	}
+
+	envStepRunner := &runtime.EnvStepRunner{
+		RunStepRunner: runStepRunner,
+	}
+
+	stepsRunner := runtime.NewStepsRunner(
+		initStepRunner,
+		destroyPlanStepRunner,
+		showStepRunner,
+		policyCheckStepRunner,
+		applyStepRunner,
+		versionStepRunner,
+		runStepRunner,
+		envStepRunner,
+	)
+
+	projectCommandRunner := events.NewProjectCommandRunner(
+		stepsRunner,
+		projectLocker,
+		router,
+		workingDir,
+		webhooksManager,
+		workingDirLocker,
+		applyRequirementHandler,
+	)
 
 	dbUpdater := &events.DBUpdater{
 		DB: boltdb,
@@ -640,7 +654,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	} else {
 		snsWriter = sns.NewNoopWriter()
 	}
-
 	auditProjectCmdRunner := &lyftDecorators.AuditProjectCommandWrapper{
 		SnsWriter:            snsWriter,
 		ProjectCommandRunner: featureAwareProjectCommandRunner,

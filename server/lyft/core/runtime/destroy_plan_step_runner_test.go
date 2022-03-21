@@ -1,4 +1,4 @@
-package decorators_test
+package runtime_test
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/lyft/decorators"
+	lyftRuntime "github.com/runatlantis/atlantis/server/lyft/core/runtime"
 
 	. "github.com/petergtz/pegomock"
 	. "github.com/runatlantis/atlantis/testing"
@@ -58,7 +58,7 @@ func TestRun_DestroyPlan(t *testing.T) {
 				"args",
 			},
 			tags: map[string]string{
-				decorators.Deprecated: decorators.Destroy,
+				lyftRuntime.Deprecated: lyftRuntime.Destroy,
 			},
 		},
 		{
@@ -98,7 +98,7 @@ func TestRun_DestroyPlan(t *testing.T) {
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
-			stepRunner := decorators.DestroyPlanStepRunnerWrapper{
+			stepRunner := lyftRuntime.DestroyPlanStepRunner{
 				StepRunner: &planStepRunner,
 			}
 			ctx := command.ProjectContext{

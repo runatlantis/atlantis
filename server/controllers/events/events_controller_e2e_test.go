@@ -919,7 +919,6 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
-
 	Ok(t, err)
 
 	conftestVersion, _ := version.NewVersion(ConftestVersion)
@@ -934,29 +933,54 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		conftestVersion,
 		conftextExec,
 	)
+	Ok(t, err)
+	initStepRunner := &runtime.InitStepRunner{
+		TerraformExecutor: terraformClient,
+		DefaultTFVersion:  defaultTFVersion,
+	}
+	planStepRunner := &runtime.PlanStepRunner{
+		TerraformExecutor: terraformClient,
+		DefaultTFVersion:  defaultTFVersion,
+		AsyncTFExec:       terraformClient,
+	}
+
+	applyStepRunner := &runtime.ApplyStepRunner{
+		TerraformExecutor: terraformClient,
+		AsyncTFExec:       terraformClient,
+	}
+
+	versionStepRunner := &runtime.VersionStepRunner{
+		TerraformExecutor: terraformClient,
+		DefaultTFVersion:  defaultTFVersion,
+	}
+
+	runStepRunner := &runtime.RunStepRunner{
+		TerraformExecutor: terraformClient,
+		DefaultTFVersion:  defaultTFVersion,
+		TerraformBinDir:   binDir,
+	}
+
+	envStepRunner := &runtime.EnvStepRunner{
+		RunStepRunner: runStepRunner,
+	}
+
+	stepsRunner := runtime.NewStepsRunner(
+		initStepRunner,
+		planStepRunner,
+		showStepRunner,
+		policyCheckRunner,
+		applyStepRunner,
+		versionStepRunner,
+		runStepRunner,
+		envStepRunner,
+	)
 
 	Ok(t, err)
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		Locker:           projectLocker,
 		LockURLGenerator: &mockLockURLGenerator{},
-		InitStepRunner: &runtime.InitStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
-		PlanStepRunner: &runtime.PlanStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
-		ShowStepRunner:        showStepRunner,
-		PolicyCheckStepRunner: policyCheckRunner,
-		ApplyStepRunner: &runtime.ApplyStepRunner{
-			TerraformExecutor: terraformClient,
-		},
-		RunStepRunner: &runtime.RunStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
+		StepsRunner:      stepsRunner,
 		WorkingDir:       workingDir,
 		Webhooks:         &mockWebhookSender{},
 		WorkingDirLocker: locker,

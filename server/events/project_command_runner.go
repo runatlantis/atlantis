@@ -17,10 +17,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -47,30 +45,6 @@ func (d DirNotExistErr) Error() string {
 type LockURLGenerator interface {
 	// GenerateLockURL returns the full URL to the lock at lockID.
 	GenerateLockURL(lockID string) string
-}
-
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_step_runner.go StepRunner
-
-// StepRunner runs steps. Steps are individual pieces of execution like
-// `terraform plan`.
-type StepRunner interface {
-	// Run runs the step.
-	Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error)
-}
-
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
-
-// CustomStepRunner runs custom run steps.
-type CustomStepRunner interface {
-	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
-}
-
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
-
-// EnvStepRunner runs env steps.
-type EnvStepRunner interface {
-	Run(ctx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -188,19 +162,31 @@ func (f *FeatureAwareProjectCommandRunner) Apply(ctx command.ProjectContext) com
 	return f.ProjectCommandRunner.Apply(ctx)
 }
 
+func NewProjectCommandRunner(
+	stepsRunner runtime.StepsRunner,
+	locker ProjectLocker,
+	lockUrlGenerator LockURLGenerator,
+	workingDir WorkingDir,
+	webhooks WebhooksSender,
+	workingDirLocker WorkingDirLocker,
+	aggregateApplyRequirements ApplyRequirement,
+) *DefaultProjectCommandRunner {
+	return &DefaultProjectCommandRunner{
+		StepsRunner:                stepsRunner,
+		Locker:                     locker,
+		LockURLGenerator:           lockUrlGenerator,
+		WorkingDir:                 workingDir,
+		Webhooks:                   webhooks,
+		WorkingDirLocker:           workingDirLocker,
+		AggregateApplyRequirements: aggregateApplyRequirements,
+	}
+}
+
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct { //create object and test
+	StepsRunner                runtime.StepsRunner
 	Locker                     ProjectLocker
 	LockURLGenerator           LockURLGenerator
-	InitStepRunner             StepRunner
-	PlanStepRunner             StepRunner
-	ShowStepRunner             StepRunner
-	VersionStepRunner          StepRunner
-	ApplyStepRunner            StepRunner
-	PolicyCheckStepRunner      StepRunner
-	RunStepRunner              CustomStepRunner
-	EnvStepRunner              EnvStepRunner
-	PullApprovedChecker        runtime.PullApprovedChecker
 	WorkingDir                 WorkingDir
 	Webhooks                   WebhooksSender
 	WorkingDirLocker           WorkingDirLocker
@@ -287,13 +273,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 
 func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	// This should already be acquired from the prior plan operation.
-	// if for some reason an unlock happens between the plan and policy check step
-	// we will attempt to capture the lock here but fail to get the working directory
-	// at which point we will unlock again to preserve functionality
-	// If we fail to capture the lock here (super unlikely) then we error out and the user is forced to replan
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
-
 	if err != nil {
 		return nil, "", errors.Wrap(err, "acquiring lock")
 	}
@@ -337,16 +317,16 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	outputs, err := p.StepsRunner.Run(ctx, absPath)
 	if err != nil {
 		// Note: we are explicitly not unlocking the pr here since a failing policy check will require
 		// approval
-		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		return nil, "", fmt.Errorf("%s\n%s", err, outputs)
 	}
 
 	return &models.PolicyCheckSuccess{
 		LockURL:           p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
-		PolicyCheckOutput: strings.Join(outputs, "\n"),
+		PolicyCheckOutput: outputs,
 		RePlanCmd:         ctx.RePlanCmd,
 		ApplyCmd:          ctx.ApplyCmd,
 
@@ -387,18 +367,18 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
+	outputs, err := p.StepsRunner.Run(ctx, projAbsPath)
 
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		return nil, "", fmt.Errorf("%s\n%s", err, outputs)
 	}
 
 	return &models.PlanSuccess{
 		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
-		TerraformOutput: strings.Join(outputs, "\n"),
+		TerraformOutput: outputs,
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,
 		HasDiverged:     hasDiverged,
@@ -431,7 +411,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 	defer unlockFn()
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	outputs, err := p.StepsRunner.Run(ctx, absPath)
 
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
 		Workspace: ctx.Workspace,
@@ -443,10 +423,10 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	})
 
 	if err != nil {
-		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		return "", "", fmt.Errorf("%s\n%s", err, outputs)
 	}
 
-	return strings.Join(outputs, "\n"), "", nil
+	return outputs, "", nil
 }
 
 func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (versionOut string, failure string, err error) {
@@ -469,50 +449,10 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 	}
 	defer unlockFn()
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	outputs, err := p.StepsRunner.Run(ctx, absPath)
 	if err != nil {
-		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		return "", "", fmt.Errorf("%s\n%s", err, outputs)
 	}
 
-	return strings.Join(outputs, "\n"), "", nil
-}
-
-func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.ProjectContext, absPath string) ([]string, error) {
-	var outputs []string
-
-	envs := make(map[string]string)
-	for _, step := range steps {
-		var out string
-		var err error
-		switch step.StepName {
-		case "init":
-			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
-		case "plan":
-			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
-		case "show":
-			_, err = p.ShowStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
-		case "policy_check":
-			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
-		case "apply":
-			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
-		case "version":
-			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
-		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs)
-		case "env":
-			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
-			envs[step.EnvVarName] = out
-			// We reset out to the empty string because we don't want it to
-			// be printed to the PR, it's solely to set the environment variable.
-			out = ""
-		}
-
-		if out != "" {
-			outputs = append(outputs, out)
-		}
-		if err != nil {
-			return outputs, err
-		}
-	}
-	return outputs, nil
+	return outputs, "", nil
 }

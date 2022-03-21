@@ -13,7 +13,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/core/terraform/helpers"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -370,7 +370,7 @@ type remoteApplyMock struct {
 	DoneCh chan bool
 }
 
-func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) <-chan terraform.Line {
+func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) <-chan helpers.Line {
 	in := make(chan string)
 
 	defer close(in)
@@ -379,10 +379,10 @@ func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path strin
 }
 
 // RunCommandAsync fakes out running terraform async.
-func (r *remoteApplyMock) RunCommandAsyncWithInput(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string, input <-chan string) <-chan terraform.Line {
+func (r *remoteApplyMock) RunCommandAsyncWithInput(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string, input <-chan string) <-chan helpers.Line {
 	r.CalledArgs = args
 
-	out := make(chan terraform.Line)
+	out := make(chan helpers.Line)
 
 	// We use a wait group to ensure our sending and receiving routines have
 	// completed.
@@ -404,10 +404,10 @@ func (r *remoteApplyMock) RunCommandAsyncWithInput(ctx command.ProjectContext, p
 	// Asynchronously send the lines we're supposed to.
 	go func() {
 		for _, line := range strings.Split(r.LinesToSend, "\n") {
-			out <- terraform.Line{Line: line}
+			out <- helpers.Line{Line: line}
 		}
 		if r.Err != nil {
-			out <- terraform.Line{Err: r.Err}
+			out <- helpers.Line{Err: r.Err}
 		}
 		close(out)
 		wg.Done()

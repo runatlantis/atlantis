@@ -8,12 +8,21 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/terraform/helpers"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
 // Setting the buffer size to 10mb
 const BufioScannerBufferSize = 10 * 1024 * 1024
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_terraform_client_async.go ClientAsync
+
+type ClientAsync interface {
+	RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) <-chan helpers.Line
+
+	RunCommandAsyncWithInput(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string, input <-chan string) <-chan helpers.Line
+}
 
 type AsyncClient struct {
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler
@@ -26,15 +35,15 @@ type AsyncClient struct {
 // Callers can use the input channel to pass stdin input to the command.
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
-func (c *AsyncClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) <-chan Line {
+func (c *AsyncClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) <-chan helpers.Line {
 
 	input := make(chan string)
 	defer close(input)
 
 	return c.RunCommandAsyncWithInput(ctx, path, args, customEnvVars, v, workspace, input)
 }
-func (c *AsyncClient) RunCommandAsyncWithInput(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string, input <-chan string) <-chan Line {
-	outCh := make(chan Line)
+func (c *AsyncClient) RunCommandAsyncWithInput(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string, input <-chan string) <-chan helpers.Line {
+	outCh := make(chan helpers.Line)
 
 	// We start a goroutine to do our work asynchronously and then immediately
 	// return our channels.
@@ -48,7 +57,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx command.ProjectContext, path 
 		cmd, err := c.commandBuilder.Build(v, workspace, path, args)
 		if err != nil {
 			ctx.Log.Err(err.Error())
-			outCh <- Line{Err: err}
+			outCh <- helpers.Line{Err: err}
 			return
 		}
 		stdout, _ := cmd.StdoutPipe()
@@ -65,7 +74,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx command.ProjectContext, path 
 		if err != nil {
 			err = errors.Wrapf(err, "running %q in %q", cmd.String(), path)
 			ctx.Log.Err(err.Error())
-			outCh <- Line{Err: err}
+			outCh <- helpers.Line{Err: err}
 			return
 		}
 
@@ -92,7 +101,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx command.ProjectContext, path 
 
 			for s.Scan() {
 				message := s.Text()
-				outCh <- Line{Line: message}
+				outCh <- helpers.Line{Line: message}
 				c.projectCmdOutputHandler.Send(ctx, message)
 			}
 			wg.Done()
@@ -101,7 +110,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx command.ProjectContext, path 
 			s := bufio.NewScanner(stderr)
 			for s.Scan() {
 				message := s.Text()
-				outCh <- Line{Line: message}
+				outCh <- helpers.Line{Line: message}
 				c.projectCmdOutputHandler.Send(ctx, message)
 			}
 			wg.Done()
@@ -118,7 +127,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx command.ProjectContext, path 
 		if err != nil {
 			err = errors.Wrapf(err, "running %q in %q", cmd.String(), path)
 			ctx.Log.Err(err.Error())
-			outCh <- Line{Err: err}
+			outCh <- helpers.Line{Err: err}
 		} else {
 			ctx.Log.Info("successfully ran %q in %q", cmd.String(), path)
 		}

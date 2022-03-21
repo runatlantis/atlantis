@@ -19,15 +19,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/runtime"
-	tmocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	smocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
-	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -37,24 +34,15 @@ import (
 // Test that it runs the expected plan steps.
 func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	RegisterMockTestingT(t)
-	mockInit := mocks.NewMockStepRunner()
-	mockPlan := mocks.NewMockStepRunner()
-	mockApply := mocks.NewMockStepRunner()
-	mockRun := mocks.NewMockCustomStepRunner()
-	realEnv := runtime.EnvStepRunner{}
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
 	mockApplyReqHandler := mocks.NewMockApplyRequirement()
+	mockStepsRunner := smocks.NewMockStepsRunner()
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:                     mockLocker,
 		LockURLGenerator:           mockURLGenerator{},
-		InitStepRunner:             mockInit,
-		PlanStepRunner:             mockPlan,
-		ApplyStepRunner:            mockApply,
-		RunStepRunner:              mockRun,
-		EnvStepRunner:              &realEnv,
-		PullApprovedChecker:        nil,
+		StepsRunner:                mockStepsRunner,
 		WorkingDir:                 mockWorkingDir,
 		Webhooks:                   nil,
 		WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
@@ -80,9 +68,6 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		LockKey:      "lock-key",
 	}, nil)
 
-	expEnvs := map[string]string{
-		"name": "value",
-	}
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
@@ -107,29 +92,14 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		Workspace:  "default",
 		RepoRelDir: ".",
 	}
-	// Each step will output its step name.
-	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
-	When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
-	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-	When(mockRun.Run(ctx, "", repoDir, expEnvs)).ThenReturn("run", nil)
+
+	When(mockStepsRunner.Run(ctx, repoDir)).ThenReturn("run\napply\nplan\ninit", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
-	expSteps := []string{"run", "apply", "plan", "init", "env"}
-	for _, step := range expSteps {
-		switch step {
-		case "init":
-			mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-		case "plan":
-			mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-		case "apply":
-			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-		case "run":
-			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs)
-		}
-	}
+	mockStepsRunner.VerifyWasCalledOnce().Run(ctx, repoDir)
 }
 
 func TestProjectOutputWrapper(t *testing.T) {
@@ -189,8 +159,8 @@ func TestProjectOutputWrapper(t *testing.T) {
 			var prjResult command.ProjectResult
 			var expCommitStatus models.CommitStatus
 
-			mockJobURLSetter := eventmocks.NewMockJobURLSetter()
-			mockJobCloser := eventmocks.NewMockJobCloser()
+			mockJobURLSetter := mocks.NewMockJobURLSetter()
+			mockJobCloser := mocks.NewMockJobCloser()
 			mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
 			runner := &events.ProjectOutputWrapper{
@@ -289,6 +259,7 @@ func TestDefaultProjectCommandRunner_ForceOverridesApplyReqs(t *testing.T) {
 	mockSender := mocks.NewMockWebhooksSender()
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
+		StepsRunner:      smocks.NewMockStepsRunner(),
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			WorkingDir: mockWorkingDir,
@@ -319,6 +290,7 @@ func TestFeatureAwareProjectCommandRunner_ForceOverrideWhenEnabled(t *testing.T)
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		StepsRunner:      smocks.NewMockStepsRunner(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			WorkingDir: mockWorkingDir,
 		},
@@ -352,6 +324,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		StepsRunner:      smocks.NewMockStepsRunner(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			WorkingDir: mockWorkingDir,
 		},
@@ -377,6 +350,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		StepsRunner:      smocks.NewMockStepsRunner(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			WorkingDir: mockWorkingDir,
 		},
@@ -474,11 +448,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 		}
 		t.Run(c.description, func(t *testing.T) {
 			RegisterMockTestingT(t)
-			mockInit := mocks.NewMockStepRunner()
-			mockPlan := mocks.NewMockStepRunner()
-			mockApply := mocks.NewMockStepRunner()
-			mockRun := mocks.NewMockCustomStepRunner()
-			mockEnv := mocks.NewMockEnvStepRunner()
+			mockStepsRunner := smocks.NewMockStepsRunner()
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
@@ -489,11 +459,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			runner := events.DefaultProjectCommandRunner{
 				Locker:                     mockLocker,
 				LockURLGenerator:           mockURLGenerator{},
-				InitStepRunner:             mockInit,
-				PlanStepRunner:             mockPlan,
-				ApplyStepRunner:            mockApply,
-				RunStepRunner:              mockRun,
-				EnvStepRunner:              mockEnv,
+				StepsRunner:                mockStepsRunner,
 				WorkingDir:                 mockWorkingDir,
 				Webhooks:                   mockSender,
 				WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
@@ -520,33 +486,14 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 					Mergeable: true,
 				},
 			}
-			expEnvs := map[string]string{
-				"key": "value",
-			}
-			When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
-			When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
-			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, "", repoDir, expEnvs)).ThenReturn("run", nil)
-			When(mockEnv.Run(ctx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
+
+			When(mockStepsRunner.Run(ctx, repoDir)).ThenReturn("run\napply\nplan\ninit", nil)
 
 			res := runner.Apply(ctx)
 			Equals(t, c.expOut, res.ApplySuccess)
 			Equals(t, c.expFailure, res.Failure)
 
-			for _, step := range c.expSteps {
-				switch step {
-				case "init":
-					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-				case "plan":
-					mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-				case "apply":
-					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs)
-				case "env":
-					mockEnv.VerifyWasCalledOnce().Run(ctx, "", "value", repoDir, expEnvs)
-				}
-			}
+			mockStepsRunner.VerifyWasCalledOnce().Run(ctx, repoDir)
 		})
 	}
 }
@@ -554,7 +501,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 // Test that it runs the expected apply steps.
 func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	RegisterMockTestingT(t)
-	mockApply := mocks.NewMockStepRunner()
+	mockStepsRunner := smocks.NewMockStepsRunner()
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
 	mockSender := mocks.NewMockWebhooksSender()
@@ -565,7 +512,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	runner := events.DefaultProjectCommandRunner{
 		Locker:                     mockLocker,
 		LockURLGenerator:           mockURLGenerator{},
-		ApplyStepRunner:            mockApply,
+		StepsRunner:                mockStepsRunner,
 		WorkingDir:                 mockWorkingDir,
 		WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
 		AggregateApplyRequirements: applyReqHandler,
@@ -593,104 +540,12 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 			Mergeable: true,
 		},
 	}
-	expEnvs := map[string]string{}
-	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", fmt.Errorf("something went wrong"))
+	When(mockStepsRunner.Run(ctx, ".")).ThenReturn("apply", fmt.Errorf("something went wrong"))
 
 	res := runner.Apply(ctx)
 	Assert(t, res.ApplySuccess == "", "exp apply failure")
 
-	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-}
-
-// Test run and env steps. We don't use mocks for this test since we're
-// not running any Terraform.
-func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
-	RegisterMockTestingT(t)
-	tfClient := tmocks.NewMockClient()
-	tfVersion, err := version.NewVersion("0.12.0")
-	Ok(t, err)
-	run := runtime.RunStepRunner{
-		TerraformExecutor: tfClient,
-		DefaultTFVersion:  tfVersion,
-	}
-	env := runtime.EnvStepRunner{
-		RunStepRunner: &run,
-	}
-	mockWorkingDir := mocks.NewMockWorkingDir()
-	mockLocker := mocks.NewMockProjectLocker()
-
-	runner := events.DefaultProjectCommandRunner{
-		Locker:           mockLocker,
-		LockURLGenerator: mockURLGenerator{},
-		RunStepRunner:    &run,
-		EnvStepRunner:    &env,
-		WorkingDir:       mockWorkingDir,
-		Webhooks:         nil,
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-	}
-
-	repoDir, cleanup := TempDir(t)
-	defer cleanup()
-	When(mockWorkingDir.Clone(
-		matchers.AnyPtrToLoggingSimpleLogger(),
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		AnyString(),
-	)).ThenReturn(repoDir, false, nil)
-	When(mockLocker.TryLock(
-		matchers.AnyPtrToLoggingSimpleLogger(),
-		matchers.AnyModelsPullRequest(),
-		matchers.AnyModelsUser(),
-		AnyString(),
-		matchers.AnyModelsProject(),
-	)).ThenReturn(&events.TryLockResponse{
-		LockAcquired: true,
-		LockKey:      "lock-key",
-	}, nil)
-
-	ctx := command.ProjectContext{
-		Log: logging.NewNoopLogger(t),
-		Steps: []valid.Step{
-			{
-				StepName:   "run",
-				RunCommand: "echo var=$var",
-			},
-			{
-				StepName:    "env",
-				EnvVarName:  "var",
-				EnvVarValue: "value",
-			},
-			{
-				StepName:   "run",
-				RunCommand: "echo var=$var",
-			},
-			{
-				StepName:   "env",
-				EnvVarName: "dynamic_var",
-				RunCommand: "echo dynamic_value",
-			},
-			{
-				StepName:   "run",
-				RunCommand: "echo dynamic_var=$dynamic_var",
-			},
-			// Test overriding the variable
-			{
-				StepName:    "env",
-				EnvVarName:  "dynamic_var",
-				EnvVarValue: "overridden",
-			},
-			{
-				StepName:   "run",
-				RunCommand: "echo dynamic_var=$dynamic_var",
-			},
-		},
-		Workspace:  "default",
-		RepoRelDir: ".",
-	}
-	res := runner.Plan(ctx)
-	Assert(t, res.PlanSuccess != nil, "exp plan success")
-	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
-	Equals(t, "var=\n\nvar=value\n\ndynamic_var=dynamic_value\n\ndynamic_var=overridden\n", res.PlanSuccess.TerraformOutput)
+	mockStepsRunner.VerifyWasCalledOnce().Run(ctx, repoDir)
 }
 
 type mockURLGenerator struct{}
