@@ -2,32 +2,33 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
 	"reflect"
 
-	models "github.com/runatlantis/atlantis/server/events/models"
+	"github.com/petergtz/pegomock"
+
+	command "github.com/runatlantis/atlantis/server/events/command"
 )
 
-func AnyPtrToModelsCommandLock() *models.CommandLock {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(*models.CommandLock))(nil)).Elem()))
-	var nullValue *models.CommandLock
+func AnyPtrToModelsCommandLock() *command.Lock {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(*command.Lock))(nil)).Elem()))
+	var nullValue *command.Lock
 	return nullValue
 }
 
-func EqPtrToModelsCommandLock(value *models.CommandLock) *models.CommandLock {
+func EqPtrToModelsCommandLock(value *command.Lock) *command.Lock {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue *models.CommandLock
+	var nullValue *command.Lock
 	return nullValue
 }
 
-func NotEqPtrToModelsCommandLock(value *models.CommandLock) *models.CommandLock {
+func NotEqPtrToModelsCommandLock(value *command.Lock) *command.Lock {
 	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
-	var nullValue *models.CommandLock
+	var nullValue *command.Lock
 	return nullValue
 }
 
-func PtrToModelsCommandLockThat(matcher pegomock.ArgumentMatcher) *models.CommandLock {
+func PtrToModelsCommandLockThat(matcher pegomock.ArgumentMatcher) *command.Lock {
 	pegomock.RegisterMatcher(matcher)
-	var nullValue *models.CommandLock
+	var nullValue *command.Lock
 	return nullValue
 }

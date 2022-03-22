@@ -2,7 +2,7 @@ package runtime
 
 import (
 	version "github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -16,7 +16,7 @@ type VersionedExecutorWorkflow interface {
 
 // Executor runs an executable with provided environment variables and arguments and returns stdout
 type Executor interface {
-	Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error)
+	Run(ctx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error)
 }
 
 // ExecutorVersionEnsurer ensures a given version exists and outputs a path to the executable

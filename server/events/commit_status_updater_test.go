@@ -19,6 +19,7 @@ import (
 
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	. "github.com/runatlantis/atlantis/testing"
@@ -27,37 +28,37 @@ import (
 func TestUpdateCombined(t *testing.T) {
 	cases := []struct {
 		status     models.CommitStatus
-		command    models.CommandName
+		command    command.Name
 		expDescrip string
 	}{
 		{
 			status:     models.PendingCommitStatus,
-			command:    models.PlanCommand,
+			command:    command.Plan,
 			expDescrip: "Plan in progress...",
 		},
 		{
 			status:     models.FailedCommitStatus,
-			command:    models.PlanCommand,
+			command:    command.Plan,
 			expDescrip: "Plan failed.",
 		},
 		{
 			status:     models.SuccessCommitStatus,
-			command:    models.PlanCommand,
+			command:    command.Plan,
 			expDescrip: "Plan succeeded.",
 		},
 		{
 			status:     models.PendingCommitStatus,
-			command:    models.ApplyCommand,
+			command:    command.Apply,
 			expDescrip: "Apply in progress...",
 		},
 		{
 			status:     models.FailedCommitStatus,
-			command:    models.ApplyCommand,
+			command:    command.Apply,
 			expDescrip: "Apply failed.",
 		},
 		{
 			status:     models.SuccessCommitStatus,
-			command:    models.ApplyCommand,
+			command:    command.Apply,
 			expDescrip: "Apply succeeded.",
 		},
 	}
@@ -79,49 +80,49 @@ func TestUpdateCombined(t *testing.T) {
 func TestUpdateCombinedCount(t *testing.T) {
 	cases := []struct {
 		status     models.CommitStatus
-		command    models.CommandName
+		command    command.Name
 		numSuccess int
 		numTotal   int
 		expDescrip string
 	}{
 		{
 			status:     models.PendingCommitStatus,
-			command:    models.PlanCommand,
+			command:    command.Plan,
 			numSuccess: 0,
 			numTotal:   2,
 			expDescrip: "0/2 projects planned successfully.",
 		},
 		{
 			status:     models.FailedCommitStatus,
-			command:    models.PlanCommand,
+			command:    command.Plan,
 			numSuccess: 1,
 			numTotal:   2,
 			expDescrip: "1/2 projects planned successfully.",
 		},
 		{
 			status:     models.SuccessCommitStatus,
-			command:    models.PlanCommand,
+			command:    command.Plan,
 			numSuccess: 2,
 			numTotal:   2,
 			expDescrip: "2/2 projects planned successfully.",
 		},
 		{
 			status:     models.FailedCommitStatus,
-			command:    models.ApplyCommand,
+			command:    command.Apply,
 			numSuccess: 0,
 			numTotal:   2,
 			expDescrip: "0/2 projects applied successfully.",
 		},
 		{
 			status:     models.PendingCommitStatus,
-			command:    models.ApplyCommand,
+			command:    command.Apply,
 			numSuccess: 1,
 			numTotal:   2,
 			expDescrip: "1/2 projects applied successfully.",
 		},
 		{
 			status:     models.SuccessCommitStatus,
-			command:    models.ApplyCommand,
+			command:    command.Apply,
 			numSuccess: 2,
 			numTotal:   2,
 			expDescrip: "2/2 projects applied successfully.",
@@ -170,12 +171,12 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 		t.Run(c.expSrc, func(t *testing.T) {
 			client := mocks.NewMockClient()
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
-			err := s.UpdateProject(models.ProjectCommandContext{
+			err := s.UpdateProject(command.ProjectContext{
 				ProjectName: c.projectName,
 				RepoRelDir:  c.repoRelDir,
 				Workspace:   c.workspace,
 			},
-				models.PlanCommand,
+				command.Plan,
 				models.PendingCommitStatus,
 				"url")
 			Ok(t, err)
@@ -189,37 +190,37 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 	RegisterMockTestingT(t)
 	cases := []struct {
 		status     models.CommitStatus
-		cmd        models.CommandName
+		cmd        command.Name
 		expDescrip string
 	}{
 		{
 			models.PendingCommitStatus,
-			models.PlanCommand,
+			command.Plan,
 			"Plan in progress...",
 		},
 		{
 			models.FailedCommitStatus,
-			models.PlanCommand,
+			command.Plan,
 			"Plan failed.",
 		},
 		{
 			models.SuccessCommitStatus,
-			models.PlanCommand,
+			command.Plan,
 			"Plan succeeded.",
 		},
 		{
 			models.PendingCommitStatus,
-			models.ApplyCommand,
+			command.Apply,
 			"Apply in progress...",
 		},
 		{
 			models.FailedCommitStatus,
-			models.ApplyCommand,
+			command.Apply,
 			"Apply failed.",
 		},
 		{
 			models.SuccessCommitStatus,
-			models.ApplyCommand,
+			command.Apply,
 			"Apply succeeded.",
 		},
 	}
@@ -228,7 +229,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 		t.Run(c.expDescrip, func(t *testing.T) {
 			client := mocks.NewMockClient()
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
-			err := s.UpdateProject(models.ProjectCommandContext{
+			err := s.UpdateProject(command.ProjectContext{
 				RepoRelDir: ".",
 				Workspace:  "default",
 			},
@@ -246,11 +247,11 @@ func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) 
 	RegisterMockTestingT(t)
 	client := mocks.NewMockClient()
 	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "custom"}
-	err := s.UpdateProject(models.ProjectCommandContext{
+	err := s.UpdateProject(command.ProjectContext{
 		RepoRelDir: ".",
 		Workspace:  "default",
 	},
-		models.ApplyCommand,
+		command.Apply,
 		models.SuccessCommitStatus,
 		"url")
 	Ok(t, err)

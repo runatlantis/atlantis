@@ -47,6 +47,8 @@ need to be defined.
 version: 3
 automerge: true
 delete_source_branch_on_merge: true
+parallel_plan: true
+parallel_apply: true
 projects:
 - name: my-project-name
   dir: .
@@ -125,6 +127,22 @@ projects:
   autoplan:
     enabled: true
 ```
+
+### Run plans and applies in parallel
+
+```yaml
+version: 3
+parallel_plan: true
+parallel_apply: true
+```
+
+This will run plans and applies for all of your projects in parallel.
+
+Enabling these options can significantly reduce the duration of plans and applies, especially for repositories with many projects.
+
+Use the `--parallel-pool-size` to configure the max number of plans and applies that can run in parallel. The default is 15.
+
+Parallel plans and applies work across both multiple directories and multiple workspaces.
 
 ### Configuring Planning
 

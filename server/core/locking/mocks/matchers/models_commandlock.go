@@ -3,18 +3,19 @@ package matchers
 
 import (
 	"reflect"
+
 	"github.com/petergtz/pegomock"
-	models "github.com/runatlantis/atlantis/server/events/models"
+	command "github.com/runatlantis/atlantis/server/events/command"
 )
 
-func AnyModelsCommandLock() models.CommandLock {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(models.CommandLock))(nil)).Elem()))
-	var nullValue models.CommandLock
+func AnyModelsCommandLock() command.Lock {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(command.Lock))(nil)).Elem()))
+	var nullValue command.Lock
 	return nullValue
 }
 
-func EqModelsCommandLock(value models.CommandLock) models.CommandLock {
+func EqModelsCommandLock(value command.Lock) command.Lock {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue models.CommandLock
+	var nullValue command.Lock
 	return nullValue
 }

@@ -2,9 +2,10 @@
 package matchers
 
 import (
-	"reflect"
-	"github.com/petergtz/pegomock"
 	log "log"
+	"reflect"
+
+	"github.com/petergtz/pegomock"
 )
 
 func AnyPtrToLogLogger() *log.Logger {

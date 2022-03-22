@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -33,9 +34,9 @@ type Backend interface {
 	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
 
-	LockCommand(cmdName models.CommandName, lockTime time.Time) (*models.CommandLock, error)
-	UnlockCommand(cmdName models.CommandName) error
-	CheckCommandLock(cmdName models.CommandName) (*models.CommandLock, error)
+	LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error)
+	UnlockCommand(cmdName command.Name) error
+	CheckCommandLock(cmdName command.Name) (*command.Lock, error)
 }
 
 // TryLockResponse results from an attempted lock.
