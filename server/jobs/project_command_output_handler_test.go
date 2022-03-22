@@ -72,7 +72,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		var expectedMsg string
 		projectOutputHandler, jobStore := createProjectCommandOutputHandler(t)
 
-		When(jobStore.Get(AnyString())).ThenReturn(jobs.Job{}, nil)
+		When(jobStore.Get(AnyString())).ThenReturn(&jobs.Job{}, nil)
 		ch := make(chan string)
 
 		// read from channel
@@ -103,7 +103,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		var wg sync.WaitGroup
 
 		projectOutputHandler, jobStore := createProjectCommandOutputHandler(t)
-		When(jobStore.Get(AnyString())).ThenReturn(jobs.Job{
+		When(jobStore.Get(AnyString())).ThenReturn(&jobs.Job{
 			Output: []string{Msg},
 			Status: jobs.Processing,
 		}, nil)
@@ -149,7 +149,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 	t.Run("clean up all jobs when PR is closed", func(t *testing.T) {
 		var wg sync.WaitGroup
 		projectOutputHandler, jobStore := createProjectCommandOutputHandler(t)
-		When(jobStore.Get(AnyString())).ThenReturn(jobs.Job{}, nil)
+		When(jobStore.Get(AnyString())).ThenReturn(&jobs.Job{}, nil)
 
 		ch := make(chan string)
 
@@ -185,9 +185,12 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		dfProjectOutputHandler, ok := projectOutputHandler.(*jobs.AsyncProjectCommandOutputHandler)
 		assert.True(t, ok)
 
-		assert.Empty(t, dfProjectOutputHandler.GetJob(ctx.JobID).Output)
+		job, err := dfProjectOutputHandler.JobStore.Get(ctx.JobID)
+		Ok(t, err)
+
+		assert.Empty(t, job.Output)
 		assert.Empty(t, dfProjectOutputHandler.GetReceiverBufferForPull(ctx.JobID))
-		assert.Empty(t, dfProjectOutputHandler.GetJobIDMapForPull(pullContext))
+		assert.Empty(t, dfProjectOutputHandler.GetJobIdMapForPull(pullContext))
 	})
 
 	t.Run("close conn buffer after streaming logs for completed operation", func(t *testing.T) {
@@ -196,7 +199,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 			Output: []string{"a", "b"},
 			Status: jobs.Complete,
 		}
-		When(jobStore.Get(AnyString())).ThenReturn(job, nil)
+		When(jobStore.Get(AnyString())).ThenReturn(&job, nil)
 
 		ch := make(chan string)
 

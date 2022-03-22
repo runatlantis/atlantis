@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/jobs/mocks"
+	"github.com/runatlantis/atlantis/server/jobs/mocks/matchers"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/petergtz/pegomock"
@@ -23,7 +24,6 @@ func TestJobStore_Get(t *testing.T) {
 		}
 		jobsMap := make(map[string]*jobs.Job)
 		jobsMap["1234"] = expectedJob
-
 		jobStore := jobs.NewTestJobStore(storageBackend, jobsMap)
 
 		// Assert job
@@ -54,14 +54,14 @@ func TestJobStore_Get(t *testing.T) {
 	t.Run("error when reading from storage backend fails", func(t *testing.T) {
 		// Setup job store
 		storageBackend := mocks.NewMockStorageBackend()
-		expectedError := fmt.Errorf("error")
-		When(storageBackend.Read(AnyString())).ThenReturn([]string{}, expectedError)
+		expectedError := fmt.Errorf("reading from backend storage: error")
+		When(storageBackend.Read(AnyString())).ThenReturn([]string{}, errors.New("error"))
 
 		// Assert job
 		jobStore := jobs.NewJobStore(storageBackend)
 		gotJob, err := jobStore.Get("1234")
 		assert.Empty(t, gotJob)
-		assert.ErrorIs(t, expectedError, err)
+		assert.EqualError(t, expectedError, err.Error())
 	})
 }
 
@@ -112,7 +112,6 @@ func TestJobStore_AppendOutput(t *testing.T) {
 		// Add complete to job in store
 		jobsMap := make(map[string]*jobs.Job)
 		jobsMap[jobID] = job
-
 		jobStore := jobs.NewTestJobStore(storageBackend, jobsMap)
 
 		// Assert error
@@ -133,13 +132,13 @@ func TestJobStore_UpdateJobStatus(t *testing.T) {
 		jobsMap := make(map[string]*jobs.Job)
 		jobsMap[jobID] = job
 		storageBackendErr := fmt.Errorf("random error")
-		expecterErr := errors.Wrapf(storageBackendErr, "error persisting job: %s", jobID)
+		expecterErr := errors.Wrapf(storageBackendErr, "persisting job: %s", jobID)
 
 		// Setup storage backend
 		storageBackend := mocks.NewMockStorageBackend()
-		When(storageBackend.Write(AnyString(), AnyStringSlice())).ThenReturn(false, storageBackendErr)
+		When(storageBackend.Write(AnyString(), matchers.AnySliceOfString(), AnyString())).ThenReturn(false, storageBackendErr)
 		jobStore := jobs.NewTestJobStore(storageBackend, jobsMap)
-		err := jobStore.SetJobCompleteStatus(jobID, jobs.Complete)
+		err := jobStore.SetJobCompleteStatus(jobID, "test-repo", jobs.Complete)
 
 		// Assert storage backend error
 		assert.EqualError(t, err, expecterErr.Error())
@@ -164,7 +163,7 @@ func TestJobStore_UpdateJobStatus(t *testing.T) {
 		// Setup storage backend
 		storageBackend := &jobs.NoopStorageBackend{}
 		jobStore := jobs.NewTestJobStore(storageBackend, jobsMap)
-		err := jobStore.SetJobCompleteStatus(jobID, jobs.Complete)
+		err := jobStore.SetJobCompleteStatus(jobID, "test-repo", jobs.Complete)
 
 		assert.Nil(t, err)
 
@@ -187,14 +186,15 @@ func TestJobStore_UpdateJobStatus(t *testing.T) {
 
 		// Setup storage backend
 		storageBackend := mocks.NewMockStorageBackend()
-		When(storageBackend.Write(AnyString(), AnyStringSlice())).ThenReturn(true, nil)
-
+		When(storageBackend.Write(AnyString(), matchers.AnySliceOfString(), AnyString())).ThenReturn(true, nil)
 		jobStore := jobs.NewTestJobStore(storageBackend, jobsMap)
-		err := jobStore.SetJobCompleteStatus(jobID, jobs.Complete)
+		err := jobStore.SetJobCompleteStatus(jobID, "test-repo", jobs.Complete)
 		assert.Nil(t, err)
 
-		_, ok := jobStore.GetJobFromMemory(jobID)
-		assert.False(t, ok)
+		When(storageBackend.Read(jobID)).ThenReturn([]string{}, nil)
+		gotJob, err := jobStore.Get(jobID)
+		assert.Nil(t, err)
+		assert.Empty(t, gotJob.Output)
 	})
 
 	t.Run("error when job does not exist", func(t *testing.T) {
@@ -203,7 +203,7 @@ func TestJobStore_UpdateJobStatus(t *testing.T) {
 		jobID := "1234"
 		expectedErrString := fmt.Sprintf("job: %s does not exist", jobID)
 
-		err := jobStore.SetJobCompleteStatus(jobID, jobs.Complete)
+		err := jobStore.SetJobCompleteStatus(jobID, "test-repo", jobs.Complete)
 		assert.EqualError(t, err, expectedErrString)
 
 	})
