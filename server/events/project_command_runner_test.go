@@ -283,40 +283,6 @@ func TestDefaultProjectCommandRunner_ForceOverridesApplyReqs(t *testing.T) {
 	Equals(t, "", res.Failure)
 }
 
-func TestFeatureAwareProjectCommandRunner_ForceOverrideWhenEnabled(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockWorkingDir := mocks.NewMockWorkingDir()
-	mockSender := mocks.NewMockWebhooksSender()
-	runner := &events.DefaultProjectCommandRunner{
-		WorkingDir:       mockWorkingDir,
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-		StepsRunner:      smocks.NewMockStepsRunner(),
-		AggregateApplyRequirements: &events.AggregateApplyRequirements{
-			WorkingDir: mockWorkingDir,
-		},
-		Webhooks: mockSender,
-	}
-	featureAwareRunner := &events.FeatureAwareProjectCommandRunner{
-		ProjectCommandRunner: runner,
-	}
-	ctx := command.ProjectContext{
-		ApplyRequirements: []string{"approved"},
-		ForceApply:        true,
-		PullReqStatus: models.PullReqStatus{
-			ApprovalStatus: models.ApprovalStatus{
-				IsApproved: false,
-			},
-		},
-		Log: logging.NewNoopLogger(t),
-	}
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
-
-	res := featureAwareRunner.Apply(ctx)
-	Equals(t, "", res.Failure)
-}
-
 // Test that if mergeable is required and the PR isn't mergeable we give an error.
 func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	RegisterMockTestingT(t)

@@ -633,11 +633,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		JobCloser:            projectCmdOutputHandler,
 	}
 
-	featureAwareProjectCommandRunner := &events.FeatureAwareProjectCommandRunner{
-		FeatureAllocator:     featureAllocator,
-		ProjectCommandRunner: projectOutputWrapper,
-	}
-
 	session, err := aws.NewSession()
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing new aws session")
@@ -656,7 +651,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	auditProjectCmdRunner := &lyftDecorators.AuditProjectCommandWrapper{
 		SnsWriter:            snsWriter,
-		ProjectCommandRunner: featureAwareProjectCommandRunner,
+		ProjectCommandRunner: projectOutputWrapper,
 	}
 
 	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
