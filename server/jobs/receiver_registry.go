@@ -9,18 +9,18 @@ type ReceiverRegistry interface {
 	CloseAndRemoveReceiversForJob(jobID string)
 }
 
-type receiverRegistry struct {
+type InMemoryReceiverRegistry struct {
 	receivers map[string]map[chan string]bool
 	lock      sync.RWMutex
 }
 
-func NewReceiverRegistry() *receiverRegistry {
-	return &receiverRegistry{
+func NewReceiverRegistry() *InMemoryReceiverRegistry {
+	return &InMemoryReceiverRegistry{
 		receivers: map[string]map[chan string]bool{},
 	}
 }
 
-func (r *receiverRegistry) AddReceiver(jobID string, ch chan string) {
+func (r *InMemoryReceiverRegistry) AddReceiver(jobID string, ch chan string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -31,21 +31,21 @@ func (r *receiverRegistry) AddReceiver(jobID string, ch chan string) {
 	r.receivers[jobID][ch] = true
 }
 
-func (r *receiverRegistry) RemoveReceiver(jobID string, ch chan string) {
+func (r *InMemoryReceiverRegistry) RemoveReceiver(jobID string, ch chan string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
 	delete(r.receivers[jobID], ch)
 }
 
-func (r *receiverRegistry) GetReceivers(jobID string) map[chan string]bool {
+func (r *InMemoryReceiverRegistry) GetReceivers(jobID string) map[chan string]bool {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
 	return r.receivers[jobID]
 }
 
-func (r *receiverRegistry) CloseAndRemoveReceiversForJob(jobID string) {
+func (r *InMemoryReceiverRegistry) CloseAndRemoveReceiversForJob(jobID string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
