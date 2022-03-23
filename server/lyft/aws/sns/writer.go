@@ -28,7 +28,7 @@ func NewWriterWithStats(
 	scope tally.Scope,
 ) Writer {
 	return &writerWithStats{
-		scope: scope.SubScope("aws.sns"),
+		scope: scope,
 		Writer: &writer{
 			client:   awsSns.New(session),
 			topicArn: aws.String(topicArn),

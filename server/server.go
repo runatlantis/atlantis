@@ -645,7 +645,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		snsWriter = sns.NewWriterWithStats(
 			session,
 			userConfig.LyftAuditJobsSnsTopicArn,
-			statsScope,
+			statsScope.SubScope("aws.sns.jobs"),
 		)
 	} else {
 		snsWriter = sns.NewNoopWriter()
@@ -877,7 +877,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	gatewaySnsWriter := sns.NewWriterWithStats(session, userConfig.LyftGatewaySnsTopicArn, statsScope)
+	gatewaySnsWriter := sns.NewWriterWithStats(session, userConfig.LyftGatewaySnsTopicArn, statsScope.SubScope("aws.sns.gateway"))
 	autoplanValidator := &gateway.AutoplanValidator{
 		Logger:                        logger,
 		Scope:                         statsScope.SubScope("validator"),
