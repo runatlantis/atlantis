@@ -122,26 +122,26 @@ type ProjectPlanCommandBuilder interface {
 	// BuildPlanCommands builds project plan commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
+	BuildPlanCommands(ctx *command.Context, comment *command.Comment) ([]command.ProjectContext, error)
 }
 
 type ProjectApplyCommandBuilder interface {
 	// BuildApplyCommands builds project Apply commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildApplyCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
+	BuildApplyCommands(ctx *command.Context, comment *command.Comment) ([]command.ProjectContext, error)
 }
 
 type ProjectApprovePoliciesCommandBuilder interface {
 	// BuildApprovePoliciesCommands builds project PolicyCheck commands for this ctx and comment.
-	BuildApprovePoliciesCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
+	BuildApprovePoliciesCommands(ctx *command.Context, comment *command.Comment) ([]command.ProjectContext, error)
 }
 
 type ProjectVersionCommandBuilder interface {
 	// BuildVersionCommands builds project Version commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildVersionCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
+	BuildVersionCommands(ctx *command.Context, comment *command.Comment) ([]command.ProjectContext, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
@@ -190,7 +190,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 }
 
 // See ProjectCommandBuilder.BuildPlanCommands.
-func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *command.Comment) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose, cmd.ForceApply)
 	}
@@ -199,7 +199,7 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, c
 }
 
 // See ProjectCommandBuilder.BuildApplyCommands.
-func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, cmd *command.Comment) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommands(ctx, cmd)
 	}
@@ -207,11 +207,11 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, 
 	return pac, err
 }
 
-func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *command.Context, cmd *command.Comment) ([]command.ProjectContext, error) {
 	return p.buildAllProjectCommands(ctx, cmd)
 }
 
-func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, cmd *command.Comment) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommands(ctx, cmd)
 	}
@@ -353,7 +353,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 
 // buildProjectPlanCommand builds a plan context for a single project.
 // cmd must be for only one project.
-func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Context, cmd *command.Comment) ([]command.ProjectContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
@@ -452,7 +452,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 
 // buildAllProjectCommands builds contexts for a command for every project that has
 // pending plans in this ctx.
-func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *command.Context, commentCmd *CommentCommand) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *command.Context, commentCmd *command.Comment) ([]command.ProjectContext, error) {
 	// Lock all dirs in this pull request (instead of a single dir) because we
 	// don't know how many dirs we'll need to run the command in.
 	unlockFn, err := p.WorkingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
@@ -491,7 +491,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *command.Cont
 
 // buildProjectApplyCommand builds an apply command for the single project
 // identified by cmd.
-func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *command.Context, cmd *command.Comment) ([]command.ProjectContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
@@ -533,7 +533,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *command.Con
 
 // buildProjectVersionCommand builds a version command for the single project
 // identified by cmd.
-func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *command.Context, cmd *command.Comment) ([]command.ProjectContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace

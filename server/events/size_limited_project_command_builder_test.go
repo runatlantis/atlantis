@@ -106,7 +106,7 @@ func TestSizeLimitedProjectCommandBuilder_planComment(t *testing.T) {
 
 	ctx := &command.Context{}
 
-	comment := &events.CommentCommand{}
+	comment := &command.Comment{}
 
 	project1 := command.ProjectContext{
 		ProjectName: "test1",

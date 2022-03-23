@@ -30,6 +30,7 @@ import (
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	emocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -375,7 +376,7 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	baseRepo := models.Repo{}
 	user := models.User{}
-	cmd := events.CommentCommand{}
+	cmd := command.Comment{}
 	When(p.ParseGithubIssueCommentEvent(matchers.AnyPtrToGithubIssueCommentEvent())).ThenReturn(baseRepo, user, 1, nil)
 	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
 	w := httptest.NewRecorder()

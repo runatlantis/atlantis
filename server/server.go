@@ -19,8 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	assetfs "github.com/elazarl/go-bindata-assetfs"
-	"github.com/runatlantis/atlantis/server/static"
 	"io"
 	"io/ioutil"
 	"log"
@@ -33,6 +31,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	assetfs "github.com/elazarl/go-bindata-assetfs"
+	"github.com/runatlantis/atlantis/server/static"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -753,7 +754,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		approvePoliciesCommandRunner,
 	)
 
-	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
+	commentCommandRunnerByCmd := map[command.Name]command.Runner{
 		command.Plan:            featuredPlanRunner,
 		command.Apply:           featuredApplyRunner,
 		command.ApprovePolicies: featuredPolicyCheckRunner,

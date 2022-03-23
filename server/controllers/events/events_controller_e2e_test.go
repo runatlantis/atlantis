@@ -1074,7 +1074,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		silenceNoProjects,
 	)
 
-	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
+	commentCommandRunnerByCmd := map[command.Name]command.Runner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
 		command.ApprovePolicies: approvePoliciesCommandRunner,

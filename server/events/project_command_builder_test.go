@@ -187,7 +187,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 	cases := []struct {
 		Description      string
 		AtlantisYAML     string
-		Cmd              events.CommentCommand
+		Cmd              command.Comment
 		ExpCommentArgs   []string
 		ExpWorkspace     string
 		ExpDir           string
@@ -199,7 +199,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 	}{
 		{
 			Description: "no atlantis.yaml",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				RepoRelDir: ".",
 				Flags:      []string{"commentarg"},
 				Name:       command.Plan,
@@ -213,7 +213,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 		},
 		{
 			Description: "no atlantis.yaml with project flag",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				RepoRelDir:  ".",
 				Name:        command.Plan,
 				ProjectName: "myproject",
@@ -223,7 +223,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 		},
 		{
 			Description: "simple atlantis.yaml",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				RepoRelDir: ".",
 				Name:       command.Plan,
 				Workspace:  "myworkspace",
@@ -240,7 +240,7 @@ projects:
 		},
 		{
 			Description: "atlantis.yaml wrong dir",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				RepoRelDir: ".",
 				Name:       command.Plan,
 				Workspace:  "myworkspace",
@@ -257,7 +257,7 @@ projects:
 		},
 		{
 			Description: "atlantis.yaml wrong workspace",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				RepoRelDir: ".",
 				Name:       command.Plan,
 				Workspace:  "myworkspace",
@@ -272,7 +272,7 @@ projects:
 		},
 		{
 			Description: "atlantis.yaml with projectname",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				Name:        command.Plan,
 				ProjectName: "myproject",
 			},
@@ -290,7 +290,7 @@ projects:
 		},
 		{
 			Description: "atlantis.yaml with mergeable apply requirement",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				Name:        command.Plan,
 				ProjectName: "myproject",
 			},
@@ -308,7 +308,7 @@ projects:
 		},
 		{
 			Description: "atlantis.yaml with mergeable and approved apply requirements",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				Name:        command.Plan,
 				ProjectName: "myproject",
 			},
@@ -326,7 +326,7 @@ projects:
 		},
 		{
 			Description: "atlantis.yaml with multiple dir/workspaces matching",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				Name:       command.Plan,
 				RepoRelDir: ".",
 				Workspace:  "myworkspace",
@@ -346,7 +346,7 @@ projects:
 		},
 		{
 			Description: "atlantis.yaml with project flag not matching",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				Name:        command.Plan,
 				RepoRelDir:  ".",
 				Workspace:   "default",
@@ -361,7 +361,7 @@ projects:
 		},
 		{
 			Description: "atlantis.yaml with ParallelPlan Set to true",
-			Cmd: events.CommentCommand{
+			Cmd: command.Comment{
 				Name:        command.Plan,
 				RepoRelDir:  ".",
 				Workspace:   "default",
@@ -591,7 +591,7 @@ projects:
 					Log:   logger,
 					Scope: scope,
 				},
-				&events.CommentCommand{
+				&command.Comment{
 					RepoRelDir:  "",
 					Flags:       nil,
 					Name:        command.Plan,
@@ -682,7 +682,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 			Log:   logger,
 			Scope: scope,
 		},
-		&events.CommentCommand{
+		&command.Comment{
 			RepoRelDir:  "",
 			Flags:       nil,
 			Name:        command.Apply,
@@ -769,7 +769,7 @@ projects:
 		Log:      logging.NewNoopLogger(t),
 		Scope:    scope,
 	}
-	_, err = builder.BuildPlanCommands(ctx, &events.CommentCommand{
+	_, err = builder.BuildPlanCommands(ctx, &command.Comment{
 		RepoRelDir:  ".",
 		Flags:       nil,
 		Name:        command.Plan,
@@ -846,7 +846,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
 				Log:   logger,
 				Scope: scope,
-			}, &events.CommentCommand{
+			}, &command.Comment{
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
 				Name:       command.Plan,
@@ -1029,7 +1029,7 @@ projects:
 					Log:   logger,
 					Scope: scope,
 				},
-				&events.CommentCommand{
+				&command.Comment{
 					RepoRelDir: "",
 					Flags:      nil,
 					Name:       command.Plan,
@@ -1235,7 +1235,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		&command.Context{
 			Log: logger,
 		},
-		&events.CommentCommand{
+		&command.Comment{
 			RepoRelDir:  "",
 			Flags:       nil,
 			Name:        command.Version,

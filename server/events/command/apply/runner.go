@@ -1,7 +1,6 @@
 package apply
 
 import (
-	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -16,7 +15,7 @@ type Runner struct {
 	vcsClient vcs.Client
 }
 
-func (r *Runner) Run(ctx *command.Context, cmd *events.CommentCommand) {
+func (r *Runner) Run(ctx *command.Context, cmd *command.Comment) {
 	if err := r.vcsClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, "I'm a platform mode apply runner", command.Apply.String()); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)
 	}

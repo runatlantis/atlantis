@@ -659,7 +659,7 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
 	cmd := events.NewCommentCommand("", nil, command.Plan, false, false, false, "", "")
-	Equals(t, events.CommentCommand{
+	Equals(t, command.Comment{
 		RepoRelDir:  "",
 		Flags:       nil,
 		Name:        command.Plan,
@@ -671,7 +671,7 @@ func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
 	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, command.Plan, true, false, false, "workspace", "project")
-	Equals(t, events.CommentCommand{
+	Equals(t, command.Comment{
 		Workspace:   "workspace",
 		RepoRelDir:  "dir",
 		Verbose:     true,
@@ -694,30 +694,30 @@ func TestAutoplanCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_CommandName(t *testing.T) {
-	Equals(t, command.Plan, (events.CommentCommand{
+	Equals(t, command.Plan, (command.Comment{
 		Name: command.Plan,
 	}).CommandName())
-	Equals(t, command.Apply, (events.CommentCommand{
+	Equals(t, command.Apply, (command.Comment{
 		Name: command.Apply,
 	}).CommandName())
 }
 
 func TestCommentCommand_IsVerbose(t *testing.T) {
-	Equals(t, false, (events.CommentCommand{
+	Equals(t, false, (command.Comment{
 		Verbose: false,
 	}).IsVerbose())
-	Equals(t, true, (events.CommentCommand{
+	Equals(t, true, (command.Comment{
 		Verbose: true,
 	}).IsVerbose())
 }
 
 func TestCommentCommand_IsAutoplan(t *testing.T) {
-	Equals(t, false, (events.CommentCommand{}).IsAutoplan())
+	Equals(t, false, (command.Comment{}).IsAutoplan())
 }
 
 func TestCommentCommand_String(t *testing.T) {
 	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" flags="flag1,flag2"`
-	Equals(t, exp, (events.CommentCommand{
+	Equals(t, exp, (command.Comment{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},
 		Name:        command.Plan,

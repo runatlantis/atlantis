@@ -39,7 +39,7 @@ type ApprovePoliciesCommandRunner struct {
 	silenceVCSStatusNoProjects bool
 }
 
-func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
+func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 

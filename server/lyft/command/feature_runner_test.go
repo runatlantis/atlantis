@@ -7,7 +7,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/command/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	lyftCommand "github.com/runatlantis/atlantis/server/lyft/command"
@@ -58,8 +58,8 @@ func TestFeatureAllocatorRunner(t *testing.T) {
 		t.Run(c.description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 
-			allocatedRunner := mocks.NewMockCommentCommandRunner()
-			unallocatedRunner := mocks.NewMockCommentCommandRunner()
+			allocatedRunner := mocks.NewMockRunner()
+			unallocatedRunner := mocks.NewMockRunner()
 			featuredRunner := lyftCommand.NewPlatformModeFeatureRunner(
 				featureAllocator,
 				c.platformModeEnabled,
@@ -78,7 +78,7 @@ func TestFeatureAllocatorRunner(t *testing.T) {
 					FullName: "test-repo",
 				},
 			}
-			cmd := &events.CommentCommand{}
+			cmd := &command.Comment{}
 			featuredRunner.Run(ctx, cmd)
 
 			if c.platformModeEnabled && c.allocated {

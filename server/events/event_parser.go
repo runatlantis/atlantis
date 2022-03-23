@@ -135,7 +135,7 @@ func (c CommentCommand) String() string {
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name command.Name, verbose, forceApply, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, verbose, forceApply, autoMergeDisabled bool, workspace string, project string) *command.Comment {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -144,7 +144,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, ver
 			repoRelDir = "."
 		}
 	}
-	return &CommentCommand{
+	return &command.Comment{
 		RepoRelDir:        repoRelDir,
 		Flags:             flags,
 		Name:              name,

@@ -44,7 +44,7 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 	}
 }
 
-// automergeEnabled returns true if automerging is enabled in this context.
+// AutomergeEnabled returns true if automerging is enabled in this context.
 func (c *AutoMerger) automergeEnabled(projectCmds []command.ProjectContext) bool {
 	// If the global automerge is set, we always automerge.
 	return c.GlobalAutomerge ||

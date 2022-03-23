@@ -7,7 +7,6 @@ import (
 	"github.com/google/go-github/v31/github"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/locking"
-	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
@@ -68,7 +67,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			}
 
 			When(applyLockChecker.CheckApplyLock()).ThenReturn(locking.ApplyCommandLock{Locked: c.ApplyLocked}, c.ApplyLockError)
-			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
+			applyCommandRunner.Run(ctx, &command.Comment{Name: command.Apply})
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, c.ExpComment, "apply")
 		})

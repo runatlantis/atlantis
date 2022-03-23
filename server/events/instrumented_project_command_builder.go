@@ -11,7 +11,7 @@ type InstrumentedProjectCommandBuilder struct {
 	Logger logging.SimpleLogging
 }
 
-func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, comment *command.Comment) ([]command.ProjectContext, error) {
 	scope := ctx.Scope.SubScope("builder")
 
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
@@ -53,7 +53,7 @@ func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.C
 	return projectCmds, err
 
 }
-func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *command.Comment) ([]command.ProjectContext, error) {
 	scope := ctx.Scope.SubScope("builder")
 
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()

@@ -285,7 +285,7 @@ func TestParse_Multiline(t *testing.T) {
 		t.Run(comment, func(t *testing.T) {
 			r := commentParser.Parse(comment, models.Github)
 			Equals(t, "", r.CommentResponse)
-			Equals(t, &events.CommentCommand{
+			Equals(t, &command.Comment{
 				RepoRelDir:  "",
 				Flags:       nil,
 				Name:        command.Plan,

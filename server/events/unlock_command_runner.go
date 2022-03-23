@@ -27,7 +27,7 @@ type UnlockCommandRunner struct {
 
 func (u *UnlockCommandRunner) Run(
 	ctx *command.Context,
-	cmd *CommentCommand,
+	cmd *command.Comment,
 ) {
 	baseRepo := ctx.Pull.BaseRepo
 	pullNum := ctx.Pull.Num

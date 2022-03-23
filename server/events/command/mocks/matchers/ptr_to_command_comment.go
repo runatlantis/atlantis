@@ -2,19 +2,18 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
 	"reflect"
-
-	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/petergtz/pegomock"
+	command "github.com/runatlantis/atlantis/server/events/command"
 )
 
-func AnyPtrToEventsCommentCommand() *command.Comment {
+func AnyPtrToCommandComment() *command.Comment {
 	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(*command.Comment))(nil)).Elem()))
 	var nullValue *command.Comment
 	return nullValue
 }
 
-func EqPtrToEventsCommentCommand(value *command.Comment) *command.Comment {
+func EqPtrToCommandComment(value *command.Comment) *command.Comment {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
 	var nullValue *command.Comment
 	return nullValue

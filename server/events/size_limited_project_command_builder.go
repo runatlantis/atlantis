@@ -22,7 +22,7 @@ func (b *SizeLimitedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Co
 	return projects, b.CheckAgainstLimit(projects)
 }
 
-func (b *SizeLimitedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+func (b *SizeLimitedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *command.Comment) ([]command.ProjectContext, error) {
 	projects, err := b.ProjectCommandBuilder.BuildPlanCommands(ctx, comment)
 
 	if err != nil {

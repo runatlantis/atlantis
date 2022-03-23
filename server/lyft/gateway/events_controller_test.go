@@ -3,10 +3,19 @@ package gateway_test
 import (
 	"bytes"
 	"errors"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
 	. "github.com/petergtz/pegomock"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	emocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -18,13 +27,6 @@ import (
 	ev_mocks "github.com/runatlantis/atlantis/server/lyft/gateway/mocks"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"path/filepath"
-	"strings"
-	"testing"
-	"time"
 )
 
 var secret = []byte("secret")
@@ -232,7 +234,7 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	baseRepo := models.Repo{}
 	user := models.User{}
-	cmd := events.CommentCommand{}
+	cmd := command.Comment{}
 	When(p.ParseGithubIssueCommentEvent(matchers.AnyPtrToGithubIssueCommentEvent())).ThenReturn(baseRepo, user, 1, nil)
 	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
 	When(sns.Write(sns_matchers.AnySliceOfByte())).ThenReturn(nil)
@@ -251,7 +253,7 @@ func TestPost_GithubCommentFailure(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	baseRepo := models.Repo{}
 	user := models.User{}
-	cmd := events.CommentCommand{}
+	cmd := command.Comment{}
 	When(p.ParseGithubIssueCommentEvent(matchers.AnyPtrToGithubIssueCommentEvent())).ThenReturn(baseRepo, user, 1, nil)
 	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
 	When(sns.Write(sns_matchers.AnySliceOfByte())).ThenReturn(errors.New("err"))

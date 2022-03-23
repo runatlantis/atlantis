@@ -180,7 +180,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		SilenceNoProjects,
 	)
 
-	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
+	commentCommandRunnerByCmd := map[command.Name]command.Runner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
 		command.ApprovePolicies: approvePoliciesCommandRunner,
@@ -221,7 +221,7 @@ func TestRunCommentCommand_LogPanics(t *testing.T) {
 	t.Log("if there is a panic it is commented back on the pull request")
 	vcsClient := setup(t)
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, 1, &events.CommentCommand{Name: command.Plan}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, 1, &command.Comment{Name: command.Plan}, time.Now())
 	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString()).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), fmt.Sprintf("comment should be about a goroutine panic but was %q", comment))
 }
@@ -305,7 +305,7 @@ func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Plan}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Plan}, time.Now())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 		matchers.AnyModelsRepo(),
@@ -327,7 +327,7 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Apply}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 		matchers.AnyModelsRepo(),
@@ -349,7 +349,7 @@ func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) 
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 		matchers.AnyModelsRepo(),
@@ -370,7 +370,7 @@ func TestRunCommentCommandUnlock_NoProjects_SilenceEnabled(t *testing.T) {
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Unlock}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Unlock}, time.Now())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
@@ -387,7 +387,7 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &events.CommentCommand{Name: command.Apply}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &command.Comment{Name: command.Apply}, time.Now())
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "**Error:** Running `atlantis apply` without flags is disabled. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags.", "apply")
 }
 
@@ -404,7 +404,7 @@ func TestForceApplyRunCommentCommandRunner_CommentWhenEnabled(t *testing.T) {
 
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
 
-	fa.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &events.CommentCommand{Name: command.Apply, ForceApply: true}, time.Now())
+	fa.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &command.Comment{Name: command.Apply, ForceApply: true}, time.Now())
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "⚠️ WARNING ⚠️\n\n You have bypassed all apply requirements for this PR 🚀 . This can have unpredictable consequences 🙏🏽 and should only be used in an emergency 🆘 .\n\n 𝐓𝐡𝐢𝐬 𝐚𝐜𝐭𝐢𝐨𝐧 𝐰𝐢𝐥𝐥 𝐛𝐞 𝐚𝐮𝐝𝐢𝐭𝐞𝐝.\n", "")
 }
 
@@ -457,7 +457,7 @@ func TestRunCommentCommand_MatchedBranch(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Plan}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Plan}, time.Now())
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Ran Plan for 0 projects:\n\n\n\n", "plan")
 }
 
@@ -474,7 +474,7 @@ func TestRunCommentCommand_UnmatchedBranch(t *testing.T) {
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Plan}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Plan}, time.Now())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
@@ -491,7 +491,7 @@ func TestRunUnlockCommand_VCSComment(t *testing.T) {
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Unlock}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Unlock}, time.Now())
 
 	deleteLockCommand.VerifyWasCalledOnce().DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "All Atlantis locks for this PR have been unlocked and plans discarded", "unlock")
@@ -511,7 +511,7 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 	When(deleteLockCommand.DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(0, errors.New("err"))
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Unlock}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Unlock}, time.Now())
 
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Failed to delete PR locks", "unlock")
 }
@@ -599,7 +599,7 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 
 	When(workingDir.GetPullDir(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(tmp, nil)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &fixtures.Pull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &fixtures.Pull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
@@ -655,7 +655,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 		}
 	})
 
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &fixtures.Pull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &fixtures.Pull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
@@ -717,7 +717,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	})
 
 	When(workingDir.GetPullDir(fixtures.GithubRepo, modelPull)).ThenReturn(tmp, nil)
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &modelPull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Apply}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now())
 }
 
 func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
@@ -738,7 +738,7 @@ func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 		DeleteSourceBranchOnMerge: false,
 	}
 
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Apply}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now())
 	vcsClient.VerifyWasCalledOnce().MergePull(modelPull, pullOptions)
 }
 
@@ -775,7 +775,7 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	When(eventParsing.ParseGithubPull(ghPull)).ThenReturn(pull, pull.BaseRepo, fixtures.GithubRepo, nil)
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
 		ThenReturn(tmp, nil)
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &pull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Apply}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &pull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now())
 
 	vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 }
@@ -827,7 +827,7 @@ func TestRunCommentCommand_DropStaleRequest(t *testing.T) {
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(true)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &events.CommentCommand{Name: command.Apply}, time.Now())
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &command.Comment{Name: command.Apply}, time.Now())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 

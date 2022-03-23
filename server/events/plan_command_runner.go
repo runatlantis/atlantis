@@ -146,7 +146,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 }
 
-func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
+func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
@@ -217,7 +217,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 }
 
-func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
+func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	if ctx.Trigger == command.AutoTrigger {
 		p.runAutoplan(ctx)
 	} else {
