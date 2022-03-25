@@ -895,6 +895,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PrjCmdBuilder:                 projectCommandBuilder,
 		PullUpdater:                   pullUpdater,
 		WorkingDir:                    workingDir,
+		WorkingDirLocker:              workingDirLocker,
 	}
 	gatewayEventsController := &gateway.VCSEventsController{
 		Logger:                 logger,
