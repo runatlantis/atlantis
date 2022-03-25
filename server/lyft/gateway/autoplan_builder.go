@@ -36,10 +36,10 @@ type AutoplanValidator struct {
 	SilenceForkPRErrorsFlag string
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found
-	silenceVCSStatusNoPlans bool
+	SilenceVCSStatusNoPlans bool
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
-	silenceVCSStatusNoProjects bool
+	SilenceVCSStatusNoProjects bool
 	CommitStatusUpdater        events.CommitStatusUpdater
 	PrjCmdBuilder              events.ProjectPlanCommandBuilder
 	PullUpdater                *events.PullUpdater
@@ -92,7 +92,7 @@ func (r *AutoplanValidator) isValid(baseRepo models.Repo, headRepo models.Repo, 
 	}
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
-		if !(r.silenceVCSStatusNoPlans || r.silenceVCSStatusNoProjects) {
+		if !(r.SilenceVCSStatusNoPlans || r.SilenceVCSStatusNoProjects) {
 			// If there were no projects modified, we set successful commit statuses
 			// with 0/0 projects planned/policy_checked/applied successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
