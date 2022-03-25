@@ -5,8 +5,9 @@ package mocks
 
 import (
 	pegomock "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/events/command"
+	command "github.com/runatlantis/atlantis/server/events/command"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	logging "github.com/runatlantis/atlantis/server/logging"
 	"reflect"
 	"time"
 )
@@ -26,19 +27,19 @@ func NewMockCommandRunner(options ...pegomock.Option) *MockCommandRunner {
 func (mock *MockCommandRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockCommandRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time) {
+func (mock *MockCommandRunner) RunCommentCommand(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommandRunner().")
 	}
-	params := []pegomock.Param{baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd, timestamp}
+	params := []pegomock.Param{logger, baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd, timestamp}
 	pegomock.GetGenericMockFrom(mock).Invoke("RunCommentCommand", params, []reflect.Type{})
 }
 
-func (mock *MockCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time) {
+func (mock *MockCommandRunner) RunAutoplanCommand(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommandRunner().")
 	}
-	params := []pegomock.Param{baseRepo, headRepo, pull, user, timestamp}
+	params := []pegomock.Param{logger, baseRepo, headRepo, pull, user, timestamp}
 	pegomock.GetGenericMockFrom(mock).Invoke("RunAutoplanCommand", params, []reflect.Type{})
 }
 
@@ -79,8 +80,8 @@ type VerifierMockCommandRunner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time) *MockCommandRunner_RunCommentCommand_OngoingVerification {
-	params := []pegomock.Param{baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd, timestamp}
+func (verifier *VerifierMockCommandRunner) RunCommentCommand(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time) *MockCommandRunner_RunCommentCommand_OngoingVerification {
+	params := []pegomock.Param{logger, baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd, timestamp}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunCommentCommand", params, verifier.timeout)
 	return &MockCommandRunner_RunCommentCommand_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -90,48 +91,52 @@ type MockCommandRunner_RunCommentCommand_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockCommandRunner_RunCommentCommand_OngoingVerification) GetCapturedArguments() (models.Repo, *models.Repo, *models.PullRequest, models.User, int, *command.Comment, time.Time) {
-	baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd, timestamp := c.GetAllCapturedArguments()
-	return baseRepo[len(baseRepo)-1], maybeHeadRepo[len(maybeHeadRepo)-1], maybePull[len(maybePull)-1], user[len(user)-1], pullNum[len(pullNum)-1], cmd[len(cmd)-1], timestamp[len(timestamp)-1]
+func (c *MockCommandRunner_RunCommentCommand_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.Repo, *models.Repo, *models.PullRequest, models.User, int, *command.Comment, time.Time) {
+	logger, baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd, timestamp := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], baseRepo[len(baseRepo)-1], maybeHeadRepo[len(maybeHeadRepo)-1], maybePull[len(maybePull)-1], user[len(user)-1], pullNum[len(pullNum)-1], cmd[len(cmd)-1], timestamp[len(timestamp)-1]
 }
 
-func (c *MockCommandRunner_RunCommentCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []*models.Repo, _param2 []*models.PullRequest, _param3 []models.User, _param4 []int, _param5 []*command.Comment, _param6 []time.Time) {
+func (c *MockCommandRunner_RunCommentCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []*models.Repo, _param3 []*models.PullRequest, _param4 []models.User, _param5 []int, _param6 []*command.Comment, _param7 []time.Time) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(models.Repo)
+			_param0[u] = param.(logging.SimpleLogging)
 		}
-		_param1 = make([]*models.Repo, len(c.methodInvocations))
+		_param1 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(*models.Repo)
+			_param1[u] = param.(models.Repo)
 		}
-		_param2 = make([]*models.PullRequest, len(c.methodInvocations))
+		_param2 = make([]*models.Repo, len(c.methodInvocations))
 		for u, param := range params[2] {
-			_param2[u] = param.(*models.PullRequest)
+			_param2[u] = param.(*models.Repo)
 		}
-		_param3 = make([]models.User, len(c.methodInvocations))
+		_param3 = make([]*models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[3] {
-			_param3[u] = param.(models.User)
+			_param3[u] = param.(*models.PullRequest)
 		}
-		_param4 = make([]int, len(c.methodInvocations))
+		_param4 = make([]models.User, len(c.methodInvocations))
 		for u, param := range params[4] {
-			_param4[u] = param.(int)
+			_param4[u] = param.(models.User)
 		}
-		_param5 = make([]*command.Comment, len(c.methodInvocations))
+		_param5 = make([]int, len(c.methodInvocations))
 		for u, param := range params[5] {
-			_param5[u] = param.(*command.Comment)
+			_param5[u] = param.(int)
 		}
-		_param6 = make([]time.Time, len(c.methodInvocations))
+		_param6 = make([]*command.Comment, len(c.methodInvocations))
 		for u, param := range params[6] {
-			_param6[u] = param.(time.Time)
+			_param6[u] = param.(*command.Comment)
+		}
+		_param7 = make([]time.Time, len(c.methodInvocations))
+		for u, param := range params[7] {
+			_param7[u] = param.(time.Time)
 		}
 	}
 	return
 }
 
-func (verifier *VerifierMockCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time) *MockCommandRunner_RunAutoplanCommand_OngoingVerification {
-	params := []pegomock.Param{baseRepo, headRepo, pull, user, timestamp}
+func (verifier *VerifierMockCommandRunner) RunAutoplanCommand(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time) *MockCommandRunner_RunAutoplanCommand_OngoingVerification {
+	params := []pegomock.Param{logger, baseRepo, headRepo, pull, user, timestamp}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunAutoplanCommand", params, verifier.timeout)
 	return &MockCommandRunner_RunAutoplanCommand_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -141,33 +146,37 @@ type MockCommandRunner_RunAutoplanCommand_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockCommandRunner_RunAutoplanCommand_OngoingVerification) GetCapturedArguments() (models.Repo, models.Repo, models.PullRequest, models.User, time.Time) {
-	baseRepo, headRepo, pull, user, timestamp := c.GetAllCapturedArguments()
-	return baseRepo[len(baseRepo)-1], headRepo[len(headRepo)-1], pull[len(pull)-1], user[len(user)-1], timestamp[len(timestamp)-1]
+func (c *MockCommandRunner_RunAutoplanCommand_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.Repo, models.Repo, models.PullRequest, models.User, time.Time) {
+	logger, baseRepo, headRepo, pull, user, timestamp := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], baseRepo[len(baseRepo)-1], headRepo[len(headRepo)-1], pull[len(pull)-1], user[len(user)-1], timestamp[len(timestamp)-1]
 }
 
-func (c *MockCommandRunner_RunAutoplanCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.Repo, _param2 []models.PullRequest, _param3 []models.User, _param4 []time.Time) {
+func (c *MockCommandRunner_RunAutoplanCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []models.Repo, _param3 []models.PullRequest, _param4 []models.User, _param5 []time.Time) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(models.Repo)
+			_param0[u] = param.(logging.SimpleLogging)
 		}
 		_param1 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.Repo)
 		}
-		_param2 = make([]models.PullRequest, len(c.methodInvocations))
+		_param2 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[2] {
-			_param2[u] = param.(models.PullRequest)
+			_param2[u] = param.(models.Repo)
 		}
-		_param3 = make([]models.User, len(c.methodInvocations))
+		_param3 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[3] {
-			_param3[u] = param.(models.User)
+			_param3[u] = param.(models.PullRequest)
 		}
-		_param4 = make([]time.Time, len(c.methodInvocations))
+		_param4 = make([]models.User, len(c.methodInvocations))
 		for u, param := range params[4] {
-			_param4[u] = param.(time.Time)
+			_param4[u] = param.(models.User)
+		}
+		_param5 = make([]time.Time, len(c.methodInvocations))
+		for u, param := range params[5] {
+			_param5[u] = param.(time.Time)
 		}
 	}
 	return

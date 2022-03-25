@@ -43,8 +43,8 @@ type CommandRunner interface {
 	// RunCommentCommand is the first step after a command request has been parsed.
 	// It handles gathering additional information needed to execute the command
 	// and then calling the appropriate services to finish executing the command.
-	RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time)
-	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time)
+	RunCommentCommand(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time)
+	RunAutoplanCommand(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_stale_command_checker.go StaleCommandChecker
@@ -109,7 +109,6 @@ type DefaultCommandRunner struct {
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	DisableAutoplan          bool
 	EventParser              EventParsing
-	Logger                   logging.SimpleLogging
 	GlobalCfg                valid.GlobalCfg
 	StatsScope               tally.Scope
 	// AllowForkPRs controls whether we operate on pull requests from forks.
@@ -135,16 +134,16 @@ type DefaultCommandRunner struct {
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
-func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time) {
+func (c *DefaultCommandRunner) RunAutoplanCommand(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
 		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment, command.Plan.String()); commentErr != nil {
-			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
+			logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
 		return
 	}
 	defer c.Drainer.OpDone()
 
-	log := c.buildLogger(baseRepo.FullName, pull.Num)
+	log := c.buildLogger(logger, baseRepo.FullName, pull.Num)
 	defer c.logPanics(baseRepo, pull.Num, log)
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
@@ -193,16 +192,16 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 // enough data to construct the Repo model and callers might want to wait until
 // the event is further validated before making an additional (potentially
 // wasteful) call to get the necessary data.
-func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time) {
+func (c *DefaultCommandRunner) RunCommentCommand(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
 		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, ShutdownComment, ""); commentErr != nil {
-			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
+			logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
 		return
 	}
 	defer c.Drainer.OpDone()
 
-	log := c.buildLogger(baseRepo.FullName, pullNum)
+	log := c.buildLogger(logger, baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
 
 	scope := c.StatsScope.SubScope("comment")
@@ -297,9 +296,9 @@ func (c *DefaultCommandRunner) getAzureDevopsData(baseRepo models.Repo, pullNum 
 	return pull, headRepo, nil
 }
 
-func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) logging.SimpleLogging {
+func (c *DefaultCommandRunner) buildLogger(log logging.SimpleLogging, repoFullName string, pullNum int) logging.SimpleLogging {
 
-	return c.Logger.WithHistory(
+	return log.WithHistory(
 		//TODO: parameterize this since this is different from upstream
 		"repository", repoFullName,
 		"pull-num", strconv.Itoa(pullNum),
@@ -394,16 +393,15 @@ var automergeComment = `Automatically merging because all plans have been succes
 
 type ForceApplyCommandRunner struct {
 	CommandRunner
-	Logger    logging.SimpleLogging
 	VCSClient vcs.Client
 }
 
-func (f *ForceApplyCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time) {
+func (f *ForceApplyCommandRunner) RunCommentCommand(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time) {
 	if cmd.ForceApply {
 		warningMessage := "⚠️ WARNING ⚠️\n\n You have bypassed all apply requirements for this PR 🚀 . This can have unpredictable consequences 🙏🏽 and should only be used in an emergency 🆘 .\n\n 𝐓𝐡𝐢𝐬 𝐚𝐜𝐭𝐢𝐨𝐧 𝐰𝐢𝐥𝐥 𝐛𝐞 𝐚𝐮𝐝𝐢𝐭𝐞𝐝.\n"
 		if commentErr := f.VCSClient.CreateComment(baseRepo, pullNum, warningMessage, ""); commentErr != nil {
-			f.Logger.Log(logging.Error, "unable to comment: %s", commentErr)
+			logger.Log(logging.Error, "unable to comment: %s", commentErr)
 		}
 	}
-	f.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd, timestamp)
+	f.CommandRunner.RunCommentCommand(logger, baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd, timestamp)
 }

@@ -32,7 +32,7 @@ type HttpError struct {
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_validator.go EventValidator
 type EventValidator interface {
-	InstrumentedIsValid(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) bool
+	InstrumentedIsValid(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) bool
 }
 
 // VCSEventsController handles all webhook requests which signify 'events' in the
@@ -74,15 +74,17 @@ func (g *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 		return
 	}
 	event, _ := github.ParseWebHook(github.WebHookType(r), payload)
+	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
+	logger := g.Logger.With("gh-request-id", githubReqID)
 	scope := g.Scope.SubScope("github.event")
 
 	var resp HttpResponse
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
-		resp = g.HandleGithubCommentEvent(event, r, payload)
+		resp = g.HandleGithubCommentEvent(logger, event, r, payload)
 		scope = scope.SubScope(fmt.Sprintf("comment.%s", *event.Action))
 	case *github.PullRequestEvent:
-		resp = g.HandleGithubPullRequestEvent(event, r, payload)
+		resp = g.HandleGithubPullRequestEvent(logger, event, r, payload)
 		scope = scope.SubScope(fmt.Sprintf("pr.%s", *event.Action))
 	default:
 		resp = HttpResponse{
@@ -90,7 +92,7 @@ func (g *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 		}
 	}
 	if resp.err.code != 0 {
-		g.Logger.Err("error handling gh post code: %d err: %s", resp.err.code, resp.err.err.Error())
+		logger.Err("error handling gh post code: %d err: %s", resp.err.code, resp.err.err.Error())
 		scope.Counter(fmt.Sprintf("error_%d", resp.err.code)).Inc(1)
 		w.WriteHeader(resp.err.code)
 		fmt.Fprintln(w, resp.err.err.Error())
@@ -103,7 +105,7 @@ func (g *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 
 // HandleGithubCommentEvent handles comment events from GitHub where Atlantis
 // commands can come from. It's exported to make testing easier.
-func (g *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommentEvent, r *http.Request, payload []byte) HttpResponse {
+func (g *VCSEventsController) HandleGithubCommentEvent(logger logging.SimpleLogging, event *github.IssueCommentEvent, r *http.Request, payload []byte) HttpResponse {
 	if event.GetAction() != "created" {
 		return HttpResponse{
 			body: fmt.Sprintf("Ignoring comment event since action was not created"),
@@ -122,10 +124,10 @@ func (g *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 	}
 	// We pass in nil for maybeHeadRepo because the head repo data isn't
 	// available in the GithubIssueComment event.
-	return g.handleCommentEvent(baseRepo, pullNum, event.Comment.GetBody(), models.Github, r, payload)
+	return g.handleCommentEvent(logger, baseRepo, pullNum, event.Comment.GetBody(), models.Github, r, payload)
 }
 
-func (g *VCSEventsController) handleCommentEvent(baseRepo models.Repo, pullNum int, comment string, vcsHost models.VCSHostType, r *http.Request, payload []byte) HttpResponse {
+func (g *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int, comment string, vcsHost models.VCSHostType, r *http.Request, payload []byte) HttpResponse {
 	parseResult := g.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -141,7 +143,7 @@ func (g *VCSEventsController) handleCommentEvent(baseRepo models.Repo, pullNum i
 	// At this point we know it's a command we're not supposed to ignore, so now
 	// we check if this repo is allowed to run commands in the first place.
 	if !g.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
-		g.commentNotAllowlisted(baseRepo, pullNum)
+		g.commentNotAllowlisted(logger, baseRepo, pullNum)
 
 		err := errors.New("Repo not allowlisted")
 		return HttpResponse{
@@ -159,14 +161,14 @@ func (g *VCSEventsController) handleCommentEvent(baseRepo models.Repo, pullNum i
 	// variable to comment back on the pull request.
 	if parseResult.CommentResponse != "" {
 		if err := g.VCSClient.CreateComment(baseRepo, pullNum, parseResult.CommentResponse, ""); err != nil {
-			g.Logger.Err("unable to comment on pull request: %s", err)
+			logger.Err("unable to comment on pull request: %s", err)
 		}
 		return HttpResponse{
 			body: "Commenting back on pull request",
 		}
 	}
 	if err := g.SendToWorker(r, payload); err != nil {
-		g.Logger.With("err", err).Err("failed to send comment request to Atlantis worker")
+		logger.Err("failed to send comment request to Atlantis worker %w", err)
 		return HttpResponse{
 			body: err.Error(),
 			err: HttpError{
@@ -180,7 +182,7 @@ func (g *VCSEventsController) handleCommentEvent(baseRepo models.Repo, pullNum i
 	}
 }
 
-func (g *VCSEventsController) HandleGithubPullRequestEvent(pullEvent *github.PullRequestEvent, r *http.Request, payload []byte) HttpResponse {
+func (g *VCSEventsController) HandleGithubPullRequestEvent(logger logging.SimpleLogging, pullEvent *github.PullRequestEvent, r *http.Request, payload []byte) HttpResponse {
 	pull, pullEventType, baseRepo, headRepo, user, err := g.Parser.ParseGithubPullEvent(pullEvent)
 	if err != nil {
 		wrapped := errors.Wrapf(err, "Error parsing pull data: %s", err)
@@ -192,17 +194,17 @@ func (g *VCSEventsController) HandleGithubPullRequestEvent(pullEvent *github.Pul
 			},
 		}
 	}
-	return g.handlePullRequestEvent(baseRepo, headRepo, pull, user, pullEventType, r, payload)
+	return g.handlePullRequestEvent(logger, baseRepo, headRepo, pull, user, pullEventType, r, payload)
 }
 
-func (g *VCSEventsController) handlePullRequestEvent(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType, request *http.Request, payload []byte) HttpResponse {
+func (g *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType, request *http.Request, payload []byte) HttpResponse {
 	if !g.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
 		// If the repo isn't allowlisted and we receive an opened pull request
 		// event we comment back on the pull request that the repo isn't
 		// allowlisted. This is because the user might be expecting Atlantis to
 		// autoplan. For other events, we just ignore them.
 		if eventType == models.OpenedPullEvent {
-			g.commentNotAllowlisted(baseRepo, pull.Num)
+			g.commentNotAllowlisted(logger, baseRepo, pull.Num)
 		}
 		err := errors.New(fmt.Sprintf("Pull request event from non-allowlisted repo \"%s/%s\"", baseRepo.VCSHost.Hostname, baseRepo.FullName))
 		return HttpResponse{
@@ -217,7 +219,7 @@ func (g *VCSEventsController) handlePullRequestEvent(baseRepo models.Repo, headR
 	case models.OpenedPullEvent, models.UpdatedPullEvent:
 		// If the pull request was opened or updated, we perform a pseudo-autoplan to determine if tf changes exist.
 		// If it exists, then we will forward request to the worker.
-		go g.handleOpenPullEvent(baseRepo, headRepo, pull, user, request, payload)
+		go g.handleOpenPullEvent(logger, baseRepo, headRepo, pull, user, request, payload)
 		return HttpResponse{
 			body: "Processing...",
 		}
@@ -241,10 +243,11 @@ func (g *VCSEventsController) handlePullRequestEvent(baseRepo models.Repo, headR
 	return HttpResponse{}
 }
 
-func (g *VCSEventsController) handleOpenPullEvent(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, request *http.Request, payload []byte) {
-	if hasTerraformChanges := g.AutoplanValidator.InstrumentedIsValid(baseRepo, headRepo, pull, user); hasTerraformChanges {
+func (g *VCSEventsController) handleOpenPullEvent(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, request *http.Request, payload []byte) {
+	if hasTerraformChanges := g.AutoplanValidator.InstrumentedIsValid(logger, baseRepo, headRepo, pull, user); hasTerraformChanges {
+		
 		if err := g.SendToWorker(request, payload); err != nil {
-			g.Logger.With("err", err).Err("failed to send autoplan request to Atlantis worker")
+			logger.Err("failed to send autoplan request to Atlantis worker %w", err)
 		}
 	}
 }
@@ -283,9 +286,9 @@ func (g *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLeve
 
 // commentNotAllowlisted comments on the pull request that the repo is not
 // allowlisted unless allowlist error comments are disabled.
-func (g *VCSEventsController) commentNotAllowlisted(baseRepo models.Repo, pullNum int) {
+func (g *VCSEventsController) commentNotAllowlisted(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) {
 	if g.SilenceAllowlistErrors {
 		return
 	}
-	g.Logger.With("repo", baseRepo.FullName, "pullNum", pullNum).Err("This repo is not allowlisted for Atlantis")
+	logger.WithHistory("repository", baseRepo.FullName, "pull-num", pullNum).Err("This repo is not allowlisted for Atlantis")
 }

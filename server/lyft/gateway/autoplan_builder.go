@@ -16,7 +16,6 @@ import (
 
 // AutoplanValidator handles setting up repo cloning and checking to verify of any terraform files have changed
 type AutoplanValidator struct {
-	Logger                        logging.SimpleLogging
 	Scope                         tally.Scope
 	VCSClient                     vcs.Client
 	PreWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
@@ -49,16 +48,20 @@ type AutoplanValidator struct {
 
 const DefaultWorkspace = "default"
 
-func (r *AutoplanValidator) isValid(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) (bool, error) {
+func (r *AutoplanValidator) createLogger(logger logging.SimpleLogging, repoName string, pullNum int) logging.SimpleLogging {
+	return logger.WithHistory(
+		"repository", repoName,
+		"pull-num", strconv.Itoa(pullNum),
+	)
+}
+
+func (r *AutoplanValidator) isValid(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) (bool, error) {
 	if opStarted := r.Drainer.StartOp(); !opStarted {
 		return false, errors.New("atlantis is shutting down, cannot process current event")
 	}
 	defer r.Drainer.OpDone()
 
-	log := r.Logger.WithHistory(
-		"repository", baseRepo.FullName,
-		"pull-num", strconv.Itoa(pull.Num),
-	)
+	log := r.createLogger(logger, baseRepo.FullName, pull.Num)
 	defer r.logPanics(log)
 
 	ctx := &command.Context{
@@ -80,7 +83,7 @@ func (r *AutoplanValidator) isValid(baseRepo models.Repo, headRepo models.Repo, 
 	projectCmds, err := r.PrjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
 		if statusErr := r.CommitStatusUpdater.UpdateCombined(baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+			ctx.Log.Warn("unable to update commit status: %w", statusErr)
 		}
 		// If error happened after clone was made, we should clean it up here too
 		unlockFn, lockErr := r.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
@@ -106,16 +109,10 @@ func (r *AutoplanValidator) isValid(baseRepo models.Repo, headRepo models.Repo, 
 		return false, errors.Wrap(err, "Failed deleting cloned repo")
 	}
 	if len(projectCmds) == 0 {
-		ctx.Log.Info("determined there was no project to run plan in")
-		if !(r.SilenceVCSStatusNoPlans || r.SilenceVCSStatusNoProjects) {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects planned/policy_checked/applied successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debug("setting VCS status to success with no projects found")
-			for _, cmd := range []command.Name{command.Plan, command.Apply, command.PolicyCheck} {
-				if err := r.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, cmd, 0, 0); err != nil {
-					ctx.Log.Warn("unable to update commit status: %s", err)
-				}
+		ctx.Log.Info("no modified projects have been found")
+		for _, cmd := range []command.Name{command.Plan, command.Apply, command.PolicyCheck} {
+			if err := r.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, cmd, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		}
 		return false, nil
@@ -123,12 +120,15 @@ func (r *AutoplanValidator) isValid(baseRepo models.Repo, headRepo models.Repo, 
 	return true, nil
 }
 
-func (r *AutoplanValidator) InstrumentedIsValid(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) bool {
+func (r *AutoplanValidator) InstrumentedIsValid(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) bool {
 	timer := r.Scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
-	isValid, err := r.isValid(baseRepo, headRepo, pull, user)
+	isValid, err := r.isValid(logger, baseRepo, headRepo, pull, user)
+
+	log := r.createLogger(logger, baseRepo.FullName, pull.Num)
+
 	if err != nil {
-		r.Logger.With("repo", baseRepo.FullName, "pull", pull.Num).Err(err.Error())
+		log.Err(err.Error())
 		r.Scope.Counter(metrics.ExecutionErrorMetric).Inc(1)
 		return false
 	}

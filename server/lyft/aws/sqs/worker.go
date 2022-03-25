@@ -28,7 +28,7 @@ type Worker struct {
 	Logger           logging.SimpleLogging
 }
 
-func NewGatewaySQSWorker(scope tally.Scope, logger logging.SimpleLogging, queueURL string, postHandler VCSPostHandler, ctx context.Context) (*Worker, error) {
+func NewGatewaySQSWorker(ctx context.Context, scope tally.Scope, logger logging.SimpleLogging, queueURL string, postHandler VCSPostHandler) (*Worker, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading aws config for sqs worker")

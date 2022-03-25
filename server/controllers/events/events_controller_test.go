@@ -36,6 +36,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
+	lmatchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
@@ -364,7 +365,7 @@ func TestPost_GitlabCommentSuccess(t *testing.T) {
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
 
-	cr.VerifyWasCalledOnce().RunCommentCommand(matchers.AnyModelsRepo(), matchers.AnyPtrToModelsRepo(), matchers.AnyPtrToModelsPullRequest(), matchers.AnyModelsUser(), EqInt(0), matchers.AnyPtrToEventsCommentCommand(), matchers.AnyTimeTime())
+	cr.VerifyWasCalledOnce().RunCommentCommand(lmatchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyPtrToModelsRepo(), matchers.AnyPtrToModelsPullRequest(), matchers.AnyModelsUser(), EqInt(0), matchers.AnyPtrToEventsCommentCommand(), matchers.AnyTimeTime())
 }
 
 func TestPost_GithubCommentSuccess(t *testing.T) {
@@ -382,7 +383,7 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
-	cr.VerifyWasCalledOnce().RunCommentCommand(matchers.EqModelsRepo(baseRepo), matchers.AnyPtrToModelsRepo(), matchers.AnyPtrToModelsPullRequest(), matchers.EqModelsUser(user), EqInt(1), matchers.EqPtrToEventsCommentCommand(&cmd), matchers.AnyTimeTime())
+	cr.VerifyWasCalledOnce().RunCommentCommand(lmatchers.AnyLoggingSimpleLogging(), matchers.EqModelsRepo(baseRepo), matchers.AnyPtrToModelsRepo(), matchers.AnyPtrToModelsPullRequest(), matchers.EqModelsUser(user), EqInt(1), matchers.EqPtrToEventsCommentCommand(&cmd), matchers.AnyTimeTime())
 }
 
 func TestPost_GithubPullRequestInvalid(t *testing.T) {
@@ -768,7 +769,7 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 			w := httptest.NewRecorder()
 			e.Post(w, req)
 			ResponseContains(t, w, http.StatusOK, "Processing...")
-			cr.VerifyWasCalledOnce().RunAutoplanCommand(matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.EqModelsPullRequest(models.PullRequest{State: models.ClosedPullState}), matchers.AnyModelsUser(), matchers.AnyTimeTime())
+			cr.VerifyWasCalledOnce().RunAutoplanCommand(lmatchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.EqModelsPullRequest(models.PullRequest{State: models.ClosedPullState}), matchers.AnyModelsUser(), matchers.AnyTimeTime())
 		})
 	}
 }

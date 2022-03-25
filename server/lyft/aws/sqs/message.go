@@ -50,6 +50,10 @@ func (s *VCSEventMessageProcessorStats) ProcessMessage(msg types.Message) error 
 	successCount := s.Scope.Counter(Success)
 	errorCount := s.Scope.Counter(Error)
 
+	timer := s.Scope.Timer(Latency)
+	span := timer.Start()
+	defer span.Stop()
+
 	if err := s.VCSEventMessageProcessor.ProcessMessage(msg); err != nil {
 		errorCount.Inc(1)
 		return err

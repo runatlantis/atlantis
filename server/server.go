@@ -772,7 +772,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsPullGetter:         azuredevopsClient,
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
 		EventParser:                   eventParser,
-		Logger:                        logger,
 		GlobalCfg:                     globalCfg,
 		StatsScope:                    cmdStatsScope,
 		AllowForkPRs:                  userConfig.AllowForkPRs,
@@ -789,7 +788,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	forceApplyCommandRunner := &events.ForceApplyCommandRunner{
 		CommandRunner: commandRunner,
 		VCSClient:     vcsClient,
-		Logger:        logger,
 	}
 
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
@@ -879,7 +877,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	gatewaySnsWriter := sns.NewWriterWithStats(session, userConfig.LyftGatewaySnsTopicArn, statsScope.SubScope("aws.sns.gateway"))
 	autoplanValidator := &gateway.AutoplanValidator{
-		Logger:                        logger,
 		Scope:                         statsScope.SubScope("validator"),
 		VCSClient:                     vcsClient,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
@@ -943,7 +940,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		logger.With("sns", userConfig.LyftGatewaySnsTopicArn).Info("running Atlantis in gateway mode")
 	case Hybrid: // gateway eventsController handles POST, and SQS worker is set up to handle messages via default eventsController
 		vcsPostHandler = gatewayEventsController
-		worker, err := sqs.NewGatewaySQSWorker(statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController, ctx)
+		worker, err := sqs.NewGatewaySQSWorker(ctx, statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController)
 		if err != nil {
 			logger.With("err", err).Err("unable to set up worker")
 			cancel()
@@ -952,7 +949,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		go worker.Work(ctx)
 		logger.With("queue", userConfig.LyftWorkerQueueURL, "sns", userConfig.LyftGatewaySnsTopicArn).Info("running Atlantis in hybrid mode")
 	case Worker: // an SQS worker is set up to handle messages via default eventsController
-		worker, err := sqs.NewGatewaySQSWorker(statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController, ctx)
+		worker, err := sqs.NewGatewaySQSWorker(ctx, statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController)
 		if err != nil {
 			logger.With("err", err).Err("unable to set up worker")
 			cancel()

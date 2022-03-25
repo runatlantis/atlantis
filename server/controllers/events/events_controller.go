@@ -457,10 +457,10 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 		// We use a goroutine so that this function returns and the connection is
 		// closed.
 		if !e.TestingMode {
-			go e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user, timestamp)
+			go e.CommandRunner.RunAutoplanCommand(logger, baseRepo, headRepo, pull, user, timestamp)
 		} else {
 			// When testing we want to wait for everything to complete.
-			e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user, timestamp)
+			e.CommandRunner.RunAutoplanCommand(logger, baseRepo, headRepo, pull, user, timestamp)
 		}
 		return HttpResponse{
 			body: "Processing...",
@@ -584,10 +584,10 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		// Respond with success and then actually execute the command asynchronously.
 		// We use a goroutine so that this function returns and the connection is
 		// closed.
-		go e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command, timestamp)
+		go e.CommandRunner.RunCommentCommand(logger, baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command, timestamp)
 	} else {
 		// When testing we want to wait for everything to complete.
-		e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command, timestamp)
+		e.CommandRunner.RunCommentCommand(logger, baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command, timestamp)
 	}
 
 	return HttpResponse{

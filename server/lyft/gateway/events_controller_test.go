@@ -21,6 +21,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
+	lmatchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	sns_mocks "github.com/runatlantis/atlantis/server/lyft/aws/sns/mocks"
 	sns_matchers "github.com/runatlantis/atlantis/server/lyft/aws/sns/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/lyft/gateway"
@@ -307,11 +308,11 @@ func TestPost_GithubOpenPR_WithTerraformChanges(t *testing.T) {
 	repo := models.Repo{}
 	pull := models.PullRequest{State: models.OpenPullState}
 	When(p.ParseGithubPullEvent(matchers.AnyPtrToGithubPullRequestEvent())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
-	When(ev.InstrumentedIsValid(matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsUser())).ThenReturn(true)
+	When(ev.InstrumentedIsValid(lmatchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsUser())).ThenReturn(true)
 	When(sns.Write(sns_matchers.AnySliceOfByte())).ThenReturn(nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	ev.VerifyWasCalledEventually(Once(), 500*time.Millisecond).InstrumentedIsValid(matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsUser())
+	ev.VerifyWasCalledEventually(Once(), 500*time.Millisecond).InstrumentedIsValid(lmatchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsUser())
 	sns.VerifyWasCalledEventually(Once(), 500*time.Millisecond).Write(sns_matchers.AnySliceOfByte())
 	ResponseContains(t, w, http.StatusOK, "")
 }
@@ -326,11 +327,11 @@ func TestPost_GithubOpenPR_NoTerraformChanges(t *testing.T) {
 	repo := models.Repo{}
 	pull := models.PullRequest{State: models.OpenPullState}
 	When(p.ParseGithubPullEvent(matchers.AnyPtrToGithubPullRequestEvent())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
-	When(ev.InstrumentedIsValid(matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsUser())).ThenReturn(false)
+	When(ev.InstrumentedIsValid(lmatchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsUser())).ThenReturn(false)
 	When(sns.Write(sns_matchers.AnySliceOfByte())).ThenReturn(nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	ev.VerifyWasCalledEventually(Once(), 500*time.Millisecond).InstrumentedIsValid(matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsUser())
+	ev.VerifyWasCalledEventually(Once(), 500*time.Millisecond).InstrumentedIsValid(lmatchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsUser())
 	sns.VerifyWasCalledEventually(Never(), 500*time.Millisecond).Write(sns_matchers.AnySliceOfByte())
 	ResponseContains(t, w, http.StatusOK, "")
 }

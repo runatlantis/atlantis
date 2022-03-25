@@ -1087,7 +1087,6 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		VCSClient:                     e2eVCSClient,
 		GithubPullGetter:              e2eGithubGetter,
 		GitlabMergeRequestGetter:      e2eGitlabGetter,
-		Logger:                        logger,
 		GlobalCfg:                     globalCfg,
 		StatsScope:                    statsScope,
 		AllowForkPRs:                  allowForkPRs,
