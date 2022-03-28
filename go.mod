@@ -39,7 +39,7 @@ require (
 	github.com/stretchr/testify v1.7.1
 	github.com/urfave/cli v1.22.5
 	github.com/urfave/negroni v1.0.0
-	github.com/xanzy/go-gitlab v0.59.0
+	github.com/xanzy/go-gitlab v0.60.0
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.21.0
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
