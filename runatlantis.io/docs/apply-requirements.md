@@ -232,7 +232,7 @@ If you only want some projects/repos to have apply requirements, then you must
 
 
 ### Multiple Requirements
-You can set any or all of `apply`, `mergeable`, and `undiverged` requirements.
+You can set any or all of `approved`, `mergeable`, and `undiverged` requirements.
 
 ## Who Can Apply?
 Once the apply requirement is satisfied, **anyone** that can comment on the pull
