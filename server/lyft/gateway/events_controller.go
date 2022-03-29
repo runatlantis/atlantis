@@ -291,5 +291,5 @@ func (g *VCSEventsController) commentNotAllowlisted(logger logging.SimpleLogging
 	if g.SilenceAllowlistErrors {
 		return
 	}
-	logger.WithHistory("repository", baseRepo.FullName, "pull-num", pullNum).Err("This repo is not allowlisted for Atlantis")
+	logger.With("repository", baseRepo.FullName, "pull-num", pullNum).Err("This repo is not allowlisted for Atlantis")
 }

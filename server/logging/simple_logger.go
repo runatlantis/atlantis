@@ -15,8 +15,6 @@
 package logging
 
 import (
-	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -44,31 +42,13 @@ type SimpleLogging interface {
 	// and the second as the field value.
 	With(a ...interface{}) SimpleLogging
 
-	// Creates a new logger with history preserved . log storage + search strategies
-	// should ideally be used instead of managing this ourselves.
-	// keeping as a separate method to ensure that usage of history is completely intentional
-	WithHistory(a ...interface{}) SimpleLogging
-
-	// Fetches the history we've stored associated with the logging context
-	GetHistory() string
-
 	// Flushes anything left in the buffer
 	Flush() error
 }
 
 type StructuredLogger struct {
-	z           *zap.SugaredLogger
-	level       zap.AtomicLevel
-	keepHistory bool
-	// History stores all log entries ever written using
-	// this logger. This is safe for short-lived loggers
-	// like those used during plan/apply commands.
-	// TODO: Deprecate this
-	// this is added here to maintain backwards compatibility
-	// This doesn't really make sense to keep given that structured logging
-	// gives us the ability to query our logs across multiple dimensions
-	// I don't believe we should mix this in with atlantis commands and expose this to the user
-	history bytes.Buffer
+	z     *zap.SugaredLogger
+	level zap.AtomicLevel
 }
 
 func NewStructuredLoggerFromLevel(lvl LogLevel) (SimpleLogging, error) {
@@ -112,41 +92,20 @@ func (l *StructuredLogger) With(a ...interface{}) SimpleLogging {
 	}
 }
 
-func (l *StructuredLogger) WithHistory(a ...interface{}) SimpleLogging {
-	logger := &StructuredLogger{
-		z:     l.z.With(a...),
-		level: l.level,
-	}
-
-	// ensure that the history is kept across loggers.
-	logger.keepHistory = true
-	logger.history = l.history
-
-	return logger
-}
-
-func (l *StructuredLogger) GetHistory() string {
-	return l.history.String()
-}
-
 func (l *StructuredLogger) Debug(format string, a ...interface{}) {
 	l.z.Debugf(format, a...)
-	l.saveToHistory(Debug, format, a...)
 }
 
 func (l *StructuredLogger) Info(format string, a ...interface{}) {
 	l.z.Infof(format, a...)
-	l.saveToHistory(Info, format, a...)
 }
 
 func (l *StructuredLogger) Warn(format string, a ...interface{}) {
 	l.z.Warnf(format, a...)
-	l.saveToHistory(Warn, format, a...)
 }
 
 func (l *StructuredLogger) Err(format string, a ...interface{}) {
 	l.z.Errorf(format, a...)
-	l.saveToHistory(Error, format, a...)
 }
 
 func (l *StructuredLogger) Log(level LogLevel, format string, a ...interface{}) {
@@ -170,14 +129,6 @@ func (l *StructuredLogger) SetLevel(lvl LogLevel) {
 
 func (l *StructuredLogger) Flush() error {
 	return l.z.Sync()
-}
-
-func (l *StructuredLogger) saveToHistory(lvl LogLevel, format string, a ...interface{}) {
-	if !l.keepHistory {
-		return
-	}
-	msg := fmt.Sprintf(format, a...)
-	l.history.WriteString(fmt.Sprintf("[%s] %s\n", lvl.shortStr, msg))
 }
 
 // NewNoopLogger creates a logger instance that discards all logs and never

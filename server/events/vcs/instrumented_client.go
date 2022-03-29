@@ -62,7 +62,7 @@ type InstrumentedGithubClient struct {
 
 func (c *InstrumentedGithubClient) GetContents(owner, repo, branch, path string) ([]byte, error) {
 	scope := c.StatsScope.SubScope("get_contents")
-	logger := c.Logger.WithHistory([]interface{}{
+	logger := c.Logger.With([]interface{}{
 		"repository", fmt.Sprintf("%s/%s", owner, repo),
 	}...)
 
@@ -91,7 +91,7 @@ func (c *InstrumentedGithubClient) GetPullRequest(repo models.Repo, pullNum int)
 
 func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoOwner string, pullNum int) (*github.PullRequest, error) {
 	scope := c.StatsScope.SubScope("get_pull_request")
-	logger := c.Logger.WithHistory([]interface{}{
+	logger := c.Logger.With([]interface{}{
 		"repository", fmt.Sprintf("%s/%s", repoOwner, repoName),
 		"pull-num", strconv.Itoa(pullNum),
 	}...)
@@ -116,7 +116,7 @@ func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoO
 
 func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.PullRequest) ([]*github.CheckRun, error) {
 	scope := c.StatsScope.SubScope("get_repo_checks")
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
+	logger := c.Logger.With(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -138,7 +138,7 @@ func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.P
 
 func (c *InstrumentedGithubClient) GetRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error) {
 	scope := c.StatsScope.SubScope("get_repo_status")
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
+	logger := c.Logger.With(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -166,7 +166,7 @@ type InstrumentedClient struct {
 
 func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	scope := c.StatsScope.SubScope("get_modified_files")
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
+	logger := c.Logger.With(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -188,7 +188,7 @@ func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.Pull
 }
 func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
 	scope := c.StatsScope.SubScope("create_comment")
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, pullNum)...)
+	logger := c.Logger.With(fmtLogSrc(repo, pullNum)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -207,7 +207,7 @@ func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, commen
 }
 func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	scope := c.StatsScope.SubScope("hide_prev_plan_comments")
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, pullNum)...)
+	logger := c.Logger.With(fmtLogSrc(repo, pullNum)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -227,7 +227,7 @@ func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum i
 }
 func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	scope := c.StatsScope.SubScope("pull_is_approved")
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
+	logger := c.Logger.With(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -249,7 +249,7 @@ func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRe
 }
 func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	scope := c.StatsScope.SubScope("pull_is_mergeable")
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
+	logger := c.Logger.With(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -273,7 +273,7 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 	scope := c.StatsScope.SubScope("update_status")
 
 	repo := request.Repo
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, request.PullNum)...)
+	logger := c.Logger.With(fmtLogSrc(repo, request.PullNum)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -293,7 +293,7 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 }
 func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	scope := c.StatsScope.SubScope("merge_pull")
-	logger := c.Logger.WithHistory("pull-num", pull.Num)
+	logger := c.Logger.With("pull-num", pull.Num)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()

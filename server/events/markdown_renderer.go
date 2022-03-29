@@ -103,6 +103,7 @@ type projectResultTmplData struct {
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
+// TODO: remove support for verbose as this is deprecated, since history is not actually saved.
 func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType, templateOverrides map[string]string) string {
 	commandStr := strings.Title(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{

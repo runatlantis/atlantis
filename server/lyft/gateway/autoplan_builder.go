@@ -51,7 +51,7 @@ type AutoplanValidator struct {
 const DefaultWorkspace = "default"
 
 func (r *AutoplanValidator) createLogger(logger logging.SimpleLogging, repoName string, pullNum int) logging.SimpleLogging {
-	return logger.WithHistory(
+	return logger.With(
 		"repository", repoName,
 		"pull-num", strconv.Itoa(pullNum),
 	)

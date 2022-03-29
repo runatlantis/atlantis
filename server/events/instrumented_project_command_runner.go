@@ -27,7 +27,7 @@ func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute fun
 	ctx.SetScope("project")
 
 	scope := ctx.Scope
-	ctx.Log = ctx.Log.WithHistory("project", ctx.ProjectName)
+	ctx.Log = ctx.Log.With("project", ctx.ProjectName)
 	logger := ctx.Log
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
