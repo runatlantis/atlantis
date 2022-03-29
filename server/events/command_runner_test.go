@@ -314,6 +314,7 @@ func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 	ch.RunCommentCommand(log, fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Plan}, time.Now())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
@@ -337,6 +338,7 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	ch.RunCommentCommand(log, fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
@@ -360,6 +362,7 @@ func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) 
 	ch.RunCommentCommand(log, fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
@@ -619,6 +622,7 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 
 	ch.RunCommentCommand(log, fixtures.GithubRepo, &fixtures.GithubRepo, &fixtures.Pull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
@@ -676,6 +680,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 
 	ch.RunCommentCommand(log, fixtures.GithubRepo, &fixtures.GithubRepo, &fixtures.Pull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),

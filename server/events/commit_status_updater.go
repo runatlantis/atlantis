@@ -14,81 +14,22 @@
 package events
 
 import (
+	"context"
 	"fmt"
-	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_commit_status_updater.go CommitStatusUpdater
-
-// CommitStatusUpdater updates the status of a commit with the VCS host. We set
-// the status to signify whether the plan/apply succeeds.
 type CommitStatusUpdater interface {
 	// UpdateCombined updates the combined status of the head commit of pull.
 	// A combined status represents all the projects modified in the pull.
-	UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name) error
+	UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer) error
 	// UpdateCombinedCount updates the combined status to reflect the
 	// numSuccess out of numTotal.
-	UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error
+	UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int) error
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
-	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error
-}
-
-// DefaultCommitStatusUpdater implements CommitStatusUpdater.
-type DefaultCommitStatusUpdater struct {
-	Client       vcs.Client
-	TitleBuilder vcs.StatusTitleBuilder
-}
-
-func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name) error {
-	src := d.TitleBuilder.Build(cmdName.String())
-	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
-	return d.Client.UpdateStatus(repo, pull, status, src, descrip, "")
-}
-
-func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
-	src := d.TitleBuilder.Build(cmdName.String())
-	cmdVerb := "unknown"
-
-	switch cmdName {
-	case command.Plan:
-		cmdVerb = "planned"
-	case command.PolicyCheck:
-		cmdVerb = "policies checked"
-	case command.Apply:
-		cmdVerb = "applied"
-	}
-
-	return d.Client.UpdateStatus(repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
-}
-
-func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error {
-	projectID := ctx.ProjectName
-	if projectID == "" {
-		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
-	}
-	src := d.TitleBuilder.Build(cmdName.String(), vcs.StatusTitleOptions{
-		ProjectName: projectID,
-	})
-
-	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
-	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
-}
-
-func (d *DefaultCommitStatusUpdater) statusDescription(status models.CommitStatus) string {
-	var descripWords string
-	switch status {
-	case models.PendingCommitStatus:
-		descripWords = "in progress..."
-	case models.FailedCommitStatus:
-		descripWords = "failed."
-	case models.SuccessCommitStatus:
-		descripWords = "succeeded."
-	}
-
-	return descripWords
+	UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string) error
 }

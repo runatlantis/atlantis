@@ -27,6 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/shurcooL/githubv4"
 )
@@ -412,9 +413,9 @@ func (g *GithubClient) GetRepoStatuses(repo models.Repo, pull models.PullRequest
 
 // UpdateStatus updates the status badge on the pull request.
 // See https://github.com/blog/1227-commit-status-api.
-func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (g *GithubClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
 	ghState := "error"
-	switch state {
+	switch request.State {
 	case models.PendingCommitStatus:
 		ghState = "pending"
 	case models.SuccessCommitStatus:
@@ -425,11 +426,11 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 
 	status := &github.RepoStatus{
 		State:       github.String(ghState),
-		Description: github.String(description),
-		Context:     github.String(src),
-		TargetURL:   &url,
+		Description: github.String(request.Description),
+		Context:     github.String(request.StatusName),
+		TargetURL:   &request.DetailsURL,
 	}
-	_, _, err := g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, status)
+	_, _, err := g.client.Repositories.CreateStatus(ctx, request.Repo.Owner, request.Repo.Name, request.Ref, status)
 	return err
 }
 

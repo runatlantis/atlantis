@@ -2,6 +2,7 @@ package bitbucketcloud
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	validator "gopkg.in/go-playground/validator.v9"
 )
 
@@ -163,9 +165,9 @@ func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (boo
 }
 
 // UpdateStatus updates the status of a commit.
-func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, src string, description string, url string) error {
+func (b *Client) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
 	bbState := "FAILED"
-	switch status {
+	switch request.State {
 	case models.PendingCommitStatus:
 		bbState = "INPROGRESS"
 	case models.SuccessCommitStatus:
@@ -176,18 +178,20 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 
 	// URL is a required field for bitbucket statuses. We default to the
 	// Atlantis server's URL.
+	url := request.DetailsURL
 	if url == "" {
 		url = b.AtlantisURL
 	}
+	repo := request.Repo
 
 	bodyBytes, err := json.Marshal(map[string]string{
-		"key":         src,
+		"key":         request.StatusName,
 		"url":         url,
 		"state":       bbState,
-		"description": description,
+		"description": request.Description,
 	})
 
-	path := fmt.Sprintf("%s/2.0/repositories/%s/commit/%s/statuses/build", b.BaseURL, repo.FullName, pull.HeadCommit)
+	path := fmt.Sprintf("%s/2.0/repositories/%s/commit/%s/statuses/build", b.BaseURL, repo.FullName, request.Ref)
 	if err != nil {
 		return errors.Wrap(err, "json encoding")
 	}

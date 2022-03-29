@@ -3,6 +3,9 @@ package gateway
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+
 	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
@@ -12,8 +15,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sns"
 	"github.com/uber-go/tally"
-	"io/ioutil"
-	"net/http"
 )
 
 const (
@@ -245,7 +246,7 @@ func (g *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 
 func (g *VCSEventsController) handleOpenPullEvent(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, request *http.Request, payload []byte) {
 	if hasTerraformChanges := g.AutoplanValidator.InstrumentedIsValid(logger, baseRepo, headRepo, pull, user); hasTerraformChanges {
-		
+
 		if err := g.SendToWorker(request, payload); err != nil {
 			logger.Err("failed to send autoplan request to Atlantis worker %w", err)
 		}

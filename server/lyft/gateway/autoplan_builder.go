@@ -1,6 +1,9 @@
 package gateway
 
 import (
+	"context"
+	"strconv"
+
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
@@ -11,7 +14,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/recovery"
 	"github.com/uber-go/tally"
-	"strconv"
 )
 
 // AutoplanValidator handles setting up repo cloning and checking to verify of any terraform files have changed
@@ -82,7 +84,7 @@ func (r *AutoplanValidator) isValid(logger logging.SimpleLogging, baseRepo model
 
 	projectCmds, err := r.PrjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
-		if statusErr := r.CommitStatusUpdater.UpdateCombined(baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
+		if statusErr := r.CommitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %w", statusErr)
 		}
 		// If error happened after clone was made, we should clean it up here too
@@ -111,7 +113,7 @@ func (r *AutoplanValidator) isValid(logger logging.SimpleLogging, baseRepo model
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("no modified projects have been found")
 		for _, cmd := range []command.Name{command.Plan, command.Apply, command.PolicyCheck} {
-			if err := r.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, cmd, 0, 0); err != nil {
+			if err := r.CommitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, cmd, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		}

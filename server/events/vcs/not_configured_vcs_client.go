@@ -14,9 +14,11 @@
 package vcs
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 )
 
 // NotConfiguredVCSClient is used as a placeholder when Atlantis isn't configured
@@ -41,7 +43,7 @@ func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.Pu
 func (a *NotConfiguredVCSClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	return false, a.err()
 }
-func (a *NotConfiguredVCSClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (a *NotConfiguredVCSClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
 	return a.err()
 }
 func (a *NotConfiguredVCSClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {

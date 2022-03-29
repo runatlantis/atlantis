@@ -24,8 +24,8 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config"
 
-	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -212,7 +212,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	for _, status := range statuses {
-		if !strings.HasSuffix(status.Name, fmt.Sprintf("/%s", command.Apply.String())) {
+		if !strings.HasSuffix(status.Name, fmt.Sprintf("/%s", "apply")) {
 			if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
 				return false, nil
 			}
@@ -232,9 +232,9 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 }
 
 // UpdateStatus updates the build status of a commit.
-func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (g *GitlabClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
 	gitlabState := gitlab.Failed
-	switch state {
+	switch request.State {
 	case models.PendingCommitStatus:
 		gitlabState = gitlab.Pending
 	case models.FailedCommitStatus:
@@ -242,11 +242,11 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	case models.SuccessCommitStatus:
 		gitlabState = gitlab.Success
 	}
-	_, _, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
+	_, _, err := g.Client.Commits.SetCommitStatus(request.Repo.FullName, request.Ref, &gitlab.SetCommitStatusOptions{
 		State:       gitlabState,
-		Context:     gitlab.String(src),
-		Description: gitlab.String(description),
-		TargetURL:   &url,
+		Context:     gitlab.String(request.StatusName),
+		Description: gitlab.String(request.Description),
+		TargetURL:   &request.DetailsURL,
 	})
 	return err
 }

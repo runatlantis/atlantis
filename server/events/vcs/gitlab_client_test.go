@@ -1,6 +1,7 @@
 package vcs
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/logging"
 	gitlab "github.com/xanzy/go-gitlab"
 
@@ -237,11 +239,16 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 				Owner:    "runatlantis",
 				Name:     "atlantis",
 			}
-			err = client.UpdateStatus(repo, models.PullRequest{
-				Num:        1,
-				BaseRepo:   repo,
-				HeadCommit: "sha",
-			}, c.status, "src", "description", "https://google.com")
+			err = client.UpdateStatus(context.TODO(), types.UpdateStatusRequest{
+				Repo:        repo,
+				PullNum:     1,
+				Ref:         "sha",
+				State:       c.status,
+				StatusName:  "src",
+				Description: "description",
+				DetailsURL:  "https://google.com",
+			})
+
 			Ok(t, err)
 			Assert(t, gotRequest, "expected to get the request")
 		})

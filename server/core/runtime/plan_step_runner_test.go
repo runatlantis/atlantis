@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -808,8 +809,8 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
 
 			// Ensure that the status was updated with the runURL.
 			runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
-			updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.PendingCommitStatus, runURL)
-			updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.SuccessCommitStatus, runURL)
+			updater.VerifyWasCalledOnce().UpdateProject(context.TODO(), ctx, command.Plan, models.PendingCommitStatus, runURL)
+			updater.VerifyWasCalledOnce().UpdateProject(context.TODO(), ctx, command.Plan, models.SuccessCommitStatus, runURL)
 		})
 	}
 }

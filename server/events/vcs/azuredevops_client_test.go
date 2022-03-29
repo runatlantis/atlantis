@@ -14,6 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -222,11 +223,15 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 				Owner:    "owner",
 				Name:     "repo",
 			}
-			err = client.UpdateStatus(repo, models.PullRequest{
-				Num:        22,
-				BaseRepo:   repo,
-				HeadCommit: "sha",
-			}, c.status, "src", "description", "https://google.com")
+			err = client.UpdateStatus(context.TODO(), types.UpdateStatusRequest{
+				Repo:        repo,
+				PullNum:     22,
+				Ref:         "sha",
+				State:       c.status,
+				StatusName:  "src",
+				Description: "description",
+				DetailsURL:  "https://google.com",
+			})
 			Ok(t, err)
 			Assert(t, gotRequest, "expected to get the request")
 		})

@@ -2,6 +2,7 @@ package bitbucketserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -213,9 +215,10 @@ func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (boo
 }
 
 // UpdateStatus updates the status of a commit.
-func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, src string, description string, url string) error {
+func (b *Client) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
 	bbState := "FAILED"
-	switch status {
+
+	switch request.State {
 	case models.PendingCommitStatus:
 		bbState = "INPROGRESS"
 	case models.SuccessCommitStatus:
@@ -226,18 +229,19 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 
 	// URL is a required field for bitbucket statuses. We default to the
 	// Atlantis server's URL.
+	url := request.DetailsURL
 	if url == "" {
 		url = b.AtlantisURL
 	}
 
 	bodyBytes, err := json.Marshal(map[string]string{
-		"key":         src,
+		"key":         request.StatusName,
 		"url":         url,
 		"state":       bbState,
-		"description": description,
+		"description": request.Description,
 	})
 
-	path := fmt.Sprintf("%s/rest/build-status/1.0/commits/%s", b.BaseURL, pull.HeadCommit)
+	path := fmt.Sprintf("%s/rest/build-status/1.0/commits/%s", b.BaseURL, request.Ref)
 	if err != nil {
 		return errors.Wrap(err, "json encoding")
 	}

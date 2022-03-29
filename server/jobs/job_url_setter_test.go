@@ -1,6 +1,7 @@
 package jobs_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -25,11 +26,11 @@ func TestJobURLSetter(t *testing.T) {
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
 
 		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn(url, nil)
-		When(projectStatusUpdater.UpdateProject(ctx, command.Plan, models.PendingCommitStatus, url)).ThenReturn(nil)
+		When(projectStatusUpdater.UpdateProject(context.TODO(), ctx, command.Plan, models.PendingCommitStatus, url)).ThenReturn(nil)
 		err := jobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus)
 		Ok(t, err)
 
-		projectStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.PendingCommitStatus, "url-to-project-jobs")
+		projectStatusUpdater.VerifyWasCalledOnce().UpdateProject(context.TODO(), ctx, command.Plan, models.PendingCommitStatus, "url-to-project-jobs")
 	})
 
 	t.Run("update project status with project jobs url error", func(t *testing.T) {

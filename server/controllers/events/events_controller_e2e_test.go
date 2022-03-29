@@ -2,6 +2,7 @@ package events_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -34,6 +35,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	lyft_vcs "github.com/runatlantis/atlantis/server/events/vcs/lyft"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
@@ -552,7 +554,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	// TODO: aggregate some of this with that of server.go to minimize duplication
 	allowForkPRs := false
 	vcsClient := vcs.NewClientProxy(ghClient, nil, nil, nil, nil)
-	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}}
+	e2eStatusUpdater := &command.VCSStatusUpdater{Client: vcsClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}}
 
 	eventParser := &events.EventParser{
 		GithubUser:  "github-user",
@@ -1153,7 +1155,7 @@ func (t *testGithubClient) PullIsApproved(repo models.Repo, pull models.PullRequ
 func (t *testGithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	return false, nil
 }
-func (t *testGithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (t *testGithubClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
 	return nil
 }
 func (t *testGithubClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {

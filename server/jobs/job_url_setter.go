@@ -1,6 +1,9 @@
 package jobs
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
@@ -17,7 +20,7 @@ type ProjectJobURLGenerator interface {
 type ProjectStatusUpdater interface {
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
-	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error
+	UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string) error
 }
 
 type JobURLSetter struct {
@@ -38,5 +41,5 @@ func (j *JobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName c
 	if err != nil {
 		return err
 	}
-	return j.projectStatusUpdater.UpdateProject(ctx, cmdName, status, url)
+	return j.projectStatusUpdater.UpdateProject(context.TODO(), ctx, cmdName, status, url)
 }

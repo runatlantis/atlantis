@@ -12,11 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"golang.org/x/net/context"
 
 	"github.com/shurcooL/githubv4"
 )
@@ -232,7 +233,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 			},
 		},
 		123,
-		command.Plan.TitleString(),
+		"Plan",
 	)
 	Ok(t, err)
 	Equals(t, 2, len(gotMinimizeCalls))
@@ -322,7 +323,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 			},
 		},
 		123,
-		command.Plan.TitleString(),
+		"Plan",
 	)
 	Ok(t, err)
 	Equals(t, 3, len(gotMinimizeCalls))
@@ -376,19 +377,24 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 			Ok(t, err)
 			defer disableSSLVerification()()
 
-			err = client.UpdateStatus(models.Repo{
-				FullName:          "owner/repo",
-				Owner:             "owner",
-				Name:              "repo",
-				CloneURL:          "",
-				SanitizedCloneURL: "",
-				VCSHost: models.VCSHost{
-					Type:     models.Github,
-					Hostname: "github.com",
+			err = client.UpdateStatus(context.TODO(), types.UpdateStatusRequest{
+				Repo: models.Repo{
+					FullName:          "owner/repo",
+					Owner:             "owner",
+					Name:              "repo",
+					CloneURL:          "",
+					SanitizedCloneURL: "",
+					VCSHost: models.VCSHost{
+						Type:     models.Github,
+						Hostname: "github.com",
+					},
 				},
-			}, models.PullRequest{
-				Num: 1,
-			}, c.status, "src", "description", "https://google.com")
+				PullNum:     1,
+				State:       c.status,
+				StatusName:  "src",
+				Description: "description",
+				DetailsURL:  "https://google.com",
+			})
 			Ok(t, err)
 		})
 	}
@@ -1057,7 +1063,7 @@ func TestGithubClient_SplitComments(t *testing.T) {
 	}
 	// create an extra long string
 	comment := strings.Repeat("a", 65537)
-	err = client.CreateComment(repo, pull.Num, comment, command.Plan.String())
+	err = client.CreateComment(repo, pull.Num, comment, "plan")
 	Ok(t, err)
 	err = client.CreateComment(repo, pull.Num, comment, "")
 	Ok(t, err)
@@ -1068,7 +1074,7 @@ func TestGithubClient_SplitComments(t *testing.T) {
 	secondSplit := strings.ToLower(body[0])
 
 	Equals(t, 4, len(githubComments))
-	Assert(t, strings.Contains(firstSplit, command.Plan.String()), fmt.Sprintf("comment should contain the command name but was %q", firstSplit))
+	Assert(t, strings.Contains(firstSplit, "plan"), fmt.Sprintf("comment should contain the command name but was %q", firstSplit))
 	Assert(t, strings.Contains(secondSplit, "continued from previous comment"), fmt.Sprintf("comment should contain no reference to the command name but was %q", secondSplit))
 }
 

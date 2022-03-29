@@ -11,18 +11,19 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package events_test
+package command_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -70,12 +71,20 @@ func TestUpdateCombined(t *testing.T) {
 			client := mocks.NewMockClient()
 
 			titleBuilder := vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}
-			s := events.DefaultCommitStatusUpdater{Client: client, TitleBuilder: titleBuilder}
-			err := s.UpdateCombined(models.Repo{}, models.PullRequest{}, c.status, c.command)
+			s := command.VCSStatusUpdater{Client: client, TitleBuilder: titleBuilder}
+			ctx := context.Background()
+
+			err := s.UpdateCombined(ctx, models.Repo{}, models.PullRequest{}, c.status, c.command)
 			Ok(t, err)
 
 			expSrc := fmt.Sprintf("atlantis/%s", c.command)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
+			client.VerifyWasCalledOnce().UpdateStatus(ctx, types.UpdateStatusRequest{
+				Repo:        models.Repo{},
+				PullNum:     0,
+				State:       c.status,
+				StatusName:  expSrc,
+				Description: c.expDescrip,
+			})
 		})
 	}
 }
@@ -137,12 +146,19 @@ func TestUpdateCombinedCount(t *testing.T) {
 			RegisterMockTestingT(t)
 			client := mocks.NewMockClient()
 			titleBuilder := vcs.StatusTitleBuilder{TitlePrefix: "atlantis-test"}
-			s := events.DefaultCommitStatusUpdater{Client: client, TitleBuilder: titleBuilder}
-			err := s.UpdateCombinedCount(models.Repo{}, models.PullRequest{}, c.status, c.command, c.numSuccess, c.numTotal)
+			s := command.VCSStatusUpdater{Client: client, TitleBuilder: titleBuilder}
+			ctx := context.Background()
+			err := s.UpdateCombinedCount(ctx, models.Repo{}, models.PullRequest{}, c.status, c.command, c.numSuccess, c.numTotal)
 			Ok(t, err)
 
 			expSrc := fmt.Sprintf("%s/%s", titleBuilder.TitlePrefix, c.command)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
+			client.VerifyWasCalledOnce().UpdateStatus(ctx, types.UpdateStatusRequest{
+				Repo:        models.Repo{},
+				PullNum:     0,
+				State:       c.status,
+				StatusName:  expSrc,
+				Description: c.expDescrip,
+			})
 		})
 	}
 }
@@ -175,8 +191,9 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 		t.Run(c.expSrc, func(t *testing.T) {
 			client := mocks.NewMockClient()
 			titleBuilder := vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}
-			s := events.DefaultCommitStatusUpdater{Client: client, TitleBuilder: titleBuilder}
-			err := s.UpdateProject(command.ProjectContext{
+			s := command.VCSStatusUpdater{Client: client, TitleBuilder: titleBuilder}
+			ctx := context.Background()
+			err := s.UpdateProject(ctx, command.ProjectContext{
 				ProjectName: c.projectName,
 				RepoRelDir:  c.repoRelDir,
 				Workspace:   c.workspace,
@@ -185,7 +202,14 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 				models.PendingCommitStatus,
 				"url")
 			Ok(t, err)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, models.PendingCommitStatus, c.expSrc, "Plan in progress...", "url")
+			client.VerifyWasCalledOnce().UpdateStatus(ctx, types.UpdateStatusRequest{
+				Repo:        models.Repo{},
+				PullNum:     0,
+				State:       models.PendingCommitStatus,
+				StatusName:  c.expSrc,
+				Description: "Plan in progress...",
+				DetailsURL:  "url",
+			})
 		})
 	}
 }
@@ -234,8 +258,9 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 		t.Run(c.expDescrip, func(t *testing.T) {
 			client := mocks.NewMockClient()
 			titleBuilder := vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}
-			s := events.DefaultCommitStatusUpdater{Client: client, TitleBuilder: titleBuilder}
-			err := s.UpdateProject(command.ProjectContext{
+			s := command.VCSStatusUpdater{Client: client, TitleBuilder: titleBuilder}
+			ctx := context.Background()
+			err := s.UpdateProject(ctx, command.ProjectContext{
 				RepoRelDir: ".",
 				Workspace:  "default",
 			},
@@ -243,7 +268,14 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 				c.status,
 				"url")
 			Ok(t, err)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, fmt.Sprintf("atlantis/%s: ./default", c.cmd.String()), c.expDescrip, "url")
+			client.VerifyWasCalledOnce().UpdateStatus(ctx, types.UpdateStatusRequest{
+				Repo:        models.Repo{},
+				PullNum:     0,
+				State:       c.status,
+				StatusName:  fmt.Sprintf("atlantis/%s: ./default", c.cmd.String()),
+				Description: c.expDescrip,
+				DetailsURL:  "url",
+			})
 		})
 	}
 }
@@ -253,8 +285,9 @@ func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) 
 	RegisterMockTestingT(t)
 	client := mocks.NewMockClient()
 	titleBuilder := vcs.StatusTitleBuilder{TitlePrefix: "custom"}
-	s := events.DefaultCommitStatusUpdater{Client: client, TitleBuilder: titleBuilder}
-	err := s.UpdateProject(command.ProjectContext{
+	s := command.VCSStatusUpdater{Client: client, TitleBuilder: titleBuilder}
+	ctx := context.Background()
+	err := s.UpdateProject(ctx, command.ProjectContext{
 		RepoRelDir: ".",
 		Workspace:  "default",
 	},
@@ -262,6 +295,12 @@ func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) 
 		models.SuccessCommitStatus,
 		"url")
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{},
-		models.SuccessCommitStatus, "custom/apply: ./default", "Apply succeeded.", "url")
+	client.VerifyWasCalledOnce().UpdateStatus(ctx, types.UpdateStatusRequest{
+		Repo:        models.Repo{},
+		PullNum:     0,
+		State:       models.SuccessCommitStatus,
+		StatusName:  "custom/apply: ./default",
+		Description: "Apply succeeded.",
+		DetailsURL:  "url",
+	})
 }

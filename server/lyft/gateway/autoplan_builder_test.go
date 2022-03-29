@@ -2,6 +2,8 @@ package gateway_test
 
 import (
 	"errors"
+	"testing"
+
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
@@ -14,7 +16,6 @@ import (
 	"github.com/runatlantis/atlantis/server/lyft/gateway"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
-	"testing"
 )
 
 var autoplanValidator gateway.AutoplanValidator
@@ -141,6 +142,7 @@ func TestIsValid_TerraformChanges(t *testing.T) {
 	containsTerraformChanges := autoplanValidator.InstrumentedIsValid(log, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	Assert(t, containsTerraformChanges == true, "should have terraform changes")
 	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		matchers.AnyModelsCommitStatus(),
@@ -161,6 +163,7 @@ func TestPullRequestHasTerraformChanges_NoTerraformChanges(t *testing.T) {
 	Assert(t, containsTerraformChanges == false, "should have no terraform changes")
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 	commitStatusUpdater.VerifyWasCalled(Times(3)).UpdateCombinedCount(
+		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		matchers.AnyModelsCommitStatus(),

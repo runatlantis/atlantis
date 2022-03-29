@@ -13,9 +13,9 @@ import (
 )
 
 type CloneActivityRequest struct {
-	Repo   models.Repo
-	Branch string
-	Dir    string
+	Repo     models.Repo
+	Branch   string
+	Dir      string
 	Revision string
 }
 

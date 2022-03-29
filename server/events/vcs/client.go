@@ -14,11 +14,13 @@
 package vcs
 
 import (
+	"context"
+
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_client.go Client
-
 // Client is used to make API calls to a VCS host like GitHub or GitLab.
 type Client interface {
 	// GetModifiedFiles returns the names of files that were modified in the merge request
@@ -35,7 +37,7 @@ type Client interface {
 	// change across runs.
 	// url is an optional link that users should click on for more information
 	// about this status.
-	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error
+	UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error
 	MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error
 	MarkdownPullLink(pull models.PullRequest) (string, error)
 

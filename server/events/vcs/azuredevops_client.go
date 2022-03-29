@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 )
 
 // AzureDevopsClient represents an Azure DevOps VCS client
@@ -228,9 +229,9 @@ func (g *AzureDevopsClient) GetPullRequest(repo models.Repo, num int) (*azuredev
 }
 
 // UpdateStatus updates the build status of a commit.
-func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (g *AzureDevopsClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
 	adState := azuredevops.GitError.String()
-	switch state {
+	switch request.State {
 	case models.PendingCommitStatus:
 		adState = azuredevops.GitPending.String()
 	case models.SuccessCommitStatus:
@@ -240,9 +241,13 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	}
 
 	status := azuredevops.GitPullRequestStatus{}
-	status.Context = GitStatusContextFromSrc(src)
-	status.Description = &description
+	status.Context = GitStatusContextFromSrc(request.StatusName)
+	status.Description = &request.Description
 	status.State = &adState
+
+	repo := request.Repo
+
+	url := request.DetailsURL
 	if url != "" {
 		status.TargetURL = &url
 	}
@@ -250,7 +255,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestListOptions{}
-	source, resp, err := g.Client.PullRequests.Get(g.ctx, owner, project, pull.Num, &opts)
+	source, resp, err := g.Client.PullRequests.Get(g.ctx, owner, project, request.PullNum, &opts)
 	if err != nil {
 		return errors.Wrap(err, "getting pull request")
 	}
@@ -259,7 +264,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	}
 	if source.GetSupportsIterations() {
 		opts := azuredevops.PullRequestIterationsListOptions{}
-		iterations, resp, err := g.Client.PullRequests.ListIterations(g.ctx, owner, project, repoName, pull.Num, &opts)
+		iterations, resp, err := g.Client.PullRequests.ListIterations(g.ctx, owner, project, repoName, request.PullNum, &opts)
 		if err != nil {
 			return errors.Wrap(err, "listing pull request iterations")
 		}
@@ -268,7 +273,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 		}
 		for _, iteration := range iterations {
 			if sourceRef := iteration.GetSourceRefCommit(); sourceRef != nil {
-				if *sourceRef.CommitID == pull.HeadCommit {
+				if *sourceRef.CommitID == request.Ref {
 					status.IterationID = iteration.ID
 					break
 				}
@@ -280,7 +285,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 			}
 		}
 	}
-	_, resp, err = g.Client.PullRequests.CreateStatus(g.ctx, owner, project, repoName, pull.Num, &status)
+	_, resp, err = g.Client.PullRequests.CreateStatus(g.ctx, owner, project, repoName, request.PullNum, &status)
 	if err != nil {
 		return errors.Wrap(err, "creating pull request status")
 	}

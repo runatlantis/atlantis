@@ -1,12 +1,14 @@
 package vcs
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
 	"github.com/google/go-github/v31/github"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/uber-go/tally"
 )
@@ -267,9 +269,11 @@ func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullR
 	return mergeable, err
 }
 
-func (c *InstrumentedClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
 	scope := c.StatsScope.SubScope("update_status")
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
+
+	repo := request.Repo
+	logger := c.Logger.WithHistory(fmtLogSrc(repo, request.PullNum)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -277,9 +281,9 @@ func (c *InstrumentedClient) UpdateStatus(repo models.Repo, pull models.PullRequ
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	if err := c.Client.UpdateStatus(repo, pull, state, src, description, url); err != nil {
+	if err := c.Client.UpdateStatus(ctx, request); err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to update status at url: %s, error: %s", url, err.Error())
+		logger.Err("Unable to update status at url: %s, error: %s", request.DetailsURL, err.Error())
 		return err
 	}
 
