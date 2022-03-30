@@ -241,8 +241,7 @@ func TestPlatformModeNewGlobalCfg(t *testing.T) {
 		Plan: valid.Stage{
 			Steps: []valid.Step{
 				{
-					StepName:  "init",
-					ExtraArgs: []string{"-lock=false"},
+					StepName: "init",
 				},
 				{
 					StepName:  "plan",

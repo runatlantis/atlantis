@@ -20,7 +20,7 @@ Checking plan against the following policies:
 
 ---
 ### 2. dir: `dir2` workspace: `default`
-**Policy Check Error**
+**Policy Check Failed**
 ```
 exit status 1
 Checking plan against the following policies: 

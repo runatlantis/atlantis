@@ -11,14 +11,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
+	"github.com/uber-go/tally"
 )
 
 func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 
+	scope := tally.NewTestScope("test", nil)
 	mockCommentBuilder := mocks.NewMockCommentBuilder()
-	subject := events.DefaultProjectCommandContextBuilder{
-		CommentBuilder: mockCommentBuilder,
-	}
+	subject := events.NewProjectCommandContextBuilder(mockCommentBuilder)
 
 	projRepoRelDir := "dir1"
 	projWorkspace := "default"
@@ -41,6 +41,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 	commandCtx := &command.Context{
 		Log:        logging.NewNoopLogger(t),
 		PullStatus: pullStatus,
+		Scope:      scope,
 	}
 
 	expectedApplyCmt := "Apply Comment"
@@ -57,7 +58,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 				RepoRelDir:  "dir1",
 			},
 		}
-		contextFlags := &events.ContextFlags{
+		contextFlags := &command.ContextFlags{
 			Automerge:                 false,
 			DeleteSourceBranchOnMerge: false,
 			ParallelApply:             false,
@@ -65,34 +66,6 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			Verbose:                   false,
 			ForceApply:                false,
 		}
-		result := subject.BuildProjectContext(commandCtx, command.Plan, projCfg, []string{}, "some/dir", contextFlags)
-
-		assert.Equal(t, models.ErroredPolicyCheckStatus, result[0].ProjectPlanStatus)
-	})
-
-	t.Run("with no project name defined", func(t *testing.T) {
-		projCfg.Name = ""
-		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, "", []string{})).ThenReturn(expectedPlanCmt)
-		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "", false)).ThenReturn(expectedApplyCmt)
-		pullStatus.Projects = []models.ProjectStatus{
-			{
-				Status:     models.ErroredPlanStatus,
-				RepoRelDir: "dir2",
-			},
-			{
-				Status:     models.ErroredPolicyCheckStatus,
-				RepoRelDir: "dir1",
-			},
-		}
-		contextFlags := &events.ContextFlags{
-			Automerge:                 false,
-			DeleteSourceBranchOnMerge: false,
-			ParallelApply:             false,
-			ParallelPlan:              false,
-			Verbose:                   false,
-			ForceApply:                false,
-		}
-
 		result := subject.BuildProjectContext(commandCtx, command.Plan, projCfg, []string{}, "some/dir", contextFlags)
 
 		assert.Equal(t, models.ErroredPolicyCheckStatus, result[0].ProjectPlanStatus)
@@ -112,7 +85,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 				RepoRelDir: "dir1",
 			},
 		}
-		contextFlags := &events.ContextFlags{
+		contextFlags := &command.ContextFlags{
 			Automerge:                 false,
 			DeleteSourceBranchOnMerge: false,
 			ParallelApply:             true,

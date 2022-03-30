@@ -135,7 +135,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		autoMerger,
 		parallelPoolSize,
 		SilenceNoProjects,
-		defaultBoltDB,
 	)
 
 	pullReqStatusFetcher := lyft_vcs.NewSQBasedPullStatusFetcher(githubClient, vcs.NewLyftPullMergeabilityChecker("atlantis"))

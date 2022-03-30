@@ -1,0 +1,6 @@
+version: 3
+projects:
+  - dir: staging
+    workspace: staging
+    autoplan:
+      when_modified: ["**/*.tf*"]

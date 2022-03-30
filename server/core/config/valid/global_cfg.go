@@ -160,8 +160,7 @@ var DefaultPlanStage = Stage{
 var DefaultLocklessPlanStage = Stage{
 	Steps: []Step{
 		{
-			StepName:  "init",
-			ExtraArgs: []string{"-lock=false"},
+			StepName: "init",
 		},
 		{
 			StepName:  "plan",

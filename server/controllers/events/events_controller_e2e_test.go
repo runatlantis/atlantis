@@ -31,6 +31,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/command/apply"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -40,6 +41,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/wrappers"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -520,6 +522,105 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 	}
 }
 
+func TestGitHubWorkflowPullRequestsWorkflows(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// Ensure we have >= TF 0.14 locally.
+	ensureRunning014(t)
+	// Ensure we have >= Conftest 0.21 locally.
+	ensureRunningConftest(t)
+
+	cases := []struct {
+		Description string
+		// RepoDir is relative to testfixtures/test-repos.
+		RepoDir string
+		// ModifiedFiles are the list of files that have been modified in this
+		// pull request.
+		ModifiedFiles []string
+		// Comments are what our mock user writes to the pull request.
+		Comments []string
+		// ExpReplies is a list of files containing the expected replies that
+		// Atlantis writes to the pull request in order. A reply from a parallel operation
+		// will be matched using a substring check.
+		ExpReplies [][]string
+	}{
+		{
+			Description:   "disabled apply",
+			RepoDir:       "platform-mode/disabled-apply",
+			ModifiedFiles: []string{"staging/main.tf"},
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+			},
+		},
+		{
+			Description:   "autoplan and policy check approvals",
+			RepoDir:       "platform-mode/policy-check-approval",
+			ModifiedFiles: []string{"main.tf"},
+			Comments: []string{
+				"atlantis approve_policies",
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-approve-policies.txt"},
+				{"exp-output-apply.txt"},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			t.Parallel()
+			// Setup test dependencies.
+			w := httptest.NewRecorder()
+			// reset userConfig
+			userConfig := &server.UserConfig{}
+			userConfig.EnablePlatformMode = true
+			userConfig.EnablePolicyChecksFlag = true
+
+			ghClient := &testGithubClient{ExpectedModifiedFiles: c.ModifiedFiles}
+
+			headSHA, ctrl, _ := setupE2E(t, c.RepoDir, userConfig, ghClient)
+
+			ghClient.ExpectedPull = GitHubPullRequestParsed(headSHA)
+			ghClient.ExpectedApprovalStatus = models.ApprovalStatus{IsApproved: true}
+
+			// First, send the open pull request event which triggers autoplan.
+			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
+			ctrl.Post(w, pullOpenedReq)
+			ResponseContains(t, w, 200, "Processing...")
+
+			// Now send any other comments.
+			for _, comment := range c.Comments {
+				commentReq := GitHubCommentEvent(t, comment)
+				w = httptest.NewRecorder()
+				ctrl.Post(w, commentReq)
+				ResponseContains(t, w, 200, "Processing...")
+			}
+
+			// Send the "pull closed" event which would be triggered by the
+			// automerge or a manual merge.
+			pullClosedReq := GitHubPullRequestClosedEvent(t)
+			w = httptest.NewRecorder()
+			ctrl.Post(w, pullClosedReq)
+			ResponseContains(t, w, 200, "Pull request cleaned successfully")
+
+			// Verify
+			actReplies := ghClient.CapturedComments
+			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
+			for i, expReply := range c.ExpReplies {
+				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, false)
+			}
+		})
+	}
+}
+
 func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig, ghClient vcs.IGithubClient) (string, events_controllers.VCSEventsController, locking.ApplyLocker) {
 	// env vars
 	// need this to be set or we'll fail the policy check step
@@ -618,8 +719,22 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	statsScope, _, err := metrics.NewLoggingScope(logger, "atlantis")
 	Ok(t, err)
 
+	projectContextBuilder := wrappers.
+		WrapProjectContext(events.NewProjectCommandContextBuilder(commentParser)).
+		WithInstrumentation(statsScope)
+
+	if userConfig.EnablePlatformMode {
+		projectContextBuilder = wrappers.
+			WrapProjectContext(events.NewPRProjectCommandContextBuilder(commentParser)).
+			WithInstrumentation(statsScope)
+	}
+
+	if userConfig.EnablePolicyChecksFlag {
+		projectContextBuilder = projectContextBuilder.WithPolicyChecks(commentParser)
+	}
+
 	projectCommandBuilder := events.NewProjectCommandBuilder(
-		userConfig.EnablePolicyChecksFlag,
+		projectContextBuilder,
 		parser,
 		&events.DefaultProjectFinder{},
 		vcsClient,
@@ -627,12 +742,11 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		locker,
 		globalCfg,
 		&events.DefaultPendingPlanFinder{},
-		commentParser,
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-		statsScope,
 		logger,
+		events.InfiniteProjectsPerPR,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
@@ -695,16 +809,22 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	Ok(t, err)
 
-	projectCommandRunner := &events.DefaultProjectCommandRunner{
-		Locker:           projectLocker,
-		LockURLGenerator: lockURLGenerator,
-		StepsRunner:      stepsRunner,
-		WorkingDir:       workingDir,
-		Webhooks:         webhookSender,
-		WorkingDirLocker: locker,
-		AggregateApplyRequirements: &events.AggregateApplyRequirements{
-			WorkingDir: workingDir,
-		},
+	applyRequirementHandler := &events.AggregateApplyRequirements{
+		WorkingDir: workingDir,
+	}
+
+	prjCmdRunner := wrappers.WrapProjectRunner(
+		events.NewProjectCommandRunner(
+			stepsRunner,
+			workingDir,
+			webhookSender,
+			locker,
+			applyRequirementHandler,
+		),
+	)
+
+	if !userConfig.EnablePlatformMode {
+		prjCmdRunner = prjCmdRunner.WithSync(projectLocker, lockURLGenerator)
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -734,7 +854,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		dbUpdater,
 		pullUpdater,
 		e2eStatusUpdater,
-		projectCommandRunner,
+		prjCmdRunner,
 		parallelPoolSize,
 		false,
 	)
@@ -747,38 +867,19 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		workingDir,
 		e2eStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		prjCmdRunner,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
 		silenceNoProjects,
-		boltdb,
-	)
-
-	e2ePullReqStatusFetcher := lyft_vcs.NewSQBasedPullStatusFetcher(ghClient, vcs.NewLyftPullMergeabilityChecker("atlantis"))
-
-	applyCommandRunner := events.NewApplyCommandRunner(
-		vcsClient,
-		false,
-		applyLocker,
-		e2eStatusUpdater,
-		projectCommandBuilder,
-		projectCommandRunner,
-		autoMerger,
-		pullUpdater,
-		dbUpdater,
-		parallelPoolSize,
-		silenceNoProjects,
-		false,
-		e2ePullReqStatusFetcher,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		e2eStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		prjCmdRunner,
 		pullUpdater,
 		dbUpdater,
 		silenceNoProjects,
@@ -794,10 +895,32 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	versionCommandRunner := events.NewVersionCommandRunner(
 		pullUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		prjCmdRunner,
 		parallelPoolSize,
 		silenceNoProjects,
 	)
+
+	var applyCommandRunner command.Runner
+	e2ePullReqStatusFetcher := lyft_vcs.NewSQBasedPullStatusFetcher(ghClient, vcs.NewLyftPullMergeabilityChecker("atlantis"))
+	if userConfig.EnablePlatformMode {
+		applyCommandRunner = apply.NewDisabledRunner(pullUpdater)
+	} else {
+		applyCommandRunner = events.NewApplyCommandRunner(
+			vcsClient,
+			false,
+			applyLocker,
+			e2eStatusUpdater,
+			projectCommandBuilder,
+			prjCmdRunner,
+			autoMerger,
+			pullUpdater,
+			dbUpdater,
+			parallelPoolSize,
+			silenceNoProjects,
+			false,
+			e2ePullReqStatusFetcher,
+		)
+	}
 
 	commentCommandRunnerByCmd := map[command.Name]command.Runner{
 		command.Plan:            planCommandRunner,
@@ -1028,7 +1151,7 @@ func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir 
 		}
 
 		if !replyMatchesExpected(act, expStr) {
-			t.Logf("exp: %s, got: %s", expStr, act)
+			t.Logf("\nexp:\n %s\n got:\n %s\n", expStr, act)
 			t.FailNow()
 		}
 	}

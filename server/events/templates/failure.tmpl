@@ -1,1 +1,6 @@
-**{{.Command}} Failed**: {{.Failure}}
+{{if ne .Command "Policy Check"}}**{{.Command}} Failed**: {{.Failure}}{{else}}**{{.Command}} Failed**
+```
+{{.Failure}}
+```
+* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.
+{{end}}

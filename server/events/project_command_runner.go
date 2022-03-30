@@ -108,8 +108,6 @@ type JobCloser interface {
 
 func NewProjectCommandRunner(
 	stepsRunner runtime.StepsRunner,
-	locker ProjectLocker,
-	lockUrlGenerator LockURLGenerator,
 	workingDir WorkingDir,
 	webhooks WebhooksSender,
 	workingDirLocker WorkingDirLocker,
@@ -117,8 +115,6 @@ func NewProjectCommandRunner(
 ) *DefaultProjectCommandRunner {
 	return &DefaultProjectCommandRunner{
 		StepsRunner:                stepsRunner,
-		Locker:                     locker,
-		LockURLGenerator:           lockUrlGenerator,
 		WorkingDir:                 workingDir,
 		Webhooks:                   webhooks,
 		WorkingDirLocker:           workingDirLocker,
@@ -129,8 +125,6 @@ func NewProjectCommandRunner(
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct { //create object and test
 	StepsRunner                runtime.StepsRunner
-	Locker                     ProjectLocker
-	LockURLGenerator           LockURLGenerator
 	WorkingDir                 WorkingDir
 	Webhooks                   WebhooksSender
 	WorkingDirLocker           WorkingDirLocker
@@ -216,16 +210,6 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 }
 
 func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
-	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
-	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
-	}
-	if !lockAttempt.LockAcquired {
-		return nil, lockAttempt.LockFailureReason, nil
-	}
-	ctx.Log.Debugf("acquired lock for project")
-
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
 	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
@@ -239,12 +223,6 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// that shouldn't affect this particular operation.
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
-
-		// let's unlock here since something probably nuked our directory between the plan and policy check phase
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Errorf("error unlocking state after plan error: %v", unlockErr)
-		}
-
 		if os.IsNotExist(err) {
 			return nil, "", errors.New("project has not been cloned–did you run plan?")
 		}
@@ -252,24 +230,19 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-
-		// let's unlock here since something probably nuked our directory between the plan and policy check phase
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Errorf("error unlocking state after plan error: %v", unlockErr)
-		}
-
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	outputs, err := p.StepsRunner.Run(ctx, absPath)
 	if err != nil {
-		// Note: we are explicitly not unlocking the pr here since a failing policy check will require
-		// approval
-		return nil, "", fmt.Errorf("%s\n%s", err, outputs)
+		// Note: we are explicitly not unlocking the pr here since a failing
+		// policy check will require approval. This is a bit tricky and hacky
+		// solution because we will be missing legitimate failures and assume
+		// any failure is a policy check failure.
+		return nil, fmt.Sprintf("%s\n%s", err, outputs), nil
 	}
 
 	return &models.PolicyCheckSuccess{
-		LockURL:           p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		PolicyCheckOutput: outputs,
 		RePlanCmd:         ctx.RePlanCmd,
 		ApplyCmd:          ctx.ApplyCmd,
@@ -281,17 +254,6 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*models.PlanSuccess, string, error) {
-	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
-	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
-	}
-	if !lockAttempt.LockAcquired {
-		return nil, lockAttempt.LockFailureReason, nil
-	}
-	ctx.Log.Debugf("acquired lock for project")
-
-	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.ProjectCloneDir())
 	if err != nil {
 		return nil, "", err
@@ -301,9 +263,6 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	// Clone is idempotent so okay to run even if the repo was already cloned.
 	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.ProjectCloneDir())
 	if cloneErr != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Errorf("error unlocking state after plan error: %v", unlockErr)
-		}
 		return nil, "", cloneErr
 	}
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
@@ -314,14 +273,10 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	outputs, err := p.StepsRunner.Run(ctx, projAbsPath)
 
 	if err != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Errorf("error unlocking state after plan error: %v", unlockErr)
-		}
 		return nil, "", fmt.Errorf("%s\n%s", err, outputs)
 	}
 
 	return &models.PlanSuccess{
-		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		TerraformOutput: outputs,
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,

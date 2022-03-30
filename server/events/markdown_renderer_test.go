@@ -200,8 +200,7 @@ func TestRenderErrorf(t *testing.T) {
 			"policy check error",
 			command.PolicyCheck,
 			err,
-			"**Policy Check Error**\n```\nerr\n```" +
-				"\n* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.\n\n",
+			"**Policy Check Error**\n```\nerr\n```\n",
 		},
 	}
 
@@ -246,7 +245,8 @@ func TestRenderFailure(t *testing.T) {
 			"policy check failure",
 			command.PolicyCheck,
 			"failure",
-			"**Policy Check Failed**: failure\n",
+			"**Policy Check Failed**\n```failure\n```" +
+				"\n* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.\n\n",
 		},
 	}
 
@@ -790,7 +790,12 @@ $$$
 
 ---
 ### 2. dir: $path2$ workspace: $workspace$
-**Policy Check Failed**: failure
+**Policy Check Failed**
+$$$
+failure
+$$$
+* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.
+
 
 ---
 ### 3. project: $projectname$ dir: $path3$ workspace: $workspace$
@@ -798,8 +803,6 @@ $$$
 $$$
 error
 $$$
-* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.
-
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:

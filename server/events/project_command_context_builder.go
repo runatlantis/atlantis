@@ -4,43 +4,11 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/uber-go/tally"
 )
-
-func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope tally.Scope) ProjectCommandContextBuilder {
-	projectCommandContextBuilder := &DefaultProjectCommandContextBuilder{
-		CommentBuilder: commentBuilder,
-	}
-
-	contextBuilderWithStats := &CommandScopedStatsProjectCommandContextBuilder{
-		ProjectCommandContextBuilder: projectCommandContextBuilder,
-		ProjectCounter:               scope.Counter("projects"),
-	}
-
-	if policyCheckEnabled {
-		return &PolicyCheckProjectCommandContextBuilder{
-			CommentBuilder:               commentBuilder,
-			ProjectCommandContextBuilder: contextBuilderWithStats,
-		}
-	}
-
-	return projectCommandContextBuilder
-}
-
-type ContextFlags struct {
-	Automerge,
-	DeleteSourceBranchOnMerge,
-	ParallelApply,
-	ParallelPlan,
-	Verbose,
-	ForceApply bool
-}
 
 type ProjectCommandContextBuilder interface {
 	// BuildProjectContext builds project command contexts for atlantis commands
@@ -48,220 +16,100 @@ type ProjectCommandContextBuilder interface {
 		ctx *command.Context,
 		cmdName command.Name,
 		prjCfg valid.MergedProjectCfg,
-		commentFlags []string,
+		commentArgs []string,
 		repoDir string,
-		contextFlags *ContextFlags,
+		contextFlags *command.ContextFlags,
 	) []command.ProjectContext
 }
 
-// CommandScopedStatsProjectCommandContextBuilder ensures that project command context contains a scoped stats
-// object relevant to the command it applies to.
-type CommandScopedStatsProjectCommandContextBuilder struct {
-	ProjectCommandContextBuilder
-	// Conciously making this global since it gets flushed periodically anyways
-	ProjectCounter tally.Counter
-}
-
-// BuildProjectContext builds the context and injects the appropriate command level scope after the fact.
-func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
-	ctx *command.Context,
-	cmdName command.Name,
-	prjCfg valid.MergedProjectCfg,
-	commentFlags []string,
-	repoDir string,
-	contextFlags *ContextFlags,
-) (projectCmds []command.ProjectContext) {
-	cb.ProjectCounter.Inc(1)
-
-	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
-		ctx, cmdName, prjCfg, commentFlags, repoDir, contextFlags,
-	)
-
-	projectCmds = []command.ProjectContext{}
-
-	for _, cmd := range cmds {
-
-		// specifically use the command name in the context instead of the arg
-		// since we can return multiple commands worth of contexts for a given command name arg
-		// to effectively pipeline them.
-		cmd.SetScope(cmd.CommandName.String())
-		projectCmds = append(projectCmds, cmd)
+func NewProjectCommandContextBuilder(
+	commentBuilder CommentBuilder,
+) ProjectCommandContextBuilder {
+	return &projectCommandContextBuilder{
+		CommentBuilder: commentBuilder,
 	}
-
-	return
 }
 
-type DefaultProjectCommandContextBuilder struct {
+type projectCommandContextBuilder struct {
 	CommentBuilder CommentBuilder
 }
 
-func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
+func (cb *projectCommandContextBuilder) BuildProjectContext(
 	ctx *command.Context,
 	cmdName command.Name,
 	prjCfg valid.MergedProjectCfg,
-	commentFlags []string,
+	commentArgs []string,
 	repoDir string,
-	contextFlags *ContextFlags,
-) (projectCmds []command.ProjectContext) {
-	ctx.Log.Debugf("Building project command context for %s", cmdName)
-
-	var steps []valid.Step
-	switch cmdName {
-	case command.Plan:
-		steps = prjCfg.Workflow.Plan.Steps
-	case command.Apply:
-		steps = prjCfg.Workflow.Apply.Steps
-	case command.Version:
-		// Setting statically since there will only be one step
-		steps = []valid.Step{{
-			StepName: "version",
-		}}
-	}
-
-	// If TerraformVersion not defined in config file look for a
-	// terraform.require_version block.
-	if prjCfg.TerraformVersion == nil {
-		prjCfg.TerraformVersion = getTfVersion(ctx, filepath.Join(repoDir, prjCfg.RepoRelDir))
-	}
-
-	projectCmdContext := newProjectCommandContext(
+	contextFlags *command.ContextFlags,
+) []command.ProjectContext {
+	return buildContext(
 		ctx,
 		cmdName,
-		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
-		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
-		cb.CommentBuilder.BuildVersionComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
+		getSteps(cmdName, prjCfg.Workflow),
+		cb.CommentBuilder,
 		prjCfg,
-		steps,
-		prjCfg.PolicySets,
-		escapeArgs(commentFlags),
-		contextFlags,
-		ctx.Scope,
-		ctx.PullRequestStatus,
-	)
-
-	projectCmds = append(projectCmds, projectCmdContext)
-
-	return
-}
-
-type PolicyCheckProjectCommandContextBuilder struct {
-	ProjectCommandContextBuilder
-	CommentBuilder CommentBuilder
-}
-
-func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
-	ctx *command.Context,
-	cmdName command.Name,
-	prjCfg valid.MergedProjectCfg,
-	commentFlags []string,
-	repoDir string,
-	contextFlags *ContextFlags,
-) (projectCmds []command.ProjectContext) {
-	ctx.Log.Debugf("PolicyChecks are enabled")
-
-	// If TerraformVersion not defined in config file look for a
-	// terraform.require_version block.
-	if prjCfg.TerraformVersion == nil {
-		prjCfg.TerraformVersion = getTfVersion(ctx, filepath.Join(repoDir, prjCfg.RepoRelDir))
-	}
-
-	projectCmds = cb.ProjectCommandContextBuilder.BuildProjectContext(
-		ctx,
-		cmdName,
-		prjCfg,
-		commentFlags,
+		commentArgs,
 		repoDir,
 		contextFlags,
 	)
+}
 
-	if cmdName == command.Plan {
-		ctx.Log.Debugf("Building project command context for %s", command.PolicyCheck)
-		steps := prjCfg.Workflow.PolicyCheck.Steps
+func buildContext(
+	ctx *command.Context,
+	cmdName command.Name,
+	steps []valid.Step,
+	commentBuilder CommentBuilder,
+	prjCfg valid.MergedProjectCfg,
+	commentArgs []string,
+	repoDir string,
+	contextFlags *command.ContextFlags,
+) []command.ProjectContext {
+	ctx.Log.Debugf("Building project command context for %s", cmdName)
+	projectCmds := make([]command.ProjectContext, 0)
 
-		projectCmds = append(projectCmds, newProjectCommandContext(
+	// If TerraformVersion not defined in config file look for a
+	// terraform.require_version block.
+	if prjCfg.TerraformVersion == nil {
+		prjCfg.TerraformVersion = getTfVersion(ctx, filepath.Join(repoDir, prjCfg.RepoRelDir))
+	}
+
+	projectCmds = append(projectCmds,
+		command.NewProjectContext(
 			ctx,
-			command.PolicyCheck,
-			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
-			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
-			cb.CommentBuilder.BuildVersionComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
+			cmdName,
+			commentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+			commentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentArgs),
 			prjCfg,
 			steps,
 			prjCfg.PolicySets,
-			escapeArgs(commentFlags),
+			escapeArgs(commentArgs),
 			contextFlags,
 			ctx.Scope,
 			ctx.PullRequestStatus,
-		))
-	}
+		),
+	)
 
-	return
+	return projectCmds
+
 }
 
-// newProjectCommandContext is a initializer method that handles constructing the
-// ProjectCommandContext.
-func newProjectCommandContext(ctx *command.Context,
-	cmd command.Name,
-	applyCmd string,
-	planCmd string,
-	versionCmd string,
-	projCfg valid.MergedProjectCfg,
-	steps []valid.Step,
-	policySets valid.PolicySets,
-	escapedCommentArgs []string,
-	contextFlags *ContextFlags,
-	scope tally.Scope,
-	pullStatus models.PullReqStatus,
-) command.ProjectContext {
-
-	var projectPlanStatus models.ProjectPlanStatus
-
-	if ctx.PullStatus != nil {
-		for _, project := range ctx.PullStatus.Projects {
-
-			// if name is not used, let's match the directory
-			if projCfg.Name == "" && project.RepoRelDir == projCfg.RepoRelDir {
-				projectPlanStatus = project.Status
-				break
-			}
-
-			if projCfg.Name != "" && project.ProjectName == projCfg.Name {
-				projectPlanStatus = project.Status
-				break
-			}
-		}
+func getSteps(
+	cmdName command.Name,
+	workflow valid.Workflow,
+) (steps []valid.Step) {
+	switch cmdName {
+	case command.Plan:
+		steps = workflow.Plan.Steps
+	case command.Apply:
+		steps = workflow.Apply.Steps
+	case command.Version:
+		steps = []valid.Step{{
+			StepName: "version",
+		}}
+	case command.PolicyCheck:
+		steps = workflow.PolicyCheck.Steps
 	}
-
-	return command.ProjectContext{
-		CommandName:               cmd,
-		ApplyCmd:                  applyCmd,
-		BaseRepo:                  ctx.Pull.BaseRepo,
-		EscapedCommentArgs:        escapedCommentArgs,
-		AutomergeEnabled:          contextFlags.Automerge,
-		DeleteSourceBranchOnMerge: contextFlags.DeleteSourceBranchOnMerge,
-		ParallelApplyEnabled:      contextFlags.ParallelApply,
-		ParallelPlanEnabled:       contextFlags.ParallelPlan,
-		AutoplanEnabled:           projCfg.AutoplanEnabled,
-		Steps:                     steps,
-		HeadRepo:                  ctx.HeadRepo,
-		Log:                       ctx.Log,
-		Scope:                     scope,
-		ProjectPlanStatus:         projectPlanStatus,
-		Pull:                      ctx.Pull,
-		ProjectName:               projCfg.Name,
-		ApplyRequirements:         projCfg.ApplyRequirements,
-		RePlanCmd:                 planCmd,
-		RepoRelDir:                projCfg.RepoRelDir,
-		RepoConfigVersion:         projCfg.RepoCfgVersion,
-		TerraformVersion:          projCfg.TerraformVersion,
-		User:                      ctx.User,
-		Verbose:                   contextFlags.Verbose,
-		ForceApply:                contextFlags.ForceApply,
-		Workspace:                 projCfg.Workspace,
-		PolicySets:                policySets,
-		Tags:                      projCfg.Tags,
-		PullReqStatus:             pullStatus,
-		JobID:                     uuid.New().String(),
-	}
+	return steps
 }
 
 func escapeArgs(args []string) []string {
@@ -284,7 +132,6 @@ func getTfVersion(ctx *command.Context, absProjDir string) *version.Version {
 		ctx.Log.Errorf("trying to detect required version: %s", diags.Error())
 		return nil
 	}
-
 	if len(module.RequiredCore) != 1 {
 		ctx.Log.Infof("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
 		return nil

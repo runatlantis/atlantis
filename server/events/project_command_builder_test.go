@@ -18,7 +18,9 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/wrappers"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/uber-go/tally"
 )
 
 func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
@@ -147,7 +149,7 @@ projects:
 			}
 
 			builder := events.NewProjectCommandBuilder(
-				false,
+				events.NewProjectCommandContextBuilder(&events.CommentParser{}),
 				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
@@ -155,12 +157,11 @@ projects:
 				events.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
-				&events.CommentParser{},
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-				scope,
 				logger,
+				events.InfiniteProjectsPerPR,
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -415,7 +416,7 @@ projects:
 				}
 
 				builder := events.NewProjectCommandBuilder(
-					false,
+					events.NewProjectCommandContextBuilder(&events.CommentParser{}),
 					&config.ParserValidator{},
 					&events.DefaultProjectFinder{},
 					vcsClient,
@@ -423,12 +424,11 @@ projects:
 					events.NewDefaultWorkingDirLocker(),
 					valid.NewGlobalCfgFromArgs(globalCfgArgs),
 					&events.DefaultPendingPlanFinder{},
-					&events.CommentParser{},
 					false,
 					true,
 					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-					scope,
 					logger,
+					events.InfiniteProjectsPerPR,
 				)
 
 				var actCtxs []command.ProjectContext
@@ -570,7 +570,7 @@ projects:
 			}
 
 			builder := events.NewProjectCommandBuilder(
-				false,
+				events.NewProjectCommandContextBuilder(&events.CommentParser{}),
 				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
@@ -578,12 +578,11 @@ projects:
 				events.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
-				&events.CommentParser{},
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-				scope,
 				logger,
+				events.InfiniteProjectsPerPR,
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -661,7 +660,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	builder := events.NewProjectCommandBuilder(
-		false,
+		events.NewProjectCommandContextBuilder(&events.CommentParser{}),
 		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
@@ -669,12 +668,11 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		events.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
-		&events.CommentParser{},
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-		scope,
 		logger,
+		events.InfiniteProjectsPerPR,
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -746,7 +744,7 @@ projects:
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	builder := events.NewProjectCommandBuilder(
-		false,
+		events.NewProjectCommandContextBuilder(&events.CommentParser{}),
 		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
@@ -754,12 +752,11 @@ projects:
 		events.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
-		&events.CommentParser{},
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-		scope,
 		logger,
+		events.InfiniteProjectsPerPR,
 	)
 
 	ctx := &command.Context{
@@ -825,7 +822,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			}
 
 			builder := events.NewProjectCommandBuilder(
-				false,
+				events.NewProjectCommandContextBuilder(&events.CommentParser{}),
 				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
@@ -833,12 +830,11 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				events.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
-				&events.CommentParser{},
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-				scope,
 				logger,
+				events.InfiniteProjectsPerPR,
 			)
 
 			var actCtxs []command.ProjectContext
@@ -1008,7 +1004,7 @@ projects:
 			}
 
 			builder := events.NewProjectCommandBuilder(
-				false,
+				events.NewProjectCommandContextBuilder(&events.CommentParser{}),
 				&config.ParserValidator{},
 				&events.DefaultProjectFinder{},
 				vcsClient,
@@ -1016,12 +1012,11 @@ projects:
 				events.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
-				&events.CommentParser{},
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-				scope,
 				logger,
+				events.InfiniteProjectsPerPR,
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -1075,7 +1070,7 @@ projects:
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	builder := events.NewProjectCommandBuilder(
-		false,
+		events.NewProjectCommandContextBuilder(&events.CommentParser{}),
 		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		vcsClient,
@@ -1083,12 +1078,11 @@ projects:
 		events.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
-		&events.CommentParser{},
 		true,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-		scope,
 		logger,
+		events.InfiniteProjectsPerPR,
 	)
 
 	var actCtxs []command.ProjectContext
@@ -1131,9 +1125,13 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	commentParser := &events.CommentParser{}
+	contextBuilder := wrappers.
+		WrapProjectContext(events.NewProjectCommandContextBuilder(commentParser)).
+		WithPolicyChecks(commentParser)
 
 	builder := events.NewProjectCommandBuilder(
-		true,
+		contextBuilder,
 		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		vcsClient,
@@ -1141,12 +1139,11 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		events.NewDefaultWorkingDirLocker(),
 		globalCfg,
 		&events.DefaultPendingPlanFinder{},
-		&events.CommentParser{},
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-		scope,
 		logger,
+		events.InfiniteProjectsPerPR,
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -1205,7 +1202,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		ThenReturn(tmpDir, nil)
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := tally.NewTestScope("test", nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg:  false,
@@ -1215,7 +1212,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	}
 
 	builder := events.NewProjectCommandBuilder(
-		false,
+		events.NewProjectCommandContextBuilder(&events.CommentParser{}),
 		&config.ParserValidator{},
 		&events.DefaultProjectFinder{},
 		nil,
@@ -1223,17 +1220,17 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		events.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
-		&events.CommentParser{},
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-		scope,
 		logger,
+		events.InfiniteProjectsPerPR,
 	)
 
 	ctxs, err := builder.BuildVersionCommands(
 		&command.Context{
-			Log: logger,
+			Log:   logger,
+			Scope: scope,
 		},
 		&command.Comment{
 			RepoRelDir:  "",

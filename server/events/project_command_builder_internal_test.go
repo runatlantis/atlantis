@@ -613,7 +613,7 @@ projects:
 				GlobalCfg:          globalCfg,
 				PendingPlanFinder:  &DefaultPendingPlanFinder{},
 				SkipCloneNoChanges: false,
-				ProjectCommandContextBuilder: &DefaultProjectCommandContextBuilder{
+				ProjectCommandContextBuilder: &projectCommandContextBuilder{
 					CommentBuilder: &CommentParser{},
 				},
 				AutoplanFileList: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
@@ -808,7 +808,7 @@ projects:
 				GlobalCfg:          globalCfg,
 				PendingPlanFinder:  &DefaultPendingPlanFinder{},
 				SkipCloneNoChanges: true,
-				ProjectCommandContextBuilder: &DefaultProjectCommandContextBuilder{
+				ProjectCommandContextBuilder: &projectCommandContextBuilder{
 					CommentBuilder: &CommentParser{},
 				},
 				AutoplanFileList: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
@@ -1022,23 +1022,22 @@ workflows:
 			if c.repoCfg != "" {
 				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-
+			contextBuilder := NewProjectCommandContextBuilder(&CommentParser{})
+			contextBuilder = &PolicyCheckProjectContextBuilder{
+				contextBuilder,
+				&CommentParser{},
+			}
 			builder := &DefaultProjectCommandBuilder{
-				ParserValidator:    &config.ParserValidator{},
-				ProjectFinder:      &DefaultProjectFinder{},
-				VCSClient:          vcsClient,
-				WorkingDir:         workingDir,
-				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
-				GlobalCfg:          globalCfg,
-				PendingPlanFinder:  &DefaultPendingPlanFinder{},
-				SkipCloneNoChanges: true,
-				ProjectCommandContextBuilder: &PolicyCheckProjectCommandContextBuilder{
-					ProjectCommandContextBuilder: &DefaultProjectCommandContextBuilder{
-						CommentBuilder: &CommentParser{},
-					},
-					CommentBuilder: &CommentParser{},
-				},
-				AutoplanFileList: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				ParserValidator:              &config.ParserValidator{},
+				ProjectFinder:                &DefaultProjectFinder{},
+				VCSClient:                    vcsClient,
+				WorkingDir:                   workingDir,
+				WorkingDirLocker:             NewDefaultWorkingDirLocker(),
+				GlobalCfg:                    globalCfg,
+				PendingPlanFinder:            &DefaultPendingPlanFinder{},
+				SkipCloneNoChanges:           true,
+				ProjectCommandContextBuilder: contextBuilder,
+				AutoplanFileList:             "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			}
 
 			cmd := command.PolicyCheck

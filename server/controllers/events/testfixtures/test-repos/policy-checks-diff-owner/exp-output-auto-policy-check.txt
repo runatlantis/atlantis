@@ -1,6 +1,6 @@
 Ran Policy Check for dir: `.` workspace: `default`
 
-**Policy Check Error**
+**Policy Check Failed**
 ```
 exit status 1
 Checking plan against the following policies: 

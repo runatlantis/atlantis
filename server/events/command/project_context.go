@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -15,6 +16,72 @@ import (
 const (
 	planfileSlashReplace = "::"
 )
+
+type ContextFlags struct {
+	Automerge,
+	DeleteSourceBranchOnMerge,
+	ParallelApply,
+	ParallelPlan,
+	Verbose,
+	ForceApply bool
+}
+
+func NewProjectContext(
+	ctx *Context,
+	cmd Name,
+	applyCmd string,
+	planCmd string,
+	projCfg valid.MergedProjectCfg,
+	steps []valid.Step,
+	policySets valid.PolicySets,
+	escapedCommentArgs []string,
+	contextFlags *ContextFlags,
+	scope tally.Scope,
+	pullStatus models.PullReqStatus,
+) ProjectContext {
+	var projectPlanStatus models.ProjectPlanStatus
+
+	if ctx.PullStatus != nil {
+		for _, project := range ctx.PullStatus.Projects {
+			if project.ProjectName == projCfg.Name {
+				projectPlanStatus = project.Status
+				break
+			}
+		}
+	}
+
+	return ProjectContext{
+		CommandName:               cmd,
+		ApplyCmd:                  applyCmd,
+		BaseRepo:                  ctx.Pull.BaseRepo,
+		EscapedCommentArgs:        escapedCommentArgs,
+		AutomergeEnabled:          contextFlags.Automerge,
+		DeleteSourceBranchOnMerge: contextFlags.DeleteSourceBranchOnMerge,
+		ParallelApplyEnabled:      contextFlags.ParallelApply,
+		ParallelPlanEnabled:       contextFlags.ParallelPlan,
+		AutoplanEnabled:           projCfg.AutoplanEnabled,
+		Steps:                     steps,
+		HeadRepo:                  ctx.HeadRepo,
+		Log:                       ctx.Log,
+		Scope:                     scope,
+		ProjectPlanStatus:         projectPlanStatus,
+		Pull:                      ctx.Pull,
+		ProjectName:               projCfg.Name,
+		ApplyRequirements:         projCfg.ApplyRequirements,
+		RePlanCmd:                 planCmd,
+		RepoRelDir:                projCfg.RepoRelDir,
+		RepoConfigVersion:         projCfg.RepoCfgVersion,
+		TerraformVersion:          projCfg.TerraformVersion,
+		User:                      ctx.User,
+		Verbose:                   contextFlags.Verbose,
+		ForceApply:                contextFlags.ForceApply,
+		Workspace:                 projCfg.Workspace,
+		PolicySets:                policySets,
+		Tags:                      projCfg.Tags,
+		PullReqStatus:             pullStatus,
+		JobID:                     uuid.New().String(),
+	}
+}
 
 // ProjectContext defines the context for a plan or apply stage that will
 // be executed for a project.

@@ -6,7 +6,6 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config"
@@ -35,7 +34,7 @@ const (
 )
 
 func NewProjectCommandBuilder(
-	policyChecksSupported bool,
+	projectContextBuilder ProjectCommandContextBuilder,
 	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
 	vcsClient vcs.Client,
@@ -43,65 +42,24 @@ func NewProjectCommandBuilder(
 	workingDirLocker WorkingDirLocker,
 	globalCfg valid.GlobalCfg,
 	pendingPlanFinder *DefaultPendingPlanFinder,
-	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	AutoplanFileList string,
-	scope tally.Scope,
-	logger logging.SimpleLogging,
-) ProjectCommandBuilder {
-	return NewProjectCommandBuilderWithLimit(
-		policyChecksSupported,
-		parserValidator,
-		projectFinder,
-		vcsClient,
-		workingDir,
-		workingDirLocker,
-		globalCfg,
-		pendingPlanFinder,
-		commentBuilder,
-		skipCloneNoChanges,
-		EnableRegExpCmd,
-		AutoplanFileList,
-		scope,
-		logger,
-		InfiniteProjectsPerPR,
-	)
-}
-
-func NewProjectCommandBuilderWithLimit(
-	policyChecksSupported bool,
-	parserValidator *config.ParserValidator,
-	projectFinder ProjectFinder,
-	vcsClient vcs.Client,
-	workingDir WorkingDir,
-	workingDirLocker WorkingDirLocker,
-	globalCfg valid.GlobalCfg,
-	pendingPlanFinder *DefaultPendingPlanFinder,
-	commentBuilder CommentBuilder,
-	skipCloneNoChanges bool,
-	EnableRegExpCmd bool,
-	AutoplanFileList string,
-	scope tally.Scope,
 	logger logging.SimpleLogging,
 	limit int,
 ) ProjectCommandBuilder {
 	var projectCommandBuilder ProjectCommandBuilder = &DefaultProjectCommandBuilder{
-		ParserValidator:    parserValidator,
-		ProjectFinder:      projectFinder,
-		VCSClient:          vcsClient,
-		WorkingDir:         workingDir,
-		WorkingDirLocker:   workingDirLocker,
-		GlobalCfg:          globalCfg,
-		PendingPlanFinder:  pendingPlanFinder,
-		SkipCloneNoChanges: skipCloneNoChanges,
-		EnableRegExpCmd:    EnableRegExpCmd,
-		AutoplanFileList:   AutoplanFileList,
-		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
-			policyChecksSupported,
-			commentBuilder,
-			scope,
-		),
+		ParserValidator:              parserValidator,
+		ProjectFinder:                projectFinder,
+		VCSClient:                    vcsClient,
+		WorkingDir:                   workingDir,
+		WorkingDirLocker:             workingDirLocker,
+		GlobalCfg:                    globalCfg,
+		PendingPlanFinder:            pendingPlanFinder,
+		SkipCloneNoChanges:           skipCloneNoChanges,
+		EnableRegExpCmd:              EnableRegExpCmd,
+		AutoplanFileList:             AutoplanFileList,
+		ProjectCommandContextBuilder: projectContextBuilder,
 	}
 
 	projectCommandBuilder = &SizeLimitedProjectCommandBuilder{
@@ -279,7 +237,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 	}
 
 	var projCtxs []command.ProjectContext
-
 	if hasRepoCfg {
 		// If there's a repo cfg then we'll use it to figure out which projects
 		// should be planed.
@@ -297,7 +254,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		for _, mp := range matchingProjects {
 			ctx.Log.Debugf("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
-			contextFlags := &ContextFlags{
+			contextFlags := &command.ContextFlags{
 				Automerge:                 repoCfg.Automerge,
 				Verbose:                   verbose,
 				ForceApply:                forceApply,
@@ -328,7 +285,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			ctx.Log.Debugf("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
 
-			contextFlags := &ContextFlags{
+			contextFlags := &command.ContextFlags{
 				Automerge:                 DefaultAutomergeEnabled,
 				Verbose:                   verbose,
 				ForceApply:                forceApply,
@@ -600,6 +557,14 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		parallelPlan = repoCfgPtr.ParallelPlan
 	}
 
+	contextFlags := &command.ContextFlags{
+		Automerge:     automerge,
+		Verbose:       verbose,
+		ForceApply:    forceApply,
+		ParallelApply: parallelApply,
+		ParallelPlan:  parallelPlan,
+	}
+
 	if len(matchingProjects) > 0 {
 		// Override any dir/workspace defined on the comment with what was
 		// defined in config. This shouldn't matter since we don't allow comments
@@ -608,15 +573,13 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		workspace = projCfg.Workspace
 		for _, mp := range matchingProjects {
 			ctx.Log.Debugf("Merging config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
-			projCfg = p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, *repoCfgPtr)
-			contextFlags := &ContextFlags{
-				Automerge:                 automerge,
-				Verbose:                   verbose,
-				ForceApply:                forceApply,
-				ParallelApply:             parallelApply,
-				ParallelPlan:              parallelPlan,
-				DeleteSourceBranchOnMerge: projCfg.DeleteSourceBranchOnMerge,
-			}
+			projCfg = p.GlobalCfg.MergeProjectCfg(
+				ctx.Log,
+				ctx.Pull.BaseRepo.ID(),
+				mp,
+				*repoCfgPtr,
+			)
+			contextFlags.DeleteSourceBranchOnMerge = projCfg.DeleteSourceBranchOnMerge
 
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
@@ -629,15 +592,14 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				)...)
 		}
 	} else {
-		projCfg = p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), repoRelDir, workspace)
-		contextFlags := &ContextFlags{
-			Automerge:                 automerge,
-			Verbose:                   verbose,
-			ForceApply:                forceApply,
-			ParallelApply:             parallelApply,
-			ParallelPlan:              parallelPlan,
-			DeleteSourceBranchOnMerge: projCfg.DeleteSourceBranchOnMerge,
-		}
+		projCfg = p.GlobalCfg.DefaultProjCfg(
+			ctx.Log,
+			ctx.Pull.BaseRepo.ID(),
+			repoRelDir,
+			workspace,
+		)
+
+		contextFlags.DeleteSourceBranchOnMerge = projCfg.DeleteSourceBranchOnMerge
 
 		projCtxs = append(projCtxs,
 			p.ProjectCommandContextBuilder.BuildProjectContext(
