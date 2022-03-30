@@ -37,7 +37,7 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 		return "", errors.Wrap(err, "unable to read planfile")
 	}
 
-	ctx.Log.Info("starting apply")
+	ctx.Log.Infof("starting apply")
 	var out string
 
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
@@ -56,9 +56,9 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 
 	// If the apply was successful, delete the plan.
 	if err == nil {
-		ctx.Log.Info("apply successful, deleting planfile")
+		ctx.Log.Infof("apply successful, deleting planfile")
 		if removeErr := os.Remove(planPath); removeErr != nil {
-			ctx.Log.Warn("failed to delete planfile after successful apply: %s", removeErr)
+			ctx.Log.Warnf("failed to delete planfile after successful apply: %s", removeErr)
 		}
 	}
 	return out, err
@@ -128,12 +128,12 @@ func (a *ApplyStepRunner) runRemoteApply(
 	// updateStatusF will update the commit status and log any error.
 	updateStatusF := func(status models.CommitStatus, url string) {
 		if err := a.CommitStatusUpdater.UpdateProject(context.TODO(), ctx, command.Apply, status, url); err != nil {
-			ctx.Log.Err("unable to update status: %s", err)
+			ctx.Log.Errorf("unable to update status: %s", err)
 		}
 	}
 
 	// Start the async command execution.
-	ctx.Log.Debug("starting async tf remote operation")
+	ctx.Log.Debugf("starting async tf remote operation")
 	inCh := make(chan string)
 	defer close(inCh)
 	outCh := a.AsyncTFExec.RunCommandAsyncWithInput(ctx, filepath.Clean(path), applyArgs, envs, tfVersion, ctx.Workspace, inCh)
@@ -155,7 +155,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
-			ctx.Log.Debug("remote run url found, updating commit status")
+			ctx.Log.Debugf("remote run url found, updating commit status")
 			updateStatusF(models.PendingCommitStatus, runURL)
 			nextLineIsRunURL = false
 		}
@@ -163,12 +163,12 @@ func (a *ApplyStepRunner) runRemoteApply(
 		// If the plan is complete and it's waiting for us to verify the apply,
 		// check if the plan is the same and if so, input "yes".
 		if a.atConfirmApplyPrompt(lines) {
-			ctx.Log.Debug("remote apply is waiting for confirmation")
+			ctx.Log.Debugf("remote apply is waiting for confirmation")
 
 			// Check if the plan is as expected.
 			planChangedErr = a.remotePlanChanged(string(planfileBytes), strings.Join(lines, "\n"), tfVersion)
 			if planChangedErr != nil {
-				ctx.Log.Err("plan generated during apply does not match expected plan, aborting")
+				ctx.Log.Errorf("plan generated during apply does not match expected plan, aborting")
 				inCh <- "no\n"
 				// Need to continue so we read all the lines, otherwise channel
 				// sender (in TerraformClient) will block indefinitely waiting
@@ -176,12 +176,12 @@ func (a *ApplyStepRunner) runRemoteApply(
 				continue
 			}
 
-			ctx.Log.Debug("plan generated during apply matches expected plan, continuing")
+			ctx.Log.Debugf("plan generated during apply matches expected plan, continuing")
 			inCh <- "yes\n"
 		}
 	}
 
-	ctx.Log.Debug("async tf remote operation complete")
+	ctx.Log.Debugf("async tf remote operation complete")
 	output := strings.Join(lines, "\n")
 	if planChangedErr != nil {
 		updateStatusF(models.FailedCommitStatus, runURL)

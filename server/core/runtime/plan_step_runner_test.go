@@ -579,7 +579,7 @@ Terraform will perform the following actions:
 }
 
 // Test that even if there's an error, we get the returned output.
-func TestRun_OutputOnErr(t *testing.T) {
+func TestRun_OutputOnErrorf(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.10.0")

@@ -38,7 +38,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestCleanUpPullWorkspaceErr(t *testing.T) {
+func TestCleanUpPullWorkspaceErrorf(t *testing.T) {
 	t.Log("when workspace.Delete returns an error, we return it")
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkingDir()
@@ -57,7 +57,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	Equals(t, "cleaning workspace: err", actualErr.Error())
 }
 
-func TestCleanUpPullUnlockErr(t *testing.T) {
+func TestCleanUpPullUnlockErrorf(t *testing.T) {
 	t.Log("when locker.UnlockByPull returns an error, we return it")
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkingDir()
@@ -285,10 +285,10 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		// Assert log streaming resources are cleaned up.
 		dfPrjCmdOutputHandler := prjCmdOutHandler.(*jobs.AsyncProjectCommandOutputHandler)
 
-		job, err := dfPrjCmdOutputHandler.JobStore.Get(ctx.PullInfo())
+		job, err := dfPrjCmdOutputHandler.JobStore.Get(ctx.PullInfof())
 		Ok(t, err)
 
 		assert.Empty(t, job.Output)
-		assert.Empty(t, dfPrjCmdOutputHandler.GetReceiverBufferForPull(ctx.PullInfo()))
+		assert.Empty(t, dfPrjCmdOutputHandler.GetReceiverBufferForPull(ctx.PullInfof()))
 	})
 }

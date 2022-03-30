@@ -96,7 +96,7 @@ func NewMultiWebhookSender(configs []Config, client SlackClient) (*MultiWebhookS
 func (w *MultiWebhookSender) Send(log logging.SimpleLogging, result ApplyResult) error {
 	for _, w := range w.Webhooks {
 		if err := w.Send(log, result); err != nil {
-			log.Warn("error sending slack webhook: %s", err)
+			log.Warnf("error sending slack webhook: %s", err)
 		}
 	}
 	return nil

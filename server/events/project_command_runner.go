@@ -224,7 +224,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
 	}
-	ctx.Log.Debug("acquired lock for project")
+	ctx.Log.Debugf("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
@@ -242,7 +242,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 
 		// let's unlock here since something probably nuked our directory between the plan and policy check phase
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+			ctx.Log.Errorf("error unlocking state after plan error: %v", unlockErr)
 		}
 
 		if os.IsNotExist(err) {
@@ -255,7 +255,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 
 		// let's unlock here since something probably nuked our directory between the plan and policy check phase
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+			ctx.Log.Errorf("error unlocking state after plan error: %v", unlockErr)
 		}
 
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
@@ -289,7 +289,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
 	}
-	ctx.Log.Debug("acquired lock for project")
+	ctx.Log.Debugf("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.ProjectCloneDir())
@@ -302,7 +302,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.ProjectCloneDir())
 	if cloneErr != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+			ctx.Log.Errorf("error unlocking state after plan error: %v", unlockErr)
 		}
 		return nil, "", cloneErr
 	}
@@ -315,7 +315,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+			ctx.Log.Errorf("error unlocking state after plan error: %v", unlockErr)
 		}
 		return nil, "", fmt.Errorf("%s\n%s", err, outputs)
 	}

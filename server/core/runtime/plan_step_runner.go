@@ -49,8 +49,8 @@ func (p *PlanStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfVersion, ctx.Workspace)
-	if p.isRemoteOpsErr(output, err) {
-		ctx.Log.Debug("detected that this project is using TFE remote ops")
+	if p.isRemoteOpsErrorf(output, err) {
+		ctx.Log.Debugf("detected that this project is using TFE remote ops")
 		return p.remotePlan(ctx, extraArgs, path, tfVersion, planFile, envs)
 	}
 	if err != nil {
@@ -61,7 +61,7 @@ func (p *PlanStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 
 // isRemoteOpsErr returns true if there was an error caused due to this
 // project using TFE remote operations.
-func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
+func (p *PlanStepRunner) isRemoteOpsErrorf(output string, err error) bool {
 	if err == nil {
 		return false
 	}
@@ -249,12 +249,12 @@ func (p *PlanStepRunner) runRemotePlan(
 	// updateStatusF will update the commit status and log any error.
 	updateStatusF := func(status models.CommitStatus, url string) {
 		if err := p.CommitStatusUpdater.UpdateProject(context.TODO(), ctx, command.Plan, status, url); err != nil {
-			ctx.Log.Err("unable to update status: %s", err)
+			ctx.Log.Errorf("unable to update status: %s", err)
 		}
 	}
 
 	// Start the async command execution.
-	ctx.Log.Debug("starting async tf remote operation")
+	ctx.Log.Debugf("starting async tf remote operation")
 	outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
@@ -274,13 +274,13 @@ func (p *PlanStepRunner) runRemotePlan(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
-			ctx.Log.Debug("remote run url found, updating commit status")
+			ctx.Log.Debugf("remote run url found, updating commit status")
 			updateStatusF(models.PendingCommitStatus, runURL)
 			nextLineIsRunURL = false
 		}
 	}
 
-	ctx.Log.Debug("async tf remote operation complete")
+	ctx.Log.Debugf("async tf remote operation complete")
 	output := strings.Join(lines, "\n")
 	if err != nil {
 		updateStatusF(models.FailedCommitStatus, runURL)

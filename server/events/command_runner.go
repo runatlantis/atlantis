@@ -148,7 +148,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(logger logging.SimpleLogging, 
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+		log.Errorf("Unable to fetch pull status, this is likely a bug.", err)
 	}
 
 	scope := c.StatsScope.SubScope("autoplan")
@@ -179,7 +179,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(logger logging.SimpleLogging, 
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
+		ctx.Log.Errorf("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
 	}
 
 	autoPlanRunner := buildCommentCommandRunner(c, command.Plan)
@@ -220,7 +220,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(logger logging.SimpleLogging, b
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+		log.Errorf("Unable to fetch pull status, this is likely a bug.", err)
 	}
 
 	ctx := &command.Context{
@@ -246,7 +246,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(logger logging.SimpleLogging, b
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, cmd.Name.String())
+		ctx.Log.Errorf("Error running pre-workflow hooks %s. Proceeding with %s command.", err, cmd.Name.String())
 	}
 
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
@@ -335,9 +335,9 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	}
 
 	if err != nil {
-		log.Err(err.Error())
+		log.Errorf(err.Error())
 		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err), ""); commentErr != nil {
-			log.Err("unable to comment: %s", commentErr)
+			log.Errorf("unable to comment: %s", commentErr)
 		}
 	}
 
@@ -349,24 +349,24 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context) bool 
 		if c.SilenceForkPRErrors {
 			return false
 		}
-		ctx.Log.Info("command was run on a fork pull request which is disallowed")
+		ctx.Log.Infof("command was run on a fork pull request which is disallowed")
 		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag), ""); err != nil {
-			ctx.Log.Err("unable to comment: %s", err)
+			ctx.Log.Errorf("unable to comment: %s", err)
 		}
 		return false
 	}
 
 	if ctx.Pull.State != models.OpenPullState {
-		ctx.Log.Info("command was run on closed pull request")
+		ctx.Log.Infof("command was run on closed pull request")
 		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
-			ctx.Log.Err("unable to comment: %s", err)
+			ctx.Log.Errorf("unable to comment: %s", err)
 		}
 		return false
 	}
 
 	repo := c.GlobalCfg.MatchingRepo(ctx.Pull.BaseRepo.ID())
 	if !repo.BranchMatches(ctx.Pull.BaseBranch) {
-		ctx.Log.Info("command was run on a pull request which doesn't match base branches")
+		ctx.Log.Infof("command was run on a pull request which doesn't match base branches")
 		// just ignore it to allow us to use any git workflows without malicious intentions.
 		return false
 	}
@@ -377,14 +377,14 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context) bool 
 func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logger logging.SimpleLogging) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
-		logger.Err("PANIC: %s\n%s", err, stack)
+		logger.Errorf("PANIC: %s\n%s", err, stack)
 		if commentErr := c.VCSClient.CreateComment(
 			baseRepo,
 			pullNum,
 			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack),
 			"",
 		); commentErr != nil {
-			logger.Err("unable to comment: %s", commentErr)
+			logger.Errorf("unable to comment: %s", commentErr)
 		}
 	}
 }

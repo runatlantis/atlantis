@@ -226,7 +226,7 @@ func TestRunCommentCommand_LogPanics(t *testing.T) {
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), fmt.Sprintf("comment should be about a goroutine panic but was %q", comment))
 }
 
-func TestRunCommentCommand_GithubPullErr(t *testing.T) {
+func TestRunCommentCommand_GithubPullErrorf(t *testing.T) {
 	t.Log("if getting the github pull request fails an error should be logged")
 	vcsClient := setup(t)
 	log := logging.NewNoopLogger(t)
@@ -235,7 +235,7 @@ func TestRunCommentCommand_GithubPullErr(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "`Error: making pull request API call to GitHub: err`", "")
 }
 
-func TestRunCommentCommand_GitlabMergeRequestErr(t *testing.T) {
+func TestRunCommentCommand_GitlabMergeRequestErrorf(t *testing.T) {
 	t.Log("if getting the gitlab merge request fails an error should be logged")
 	vcsClient := setup(t)
 	log := logging.NewNoopLogger(t)
@@ -244,7 +244,7 @@ func TestRunCommentCommand_GitlabMergeRequestErr(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GitlabRepo, fixtures.Pull.Num, "`Error: making merge request API call to GitLab: err`", "")
 }
 
-func TestRunCommentCommand_GithubPullParseErr(t *testing.T) {
+func TestRunCommentCommand_GithubPullParseErrorf(t *testing.T) {
 	t.Log("if parsing the returned github pull request fails an error should be logged")
 	vcsClient := setup(t)
 	log := logging.NewNoopLogger(t)

@@ -39,17 +39,17 @@ func (r *debugReporter) Flush() {
 
 func (r *debugReporter) ReportCounter(name string, tags map[string]string, value int64) {
 	log := r.log.With("name", name, "value", value, "tags", tags, "type", "counter")
-	log.Debug("counter")
+	log.Debugf("counter")
 }
 
 func (r *debugReporter) ReportGauge(name string, tags map[string]string, value float64) {
 	log := r.log.With("name", name, "value", value, "tags", tags, "type", "gauge")
-	log.Debug("gauge")
+	log.Debugf("gauge")
 }
 
 func (r *debugReporter) ReportTimer(name string, tags map[string]string, interval time.Duration) {
 	log := r.log.With("name", name, "value", interval, "tags", tags, "type", "timer")
-	log.Debug("timer")
+	log.Debugf("timer")
 }
 
 func (r *debugReporter) ReportHistogramValueSamples(
@@ -69,7 +69,7 @@ func (r *debugReporter) ReportHistogramValueSamples(
 		"tags", tags,
 		"type", "valueHistogram",
 	)
-	log.Debug("histogram")
+	log.Debugf("histogram")
 }
 
 func (r *debugReporter) ReportHistogramDurationSamples(
@@ -89,5 +89,5 @@ func (r *debugReporter) ReportHistogramDurationSamples(
 		"tags", tags,
 		"type", "durationHistogram",
 	)
-	log.Debug("histogram")
+	log.Debugf("histogram")
 }

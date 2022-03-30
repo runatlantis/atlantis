@@ -41,17 +41,17 @@ func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute fun
 
 	if result.Error != nil {
 		executionError.Inc(1)
-		logger.Err("Error running %s operation: %s", commandName, result.Error.Error())
+		logger.Errorf("Error running %s operation: %s", commandName, result.Error.Error())
 		return result
 	}
 
 	if result.Failure != "" {
 		executionFailure.Inc(1)
-		logger.Err("Failure running %s operation: %s", commandName, result.Failure)
+		logger.Errorf("Failure running %s operation: %s", commandName, result.Failure)
 		return result
 	}
 
-	logger.Info("%s success. output available at: %s", commandName, ctx.Pull.URL)
+	logger.Infof("%s success. output available at: %s", commandName, ctx.Pull.URL)
 
 	executionSuccess.Inc(1)
 	return result

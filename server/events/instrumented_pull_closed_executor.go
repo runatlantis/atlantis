@@ -37,13 +37,13 @@ func (e *InstrumentedPullClosedExecutor) CleanUpPull(repo models.Repo, pull mode
 	executionTime := e.scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
 
-	log.Info("Initiating cleanup of pull data.")
+	log.Infof("Initiating cleanup of pull data.")
 
 	err := e.cleaner.CleanUpPull(repo, pull)
 
 	if err != nil {
 		executionError.Inc(1)
-		log.Err("error during cleanup of pull data", err)
+		log.Errorf("error during cleanup of pull data", err)
 		return err
 	}
 

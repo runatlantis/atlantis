@@ -86,7 +86,7 @@ type JobDefinition struct {
 }
 
 func (s *ExecutorService) Run() {
-	s.log.Info("Scheduled Executor Service started")
+	s.log.Infof("Scheduled Executor Service started")
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -103,12 +103,12 @@ func (s *ExecutorService) Run() {
 
 	<-interrupt
 
-	s.log.Warn("Received interrupt. Attempting to Shut down scheduled executor service")
+	s.log.Warnf("Received interrupt. Attempting to Shut down scheduled executor service")
 
 	cancel()
 	wg.Wait()
 
-	s.log.Warn("All jobs completed, exiting.")
+	s.log.Warnf("All jobs completed, exiting.")
 }
 
 func (s *ExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGroup, jd JobDefinition) {
@@ -123,14 +123,14 @@ func (s *ExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGrou
 		// Keep the recovery outside the select to ensure that we don't infinitely panic.
 		defer func() {
 			if r := recover(); r != nil {
-				s.log.Err("Recovered from panic: %v", r)
+				s.log.Errorf("Recovered from panic: %v", r)
 			}
 		}()
 
 		for {
 			select {
 			case <-ctx.Done():
-				s.log.Warn("Received interrupt, cancelling job")
+				s.log.Warnf("Received interrupt, cancelling job")
 				return
 			case <-ticker.C:
 				jd.Job.Run()
@@ -208,7 +208,7 @@ func (g *GarbageCollector) Run() {
 	pulls, err := g.workingDirIterator.ListCurrentWorkingDirPulls()
 
 	if err != nil {
-		g.log.Err("error listing pulls %s", err)
+		g.log.Errorf("error listing pulls %s", err)
 		errCounter.Inc(1)
 	}
 
@@ -231,12 +231,12 @@ func (g *GarbageCollector) Run() {
 			if pull.UpdatedAt.Before(thirtyDaysAgo) {
 				updatedthirtyDaysAgoOpenPullsCounter.Inc(1)
 
-				logger.Warn("Pull hasn't been updated for more than 30 days.")
+				logger.Warnf("Pull hasn't been updated for more than 30 days.")
 
 				err := g.openPullCleaner.CleanUpPull(pull.BaseRepo, pull)
 
 				if err != nil {
-					logger.Err("Error cleaning up open pulls that haven't been updated in 30 days %s", err)
+					logger.Errorf("Error cleaning up open pulls that haven't been updated in 30 days %s", err)
 					errCounter.Inc(1)
 					return
 				}
@@ -252,12 +252,12 @@ func (g *GarbageCollector) Run() {
 		if pull.ClosedAt.Before(fiveMinutesAgo) {
 			fiveMinutesAgoClosedPullsCounter.Inc(1)
 
-			logger.Warn("Pull closed for more than 5 minutes but data still on disk")
+			logger.Warnf("Pull closed for more than 5 minutes but data still on disk")
 
 			err := g.closedPullCleaner.CleanUpPull(pull.BaseRepo, pull)
 
 			if err != nil {
-				logger.Err("Error cleaning up 5 minutes old closed pulls %s", err)
+				logger.Errorf("Error cleaning up 5 minutes old closed pulls %s", err)
 				errCounter.Inc(1)
 				return
 			}

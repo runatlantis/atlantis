@@ -32,7 +32,7 @@ type RequestLogger struct {
 
 // ServeHTTP implements the middleware function. It logs all requests at DEBUG level.
 func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	l.logger.Debug("%s %s – from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
+	l.logger.Debugf("%s %s – from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
 	next(rw, r)
-	l.logger.Debug("%s %s – respond HTTP %d", r.Method, r.URL.RequestURI(), rw.(negroni.ResponseWriter).Status())
+	l.logger.Debugf("%s %s – respond HTTP %d", r.Method, r.URL.RequestURI(), rw.(negroni.ResponseWriter).Status())
 }

@@ -13,7 +13,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestDeleteLock_LockerErr(t *testing.T) {
+func TestDeleteLock_LockerErrorf(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, we return the error")
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
@@ -89,7 +89,7 @@ func TestDeleteLock_Success(t *testing.T) {
 	workingDir.VerifyWasCalledOnce().DeleteForWorkspace(pull.BaseRepo, pull, "workspace")
 }
 
-func TestDeleteLocksByPull_LockerErr(t *testing.T) {
+func TestDeleteLocksByPull_LockerErrorf(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, returned a failed status")
 	repoName := "reponame"
 	pullNum := 2

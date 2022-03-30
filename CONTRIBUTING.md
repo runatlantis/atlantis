@@ -116,7 +116,7 @@ ngrok http 4141
     - warn is for something that might be a problem but we're not sure
     - error is for something that's definitely a problem
 - **ALWAYS** logs should be all lowercase (when printed, the first letter of each line will be automatically capitalized)
-- **ALWAYS** quote any string variables using %q in the fmt string, ex. `ctx.Log.Info("cleaning clone dir %q", dir)` => `Cleaning clone directory "/tmp/atlantis/lkysow/atlantis-terraform-test/3"`
+- **ALWAYS** quote any string variables using %q in the fmt string, ex. `ctx.Log.Infof("cleaning clone dir %q", dir)` => `Cleaning clone directory "/tmp/atlantis/lkysow/atlantis-terraform-test/3"`
 - **NEVER** use colons "`:`" in a log since that's used to separate error descriptions and causes
   - if you need to have a break in your log, either use `-` or `,` ex. `failed to clean directory, continuing regardless`
 

@@ -27,14 +27,14 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 		if err := ioutil.WriteFile(credsFile, []byte(config), 0600); err != nil {
 			return errors.Wrapf(err, "writing generated %s file with user, token and hostname to %s", credsFilename, credsFile)
 		}
-		logger.Info("wrote git credentials to %s", credsFile)
+		logger.Infof("wrote git credentials to %s", credsFile)
 	} else {
 		hasLine, err := fileHasLine(config, credsFile)
 		if err != nil {
 			return err
 		}
 		if hasLine {
-			logger.Debug("git credentials file has expected contents, not modifying")
+			logger.Debugf("git credentials file has expected contents, not modifying")
 			return nil
 		}
 
@@ -43,13 +43,13 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 			if err := fileLineReplace(config, gitUser, gitHostname, credsFile); err != nil {
 				return errors.Wrap(err, "replacing git credentials line for github app")
 			}
-			logger.Info("updated git app credentials in %s", credsFile)
+			logger.Infof("updated git app credentials in %s", credsFile)
 		} else {
 			// Otherwise we need to append the line.
 			if err := fileAppend(config, credsFile); err != nil {
 				return err
 			}
-			logger.Info("wrote git credentials to %s", credsFile)
+			logger.Infof("wrote git credentials to %s", credsFile)
 		}
 	}
 
@@ -57,13 +57,13 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 	if out, err := credentialCmd.CombinedOutput(); err != nil {
 		return errors.Wrapf(err, "There was an error running %s: %s", strings.Join(credentialCmd.Args, " "), string(out))
 	}
-	logger.Info("successfully ran %s", strings.Join(credentialCmd.Args, " "))
+	logger.Infof("successfully ran %s", strings.Join(credentialCmd.Args, " "))
 
 	urlCmd := exec.Command("git", "config", "--global", fmt.Sprintf("url.https://%s@%s.insteadOf", gitUser, gitHostname), fmt.Sprintf("ssh://git@%s", gitHostname)) // nolint: gosec
 	if out, err := urlCmd.CombinedOutput(); err != nil {
 		return errors.Wrapf(err, "There was an error running %s: %s", strings.Join(urlCmd.Args, " "), string(out))
 	}
-	logger.Info("successfully ran %s", strings.Join(urlCmd.Args, " "))
+	logger.Infof("successfully ran %s", strings.Join(urlCmd.Args, " "))
 	return nil
 }
 

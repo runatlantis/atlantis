@@ -176,7 +176,7 @@ $$$
 
 }
 
-func TestRenderErr(t *testing.T) {
+func TestRenderErrorf(t *testing.T) {
 	err := errors.New("err")
 	cases := []struct {
 		Description string
@@ -1244,7 +1244,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 
 // Test that if the output is longer than 12 lines, it gets wrapped on the right
 // VCS hosts during an error.
-func TestRenderProjectResults_WrappedErr(t *testing.T) {
+func TestRenderProjectResults_WrappedErrorf(t *testing.T) {
 	cases := []struct {
 		VCSHost                 models.VCSHostType
 		GitlabCommonMarkSupport bool

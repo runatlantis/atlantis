@@ -181,7 +181,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 	var autoplanEnabled []command.ProjectContext
 	for _, projCtx := range projCtxs {
 		if !projCtx.AutoplanEnabled {
-			ctx.Log.Debug("ignoring project at dir %q, workspace: %q because autoplan is disabled", projCtx.RepoRelDir, projCtx.Workspace)
+			ctx.Log.Debugf("ignoring project at dir %q, workspace: %q because autoplan is disabled", projCtx.RepoRelDir, projCtx.Workspace)
 			continue
 		}
 		autoplanEnabled = append(autoplanEnabled, projCtx)
@@ -227,7 +227,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 	if err != nil {
 		return nil, err
 	}
-	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
+	ctx.Log.Debugf("%d files were modified in this pull request", len(modifiedFiles))
 
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
 		hasRepoCfg, repoCfgData, err := p.VCSClient.DownloadRepoConfigFile(ctx.Pull)
@@ -240,14 +240,14 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			if err != nil {
 				return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 			}
-			ctx.Log.Info("successfully parsed remote %s file", config.AtlantisYAMLFilename)
+			ctx.Log.Infof("successfully parsed remote %s file", config.AtlantisYAMLFilename)
 			matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "")
 			if err != nil {
 				return nil, err
 			}
-			ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
+			ctx.Log.Infof("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
 			if len(matchingProjects) == 0 {
-				ctx.Log.Info("skipping repo clone since no project was modified")
+				ctx.Log.Infof("skipping repo clone since no project was modified")
 				return []command.ProjectContext{}, nil
 			}
 			// NOTE: We discard this work here and end up doing it again after
@@ -261,10 +261,10 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
-		ctx.Log.Warn("workspace was locked")
+		ctx.Log.Warnf("workspace was locked")
 		return nil, err
 	}
-	ctx.Log.Debug("got workspace lock")
+	ctx.Log.Debugf("got workspace lock")
 	defer unlockFn()
 
 	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
@@ -287,15 +287,15 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 		}
-		ctx.Log.Info("successfully parsed %s file", config.AtlantisYAMLFilename)
+		ctx.Log.Infof("successfully parsed %s file", config.AtlantisYAMLFilename)
 		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
 		if err != nil {
 			return nil, err
 		}
-		ctx.Log.Info("%d projects are to be planned based on their when_modified config", len(matchingProjects))
+		ctx.Log.Infof("%d projects are to be planned based on their when_modified config", len(matchingProjects))
 
 		for _, mp := range matchingProjects {
-			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
+			ctx.Log.Debugf("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
 			contextFlags := &ContextFlags{
 				Automerge:                 repoCfg.Automerge,
@@ -318,14 +318,14 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 	} else {
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.
-		ctx.Log.Info("found no %s file", config.AtlantisYAMLFilename)
+		ctx.Log.Infof("found no %s file", config.AtlantisYAMLFilename)
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList)
 		if err != nil {
 			return nil, errors.Wrapf(err, "finding modified projects: %s", modifiedFiles)
 		}
-		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
+		ctx.Log.Infof("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
-			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
+			ctx.Log.Debugf("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
 
 			contextFlags := &ContextFlags{
@@ -360,14 +360,14 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	}
 
 	var pcc []command.ProjectContext
-	ctx.Log.Debug("building plan command")
+	ctx.Log.Debugf("building plan command")
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
 		return pcc, err
 	}
 	defer unlockFn()
 
-	ctx.Log.Debug("cloning repository")
+	ctx.Log.Debugf("cloning repository")
 	_, _, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return pcc, err
@@ -607,7 +607,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		repoRelDir = projCfg.RepoRelDir
 		workspace = projCfg.Workspace
 		for _, mp := range matchingProjects {
-			ctx.Log.Debug("Merging config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
+			ctx.Log.Debugf("Merging config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			projCfg = p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, *repoCfgPtr)
 			contextFlags := &ContextFlags{
 				Automerge:                 automerge,

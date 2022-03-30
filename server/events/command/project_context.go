@@ -122,10 +122,10 @@ func (p ProjectContext) GetShowResultFileName() string {
 }
 
 // Gets a unique identifier for the current pull request as a single string
-func (p ProjectContext) PullInfo() string {
-	return buildPullInfo(p.BaseRepo.FullName, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
+func (p ProjectContext) PullInfof() string {
+	return buildPullInfof(p.BaseRepo.FullName, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
 }
-func buildPullInfo(repoName string, pullNum int, projectName string, relDir string, workspace string) string {
+func buildPullInfof(repoName string, pullNum int, projectName string, relDir string, workspace string) string {
 	projectIdentifier := getProjectIdentifier(relDir, projectName)
 	return fmt.Sprintf("%s/%d/%s/%s", repoName, pullNum, projectIdentifier, workspace)
 }

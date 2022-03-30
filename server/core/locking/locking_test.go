@@ -37,7 +37,7 @@ var errExpected = errors.New("err")
 var timeNow = time.Now().Local()
 var pl = models.ProjectLock{Project: project, Pull: pull, User: user, Workspace: workspace, Time: timeNow}
 
-func TestTryLock_Err(t *testing.T) {
+func TestTryLock_Errorf(t *testing.T) {
 	RegisterMockTestingT(t)
 	backend := mocks.NewMockBackend()
 	When(backend.TryLock(matchers.AnyModelsProjectLock())).ThenReturn(false, models.ProjectLock{}, errExpected)
@@ -68,7 +68,7 @@ func TestUnlock_InvalidKey(t *testing.T) {
 	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected err")
 }
 
-func TestUnlock_Err(t *testing.T) {
+func TestUnlock_Errorf(t *testing.T) {
 	RegisterMockTestingT(t)
 	backend := mocks.NewMockBackend()
 	When(backend.Unlock(matchers.AnyModelsProject(), AnyString())).ThenReturn(nil, errExpected)
@@ -88,7 +88,7 @@ func TestUnlock(t *testing.T) {
 	Equals(t, &pl, lock)
 }
 
-func TestList_Err(t *testing.T) {
+func TestList_Errorf(t *testing.T) {
 	RegisterMockTestingT(t)
 	backend := mocks.NewMockBackend()
 	When(backend.List()).ThenReturn(nil, errExpected)
@@ -127,7 +127,7 @@ func TestGetLock_BadKey(t *testing.T) {
 	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected different err")
 }
 
-func TestGetLock_Err(t *testing.T) {
+func TestGetLock_Errorf(t *testing.T) {
 	RegisterMockTestingT(t)
 	backend := mocks.NewMockBackend()
 	When(backend.GetLock(project, workspace)).ThenReturn(nil, errExpected)

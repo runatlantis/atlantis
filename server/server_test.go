@@ -34,7 +34,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestIndex_LockErr(t *testing.T) {
+func TestIndex_LockErrorf(t *testing.T) {
 	t.Log("index should return a 503 if unable to list locks")
 	RegisterMockTestingT(t)
 	l := mocks.NewMockLocker()

@@ -34,14 +34,14 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 	// block on reading our input channel
 	for msg := range input {
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte("\r"+msg+"\n")); err != nil {
-			w.log.Warn("Failed to write ws message: %s", err)
+			w.log.Warnf("Failed to write ws message: %s", err)
 			return err
 		}
 	}
 
 	// close ws conn after input channel is closed
 	if err = conn.Close(); err != nil {
-		w.log.Warn("Failed to close ws connection: %s", err)
+		w.log.Warnf("Failed to close ws connection: %s", err)
 	}
 	return nil
 }

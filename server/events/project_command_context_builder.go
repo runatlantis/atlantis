@@ -103,7 +103,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	repoDir string,
 	contextFlags *ContextFlags,
 ) (projectCmds []command.ProjectContext) {
-	ctx.Log.Debug("Building project command context for %s", cmdName)
+	ctx.Log.Debugf("Building project command context for %s", cmdName)
 
 	var steps []valid.Step
 	switch cmdName {
@@ -157,7 +157,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	repoDir string,
 	contextFlags *ContextFlags,
 ) (projectCmds []command.ProjectContext) {
-	ctx.Log.Debug("PolicyChecks are enabled")
+	ctx.Log.Debugf("PolicyChecks are enabled")
 
 	// If TerraformVersion not defined in config file look for a
 	// terraform.require_version block.
@@ -175,7 +175,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	)
 
 	if cmdName == command.Plan {
-		ctx.Log.Debug("Building project command context for %s", command.PolicyCheck)
+		ctx.Log.Debugf("Building project command context for %s", command.PolicyCheck)
 		steps := prjCfg.Workflow.PolicyCheck.Steps
 
 		projectCmds = append(projectCmds, newProjectCommandContext(
@@ -281,12 +281,12 @@ func escapeArgs(args []string) []string {
 func getTfVersion(ctx *command.Context, absProjDir string) *version.Version {
 	module, diags := tfconfig.LoadModule(absProjDir)
 	if diags.HasErrors() {
-		ctx.Log.Err("trying to detect required version: %s", diags.Error())
+		ctx.Log.Errorf("trying to detect required version: %s", diags.Error())
 		return nil
 	}
 
 	if len(module.RequiredCore) != 1 {
-		ctx.Log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+		ctx.Log.Infof("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
 		return nil
 	}
 	requiredVersionSetting := module.RequiredCore[0]
@@ -295,16 +295,16 @@ func getTfVersion(ctx *command.Context, absProjDir string) *version.Version {
 	re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
 	matched := re.FindStringSubmatch(requiredVersionSetting)
 	if len(matched) == 0 {
-		ctx.Log.Debug("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
+		ctx.Log.Debugf("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
 		return nil
 	}
-	ctx.Log.Debug("found required_version setting of %q", requiredVersionSetting)
+	ctx.Log.Debugf("found required_version setting of %q", requiredVersionSetting)
 	version, err := version.NewVersion(matched[1])
 	if err != nil {
-		ctx.Log.Debug(err.Error())
+		ctx.Log.Debugf(err.Error())
 		return nil
 	}
 
-	ctx.Log.Info("detected module requires version: %q", version.String())
+	ctx.Log.Infof("detected module requires version: %q", version.String())
 	return version
 }

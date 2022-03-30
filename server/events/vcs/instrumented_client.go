@@ -76,7 +76,7 @@ func (c *InstrumentedGithubClient) GetContents(owner, repo, branch, path string)
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to get contents, error: %s", err.Error())
+		logger.Errorf("Unable to get contents, error: %s", err.Error())
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -106,7 +106,7 @@ func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoO
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to get pull number for repo, error: %s", err.Error())
+		logger.Errorf("Unable to get pull number for repo, error: %s", err.Error())
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -128,7 +128,7 @@ func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.P
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to get repo status: %s", err.Error())
+		logger.Errorf("Unable to get repo status: %s", err.Error())
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -150,7 +150,7 @@ func (c *InstrumentedGithubClient) GetRepoStatuses(repo models.Repo, pull models
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to get repo status: %s", err.Error())
+		logger.Errorf("Unable to get repo status: %s", err.Error())
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -178,7 +178,7 @@ func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.Pull
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to get modified files, error: %s", err.Error())
+		logger.Errorf("Unable to get modified files, error: %s", err.Error())
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -198,7 +198,7 @@ func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, commen
 
 	if err := c.Client.CreateComment(repo, pullNum, comment, command); err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to create comment for command %s, error: %s", command, err.Error())
+		logger.Errorf("Unable to create comment for command %s, error: %s", command, err.Error())
 		return err
 	}
 
@@ -217,7 +217,7 @@ func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum i
 
 	if err := c.Client.HidePrevCommandComments(repo, pullNum, command); err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to hide previous %s comments, error: %s", command, err.Error())
+		logger.Errorf("Unable to hide previous %s comments, error: %s", command, err.Error())
 		return err
 	}
 
@@ -239,7 +239,7 @@ func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRe
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to check pull approval status, error: %s", err.Error())
+		logger.Errorf("Unable to check pull approval status, error: %s", err.Error())
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -261,7 +261,7 @@ func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullR
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to check pull mergeable status, error: %s", err.Error())
+		logger.Errorf("Unable to check pull mergeable status, error: %s", err.Error())
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -283,7 +283,7 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 
 	if err := c.Client.UpdateStatus(ctx, request); err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to update status at url: %s, error: %s", request.DetailsURL, err.Error())
+		logger.Errorf("Unable to update status at url: %s, error: %s", request.DetailsURL, err.Error())
 		return err
 	}
 
@@ -303,7 +303,7 @@ func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions mode
 
 	if err := c.Client.MergePull(pull, pullOptions); err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to merge pull, error: %s", err.Error())
+		logger.Errorf("Unable to merge pull, error: %s", err.Error())
 	}
 
 	executionSuccess.Inc(1)

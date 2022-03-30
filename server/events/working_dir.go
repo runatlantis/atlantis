@@ -85,7 +85,7 @@ func (w *FileWorkspace) Clone(
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
 	if _, err := os.Stat(cloneDir); err == nil {
-		log.Debug("clone directory %q already exists, checking if it's at the right commit", cloneDir)
+		log.Debugf("clone directory %q already exists, checking if it's at the right commit", cloneDir)
 
 		// We use git rev-parse to see if our repo is at the right commit.
 		// If just checking out the pull request branch, we can use HEAD.
@@ -100,7 +100,7 @@ func (w *FileWorkspace) Clone(
 		revParseCmd.Dir = cloneDir
 		outputRevParseCmd, err := revParseCmd.CombinedOutput()
 		if err != nil {
-			log.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
+			log.Warnf("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
 			return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
 		}
 		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
@@ -108,11 +108,11 @@ func (w *FileWorkspace) Clone(
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
+			log.Debugf("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 			return cloneDir, w.warnDiverged(log, p, headRepo, cloneDir), nil
 		}
 
-		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
+		log.Debugf("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
 		// We'll fall through to re-clone.
 	}
 
@@ -160,16 +160,16 @@ func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullReq
 		output, err := cmd.CombinedOutput()
 
 		if err != nil {
-			log.Warn("getting remote update failed: %s", string(output))
+			log.Warnf("getting remote update failed: %s", string(output))
 			return false
 		}
 	}
 
 	hasDiverged := w.HasDiverged(log, cloneDir)
 	if hasDiverged {
-		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
+		log.Infof("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
 	} else {
-		log.Debug("remote master branch has no new commits")
+		log.Debugf("remote master branch has no new commits")
 	}
 	return hasDiverged
 }
@@ -185,7 +185,7 @@ func (w *FileWorkspace) HasDiverged(log logging.SimpleLogging, cloneDir string) 
 	statusUnoCmd.Dir = cloneDir
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
 	if err != nil {
-		log.Warn("getting repo status has failed: %s", string(outputStatusUno))
+		log.Warnf("getting repo status has failed: %s", string(outputStatusUno))
 		return false
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
@@ -203,7 +203,7 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	}
 
 	// Create the directory and parents if necessary.
-	log.Info("creating dir %q", cloneDir)
+	log.Infof("creating dir %q", cloneDir)
 	if err := os.MkdirAll(cloneDir, 0700); err != nil {
 		return errors.Wrap(err, "creating new workspace")
 	}
@@ -269,7 +269,7 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 			sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
 			return fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
 		}
-		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
+		log.Debugf("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
 	}
 	return nil
 }

@@ -28,7 +28,7 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 	err := r.TerraformExecutor.EnsureVersion(ctx.Log, tfVersion)
 	if err != nil {
 		err = fmt.Errorf("%s: Downloading terraform Version %s", err, tfVersion.String())
-		ctx.Log.Debug("error: %s", err)
+		ctx.Log.Debugf("error: %s", err)
 		return "", err
 	}
 
@@ -70,9 +70,9 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
-		ctx.Log.Debug("error: %s", err)
+		ctx.Log.Debugf("error: %s", err)
 		return "", err
 	}
-	ctx.Log.Info("successfully ran %q in %q", command, path)
+	ctx.Log.Infof("successfully ran %q in %q", command, path)
 	return string(out), nil
 }

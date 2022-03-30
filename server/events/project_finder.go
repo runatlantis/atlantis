@@ -54,7 +54,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 	if len(modifiedTerraformFiles) == 0 {
 		return projects
 	}
-	log.Info("filtered modified files to %d .tf or terragrunt.hcl files: %v",
+	log.Infof("filtered modified files to %d .tf or terragrunt.hcl files: %v",
 		len(modifiedTerraformFiles), modifiedTerraformFiles)
 
 	var dirs []string
@@ -75,7 +75,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 	for _, p := range exists {
 		projects = append(projects, models.NewProject(repoFullName, p))
 	}
-	log.Info("there are %d modified project(s) at path(s): %v",
+	log.Infof("there are %d modified project(s) at path(s): %v",
 		len(projects), strings.Join(exists, ", "))
 	return projects
 }
@@ -84,7 +84,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error) {
 	var projects []valid.Project
 	for _, project := range config.Projects {
-		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
+		log.Debugf("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
 		var whenModifiedRelToRepoRoot []string
 		for _, wm := range project.Autoplan.WhenModified {
 			wm = strings.TrimSpace(wm)
@@ -115,11 +115,11 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 		for _, file := range modifiedFiles {
 			match, err := pm.Matches(file)
 			if err != nil {
-				log.Debug("match err for file %q: %s", file, err)
+				log.Debugf("match err for file %q: %s", file, err)
 				continue
 			}
 			if match {
-				log.Debug("file %q matched pattern", file)
+				log.Debugf("file %q matched pattern", file)
 				// If we're checking using an atlantis.yaml file we downloaded
 				// directly from the repo (when doing a no-clone check) then
 				// absRepoDir will be empty. Since we didn't clone the repo
@@ -132,7 +132,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 					if err == nil {
 						projects = append(projects, project)
 					} else {
-						log.Debug("project at dir %q not included because dir does not exist", project.Dir)
+						log.Debugf("project at dir %q not included because dir does not exist", project.Dir)
 					}
 				} else {
 					projects = append(projects, project)
@@ -157,7 +157,7 @@ func (p *DefaultProjectFinder) filterToFileList(log logging.SimpleLogging, files
 		}
 		match, err := patternMatcher.Matches(fileName)
 		if err != nil {
-			log.Debug("filter err for file %q: %s", fileName, err)
+			log.Debugf("filter err for file %q: %s", fileName, err)
 			continue
 		}
 		if match {

@@ -93,7 +93,7 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 
 	err = l.LockDetailTemplate.Execute(w, viewData)
 	if err != nil {
-		l.Logger.Err(err.Error())
+		l.Logger.Errorf(err.Error())
 	}
 }
 
@@ -129,26 +129,26 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	if lock.Pull.BaseRepo != (models.Repo{}) {
 		unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace)
 		if err != nil {
-			l.Logger.Err("unable to obtain working dir lock when trying to delete old plans: %s", err)
+			l.Logger.Errorf("unable to obtain working dir lock when trying to delete old plans: %s", err)
 		} else {
 			defer unlock()
 			// nolint: vetshadow
 			if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
-				l.Logger.Err("unable to delete workspace: %s", err)
+				l.Logger.Errorf("unable to delete workspace: %s", err)
 			}
 		}
 		if err := l.DB.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
-			l.Logger.Err("unable to update project status: %s", err)
+			l.Logger.Errorf("unable to update project status: %s", err)
 		}
 
 		// Once the lock has been deleted, comment back on the pull request.
 		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
 		if err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
-			l.Logger.Warn("failed commenting on pull request: %s", err)
+			l.Logger.Warnf("failed commenting on pull request: %s", err)
 		}
 	} else {
-		l.Logger.Debug("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
+		l.Logger.Debugf("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
 	}
 	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id %q", id)
 }

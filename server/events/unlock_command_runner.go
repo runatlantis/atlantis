@@ -36,7 +36,7 @@ func (u *UnlockCommandRunner) Run(
 	numLocks, err := u.deleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
 	if err != nil {
 		vcsMessage = "Failed to delete PR locks"
-		ctx.Log.Err("failed to delete locks by pull %s", err.Error())
+		ctx.Log.Errorf("failed to delete locks by pull %s", err.Error())
 	}
 
 	// if there are no locks to delete, no errors, and SilenceNoProjects is enabled, don't comment
@@ -45,6 +45,6 @@ func (u *UnlockCommandRunner) Run(
 	}
 
 	if commentErr := u.vcsClient.CreateComment(baseRepo, pullNum, vcsMessage, command.Unlock.String()); commentErr != nil {
-		ctx.Log.Err("unable to comment: %s", commentErr)
+		ctx.Log.Errorf("unable to comment: %s", commentErr)
 	}
 }

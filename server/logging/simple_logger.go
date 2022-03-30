@@ -29,10 +29,10 @@ import (
 type SimpleLogging interface {
 
 	// These basically just fmt.Sprintf() the message and args.
-	Debug(format string, a ...interface{})
-	Info(format string, a ...interface{})
-	Warn(format string, a ...interface{})
-	Err(format string, a ...interface{})
+	Debugf(format string, a ...interface{})
+	Infof(format string, a ...interface{})
+	Warnf(format string, a ...interface{})
+	Errorf(format string, a ...interface{})
 	Log(level LogLevel, format string, a ...interface{})
 	SetLevel(lvl LogLevel)
 
@@ -92,32 +92,32 @@ func (l *StructuredLogger) With(a ...interface{}) SimpleLogging {
 	}
 }
 
-func (l *StructuredLogger) Debug(format string, a ...interface{}) {
+func (l *StructuredLogger) Debugf(format string, a ...interface{}) {
 	l.z.Debugf(format, a...)
 }
 
-func (l *StructuredLogger) Info(format string, a ...interface{}) {
+func (l *StructuredLogger) Infof(format string, a ...interface{}) {
 	l.z.Infof(format, a...)
 }
 
-func (l *StructuredLogger) Warn(format string, a ...interface{}) {
+func (l *StructuredLogger) Warnf(format string, a ...interface{}) {
 	l.z.Warnf(format, a...)
 }
 
-func (l *StructuredLogger) Err(format string, a ...interface{}) {
+func (l *StructuredLogger) Errorf(format string, a ...interface{}) {
 	l.z.Errorf(format, a...)
 }
 
 func (l *StructuredLogger) Log(level LogLevel, format string, a ...interface{}) {
 	switch level {
 	case Debug:
-		l.Debug(format, a...)
+		l.Debugf(format, a...)
 	case Info:
-		l.Info(format, a...)
+		l.Infof(format, a...)
 	case Warn:
-		l.Warn(format, a...)
+		l.Warnf(format, a...)
 	case Error:
-		l.Err(format, a...)
+		l.Errorf(format, a...)
 	}
 }
 

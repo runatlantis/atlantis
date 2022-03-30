@@ -60,7 +60,7 @@ type VCSEventsController struct {
 // Post handles POST webhook requests.
 func (g *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get(GithubHeader) != "" {
-		g.Logger.Debug("handling GitHub post")
+		g.Logger.Debugf("handling GitHub post")
 		g.handleGithubPost(w, r)
 		return
 	}
@@ -93,7 +93,7 @@ func (g *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 		}
 	}
 	if resp.err.code != 0 {
-		logger.Err("error handling gh post code: %d err: %s", resp.err.code, resp.err.err.Error())
+		logger.Errorf("error handling gh post code: %d err: %s", resp.err.code, resp.err.err.Error())
 		scope.Counter(fmt.Sprintf("error_%d", resp.err.code)).Inc(1)
 		w.WriteHeader(resp.err.code)
 		fmt.Fprintln(w, resp.err.err.Error())
@@ -162,14 +162,14 @@ func (g *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 	// variable to comment back on the pull request.
 	if parseResult.CommentResponse != "" {
 		if err := g.VCSClient.CreateComment(baseRepo, pullNum, parseResult.CommentResponse, ""); err != nil {
-			logger.Err("unable to comment on pull request: %s", err)
+			logger.Errorf("unable to comment on pull request: %s", err)
 		}
 		return HttpResponse{
 			body: "Commenting back on pull request",
 		}
 	}
 	if err := g.SendToWorker(r, payload); err != nil {
-		logger.Err("failed to send comment request to Atlantis worker %w", err)
+		logger.Errorf("failed to send comment request to Atlantis worker %w", err)
 		return HttpResponse{
 			body: err.Error(),
 			err: HttpError{
@@ -248,7 +248,7 @@ func (g *VCSEventsController) handleOpenPullEvent(logger logging.SimpleLogging, 
 	if hasTerraformChanges := g.AutoplanValidator.InstrumentedIsValid(logger, baseRepo, headRepo, pull, user); hasTerraformChanges {
 
 		if err := g.SendToWorker(request, payload); err != nil {
-			logger.Err("failed to send autoplan request to Atlantis worker %w", err)
+			logger.Errorf("failed to send autoplan request to Atlantis worker %w", err)
 		}
 	}
 }
@@ -291,5 +291,5 @@ func (g *VCSEventsController) commentNotAllowlisted(logger logging.SimpleLogging
 	if g.SilenceAllowlistErrors {
 		return
 	}
-	logger.With("repository", baseRepo.FullName, "pull-num", pullNum).Err("This repo is not allowlisted for Atlantis")
+	logger.With("repository", baseRepo.FullName, "pull-num", pullNum).Errorf("This repo is not allowlisted for Atlantis")
 }

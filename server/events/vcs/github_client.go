@@ -106,7 +106,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 	)
 
 	user, err := credentials.GetUser()
-	logger.Debug("GH User: %s", user)
+	logger.Debugf("GH User: %s", user)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "getting user")
@@ -125,7 +125,7 @@ func (g *GithubClient) GetRateLimits() (*github.RateLimits, error) {
 	rateLimits, resp, err := g.client.RateLimits(g.ctx)
 
 	if err != nil {
-		g.logger.Err("error retrieving rate limits: %s", err)
+		g.logger.Errorf("error retrieving rate limits: %s", err)
 		return nil, errors.Wrap(err, "retrieving rate limits")
 	}
 
@@ -147,7 +147,7 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 		if nextPage != 0 {
 			opts.Page = nextPage
 		}
-		g.logger.Debug("GET /repos/%v/%v/pulls/%d/files", repo.Owner, repo.Name, pull.Num)
+		g.logger.Debugf("GET /repos/%v/%v/pulls/%d/files", repo.Owner, repo.Name, pull.Num)
 		pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
 		if err != nil {
 			return files, err
@@ -188,7 +188,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	for i := range comments {
-		g.logger.Debug("POST /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
+		g.logger.Debugf("POST /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
 		_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
 		if err != nil {
 			return err
@@ -201,7 +201,7 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 	var allComments []*github.IssueComment
 	nextPage := 0
 	for {
-		g.logger.Debug("GET /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
+		g.logger.Debugf("GET /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
 			Sort:        github.String("created"),
 			Direction:   github.String("asc"),
@@ -269,7 +269,7 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 		if nextPage != 0 {
 			opts.Page = nextPage
 		}
-		g.logger.Debug("GET /repos/%v/%v/pulls/%d/reviews", repo.Owner, repo.Name, pull.Num)
+		g.logger.Debugf("GET /repos/%v/%v/pulls/%d/reviews", repo.Owner, repo.Name, pull.Num)
 		pageReviews, resp, err := g.client.PullRequests.ListReviews(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
 		if err != nil {
 			return approvalStatus, errors.Wrap(err, "getting reviews")
@@ -438,7 +438,7 @@ func (g *GithubClient) UpdateStatus(ctx context.Context, request types.UpdateSta
 func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
-	g.logger.Debug("GET /repos/%v/%v", pull.BaseRepo.Owner, pull.BaseRepo.Name)
+	g.logger.Debugf("GET /repos/%v/%v", pull.BaseRepo.Owner, pull.BaseRepo.Name)
 	repo, _, err := g.client.Repositories.Get(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name)
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
@@ -461,7 +461,7 @@ func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 	options := &github.PullRequestOptions{
 		MergeMethod: method,
 	}
-	g.logger.Debug("PUT /repos/%v/%v/pulls/%d/merge", repo.Owner, repo.Name, pull.Num)
+	g.logger.Debugf("PUT /repos/%v/%v/pulls/%d/merge", repo.Owner, repo.Name, pull.Num)
 	mergeResult, _, err := g.client.PullRequests.Merge(
 		g.ctx,
 		pull.BaseRepo.Owner,

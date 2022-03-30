@@ -136,7 +136,7 @@ func TestGetLock_InvalidLockID(t *testing.T) {
 	ResponseContains(t, w, http.StatusBadRequest, "Invalid lock id")
 }
 
-func TestGetLock_LockerErr(t *testing.T) {
+func TestGetLock_LockerErrorf(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
 	RegisterMockTestingT(t)
 	l := mocks.NewMockLocker()
@@ -224,7 +224,7 @@ func TestDeleteLock_InvalidLockID(t *testing.T) {
 	ResponseContains(t, w, http.StatusBadRequest, "Invalid lock id \"%A@\"")
 }
 
-func TestDeleteLock_LockerErr(t *testing.T) {
+func TestDeleteLock_LockerErrorf(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()

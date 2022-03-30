@@ -52,7 +52,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err = j.ProjectJobsTemplate.Execute(w, viewData); err != nil {
-		j.Logger.Err(err.Error())
+		j.Logger.Errorf(err.Error())
 		return err
 	}
 

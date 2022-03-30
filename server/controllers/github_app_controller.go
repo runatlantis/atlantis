@@ -54,7 +54,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 		g.respond(w, logging.Debug, http.StatusOK, "Ignoring callback, missing code query parameter")
 	}
 
-	g.Logger.Debug("Exchanging GitHub app code for app credentials")
+	g.Logger.Debugf("Exchanging GitHub app code for app credentials")
 	creds := &vcs.GithubAnonymousCredentials{}
 
 	// TODO: unify this in a single inject.go file
@@ -72,7 +72,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	g.Logger.Debug("Found credentials for GitHub app %q with id %d", app.Name, app.ID)
+	g.Logger.Debugf("Found credentials for GitHub app %q with id %d", app.Name, app.ID)
 
 	err = templates.GithubAppSetupTemplate.Execute(w, templates.GithubSetupData{
 		Target:        "",
@@ -83,7 +83,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 		URL:           app.URL,
 	})
 	if err != nil {
-		g.Logger.Err(err.Error())
+		g.Logger.Errorf(err.Error())
 	}
 }
 
@@ -148,7 +148,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 		Manifest: string(jsonManifest),
 	})
 	if err != nil {
-		g.Logger.Err(err.Error())
+		g.Logger.Errorf(err.Error())
 	}
 }
 

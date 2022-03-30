@@ -282,10 +282,10 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", cmd.String(), path)
-		ctx.Log.Err(err.Error())
+		ctx.Log.Errorf(err.Error())
 		return ansi.Strip(string(out)), err
 	}
-	ctx.Log.Info("successfully ran %q in %q", cmd.String(), path)
+	ctx.Log.Infof("successfully ran %q in %q", cmd.String(), path)
 
 	return ansi.Strip(string(out)), nil
 }

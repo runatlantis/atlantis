@@ -65,7 +65,7 @@ func NewGHSourcedAllocator(repoConfig RepoConfig, githubClient vcs.IGithubClient
 
 	// default to local config if no github client is provided.
 	if githubClient == nil {
-		logger.Warn("no github client provided, defaulting to local config for feature allocation.")
+		logger.Warnf("no github client provided, defaulting to local config for feature allocation.")
 		return NoopAllocator{}, nil
 	}
 
@@ -107,7 +107,7 @@ func (r *PercentageBasedAllocator) ShouldAllocate(featureID Name, fullRepoName s
 	repo := ffuser.NewUser(fullRepoName)
 	shouldAllocate, err := ffclient.BoolVariation(string(featureID), repo, false)
 
-	r.logger.Debug("feature %s allocation: %t for repo: %s", featureID, shouldAllocate, fullRepoName)
+	r.logger.Debugf("feature %s allocation: %t for repo: %s", featureID, shouldAllocate, fullRepoName)
 
 	// if we error out we shouldn't enable the feature, could be risky
 	// Note: if the feature doesn't exist, the library returns the default value.

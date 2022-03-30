@@ -24,7 +24,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestValidate_WithSecretErr(t *testing.T) {
+func TestValidate_WithSecretErrorf(t *testing.T) {
 	t.Log("if the request is not valid against the secret there is an error")
 	RegisterMockTestingT(t)
 	g := events.DefaultGithubRequestValidator{}

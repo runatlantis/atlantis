@@ -278,7 +278,7 @@ func (g GlobalCfg) PlatformModeEnabled() bool {
 // MergeProjectCfg merges proj and rCfg with the global config to return a
 // final config. It assumes that all configs have been validated.
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
-	log.Debug("MergeProjectCfg started")
+	log.Debugf("MergeProjectCfg started")
 	var applyReqs []string
 	var workflow Workflow
 	var pullRequestWorkflow Workflow
@@ -305,7 +305,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		switch key {
 		case ApplyRequirementsKey:
 			if proj.ApplyRequirements != nil {
-				log.Debug("overriding server-defined %s with repo settings: [%s]", ApplyRequirementsKey, strings.Join(proj.ApplyRequirements, ","))
+				log.Debugf("overriding server-defined %s with repo settings: [%s]", ApplyRequirementsKey, strings.Join(proj.ApplyRequirements, ","))
 				applyReqs = proj.ApplyRequirements
 			}
 		case WorkflowKey:
@@ -323,7 +323,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				if w, ok := rCfg.Workflows[name]; allowCustomWorkflows && ok {
 					workflow = w
 				}
-				log.Debug("overriding server-defined %s with repo-specified workflow: %q", WorkflowKey, workflow.Name)
+				log.Debugf("overriding server-defined %s with repo-specified workflow: %q", WorkflowKey, workflow.Name)
 			}
 		case PullRequestWorkflowKey:
 			if proj.PullRequestWorkflowName != nil {
@@ -333,7 +333,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				}
 			}
 
-			log.Debug("overriding server-defined %s with repo-specified pull_request_workflow: %q", PullRequestWorkflowKey, workflow.Name)
+			log.Debugf("overriding server-defined %s with repo-specified pull_request_workflow: %q", PullRequestWorkflowKey, workflow.Name)
 		case DeploymentWorkflowKey:
 			if proj.DeploymentWorkflowName != nil {
 				name := *proj.DeploymentWorkflowName
@@ -342,31 +342,31 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				}
 			}
 
-			log.Debug("overriding server-defined %s with repo-specified deployment_workflow: %q", DeploymentWorkflowKey, workflow.Name)
+			log.Debugf("overriding server-defined %s with repo-specified deployment_workflow: %q", DeploymentWorkflowKey, workflow.Name)
 		case DeleteSourceBranchOnMergeKey:
 			//We check whether the server configured value and repo-root level
 			//config is different. If it is then we change to the more granular.
 			if rCfg.DeleteSourceBranchOnMerge != nil && deleteSourceBranchOnMerge != *rCfg.DeleteSourceBranchOnMerge {
-				log.Debug("overriding server-defined %s with repo settings: [%t]", DeleteSourceBranchOnMergeKey, rCfg.DeleteSourceBranchOnMerge)
+				log.Debugf("overriding server-defined %s with repo settings: [%t]", DeleteSourceBranchOnMergeKey, rCfg.DeleteSourceBranchOnMerge)
 				deleteSourceBranchOnMerge = *rCfg.DeleteSourceBranchOnMerge
 			}
 			//Then we check whether the more granular project based config is
 			//different. If it is then we set it.
 			if proj.DeleteSourceBranchOnMerge != nil && deleteSourceBranchOnMerge != *proj.DeleteSourceBranchOnMerge {
-				log.Debug("overriding repo-root-defined %s with repo settings: [%t]", DeleteSourceBranchOnMergeKey, *proj.DeleteSourceBranchOnMerge)
+				log.Debugf("overriding repo-root-defined %s with repo settings: [%t]", DeleteSourceBranchOnMergeKey, *proj.DeleteSourceBranchOnMerge)
 				deleteSourceBranchOnMerge = *proj.DeleteSourceBranchOnMerge
 			}
-			log.Debug("merged deleteSourceBranchOnMerge: [%t]", deleteSourceBranchOnMerge)
+			log.Debugf("merged deleteSourceBranchOnMerge: [%t]", deleteSourceBranchOnMerge)
 		}
-		log.Debug("MergeProjectCfg completed")
+		log.Debugf("MergeProjectCfg completed")
 	}
 
 	if g.PlatformModeEnabled() {
-		log.Debug("final settings: %s: %s, %s: %s, %s: %s",
+		log.Debugf("final settings: %s: %s, %s: %s, %s: %s",
 			WorkflowKey, workflow.Name, DeploymentWorkflowKey, deploymentWorkflow.Name, PullRequestWorkflowKey, pullRequestWorkflow.Name)
 
 	} else {
-		log.Debug("final settings: %s: [%s], %s: %s",
+		log.Debugf("final settings: %s: [%s], %s: %s",
 			ApplyRequirementsKey, strings.Join(applyReqs, ","), WorkflowKey, workflow.Name)
 	}
 
@@ -390,7 +390,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 // DefaultProjCfg returns the default project config for all projects under the
 // repo with id repoID. It is used when there is no repo config.
 func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
-	log.Debug("building config based on server-side config")
+	log.Debugf("building config based on server-side config")
 	repo := g.foldMatchingRepos(repoID)
 
 	mrgPrj := MergedProjectCfg{

@@ -542,7 +542,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 	c.SetUsageTemplate(usageTmpl(stringFlags, intFlags, boolFlags))
 	// If a user passes in an invalid flag, tell them what the flag was.
 	c.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
-		s.printErr(err)
+		s.printErrorf(err)
 		return err
 	})
 
@@ -776,7 +776,7 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		BitbucketWebhookSecretFlag: userConfig.BitbucketWebhookSecret,
 	} {
 		if strings.Contains(token, "\n") {
-			s.Logger.Warn("--%s contains a newline which is usually unintentional", name)
+			s.Logger.Warnf("--%s contains a newline which is usually unintentional", name)
 		}
 	}
 
@@ -838,19 +838,19 @@ func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 
 func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.GithubUser != "" && userConfig.GithubWebhookSecret == "" && !s.SilenceOutput {
-		s.Logger.Warn("no GitHub webhook secret set. This could allow attackers to spoof requests from GitHub")
+		s.Logger.Warnf("no GitHub webhook secret set. This could allow attackers to spoof requests from GitHub")
 	}
 	if userConfig.GitlabUser != "" && userConfig.GitlabWebhookSecret == "" && !s.SilenceOutput {
-		s.Logger.Warn("no GitLab webhook secret set. This could allow attackers to spoof requests from GitLab")
+		s.Logger.Warnf("no GitLab webhook secret set. This could allow attackers to spoof requests from GitLab")
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL != DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret == "" && !s.SilenceOutput {
-		s.Logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
+		s.Logger.Warnf("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs")
+		s.Logger.Warnf("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs")
 	}
 	if userConfig.AzureDevopsWebhookUser != "" && userConfig.AzureDevopsWebhookPassword == "" && !s.SilenceOutput {
-		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
+		s.Logger.Warnf("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
 	}
 }
 
@@ -917,14 +917,14 @@ func (s *ServerCmd) withErrPrint(f func(*cobra.Command, []string) error) func(*c
 	return func(cmd *cobra.Command, args []string) error {
 		err := f(cmd, args)
 		if err != nil && !s.SilenceOutput {
-			s.printErr(err)
+			s.printErrorf(err)
 		}
 		return err
 	}
 }
 
 // printErr prints err to stderr using a red terminal colour.
-func (s *ServerCmd) printErr(err error) {
+func (s *ServerCmd) printErrorf(err error) {
 	fmt.Fprintf(os.Stderr, "%sError: %s%s\n", "\033[31m", err.Error(), "\033[39m")
 }
 

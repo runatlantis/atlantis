@@ -80,9 +80,9 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 		// doesn't give good error messages in this case.
 		ips, err := net.LookupIP(url.Hostname())
 		if err != nil {
-			logger.Warn("unable to resolve %q: %s", url.Hostname(), err)
+			logger.Warnf("unable to resolve %q: %s", url.Hostname(), err)
 		} else if len(ips) == 0 {
-			logger.Warn("found no IPs while resolving %q", url.Hostname())
+			logger.Warnf("found no IPs while resolving %q", url.Hostname())
 		}
 
 		// Now we're ready to construct the client.
@@ -102,7 +102,7 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 		if err != nil {
 			return nil, err
 		}
-		logger.Info("determined GitLab is running version %s", client.Version.String())
+		logger.Infof("determined GitLab is running version %s", client.Version.String())
 	}
 
 	return client, nil
@@ -265,7 +265,7 @@ func (g *GitlabClient) WaitForSuccessPipeline(ctx context.Context, pull models.P
 		case <-ctx.Done():
 			// validation check time out
 			cancel()
-			return //ctx.Err()
+			return //ctx.Errorf()
 
 		default:
 			mr, _ := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)

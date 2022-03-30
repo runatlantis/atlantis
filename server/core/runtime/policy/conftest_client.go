@@ -140,7 +140,7 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 
 	if err != nil {
 		// conftest default versions are not essential to service startup so let's not block on it.
-		log.Warn("failed to get default conftest version. Will attempt request scoped lazy loads %s", err.Error())
+		log.Warnf("failed to get default conftest version. Will attempt request scoped lazy loads %s", err.Error())
 	}
 
 	versionCache := cache.NewExecutionVersionLayeredLoadingCache(
@@ -162,13 +162,13 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
 	policyArgs := []Arg{}
 	policySetNames := []string{}
-	ctx.Log.Debug("policy sets, %s ", ctx.PolicySets)
+	ctx.Log.Debugf("policy sets, %s ", ctx.PolicySets)
 	for _, policySet := range ctx.PolicySets.PolicySets {
 		path, err := c.SourceResolver.Resolve(policySet)
 
 		// Let's not fail the whole step because of a single failure. Log and fail silently
 		if err != nil {
-			ctx.Log.Err("Error resolving policyset %s. err: %s", policySet.Name, err.Error())
+			ctx.Log.Errorf("Error resolving policyset %s. err: %s", policySet.Name, err.Error())
 			continue
 		}
 
@@ -190,7 +190,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 	serializedArgs, err := args.build()
 
 	if err != nil {
-		ctx.Log.Warn("No policies have been configured")
+		ctx.Log.Warnf("No policies have been configured")
 		return "", nil
 		// TODO: enable when we can pass policies in otherwise e2e tests with policy checks fail
 		// return "", errors.Wrap(err, "building args")

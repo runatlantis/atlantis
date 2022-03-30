@@ -45,7 +45,7 @@ func (r *PlatformModeFeatureRunner) Run(ctx *command.Context, cmd *command.Comme
 
 	shouldAllocate, err := r.featureAllocator.ShouldAllocate(feature.PlatformMode, ctx.HeadRepo.FullName)
 	if err != nil {
-		r.logger.Err("unable to allocate for feature: %s, error: %s", feature.PlatformMode, err)
+		r.logger.Errorf("unable to allocate for feature: %s, error: %s", feature.PlatformMode, err)
 	}
 
 	if !shouldAllocate {

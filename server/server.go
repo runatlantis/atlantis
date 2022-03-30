@@ -181,7 +181,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	policyChecksEnabled := false
 	if userConfig.EnablePolicyChecksFlag {
-		logger.Info("Policy Checks are enabled")
+		logger.Infof("Policy Checks are enabled")
 		policyChecksEnabled = true
 	}
 
@@ -934,29 +934,29 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	switch lyftMode {
 	case Default: // default eventsController handles POST
 		vcsPostHandler = defaultEventsController
-		logger.Info("running Atlantis in default mode")
+		logger.Infof("running Atlantis in default mode")
 	case Gateway: // gateway eventsController handles POST
 		vcsPostHandler = gatewayEventsController
-		logger.With("sns", userConfig.LyftGatewaySnsTopicArn).Info("running Atlantis in gateway mode")
+		logger.With("sns", userConfig.LyftGatewaySnsTopicArn).Infof("running Atlantis in gateway mode")
 	case Hybrid: // gateway eventsController handles POST, and SQS worker is set up to handle messages via default eventsController
 		vcsPostHandler = gatewayEventsController
 		worker, err := sqs.NewGatewaySQSWorker(ctx, statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController)
 		if err != nil {
-			logger.With("err", err).Err("unable to set up worker")
+			logger.With("err", err).Errorf("unable to set up worker")
 			cancel()
 			return nil, errors.Wrapf(err, "setting up sqs handler for hybrid mode")
 		}
 		go worker.Work(ctx)
-		logger.With("queue", userConfig.LyftWorkerQueueURL, "sns", userConfig.LyftGatewaySnsTopicArn).Info("running Atlantis in hybrid mode")
+		logger.With("queue", userConfig.LyftWorkerQueueURL, "sns", userConfig.LyftGatewaySnsTopicArn).Infof("running Atlantis in hybrid mode")
 	case Worker: // an SQS worker is set up to handle messages via default eventsController
 		worker, err := sqs.NewGatewaySQSWorker(ctx, statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController)
 		if err != nil {
-			logger.With("err", err).Err("unable to set up worker")
+			logger.With("err", err).Errorf("unable to set up worker")
 			cancel()
 			return nil, errors.Wrapf(err, "setting up sqs handler for worker mode")
 		}
 		go worker.Work(ctx)
-		logger.With("queue", userConfig.LyftWorkerQueueURL).Info("running Atlantis in worker mode")
+		logger.With("queue", userConfig.LyftWorkerQueueURL).Infof("running Atlantis in worker mode")
 	}
 
 	return &Server{
@@ -1036,7 +1036,7 @@ func (s *Server) Start() error {
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
 	go func() {
-		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
+		s.Logger.Infof("Atlantis started - listening on port %v", s.Port)
 
 		var err error
 		if s.SSLCertFile != "" && s.SSLKeyFile != "" {
@@ -1046,23 +1046,23 @@ func (s *Server) Start() error {
 		}
 
 		if err != nil && err != http.ErrServerClosed {
-			s.Logger.Err(err.Error())
+			s.Logger.Errorf(err.Error())
 		}
 	}()
 	<-stop
 
 	// Shutdown sqs polling. Any received messages being processed will either succeed/fail depending on if drainer started.
 	if s.LyftMode == Hybrid || s.LyftMode == Worker {
-		s.Logger.Warn("Received interrupt. Shutting down the sqs handler")
+		s.Logger.Warnf("Received interrupt. Shutting down the sqs handler")
 		s.CancelWorker()
 	}
 
-	s.Logger.Warn("Received interrupt. Waiting for in-progress operations to complete")
+	s.Logger.Warnf("Received interrupt. Waiting for in-progress operations to complete")
 	s.waitForDrain()
 
 	// flush stats before shutdown
 	if err := s.StatsCloser.Close(); err != nil {
-		s.Logger.Err(err.Error())
+		s.Logger.Errorf(err.Error())
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
@@ -1083,10 +1083,10 @@ func (s *Server) waitForDrain() {
 	for {
 		select {
 		case <-drainComplete:
-			s.Logger.Info("All in-progress operations complete, shutting down")
+			s.Logger.Infof("All in-progress operations complete, shutting down")
 			return
 		case <-ticker.C:
-			s.Logger.Info("Waiting for in-progress operations to complete, current in-progress ops: %d", s.Drainer.GetStatus().InProgressOps)
+			s.Logger.Infof("Waiting for in-progress operations to complete, current in-progress ops: %d", s.Drainer.GetStatus().InProgressOps)
 		}
 	}
 }
@@ -1117,7 +1117,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	applyCmdLock, err := s.ApplyLocker.CheckApplyLock()
-	s.Logger.Info("Apply Lock: %v", applyCmdLock)
+	s.Logger.Infof("Apply Lock: %v", applyCmdLock)
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err)
@@ -1139,7 +1139,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		CleanedBasePath: s.AtlantisURL.Path,
 	})
 	if err != nil {
-		s.Logger.Err(err.Error())
+		s.Logger.Errorf(err.Error())
 	}
 }
 

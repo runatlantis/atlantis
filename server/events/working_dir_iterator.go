@@ -44,7 +44,7 @@ func (f *FileWorkDirIterator) ListCurrentWorkingDirPulls() ([]models.PullRequest
 	baseFilePath := filepath.Join(f.DataDir, workingDirPrefix)
 
 	if _, err := os.Stat(baseFilePath); os.IsNotExist(err) {
-		f.Log.Warn("cannot list working dirs, %s doesn't exist", baseFilePath)
+		f.Log.Warnf("cannot list working dirs, %s doesn't exist", baseFilePath)
 		return results, nil
 	}
 
@@ -74,7 +74,7 @@ func (f *FileWorkDirIterator) ListCurrentWorkingDirPulls() ([]models.PullRequest
 			return errors.Wrapf(err, "parsing pull num %s", pathComponents[2])
 		}
 
-		f.Log.Debug("Fetching pull for %s/%s #%d", ownerName, repoName, pullNum)
+		f.Log.Debugf("Fetching pull for %s/%s #%d", ownerName, repoName, pullNum)
 
 		pull, err := f.GithubClient.GetPullRequestFromName(repoName, ownerName, pullNum)
 
@@ -87,7 +87,7 @@ func (f *FileWorkDirIterator) ListCurrentWorkingDirPulls() ([]models.PullRequest
 				return errors.Wrapf(err, "fetching pull for %s", filepath.Join(pathComponents...))
 			}
 
-			f.Log.Warn("%s/%s/#%d not found, %s", ownerName, repoName, pullNum, notFoundErr)
+			f.Log.Warnf("%s/%s/#%d not found, %s", ownerName, repoName, pullNum, notFoundErr)
 
 			return fs.SkipDir
 		}

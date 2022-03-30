@@ -96,7 +96,7 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitHub")
 			return
 		}
-		e.Logger.Debug("handling GitHub post")
+		e.Logger.Debugf("handling GitHub post")
 		e.handleGithubPost(w, r)
 		return
 	} else if r.Header.Get(gitlabHeader) != "" {
@@ -104,7 +104,7 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitLab")
 			return
 		}
-		e.Logger.Debug("handling GitLab post")
+		e.Logger.Debugf("handling GitLab post")
 		e.handleGitlabPost(w, r)
 		return
 	} else if r.Header.Get(bitbucketEventTypeHeader) != "" {
@@ -115,7 +115,7 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 				e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Bitbucket Cloud")
 				return
 			}
-			e.Logger.Debug("handling Bitbucket Cloud post")
+			e.Logger.Debugf("handling Bitbucket Cloud post")
 			e.handleBitbucketCloudPost(w, r)
 			return
 		} else if r.Header.Get(bitbucketServerRequestIDHeader) != "" {
@@ -123,7 +123,7 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 				e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Bitbucket Server")
 				return
 			}
-			e.Logger.Debug("handling Bitbucket Server post")
+			e.Logger.Debugf("handling Bitbucket Server post")
 			e.handleBitbucketServerPost(w, r)
 			return
 		}
@@ -132,7 +132,7 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support AzureDevops")
 			return
 		}
-		e.Logger.Debug("handling AzureDevops post")
+		e.Logger.Debugf("handling AzureDevops post")
 		e.handleAzureDevopsPost(w, r)
 		return
 	}
@@ -161,7 +161,7 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	logger := e.Logger.With("gh-request-id", githubReqID)
 	scope := e.Scope.SubScope("github.event")
 
-	logger.Debug("request valid")
+	logger.Debugf("request valid")
 
 	event, _ := github.ParseWebHook(github.WebHookType(r), payload)
 
@@ -181,7 +181,7 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	}
 
 	if resp.err.code != 0 {
-		logger.Err("error handling gh post code: %d err: %s", resp.err.code, resp.err.err.Error())
+		logger.Errorf("error handling gh post code: %d err: %s", resp.err.code, resp.err.err.Error())
 		scope.Counter(fmt.Sprintf("error_%d", resp.err.code)).Inc(1)
 		w.WriteHeader(resp.err.code)
 		fmt.Fprintln(w, resp.err.err.Error())
@@ -204,11 +204,11 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 	}
 	switch eventType {
 	case bitbucketcloud.PullCreatedHeader, bitbucketcloud.PullUpdatedHeader, bitbucketcloud.PullFulfilledHeader, bitbucketcloud.PullRejectedHeader:
-		e.Logger.Debug("handling as pull request state changed event")
+		e.Logger.Debugf("handling as pull request state changed event")
 		e.handleBitbucketCloudPullRequestEvent(w, eventType, body, reqID)
 		return
 	case bitbucketcloud.PullCommentCreatedHeader:
-		e.Logger.Debug("handling as comment created event")
+		e.Logger.Debugf("handling as comment created event")
 		e.HandleBitbucketCloudCommentEvent(w, body, reqID)
 		return
 	default:
@@ -240,11 +240,11 @@ func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r
 	}
 	switch eventType {
 	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader, bitbucketserver.PullDeletedHeader:
-		e.Logger.Debug("handling as pull request state changed event")
+		e.Logger.Debugf("handling as pull request state changed event")
 		e.handleBitbucketServerPullRequestEvent(w, eventType, body, reqID)
 		return
 	case bitbucketserver.PullCommentCreatedHeader:
-		e.Logger.Debug("handling as comment created event")
+		e.Logger.Debugf("handling as comment created event")
 		e.HandleBitbucketServerCommentEvent(w, body, reqID)
 		return
 	default:
@@ -259,7 +259,7 @@ func (e *VCSEventsController) handleAzureDevopsPost(w http.ResponseWriter, r *ht
 		e.respond(w, logging.Warn, http.StatusUnauthorized, err.Error())
 		return
 	}
-	e.Logger.Debug("request valid")
+	e.Logger.Debugf("request valid")
 
 	azuredevopsReqID := "Request-Id=" + r.Header.Get("Request-Id")
 	event, err := azuredevops.ParseWebHook(payload)
@@ -269,10 +269,10 @@ func (e *VCSEventsController) handleAzureDevopsPost(w http.ResponseWriter, r *ht
 	}
 	switch event.PayloadType {
 	case azuredevops.PullRequestCommentedEvent:
-		e.Logger.Debug("handling as pull request commented event")
+		e.Logger.Debugf("handling as pull request commented event")
 		e.HandleAzureDevopsPullRequestCommentedEvent(w, event, azuredevopsReqID)
 	case azuredevops.PullRequestEvent:
-		e.Logger.Debug("handling as pull request event")
+		e.Logger.Debugf("handling as pull request event")
 		e.HandleAzureDevopsPullRequestEvent(w, event, azuredevopsReqID)
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event: %v %s", event.PayloadType, azuredevopsReqID)
@@ -363,7 +363,7 @@ func (e *VCSEventsController) handleBitbucketCloudPullRequestEvent(w http.Respon
 		return
 	}
 	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType)
-	e.Logger.Info("identified event as type %q", pullEventType.String())
+	e.Logger.Infof("identified event as type %q", pullEventType.String())
 	eventTimestamp := time.Now()
 	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType, eventTimestamp)
 
@@ -386,7 +386,7 @@ func (e *VCSEventsController) handleBitbucketServerPullRequestEvent(w http.Respo
 		return
 	}
 	pullEventType := e.Parser.GetBitbucketServerPullEventType(eventType)
-	e.Logger.Info("identified event as type %q", pullEventType.String())
+	e.Logger.Infof("identified event as type %q", pullEventType.String())
 	eventTimestamp := time.Now()
 	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType, eventTimestamp)
 
@@ -417,7 +417,7 @@ func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.Simple
 			},
 		}
 	}
-	logger.Debug("identified event as type %q", pullEventType.String())
+	logger.Debugf("identified event as type %q", pullEventType.String())
 	eventTimestamp := time.Now()
 	githubPullRequest := pullEvent.PullRequest
 	if githubPullRequest != nil && githubPullRequest.UpdatedAt != nil {
@@ -476,7 +476,7 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 				},
 			}
 		}
-		logger.Info("deleted locks and workspace for repo %s, pull %d", baseRepo.FullName, pull.Num)
+		logger.Infof("deleted locks and workspace for repo %s, pull %d", baseRepo.FullName, pull.Num)
 		return HttpResponse{
 			body: "Pull request cleaned successfully",
 		}
@@ -495,17 +495,17 @@ func (e *VCSEventsController) handleGitlabPost(w http.ResponseWriter, r *http.Re
 		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
 		return
 	}
-	e.Logger.Debug("request valid")
+	e.Logger.Debugf("request valid")
 
 	switch event := event.(type) {
 	case gitlab.MergeCommentEvent:
-		e.Logger.Debug("handling as comment event")
+		e.Logger.Debugf("handling as comment event")
 		e.HandleGitlabCommentEvent(w, event)
 	case gitlab.MergeEvent:
-		e.Logger.Debug("handling as pull request event")
+		e.Logger.Debugf("handling as pull request event")
 		e.HandleGitlabMergeRequestEvent(w, event)
 	case gitlab.CommitCommentEvent:
-		e.Logger.Debug("comments on commits are not supported, only comments on merge requests")
+		e.Logger.Debugf("comments on commits are not supported, only comments on merge requests")
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment on commit event")
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event")
@@ -549,7 +549,7 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 			body: fmt.Sprintf("Ignoring non-command comment: %q", truncated),
 		}
 	}
-	logger.Info("parsed comment as %s", parseResult.Command)
+	logger.Infof("parsed comment as %s", parseResult.Command)
 
 	// At this point we know it's a command we're not supposed to ignore, so now
 	// we check if this repo is allowed to run commands in the first place.
@@ -572,14 +572,14 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 	// variable to comment back on the pull request.
 	if parseResult.CommentResponse != "" {
 		if err := e.VCSClient.CreateComment(baseRepo, pullNum, parseResult.CommentResponse, ""); err != nil {
-			logger.Err("unable to comment on pull request: %s", err)
+			logger.Errorf("unable to comment on pull request: %s", err)
 		}
 		return HttpResponse{
 			body: "Commenting back on pull request",
 		}
 	}
 
-	logger.Debug("executing command")
+	logger.Debugf("executing command")
 	if !e.TestingMode {
 		// Respond with success and then actually execute the command asynchronously.
 		// We use a goroutine so that this function returns and the connection is
@@ -604,7 +604,7 @@ func (e *VCSEventsController) HandleGitlabMergeRequestEvent(w http.ResponseWrite
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	e.Logger.Info("identified event as type %q", pullEventType.String())
+	e.Logger.Infof("identified event as type %q", pullEventType.String())
 	eventTimestamp := time.Now()
 	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType, eventTimestamp)
 
@@ -690,7 +690,7 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseW
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, azuredevopsReqID)
 		return
 	}
-	e.Logger.Info("identified event as type %q", pullEventType.String())
+	e.Logger.Infof("identified event as type %q", pullEventType.String())
 	eventTimestamp := time.Now()
 	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType, eventTimestamp)
 
@@ -732,6 +732,6 @@ func (e *VCSEventsController) commentNotAllowlisted(baseRepo models.Repo, pullNu
 
 	errMsg := "```\nError: This repo is not allowlisted for Atlantis.\n```"
 	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
-		e.Logger.Err("unable to comment on pull request: %s", err)
+		e.Logger.Errorf("unable to comment on pull request: %s", err)
 	}
 }

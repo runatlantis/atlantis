@@ -122,7 +122,7 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 		// Append new log to the output buffer for the job
 		err := p.JobStore.AppendOutput(msg.JobID, msg.Line)
 		if err != nil {
-			p.logger.Warn("appending log: %s for job: %s", msg.Line, msg.JobID, err)
+			p.logger.Warnf("appending log: %s for job: %s", msg.Line, msg.JobID, err)
 		}
 	}
 }
@@ -130,7 +130,7 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 func (p *AsyncProjectCommandOutputHandler) Register(jobID string, connection chan string) {
 	job, err := p.JobStore.Get(jobID)
 	if err != nil || job == nil {
-		p.logger.Err(fmt.Sprintf("getting job: %s", jobID), err)
+		p.logger.Errorf(fmt.Sprintf("getting job: %s", jobID), err)
 		return
 	}
 
@@ -155,7 +155,7 @@ func (p *AsyncProjectCommandOutputHandler) CloseJob(jobID string, repo models.Re
 
 	// Update job status and persist to storage if configured
 	if err := p.JobStore.SetJobCompleteStatus(jobID, repo.FullName, Complete); err != nil {
-		p.logger.Err("updating jobs status to complete", err)
+		p.logger.Errorf("updating jobs status to complete", err)
 	}
 }
 

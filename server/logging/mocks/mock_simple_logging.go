@@ -26,7 +26,7 @@ func NewMockSimpleLogging(options ...pegomock.Option) *MockSimpleLogging {
 func (mock *MockSimpleLogging) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockSimpleLogging) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockSimpleLogging) Debug(format string, a ...interface{}) {
+func (mock *MockSimpleLogging) Debugf(format string, a ...interface{}) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -37,7 +37,7 @@ func (mock *MockSimpleLogging) Debug(format string, a ...interface{}) {
 	pegomock.GetGenericMockFrom(mock).Invoke("Debug", params, []reflect.Type{})
 }
 
-func (mock *MockSimpleLogging) Info(format string, a ...interface{}) {
+func (mock *MockSimpleLogging) Infof(format string, a ...interface{}) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -48,7 +48,7 @@ func (mock *MockSimpleLogging) Info(format string, a ...interface{}) {
 	pegomock.GetGenericMockFrom(mock).Invoke("Info", params, []reflect.Type{})
 }
 
-func (mock *MockSimpleLogging) Warn(format string, a ...interface{}) {
+func (mock *MockSimpleLogging) Warnf(format string, a ...interface{}) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -59,7 +59,7 @@ func (mock *MockSimpleLogging) Warn(format string, a ...interface{}) {
 	pegomock.GetGenericMockFrom(mock).Invoke("Warn", params, []reflect.Type{})
 }
 
-func (mock *MockSimpleLogging) Err(format string, a ...interface{}) {
+func (mock *MockSimpleLogging) Errorf(format string, a ...interface{}) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -192,7 +192,7 @@ type VerifierMockSimpleLogging struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockSimpleLogging) Debug(format string, a ...interface{}) *MockSimpleLogging_Debug_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) Debugf(format string, a ...interface{}) *MockSimpleLogging_Debug_OngoingVerification {
 	params := []pegomock.Param{format}
 	for _, param := range a {
 		params = append(params, param)
@@ -231,7 +231,7 @@ func (c *MockSimpleLogging_Debug_OngoingVerification) GetAllCapturedArguments() 
 	return
 }
 
-func (verifier *VerifierMockSimpleLogging) Info(format string, a ...interface{}) *MockSimpleLogging_Info_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) Infof(format string, a ...interface{}) *MockSimpleLogging_Info_OngoingVerification {
 	params := []pegomock.Param{format}
 	for _, param := range a {
 		params = append(params, param)
@@ -270,7 +270,7 @@ func (c *MockSimpleLogging_Info_OngoingVerification) GetAllCapturedArguments() (
 	return
 }
 
-func (verifier *VerifierMockSimpleLogging) Warn(format string, a ...interface{}) *MockSimpleLogging_Warn_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) Warnf(format string, a ...interface{}) *MockSimpleLogging_Warn_OngoingVerification {
 	params := []pegomock.Param{format}
 	for _, param := range a {
 		params = append(params, param)
@@ -309,7 +309,7 @@ func (c *MockSimpleLogging_Warn_OngoingVerification) GetAllCapturedArguments() (
 	return
 }
 
-func (verifier *VerifierMockSimpleLogging) Err(format string, a ...interface{}) *MockSimpleLogging_Err_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) Errorf(format string, a ...interface{}) *MockSimpleLogging_Err_OngoingVerification {
 	params := []pegomock.Param{format}
 	for _, param := range a {
 		params = append(params, param)

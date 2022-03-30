@@ -10,7 +10,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestAzureDevopsValidate_WithBasicAuthErr(t *testing.T) {
+func TestAzureDevopsValidate_WithBasicAuthErrorf(t *testing.T) {
 	t.Log("if the request does not have a valid basic auth user and password there is an error")
 	RegisterMockTestingT(t)
 	g := events.DefaultAzureDevopsRequestValidator{}

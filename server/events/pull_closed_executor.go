@@ -84,7 +84,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	pullStatus, err := p.DB.GetPullStatus(pull)
 	if err != nil {
 		// Log and continue to clean up other resources.
-		p.Logger.Err("retrieving pull status: %s", err)
+		p.Logger.Errorf("retrieving pull status: %s", err)
 	}
 
 	if pullStatus != nil {
@@ -113,7 +113,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 
 	// Delete pull from DB.
 	if err := p.DB.DeletePullStatus(pull); err != nil {
-		p.Logger.Err("deleting pull from db: %s", err)
+		p.Logger.Errorf("deleting pull from db: %s", err)
 	}
 
 	// If there are no locks then there's no need to comment.
