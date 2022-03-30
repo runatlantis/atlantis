@@ -15,24 +15,87 @@
 package logging
 
 import (
+	"context"
 	"testing"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
+	logurzap "logur.dev/adapter/zap"
+	"logur.dev/logur"
 )
+
+const (
+	RequestIDKey  = "gh-request-id"
+	RepositoryKey = "repository"
+	SHAKey        = "sha"
+	PullNumKey    = "pull-num"
+	ProjectKey    = "project"
+)
+
+// Logger is the logging interface used throughout the code.
+// All new code should leverage this over SimpleLogging
+type Logger interface {
+	logur.Logger
+	logur.LoggerContext
+	Closer
+}
+
+// Closer is responsible for closing an underlying logger.  This may mean,
+// flushing buffer contents on exit, but is up to the implementation.
+type Closer interface {
+	Close() error
+}
+
+type logger struct {
+	logur.LoggerFacade
+	Closer
+}
+
+func NewLoggerFromLevel(lvl LogLevel) (*logger, error) {
+	structuredLogger, err := NewStructuredLoggerFromLevel(lvl)
+	if err != nil {
+		return &logger{}, err
+
+	}
+
+	ctxLogger := logur.WithContextExtractor(
+		structuredLogger,
+		extractFields,
+	)
+
+	return &logger{
+		LoggerFacade: ctxLogger,
+	}, nil
+
+}
+
+// Extracts relevant fields from context for structured logging.
+func extractFields(ctx context.Context) map[string]interface{} {
+	args := make(map[string]interface{})
+
+	for _, k := range []string{RequestIDKey, RepositoryKey, PullNumKey, ProjectKey, SHAKey} {
+		if v, ok := ctx.Value(k).(string); ok {
+			args[k] = v
+		}
+	}
+
+	return args
+}
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_simple_logging.go SimpleLogging
 
+// Deprecated: Use Logger instead
 // SimpleLogging is the interface used for logging throughout the codebase.
 type SimpleLogging interface {
-
 	// These basically just fmt.Sprintf() the message and args.
+
 	Debugf(format string, a ...interface{})
 	Infof(format string, a ...interface{})
 	Warnf(format string, a ...interface{})
 	Errorf(format string, a ...interface{})
+
 	Log(level LogLevel, format string, a ...interface{})
 	SetLevel(lvl LogLevel)
 
@@ -42,26 +105,21 @@ type SimpleLogging interface {
 	// and the second as the field value.
 	With(a ...interface{}) SimpleLogging
 
-	// Flushes anything left in the buffer
-	Flush() error
+	// Closes the underlying log writer, flushing anything from the buffer
+	Close() error
 }
 
 type StructuredLogger struct {
 	z     *zap.SugaredLogger
 	level zap.AtomicLevel
+	logur.Logger
 }
 
-func NewStructuredLoggerFromLevel(lvl LogLevel) (SimpleLogging, error) {
+func NewStructuredLoggerFromLevel(lvl LogLevel) (*StructuredLogger, error) {
 	cfg := zap.NewProductionConfig()
 
 	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	cfg.Level = zap.NewAtomicLevelAt(lvl.zLevel)
-	return newStructuredLogger(cfg)
-}
-
-func NewStructuredLogger() (SimpleLogging, error) {
-	cfg := zap.NewProductionConfig()
-	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	return newStructuredLogger(cfg)
 }
 
@@ -80,8 +138,9 @@ func newStructuredLogger(cfg zap.Config) (*StructuredLogger, error) {
 	}
 
 	return &StructuredLogger{
-		z:     baseLogger.Sugar(),
-		level: cfg.Level,
+		z:      baseLogger.Sugar(),
+		level:  cfg.Level,
+		Logger: logurzap.New(baseLogger),
 	}, nil
 }
 
@@ -127,7 +186,7 @@ func (l *StructuredLogger) SetLevel(lvl LogLevel) {
 	}
 }
 
-func (l *StructuredLogger) Flush() error {
+func (l *StructuredLogger) Close() error {
 	return l.z.Sync()
 }
 

@@ -106,6 +106,7 @@ type Server struct {
 	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
 	CommandRunner                 *events.DefaultCommandRunner
 	Logger                        logging.SimpleLogging
+	CtxLogger                     logging.Logger
 	StatsScope                    tally.Scope
 	StatsCloser                   io.Closer
 	Locker                        locking.Locker
@@ -159,6 +160,11 @@ type WebhookConfig struct {
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
 
+	if err != nil {
+		return nil, err
+	}
+
+	ctxLogger, err := logging.NewLoggerFromLevel(userConfig.ToLogLevel())
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +256,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, err
 		}
 
-		githubClient = vcs.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
+		githubClient = vcs.NewInstrumentedGithubClient(rawGithubClient, statsScope, ctxLogger)
 	}
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
@@ -967,6 +973,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		CommandRunner:                 commandRunner,
 		Logger:                        logger,
+		CtxLogger:                     ctxLogger,
 		StatsScope:                    statsScope,
 		StatsCloser:                   closer,
 		Locker:                        lockingClient,
@@ -1021,7 +1028,8 @@ func (s *Server) Start() error {
 	}, NewRequestLogger(s.Logger))
 	n.UseHandler(s.Router)
 
-	defer s.Logger.Flush()
+	defer s.Logger.Close()
+	defer s.CtxLogger.Close()
 
 	// Ensure server gracefully drains connections when stopped.
 	stop := make(chan os.Signal, 1)

@@ -25,7 +25,6 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
-	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -818,7 +817,6 @@ func setup(flags map[string]interface{}, t *testing.T) *cobra.Command {
 		ServerCreator: &ServerCreatorMock{},
 		Viper:         vipr,
 		SilenceOutput: true,
-		Logger:        logging.NewNoopLogger(t),
 	}
 	return c.Init()
 }
@@ -836,7 +834,6 @@ func setupWithDefaults(flags map[string]interface{}, t *testing.T) *cobra.Comman
 		ServerCreator: &ServerCreatorMock{},
 		Viper:         vipr,
 		SilenceOutput: true,
-		Logger:        logging.NewNoopLogger(t),
 	}
 	return c.Init()
 }

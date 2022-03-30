@@ -15,10 +15,7 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/runatlantis/atlantis/cmd"
-	"github.com/runatlantis/atlantis/server/logging"
 	temporalCmd "github.com/runatlantis/atlantis/server/lyft/temporal/cmd"
 	"github.com/spf13/viper"
 )
@@ -28,19 +25,12 @@ const atlantisVersion = "0.17.3"
 func main() {
 	v := viper.New()
 
-	logger, err := logging.NewStructuredLogger()
-
-	if err != nil {
-		panic(fmt.Sprintf("unable to initialize logger. %s", err.Error()))
-	}
-
 	// We're creating commands manually here rather than using init() functions
 	// (as recommended by cobra) because it makes testing easier.
 	server := &cmd.ServerCmd{
 		ServerCreator:   &cmd.DefaultServerCreator{},
 		Viper:           v,
 		AtlantisVersion: atlantisVersion,
-		Logger:          logger,
 	}
 	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
 	testdrive := &cmd.TestdriveCmd{}

@@ -14,7 +14,7 @@ import (
 )
 
 // NewInstrumentedGithubClient creates a client proxy responsible for gathering stats and logging
-func NewInstrumentedGithubClient(client *GithubClient, statsScope tally.Scope, logger logging.SimpleLogging) IGithubClient {
+func NewInstrumentedGithubClient(client *GithubClient, statsScope tally.Scope, logger logging.Logger) IGithubClient {
 	scope := statsScope.SubScope("github")
 
 	instrumentedGHClient := &InstrumentedClient{
@@ -57,14 +57,11 @@ type InstrumentedGithubClient struct {
 	*InstrumentedClient
 	GhClient   *GithubClient
 	StatsScope tally.Scope
-	Logger     logging.SimpleLogging
+	Logger     logging.Logger
 }
 
 func (c *InstrumentedGithubClient) GetContents(owner, repo, branch, path string) ([]byte, error) {
 	scope := c.StatsScope.SubScope("get_contents")
-	logger := c.Logger.With([]interface{}{
-		"repository", fmt.Sprintf("%s/%s", owner, repo),
-	}...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -76,10 +73,14 @@ func (c *InstrumentedGithubClient) GetContents(owner, repo, branch, path string)
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to get contents, error: %s", err.Error())
-	} else {
-		executionSuccess.Inc(1)
+		return contents, err
 	}
+	executionSuccess.Inc(1)
+
+	//TODO: thread context and use related logging methods.
+	c.Logger.Debug("fetched contents", map[string]interface{}{
+		logging.RepositoryKey: repo,
+	})
 
 	return contents, err
 }
@@ -91,10 +92,6 @@ func (c *InstrumentedGithubClient) GetPullRequest(repo models.Repo, pullNum int)
 
 func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoOwner string, pullNum int) (*github.PullRequest, error) {
 	scope := c.StatsScope.SubScope("get_pull_request")
-	logger := c.Logger.With([]interface{}{
-		"repository", fmt.Sprintf("%s/%s", repoOwner, repoName),
-		"pull-num", strconv.Itoa(pullNum),
-	}...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -106,17 +103,22 @@ func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoO
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to get pull number for repo, error: %s", err.Error())
-	} else {
-		executionSuccess.Inc(1)
+		return pull, err
 	}
+
+	executionSuccess.Inc(1)
+
+	//TODO: thread context and use related logging methods.
+	c.Logger.Debug("fetched pull request", map[string]interface{}{
+		logging.RepositoryKey: fmt.Sprintf("%s/%s", repoOwner, repoName),
+		logging.PullNumKey:    strconv.Itoa(pullNum),
+	})
 
 	return pull, err
 }
 
 func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.PullRequest) ([]*github.CheckRun, error) {
 	scope := c.StatsScope.SubScope("get_repo_checks")
-	logger := c.Logger.With(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -128,17 +130,19 @@ func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.P
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to get repo status: %s", err.Error())
-	} else {
-		executionSuccess.Inc(1)
+		return statuses, err
 	}
+
+	executionSuccess.Inc(1)
+
+	//TODO: thread context and use related logging methods.
+	c.Logger.Debug("fetched vcs repo checks", logKVs(repo, pull))
 
 	return statuses, err
 }
 
 func (c *InstrumentedGithubClient) GetRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error) {
 	scope := c.StatsScope.SubScope("get_repo_status")
-	logger := c.Logger.With(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -150,10 +154,13 @@ func (c *InstrumentedGithubClient) GetRepoStatuses(repo models.Repo, pull models
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to get repo status: %s", err.Error())
-	} else {
-		executionSuccess.Inc(1)
+		return statuses, err
 	}
+
+	executionSuccess.Inc(1)
+
+	//TODO: thread context and use related logging methods.
+	c.Logger.Debug("fetched vcs repo statuses", logKVs(repo, pull))
 
 	return statuses, err
 }
@@ -161,12 +168,11 @@ func (c *InstrumentedGithubClient) GetRepoStatuses(repo models.Repo, pull models
 type InstrumentedClient struct {
 	Client
 	StatsScope tally.Scope
-	Logger     logging.SimpleLogging
+	Logger     logging.Logger
 }
 
 func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	scope := c.StatsScope.SubScope("get_modified_files")
-	logger := c.Logger.With(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -178,17 +184,19 @@ func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.Pull
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to get modified files, error: %s", err.Error())
-	} else {
-		executionSuccess.Inc(1)
+		return files, err
 	}
+
+	executionSuccess.Inc(1)
+
+	//TODO: thread context and use related logging methods.
+	c.Logger.Debug("fetched pull request modified files", logKVs(repo, pull))
 
 	return files, err
 
 }
 func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
 	scope := c.StatsScope.SubScope("create_comment")
-	logger := c.Logger.With(fmtLogSrc(repo, pullNum)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -198,16 +206,20 @@ func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, commen
 
 	if err := c.Client.CreateComment(repo, pullNum, comment, command); err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to create comment for command %s, error: %s", command, err.Error())
 		return err
 	}
 
 	executionSuccess.Inc(1)
+
+	//TODO: thread context and use related logging methods.
+	c.Logger.Debug("created pull request comment", map[string]interface{}{
+		logging.RepositoryKey: repo.FullName,
+		logging.PullNumKey:    strconv.Itoa(pullNum),
+	})
 	return nil
 }
 func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	scope := c.StatsScope.SubScope("hide_prev_plan_comments")
-	logger := c.Logger.With(fmtLogSrc(repo, pullNum)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -217,17 +229,21 @@ func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum i
 
 	if err := c.Client.HidePrevCommandComments(repo, pullNum, command); err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to hide previous %s comments, error: %s", command, err.Error())
 		return err
 	}
 
 	executionSuccess.Inc(1)
+
+	//TODO: thread context and use related logging methods.
+	c.Logger.Debug("hid previous comments", map[string]interface{}{
+		logging.RepositoryKey: repo.FullName,
+		logging.PullNumKey:    strconv.Itoa(pullNum),
+	})
 	return nil
 
 }
 func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	scope := c.StatsScope.SubScope("pull_is_approved")
-	logger := c.Logger.With(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -239,17 +255,19 @@ func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRe
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to check pull approval status, error: %s", err.Error())
-	} else {
-		executionSuccess.Inc(1)
+		return approvalStatus, err
 	}
+
+	executionSuccess.Inc(1)
+
+	//TODO: thread context and use related logging methods.
+	c.Logger.Debug("fetched pull request approval status", logKVs(repo, pull))
 
 	return approvalStatus, err
 
 }
 func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	scope := c.StatsScope.SubScope("pull_is_mergeable")
-	logger := c.Logger.With(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -261,19 +279,18 @@ func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullR
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to check pull mergeable status, error: %s", err.Error())
-	} else {
-		executionSuccess.Inc(1)
+		return mergeable, err
 	}
+
+	executionSuccess.Inc(1)
+	//TODO: thread context and use related logging methods.
+	c.Logger.Debug("fetched pull request mergeability", logKVs(repo, pull))
 
 	return mergeable, err
 }
 
 func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
 	scope := c.StatsScope.SubScope("update_status")
-
-	repo := request.Repo
-	logger := c.Logger.With(fmtLogSrc(repo, request.PullNum)...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -283,9 +300,19 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 
 	if err := c.Client.UpdateStatus(ctx, request); err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to update status at url: %s, error: %s", request.DetailsURL, err.Error())
 		return err
 	}
+
+	//TODO: thread context and use related logging methods.
+	// for now keeping this at info to debug weirdness we've been
+	// seeing with status api calls.
+	c.Logger.Info("updated vcs status", map[string]interface{}{
+		logging.RepositoryKey: request.Repo.FullName,
+		logging.PullNumKey:    strconv.Itoa(request.PullNum),
+		logging.SHAKey:        request.Ref,
+		"status-name":         request.StatusName,
+		"state":               request.State.String(),
+	})
 
 	executionSuccess.Inc(1)
 	return nil
@@ -293,7 +320,6 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 }
 func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	scope := c.StatsScope.SubScope("merge_pull")
-	logger := c.Logger.With("pull-num", pull.Num)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -303,18 +329,22 @@ func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions mode
 
 	if err := c.Client.MergePull(pull, pullOptions); err != nil {
 		executionError.Inc(1)
-		logger.Errorf("Unable to merge pull, error: %s", err.Error())
 	}
 
 	executionSuccess.Inc(1)
+
+	//TODO: thread context and use related logging methods.
+	c.Logger.Debug("merged pull request", logKVs(pull.BaseRepo, pull))
+
 	return nil
 
 }
 
 // taken from other parts of the code, would be great to have this in a shared spot
-func fmtLogSrc(repo models.Repo, pullNum int) []interface{} {
-	return []interface{}{
-		"repository", repo.FullName,
-		"pull-num", strconv.Itoa(pullNum),
+func logKVs(repo models.Repo, pull models.PullRequest) map[string]interface{} {
+	return map[string]interface{}{
+		logging.RepositoryKey: repo.FullName,
+		logging.PullNumKey:    strconv.Itoa(pull.Num),
+		logging.SHAKey:        pull.HeadCommit,
 	}
 }

@@ -493,7 +493,6 @@ type ServerCmd struct {
 	// Useful for testing to keep the logs clean.
 	SilenceOutput   bool
 	AtlantisVersion string
-	Logger          logging.SimpleLogging
 }
 
 // ServerCreator creates servers.
@@ -616,11 +615,13 @@ func (s *ServerCmd) run() error {
 	}
 	s.setDefaults(&userConfig)
 
-	// Now that we've parsed the config we can set our local logger to the
-	// right level.
-	s.Logger.SetLevel(userConfig.ToLogLevel())
+	logger, err := logging.NewLoggerFromLevel(userConfig.ToLogLevel())
 
-	if err := s.validate(userConfig); err != nil {
+	if err != nil {
+		return errors.Wrap(err, "initializing logger")
+	}
+
+	if err := s.validate(userConfig, logger); err != nil {
 		return err
 	}
 	if err := s.setAtlantisURL(&userConfig); err != nil {
@@ -632,7 +633,7 @@ func (s *ServerCmd) run() error {
 	if err := s.deprecationWarnings(&userConfig); err != nil {
 		return err
 	}
-	s.securityWarnings(&userConfig)
+	s.securityWarnings(&userConfig, logger)
 	s.trimAtSymbolFromUsers(&userConfig)
 
 	// Config looks good. Start the server.
@@ -695,7 +696,7 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 }
 
-func (s *ServerCmd) validate(userConfig server.UserConfig) error {
+func (s *ServerCmd) validate(userConfig server.UserConfig, logger logging.Logger) error {
 	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)
 	if !isValidLogLevel(userConfig.LogLevel) {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
@@ -776,7 +777,7 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		BitbucketWebhookSecretFlag: userConfig.BitbucketWebhookSecret,
 	} {
 		if strings.Contains(token, "\n") {
-			s.Logger.Warnf("--%s contains a newline which is usually unintentional", name)
+			logger.Warn(fmt.Sprintf("--%s contains a newline which is usually unintentional", name))
 		}
 	}
 
@@ -836,21 +837,21 @@ func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 	userConfig.AzureDevopsUser = strings.TrimPrefix(userConfig.AzureDevopsUser, "@")
 }
 
-func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
+func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig, logger logging.Logger) {
 	if userConfig.GithubUser != "" && userConfig.GithubWebhookSecret == "" && !s.SilenceOutput {
-		s.Logger.Warnf("no GitHub webhook secret set. This could allow attackers to spoof requests from GitHub")
+		logger.Warn("no GitHub webhook secret set. This could allow attackers to spoof requests from GitHub")
 	}
 	if userConfig.GitlabUser != "" && userConfig.GitlabWebhookSecret == "" && !s.SilenceOutput {
-		s.Logger.Warnf("no GitLab webhook secret set. This could allow attackers to spoof requests from GitLab")
+		logger.Warn("no GitLab webhook secret set. This could allow attackers to spoof requests from GitLab")
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL != DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret == "" && !s.SilenceOutput {
-		s.Logger.Warnf("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
+		logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		s.Logger.Warnf("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs")
+		logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs")
 	}
 	if userConfig.AzureDevopsWebhookUser != "" && userConfig.AzureDevopsWebhookPassword == "" && !s.SilenceOutput {
-		s.Logger.Warnf("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
+		logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
 	}
 }
 

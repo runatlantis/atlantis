@@ -19,6 +19,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/logging"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -34,7 +35,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
-	loggermocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -253,7 +253,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		workingDir := mocks.NewMockWorkingDir()
 		locker := lockmocks.NewMockLocker()
 		client := vcsmocks.NewMockClient()
-		logger := loggermocks.NewMockSimpleLogging()
+		logger := logging.NewNoopLogger(t)
 
 		pullClosedExecutor := events.PullClosedExecutor{
 			Locker:                   locker,
