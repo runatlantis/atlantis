@@ -212,7 +212,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	for _, status := range statuses {
-		if !strings.HasSuffix(status.Name, fmt.Sprintf("/%s", command.Apply.String())) {
+		if !strings.HasPrefix(status.Name, fmt.Sprintf("atlantis/%s", command.Apply.String())) {
 			if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
 				return false, nil
 			}
