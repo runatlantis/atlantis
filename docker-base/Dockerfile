@@ -25,7 +25,7 @@ ENV GIT_LFS_VERSION=3.1.2
 ARG TARGETPLATFORM
 
 # Install packages needed for running Atlantis.
-RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap dumb-init && \
+RUN apk add --no-cache ca-certificates curl git unzip bash openssh libcap dumb-init gcompat && \
     # Install packages needed for building dependencies.
     apk add --no-cache --virtual .build-deps gnupg openssl && \
     mkdir -p /tmp/build && \
