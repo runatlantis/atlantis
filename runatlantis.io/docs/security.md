@@ -34,7 +34,7 @@ To prevent this, allowlist [Bitbucket's IP addresses](https://confluence.atlassi
 
 ## Mitigations
 ### Don't Use On Public Repos
-Because anyone can comment on public pull requests, even with all the security mitigations available, it's still dangerous to run Atlantis on public repos until Atlantis gets an authentication system.
+Because anyone can comment on public pull requests, even with all the security mitigations available, it's still dangerous to run Atlantis on public repos without proper configuration of the security settings.
 
 ### Don't Use `--allow-fork-prs`
 If you're running on a public repo (which isn't recommended, see above) you shouldn't set `--allow-fork-prs` (defaults to false)
@@ -79,3 +79,12 @@ Azure DevOps supports sending a basic authentication header in all webhook event
 If you're using webhook secrets but your traffic is over HTTP then the webhook secrets
 could be stolen. Enable SSL/HTTPS using the `--ssl-cert-file` and `--ssl-key-file`
 flags.
+
+### Enable Authentication on Atlantis Web Server
+It is very recommended to enable authentication in the web service. Enable BasicAuth using the `--web-basic-auth=true` and setup a username and a password using `--web-username=yourUsername` and `--web-password=yourPassword` flags.
+
+You can also pass these as environment variables `ATLANTIS_WEB_BASIC_AUTH=true` `ATLANTIS_WEB_USERNAME=yourUsername` and `ATLANTIS_WEB_PASSWORD=yourPassword`. 
+
+:::tip Tip
+We do encourage the usage of complex passwords in order to prevent basic bruteforcing attacks.
+:::

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/core/config"
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
@@ -168,15 +168,17 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	approvals, _, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	if approvals.ApprovalsLeft > 0 {
-		return false, nil
+		return approvalStatus, nil
 	}
-	return true, nil
+	return models.ApprovalStatus{
+		IsApproved: true,
+	}, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
@@ -230,10 +232,10 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 // UpdateStatus updates the build status of a commit.
 func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
-	gitlabState := gitlab.Failed
+	gitlabState := gitlab.Pending
 	switch state {
 	case models.PendingCommitStatus:
-		gitlabState = gitlab.Pending
+		gitlabState = gitlab.Running
 	case models.FailedCommitStatus:
 		gitlabState = gitlab.Failed
 	case models.SuccessCommitStatus:
@@ -352,13 +354,18 @@ func MustConstraint(constraint string) version.Constraints {
 	return c
 }
 
+// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
+func (g *GitlabClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	return nil, nil
+}
+
 // DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)
 // The first return value indicate that repo contain atlantis.yaml or not
 // if BaseRepo had one repo config file, its content will placed on the second return value
 func (g *GitlabClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	opt := gitlab.GetRawFileOptions{Ref: gitlab.String(pull.HeadBranch)}
 
-	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, yaml.AtlantisYAMLFilename, &opt)
+	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, config.AtlantisYAMLFilename, &opt)
 	if resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil
 	}

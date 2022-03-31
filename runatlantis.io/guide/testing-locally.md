@@ -135,9 +135,8 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
         <li>Set <strong>URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
         <li>Double-check you added <code>/events</code> to the end of your URL.</li>
         <li>Set <strong>Secret</strong> to your random string</li>
-        <li>Under <strong>Repository</strong> select <strong>Push</strong></li>
-        <li>Under <strong>Pull Request</strong>, select: Opened, Modified, Merged, Declined, Deleted and Comment added</li>
-        <li>Click <strong>Save</strong><img src="./images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;"></li>
+        <li>Under <strong>Pull Request</strong>, select: Opened, Source branch updated, Merged, Declined, Deleted and Comment added</li>
+        <li>Click <strong>Save</strong><img src="./images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 600px;"></li>
     </ul>
 </details>
 
@@ -262,7 +261,7 @@ atlantis server \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
 
-##### Azure DevOps
+### Azure DevOps
 
 A certificate and private key are required if using Basic authentication for webhooks.
 
@@ -310,6 +309,10 @@ atlantis plan -- -target=resource -var 'foo=bar'
 ### Apply
 If you'd like to `apply`, type a comment: `atlantis apply`. You can use the `-d` or `-w` flags to point
 Atlantis at a specific plan. Otherwise it tries to apply the plan for the root directory.
+
+## Real-time logs
+The [real-time terraform output](/docs/streaming-logs.md) for your command can be found by clicking into the status check for a given project in a PR which
+links to the log-streaming UI. This is a terminal UI where you can view your commands executing in real-time. 
 
 ## Next Steps
 * If things are working as expected you can `Ctrl-C` the `atlantis server` command and the `ngrok` command.

@@ -15,3 +15,7 @@ bin/
 golangci-lint
 atlantis
 vendor
+.devcontainer
+
+# gitreleaser
+dist/

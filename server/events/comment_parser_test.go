@@ -729,6 +729,8 @@ Commands:
            To only apply a specific plan, use the -d, -w and -p flags.
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
+  approve_policies
+           Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
   help     View help.
 
@@ -756,6 +758,8 @@ Commands:
            To plan a specific project, use the -d, -w and -p flags.
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
+  approve_policies
+           Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
   help     View help.
 

@@ -371,7 +371,9 @@ var unwrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"{{.Error}}\n" +
 	"```" +
 	"{{ if eq .Command \"Policy Check\" }}" +
-	"\n* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.\n" +
+	"\n* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:\n" +
+	"    * `atlantis approve_policies`\n" +
+	"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.\n" +
 	"{{ end }}"
 var wrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"<details><summary>Show Output</summary>\n\n" +

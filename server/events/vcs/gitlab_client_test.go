@@ -2,7 +2,7 @@ package vcs
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -190,7 +190,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 	}{
 		{
 			models.PendingCommitStatus,
-			"pending",
+			"running",
 		},
 		{
 			models.SuccessCommitStatus,
@@ -210,7 +210,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
 						gotRequest = true
 
-						body, err := ioutil.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
 						exp := fmt.Sprintf(`{"state":"%s","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
 						Equals(t, exp, string(body))

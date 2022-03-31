@@ -64,7 +64,7 @@ func (d *ClientProxy) HidePrevCommandComments(repo models.Repo, pullNum int, com
 	return d.clients[repo.VCSHost.Type].HidePrevCommandComments(repo, pullNum, command)
 }
 
-func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	return d.clients[repo.VCSHost.Type].PullIsApproved(repo, pull)
 }
 
@@ -82,6 +82,10 @@ func (d *ClientProxy) MergePull(pull models.PullRequest, pullOptions models.Pull
 
 func (d *ClientProxy) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return d.clients[pull.BaseRepo.VCSHost.Type].MarkdownPullLink(pull)
+}
+
+func (d *ClientProxy) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	return d.clients[repo.VCSHost.Type].GetTeamNamesForUser(repo, user)
 }
 
 func (d *ClientProxy) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {

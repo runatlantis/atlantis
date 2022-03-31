@@ -4,13 +4,14 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
-func NewProjectCommandContextBulder(policyCheckEnabled bool, commentBuilder CommentBuilder) ProjectCommandContextBuilder {
+func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder) ProjectCommandContextBuilder {
 	projectCommandContextBuilder := &DefaultProjectCommandContextBuilder{
 		CommentBuilder: commentBuilder,
 	}
@@ -70,7 +71,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		prjCfg.TerraformVersion = getTfVersion(ctx, filepath.Join(repoDir, prjCfg.RepoRelDir))
 	}
 
-	projectCmds = append(projectCmds, newProjectCommandContext(
+	projectCmdContext := newProjectCommandContext(
 		ctx,
 		cmdName,
 		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
@@ -85,7 +86,10 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		parallelApply,
 		parallelPlan,
 		verbose,
-	))
+		ctx.PullRequestStatus,
+	)
+
+	projectCmds = append(projectCmds, projectCmdContext)
 
 	return
 }
@@ -143,6 +147,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			parallelApply,
 			parallelPlan,
 			verbose,
+			ctx.PullRequestStatus,
 		))
 	}
 
@@ -165,6 +170,7 @@ func newProjectCommandContext(ctx *CommandContext,
 	parallelApplyEnabled bool,
 	parallelPlanEnabled bool,
 	verbose bool,
+	pullStatus models.PullReqStatus,
 ) models.ProjectCommandContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
@@ -186,32 +192,34 @@ func newProjectCommandContext(ctx *CommandContext,
 	}
 
 	return models.ProjectCommandContext{
-		CommandName:               cmd,
-		ApplyCmd:                  applyCmd,
-		BaseRepo:                  ctx.Pull.BaseRepo,
-		EscapedCommentArgs:        escapedCommentArgs,
-		AutomergeEnabled:          automergeEnabled,
-		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
-		ParallelApplyEnabled:      parallelApplyEnabled,
-		ParallelPlanEnabled:       parallelPlanEnabled,
-		AutoplanEnabled:           projCfg.AutoplanEnabled,
-		Steps:                     steps,
-		HeadRepo:                  ctx.HeadRepo,
-		Log:                       ctx.Log,
-		PullMergeable:             ctx.PullMergeable,
-		ProjectPlanStatus:         projectPlanStatus,
-		Pull:                      ctx.Pull,
-		ProjectName:               projCfg.Name,
-		ApplyRequirements:         projCfg.ApplyRequirements,
-		RePlanCmd:                 planCmd,
-		RepoRelDir:                projCfg.RepoRelDir,
-		RepoConfigVersion:         projCfg.RepoCfgVersion,
-		TerraformVersion:          projCfg.TerraformVersion,
-		User:                      ctx.User,
-		Verbose:                   verbose,
-		Workspace:                 projCfg.Workspace,
-		PolicySets:                policySets,
-		Backend:                   projCfg.Backend,
+		CommandName:                cmd,
+		ApplyCmd:                   applyCmd,
+		BaseRepo:                   ctx.Pull.BaseRepo,
+		EscapedCommentArgs:         escapedCommentArgs,
+		AutomergeEnabled:           automergeEnabled,
+		DeleteSourceBranchOnMerge:  deleteSourceBranchOnMerge,
+		ParallelApplyEnabled:       parallelApplyEnabled,
+		ParallelPlanEnabled:        parallelPlanEnabled,
+		ParallelPolicyCheckEnabled: parallelPlanEnabled,
+		AutoplanEnabled:            projCfg.AutoplanEnabled,
+		Steps:                      steps,
+		HeadRepo:                   ctx.HeadRepo,
+		Log:                        ctx.Log,
+		ProjectPlanStatus:          projectPlanStatus,
+		Pull:                       ctx.Pull,
+		ProjectName:                projCfg.Name,
+		ApplyRequirements:          projCfg.ApplyRequirements,
+		RePlanCmd:                  planCmd,
+		RepoRelDir:                 projCfg.RepoRelDir,
+		RepoConfigVersion:          projCfg.RepoCfgVersion,
+		TerraformVersion:           projCfg.TerraformVersion,
+		User:                       ctx.User,
+		Verbose:                    verbose,
+		Workspace:                  projCfg.Workspace,
+		PolicySets:                 policySets,
+		PullReqStatus:              pullStatus,
+		Backend:                    projCfg.Backend,
+		JobID:                      uuid.New().String(),
 	}
 }
 

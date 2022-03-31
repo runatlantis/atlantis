@@ -8,7 +8,6 @@ jobs:
     - run: make test-all
     - run: make check-fmt
     - run: make check-lint
-
 workflows:
   version: 2
   branch:

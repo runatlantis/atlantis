@@ -4,10 +4,11 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -169,7 +170,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 			switch r.Method + " " + r.RequestURI {
 			case "POST /api/graphql":
 				defer r.Body.Close() // nolint: errcheck
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Errorf("read body error: %v", err)
 					http.Error(w, "server error", http.StatusInternalServerError)
@@ -272,7 +273,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 					return
 				}
 				defer r.Body.Close() // nolint: errcheck
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Errorf("read body error: %v", err)
 					http.Error(w, "server error", http.StatusInternalServerError)
@@ -350,7 +351,7 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					case "/api/v3/repos/owner/repo/statuses/":
-						body, err := ioutil.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
 						exp := fmt.Sprintf(`{"state":"%s","target_url":"https://google.com","description":"description","context":"src"}%s`, c.expState, "\n")
 						Equals(t, exp, string(body))
@@ -455,7 +456,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	approved, err := client.PullIsApproved(models.Repo{
+	approvalStatus, err := client.PullIsApproved(models.Repo{
 		FullName:          "owner/repo",
 		Owner:             "owner",
 		Name:              "repo",
@@ -469,54 +470,69 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 		Num: 1,
 	})
 	Ok(t, err)
-	Equals(t, false, approved)
+	Equals(t, false, approvalStatus.IsApproved)
 }
 
 func TestGithubClient_PullIsMergeable(t *testing.T) {
 	cases := []struct {
 		state        string
 		expMergeable bool
+		useStatus    bool
 	}{
 		{
 			"dirty",
+			false,
 			false,
 		},
 		{
 			"unknown",
 			false,
+			false,
 		},
 		{
 			"blocked",
+			true,
+			true,
+		},
+		{
+			"blocked",
+			false,
 			false,
 		},
 		{
 			"behind",
 			false,
+			false,
 		},
 		{
 			"random",
+			false,
 			false,
 		},
 		{
 			"unstable",
 			true,
+			false,
 		},
 		{
 			"has_hooks",
 			true,
+			false,
 		},
 		{
 			"clean",
 			true,
+			false,
 		},
 		{
 			"",
+			false,
 			false,
 		},
 	}
 
 	// Use a real GitHub json response and edit the mergeable_state field.
-	jsBytes, err := ioutil.ReadFile("fixtures/github-pull-request.json")
+	jsBytes, err := os.ReadFile("fixtures/github-pull-request.json")
 	Ok(t, err)
 	json := string(jsBytes)
 
@@ -528,11 +544,24 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 				1,
 			)
 
+			var statusBytes []byte
+			var err error
+			if c.useStatus {
+				statusBytes, err = os.ReadFile("fixtures/github-commit-status-full.json")
+			} else {
+				statusBytes, err = os.ReadFile("fixtures/github-commit-status-empty.json")
+			}
+			Ok(t, err)
+			statusJSON := string(statusBytes)
+
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					case "/api/v3/repos/owner/repo/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
+						return
+					case "/api/v3/repos/owner/repo/commits/6dcb09b5b57875f334f61aebed695e2e4193db5e/status?per_page=300":
+						w.Write([]byte(statusJSON)) // nolint: errcheck
 						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -590,7 +619,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 		},
 	}
 
-	jsBytes, err := ioutil.ReadFile("fixtures/github-repo.json")
+	jsBytes, err := os.ReadFile("fixtures/github-repo.json")
 	Ok(t, err)
 
 	for _, c := range cases {
@@ -602,7 +631,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 						w.Write(jsBytes) // nolint: errcheck
 						return
 					case "/api/v3/repos/owner/repo/pulls/1/merge":
-						body, err := ioutil.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
 						exp := "{\"merge_method\":\"merge\"}\n"
 						Equals(t, exp, string(body))
@@ -700,7 +729,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			// Modify response.
-			jsBytes, err := ioutil.ReadFile("fixtures/github-repo.json")
+			jsBytes, err := os.ReadFile("fixtures/github-repo.json")
 			Ok(t, err)
 			resp := string(jsBytes)
 			resp = strings.Replace(resp,
@@ -723,7 +752,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 						w.Write([]byte(resp)) // nolint: errcheck
 						return
 					case "/api/v3/repos/runatlantis/atlantis/pulls/1/merge":
-						body, err := ioutil.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
 						defer r.Body.Close() // nolint: errcheck
 						type bodyJSON struct {
@@ -806,7 +835,7 @@ func TestGithubClient_SplitComments(t *testing.T) {
 			switch r.Method + " " + r.RequestURI {
 			case "POST /api/v3/repos/runatlantis/atlantis/issues/1/comments":
 				defer r.Body.Close() // nolint: errcheck
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Errorf("read body error: %v", err)
 					http.Error(w, "server error", http.StatusInternalServerError)
@@ -905,4 +934,96 @@ func TestGithubClient_Retry404(t *testing.T) {
 	_, err = client.GetPullRequest(repo, 1)
 	Ok(t, err)
 	Equals(t, 3, numCalls)
+}
+
+// Test that we retry the get pull request files call if it 404s.
+func TestGithubClient_Retry404Files(t *testing.T) {
+	var numCalls = 0
+
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			switch r.Method + " " + r.RequestURI {
+			case "GET /api/v3/repos/runatlantis/atlantis/pulls/1/files?per_page=300":
+				defer r.Body.Close() // nolint: errcheck
+				numCalls++
+				if numCalls < 3 {
+					w.WriteHeader(404)
+				} else {
+					w.WriteHeader(200)
+				}
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, logging.NewNoopLogger(t))
+	Ok(t, err)
+	defer disableSSLVerification()()
+	repo := models.Repo{
+		FullName:          "runatlantis/atlantis",
+		Owner:             "runatlantis",
+		Name:              "atlantis",
+		CloneURL:          "",
+		SanitizedCloneURL: "",
+		VCSHost: models.VCSHost{
+			Type:     models.Github,
+			Hostname: "github.com",
+		},
+	}
+	pr := models.PullRequest{Num: 1}
+	_, err = client.GetModifiedFiles(repo, pr)
+	Ok(t, err)
+	Equals(t, 3, numCalls)
+}
+
+// GetTeamNamesForUser returns a list of team names for a user.
+func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	// Mocked GraphQL response for two teams
+	resp := `{
+		"data":{
+		  "organization": {
+			"teams":{
+				"edges":[
+					{"node":{"name":"frontend-developers"}},
+					{"node":{"name":"employees"}}
+				],
+				"pageInfo":{
+					"endCursor":"Y3Vyc29yOnYyOpHOAFMoLQ==",
+					"hasNextPage":false
+				}
+			}
+		}
+	  }
+	}`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/graphql":
+				w.Write([]byte(resp)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, logger)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	teams, err := client.GetTeamNamesForUser(models.Repo{
+		Owner: "testrepo",
+	}, models.User{
+		Username: "testuser",
+	})
+	Ok(t, err)
+	Equals(t, []string{"frontend-developers", "employees"}, teams)
 }

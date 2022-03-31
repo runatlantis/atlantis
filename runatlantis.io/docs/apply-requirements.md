@@ -7,6 +7,7 @@ command can be run:
 
 * [Approved](#approved) – requires pull requests to be approved by at least one user other than the author
 * [Mergeable](#mergeable) – requires pull requests to be able to be merged
+* [UnDiverged](#undiverged) - requires pull requests to be ahead of the base branch
 
 ## What Happens If The Requirement Is Not Met?
 If the requirement is not met, users will see an error if they try to run `atlantis apply`:
@@ -87,6 +88,13 @@ You can set the `mergeable` requirement by:
      
 #### Meaning
 Each VCS provider has a different concept of "mergeability":
+
+::: warning
+Some VCS providers have a feature for branch protection to control "mergeability". If you want to use it,
+you probably need to limit the base branch not to bypass the branch protection.
+See also the `branch` keyword in [Server Side Repo Config](server-side-repo-config.html#reference) for more details.
+:::
+
 #### GitHub
 In GitHub, if you're not using [Protected Branches](https://help.github.com/articles/about-protected-branches/) then
 all pull requests are mergeable unless there is a conflict.
@@ -161,7 +169,7 @@ You can set the `undiverged` requirement by:
     - dir: .
       apply_requirements: [undiverged]
      ```
-### Meaning
+#### Meaning
 The `merge` checkout strategy creates a temporary merge commit and runs the `plan` on the Atlantis local version of the PR 
 source and destination branch. The local destination branch can become out of date since changes to the destination branch are not fetched 
 if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of master is up to date 
@@ -224,7 +232,7 @@ If you only want some projects/repos to have apply requirements, then you must
 
 
 ### Multiple Requirements
-You can set both `apply` and `mergeable` requirements.
+You can set any or all of `apply`, `mergeable`, and `undiverged` requirements.
 
 ## Who Can Apply?
 Once the apply requirement is satisfied, **anyone** that can comment on the pull
@@ -234,4 +242,4 @@ request can run the actual `atlantis apply` command.
 * For more information on GitHub pull request reviews and approvals see: [https://help.github.com/articles/about-pull-request-reviews/](https://help.github.com/articles/about-pull-request-reviews/)
 * For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: [https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html).
 * For more information on Bitbucket pull request reviews and approvals see: [https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html](https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html)
-* For more information on Azure DevOps pull request reviews and approvals see: [https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests-overview?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests-overview?view=azure-devops)
+* For more information on Azure DevOps pull request reviews and approvals see: [https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops&tabs=browser](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops&tabs=browser)

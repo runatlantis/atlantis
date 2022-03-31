@@ -17,9 +17,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -201,7 +202,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 		RepoAllowlistChecker:         &events.RepoAllowlistChecker{},
 		VCSClient:                    vcsClient,
 	}
-	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notAllowlisted.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notAllowlisted.json"))
 	Ok(t, err)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	req.Header.Set(gitlabHeader, "Note Hook")
@@ -209,7 +210,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	e.Post(w, req)
 
 	Equals(t, http.StatusForbidden, w.Result().StatusCode)
-	body, _ := ioutil.ReadAll(w.Result().Body)
+	body, _ := io.ReadAll(w.Result().Body)
 	exp := "Repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	expRepo, _ := models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "")
@@ -230,7 +231,7 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 		VCSClient:                    vcsClient,
 		SilenceAllowlistErrors:       true,
 	}
-	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notAllowlisted.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notAllowlisted.json"))
 	Ok(t, err)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	req.Header.Set(gitlabHeader, "Note Hook")
@@ -238,7 +239,7 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	e.Post(w, req)
 
 	Equals(t, http.StatusForbidden, w.Result().StatusCode)
-	body, _ := ioutil.ReadAll(w.Result().Body)
+	body, _ := io.ReadAll(w.Result().Body)
 	exp := "Repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
@@ -258,7 +259,7 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 		RepoAllowlistChecker:   &events.RepoAllowlistChecker{},
 		VCSClient:              vcsClient,
 	}
-	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent_notAllowlisted.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent_notAllowlisted.json"))
 	Ok(t, err)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	req.Header.Set("Content-Type", "application/json")
@@ -267,7 +268,7 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	e.Post(w, req)
 
 	Equals(t, http.StatusForbidden, w.Result().StatusCode)
-	body, _ := ioutil.ReadAll(w.Result().Body)
+	body, _ := io.ReadAll(w.Result().Body)
 	exp := "Repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	expRepo, _ := models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "")
@@ -288,7 +289,7 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 		VCSClient:              vcsClient,
 		SilenceAllowlistErrors: true,
 	}
-	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent_notAllowlisted.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent_notAllowlisted.json"))
 	Ok(t, err)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	req.Header.Set("Content-Type", "application/json")
@@ -297,7 +298,7 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	e.Post(w, req)
 
 	Equals(t, http.StatusForbidden, w.Result().StatusCode)
-	body, _ := ioutil.ReadAll(w.Result().Body)
+	body, _ := io.ReadAll(w.Result().Body)
 	exp := "Repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
@@ -645,7 +646,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			}
 
 			// Build HTTP request.
-			requestBytes, err := ioutil.ReadFile(filepath.Join("testfixtures", "bb-server-pull-deleted-event.json"))
+			requestBytes, err := os.ReadFile(filepath.Join("testfixtures", "bb-server-pull-deleted-event.json"))
 			// Replace the eventKey field with our event type.
 			requestJSON := strings.Replace(string(requestBytes), `"eventKey":"pr:deleted",`, fmt.Sprintf(`"eventKey":"%s",`, c.header), -1)
 			Ok(t, err)
