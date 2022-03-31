@@ -92,7 +92,7 @@ in a pull request.
 
 Note:
 
-* When using `atlantis.yaml` to disable Autoplanning without listing other directories that should have Aitoplanning enabled, this will effectivly stop planning for all directories.
+* When using `atlantis.yaml` to disable Autoplanning without listing other directories that should have Autoplanning enabled, this will effectivly stop planning for all directories.
 
 Example:
 
