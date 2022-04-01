@@ -157,7 +157,7 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
+	githubReqID := r.Header.Get("X-Github-Delivery")
 	logger := e.Logger.With("gh-request-id", githubReqID)
 	scope := e.Scope.SubScope("github.event")
 

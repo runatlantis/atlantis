@@ -75,7 +75,7 @@ func (g *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 		return
 	}
 	event, _ := github.ParseWebHook(github.WebHookType(r), payload)
-	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
+	githubReqID := r.Header.Get("X-Github-Delivery")
 	logger := g.Logger.With("gh-request-id", githubReqID)
 	scope := g.Scope.SubScope("github.event")
 
