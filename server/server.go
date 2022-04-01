@@ -33,6 +33,7 @@ import (
 	"time"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
+	"github.com/runatlantis/atlantis/server/instrumentation"
 	"github.com/runatlantis/atlantis/server/static"
 
 	"github.com/mitchellh/go-homedir"
@@ -101,7 +102,7 @@ type Server struct {
 	AtlantisURL                   *url.URL
 	Router                        *mux.Router
 	Port                          int
-	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
+	PreWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 	CommandRunner                 *events.DefaultCommandRunner
 	Logger                        logging.SimpleLogging
 	CtxLogger                     logging.Logger
@@ -517,12 +518,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:  logger,
 		Drainer: drainer,
 	}
-	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
+
+	var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
+	preWorkflowHooksCommandRunner = &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             vcsClient,
 		GlobalCfg:             globalCfg,
 		WorkingDirLocker:      workingDirLocker,
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{},
+	}
+	preWorkflowHooksCommandRunner = &instrumentation.PreWorkflowHookRunner{
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		Logger:                        ctxLogger,
 	}
 
 	projectContextBuilder := wrappers.
@@ -858,6 +865,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             boltdb,
 		StaleCommandChecker:           staleCommandChecker,
+		CommitStatusUpdater:           commitStatusUpdater,
+		Logger:                        ctxLogger,
 	}
 
 	forceApplyCommandRunner := &events.ForceApplyCommandRunner{

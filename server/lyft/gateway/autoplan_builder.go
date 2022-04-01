@@ -77,7 +77,7 @@ func (r *AutoplanValidator) isValid(logger logging.SimpleLogging, baseRepo model
 	if !r.validateCtxAndComment(ctx) {
 		return false, errors.New("invalid command context")
 	}
-	err := r.PreWorkflowHooksCommandRunner.RunPreHooks(ctx)
+	err := r.PreWorkflowHooksCommandRunner.RunPreHooks(context.TODO(), ctx)
 	if err != nil {
 		ctx.Log.Errorf("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
 	}

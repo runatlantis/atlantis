@@ -1,6 +1,7 @@
 package events_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -97,7 +98,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		When(whWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
 		When(whPreWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, nil)
 
-		err := wh.RunPreHooks(ctx)
+		err := wh.RunPreHooks(context.TODO(), ctx)
 
 		Ok(t, err)
 		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(pCtx, testHook.RunCommand, repoDir)
@@ -124,7 +125,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		wh.GlobalCfg = globalCfg
 
-		err := wh.RunPreHooks(ctx)
+		err := wh.RunPreHooks(context.TODO(), ctx)
 
 		Ok(t, err)
 
@@ -150,7 +151,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		When(whWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)).ThenReturn(func() {}, errors.New("some error"))
 
-		err := wh.RunPreHooks(ctx)
+		err := wh.RunPreHooks(context.TODO(), ctx)
 
 		Assert(t, err != nil, "error not nil")
 		whWorkingDir.VerifyWasCalled(Never()).Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)
@@ -181,7 +182,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		When(whWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)).ThenReturn(unlockFn, nil)
 		When(whWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, errors.New("some error"))
 
-		err := wh.RunPreHooks(ctx)
+		err := wh.RunPreHooks(context.TODO(), ctx)
 
 		Assert(t, err != nil, "error not nil")
 
@@ -214,7 +215,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		When(whWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
 		When(whPreWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, errors.New("some error"))
 
-		err := wh.RunPreHooks(ctx)
+		err := wh.RunPreHooks(context.TODO(), ctx)
 
 		Assert(t, err != nil, "error not nil")
 		Assert(t, *unlockCalled == true, "unlock function called")

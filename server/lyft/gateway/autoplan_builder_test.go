@@ -40,7 +40,7 @@ func setupAutoplan(t *testing.T) *vcsmocks.MockClient {
 		MarkdownRenderer:     &events.MarkdownRenderer{},
 	}
 	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
-	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
+	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyContextContext(), matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")

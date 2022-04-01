@@ -189,7 +189,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 
 	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
 
-	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
+	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyContextContext(), matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
 
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
@@ -199,6 +199,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	ch = events.DefaultCommandRunner{
 		VCSClient:                     vcsClient,
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
+		Logger:                        logging.NewNoopCtxLogger(t),
 		EventParser:                   eventParsing,
 		GithubPullGetter:              githubGetter,
 		GitlabMergeRequestGetter:      gitlabGetter,
@@ -211,6 +212,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             defaultBoltDB,
 		StaleCommandChecker:           staleCommandChecker,
+		CommitStatusUpdater:           commitUpdater,
 	}
 	return vcsClient
 }
@@ -297,6 +299,32 @@ func TestRunCommentCommand_ForkPRDisabled_SilenceEnabled(t *testing.T) {
 
 	ch.RunCommentCommand(log, fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, nil, time.Now())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+}
+
+func TestRunCommentCommand_PreWorkflowHookError(t *testing.T) {
+	t.Log("if pre workflow hook errors out stop the execution")
+	for _, cmd := range []command.Name{command.Plan, command.Apply} {
+		t.Run(cmd.String(), func(t *testing.T) {
+			RegisterMockTestingT(t)
+			_ = setup(t)
+			log := logging.NewNoopLogger(t)
+			var pull github.PullRequest
+			modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, Num: fixtures.Pull.Num, State: models.OpenPullState}
+			preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
+
+			When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+			When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+			When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
+			When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyContextContext(), matchers.AnyPtrToEventsCommandContext())).ThenReturn(fmt.Errorf("catastrophic error"))
+
+			ch.PreWorkflowHooksCommandRunner = preWorkflowHooksCommandRunner
+
+			ch.RunCommentCommand(log, fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: cmd}, time.Now())
+			_, _, _, status, cmdName := commitUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName()).GetCapturedArguments()
+			Equals(t, models.FailedCommitStatus, status)
+			Equals(t, cmd, cmdName)
+		})
+	}
 }
 
 func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
@@ -532,6 +560,28 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 	ch.RunCommentCommand(log, fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Unlock}, time.Now())
 
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Failed to delete PR locks", "unlock")
+}
+
+func TestRunAutoplanCommand_PreWorkflowHookError(t *testing.T) {
+	t.Log("if pre workflow hook errors out stop the execution")
+	setup(t)
+	log := logging.NewNoopLogger(t)
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, Num: fixtures.Pull.Num, State: models.OpenPullState}
+	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
+
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
+	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyContextContext(), matchers.AnyPtrToEventsCommandContext())).ThenReturn(fmt.Errorf("catastrophic error"))
+	When(projectCommandRunner.Plan(matchers.AnyCommandProjectContext())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+
+	ch.PreWorkflowHooksCommandRunner = preWorkflowHooksCommandRunner
+
+	ch.RunAutoplanCommand(log, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now())
+	_, _, _, status, cmdName := commitUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName()).GetCapturedArguments()
+	Equals(t, models.FailedCommitStatus, status)
+	Equals(t, command.Plan, cmdName)
 }
 
 // Test that if one plan fails and we are using automerge, that

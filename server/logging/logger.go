@@ -32,6 +32,7 @@ const (
 	SHAKey        = "sha"
 	PullNumKey    = "pull-num"
 	ProjectKey    = "project"
+	Err           = "err"
 )
 
 // Logger is the logging interface used throughout the code.
@@ -197,6 +198,25 @@ func NewNoopLogger(t *testing.T) SimpleLogging {
 	return &StructuredLogger{
 		z:     zaptest.NewLogger(t, zaptest.Level(level)).Sugar(),
 		level: zap.NewAtomicLevelAt(level),
+	}
+}
+
+// NewNoopLogger creates a logger instance that discards all logs and never
+// writes them. Used for testing.
+func NewNoopCtxLogger(t *testing.T) Logger {
+	level := zap.DebugLevel
+	zapLogger := zaptest.NewLogger(t, zaptest.Level(level))
+	sLogger := &StructuredLogger{
+		z:      zapLogger.Sugar(),
+		level:  zap.NewAtomicLevelAt(level),
+		Logger: logurzap.New(zapLogger),
+	}
+
+	return &logger{
+		LoggerFacade: logur.WithContextExtractor(
+			sLogger,
+			extractFields,
+		),
 	}
 }
 

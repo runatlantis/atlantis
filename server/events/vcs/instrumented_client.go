@@ -10,6 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/logging/fields"
 	"github.com/uber-go/tally"
 )
 
@@ -87,7 +88,6 @@ func (c *InstrumentedGithubClient) GetContents(owner, repo, branch, path string)
 
 func (c *InstrumentedGithubClient) GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error) {
 	return c.GetPullRequestFromName(repo.Name, repo.Owner, pullNum)
-
 }
 
 func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoOwner string, pullNum int) (*github.PullRequest, error) {
@@ -136,7 +136,7 @@ func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.P
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched vcs repo checks", logKVs(repo, pull))
+	c.Logger.Debug("fetched vcs repo checks", fields.PullRequest(pull))
 
 	return statuses, err
 }
@@ -160,7 +160,7 @@ func (c *InstrumentedGithubClient) GetRepoStatuses(repo models.Repo, pull models
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched vcs repo statuses", logKVs(repo, pull))
+	c.Logger.Debug("fetched vcs repo statuses", fields.PullRequest(pull))
 
 	return statuses, err
 }
@@ -190,7 +190,7 @@ func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.Pull
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched pull request modified files", logKVs(repo, pull))
+	c.Logger.Debug("fetched pull request modified files", fields.PullRequest(pull))
 
 	return files, err
 
@@ -261,7 +261,7 @@ func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRe
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched pull request approval status", logKVs(repo, pull))
+	c.Logger.Debug("fetched pull request approval status", fields.PullRequest(pull))
 
 	return approvalStatus, err
 
@@ -284,7 +284,7 @@ func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullR
 
 	executionSuccess.Inc(1)
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched pull request mergeability", logKVs(repo, pull))
+	c.Logger.Debug("fetched pull request mergeability", fields.PullRequest(pull))
 
 	return mergeable, err
 }
@@ -334,17 +334,8 @@ func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions mode
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("merged pull request", logKVs(pull.BaseRepo, pull))
+	c.Logger.Debug("merged pull request", fields.PullRequest(pull))
 
 	return nil
 
-}
-
-// taken from other parts of the code, would be great to have this in a shared spot
-func logKVs(repo models.Repo, pull models.PullRequest) map[string]interface{} {
-	return map[string]interface{}{
-		logging.RepositoryKey: repo.FullName,
-		logging.PullNumKey:    strconv.Itoa(pull.Num),
-		logging.SHAKey:        pull.HeadCommit,
-	}
 }
