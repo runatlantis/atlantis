@@ -89,6 +89,8 @@ type ProjectContext struct {
 	DeleteSourceBranchOnMerge bool
 	// UUID for atlantis logs
 	JobID string
+	// The index of order group. Before planning/applying it will use to sort projects. Default is 0.
+	ExecutionOrderGroup int
 }
 
 // SetScope sets the scope of the stats object field. Note: we deliberately set this on the value

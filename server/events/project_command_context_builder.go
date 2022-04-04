@@ -265,6 +265,7 @@ func newProjectCommandContext(ctx *command.Context,
 		PolicySets:                 policySets,
 		PullReqStatus:              pullStatus,
 		JobID:                      uuid.New().String(),
+		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 	}
 }
 

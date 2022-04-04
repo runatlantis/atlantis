@@ -203,6 +203,17 @@ projects:
 to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-side-repo-config.html#repos-can-set-their-own-apply-requirements).
 :::
 
+### Order of planning/applying
+```yaml
+version: 3
+projects:
+- dir: project1
+  execution_order_group: 2
+- dir: project2
+  execution_order_group: 1
+```
+With this config above, Atlantis runs planning/applying for project2 first, then for project1.
+Several projects can have same `execution_order_group`. Any order in one group isn't guaranteed.
 
 ### Custom Backend Config
 See [Custom Workflow Use Cases: Custom Backend Config](custom-workflows.html#custom-backend-config)
@@ -259,8 +270,10 @@ Atlantis supports this but requires the `name` key to be specified. See [Custom 
 ```yaml
 enabled: true
 when_modified: ["*.tf", "terragrunt.hcl"]
+execution_order_group: 0
 ```
-| Key           | Type          | Default        | Required | Description                                                                                                                                                                                                                                                       |
-|---------------|---------------|----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| enabled       | boolean       | `true`         | no       | Whether autoplanning is enabled for this project.                                                                                                                                                                                                                 |
-| when_modified | array[string] | `["**/*.tf*"]` | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.html). Paths are relative to the project's dir. |
+| Key                   | Type          | Default        | Required | Description                                                                                                                                                                                                                                                       |
+|-----------------------|---------------|----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| enabled               | boolean       | `true`         | no       | Whether autoplanning is enabled for this project.                                                                                                                                                                                                                 |
+| when_modified         | array[string] | `["**/*.tf*"]` | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.html). Paths are relative to the project's dir. |
+| execution_order_group | int           | `0`            | no       | Index of execution order group. Projects will be sort by this field before planning/applying                                                                                                                                                                      |

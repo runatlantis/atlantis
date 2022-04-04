@@ -79,6 +79,7 @@ type MergedProjectCfg struct {
 	RepoCfgVersion            int
 	PolicySets                PolicySets
 	DeleteSourceBranchOnMerge bool
+	ExecutionOrderGroup       int
 }
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.
@@ -303,6 +304,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		RepoCfgVersion:            rCfg.Version,
 		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
+		ExecutionOrderGroup:       proj.ExecutionOrderGroup,
 	}
 }
 
