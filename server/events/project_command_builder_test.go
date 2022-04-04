@@ -618,31 +618,53 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	RegisterMockTestingT(t)
 	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
 		"workspace1": map[string]interface{}{
-			"project1": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+			"OBZG62TFMN2DC===": map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf":          nil,
+					"workspace.tfplan": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
 			},
-			"project2": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+			"OBZG62TFMN2DE===": map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf":          nil,
+					"workspace.tfplan": nil,
+				},
 			},
 		},
 		"workspace2": map[string]interface{}{
-			"project1": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+			"OBZG62TFMN2DC===": map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf":          nil,
+					"workspace.tfplan": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
 			},
-			"project2": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+			"OBZG62TFMN2DE===": map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf":          nil,
+					"workspace.tfplan": nil,
+				},
 			},
 		},
 	})
 	defer cleanup()
 	// Initialize git repos in each workspace so that the .tfplan files get
 	// picked up.
-	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
-	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace1", "OBZG62TFMN2DC==="), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace1", "OBZG62TFMN2DE==="), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace2", "OBZG62TFMN2DC==="), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace2", "OBZG62TFMN2DE==="), "git", "init")
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.GetPullDir(
@@ -1180,31 +1202,53 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	RegisterMockTestingT(t)
 	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
 		"workspace1": map[string]interface{}{
-			"project1": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+			"OBZG62TFMN2DC===": map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf":          nil,
+					"workspace.tfplan": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
 			},
-			"project2": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+			"OBZG62TFMN2DE===": map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf":          nil,
+					"workspace.tfplan": nil,
+				},
 			},
 		},
 		"workspace2": map[string]interface{}{
-			"project1": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+			"OBZG62TFMN2DC===": map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf":          nil,
+					"workspace.tfplan": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
 			},
-			"project2": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+			"OBZG62TFMN2DE===": map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf":          nil,
+					"workspace.tfplan": nil,
+				},
 			},
 		},
 	})
 	defer cleanup()
 	// Initialize git repos in each workspace so that the .tfplan files get
 	// picked up.
-	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
-	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace1", "OBZG62TFMN2DC==="), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace1", "OBZG62TFMN2DE==="), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace2", "OBZG62TFMN2DC==="), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace2", "OBZG62TFMN2DE==="), "git", "init")
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.GetPullDir(
