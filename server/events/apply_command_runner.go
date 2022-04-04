@@ -20,24 +20,20 @@ func NewApplyCommandRunner(
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
 	parallelPoolSize int,
-	SilenceNoProjects bool,
-	silenceVCSStatusNoProjects bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
-		vcsClient:                  vcsClient,
-		DisableApplyAll:            disableApplyAll,
-		locker:                     applyCommandLocker,
-		commitStatusUpdater:        commitStatusUpdater,
-		prjCmdBuilder:              prjCommandBuilder,
-		prjCmdRunner:               prjCmdRunner,
-		autoMerger:                 autoMerger,
-		pullUpdater:                pullUpdater,
-		dbUpdater:                  dbUpdater,
-		parallelPoolSize:           parallelPoolSize,
-		SilenceNoProjects:          SilenceNoProjects,
-		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
-		pullReqStatusFetcher:       pullReqStatusFetcher,
+		vcsClient:            vcsClient,
+		DisableApplyAll:      disableApplyAll,
+		locker:               applyCommandLocker,
+		commitStatusUpdater:  commitStatusUpdater,
+		prjCmdBuilder:        prjCommandBuilder,
+		prjCmdRunner:         prjCmdRunner,
+		autoMerger:           autoMerger,
+		pullUpdater:          pullUpdater,
+		dbUpdater:            dbUpdater,
+		parallelPoolSize:     parallelPoolSize,
+		pullReqStatusFetcher: pullReqStatusFetcher,
 	}
 }
 
@@ -53,12 +49,6 @@ type ApplyCommandRunner struct {
 	dbUpdater            *DBUpdater
 	parallelPoolSize     int
 	pullReqStatusFetcher vcs.PullReqStatusFetcher
-	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
-	// are found
-	SilenceNoProjects bool
-	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
-	// are found
-	silenceVCSStatusNoProjects bool
 }
 
 func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
@@ -118,21 +108,6 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 			ctx.Log.Warnf("unable to update commit status: %s", statusErr)
 		}
 		a.pullUpdater.UpdatePull(ctx, cmd, command.Result{Error: err})
-		return
-	}
-
-	// If there are no projects to apply, don't respond to the PR and ignore
-	if len(projectCmds) == 0 && a.SilenceNoProjects {
-		ctx.Log.Infof("determined there was no project to run apply in.")
-		if !a.silenceVCSStatusNoProjects {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects applied successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debugf("setting VCS status to success with no projects found")
-			if err := a.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
-				ctx.Log.Warnf("unable to update commit status: %s", err)
-			}
-		}
 		return
 	}
 

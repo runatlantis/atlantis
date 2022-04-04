@@ -23,29 +23,11 @@ type AutoplanValidator struct {
 	PreWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 	Drainer                       *events.Drainer
 	GlobalCfg                     valid.GlobalCfg
-	// AllowForkPRs controls whether we operate on pull requests from forks.
-	AllowForkPRs bool
-	// AllowForkPRsFlag is the name of the flag that controls fork PR's. We use
-	// this in our error message back to the user on a forked PR so they know
-	// how to enable this functionality.
-	AllowForkPRsFlag string
-	// SilenceForkPRErrors controls whether to comment on Fork PRs when AllowForkPRs = False
-	SilenceForkPRErrors bool
-	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
-	// this in our error message back to the user on a forked PR so they know
-	// how to disable error comment
-	SilenceForkPRErrorsFlag string
-	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
-	// are found
-	SilenceVCSStatusNoPlans bool
-	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
-	// are found
-	SilenceVCSStatusNoProjects bool
-	CommitStatusUpdater        events.CommitStatusUpdater
-	PrjCmdBuilder              events.ProjectPlanCommandBuilder
-	PullUpdater                *events.PullUpdater
-	WorkingDir                 events.WorkingDir
-	WorkingDirLocker           events.WorkingDirLocker
+	CommitStatusUpdater           events.CommitStatusUpdater
+	PrjCmdBuilder                 events.ProjectPlanCommandBuilder
+	PullUpdater                   *events.PullUpdater
+	WorkingDir                    events.WorkingDir
+	WorkingDirLocker              events.WorkingDirLocker
 }
 
 const DefaultWorkspace = "default"
@@ -150,10 +132,7 @@ func (r *AutoplanValidator) logPanics(logger logging.SimpleLogging) {
 }
 
 func (r *AutoplanValidator) validateCtxAndComment(ctx *command.Context) bool {
-	if !r.AllowForkPRs && ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
-		if r.SilenceForkPRErrors {
-			return false
-		}
+	if ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
 		ctx.Log.Infof("command was run on a fork pull request which is disallowed")
 		return false
 	}

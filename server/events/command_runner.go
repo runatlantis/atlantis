@@ -113,21 +113,9 @@ type DefaultCommandRunner struct {
 	EventParser              EventParsing
 	GlobalCfg                valid.GlobalCfg
 	StatsScope               tally.Scope
-	// AllowForkPRs controls whether we operate on pull requests from forks.
-	AllowForkPRs bool
 	// ParallelPoolSize controls the size of the wait group used to run
 	// parallel plans and applies (if enabled).
-	ParallelPoolSize int
-	// AllowForkPRsFlag is the name of the flag that controls fork PR's. We use
-	// this in our error message back to the user on a forked PR so they know
-	// how to enable this functionality.
-	AllowForkPRsFlag string
-	// SilenceForkPRErrors controls whether to comment on Fork PRs when AllowForkPRs = False
-	SilenceForkPRErrors bool
-	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
-	// this in our error message back to the user on a forked PR so they know
-	// how to disable error comment
-	SilenceForkPRErrorsFlag       string
+	ParallelPoolSize              int
 	CommentCommandRunnerByCmd     map[command.Name]command.Runner
 	Drainer                       *Drainer
 	PreWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner
@@ -351,12 +339,9 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 }
 
 func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context) bool {
-	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
-		if c.SilenceForkPRErrors {
-			return false
-		}
+	if ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
 		ctx.Log.Infof("command was run on a fork pull request which is disallowed")
-		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag), ""); err != nil {
+		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on fork pull requests.", ""); err != nil {
 			ctx.Log.Errorf("unable to comment: %s", err)
 		}
 		return false

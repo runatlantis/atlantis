@@ -17,7 +17,6 @@ const (
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type UserConfig struct {
-	AllowForkPRs               bool   `mapstructure:"allow-fork-prs"`
 	AllowRepoConfig            bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL                string `mapstructure:"atlantis-url"`
 	Automerge                  bool   `mapstructure:"automerge"`
@@ -77,24 +76,12 @@ type UserConfig struct {
 	// RequireMergeable is whether to require pull requests to be mergeable before
 	// allowing terraform apply's to run.
 	RequireMergeable bool `mapstructure:"require-mergeable"`
-	// SilenceNoProjects is whether Atlantis should respond to a PR if no projects are found.
-	SilenceNoProjects bool `mapstructure:"silence-no-projects"`
 	// RequireUnDiverged is whether to require pull requests to rebase default branch before
 	// allowing terraform apply's to run.
 	RequireUnDiverged bool `mapstructure:"require-undiverged"`
 	// RequireSQUnlocked is whether to require pull requests to be unlocked before running
 	// terraform apply.
-	RequireSQUnlocked   bool `mapstructure:"require-unlocked"`
-	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
-	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
-	// are found.
-	SilenceVCSStatusNoPlans bool `mapstructure:"silence-vcs-status-no-plans"`
-	// SilenceVCSStatusNoProjects is whether autoplan should set commit status if no projects
-	// are found.
-	SilenceVCSStatusNoProjects bool `mapstructure:"silence-vcs-status-no-projects"`
-	SilenceAllowlistErrors     bool `mapstructure:"silence-allowlist-errors"`
-	// SilenceWhitelistErrors is deprecated in favour of SilenceAllowlistErrors
-	SilenceWhitelistErrors   bool            `mapstructure:"silence-whitelist-errors"`
+	RequireSQUnlocked        bool            `mapstructure:"require-unlocked"`
 	SkipCloneNoChanges       bool            `mapstructure:"skip-clone-no-changes"`
 	SlackToken               string          `mapstructure:"slack-token"`
 	SSLCertFile              string          `mapstructure:"ssl-cert-file"`

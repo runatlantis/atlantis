@@ -130,12 +130,10 @@ type Server struct {
 
 // Config holds config for server that isn't passed in by the user.
 type Config struct {
-	AllowForkPRsFlag        string
-	AtlantisURLFlag         string
-	AtlantisVersion         string
-	DefaultTFVersionFlag    string
-	RepoConfigJSONFlag      string
-	SilenceForkPRErrorsFlag string
+	AtlantisURLFlag      string
+	AtlantisVersion      string
+	DefaultTFVersionFlag string
+	RepoConfigJSONFlag   string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -725,12 +723,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		prjCmdRunner,
 		userConfig.ParallelPoolSize,
-		userConfig.SilenceVCSStatusNoProjects,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
-		userConfig.SilenceVCSStatusNoPlans,
-		userConfig.SilenceVCSStatusNoProjects,
 		vcsClient,
 		pendingPlanFinder,
 		workingDir,
@@ -742,7 +737,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		policyCheckCommandRunner,
 		autoMerger,
 		userConfig.ParallelPoolSize,
-		userConfig.SilenceNoProjects,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -756,8 +750,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullUpdater,
 		dbUpdater,
 		userConfig.ParallelPoolSize,
-		userConfig.SilenceNoProjects,
-		userConfig.SilenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
 	)
 
@@ -767,14 +759,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		prjCmdRunner,
 		pullUpdater,
 		dbUpdater,
-		userConfig.SilenceNoProjects,
-		userConfig.SilenceVCSStatusNoPlans,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
-		userConfig.SilenceNoProjects,
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
@@ -782,12 +771,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandBuilder,
 		prjCmdRunner,
 		userConfig.ParallelPoolSize,
-		userConfig.SilenceNoProjects,
 	)
 
 	prPlanCommandRunner := events.NewPlanCommandRunner(
-		userConfig.SilenceVCSStatusNoPlans,
-		userConfig.SilenceVCSStatusNoProjects,
 		vcsClient,
 		pendingPlanFinder,
 		workingDir,
@@ -799,7 +785,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		policyCheckCommandRunner,
 		autoMerger,
 		userConfig.ParallelPoolSize,
-		userConfig.SilenceNoProjects,
 	)
 
 	prApprovePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -808,8 +793,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		prPrjCmdRunner,
 		pullUpdater,
 		dbUpdater,
-		userConfig.SilenceNoProjects,
-		userConfig.SilenceVCSStatusNoPlans,
 	)
 
 	featuredPlanRunner := lyftCommands.NewPlatformModeFeatureRunner(
@@ -856,10 +839,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		EventParser:                   eventParser,
 		GlobalCfg:                     globalCfg,
 		StatsScope:                    cmdStatsScope,
-		AllowForkPRs:                  userConfig.AllowForkPRs,
-		AllowForkPRsFlag:              config.AllowForkPRsFlag,
-		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,
-		SilenceForkPRErrorsFlag:       config.SilenceForkPRErrorsFlag,
 		DisableAutoplan:               userConfig.DisableAutoplan,
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
@@ -966,12 +945,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		Drainer:                       drainer,
 		GlobalCfg:                     globalCfg,
-		AllowForkPRs:                  userConfig.AllowForkPRs,
-		AllowForkPRsFlag:              config.AllowForkPRsFlag,
-		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,
-		SilenceForkPRErrorsFlag:       config.SilenceForkPRErrorsFlag,
-		SilenceVCSStatusNoPlans:       userConfig.SilenceVCSStatusNoPlans,
-		SilenceVCSStatusNoProjects:    userConfig.SilenceVCSStatusNoProjects,
 		CommitStatusUpdater:           commitStatusUpdater,
 		PrjCmdBuilder:                 projectCommandBuilder,
 		PullUpdater:                   pullUpdater,
@@ -986,7 +959,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubWebhookSecret:    []byte(userConfig.GithubWebhookSecret),
 		GithubRequestValidator: &events_controllers.DefaultGithubRequestValidator{},
 		RepoAllowlistChecker:   repoAllowlist,
-		SilenceAllowlistErrors: userConfig.SilenceAllowlistErrors,
 		VCSClient:              vcsClient,
 		SNSWriter:              gatewaySnsWriter,
 		AutoplanValidator:      autoplanValidator,
@@ -1004,7 +976,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
 		RepoAllowlistChecker:            repoAllowlist,
-		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
 		SupportedVCSHosts:               supportedVCSHosts,
 		VCSClient:                       vcsClient,
 		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),

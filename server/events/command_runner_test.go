@@ -110,19 +110,15 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	}
 
 	parallelPoolSize := 1
-	SilenceNoProjects := false
 	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
 		commitUpdater,
 		projectCommandRunner,
 		parallelPoolSize,
-		false,
 	)
 
 	planCommandRunner = events.NewPlanCommandRunner(
-		false,
-		false,
 		vcsClient,
 		pendingPlanFinder,
 		workingDir,
@@ -134,7 +130,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
-		SilenceNoProjects,
 	)
 
 	pullReqStatusFetcher := lyft_vcs.NewSQBasedPullStatusFetcher(githubClient, vcs.NewLyftPullMergeabilityChecker("atlantis"))
@@ -150,8 +145,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		pullUpdater,
 		dbUpdater,
 		parallelPoolSize,
-		SilenceNoProjects,
-		false,
 		pullReqStatusFetcher,
 	)
 
@@ -161,14 +154,11 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
-		SilenceNoProjects,
-		false,
 	)
 
 	unlockCommandRunner = events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
-		SilenceNoProjects,
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
@@ -176,7 +166,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		projectCommandBuilder,
 		projectCommandRunner,
 		parallelPoolSize,
-		SilenceNoProjects,
 	)
 
 	commentCommandRunnerByCmd := map[command.Name]command.Runner{
@@ -206,8 +195,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		AzureDevopsPullGetter:         azuredevopsGetter,
 		GlobalCfg:                     globalCfg,
 		StatsScope:                    scope,
-		AllowForkPRs:                  false,
-		AllowForkPRsFlag:              "allow-fork-prs-flag",
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             defaultBoltDB,
@@ -262,9 +249,6 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 		" comment saying that this is not allowed")
 	vcsClient := setup(t)
 	log := logging.NewNoopLogger(t)
-	// by default these are false so don't need to reset
-	ch.AllowForkPRs = false
-	ch.SilenceForkPRErrors = false
 	var pull github.PullRequest
 	modelPull := models.PullRequest{
 		BaseRepo: fixtures.GithubRepo,
@@ -278,27 +262,8 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, headRepo, nil)
 
 	ch.RunCommentCommand(log, fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, nil, time.Now())
-	commentMessage := fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", ch.AllowForkPRsFlag, ch.SilenceForkPRErrorsFlag)
+	commentMessage := "Atlantis commands can't be run on fork pull requests."
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, commentMessage, "")
-}
-
-func TestRunCommentCommand_ForkPRDisabled_SilenceEnabled(t *testing.T) {
-	t.Log("if a command is run on a forked pull request and forks are disabled and we are silencing errors do not comment with error")
-	vcsClient := setup(t)
-	log := logging.NewNoopLogger(t)
-	ch.AllowForkPRs = false // by default it's false so don't need to reset
-	ch.SilenceForkPRErrors = true
-	var pull github.PullRequest
-	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
-
-	headRepo := fixtures.GithubRepo
-	headRepo.FullName = "forkrepo/atlantis"
-	headRepo.Owner = "forkrepo"
-	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, headRepo, nil)
-
-	ch.RunCommentCommand(log, fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, nil, time.Now())
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
 func TestRunCommentCommand_PreWorkflowHookError(t *testing.T) {
@@ -327,59 +292,10 @@ func TestRunCommentCommand_PreWorkflowHookError(t *testing.T) {
 	}
 }
 
-func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
-	t.Log("if a plan command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
-	vcsClient := setup(t)
-	log := logging.NewNoopLogger(t)
-	planCommandRunner.SilenceNoProjects = true
-	var pull github.PullRequest
-	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
-	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
-
-	ch.RunCommentCommand(log, fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Plan}, time.Now())
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		matchers.AnyContextContext(),
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-		matchers.EqModelsCommandName(command.Plan),
-		EqInt(0),
-		EqInt(0),
-	)
-}
-
-func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
-	t.Log("if an apply command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
-	vcsClient := setup(t)
-	log := logging.NewNoopLogger(t)
-	applyCommandRunner.SilenceNoProjects = true
-	var pull github.PullRequest
-	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
-	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
-
-	ch.RunCommentCommand(log, fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now())
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		matchers.AnyContextContext(),
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-		matchers.EqModelsCommandName(command.Apply),
-		EqInt(0),
-		EqInt(0),
-	)
-}
-
 func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) {
 	t.Log("if an approve_policy command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
 	vcsClient := setup(t)
 	log := logging.NewNoopLogger(t)
-	approvePoliciesCommandRunner.SilenceNoProjects = true
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
@@ -397,20 +313,6 @@ func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) 
 		EqInt(0),
 		EqInt(0),
 	)
-}
-
-func TestRunCommentCommandUnlock_NoProjects_SilenceEnabled(t *testing.T) {
-	t.Log("if an unlock command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
-	vcsClient := setup(t)
-	log := logging.NewNoopLogger(t)
-	unlockCommandRunner.SilenceNoProjects = true
-	var pull github.PullRequest
-	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
-
-	ch.RunCommentCommand(log, fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Unlock}, time.Now())
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
 func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {

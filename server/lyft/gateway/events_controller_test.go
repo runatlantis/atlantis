@@ -118,36 +118,6 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 }
 
-func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
-	t.Log("when the event is a github comment from a repo that isn't allowlisted and we are silencing errors, do not comment with an error")
-	RegisterMockTestingT(t)
-	vcsClient := vcsmocks.NewMockClient()
-	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
-	e := gateway.VCSEventsController{
-		Logger:                 logger,
-		Scope:                  scope,
-		GithubRequestValidator: &events_controllers.DefaultGithubRequestValidator{},
-		CommentParser:          &events.CommentParser{},
-		Parser:                 &events.EventParser{},
-		RepoAllowlistChecker:   &events.RepoAllowlistChecker{},
-		VCSClient:              vcsClient,
-		SilenceAllowlistErrors: true,
-	}
-	requestJSON, err := ioutil.ReadFile(filepath.Join("../../controllers/events/testfixtures", "githubIssueCommentEvent_notAllowlisted.json"))
-	Ok(t, err)
-	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(gateway.GithubHeader, "issue_comment")
-	w := httptest.NewRecorder()
-	e.Post(w, req)
-
-	Equals(t, http.StatusForbidden, w.Result().StatusCode)
-	body, _ := ioutil.ReadAll(w.Result().Body)
-	exp := "Repo not allowlisted"
-	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-}
-
 func TestPost_GithubCommentResponse(t *testing.T) {
 	t.Log("when the event is a github comment that warrants a comment response we comment back")
 	e, v, _, p, _, _, vcsClient, cp, _, _ := setup(t)

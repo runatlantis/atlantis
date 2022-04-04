@@ -653,7 +653,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	// Set real dependencies here.
 	// TODO: aggregate some of this with that of server.go to minimize duplication
-	allowForkPRs := false
 	vcsClient := vcs.NewClientProxy(ghClient, nil, nil, nil, nil)
 	e2eStatusUpdater := &command.VCSStatusUpdater{Client: vcsClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}}
 
@@ -707,7 +706,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	drainer := &events.Drainer{}
 
 	parallelPoolSize := 1
-	silenceNoProjects := false
 
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             vcsClient,
@@ -856,12 +854,9 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		e2eStatusUpdater,
 		prjCmdRunner,
 		parallelPoolSize,
-		false,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
-		false,
-		false,
 		vcsClient,
 		&events.DefaultPendingPlanFinder{},
 		workingDir,
@@ -873,7 +868,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
-		silenceNoProjects,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -882,14 +876,11 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		prjCmdRunner,
 		pullUpdater,
 		dbUpdater,
-		silenceNoProjects,
-		false,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
-		silenceNoProjects,
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
@@ -897,7 +888,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		projectCommandBuilder,
 		prjCmdRunner,
 		parallelPoolSize,
-		silenceNoProjects,
 	)
 
 	var applyCommandRunner command.Runner
@@ -916,8 +906,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 			pullUpdater,
 			dbUpdater,
 			parallelPoolSize,
-			silenceNoProjects,
-			false,
 			e2ePullReqStatusFetcher,
 		)
 	}
@@ -936,8 +924,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		GithubPullGetter:              ghClient,
 		GlobalCfg:                     globalCfg,
 		StatsScope:                    statsScope,
-		AllowForkPRs:                  allowForkPRs,
-		AllowForkPRsFlag:              "allow-fork-prs",
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,

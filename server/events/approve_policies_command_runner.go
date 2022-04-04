@@ -14,17 +14,13 @@ func NewApprovePoliciesCommandRunner(
 	prjCommandRunner ProjectApprovePoliciesCommandRunner,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
-	SilenceNoProjects bool,
-	silenceVCSStatusNoProjects bool,
 ) *ApprovePoliciesCommandRunner {
 	return &ApprovePoliciesCommandRunner{
-		commitStatusUpdater:        commitStatusUpdater,
-		prjCmdBuilder:              prjCommandBuilder,
-		prjCmdRunner:               prjCommandRunner,
-		pullUpdater:                pullUpdater,
-		dbUpdater:                  dbUpdater,
-		SilenceNoProjects:          SilenceNoProjects,
-		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		commitStatusUpdater: commitStatusUpdater,
+		prjCmdBuilder:       prjCommandBuilder,
+		prjCmdRunner:        prjCommandRunner,
+		pullUpdater:         pullUpdater,
+		dbUpdater:           dbUpdater,
 	}
 }
 
@@ -34,10 +30,6 @@ type ApprovePoliciesCommandRunner struct {
 	dbUpdater           *DBUpdater
 	prjCmdBuilder       ProjectApprovePoliciesCommandBuilder
 	prjCmdRunner        ProjectApprovePoliciesCommandRunner
-	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
-	// are found
-	SilenceNoProjects          bool
-	silenceVCSStatusNoProjects bool
 }
 
 func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
@@ -57,16 +49,14 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *command.Co
 		return
 	}
 
-	if len(projectCmds) == 0 && a.SilenceNoProjects {
+	if len(projectCmds) == 0 {
 		ctx.Log.Infof("determined there was no project to run approve_policies in")
-		if !a.silenceVCSStatusNoProjects {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects approve_policies successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debugf("setting VCS status to success with no projects found")
-			if err := a.commitStatusUpdater.UpdateCombinedCount(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
-				ctx.Log.Warnf("unable to update commit status: %s", err)
-			}
+		// If there were no projects modified, we set successful commit statuses
+		// with 0/0 projects approve_policies successfully because some users require
+		// the Atlantis status to be passing for all pull requests.
+		ctx.Log.Debugf("setting VCS status to success with no projects found")
+		if err := a.commitStatusUpdater.UpdateCombinedCount(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			ctx.Log.Warnf("unable to update commit status: %s", err)
 		}
 		return
 	}

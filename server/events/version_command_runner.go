@@ -9,14 +9,12 @@ func NewVersionCommandRunner(
 	prjCmdBuilder ProjectVersionCommandBuilder,
 	prjCmdRunner ProjectVersionCommandRunner,
 	parallelPoolSize int,
-	silenceVCSStatusNoProjects bool,
 ) *VersionCommandRunner {
 	return &VersionCommandRunner{
-		pullUpdater:                pullUpdater,
-		prjCmdBuilder:              prjCmdBuilder,
-		prjCmdRunner:               prjCmdRunner,
-		parallelPoolSize:           parallelPoolSize,
-		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		pullUpdater:      pullUpdater,
+		prjCmdBuilder:    prjCmdBuilder,
+		prjCmdRunner:     prjCmdRunner,
+		parallelPoolSize: parallelPoolSize,
 	}
 }
 
@@ -25,9 +23,6 @@ type VersionCommandRunner struct {
 	prjCmdBuilder    ProjectVersionCommandBuilder
 	prjCmdRunner     ProjectVersionCommandRunner
 	parallelPoolSize int
-	// SilenceVCSStatusNoProjects is whether any plan should set commit status if no projects
-	// are found
-	silenceVCSStatusNoProjects bool
 }
 
 func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {

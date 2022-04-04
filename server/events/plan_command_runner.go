@@ -9,8 +9,6 @@ import (
 )
 
 func NewPlanCommandRunner(
-	silenceVCSStatusNoPlans bool,
-	silenceVCSStatusNoProjects bool,
 	vcsClient vcs.Client,
 	pendingPlanFinder PendingPlanFinder,
 	workingDir WorkingDir,
@@ -22,47 +20,34 @@ func NewPlanCommandRunner(
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
 	autoMerger *AutoMerger,
 	parallelPoolSize int,
-	SilenceNoProjects bool,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
-		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
-		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
-		vcsClient:                  vcsClient,
-		pendingPlanFinder:          pendingPlanFinder,
-		workingDir:                 workingDir,
-		commitStatusUpdater:        commitStatusUpdater,
-		prjCmdBuilder:              projectCommandBuilder,
-		prjCmdRunner:               projectCommandRunner,
-		dbUpdater:                  dbUpdater,
-		pullUpdater:                pullUpdater,
-		policyCheckCommandRunner:   policyCheckCommandRunner,
-		autoMerger:                 autoMerger,
-		parallelPoolSize:           parallelPoolSize,
-		SilenceNoProjects:          SilenceNoProjects,
+		vcsClient:                vcsClient,
+		pendingPlanFinder:        pendingPlanFinder,
+		workingDir:               workingDir,
+		commitStatusUpdater:      commitStatusUpdater,
+		prjCmdBuilder:            projectCommandBuilder,
+		prjCmdRunner:             projectCommandRunner,
+		dbUpdater:                dbUpdater,
+		pullUpdater:              pullUpdater,
+		policyCheckCommandRunner: policyCheckCommandRunner,
+		autoMerger:               autoMerger,
+		parallelPoolSize:         parallelPoolSize,
 	}
 }
 
 type PlanCommandRunner struct {
-	vcsClient vcs.Client
-	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
-	// are found
-	SilenceNoProjects bool
-	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
-	// are found
-	silenceVCSStatusNoPlans bool
-	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
-	// are found
-	silenceVCSStatusNoProjects bool
-	commitStatusUpdater        CommitStatusUpdater
-	pendingPlanFinder          PendingPlanFinder
-	workingDir                 WorkingDir
-	prjCmdBuilder              ProjectPlanCommandBuilder
-	prjCmdRunner               ProjectPlanCommandRunner
-	dbUpdater                  *DBUpdater
-	pullUpdater                *PullUpdater
-	policyCheckCommandRunner   *PolicyCheckCommandRunner
-	autoMerger                 *AutoMerger
-	parallelPoolSize           int
+	vcsClient                vcs.Client
+	commitStatusUpdater      CommitStatusUpdater
+	pendingPlanFinder        PendingPlanFinder
+	workingDir               WorkingDir
+	prjCmdBuilder            ProjectPlanCommandBuilder
+	prjCmdRunner             ProjectPlanCommandRunner
+	dbUpdater                *DBUpdater
+	pullUpdater              *PullUpdater
+	policyCheckCommandRunner *PolicyCheckCommandRunner
+	autoMerger               *AutoMerger
+	parallelPoolSize         int
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -82,20 +67,18 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	if len(projectCmds) == 0 {
 		ctx.Log.Infof("determined there was no project to run plan in")
-		if !(p.silenceVCSStatusNoPlans || p.silenceVCSStatusNoProjects) {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects planned/policy_checked/applied successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debugf("setting VCS status to success with no projects found")
-			if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
-				ctx.Log.Warnf("unable to update commit status: %s", err)
-			}
-			if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
-				ctx.Log.Warnf("unable to update commit status: %s", err)
-			}
-			if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
-				ctx.Log.Warnf("unable to update commit status: %s", err)
-			}
+		// If there were no projects modified, we set successful commit statuses
+		// with 0/0 projects planned/policy_checked/applied successfully because some users require
+		// the Atlantis status to be passing for all pull requests.
+		ctx.Log.Debugf("setting VCS status to success with no projects found")
+		if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+			ctx.Log.Warnf("unable to update commit status: %s", err)
+		}
+		if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			ctx.Log.Warnf("unable to update commit status: %s", err)
+		}
+		if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+			ctx.Log.Warnf("unable to update commit status: %s", err)
 		}
 		return
 	}
@@ -160,20 +143,6 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 			ctx.Log.Warnf("unable to update commit status: %s", statusErr)
 		}
 		p.pullUpdater.UpdatePull(ctx, cmd, command.Result{Error: err})
-		return
-	}
-
-	if len(projectCmds) == 0 && p.SilenceNoProjects {
-		ctx.Log.Infof("determined there was no project to run plan in")
-		if !p.silenceVCSStatusNoProjects {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects planned successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debugf("setting VCS status to success with no projects found")
-			if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
-				ctx.Log.Warnf("unable to update commit status: %s", err)
-			}
-		}
 		return
 	}
 

@@ -50,7 +50,6 @@ func setupAutoplan(t *testing.T) *vcsmocks.MockClient {
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		Drainer:                       drainer,
 		GlobalCfg:                     globalCfg,
-		AllowForkPRsFlag:              "allow-fork-prs-flag",
 		PullUpdater:                   pullUpdater,
 		PrjCmdBuilder:                 projectCommandBuilder,
 		CommitStatusUpdater:           commitStatusUpdater,

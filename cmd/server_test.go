@@ -56,7 +56,6 @@ var testFlags = map[string]interface{}{
 	ADWebhookPasswordFlag:        "ad-wh-pass",
 	ADWebhookUserFlag:            "ad-wh-user",
 	AtlantisURLFlag:              "url",
-	AllowForkPRsFlag:             true,
 	AllowRepoConfigFlag:          true,
 	AutomergeFlag:                true,
 	AutoplanFileListFlag:         "**/*.tf,**/*.yml",
@@ -91,10 +90,6 @@ var testFlags = map[string]interface{}{
 	RepoAllowlistFlag:            "github.com/runatlantis/atlantis",
 	RequireApprovalFlag:          true,
 	RequireMergeableFlag:         true,
-	SilenceNoProjectsFlag:        false,
-	SilenceForkPRErrorsFlag:      true,
-	SilenceAllowlistErrorsFlag:   true,
-	SilenceVCSStatusNoPlans:      true,
 	SkipCloneNoChanges:           true,
 	SlackTokenFlag:               "slack-token",
 	SSLCertFileFlag:              "cert-file",
@@ -733,31 +728,16 @@ func TestExecute_AllowAndWhitelist(t *testing.T) {
 	ErrEquals(t, "--repo-allowlist must be set for security purposes", err)
 }
 
-// Can't use both --silence-whitelist-errors and --silence-allowlist-errors
-func TestExecute_BothSilenceAllowAndWhitelistErrors(t *testing.T) {
-	c := setup(map[string]interface{}{
-		GHUserFlag:                 "user",
-		GHTokenFlag:                "token",
-		RepoAllowlistFlag:          "*",
-		SilenceWhitelistErrorsFlag: true,
-		SilenceAllowlistErrorsFlag: true,
-	}, t)
-	err := c.Execute()
-	ErrEquals(t, "both --silence-allowlist-errors and --silence-whitelist-errors cannot be set–use --silence-allowlist-errors", err)
-}
-
 // Test that we set the corresponding allow list values on the userConfig
 // struct if the deprecated whitelist flags are used.
 func TestExecute_RepoWhitelistDeprecation(t *testing.T) {
 	c := setup(map[string]interface{}{
-		GHUserFlag:                 "user",
-		GHTokenFlag:                "token",
-		RepoWhitelistFlag:          "*",
-		SilenceWhitelistErrorsFlag: true,
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoWhitelistFlag: "*",
 	}, t)
 	err := c.Execute()
 	Ok(t, err)
-	Equals(t, true, passedConfig.SilenceAllowlistErrors)
 	Equals(t, "*", passedConfig.RepoAllowlist)
 }
 

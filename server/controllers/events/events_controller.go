@@ -65,9 +65,6 @@ type VCSEventsController struct {
 	// request validation is done.
 	GitlabWebhookSecret  []byte
 	RepoAllowlistChecker *events.RepoAllowlistChecker
-	// SilenceAllowlistErrors controls whether we write an error comment on
-	// pull requests from non-allowlisted repos.
-	SilenceAllowlistErrors bool
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
 	SupportedVCSHosts []models.VCSHostType
@@ -726,10 +723,6 @@ func (e *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLeve
 // commentNotAllowlisted comments on the pull request that the repo is not
 // allowlisted unless allowlist error comments are disabled.
 func (e *VCSEventsController) commentNotAllowlisted(baseRepo models.Repo, pullNum int) {
-	if e.SilenceAllowlistErrors {
-		return
-	}
-
 	errMsg := "```\nError: This repo is not allowlisted for Atlantis.\n```"
 	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
 		e.Logger.Errorf("unable to comment on pull request: %s", err)

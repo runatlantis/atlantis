@@ -13,15 +13,13 @@ func NewPolicyCheckCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	projectCommandRunner ProjectPolicyCheckCommandRunner,
 	parallelPoolSize int,
-	silenceVCSStatusNoProjects bool,
 ) *PolicyCheckCommandRunner {
 	return &PolicyCheckCommandRunner{
-		dbUpdater:                  dbUpdater,
-		pullUpdater:                pullUpdater,
-		commitStatusUpdater:        commitStatusUpdater,
-		prjCmdRunner:               projectCommandRunner,
-		parallelPoolSize:           parallelPoolSize,
-		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		dbUpdater:           dbUpdater,
+		pullUpdater:         pullUpdater,
+		commitStatusUpdater: commitStatusUpdater,
+		prjCmdRunner:        projectCommandRunner,
+		parallelPoolSize:    parallelPoolSize,
 	}
 }
 
@@ -31,22 +29,17 @@ type PolicyCheckCommandRunner struct {
 	commitStatusUpdater CommitStatusUpdater
 	prjCmdRunner        ProjectPolicyCheckCommandRunner
 	parallelPoolSize    int
-	// SilenceVCSStatusNoProjects is whether any plan should set commit status if no projects
-	// are found
-	silenceVCSStatusNoProjects bool
 }
 
 func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.ProjectContext) {
 	if len(cmds) == 0 {
 		ctx.Log.Infof("no projects to run policy_check in")
-		if !p.silenceVCSStatusNoProjects {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects policy_checked successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debugf("setting VCS status to success with no projects found")
-			if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
-				ctx.Log.Warnf("unable to update commit status: %s", err)
-			}
+		// If there were no projects modified, we set successful commit statuses
+		// with 0/0 projects policy_checked successfully because some users require
+		// the Atlantis status to be passing for all pull requests.
+		ctx.Log.Debugf("setting VCS status to success with no projects found")
+		if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			ctx.Log.Warnf("unable to update commit status: %s", err)
 		}
 		return
 	}

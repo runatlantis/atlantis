@@ -42,7 +42,6 @@ const (
 	ADWebhookUserFlag          = "azuredevops-webhook-user"
 	ADTokenFlag                = "azuredevops-token" // nolint: gosec
 	ADUserFlag                 = "azuredevops-user"
-	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
 	AutomergeFlag              = "automerge"
@@ -91,17 +90,11 @@ const (
 	RepoConfigFlag             = "repo-config"
 	RepoConfigJSONFlag         = "repo-config-json"
 	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
-	RepoWhitelistFlag          = "repo-whitelist"
-	RepoAllowlistFlag          = "repo-allowlist"
-	RequireApprovalFlag        = "require-approval"
-	RequireSQUnlockedFlag      = "require-unlocked"
-	RequireMergeableFlag       = "require-mergeable"
-	SilenceNoProjectsFlag      = "silence-no-projects"
-	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
-	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
-	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
-	// SilenceWhitelistErrorsFlag is deprecated for SilenceAllowlistErrorsFlag.
-	SilenceWhitelistErrorsFlag   = "silence-whitelist-errors"
+	RepoWhitelistFlag            = "repo-whitelist"
+	RepoAllowlistFlag            = "repo-allowlist"
+	RequireApprovalFlag          = "require-approval"
+	RequireSQUnlockedFlag        = "require-unlocked"
+	RequireMergeableFlag         = "require-mergeable"
 	SkipCloneNoChanges           = "skip-clone-no-changes"
 	SlackTokenFlag               = "slack-token"
 	SSLCertFileFlag              = "ssl-cert-file"
@@ -334,10 +327,6 @@ var stringFlags = map[string]stringFlag{
 }
 
 var boolFlags = map[string]boolFlag{
-	AllowForkPRsFlag: {
-		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
-		defaultValue: false,
-	},
 	AllowRepoConfigFlag: {
 		description: "Allow repositories to use atlantis.yaml files to customize the commands Atlantis runs." +
 			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
@@ -402,27 +391,6 @@ var boolFlags = map[string]boolFlag{
 	RequireSQUnlockedFlag: {
 		description:  "Require pull requests to be \"Unlocked\" before allowing the apply command to be run.",
 		defaultValue: false,
-	},
-	SilenceNoProjectsFlag: {
-		description:  "Silences Atlants from responding to PRs when it finds no projects.",
-		defaultValue: false,
-	},
-	SilenceForkPRErrorsFlag: {
-		description:  "Silences the posting of fork pull requests not allowed error comments.",
-		defaultValue: false,
-	},
-	SilenceVCSStatusNoPlans: {
-		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
-		defaultValue: false,
-	},
-	SilenceAllowlistErrorsFlag: {
-		description:  "Silences the posting of allowlist error comments.",
-		defaultValue: false,
-	},
-	SilenceWhitelistErrorsFlag: {
-		description:  "[Deprecated for --silence-allowlist-errors].",
-		defaultValue: false,
-		hidden:       true,
 	},
 	DisableMarkdownFoldingFlag: {
 		description:  "Toggle off folding in markdown output.",
@@ -638,12 +606,10 @@ func (s *ServerCmd) run() error {
 
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
-		AllowForkPRsFlag:        AllowForkPRsFlag,
-		AtlantisURLFlag:         AtlantisURLFlag,
-		AtlantisVersion:         s.AtlantisVersion,
-		DefaultTFVersionFlag:    DefaultTFVersionFlag,
-		RepoConfigJSONFlag:      RepoConfigJSONFlag,
-		SilenceForkPRErrorsFlag: SilenceForkPRErrorsFlag,
+		AtlantisURLFlag:      AtlantisURLFlag,
+		AtlantisVersion:      s.AtlantisVersion,
+		DefaultTFVersionFlag: DefaultTFVersionFlag,
+		RepoConfigJSONFlag:   RepoConfigJSONFlag,
 	})
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
@@ -746,9 +712,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig, logger logging.Logger
 	}
 	if strings.Contains(userConfig.RepoAllowlist, "://") {
 		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoAllowlistFlag)
-	}
-	if userConfig.SilenceAllowlistErrors && userConfig.SilenceWhitelistErrors {
-		return fmt.Errorf("both --%s and --%s cannot be set–use --%s", SilenceAllowlistErrorsFlag, SilenceWhitelistErrorsFlag, SilenceAllowlistErrorsFlag)
 	}
 
 	if userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret != "" {
@@ -902,10 +865,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		fmt.Println(warning)
 	}
 
-	// Handle repo whitelist deprecation.
-	if userConfig.SilenceWhitelistErrors {
-		userConfig.SilenceAllowlistErrors = true
-	}
 	if userConfig.RepoWhitelist != "" {
 		userConfig.RepoAllowlist = userConfig.RepoWhitelist
 	}
