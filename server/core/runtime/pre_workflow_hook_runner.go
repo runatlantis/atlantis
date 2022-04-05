@@ -42,16 +42,13 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.PreWorkflowHookCommandCont
 
 	// pre-workflow hooks operate different than our terraform steps
 	// it's up to the underlying implementation to log errors/output accordingly.
-	// It doesn't make sense for us to capture it here since we do nothing special with the result.
-	// This also allows the use of the same logging pipeline as well in certain situations
-	// where std.out is captured.
-	err := cmd.Run()
+	// The only required step is to share Stdout and Stderr with the underlying
+	// process, so that our logging sidecar can forward the logs to kibana
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
-	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q", err, command, path)
-		ctx.Log.Debugf("error: %s", err)
+	if err := cmd.Run(); err != nil {
 		return "", err
 	}
-	ctx.Log.Infof("successfully ran %q in %q", command, path)
 	return "", nil
 }

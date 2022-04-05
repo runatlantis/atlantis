@@ -23,7 +23,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command: "echo 'a",
-			ExpErr:  "exit status 2: running \"echo 'a\" in",
+			ExpErr:  "exit status 2",
 		},
 	}
 
