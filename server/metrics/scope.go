@@ -35,8 +35,6 @@ func NewScope(cfg valid.Metrics, logger logging.SimpleLogging, statsNamespace st
 	} else if r, ok := reporter.(tally.CachedStatsReporter); ok {
 		scopeOpts.CachedReporter = r
 		scopeOpts.Separator = tallyprom.DefaultSeparator
-	} else {
-		return nil, nil, nil, errors.Wrap(err, "invalid stats reporter")
 	}
 
 	scope, closer := tally.NewRootScope(scopeOpts, time.Second)
