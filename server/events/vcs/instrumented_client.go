@@ -318,24 +318,3 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 	return nil
 
 }
-func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	scope := c.StatsScope.SubScope("merge_pull")
-
-	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
-	defer executionTime.Stop()
-
-	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
-	executionError := scope.Counter(metrics.ExecutionErrorMetric)
-
-	if err := c.Client.MergePull(pull, pullOptions); err != nil {
-		executionError.Inc(1)
-	}
-
-	executionSuccess.Inc(1)
-
-	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("merged pull request", fields.PullRequest(pull))
-
-	return nil
-
-}

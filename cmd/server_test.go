@@ -57,7 +57,6 @@ var testFlags = map[string]interface{}{
 	ADWebhookUserFlag:            "ad-wh-user",
 	AtlantisURLFlag:              "url",
 	AllowRepoConfigFlag:          true,
-	AutomergeFlag:                true,
 	AutoplanFileListFlag:         "**/*.tf,**/*.yml",
 	BitbucketBaseURLFlag:         "https://bitbucket-base-url.com",
 	BitbucketTokenFlag:           "bitbucket-token",

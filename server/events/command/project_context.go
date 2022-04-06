@@ -18,7 +18,6 @@ const (
 )
 
 type ContextFlags struct {
-	Automerge,
 	DeleteSourceBranchOnMerge,
 	ParallelApply,
 	ParallelPlan,
@@ -55,7 +54,6 @@ func NewProjectContext(
 		ApplyCmd:                  applyCmd,
 		BaseRepo:                  ctx.Pull.BaseRepo,
 		EscapedCommentArgs:        escapedCommentArgs,
-		AutomergeEnabled:          contextFlags.Automerge,
 		DeleteSourceBranchOnMerge: contextFlags.DeleteSourceBranchOnMerge,
 		ParallelApplyEnabled:      contextFlags.ParallelApply,
 		ParallelPlanEnabled:       contextFlags.ParallelPlan,
@@ -93,9 +91,6 @@ type ProjectContext struct {
 	// ApplyRequirements is the list of requirements that must be satisfied
 	// before we will run the apply stage.
 	ApplyRequirements []string
-	// AutomergeEnabled is true if automerge is enabled for the repo that this
-	// project is in.
-	AutomergeEnabled bool
 	// ParallelApplyEnabled is true if parallel apply is enabled for this project.
 	ParallelApplyEnabled bool
 	// ParallelPlanEnabled is true if parallel plan is enabled for this project.

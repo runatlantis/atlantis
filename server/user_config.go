@@ -19,7 +19,6 @@ const (
 type UserConfig struct {
 	AllowRepoConfig            bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL                string `mapstructure:"atlantis-url"`
-	Automerge                  bool   `mapstructure:"automerge"`
 	AutoplanFileList           string `mapstructure:"autoplan-file-list"`
 	AzureDevopsToken           string `mapstructure:"azuredevops-token"`
 	AzureDevopsUser            string `mapstructure:"azuredevops-user"`

@@ -2,10 +2,8 @@ package bitbucketserver_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -132,55 +130,6 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	})
 	Ok(t, err)
 	Equals(t, []string{"file1.txt", "file2.txt", "file3.txt"}, files)
-}
-
-// Test that we use the correct version parameter in our call to merge the pull
-// request.
-func TestClient_MergePull(t *testing.T) {
-	pullRequest, err := ioutil.ReadFile(filepath.Join("testdata", "pull-request.json"))
-	Ok(t, err)
-	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.RequestURI {
-		// The first request should hit this URL.
-		case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1":
-			w.Write(pullRequest) // nolint: errcheck
-			return
-		case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1/merge?version=3":
-			Equals(t, "POST", r.Method)
-			w.Write(pullRequest) // nolint: errcheck
-		default:
-			t.Errorf("got unexpected request at %q", r.RequestURI)
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-	}))
-	defer testServer.Close()
-
-	client, err := bitbucketserver.NewClient(http.DefaultClient, "user", "pass", testServer.URL, "runatlantis.io")
-	Ok(t, err)
-
-	err = client.MergePull(models.PullRequest{
-		Num:        1,
-		HeadCommit: "",
-		URL:        "",
-		HeadBranch: "",
-		BaseBranch: "",
-		Author:     "",
-		State:      0,
-		BaseRepo: models.Repo{
-			FullName:          "owner/repo",
-			Owner:             "owner",
-			Name:              "repo",
-			SanitizedCloneURL: fmt.Sprintf("%s/scm/ow/repo.git", testServer.URL),
-			VCSHost: models.VCSHost{
-				Type:     models.BitbucketCloud,
-				Hostname: "bitbucket.org",
-			},
-		},
-	}, models.PullRequestOptions{
-		DeleteSourceBranchOnMerge: false,
-	})
-	Ok(t, err)
 }
 
 func TestClient_MarkdownPullLink(t *testing.T) {

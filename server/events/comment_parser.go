@@ -31,19 +31,17 @@ import (
 )
 
 const (
-	workspaceFlagLong          = "workspace"
-	workspaceFlagShort         = "w"
-	dirFlagLong                = "dir"
-	dirFlagShort               = "d"
-	projectFlagLong            = "project"
-	projectFlagShort           = "p"
-	autoMergeDisabledFlagLong  = "auto-merge-disabled"
-	autoMergeDisabledFlagShort = ""
-	verboseFlagLong            = "verbose"
-	verboseFlagShort           = ""
-	forceFlagLong              = "force"
-	forceFlagShort             = "f"
-	atlantisExecutable         = "atlantis"
+	workspaceFlagLong  = "workspace"
+	workspaceFlagShort = "w"
+	dirFlagLong        = "dir"
+	dirFlagShort       = "d"
+	projectFlagLong    = "project"
+	projectFlagShort   = "p"
+	verboseFlagLong    = "verbose"
+	verboseFlagShort   = ""
+	forceFlagLong      = "force"
+	forceFlagShort     = "f"
+	atlantisExecutable = "atlantis"
 )
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -69,7 +67,7 @@ type CommentBuilder interface {
 	// BuildPlanComment builds a plan comment for the specified args.
 	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 	// BuildApplyComment builds an apply comment for the specified args.
-	BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string
+	BuildApplyComment(repoRelDir string, workspace string, project string) string
 	// BuildVersionComment builds a version comment for the specified args.
 	BuildVersionComment(repoRelDir string, workspace string, project string) string
 }
@@ -177,7 +175,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	var workspace string
 	var dir string
 	var project string
-	var verbose, autoMergeDisabled, force bool
+	var verbose, force bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
 
@@ -198,7 +196,6 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Apply the plan for this Terraform workspace.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", config.AtlantisYAMLFilename))
-		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 		flagSet.BoolVarP(&force, forceFlagLong, forceFlagShort, false, "Force Atlantis to ignore apply requirements.")
 	case command.ApprovePolicies.String():
@@ -272,13 +269,13 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	return CommentParseResult{
-		Command: command.NewComment(dir, extraArgs, name, verbose, force, autoMergeDisabled, workspace, project),
+		Command: command.NewComment(dir, extraArgs, name, verbose, force, workspace, project),
 	}
 }
 
 // BuildPlanComment builds a plan comment for the specified args.
 func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, false)
+	flags := e.buildFlags(repoRelDir, workspace, project)
 	commentFlags := ""
 	if len(commentArgs) > 0 {
 		var flagsWithoutQuotes []string
@@ -293,18 +290,18 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 }
 
 // BuildApplyComment builds an apply comment for the specified args.
-func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled)
+func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string) string {
+	flags := e.buildFlags(repoRelDir, workspace, project)
 	return fmt.Sprintf("%s %s%s", atlantisExecutable, command.Apply.String(), flags)
 }
 
 // BuildVersionComment builds a version comment for the specified args.
 func (e *CommentParser) BuildVersionComment(repoRelDir string, workspace string, project string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, false)
+	flags := e.buildFlags(repoRelDir, workspace, project)
 	return fmt.Sprintf("%s %s%s", atlantisExecutable, command.Version.String(), flags)
 }
 
-func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
+func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string) string {
 	// Add quotes if dir has spaces.
 	if strings.Contains(repoRelDir, " ") {
 		repoRelDir = fmt.Sprintf("%q", repoRelDir)
@@ -329,9 +326,7 @@ func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project 
 		// Otherwise we have to specify both flags.
 		flags = fmt.Sprintf(" -%s %s -%s %s", dirFlagShort, repoRelDir, workspaceFlagShort, workspace)
 	}
-	if autoMergeDisabled {
-		flags = fmt.Sprintf("%s --%s", flags, autoMergeDisabledFlagLong)
-	}
+
 	return flags
 }
 

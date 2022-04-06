@@ -44,7 +44,6 @@ const (
 	ADUserFlag                 = "azuredevops-user"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
-	AutomergeFlag              = "automerge"
 	AutoplanFileListFlag       = "autoplan-file-list"
 	BitbucketBaseURLFlag       = "bitbucket-base-url"
 	BitbucketTokenFlag         = "bitbucket-token"
@@ -333,10 +332,6 @@ var boolFlags = map[string]boolFlag{
 			" on the Atlantis server.",
 		defaultValue: false,
 		hidden:       true,
-	},
-	AutomergeFlag: {
-		description:  "Automatically merge pull requests when all plans are successfully applied.",
-		defaultValue: false,
 	},
 	DisableApplyAllFlag: {
 		description:  "Disable \"atlantis apply\" command without any flags (i.e. apply all). A specific project/workspace/directory has to be specified for applies.",

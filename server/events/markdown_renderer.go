@@ -56,7 +56,6 @@ type commonData struct {
 	Command                  string
 	Verbose                  bool
 	Log                      string
-	PlansDeleted             bool
 	DisableApplyAll          bool
 	DisableApply             bool
 	DisableRepoLocking       bool
@@ -110,7 +109,6 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log 
 		Command:                  commandStr,
 		Verbose:                  verbose,
 		Log:                      log,
-		PlansDeleted:             res.PlansDeleted,
 		DisableApplyAll:          m.DisableApplyAll || m.DisableApply,
 		DisableApply:             m.DisableApply,
 		DisableRepoLocking:       m.DisableRepoLocking,
@@ -155,7 +153,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				Failure: result.Failure,
 			})
 		} else if result.PlanSuccess != nil {
-			resultData.Rendered = m.renderTemplate(m.getProjectPlanSuccessTmpl(templateOverrides, vcsHost, result.PlanSuccess.TerraformOutput), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+			resultData.Rendered = m.renderTemplate(m.getProjectPlanSuccessTmpl(templateOverrides, vcsHost, result.PlanSuccess.TerraformOutput), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
 			resultData.Rendered = m.renderTemplate(m.getProjectPolicyCheckSuccessTmpl(templateOverrides, vcsHost, result.PolicyCheckSuccess.PolicyCheckOutput), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})

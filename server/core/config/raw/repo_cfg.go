@@ -7,9 +7,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
-// DefaultAutomerge is the default setting for automerge.
-const DefaultAutomerge = false
-
 // DefaultParallelApply is the default setting for parallel apply
 const DefaultParallelApply = false
 
@@ -28,7 +25,6 @@ type RepoCfg struct {
 	Projects                  []Project           `yaml:"projects,omitempty"`
 	Workflows                 map[string]Workflow `yaml:"workflows,omitempty"`
 	PolicySets                PolicySets          `yaml:"policies,omitempty"`
-	Automerge                 *bool               `yaml:"automerge,omitempty"`
 	ParallelApply             *bool               `yaml:"parallel_apply,omitempty"`
 	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
 	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
@@ -63,11 +59,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		validProjects = append(validProjects, p.ToValid())
 	}
 
-	automerge := DefaultAutomerge
-	if r.Automerge != nil {
-		automerge = *r.Automerge
-	}
-
 	parallelApply := DefaultParallelApply
 	if r.ParallelApply != nil {
 		parallelApply = *r.ParallelApply
@@ -82,7 +73,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		Version:                   *r.Version,
 		Projects:                  validProjects,
 		Workflows:                 validWorkflows,
-		Automerge:                 automerge,
 		ParallelApply:             parallelApply,
 		ParallelPlan:              parallelPlan,
 		ParallelPolicyCheck:       parallelPlan,

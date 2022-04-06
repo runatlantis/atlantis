@@ -434,52 +434,6 @@ func (g *GithubClient) UpdateStatus(ctx context.Context, request types.UpdateSta
 	return err
 }
 
-// MergePull merges the pull request.
-func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	// Users can set their repo to disallow certain types of merging.
-	// We detect which types aren't allowed and use the type that is.
-	g.logger.Debugf("GET /repos/%v/%v", pull.BaseRepo.Owner, pull.BaseRepo.Name)
-	repo, _, err := g.client.Repositories.Get(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name)
-	if err != nil {
-		return errors.Wrap(err, "fetching repo info")
-	}
-	const (
-		defaultMergeMethod = "merge"
-		rebaseMergeMethod  = "rebase"
-		squashMergeMethod  = "squash"
-	)
-	method := defaultMergeMethod
-	if !repo.GetAllowMergeCommit() {
-		if repo.GetAllowRebaseMerge() {
-			method = rebaseMergeMethod
-		} else if repo.GetAllowSquashMerge() {
-			method = squashMergeMethod
-		}
-	}
-
-	// Now we're ready to make our API call to merge the pull request.
-	options := &github.PullRequestOptions{
-		MergeMethod: method,
-	}
-	g.logger.Debugf("PUT /repos/%v/%v/pulls/%d/merge", repo.Owner, repo.Name, pull.Num)
-	mergeResult, _, err := g.client.PullRequests.Merge(
-		g.ctx,
-		pull.BaseRepo.Owner,
-		pull.BaseRepo.Name,
-		pull.Num,
-		// NOTE: Using the empty string here causes GitHub to autogenerate
-		// the commit message as it normally would.
-		"",
-		options)
-	if err != nil {
-		return errors.Wrap(err, "merging pull request")
-	}
-	if !mergeResult.GetMerged() {
-		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMessage())
-	}
-	return nil
-}
-
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
 func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil

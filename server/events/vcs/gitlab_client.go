@@ -278,35 +278,6 @@ func (g *GitlabClient) WaitForSuccessPipeline(ctx context.Context, pull models.P
 	}
 }
 
-// MergePull merges the merge request.
-func (g *GitlabClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	commitMsg := common.AutomergeCommitMsg
-
-	mr, err := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
-	if err != nil {
-		return errors.Wrap(
-			err, "unable to merge merge request, it was not possible to retrieve the merge request")
-	}
-	project, _, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
-	if err != nil {
-		return errors.Wrap(
-			err, "unable to merge merge request, it was not possible to check the project requirements")
-	}
-
-	if project != nil && project.OnlyAllowMergeIfPipelineSucceeds {
-		g.WaitForSuccessPipeline(context.Background(), pull)
-	}
-
-	_, _, err = g.Client.MergeRequests.AcceptMergeRequest(
-		pull.BaseRepo.FullName,
-		pull.Num,
-		&gitlab.AcceptMergeRequestOptions{
-			MergeCommitMessage:       &commitMsg,
-			ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
-		})
-	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
-}
-
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
 func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("!%d", pull.Num), nil

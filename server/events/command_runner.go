@@ -380,8 +380,6 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 	}
 }
 
-var automergeComment = `Automatically merging because all plans have been successfully applied.`
-
 type ForceApplyCommandRunner struct {
 	CommandRunner
 	VCSClient vcs.Client

@@ -64,7 +64,6 @@ workflows:
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -103,7 +102,6 @@ workflows:
       - apply`,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - dir: project1
   workspace: myworkspace
@@ -116,7 +114,6 @@ projects:
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -157,7 +154,6 @@ workflows:
       - apply`,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - dir: project1
   workspace: myworkspace
@@ -170,7 +166,6 @@ projects:
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -219,7 +214,6 @@ workflows:
       steps: []`,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - dir: project1
   workspace: myworkspace
@@ -232,7 +226,6 @@ projects:
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -274,7 +267,6 @@ workflows:
       - apply`,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - dir: project1
   workspace: myworkspace
@@ -301,7 +293,6 @@ workflows:
       - apply`,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - dir: project1
   workspace: myworkspace
@@ -329,7 +320,6 @@ workflows:
       - apply`,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - dir: project1
   workspace: myworkspace
@@ -358,7 +348,6 @@ workflows:
 `,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - dir: project1
   workspace: myworkspace
@@ -381,7 +370,6 @@ workflows:
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -425,7 +413,6 @@ workflows:
 `,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - dir: project1
   workspace: myworkspace
@@ -439,7 +426,6 @@ projects:
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -480,7 +466,6 @@ workflows:
 `,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - dir: project1
   workspace: myworkspace
@@ -500,7 +485,6 @@ workflows:
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -545,7 +529,6 @@ projects:
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -717,7 +700,6 @@ workflows:
       - apply`,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - name: myproject_1
   dir: project1
@@ -745,7 +727,6 @@ projects:
 				ApplyCmd:           "atlantis apply -p myproject_1",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logging.NewNoopLogger(t),
@@ -906,7 +887,6 @@ repos:
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -943,7 +923,6 @@ workflows:
 `,
 			repoCfg: `
 version: 3
-automerge: true
 projects:
 - dir: project1
   workspace: myworkspace
@@ -963,7 +942,6 @@ workflows:
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,

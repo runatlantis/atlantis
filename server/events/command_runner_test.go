@@ -62,7 +62,6 @@ var staleCommandChecker *mocks.MockStaleCommandChecker
 // readability however the tests were kept as is.
 var dbUpdater *events.DBUpdater
 var pullUpdater *events.PullUpdater
-var autoMerger *events.AutoMerger
 var policyCheckCommandRunner *events.PolicyCheckCommandRunner
 var approvePoliciesCommandRunner *events.ApprovePoliciesCommandRunner
 var planCommandRunner *events.PlanCommandRunner
@@ -104,11 +103,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		MarkdownRenderer:     &events.MarkdownRenderer{},
 	}
 
-	autoMerger = &events.AutoMerger{
-		VCSClient:       vcsClient,
-		GlobalAutomerge: false,
-	}
-
 	parallelPoolSize := 1
 	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
 		dbUpdater,
@@ -128,7 +122,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
-		autoMerger,
 		parallelPoolSize,
 	)
 
@@ -141,7 +134,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
-		autoMerger,
 		pullUpdater,
 		dbUpdater,
 		parallelPoolSize,
@@ -486,55 +478,6 @@ func TestRunAutoplanCommand_PreWorkflowHookError(t *testing.T) {
 	Equals(t, command.Plan, cmdName)
 }
 
-// Test that if one plan fails and we are using automerge, that
-// we delete the plans.
-func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
-	setup(t)
-	log := logging.NewNoopLogger(t)
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
-	boltDB, err := db.New(tmp)
-	Ok(t, err)
-	dbUpdater.DB = boltDB
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
-
-	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
-	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
-		ThenReturn([]command.ProjectContext{
-			{
-				CommandName: command.Plan,
-			},
-			{
-				CommandName: command.Plan,
-			},
-		}, nil)
-	callCount := 0
-	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
-		if callCount == 0 {
-			// The first call, we return a successful result.
-			callCount++
-			return ReturnValues{
-				command.ProjectResult{
-					PlanSuccess: &models.PlanSuccess{},
-				},
-			}
-		}
-		// The second call, we return a failed result.
-		return ReturnValues{
-			command.ProjectResult{
-				Error: errors.New("err"),
-			},
-		}
-	})
-
-	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
-		ThenReturn(tmp, nil)
-	fixtures.Pull.BaseRepo = fixtures.GithubRepo
-	ch.RunAutoplanCommand(log, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now())
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-}
-
 func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	t.Log("if \"atlantis approve_policies\" is run by non policy owner policy check status fails.")
 	setup(t)
@@ -544,8 +487,6 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
 	dbUpdater.DB = boltDB
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
 		State: github.String("open"),
@@ -592,8 +533,6 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
 	dbUpdater.DB = boltDB
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
 		State: github.String("open"),
@@ -650,8 +589,6 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
 	dbUpdater.DB = boltDB
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
 		State: github.String("open"),
@@ -694,68 +631,6 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 
 	When(workingDir.GetPullDir(fixtures.GithubRepo, modelPull)).ThenReturn(tmp, nil)
 	ch.RunCommentCommand(log, fixtures.GithubRepo, &fixtures.GithubRepo, &modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now())
-}
-
-func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
-	t.Log("if \"atlantis apply\" is run with automerge then a VCS merge is performed")
-
-	vcsClient := setup(t)
-	log := logging.NewNoopLogger(t)
-	pull := &github.PullRequest{
-		State: github.String("open"),
-	}
-	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
-	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
-
-	pullOptions := models.PullRequestOptions{
-		DeleteSourceBranchOnMerge: false,
-	}
-
-	ch.RunCommentCommand(log, fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now())
-	vcsClient.VerifyWasCalledOnce().MergePull(modelPull, pullOptions)
-}
-
-func TestRunApply_DiscardedProjects(t *testing.T) {
-	t.Log("if \"atlantis apply\" is run with automerge and at least one project" +
-		" has a discarded plan, automerge should not take place")
-	vcsClient := setup(t)
-	log := logging.NewNoopLogger(t)
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
-	boltDB, err := db.New(tmp)
-	Ok(t, err)
-	dbUpdater.DB = boltDB
-	pull := fixtures.Pull
-	pull.BaseRepo = fixtures.GithubRepo
-	_, err = boltDB.UpdatePullWithResults(pull, []command.ProjectResult{
-		{
-			Command:    command.Plan,
-			RepoRelDir: ".",
-			Workspace:  "default",
-			PlanSuccess: &models.PlanSuccess{
-				TerraformOutput: "tf-output",
-				LockURL:         "lock-url",
-			},
-		},
-	})
-	Ok(t, err)
-	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus))
-	ghPull := &github.PullRequest{
-		State: github.String("open"),
-	}
-	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(ghPull, nil)
-	When(eventParsing.ParseGithubPull(ghPull)).ThenReturn(pull, pull.BaseRepo, fixtures.GithubRepo, nil)
-	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
-		ThenReturn(tmp, nil)
-	ch.RunCommentCommand(log, fixtures.GithubRepo, &fixtures.GithubRepo, &pull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now())
-
-	vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 }
 
 func TestRunCommentCommand_DrainOngoing(t *testing.T) {

@@ -17,7 +17,6 @@ import (
 
 var dbUpdater *events.DBUpdater
 var pullUpdater *events.PullUpdater
-var autoMerger *events.AutoMerger
 var policyCheckCommandRunner *events.PolicyCheckCommandRunner
 var planCommandRunner *events.PlanCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner

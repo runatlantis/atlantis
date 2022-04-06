@@ -20,8 +20,6 @@ const (
 	// DefaultWorkspace is the default Terraform workspace we run commands in.
 	// This is also Terraform's default workspace.
 	DefaultWorkspace = "default"
-	// DefaultAutomergeEnabled is the default for the automerge setting.
-	DefaultAutomergeEnabled = false
 	// DefaultParallelApplyEnabled is the default for the parallel apply setting.
 	DefaultParallelApplyEnabled = false
 	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
@@ -255,7 +253,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			ctx.Log.Debugf("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
 			contextFlags := &command.ContextFlags{
-				Automerge:                 repoCfg.Automerge,
 				Verbose:                   verbose,
 				ForceApply:                forceApply,
 				ParallelApply:             repoCfg.ParallelApply,
@@ -286,7 +283,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
 
 			contextFlags := &command.ContextFlags{
-				Automerge:                 DefaultAutomergeEnabled,
 				Verbose:                   verbose,
 				ForceApply:                forceApply,
 				ParallelApply:             DefaultParallelApplyEnabled,
@@ -548,17 +544,14 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	}
 	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
-	automerge := DefaultAutomergeEnabled
 	parallelApply := DefaultParallelApplyEnabled
 	parallelPlan := DefaultParallelPlanEnabled
 	if repoCfgPtr != nil {
-		automerge = repoCfgPtr.Automerge
 		parallelApply = repoCfgPtr.ParallelApply
 		parallelPlan = repoCfgPtr.ParallelPlan
 	}
 
 	contextFlags := &command.ContextFlags{
-		Automerge:     automerge,
 		Verbose:       verbose,
 		ForceApply:    forceApply,
 		ParallelApply: parallelApply,

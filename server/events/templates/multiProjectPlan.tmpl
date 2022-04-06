@@ -6,7 +6,7 @@ Ran {{.Command}} for {{ len .Results }} projects:
 {{$result.Rendered}}
 
 {{ if ne $disableApplyAll true }}---
-{{end}}{{end}}{{ if ne .DisableApplyAll true }}{{ if and (gt (len .Results) 0) (not .PlansDeleted) }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+{{end}}{{end}}{{ if ne .DisableApplyAll true }}{{ if gt (len .Results) 0 }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * `atlantis apply`
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
     * `atlantis unlock`{{end}}{{end}}{{if .Verbose}}

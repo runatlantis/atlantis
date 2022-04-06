@@ -648,11 +648,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GlobalCfg:            globalCfg,
 	}
 
-	autoMerger := &events.AutoMerger{
-		VCSClient:       vcsClient,
-		GlobalAutomerge: userConfig.Automerge,
-	}
-
 	session, err := aws.NewSession()
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing new aws session")
@@ -735,7 +730,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
-		autoMerger,
 		userConfig.ParallelPoolSize,
 	)
 
@@ -746,7 +740,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
-		autoMerger,
 		pullUpdater,
 		dbUpdater,
 		userConfig.ParallelPoolSize,
@@ -783,7 +776,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
-		autoMerger,
 		userConfig.ParallelPoolSize,
 	)
 

@@ -18,7 +18,6 @@ func NewPlanCommandRunner(
 	dbUpdater *DBUpdater,
 	pullUpdater *PullUpdater,
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
-	autoMerger *AutoMerger,
 	parallelPoolSize int,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
@@ -31,7 +30,6 @@ func NewPlanCommandRunner(
 		dbUpdater:                dbUpdater,
 		pullUpdater:              pullUpdater,
 		policyCheckCommandRunner: policyCheckCommandRunner,
-		autoMerger:               autoMerger,
 		parallelPoolSize:         parallelPoolSize,
 	}
 }
@@ -46,7 +44,6 @@ type PlanCommandRunner struct {
 	dbUpdater                *DBUpdater
 	pullUpdater              *PullUpdater
 	policyCheckCommandRunner *PolicyCheckCommandRunner
-	autoMerger               *AutoMerger
 	parallelPoolSize         int
 }
 
@@ -97,12 +94,6 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
 
-	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
-		ctx.Log.Infof("deleting plans because there were errors and automerge requires all plans succeed")
-		p.deletePlans(ctx)
-		result.PlansDeleted = true
-	}
-
 	p.pullUpdater.UpdatePull(ctx, AutoplanCommand{}, result)
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
@@ -113,8 +104,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	p.updateCommitStatus(ctx, pullStatus)
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
-	if len(policyCheckCmds) > 0 &&
-		!(result.HasErrors() || result.PlansDeleted) {
+	if len(policyCheckCmds) > 0 && !result.HasErrors() {
 		// Run policy_check command
 		ctx.Log.Infof("Running policy_checks for all plans")
 
@@ -157,12 +147,6 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
 
-	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
-		ctx.Log.Infof("deleting plans because there were errors and automerge requires all plans succeed")
-		p.deletePlans(ctx)
-		result.PlansDeleted = true
-	}
-
 	p.pullUpdater.UpdatePull(
 		ctx,
 		cmd,
@@ -178,8 +162,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
-	if len(result.ProjectResults) > 0 &&
-		!(result.HasErrors() || result.PlansDeleted) {
+	if len(result.ProjectResults) > 0 && !result.HasErrors() {
 		ctx.Log.Infof("Running policy check for %s", cmd.String())
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	}

@@ -92,8 +92,6 @@ type CommentCommand struct {
 	Flags []string
 	// Name is the name of the command the comment specified.
 	Name command.Name
-	// AutoMergeDisabled is true if the command should not automerge after apply.
-	AutoMergeDisabled bool
 	// Verbose is true if the command should output verbosely.
 	Verbose bool
 	//ForceApply is true of the command should ignore apply_requirments.
@@ -135,7 +133,7 @@ func (c CommentCommand) String() string {
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name command.Name, verbose, forceApply, autoMergeDisabled bool, workspace string, project string) *command.Comment {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, verbose, forceApply bool, workspace string, project string) *command.Comment {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -145,14 +143,13 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, ver
 		}
 	}
 	return &command.Comment{
-		RepoRelDir:        repoRelDir,
-		Flags:             flags,
-		Name:              name,
-		Verbose:           verbose,
-		Workspace:         workspace,
-		AutoMergeDisabled: autoMergeDisabled,
-		ProjectName:       project,
-		ForceApply:        forceApply,
+		RepoRelDir:  repoRelDir,
+		Flags:       flags,
+		Name:        name,
+		Verbose:     verbose,
+		Workspace:   workspace,
+		ProjectName: project,
+		ForceApply:  forceApply,
 	}
 }
 

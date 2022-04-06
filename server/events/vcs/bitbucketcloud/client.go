@@ -199,13 +199,6 @@ func (b *Client) UpdateStatus(ctx context.Context, request types.UpdateStatusReq
 	return err
 }
 
-// MergePull merges the pull request.
-func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/merge", b.BaseURL, pull.BaseRepo.FullName, pull.Num)
-	_, err := b.makeRequest("POST", path, nil)
-	return err
-}
-
 // MarkdownPullLink specifies the character used in a pull request comment.
 func (b *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil

@@ -129,21 +129,6 @@ func (mock *MockClient) UpdateStatus(ctx context.Context, request types.UpdateSt
 	return ret0
 }
 
-func (mock *MockClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockClient().")
-	}
-	params := []pegomock.Param{pull, pullOptions}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("MergePull", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(error)
-		}
-	}
-	return ret0
-}
-
 func (mock *MockClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
@@ -431,37 +416,6 @@ func (c *MockClient_UpdateStatus_OngoingVerification) GetAllCapturedArguments() 
 		_param1 = make([]types.UpdateStatusRequest, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(types.UpdateStatusRequest)
-		}
-	}
-	return
-}
-
-func (verifier *VerifierMockClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) *MockClient_MergePull_OngoingVerification {
-	params := []pegomock.Param{pull, pullOptions}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "MergePull", params, verifier.timeout)
-	return &MockClient_MergePull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
-
-type MockClient_MergePull_OngoingVerification struct {
-	mock              *MockClient
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *MockClient_MergePull_OngoingVerification) GetCapturedArguments() (models.PullRequest, models.PullRequestOptions) {
-	pull, pullOptions := c.GetAllCapturedArguments()
-	return pull[len(pull)-1], pullOptions[len(pullOptions)-1]
-}
-
-func (c *MockClient_MergePull_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest, _param1 []models.PullRequestOptions) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]models.PullRequest, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(models.PullRequest)
-		}
-		_param1 = make([]models.PullRequestOptions, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequestOptions)
 		}
 	}
 	return

@@ -295,67 +295,6 @@ func (g *AzureDevopsClient) UpdateStatus(ctx context.Context, request types.Upda
 	return err
 }
 
-// MergePull merges the merge request using the default no fast-forward strategy
-// If the user has set a branch policy that disallows no fast-forward, the merge will fail
-// until we handle branch policies
-// https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
-func (g *AzureDevopsClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
-	descriptor := "Atlantis Terraform Pull Request Automation"
-
-	userID, err := g.Client.UserEntitlements.GetUserID(g.ctx, g.UserName, owner)
-	if err != nil {
-		return errors.Wrapf(err, "Getting user id failed. User name: %s Organization %s ", g.UserName, owner)
-	}
-	if userID == nil {
-		return fmt.Errorf("the user %s is not found in the organization %s", g.UserName, owner)
-	}
-
-	imageURL := "https://github.com/runatlantis/atlantis/raw/master/runatlantis.io/.vuepress/public/hero.png"
-	id := azuredevops.IdentityRef{
-		Descriptor: &descriptor,
-		ID:         userID,
-		ImageURL:   &imageURL,
-	}
-	// Set default pull request completion options
-	mcm := azuredevops.NoFastForward.String()
-	twi := new(bool)
-	*twi = true
-	completionOpts := azuredevops.GitPullRequestCompletionOptions{
-		BypassPolicy:            new(bool),
-		BypassReason:            azuredevops.String(""),
-		DeleteSourceBranch:      &pullOptions.DeleteSourceBranchOnMerge,
-		MergeCommitMessage:      azuredevops.String(common.AutomergeCommitMsg),
-		MergeStrategy:           &mcm,
-		SquashMerge:             new(bool),
-		TransitionWorkItems:     twi,
-		TriggeredByAutoComplete: new(bool),
-	}
-
-	// Construct request body from supplied parameters
-	mergePull := new(azuredevops.GitPullRequest)
-	mergePull.AutoCompleteSetBy = &id
-	mergePull.CompletionOptions = &completionOpts
-
-	mergeResult, _, err := g.Client.PullRequests.Merge(
-		g.ctx,
-		owner,
-		project,
-		repoName,
-		pull.Num,
-		mergePull,
-		completionOpts,
-		id,
-	)
-	if err != nil {
-		return errors.Wrap(err, "merging pull request")
-	}
-	if *mergeResult.MergeStatus != azuredevops.MergeSucceeded.String() {
-		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMergeFailureMessage())
-	}
-	return nil
-}
-
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
 func (g *AzureDevopsClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("!%d", pull.Num), nil

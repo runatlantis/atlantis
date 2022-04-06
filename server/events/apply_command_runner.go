@@ -16,7 +16,6 @@ func NewApplyCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
 	prjCmdRunner ProjectApplyCommandRunner,
-	autoMerger *AutoMerger,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
 	parallelPoolSize int,
@@ -29,7 +28,6 @@ func NewApplyCommandRunner(
 		commitStatusUpdater:  commitStatusUpdater,
 		prjCmdBuilder:        prjCommandBuilder,
 		prjCmdRunner:         prjCmdRunner,
-		autoMerger:           autoMerger,
 		pullUpdater:          pullUpdater,
 		dbUpdater:            dbUpdater,
 		parallelPoolSize:     parallelPoolSize,
@@ -44,7 +42,6 @@ type ApplyCommandRunner struct {
 	commitStatusUpdater  CommitStatusUpdater
 	prjCmdBuilder        ProjectApplyCommandBuilder
 	prjCmdRunner         ProjectApplyCommandRunner
-	autoMerger           *AutoMerger
 	pullUpdater          *PullUpdater
 	dbUpdater            *DBUpdater
 	parallelPoolSize     int
@@ -132,10 +129,6 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	}
 
 	a.updateCommitStatus(ctx, pullStatus)
-
-	if a.autoMerger.automergeEnabled(projectCmds) && !cmd.AutoMergeDisabled {
-		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds))
-	}
 }
 
 func (a *ApplyCommandRunner) IsLocked() (bool, error) {

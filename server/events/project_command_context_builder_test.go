@@ -49,7 +49,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 
 	t.Run("with project name defined", func(t *testing.T) {
 		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, projName, []string{})).ThenReturn(expectedPlanCmt)
-		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, projName, false)).ThenReturn(expectedApplyCmt)
+		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, projName)).ThenReturn(expectedApplyCmt)
 
 		pullStatus.Projects = []models.ProjectStatus{
 			{
@@ -59,7 +59,6 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			},
 		}
 		contextFlags := &command.ContextFlags{
-			Automerge:                 false,
 			DeleteSourceBranchOnMerge: false,
 			ParallelApply:             false,
 			ParallelPlan:              false,
@@ -74,7 +73,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 	t.Run("when ParallelApply is set to true", func(t *testing.T) {
 		projCfg.Name = "Apply Comment"
 		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, "", []string{})).ThenReturn(expectedPlanCmt)
-		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "", false)).ThenReturn(expectedApplyCmt)
+		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "")).ThenReturn(expectedApplyCmt)
 		pullStatus.Projects = []models.ProjectStatus{
 			{
 				Status:     models.ErroredPlanStatus,
@@ -86,7 +85,6 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			},
 		}
 		contextFlags := &command.ContextFlags{
-			Automerge:                 false,
 			DeleteSourceBranchOnMerge: false,
 			ParallelApply:             true,
 			ParallelPlan:              false,

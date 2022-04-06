@@ -213,21 +213,6 @@ func (mock *MockIGithubClient) MarkdownPullLink(_param0 models.PullRequest) (str
 	return ret0, ret1
 }
 
-func (mock *MockIGithubClient) MergePull(_param0 models.PullRequest, _param1 models.PullRequestOptions) error {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockIGithubClient().")
-	}
-	params := []pegomock.Param{_param0, _param1}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("MergePull", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(error)
-		}
-	}
-	return ret0
-}
-
 func (mock *MockIGithubClient) PullIsApproved(_param0 models.Repo, _param1 models.PullRequest) (models.ApprovalStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockIGithubClient().")
@@ -654,37 +639,6 @@ func (c *MockIGithubClient_MarkdownPullLink_OngoingVerification) GetAllCapturedA
 		_param0 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.PullRequest)
-		}
-	}
-	return
-}
-
-func (verifier *VerifierMockIGithubClient) MergePull(_param0 models.PullRequest, _param1 models.PullRequestOptions) *MockIGithubClient_MergePull_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "MergePull", params, verifier.timeout)
-	return &MockIGithubClient_MergePull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
-
-type MockIGithubClient_MergePull_OngoingVerification struct {
-	mock              *MockIGithubClient
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *MockIGithubClient_MergePull_OngoingVerification) GetCapturedArguments() (models.PullRequest, models.PullRequestOptions) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
-}
-
-func (c *MockIGithubClient_MergePull_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest, _param1 []models.PullRequestOptions) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]models.PullRequest, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(models.PullRequest)
-		}
-		_param1 = make([]models.PullRequestOptions, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequestOptions)
 		}
 	}
 	return

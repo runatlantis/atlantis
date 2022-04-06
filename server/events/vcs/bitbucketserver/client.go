@@ -249,31 +249,6 @@ func (b *Client) UpdateStatus(ctx context.Context, request types.UpdateStatusReq
 	return err
 }
 
-// MergePull merges the pull request.
-func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	projectKey, err := b.GetProjectKey(pull.BaseRepo.Name, pull.BaseRepo.SanitizedCloneURL)
-	if err != nil {
-		return err
-	}
-
-	// We need to make a get pull request API call to get the correct "version".
-	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num)
-	resp, err := b.makeRequest("GET", path, nil)
-	if err != nil {
-		return err
-	}
-	var pullResp PullRequest
-	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return errors.Wrapf(err, "Could not parse response %q", string(resp))
-	}
-	if err := validator.New().Struct(pullResp); err != nil {
-		return errors.Wrapf(err, "API response %q was missing fields", string(resp))
-	}
-	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
-	_, err = b.makeRequest("POST", path, nil)
-	return err
-}
-
 // MarkdownPullLink specifies the character used in a pull request comment.
 func (b *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil
