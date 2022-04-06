@@ -476,9 +476,9 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 
 func TestGithubClient_PullIsMergeable(t *testing.T) {
 	cases := []struct {
-		state        string
-		expMergeable bool
-		useStatus    bool
+		state              string
+		expMergeable       bool
+		pendingApplyStatus bool
 	}{
 		{
 			"dirty",
@@ -547,7 +547,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 
 			var statusBytes []byte
 			var err error
-			if c.useStatus {
+			if c.pendingApplyStatus {
 				statusBytes, err = os.ReadFile("fixtures/github-commit-status-full.json")
 			} else {
 				statusBytes, err = os.ReadFile("fixtures/github-commit-status-empty.json")
