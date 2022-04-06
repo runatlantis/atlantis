@@ -22,6 +22,7 @@ func NewPlanCommandRunner(
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	pullStatusFetcher PullStatusFetcher,
+	pendingApplyStatus bool,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -39,6 +40,7 @@ func NewPlanCommandRunner(
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		pullStatusFetcher:          pullStatusFetcher,
+		pendingApplyStatus:         pendingApplyStatus,
 	}
 }
 
@@ -64,6 +66,8 @@ type PlanCommandRunner struct {
 	autoMerger                 *AutoMerger
 	parallelPoolSize           int
 	pullStatusFetcher          PullStatusFetcher
+	// PendingApplyStatus is whether any plan should set pending apply status
+	pendingApplyStatus bool
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -102,11 +106,13 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	if err := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
+	if err := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
 		ctx.Log.Warn("unable to update plan commit status: %s", err)
 	}
-	if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.ApplyCommand, 0, len(projectCmds)); err != nil {
-		ctx.Log.Warn("unable to update apply commit status: %s", err)
+	if p.pendingApplyStatus {
+		if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply, 0, len(projectCmds)); err != nil {
+			ctx.Log.Warn("unable to update apply commit status: %s", err)
+		}
 	}
 
 	// Only run commands in parallel if enabled
@@ -184,11 +190,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
 
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	if err := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
+	if err := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
 		ctx.Log.Warn("unable to update plan commit status: %s", err)
 	}
-	if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.ApplyCommand, 0, len(projectCmds)); err != nil {
-		ctx.Log.Warn("unable to update apply commit status: %s", err)
+	if p.pendingApplyStatus {
+		if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply, 0, len(projectCmds)); err != nil {
+			ctx.Log.Warn("unable to update apply commit status: %s", err)
+		}
 	}
 
 	// Only run commands in parallel if enabled

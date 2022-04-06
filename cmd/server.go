@@ -82,6 +82,7 @@ const (
 	ParallelPoolSize           = "parallel-pool-size"
 	StatsNamespace             = "stats-namespace"
 	AllowDraftPRs              = "allow-draft-prs"
+	PendingApplyStatus         = "pending-apply-status"
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
 	RepoConfigJSONFlag         = "repo-config-json"
@@ -371,6 +372,10 @@ var boolFlags = map[string]boolFlag{
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
+	PendingApplyStatus: {
+		description:  "Set pending \"atlantis/apply\" commit status when planning.",
 		defaultValue: false,
 	},
 	RequireApprovalFlag: {

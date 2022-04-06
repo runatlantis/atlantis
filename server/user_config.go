@@ -50,6 +50,7 @@ type UserConfig struct {
 	LogLevel                   string `mapstructure:"log-level"`
 	ParallelPoolSize           int    `mapstructure:"parallel-pool-size"`
 	StatsNamespace             string `mapstructure:"stats-namespace"`
+	PendingApplyStatus         bool   `mapstructure:"pending-apply-status"`
 	PlanDrafts                 bool   `mapstructure:"allow-draft-prs"`
 	Port                       int    `mapstructure:"port"`
 	RepoConfig                 string `mapstructure:"repo-config"`

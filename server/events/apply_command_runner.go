@@ -112,7 +112,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
-	var projectCmds []models.ProjectCommandContext
+	var projectCmds []command.ProjectContext
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 
 	if err != nil {
