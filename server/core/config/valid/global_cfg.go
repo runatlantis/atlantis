@@ -39,12 +39,17 @@ type GlobalCfg struct {
 }
 
 type Metrics struct {
-	Statsd *Statsd
+	Statsd     *Statsd
+	Prometheus *Prometheus
 }
 
 type Statsd struct {
 	Port string
 	Host string
+}
+
+type Prometheus struct {
+	Enabled bool
 }
 
 // Repo is the final parsed version of server-side repo config.
