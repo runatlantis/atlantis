@@ -67,7 +67,6 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		Pull:     newPull,
 		Log:      log,
 		User:     fixtures.User,
-		Verbose:  false,
 	}
 
 	repoDir := "path/to/repo"

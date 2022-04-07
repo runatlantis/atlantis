@@ -130,7 +130,7 @@ type DefaultProjectCommandBuilder struct {
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
-	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false, false)
+	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 // See ProjectCommandBuilder.BuildPlanCommands.
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *command.Comment) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
-		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose, cmd.ForceApply)
+		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.ForceApply)
 	}
 	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
 	return pcc, err
@@ -177,7 +177,7 @@ func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
 // modified in this ctx.
-func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context, commentFlags []string, verbose bool, forceApply bool) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context, commentFlags []string, forceApply bool) ([]command.ProjectContext, error) {
 	// We'll need the list of modified files.
 	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
@@ -253,7 +253,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			ctx.Log.Debugf("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
 			contextFlags := &command.ContextFlags{
-				Verbose:                   verbose,
 				ForceApply:                forceApply,
 				ParallelApply:             repoCfg.ParallelApply,
 				ParallelPlan:              repoCfg.ParallelPlan,
@@ -283,7 +282,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
 
 			contextFlags := &command.ContextFlags{
-				Verbose:                   verbose,
 				ForceApply:                forceApply,
 				ParallelApply:             DefaultParallelApplyEnabled,
 				ParallelPlan:              DefaultParallelPlanEnabled,
@@ -346,7 +344,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		defaultRepoDir,
 		repoRelDir,
 		workspace,
-		cmd.Verbose,
 		cmd.ForceApply,
 	)
 }
@@ -433,7 +430,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *command.Cont
 
 	var cmds []command.ProjectContext
 	for _, plan := range plans {
-		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose, commentCmd.ForceApply)
+		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.ForceApply)
 		if err != nil {
 			return nil, errors.Wrapf(err, "building command for dir %q", plan.RepoRelDir)
 		}
@@ -479,7 +476,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *command.Con
 		repoDir,
 		repoRelDir,
 		workspace,
-		cmd.Verbose,
 		cmd.ForceApply,
 	)
 }
@@ -521,7 +517,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *command.C
 		repoDir,
 		repoRelDir,
 		workspace,
-		cmd.Verbose,
 		cmd.ForceApply,
 	)
 }
@@ -535,7 +530,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	repoDir string,
 	repoRelDir string,
 	workspace string,
-	verbose bool,
 	forceApply bool) ([]command.ProjectContext, error) {
 
 	matchingProjects, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
@@ -552,7 +546,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	}
 
 	contextFlags := &command.ContextFlags{
-		Verbose:       verbose,
 		ForceApply:    forceApply,
 		ParallelApply: parallelApply,
 		ParallelPlan:  parallelPlan,

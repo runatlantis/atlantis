@@ -594,7 +594,6 @@ projects:
 					RepoRelDir:  "",
 					Flags:       nil,
 					Name:        command.Plan,
-					Verbose:     false,
 					Workspace:   "",
 					ProjectName: "",
 				})
@@ -684,7 +683,6 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 			RepoRelDir:  "",
 			Flags:       nil,
 			Name:        command.Apply,
-			Verbose:     false,
 			Workspace:   "",
 			ProjectName: "",
 		})
@@ -770,7 +768,6 @@ projects:
 		RepoRelDir:  ".",
 		Flags:       nil,
 		Name:        command.Plan,
-		Verbose:     false,
 		Workspace:   "notconfigured",
 		ProjectName: "",
 	})
@@ -846,7 +843,6 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
 				Name:       command.Plan,
-				Verbose:    false,
 				Workspace:  "default",
 			})
 			Ok(t, err)
@@ -1028,7 +1024,6 @@ projects:
 					RepoRelDir: "",
 					Flags:      nil,
 					Name:       command.Plan,
-					Verbose:    false,
 				})
 
 			Ok(t, err)
@@ -1236,7 +1231,6 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 			RepoRelDir:  "",
 			Flags:       nil,
 			Name:        command.Version,
-			Verbose:     false,
 			Workspace:   "",
 			ProjectName: "",
 		})

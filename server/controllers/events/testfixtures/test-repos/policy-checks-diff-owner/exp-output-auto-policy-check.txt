@@ -12,4 +12,3 @@ FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibit
 ```
 * :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.
 
-

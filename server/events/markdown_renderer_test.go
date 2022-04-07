@@ -169,7 +169,7 @@ $$$
 		}
 		expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 		t.Run(fmt.Sprintf("%s_%t", c.Description, false), func(t *testing.T) {
-			s := r.Render(res, c.Command, "log", false, models.Github, c.TemplateOverrides)
+			s := r.Render(res, c.Command, models.Github, c.TemplateOverrides)
 			Equals(t, expWithBackticks, s)
 		})
 	}
@@ -209,16 +209,10 @@ func TestRenderErrorf(t *testing.T) {
 		res := command.Result{
 			Error: c.Error,
 		}
-		for _, verbose := range []bool{true, false} {
-			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
-				s := r.Render(res, c.Command, "log", verbose, models.Github, make(map[string]string))
-				if !verbose {
-					Equals(t, c.Expected, s)
-				} else {
-					Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
-				}
-			})
-		}
+		t.Run(c.Description, func(t *testing.T) {
+			s := r.Render(res, c.Command, models.Github, make(map[string]string))
+			Equals(t, c.Expected, s)
+		})
 	}
 }
 
@@ -255,16 +249,10 @@ func TestRenderFailure(t *testing.T) {
 		res := command.Result{
 			Failure: c.Failure,
 		}
-		for _, verbose := range []bool{true, false} {
-			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
-				s := r.Render(res, c.Command, "log", verbose, models.Github, make(map[string]string))
-				if !verbose {
-					Equals(t, c.Expected, s)
-				} else {
-					Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
-				}
-			})
-		}
+		t.Run(c.Description, func(t *testing.T) {
+			s := r.Render(res, c.Command, models.Github, make(map[string]string))
+			Equals(t, c.Expected, s)
+		})
 	}
 }
 
@@ -274,7 +262,7 @@ func TestRenderErrAndFailure(t *testing.T) {
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-	s := r.Render(res, command.Plan, "", false, models.Github, make(map[string]string))
+	s := r.Render(res, command.Plan, models.Github, make(map[string]string))
 	Equals(t, "**Plan Error**\n```\nerror\n```\n", s)
 }
 
@@ -298,7 +286,7 @@ func TestRenderProjectResults(t *testing.T) {
 			command.ApprovePolicies,
 			[]command.ProjectResult{},
 			models.Github,
-			"Approved Policies for 0 projects:\n\n\n\n",
+			"Approved Policies for 0 projects:\n\n\n",
 		},
 		{
 			"single successful plan",
@@ -461,7 +449,6 @@ $$$
 $$$diff
 success
 $$$
-
 `,
 		},
 		{
@@ -481,7 +468,6 @@ $$$
 $$$diff
 success
 $$$
-
 `,
 		},
 		{
@@ -662,7 +648,6 @@ $$$
 $$$
 error
 $$$
-
 `,
 		},
 		{
@@ -679,7 +664,6 @@ $$$
 			`Ran Plan for dir: $path$ workspace: $workspace$
 
 **Plan Failed**: failure
-
 `,
 		},
 		{
@@ -913,17 +897,12 @@ $$$
 			res := command.Result{
 				ProjectResults: c.ProjectResults,
 			}
-			for _, verbose := range []bool{true, false} {
-				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost, make(map[string]string))
-					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
-					if !verbose {
-						Equals(t, expWithBackticks, s)
-					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
-					}
-				})
-			}
+			t.Run(c.Description, func(t *testing.T) {
+				s := r.Render(res, c.Command, c.VCSHost, make(map[string]string))
+				expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+				Equals(t, expWithBackticks, s)
+
+			})
 		})
 	}
 }
@@ -1066,17 +1045,11 @@ $$$
 			res := command.Result{
 				ProjectResults: c.ProjectResults,
 			}
-			for _, verbose := range []bool{true, false} {
-				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost, make(map[string]string))
-					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
-					if !verbose {
-						Equals(t, expWithBackticks, s)
-					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
-					}
-				})
-			}
+			t.Run(c.Description, func(t *testing.T) {
+				s := r.Render(res, c.Command, c.VCSHost, make(map[string]string))
+				expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+				Equals(t, expWithBackticks, s)
+			})
 		})
 	}
 }
@@ -1212,17 +1185,11 @@ $$$
 			res := command.Result{
 				ProjectResults: c.ProjectResults,
 			}
-			for _, verbose := range []bool{true, false} {
-				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost, make(map[string]string))
-					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
-					if !verbose {
-						Equals(t, expWithBackticks, s)
-					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
-					}
-				})
-			}
+			t.Run(c.Description, func(t *testing.T) {
+				s := r.Render(res, c.Command, c.VCSHost, make(map[string]string))
+				expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+				Equals(t, expWithBackticks, s)
+			})
 		})
 	}
 }
@@ -1241,7 +1208,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 				Error:      errors.New(strings.Repeat("line\n", 13)),
 			},
 		},
-	}, command.Plan, "log", false, models.Github, make(map[string]string))
+	}, command.Plan, models.Github, make(map[string]string))
 	Equals(t, false, strings.Contains(rendered, "<details>"))
 }
 
@@ -1325,7 +1292,7 @@ func TestRenderProjectResults_WrappedErrorf(t *testing.T) {
 							Error:      errors.New(c.Output),
 						},
 					},
-				}, command.Plan, "log", false, c.VCSHost, make(map[string]string))
+				}, command.Plan, c.VCSHost, make(map[string]string))
 				var exp string
 				if c.ShouldWrap {
 					exp = `Ran Plan for dir: $.$ workspace: $default$
@@ -1337,7 +1304,6 @@ $$$
 ` + c.Output + `
 $$$
 </details>
-
 `
 				} else {
 					exp = `Ran Plan for dir: $.$ workspace: $default$
@@ -1346,7 +1312,6 @@ $$$
 $$$
 ` + c.Output + `
 $$$
-
 `
 				}
 
@@ -1450,7 +1415,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 					}
 					rendered := mr.Render(command.Result{
 						ProjectResults: []command.ProjectResult{pr},
-					}, cmd, "log", false, c.VCSHost, make(map[string]string))
+					}, cmd, c.VCSHost, make(map[string]string))
 
 					// Check result.
 					var exp string
@@ -1509,7 +1474,6 @@ $$$diff
 ` + c.Output + `
 $$$
 </details>
-
 `
 						} else {
 							exp = `Ran Apply for dir: $.$ workspace: $default$
@@ -1517,7 +1481,6 @@ $$$
 $$$diff
 ` + c.Output + `
 $$$
-
 `
 						}
 					}
@@ -1545,7 +1508,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 				ApplySuccess: tfOut,
 			},
 		},
-	}, command.Apply, "log", false, models.Github, make(map[string]string))
+	}, command.Apply, models.Github, make(map[string]string))
 	exp := `Ran Apply for 2 projects:
 
 1. dir: $.$ workspace: $staging$
@@ -1601,7 +1564,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 				},
 			},
 		},
-	}, command.Plan, "log", false, models.Github, make(map[string]string))
+	}, command.Plan, models.Github, make(map[string]string))
 	exp := `Ran Plan for 2 projects:
 
 1. dir: $.$ workspace: $staging$
@@ -1786,7 +1749,6 @@ $$$
 $$$diff
 success
 $$$
-
 `,
 		},
 		{
@@ -1806,7 +1768,6 @@ $$$
 $$$diff
 success
 $$$
-
 `,
 		},
 		{
@@ -1923,7 +1884,6 @@ $$$
 $$$
 error
 $$$
-
 `,
 		},
 		{
@@ -1940,7 +1900,6 @@ $$$
 			`Ran Plan for dir: $path$ workspace: $workspace$
 
 **Plan Failed**: failure
-
 `,
 		},
 		{
@@ -2107,17 +2066,11 @@ $$$
 			res := command.Result{
 				ProjectResults: c.ProjectResults,
 			}
-			for _, verbose := range []bool{true, false} {
-				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost, make(map[string]string))
-					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
-					if !verbose {
-						Equals(t, expWithBackticks, s)
-					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
-					}
-				})
-			}
+			t.Run(c.Description, func(t *testing.T) {
+				s := r.Render(res, c.Command, c.VCSHost, make(map[string]string))
+				expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+				Equals(t, expWithBackticks, s)
+			})
 		})
 	}
 }
@@ -2387,17 +2340,11 @@ Plan: 1 to add, 1 to change, 1 to destroy.
 			res := command.Result{
 				ProjectResults: c.ProjectResults,
 			}
-			for _, verbose := range []bool{true, false} {
-				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost, make(map[string]string))
-					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
-					if !verbose {
-						Equals(t, expWithBackticks, s)
-					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
-					}
-				})
-			}
+			t.Run(c.Description, func(t *testing.T) {
+				s := r.Render(res, c.Command, c.VCSHost, make(map[string]string))
+				expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+				Equals(t, expWithBackticks, s)
+			})
 		})
 	}
 }

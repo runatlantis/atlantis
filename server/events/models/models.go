@@ -492,6 +492,4 @@ type PreWorkflowHookCommandContext struct {
 	Pull PullRequest
 	// User is the user that triggered this command.
 	User User
-	// Verbose is true when the user would like verbose output.
-	Verbose bool
 }

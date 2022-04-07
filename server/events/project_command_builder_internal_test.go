@@ -76,7 +76,6 @@ workflows:
 				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:        "project1",
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -128,7 +127,6 @@ projects:
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -180,7 +178,6 @@ projects:
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -240,7 +237,6 @@ projects:
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -384,7 +380,6 @@ workflows:
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -440,7 +435,6 @@ projects:
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -499,7 +493,6 @@ workflows:
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -542,7 +535,6 @@ projects:
 				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:        "project1",
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -614,7 +606,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							Mergeable: true,
 						},
-					}, cmd, "", []string{"flag"}, tmp, "project1", "myworkspace", true, false)
+					}, cmd, "", []string{"flag"}, tmp, "project1", "myworkspace", false)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -741,7 +733,6 @@ projects:
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -807,7 +798,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							Mergeable: true,
 						},
-					}, cmd, "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true, false)
+					}, cmd, "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", false)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -899,7 +890,6 @@ repos:
 				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:        "project1",
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -956,7 +946,6 @@ workflows:
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
 				User:              models.User{},
-				Verbose:           true,
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
 			},
@@ -1028,7 +1017,7 @@ workflows:
 					PullRequestStatus: models.PullReqStatus{
 						Mergeable: true,
 					},
-				}, command.Plan, "", []string{"flag"}, tmp, "project1", "myworkspace", true, false)
+				}, command.Plan, "", []string{"flag"}, tmp, "project1", "myworkspace", false)
 
 				if c.expErr != "" {
 					ErrEquals(t, c.expErr, err)

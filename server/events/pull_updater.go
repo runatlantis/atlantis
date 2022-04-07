@@ -36,7 +36,7 @@ func (c *PullUpdater) UpdatePull(ctx *command.Context, cmd PullCommand, res comm
 		templateOverrides = repoCfg.TemplateOverrides
 	}
 
-	comment := c.MarkdownRenderer.Render(res, cmd.CommandName(), "", cmd.IsVerbose(), ctx.Pull.BaseRepo.VCSHost.Type, templateOverrides)
+	comment := c.MarkdownRenderer.Render(res, cmd.CommandName(), ctx.Pull.BaseRepo.VCSHost.Type, templateOverrides)
 	if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, comment, cmd.CommandName().String()); err != nil {
 		ctx.Log.Errorf("unable to comment: %s", err)
 	}

@@ -54,8 +54,6 @@ type MarkdownRenderer struct {
 // commonData is data that all responses have.
 type commonData struct {
 	Command                  string
-	Verbose                  bool
-	Log                      string
 	DisableApplyAll          bool
 	DisableApply             bool
 	DisableRepoLocking       bool
@@ -102,13 +100,10 @@ type projectResultTmplData struct {
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-// TODO: remove support for verbose as this is deprecated, since history is not actually saved.
-func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType, templateOverrides map[string]string) string {
+func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, vcsHost models.VCSHostType, templateOverrides map[string]string) string {
 	commandStr := strings.Title(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{
 		Command:                  commandStr,
-		Verbose:                  verbose,
-		Log:                      log,
 		DisableApplyAll:          m.DisableApplyAll || m.DisableApply,
 		DisableApply:             m.DisableApply,
 		DisableRepoLocking:       m.DisableRepoLocking,

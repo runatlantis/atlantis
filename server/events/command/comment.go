@@ -7,7 +7,7 @@ import (
 )
 
 // NewComment constructs a Command, setting all missing fields to defaults.
-func NewComment(repoRelDir string, flags []string, name Name, verbose, forceApply bool, workspace string, project string) *Comment {
+func NewComment(repoRelDir string, flags []string, name Name, forceApply bool, workspace string, project string) *Comment {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -20,7 +20,6 @@ func NewComment(repoRelDir string, flags []string, name Name, verbose, forceAppl
 		RepoRelDir:  repoRelDir,
 		Flags:       flags,
 		Name:        name,
-		Verbose:     verbose,
 		Workspace:   workspace,
 		ProjectName: project,
 		ForceApply:  forceApply,
@@ -37,8 +36,6 @@ type Comment struct {
 	Flags []string
 	// Name is the name of the command the comment specified.
 	Name Name
-	// Verbose is true if the command should output verbosely.
-	Verbose bool
 	//ForceApply is true of the command should ignore apply_requirments.
 	ForceApply bool
 	// Workspace is the name of the Terraform workspace to run the command in.
@@ -62,11 +59,6 @@ func (c Comment) CommandName() Name {
 	return c.Name
 }
 
-// IsVerbose is true if the command should give verbose output.
-func (c Comment) IsVerbose() bool {
-	return c.Verbose
-}
-
 // IsAutoplan will be false for comment commands.
 func (c Comment) IsAutoplan() bool {
 	return false
@@ -74,5 +66,5 @@ func (c Comment) IsAutoplan() bool {
 
 // String returns a string representation of the command.
 func (c Comment) String() string {
-	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, strings.Join(c.Flags, ","))
+	return fmt.Sprintf("command=%q dir=%q workspace=%q project=%q flags=%q", c.Name.String(), c.RepoRelDir, c.Workspace, c.ProjectName, strings.Join(c.Flags, ","))
 }

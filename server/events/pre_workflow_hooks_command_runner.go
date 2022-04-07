@@ -70,7 +70,6 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 			Log:      log,
 			Pull:     pull,
 			User:     user,
-			Verbose:  false,
 		},
 		preWorkflowHooks, repoDir)
 

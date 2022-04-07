@@ -6,10 +6,4 @@ Ran {{.Command}} for {{ len .Results }} projects:
 {{$result.Rendered}}
 
 ---
-{{end}}{{if .Verbose}}
-<details><summary>Log</summary>
-  <p>
-
-```
-{{.Log}}```
-</p></details>{{end}}
+{{end}}

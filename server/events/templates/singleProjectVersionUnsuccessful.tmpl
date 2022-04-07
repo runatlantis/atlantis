@@ -1,8 +1,1 @@
 {{$result := index .Results 0}}Ran {{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}
-{{if .Verbose}}
-<details><summary>Log</summary>
-  <p>
-
-```
-{{.Log}}```
-</p></details>{{end}}

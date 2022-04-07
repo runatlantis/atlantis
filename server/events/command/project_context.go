@@ -21,7 +21,6 @@ type ContextFlags struct {
 	DeleteSourceBranchOnMerge,
 	ParallelApply,
 	ParallelPlan,
-	Verbose,
 	ForceApply bool
 }
 
@@ -71,7 +70,6 @@ func NewProjectContext(
 		RepoConfigVersion:         projCfg.RepoCfgVersion,
 		TerraformVersion:          projCfg.TerraformVersion,
 		User:                      ctx.User,
-		Verbose:                   contextFlags.Verbose,
 		ForceApply:                contextFlags.ForceApply,
 		Workspace:                 projCfg.Workspace,
 		PolicySets:                policySets,
@@ -142,8 +140,6 @@ type ProjectContext struct {
 	Tags map[string]string
 	// User is the user that triggered this command.
 	User models.User
-	// Verbose is true when the user would like verbose output.
-	Verbose bool
 	// ForceApply is true when the apply should ignore apply_requirements.
 	ForceApply bool
 	// Workspace is the Terraform workspace this project is in. It will always

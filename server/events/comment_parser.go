@@ -37,8 +37,6 @@ const (
 	dirFlagShort       = "d"
 	projectFlagLong    = "project"
 	projectFlagShort   = "p"
-	verboseFlagLong    = "verbose"
-	verboseFlagShort   = ""
 	forceFlagLong      = "force"
 	forceFlagShort     = "f"
 	atlantisExecutable = "atlantis"
@@ -106,8 +104,8 @@ type CommentParseResult struct {
 // - atlantis help
 // - run plan
 // - @GithubUser plan -w staging
-// - atlantis plan -w staging -d dir --verbose
-// - atlantis plan --verbose -- -key=value -key2 value2
+// - atlantis plan -w staging -d dir
+// - atlantis plan -- -key=value -key2 value2
 // - atlantis approve_policies
 //
 func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) CommentParseResult {
@@ -175,7 +173,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	var workspace string
 	var dir string
 	var project string
-	var verbose, force bool
+	var force bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
 
@@ -188,7 +186,6 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Which project to run plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", config.AtlantisYAMLFilename))
-		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.Apply.String():
 		name = command.Apply
 		flagSet = pflag.NewFlagSet(command.Apply.String(), pflag.ContinueOnError)
@@ -196,13 +193,11 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Apply the plan for this Terraform workspace.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", config.AtlantisYAMLFilename))
-		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 		flagSet.BoolVarP(&force, forceFlagLong, forceFlagShort, false, "Force Atlantis to ignore apply requirements.")
 	case command.ApprovePolicies.String():
 		name = command.ApprovePolicies
 		flagSet = pflag.NewFlagSet(command.ApprovePolicies.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.Unlock.String():
 		name = command.Unlock
 		flagSet = pflag.NewFlagSet(command.Unlock.String(), pflag.ContinueOnError)
@@ -213,7 +208,6 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before running version.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run version in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Print the version for this project. Refers to the name of the project configured in %s.", config.AtlantisYAMLFilename))
-		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", cmd)}
 	}
@@ -269,7 +263,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	return CommentParseResult{
-		Command: command.NewComment(dir, extraArgs, name, verbose, force, workspace, project),
+		Command: command.NewComment(dir, extraArgs, name, force, workspace, project),
 	}
 }
 
