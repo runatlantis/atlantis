@@ -36,7 +36,7 @@ jobs:
         gh api repos/$GITHUB_REPOSITORY/releases/generate-notes \
           -f tag_name="${GITHUB_REF#refs/tags/}" \
           -f target_commitish=master \
-          -q .body > CHANGELOG.md
+          -q .body > tmp-CHANGELOG.md
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
     - name: Run GoReleaser for pre-release
@@ -44,7 +44,7 @@ jobs:
       if: contains(github.ref, '-pre.')
       with:
         version: v0.183.0
-        args: release --rm-dist --release-notes=CHANGELOG.md
+        args: release --rm-dist --release-notes=tmp-CHANGELOG.md
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GORELEASER_CURRENT_TAG: ${{ steps.changelog.outputs.RELEASE_TAG }}
