@@ -50,6 +50,7 @@ import (
 	"github.com/runatlantis/atlantis/server/lyft/gateway"
 	"github.com/runatlantis/atlantis/server/lyft/scheduled"
 	"github.com/runatlantis/atlantis/server/metrics"
+	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/wrappers"
 	"github.com/uber-go/tally"
 
@@ -943,38 +944,54 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:                    workingDir,
 		WorkingDirLocker:              workingDirLocker,
 	}
-	gatewayEventsController := &gateway.VCSEventsController{
-		Logger:                 logger,
-		Scope:                  statsScope,
-		Parser:                 eventParser,
-		CommentParser:          commentParser,
-		GithubWebhookSecret:    []byte(userConfig.GithubWebhookSecret),
-		GithubRequestValidator: &events_controllers.DefaultGithubRequestValidator{},
-		RepoAllowlistChecker:   repoAllowlist,
-		VCSClient:              vcsClient,
-		SNSWriter:              gatewaySnsWriter,
-		AutoplanValidator:      autoplanValidator,
+
+	repoConverter := github_converter.RepoConverter{
+		GithubUser:  userConfig.GithubUser,
+		GithubToken: userConfig.GithubToken,
 	}
-	defaultEventsController := &events_controllers.VCSEventsController{
-		CommandRunner:                   forceApplyCommandRunner,
-		PullCleaner:                     pullClosedExecutor,
-		Parser:                          eventParser,
-		CommentParser:                   commentParser,
-		Logger:                          logger,
-		Scope:                           statsScope,
-		ApplyDisabled:                   userConfig.DisableApply,
-		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
-		GithubRequestValidator:          &events_controllers.DefaultGithubRequestValidator{},
-		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{},
-		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
-		RepoAllowlistChecker:            repoAllowlist,
-		SupportedVCSHosts:               supportedVCSHosts,
-		VCSClient:                       vcsClient,
-		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
-		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
-		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
-		AzureDevopsRequestValidator:     &events_controllers.DefaultAzureDevopsRequestValidator{},
+
+	pullConverter := github_converter.PullConverter{
+		RepoConverter: repoConverter,
 	}
+
+	gatewayEventsController := gateway.NewVCSEventsController(
+		logger,
+		statsScope,
+		[]byte(userConfig.GithubWebhookSecret),
+		userConfig.PlanDrafts,
+		autoplanValidator,
+		gatewaySnsWriter,
+		commentParser,
+		repoAllowlist,
+		vcsClient,
+		ctxLogger,
+		supportedVCSHosts,
+		repoConverter,
+		pullConverter,
+	)
+
+	defaultEventsController := events_controllers.NewVCSEventsController(
+		logger,
+		statsScope,
+		[]byte(userConfig.GithubWebhookSecret),
+		userConfig.PlanDrafts,
+		forceApplyCommandRunner,
+		commentParser,
+		eventParser,
+		pullClosedExecutor,
+		repoAllowlist,
+		vcsClient,
+		ctxLogger,
+		userConfig.DisableApply,
+		[]byte(userConfig.GitlabWebhookSecret),
+		supportedVCSHosts,
+		[]byte(userConfig.BitbucketWebhookSecret),
+		[]byte(userConfig.AzureDevopsWebhookUser),
+		[]byte(userConfig.AzureDevopsWebhookPassword),
+		repoConverter,
+		pullConverter,
+	)
+
 	var vcsPostHandler sqs.VCSPostHandler
 	lyftMode := userConfig.ToLyftMode()
 	//TODO: remove logs after testing is complete

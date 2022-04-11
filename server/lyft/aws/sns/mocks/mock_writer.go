@@ -4,10 +4,10 @@
 package mocks
 
 import (
+	context "context"
+	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 	"time"
-
-	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockWriter struct {
@@ -40,6 +40,21 @@ func (mock *MockWriter) Write(_param0 []byte) error {
 	return ret0
 }
 
+func (mock *MockWriter) WriteWithContext(ctx context.Context, payload []byte) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWriter().")
+	}
+	params := []pegomock.Param{ctx, payload}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("WriteWithContext", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockWriter) VerifyWasCalledOnce() *VerifierMockWriter {
 	return &VerifierMockWriter{
 		mock:                   mock,
@@ -47,14 +62,14 @@ func (mock *MockWriter) VerifyWasCalledOnce() *VerifierMockWriter {
 	}
 }
 
-func (mock *MockWriter) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockWriter {
+func (mock *MockWriter) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockWriter {
 	return &VerifierMockWriter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockWriter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWriter {
+func (mock *MockWriter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWriter {
 	return &VerifierMockWriter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -62,7 +77,7 @@ func (mock *MockWriter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.M
 	}
 }
 
-func (mock *MockWriter) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockWriter {
+func (mock *MockWriter) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockWriter {
 	return &VerifierMockWriter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -72,7 +87,7 @@ func (mock *MockWriter) VerifyWasCalledEventually(invocationCountMatcher pegomoc
 
 type VerifierMockWriter struct {
 	mock                   *MockWriter
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -99,6 +114,37 @@ func (c *MockWriter_Write_OngoingVerification) GetAllCapturedArguments() (_param
 		_param0 = make([][]byte, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.([]byte)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWriter) WriteWithContext(ctx context.Context, payload []byte) *MockWriter_WriteWithContext_OngoingVerification {
+	params := []pegomock.Param{ctx, payload}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "WriteWithContext", params, verifier.timeout)
+	return &MockWriter_WriteWithContext_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWriter_WriteWithContext_OngoingVerification struct {
+	mock              *MockWriter
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWriter_WriteWithContext_OngoingVerification) GetCapturedArguments() (context.Context, []byte) {
+	ctx, payload := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], payload[len(payload)-1]
+}
+
+func (c *MockWriter_WriteWithContext_OngoingVerification) GetAllCapturedArguments() (_param0 []context.Context, _param1 [][]byte) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]context.Context, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(context.Context)
+		}
+		_param1 = make([][]byte, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.([]byte)
 		}
 	}
 	return

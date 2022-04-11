@@ -175,6 +175,8 @@ type PullRequest struct {
 	State PullRequestState
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
+	// HeadRepo is the repository that the pull request is merging from.
+	HeadRepo Repo
 	// UpdatedAt is the time the PR was last updated.
 	UpdatedAt time.Time
 	// ClosedAt is the time the PR was closed. This is nil if the PR is open

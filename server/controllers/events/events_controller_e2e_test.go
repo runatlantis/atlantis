@@ -20,12 +20,15 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
+	"github.com/runatlantis/atlantis/server/controllers/events/handlers"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/jobs"
+	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github/request"
 
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -46,6 +49,7 @@ import (
 )
 
 const ConftestVersion = "0.25.0"
+const githubHeader = "X-Github-Event"
 
 type NoopTFDownloader struct{}
 
@@ -364,7 +368,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			pullClosedReq := GitHubPullRequestClosedEvent(t)
 			w = httptest.NewRecorder()
 			ctrl.Post(w, pullClosedReq)
-			ResponseContains(t, w, 200, "Pull request cleaned successfully")
+			ResponseContains(t, w, 200, "Processing...")
 
 			// Verify
 			actReplies := ghClient.CapturedComments
@@ -510,7 +514,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			pullClosedReq := GitHubPullRequestClosedEvent(t)
 			w = httptest.NewRecorder()
 			ctrl.Post(w, pullClosedReq)
-			ResponseContains(t, w, 200, "Pull request cleaned successfully")
+			ResponseContains(t, w, 200, "Processing...")
 
 			// Verify
 			actReplies := ghClient.CapturedComments
@@ -609,7 +613,7 @@ func TestGitHubWorkflowPullRequestsWorkflows(t *testing.T) {
 			pullClosedReq := GitHubPullRequestClosedEvent(t)
 			w = httptest.NewRecorder()
 			ctrl.Post(w, pullClosedReq)
-			ResponseContains(t, w, 200, "Pull request cleaned successfully")
+			ResponseContains(t, w, 200, "Processing...")
 
 			// Verify
 			actReplies := ghClient.CapturedComments
@@ -647,6 +651,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	projectCmdOutputHandler := &jobs.NoopProjectOutputHandler{}
 
 	logger := logging.NewNoopLogger(t)
+	ctxLogger := logging.NewNoopCtxLogger(t)
 	featureAllocator, _ := feature.NewStringSourcedAllocator(logger)
 	terraformClient, err := terraform.NewE2ETestClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", downloader, false, projectCmdOutputHandler, featureAllocator)
 	Ok(t, err)
@@ -927,23 +932,75 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 
-	ctrl := events_controllers.VCSEventsController{
-		TestingMode:   true,
+	autoplanner := &handlers.Autoplanner{
 		CommandRunner: commandRunner,
-		PullCleaner: &events.PullClosedExecutor{
-			Locker:                   lockingClient,
-			VCSClient:                vcsClient,
-			WorkingDir:               workingDir,
-			DB:                       boltdb,
-			PullClosedTemplate:       &events.PullClosedEventTemplate{},
-			LogStreamResourceCleaner: projectCmdOutputHandler,
+		Logger:        logger,
+	}
+
+	pullCleaner := &events.PullClosedExecutor{
+		Locker:                   lockingClient,
+		VCSClient:                vcsClient,
+		WorkingDir:               workingDir,
+		DB:                       boltdb,
+		PullClosedTemplate:       &events.PullClosedEventTemplate{},
+		LogStreamResourceCleaner: projectCmdOutputHandler,
+	}
+
+	prHandler := handlers.NewPullRequestEventWithEventTypeHandlers(
+		repoAllowlistChecker,
+
+		// Use synchronous handlers for testing purposes
+		autoplanner, autoplanner,
+
+		&handlers.PullCleaner{
+			PullCleaner: pullCleaner,
+			Logger:      ctxLogger,
 		},
+	)
+
+	commentHandler := handlers.NewCommentEventWithCommandHandler(
+		commentParser,
+		repoAllowlistChecker,
+		vcsClient,
+
+		// Use synchronous handler for testing purposes
+		&handlers.CommandHandler{
+			CommandRunner: commandRunner,
+			Logger:        logger,
+		},
+		ctxLogger,
+	)
+
+	repoConverter := github_converter.RepoConverter{
+		GithubUser:  userConfig.GithubUser,
+		GithubToken: userConfig.GithubToken,
+	}
+
+	pullConverter := github_converter.PullConverter{
+		RepoConverter: repoConverter,
+	}
+
+	requestRouter := &events_controllers.RequestRouter{
+		Resolvers: []events_controllers.RequestResolver{
+			request.NewHandler(
+				logger,
+				statsScope,
+				nil,
+				commentHandler,
+				prHandler,
+				false,
+				repoConverter,
+				pullConverter,
+			),
+		},
+	}
+
+	ctrl := events_controllers.VCSEventsController{
+		RequestRouter:                requestRouter,
 		Logger:                       logger,
 		Scope:                        statsScope,
 		Parser:                       eventParser,
 		CommentParser:                commentParser,
-		GithubWebhookSecret:          nil,
-		GithubRequestValidator:       &events_controllers.DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:          nil,
 		RepoAllowlistChecker:         repoAllowlistChecker,

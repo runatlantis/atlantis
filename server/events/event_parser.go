@@ -143,6 +143,7 @@ type EventParsing interface {
 	// baseRepo is the repo that the pull request will be merged into.
 	// user is the pull request author.
 	// pullNum is the number of the pull request that triggered the webhook.
+	// Deprecated: see events/controllers/github/parser.go
 	ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (
 		baseRepo models.Repo, user models.User, pullNum int, err error)
 
@@ -151,6 +152,7 @@ type EventParsing interface {
 	// pull is the parsed pull request.
 	// baseRepo is the repo the pull request will be merged into.
 	// headRepo is the repo the pull request branch is from.
+	// Deprecated: see converters/github.go
 	ParseGithubPull(ghPull *github.PullRequest) (
 		pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, err error)
 
@@ -160,12 +162,14 @@ type EventParsing interface {
 	// baseRepo is the repo the pull request will be merged into.
 	// headRepo is the repo the pull request branch is from.
 	// user is the pull request author.
+	// Deprecated: see events/controllers/github/parser.go
 	ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (
 		pull models.PullRequest, pullEventType models.PullRequestEventType,
 		baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 
 	// ParseGithubRepo parses the response from the GitHub API endpoint that
 	// returns a repo into the Atlantis model.
+	// Deprecated: see converters/github.go
 	ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error)
 
 	// ParseGitlabMergeRequestEvent parses GitLab merge request events.
@@ -353,6 +357,7 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		Author:     *event.Actor.Nickname,
 		State:      prState,
 		BaseRepo:   baseRepo,
+		HeadRepo:   headRepo,
 	}
 	user = models.User{
 		Username: *event.Actor.Nickname,
@@ -551,6 +556,7 @@ func (e *EventParser) ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (pul
 		BaseBranch: event.ObjectAttributes.TargetBranch,
 		State:      modelState,
 		BaseRepo:   baseRepo,
+		HeadRepo:   headRepo,
 	}
 
 	switch event.ObjectAttributes.Action {
@@ -696,6 +702,7 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 		Author:     *event.Actor.Username,
 		State:      prState,
 		BaseRepo:   baseRepo,
+		HeadRepo:   headRepo,
 	}
 	user = models.User{
 		Username: *event.Actor.Username,
@@ -818,6 +825,7 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 		Num:        num,
 		State:      pullState,
 		BaseRepo:   baseRepo,
+		HeadRepo:   headRepo,
 		BaseBranch: strings.Replace(baseBranch, "refs/heads/", "", 1),
 	}
 	return

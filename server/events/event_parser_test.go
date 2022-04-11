@@ -21,7 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v31/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
@@ -33,8 +32,6 @@ import (
 )
 
 var parser = events.EventParser{
-	GithubUser:         "github-user",
-	GithubToken:        "github-token",
 	GitlabUser:         "gitlab-user",
 	GitlabToken:        "gitlab-token",
 	AllowDraftPRs:      false,
@@ -45,284 +42,6 @@ var parser = events.EventParser{
 	AzureDevopsToken:   "azuredevops-token",
 }
 
-func TestParseGithubRepo(t *testing.T) {
-	r, err := parser.ParseGithubRepo(&Repo)
-	Ok(t, err)
-	Equals(t, models.Repo{
-		Owner:             "owner",
-		FullName:          "owner/repo",
-		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
-		Name:              "repo",
-		VCSHost: models.VCSHost{
-			Hostname: "github.com",
-			Type:     models.Github,
-		},
-	}, r)
-}
-
-func TestParseGithubIssueCommentEvent(t *testing.T) {
-	comment := github.IssueCommentEvent{
-		Repo: &Repo,
-		Issue: &github.Issue{
-			Number:  github.Int(1),
-			User:    &github.User{Login: github.String("issue_user")},
-			HTMLURL: github.String("https://github.com/runatlantis/atlantis/issues/1"),
-		},
-		Comment: &github.IssueComment{
-			User: &github.User{Login: github.String("comment_user")},
-		},
-	}
-
-	testComment := deepcopy.Copy(comment).(github.IssueCommentEvent)
-	testComment.Comment = nil
-	_, _, _, err := parser.ParseGithubIssueCommentEvent(&testComment)
-	ErrEquals(t, "comment.user.login is null", err)
-
-	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
-	testComment.Comment.User = nil
-	_, _, _, err = parser.ParseGithubIssueCommentEvent(&testComment)
-	ErrEquals(t, "comment.user.login is null", err)
-
-	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
-	testComment.Comment.User.Login = nil
-	_, _, _, err = parser.ParseGithubIssueCommentEvent(&testComment)
-	ErrEquals(t, "comment.user.login is null", err)
-
-	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
-	testComment.Issue = nil
-	_, _, _, err = parser.ParseGithubIssueCommentEvent(&testComment)
-	ErrEquals(t, "issue.number is null", err)
-
-	// this should be successful
-	repo, user, pullNum, err := parser.ParseGithubIssueCommentEvent(&comment)
-	Ok(t, err)
-	Equals(t, models.Repo{
-		Owner:             *comment.Repo.Owner.Login,
-		FullName:          *comment.Repo.FullName,
-		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
-		Name:              "repo",
-		VCSHost: models.VCSHost{
-			Hostname: "github.com",
-			Type:     models.Github,
-		},
-	}, repo)
-	Equals(t, models.User{
-		Username: *comment.Comment.User.Login,
-	}, user)
-	Equals(t, *comment.Issue.Number, pullNum)
-}
-
-func TestParseGithubPullEvent(t *testing.T) {
-	_, _, _, _, _, err := parser.ParseGithubPullEvent(&github.PullRequestEvent{})
-	ErrEquals(t, "pull_request is null", err)
-
-	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	testEvent.PullRequest.HTMLURL = nil
-	_, _, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
-	ErrEquals(t, "html_url is null", err)
-
-	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	testEvent.Sender = nil
-	_, _, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
-	ErrEquals(t, "sender is null", err)
-
-	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	testEvent.Sender.Login = nil
-	_, _, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
-	ErrEquals(t, "sender.login is null", err)
-
-	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGithubPullEvent(&PullEvent)
-	Ok(t, err)
-	expBaseRepo := models.Repo{
-		Owner:             "owner",
-		FullName:          "owner/repo",
-		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
-		Name:              "repo",
-		VCSHost: models.VCSHost{
-			Hostname: "github.com",
-			Type:     models.Github,
-		},
-	}
-	Equals(t, expBaseRepo, actBaseRepo)
-	Equals(t, expBaseRepo, actHeadRepo)
-	Equals(t, models.PullRequest{
-		URL:        Pull.GetHTMLURL(),
-		Author:     Pull.User.GetLogin(),
-		HeadBranch: Pull.Head.GetRef(),
-		BaseBranch: Pull.Base.GetRef(),
-		HeadCommit: Pull.Head.GetSHA(),
-		Num:        Pull.GetNumber(),
-		State:      models.OpenPullState,
-		BaseRepo:   expBaseRepo,
-	}, actPull)
-	Equals(t, models.OpenedPullEvent, evType)
-	Equals(t, models.User{Username: "user"}, actUser)
-}
-
-func TestParseGithubPullEventFromDraft(t *testing.T) {
-	// verify that draft PRs are treated as 'other' events by default
-	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	draftPR := true
-	testEvent.PullRequest.Draft = &draftPR
-	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&testEvent)
-	Ok(t, err)
-	Equals(t, models.OtherPullEvent, evType)
-	// verify that drafts are planned if requested
-	parser.AllowDraftPRs = true
-	defer func() { parser.AllowDraftPRs = false }()
-	_, evType, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
-	Ok(t, err)
-	Equals(t, models.OpenedPullEvent, evType)
-}
-
-func TestParseGithubPullEvent_EventType(t *testing.T) {
-	cases := []struct {
-		action   string
-		exp      models.PullRequestEventType
-		draftExp models.PullRequestEventType
-	}{
-		{
-			action:   "synchronize",
-			exp:      models.UpdatedPullEvent,
-			draftExp: models.OtherPullEvent,
-		},
-		{
-			action:   "unassigned",
-			exp:      models.OtherPullEvent,
-			draftExp: models.OtherPullEvent,
-		},
-		{
-			action:   "review_requested",
-			exp:      models.OtherPullEvent,
-			draftExp: models.OtherPullEvent,
-		},
-		{
-			action:   "review_request_removed",
-			exp:      models.OtherPullEvent,
-			draftExp: models.OtherPullEvent,
-		},
-		{
-			action:   "labeled",
-			exp:      models.OtherPullEvent,
-			draftExp: models.OtherPullEvent,
-		},
-		{
-			action:   "unlabeled",
-			exp:      models.OtherPullEvent,
-			draftExp: models.OtherPullEvent,
-		},
-		{
-			action:   "opened",
-			exp:      models.OpenedPullEvent,
-			draftExp: models.OtherPullEvent,
-		},
-		{
-			action:   "edited",
-			exp:      models.OtherPullEvent,
-			draftExp: models.OtherPullEvent,
-		},
-		{
-			action:   "closed",
-			exp:      models.ClosedPullEvent,
-			draftExp: models.ClosedPullEvent,
-		},
-		{
-			action:   "reopened",
-			exp:      models.OtherPullEvent,
-			draftExp: models.OtherPullEvent,
-		},
-		{
-			action:   "ready_for_review",
-			exp:      models.OpenedPullEvent,
-			draftExp: models.OtherPullEvent,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.action, func(t *testing.T) {
-			// Test normal parsing
-			event := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-			event.Action = &c.action
-			_, actType, _, _, _, err := parser.ParseGithubPullEvent(&event)
-			Ok(t, err)
-			Equals(t, c.exp, actType)
-			// Test draft parsing when draft PRs disabled
-			draftPR := true
-			event.PullRequest.Draft = &draftPR
-			_, draftEvType, _, _, _, err := parser.ParseGithubPullEvent(&event)
-			Ok(t, err)
-			Equals(t, c.draftExp, draftEvType)
-			// Test draft parsing when draft PRs are enabled.
-			draftParser := parser
-			draftParser.AllowDraftPRs = true
-			_, draftEvType, _, _, _, err = draftParser.ParseGithubPullEvent(&event)
-			Ok(t, err)
-			Equals(t, c.exp, draftEvType)
-		})
-	}
-}
-
-func TestParseGithubPull(t *testing.T) {
-	testPull := deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.Head.SHA = nil
-	_, _, _, err := parser.ParseGithubPull(&testPull)
-	ErrEquals(t, "head.sha is null", err)
-
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.HTMLURL = nil
-	_, _, _, err = parser.ParseGithubPull(&testPull)
-	ErrEquals(t, "html_url is null", err)
-
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.Head.Ref = nil
-	_, _, _, err = parser.ParseGithubPull(&testPull)
-	ErrEquals(t, "head.ref is null", err)
-
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.Base.Ref = nil
-	_, _, _, err = parser.ParseGithubPull(&testPull)
-	ErrEquals(t, "base.ref is null", err)
-
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.User.Login = nil
-	_, _, _, err = parser.ParseGithubPull(&testPull)
-	ErrEquals(t, "user.login is null", err)
-
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.Number = nil
-	_, _, _, err = parser.ParseGithubPull(&testPull)
-	ErrEquals(t, "number is null", err)
-
-	pullRes, actBaseRepo, actHeadRepo, err := parser.ParseGithubPull(&Pull)
-	Ok(t, err)
-	expBaseRepo := models.Repo{
-		Owner:             "owner",
-		FullName:          "owner/repo",
-		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
-		Name:              "repo",
-		VCSHost: models.VCSHost{
-			Hostname: "github.com",
-			Type:     models.Github,
-		},
-	}
-	Equals(t, models.PullRequest{
-		URL:        Pull.GetHTMLURL(),
-		Author:     Pull.User.GetLogin(),
-		HeadBranch: Pull.Head.GetRef(),
-		BaseBranch: Pull.Base.GetRef(),
-		HeadCommit: Pull.Head.GetSHA(),
-		Num:        Pull.GetNumber(),
-		State:      models.OpenPullState,
-		BaseRepo:   expBaseRepo,
-	}, pullRes)
-	Equals(t, expBaseRepo, actBaseRepo)
-	Equals(t, expBaseRepo, actHeadRepo)
-}
-
 func TestParseGitlabMergeEvent(t *testing.T) {
 	t.Log("should properly parse a gitlab merge event")
 	path := filepath.Join("testdata", "gitlab-merge-request-event.json")
@@ -331,7 +50,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	var event *gitlab.MergeEvent
 	err = json.Unmarshal(bytes, &event)
 	Ok(t, err)
-	pull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGitlabMergeRequestEvent(*event)
+	pull, evType, actBaseRepo, _, actUser, err := parser.ParseGitlabMergeRequestEvent(*event)
 	Ok(t, err)
 
 	expBaseRepo := models.Repo{
@@ -355,21 +74,21 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 		BaseBranch: "master",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
+		HeadRepo: models.Repo{
+			FullName:          "sourceorg/atlantis-example",
+			Name:              "atlantis-example",
+			SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/sourceorg/atlantis-example.git",
+			Owner:             "sourceorg",
+			CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/sourceorg/atlantis-example.git",
+			VCSHost: models.VCSHost{
+				Hostname: "gitlab.com",
+				Type:     models.Gitlab,
+			},
+		},
 	}, pull)
 	Equals(t, models.OpenedPullEvent, evType)
 
 	Equals(t, expBaseRepo, actBaseRepo)
-	Equals(t, models.Repo{
-		FullName:          "sourceorg/atlantis-example",
-		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/sourceorg/atlantis-example.git",
-		Owner:             "sourceorg",
-		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/sourceorg/atlantis-example.git",
-		VCSHost: models.VCSHost{
-			Hostname: "gitlab.com",
-			Type:     models.Gitlab,
-		},
-	}, actHeadRepo)
 	Equals(t, models.User{Username: "lkysow"}, actUser)
 
 	t.Log("If the state is closed, should set field correctly.")
@@ -388,7 +107,7 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 	var event *gitlab.MergeEvent
 	err = json.Unmarshal(bytes, &event)
 	Ok(t, err)
-	pull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGitlabMergeRequestEvent(*event)
+	pull, evType, actBaseRepo, _, actUser, err := parser.ParseGitlabMergeRequestEvent(*event)
 	Ok(t, err)
 
 	expBaseRepo := models.Repo{
@@ -412,21 +131,21 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 		BaseBranch: "master",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
+		HeadRepo: models.Repo{
+			FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
+			Name:              "atlantis-example",
+			SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+			Owner:             "lkysow-test/subgroup/sub-subgroup",
+			CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+			VCSHost: models.VCSHost{
+				Hostname: "gitlab.com",
+				Type:     models.Gitlab,
+			},
+		},
 	}, pull)
 	Equals(t, models.OpenedPullEvent, evType)
 
 	Equals(t, expBaseRepo, actBaseRepo)
-	Equals(t, models.Repo{
-		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
-		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
-		Owner:             "lkysow-test/subgroup/sub-subgroup",
-		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
-		VCSHost: models.VCSHost{
-			Hostname: "gitlab.com",
-			Type:     models.Gitlab,
-		},
-	}, actHeadRepo)
 	Equals(t, models.User{Username: "lkysow"}, actUser)
 }
 
@@ -508,6 +227,7 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 		BaseBranch: "master",
 		State:      models.OpenPullState,
 		BaseRepo:   repo,
+		HeadRepo:   models.Repo{},
 	}, pull)
 
 	t.Log("If the state is closed, should set field correctly.")
@@ -547,6 +267,7 @@ func TestParseGitlabMergeRequest_Subgroup(t *testing.T) {
 		BaseBranch: "master",
 		State:      models.OpenPullState,
 		BaseRepo:   repo,
+		HeadRepo:   models.Repo{},
 	}, pull)
 }
 
@@ -735,7 +456,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
 	bytes, err := ioutil.ReadFile(path)
 	Ok(t, err)
-	pull, baseRepo, headRepo, user, comment, err := parser.ParseBitbucketCloudPullCommentEvent(bytes)
+	pull, baseRepo, _, user, comment, err := parser.ParseBitbucketCloudPullCommentEvent(bytes)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		FullName:          "lkysow/atlantis-example",
@@ -758,18 +479,18 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		Author:     "lkysow",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
-	}, pull)
-	Equals(t, models.Repo{
-		FullName:          "lkysow-fork/atlantis-example",
-		Owner:             "lkysow-fork",
-		Name:              "atlantis-example",
-		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
-		SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow-fork/atlantis-example.git",
-		VCSHost: models.VCSHost{
-			Hostname: "bitbucket.org",
-			Type:     models.BitbucketCloud,
+		HeadRepo: models.Repo{
+			FullName:          "lkysow-fork/atlantis-example",
+			Owner:             "lkysow-fork",
+			Name:              "atlantis-example",
+			CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
+			SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow-fork/atlantis-example.git",
+			VCSHost: models.VCSHost{
+				Hostname: "bitbucket.org",
+				Type:     models.BitbucketCloud,
+			},
 		},
-	}, headRepo)
+	}, pull)
 	Equals(t, models.User{
 		Username: "lkysow",
 	}, user)
@@ -821,7 +542,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 	if err != nil {
 		Ok(t, err)
 	}
-	pull, baseRepo, headRepo, user, err := parser.ParseBitbucketCloudPullEvent(bytes)
+	pull, baseRepo, _, user, err := parser.ParseBitbucketCloudPullEvent(bytes)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		FullName:          "lkysow/atlantis-example",
@@ -844,18 +565,18 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		Author:     "Luke",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
-	}, pull)
-	Equals(t, models.Repo{
-		FullName:          "lkysow-fork/atlantis-example",
-		Owner:             "lkysow-fork",
-		Name:              "atlantis-example",
-		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
-		SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow-fork/atlantis-example.git",
-		VCSHost: models.VCSHost{
-			Hostname: "bitbucket.org",
-			Type:     models.BitbucketCloud,
+		HeadRepo: models.Repo{
+			FullName:          "lkysow-fork/atlantis-example",
+			Owner:             "lkysow-fork",
+			Name:              "atlantis-example",
+			CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
+			SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow-fork/atlantis-example.git",
+			VCSHost: models.VCSHost{
+				Hostname: "bitbucket.org",
+				Type:     models.BitbucketCloud,
+			},
 		},
-	}, headRepo)
+	}, pull)
 	Equals(t, models.User{
 		Username: "Luke",
 	}, user)
@@ -951,7 +672,7 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 	if err != nil {
 		Ok(t, err)
 	}
-	pull, baseRepo, headRepo, user, comment, err := parser.ParseBitbucketServerPullCommentEvent(bytes)
+	pull, baseRepo, _, user, comment, err := parser.ParseBitbucketServerPullCommentEvent(bytes)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		FullName:          "atlantis/atlantis-example",
@@ -974,18 +695,18 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 		Author:     "lkysow",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
-	}, pull)
-	Equals(t, models.Repo{
-		FullName:          "atlantis-fork/atlantis-example",
-		Owner:             "atlantis-fork",
-		Name:              "atlantis-example",
-		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
-		SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/fk/atlantis-example.git",
-		VCSHost: models.VCSHost{
-			Hostname: "mycorp.com",
-			Type:     models.BitbucketServer,
+		HeadRepo: models.Repo{
+			FullName:          "atlantis-fork/atlantis-example",
+			Owner:             "atlantis-fork",
+			Name:              "atlantis-example",
+			CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
+			SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/fk/atlantis-example.git",
+			VCSHost: models.VCSHost{
+				Hostname: "mycorp.com",
+				Type:     models.BitbucketServer,
+			},
 		},
-	}, headRepo)
+	}, pull)
 	Equals(t, models.User{
 		Username: "lkysow",
 	}, user)
@@ -1033,7 +754,7 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 	if err != nil {
 		Ok(t, err)
 	}
-	pull, baseRepo, headRepo, user, err := parser.ParseBitbucketServerPullEvent(bytes)
+	pull, baseRepo, _, user, err := parser.ParseBitbucketServerPullEvent(bytes)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		FullName:          "atlantis/atlantis-example",
@@ -1056,18 +777,18 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 		Author:     "lkysow",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
-	}, pull)
-	Equals(t, models.Repo{
-		FullName:          "atlantis-fork/atlantis-example",
-		Owner:             "atlantis-fork",
-		Name:              "atlantis-example",
-		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
-		SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/fk/atlantis-example.git",
-		VCSHost: models.VCSHost{
-			Hostname: "mycorp.com",
-			Type:     models.BitbucketServer,
+		HeadRepo: models.Repo{
+			FullName:          "atlantis-fork/atlantis-example",
+			Owner:             "atlantis-fork",
+			Name:              "atlantis-example",
+			CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
+			SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/fk/atlantis-example.git",
+			VCSHost: models.VCSHost{
+				Hostname: "mycorp.com",
+				Type:     models.BitbucketServer,
+			},
 		},
-	}, headRepo)
+	}, pull)
 	Equals(t, models.User{
 		Username: "lkysow",
 	}, user)
@@ -1195,6 +916,7 @@ func TestParseAzureDevopsPullEvent(t *testing.T) {
 		Num:        ADPull.GetPullRequestID(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
+		HeadRepo:   expBaseRepo,
 	}, actPull)
 	Equals(t, models.OpenedPullEvent, evType)
 	Equals(t, models.User{Username: "user@example.com"}, actUser)
@@ -1295,6 +1017,7 @@ func TestParseAzureDevopsPull(t *testing.T) {
 		Num:        ADPull.GetPullRequestID(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
+		HeadRepo:   expBaseRepo,
 	}, actPull)
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, expBaseRepo, actHeadRepo)

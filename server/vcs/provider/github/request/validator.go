@@ -11,63 +11,61 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package events
+package request
 
 import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/http"
+
+	"github.com/runatlantis/atlantis/server/http"
 
 	"github.com/google/go-github/v31/github"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_request_validator.go GithubRequestValidator
-
-// GithubRequestValidator handles checking if GitHub requests are signed
-// properly by the secret.
-type GithubRequestValidator interface {
-	// Validate returns the JSON payload of the request.
-	// If secret is not empty, it checks that the request was signed
-	// by secret and returns an error if it was not.
-	// If secret is empty, it does not check if the request was signed.
-	Validate(r *http.Request, secret []byte) ([]byte, error)
+type requestValidator interface {
+	Validate(r *http.CloneableRequest, secret []byte) ([]byte, error)
 }
 
-// DefaultGithubRequestValidator handles checking if GitHub requests are signed
+// validator handles checking if GitHub requests are signed
 // properly by the secret.
-type DefaultGithubRequestValidator struct{}
+type validator struct{}
 
 // Validate returns the JSON payload of the request.
 // If secret is not empty, it checks that the request was signed
 // by secret and returns an error if it was not.
 // If secret is empty, it does not check if the request was signed.
-func (d *DefaultGithubRequestValidator) Validate(r *http.Request, secret []byte) ([]byte, error) {
+func (d validator) Validate(r *http.CloneableRequest, secret []byte) ([]byte, error) {
 	if len(secret) != 0 {
 		return d.validateAgainstSecret(r, secret)
 	}
 	return d.validateWithoutSecret(r)
 }
 
-func (d *DefaultGithubRequestValidator) validateAgainstSecret(r *http.Request, secret []byte) ([]byte, error) {
-	payload, err := github.ValidatePayload(r, secret)
+func (d validator) validateAgainstSecret(r *http.CloneableRequest, secret []byte) ([]byte, error) {
+	payload, err := github.ValidatePayload(r.GetRequest(), secret)
 	if err != nil {
 		return nil, err
 	}
 	return payload, nil
 }
 
-func (d *DefaultGithubRequestValidator) validateWithoutSecret(r *http.Request) ([]byte, error) {
-	switch ct := r.Header.Get("Content-Type"); ct {
+func (d validator) validateWithoutSecret(r *http.CloneableRequest) ([]byte, error) {
+	switch ct := r.GetHeader("Content-Type"); ct {
 	case "application/json":
-		payload, err := ioutil.ReadAll(r.Body)
+		body, err := r.GetBody()
+
+		if err != nil {
+			return []byte{}, err
+		}
+		payload, err := ioutil.ReadAll(body)
 		if err != nil {
 			return nil, fmt.Errorf("could not read body: %s", err)
 		}
 		return payload, nil
 	case "application/x-www-form-urlencoded":
 		// GitHub stores the json payload as a form value.
-		payloadForm := r.FormValue("payload")
+		payloadForm := r.GetRequest().FormValue("payload")
 		if payloadForm == "" {
 			return nil, errors.New("webhook request did not contain expected 'payload' form value")
 		}
