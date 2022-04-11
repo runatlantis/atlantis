@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -10,7 +11,7 @@ import (
 
 // StepsRunner executes steps defined in project config
 type StepsRunner interface {
-	Run(command.ProjectContext, string) (string, error)
+	Run(ctx context.Context, cmdCtx command.ProjectContext, absPath string) (string, error)
 }
 
 func NewStepsRunner(
@@ -37,30 +38,30 @@ func NewStepsRunner(
 	return stepsRunner
 }
 
-func (r *stepsRunner) Run(ctx command.ProjectContext, absPath string) (string, error) {
+func (r *stepsRunner) Run(ctx context.Context, cmdCtx command.ProjectContext, absPath string) (string, error) {
 	var outputs []string
 
 	envs := make(map[string]string)
-	for _, step := range ctx.Steps {
+	for _, step := range cmdCtx.Steps {
 		var out string
 		var err error
 		switch step.StepName {
 		case "init":
-			out, err = r.InitRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = r.InitRunner.Run(ctx, cmdCtx, step.ExtraArgs, absPath, envs)
 		case "plan":
-			out, err = r.PlanRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = r.PlanRunner.Run(ctx, cmdCtx, step.ExtraArgs, absPath, envs)
 		case "show":
-			_, err = r.ShowRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			_, err = r.ShowRunner.Run(ctx, cmdCtx, step.ExtraArgs, absPath, envs)
 		case "policy_check":
-			out, err = r.PolicyCheckRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = r.PolicyCheckRunner.Run(ctx, cmdCtx, step.ExtraArgs, absPath, envs)
 		case "apply":
-			out, err = r.ApplyRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = r.ApplyRunner.Run(ctx, cmdCtx, step.ExtraArgs, absPath, envs)
 		case "version":
-			out, err = r.VersionRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = r.VersionRunner.Run(ctx, cmdCtx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = r.RunRunner.Run(ctx, step.RunCommand, absPath, envs)
+			out, err = r.RunRunner.Run(ctx, cmdCtx, step.RunCommand, absPath, envs)
 		case "env":
-			out, err = r.EnvRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
+			out, err = r.EnvRunner.Run(ctx, cmdCtx, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out
 			// We reset out to the empty string because we don't want it to
 			// be printed to the PR, it's solely to set the environment variable.

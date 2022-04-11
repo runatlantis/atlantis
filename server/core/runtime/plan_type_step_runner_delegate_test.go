@@ -1,6 +1,7 @@
-package runtime
+package runtime_test
 
 import (
+	"context"
 	"errors"
 	"io/ioutil"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	. "github.com/runatlantis/atlantis/testing"
 
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
@@ -33,10 +35,10 @@ func TestRunDelegate(t *testing.T) {
 	mockDefaultRunner := mocks.NewMockRunner()
 	mockRemoteRunner := mocks.NewMockRunner()
 
-	subject := &PlanTypeStepRunnerDelegate{
-		defaultRunner:    mockDefaultRunner,
-		remotePlanRunner: mockRemoteRunner,
-	}
+	subject := runtime.NewPlanTypeStepRunnerDelegate(
+		mockDefaultRunner,
+		mockRemoteRunner,
+	)
 
 	tfVersion, _ := version.NewVersion("0.12.0")
 
@@ -47,7 +49,8 @@ func TestRunDelegate(t *testing.T) {
 		err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 		Ok(t, err)
 
-		ctx := command.ProjectContext{
+		ctx := context.Background()
+		prjCtx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
 			EscapedCommentArgs: []string{"comment", "args"},
@@ -58,9 +61,9 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
+		When(mockRemoteRunner.Run(ctx, prjCtx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
 
-		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
+		output, err := subject.Run(ctx, prjCtx, extraArgs, tmpDir, envs)
 
 		mockDefaultRunner.VerifyWasCalled(Never())
 
@@ -76,7 +79,8 @@ func TestRunDelegate(t *testing.T) {
 		err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 		Ok(t, err)
 
-		ctx := command.ProjectContext{
+		ctx := context.Background()
+		prjCtx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
 			EscapedCommentArgs: []string{"comment", "args"},
@@ -87,9 +91,9 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
+		When(mockRemoteRunner.Run(ctx, prjCtx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
 
-		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
+		output, err := subject.Run(ctx, prjCtx, extraArgs, tmpDir, envs)
 
 		mockDefaultRunner.VerifyWasCalled(Never())
 
@@ -105,7 +109,8 @@ func TestRunDelegate(t *testing.T) {
 		err := ioutil.WriteFile(planPath, []byte(planFileContents), 0600)
 		Ok(t, err)
 
-		ctx := command.ProjectContext{
+		ctx := context.Background()
+		prjCtx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
 			EscapedCommentArgs: []string{"comment", "args"},
@@ -116,9 +121,9 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
+		When(mockDefaultRunner.Run(ctx, prjCtx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
 
-		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
+		output, err := subject.Run(ctx, prjCtx, extraArgs, tmpDir, envs)
 
 		mockRemoteRunner.VerifyWasCalled(Never())
 
@@ -134,7 +139,8 @@ func TestRunDelegate(t *testing.T) {
 		err := ioutil.WriteFile(planPath, []byte(planFileContents), 0600)
 		Ok(t, err)
 
-		ctx := command.ProjectContext{
+		ctx := context.Background()
+		prjCtx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
 			EscapedCommentArgs: []string{"comment", "args"},
@@ -145,9 +151,9 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
+		When(mockDefaultRunner.Run(ctx, prjCtx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
 
-		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
+		output, err := subject.Run(ctx, prjCtx, extraArgs, tmpDir, envs)
 
 		mockRemoteRunner.VerifyWasCalled(Never())
 

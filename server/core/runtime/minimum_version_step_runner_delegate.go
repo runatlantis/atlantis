@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hashicorp/go-version"
@@ -30,15 +31,15 @@ func NewMinimumVersionStepRunnerDelegate(minimumVersionStr string, defaultVersio
 	}, nil
 }
 
-func (r *MinimumVersionStepRunnerDelegate) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (r *MinimumVersionStepRunnerDelegate) Run(ctx context.Context, prjCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	tfVersion := r.defaultTfVersion
-	if ctx.TerraformVersion != nil {
-		tfVersion = ctx.TerraformVersion
+	if prjCtx.TerraformVersion != nil {
+		tfVersion = prjCtx.TerraformVersion
 	}
 
 	if tfVersion.LessThan(r.minimumVersion) {
 		return fmt.Sprintf("Version: %s is unsupported for this step. Minimum version is: %s", tfVersion.String(), r.minimumVersion.String()), nil
 	}
 
-	return r.delegate.Run(ctx, extraArgs, path, envs)
+	return r.delegate.Run(ctx, prjCtx, extraArgs, path, envs)
 }

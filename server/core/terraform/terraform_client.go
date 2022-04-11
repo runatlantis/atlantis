@@ -15,6 +15,7 @@
 package terraform
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -45,7 +46,7 @@ type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
 	// workspace which should be set as an environment variable.
-	RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(ctx context.Context, prjCtx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
@@ -248,11 +249,11 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 }
 
 // See Client.RunCommandWithVersion.
-func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
+func (c *DefaultClient) RunCommandWithVersion(ctx context.Context, prjCtx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
 	// if the feature is enabled, we use the async workflow else we default to the original sync workflow
 	// Don't stream terraform show output to outCh
 	if len(args) > 0 && isAsyncEligibleCommand(args[0]) {
-		outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
+		outCh := c.RunCommandAsync(ctx, prjCtx, path, args, customEnvVars, v, workspace)
 
 		var lines []string
 		var err error
@@ -282,10 +283,10 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", cmd.String(), path)
-		ctx.Log.Errorf(err.Error())
+		prjCtx.Log.Errorf(err.Error())
 		return ansi.Strip(string(out)), err
 	}
-	ctx.Log.Infof("successfully ran %q in %q", cmd.String(), path)
+	prjCtx.Log.Infof("successfully ran %q in %q", cmd.String(), path)
 
 	return ansi.Strip(string(out)), nil
 }

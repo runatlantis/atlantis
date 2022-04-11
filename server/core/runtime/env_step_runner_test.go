@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -51,7 +52,8 @@ func TestEnvStepRunner_Run(t *testing.T) {
 		t.Run(c.Command, func(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
-			ctx := command.ProjectContext{
+			ctx := context.Background()
+			prjCtx := command.ProjectContext{
 				BaseRepo: models.Repo{
 					Name:  "basename",
 					Owner: "baseowner",
@@ -75,7 +77,7 @@ func TestEnvStepRunner_Run(t *testing.T) {
 				TerraformVersion: tfVersion,
 				ProjectName:      c.ProjectName,
 			}
-			value, err := envRunner.Run(ctx, c.Command, c.Value, tmpDir, map[string]string(nil))
+			value, err := envRunner.Run(ctx, prjCtx, c.Command, c.Value, tmpDir, map[string]string(nil))
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

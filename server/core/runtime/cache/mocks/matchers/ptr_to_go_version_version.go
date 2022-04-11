@@ -3,9 +3,7 @@ package matchers
 
 import (
 	"reflect"
-
 	"github.com/petergtz/pegomock"
-
 	go_version "github.com/hashicorp/go-version"
 )
 
@@ -17,18 +15,6 @@ func AnyPtrToGoVersionVersion() *go_version.Version {
 
 func EqPtrToGoVersionVersion(value *go_version.Version) *go_version.Version {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue *go_version.Version
-	return nullValue
-}
-
-func NotEqPtrToGoVersionVersion(value *go_version.Version) *go_version.Version {
-	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
-	var nullValue *go_version.Version
-	return nullValue
-}
-
-func PtrToGoVersionVersionThat(matcher pegomock.ArgumentMatcher) *go_version.Version {
-	pegomock.RegisterMatcher(matcher)
 	var nullValue *go_version.Version
 	return nullValue
 }

@@ -14,6 +14,7 @@
 package events_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -76,7 +77,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		AnyString(),
 	)).ThenReturn(repoDir, false, nil)
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{
@@ -101,19 +103,19 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		RepoRelDir: ".",
 	}
 
-	When(mockStepsRunner.Run(ctx, repoDir)).ThenReturn("run\napply\nplan\ninit", nil)
-	firstRes := wrappedRunner.Plan(ctx)
+	When(mockStepsRunner.Run(ctx, prjCtx, repoDir)).ThenReturn("run\napply\nplan\ninit", nil)
+	firstRes := wrappedRunner.Plan(prjCtx)
 
 	Assert(t, firstRes.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", firstRes.PlanSuccess.LockURL)
 	Equals(t, "run\napply\nplan\ninit", firstRes.PlanSuccess.TerraformOutput)
-	mockStepsRunner.VerifyWasCalledOnce().Run(ctx, repoDir)
+	mockStepsRunner.VerifyWasCalledOnce().Run(ctx, prjCtx, repoDir)
 }
 
 // Test that it runs the expected plan steps.
 func TestDefaultProjectCommandRunner_PlanWithSync(t *testing.T) {
 	RegisterMockTestingT(t)
-	ctx := command.ProjectContext{
+	prjCtx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{
@@ -191,10 +193,10 @@ func TestDefaultProjectCommandRunner_PlanWithSync(t *testing.T) {
 				wrappedRunner = wrappedRunner.WithSync(projectLocker, &mockURLGenerator{})
 			}
 
-			firstRes := wrappedRunner.Plan(ctx)
+			firstRes := wrappedRunner.Plan(prjCtx)
 			targetRes := wrappedRunner.Plan(targetCtx)
 
-			Assert(t, firstRes.IsSuccessful(), "exp first ctx to succeed")
+			Assert(t, firstRes.IsSuccessful(), "exp first prjCtx to succeed")
 			Equals(t, targetRes.PlanStatus(), c.expPlanStatus)
 			Equals(t, targetRes.Failure, c.expFailure)
 		})
@@ -203,7 +205,7 @@ func TestDefaultProjectCommandRunner_PlanWithSync(t *testing.T) {
 
 func TestProjectOutputWrapper(t *testing.T) {
 	RegisterMockTestingT(t)
-	ctx := command.ProjectContext{
+	prjCtx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{
@@ -291,19 +293,19 @@ func TestProjectOutputWrapper(t *testing.T) {
 
 			switch c.CommandName {
 			case command.Plan:
-				runner.Plan(ctx)
+				runner.Plan(prjCtx)
 			case command.Apply:
-				runner.Apply(ctx)
+				runner.Apply(prjCtx)
 			}
 
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus)
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus)
+			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(prjCtx, c.CommandName, models.PendingCommitStatus)
+			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(prjCtx, c.CommandName, expCommitStatus)
 
 			switch c.CommandName {
 			case command.Plan:
-				mockProjectCommandRunner.VerifyWasCalledOnce().Plan(ctx)
+				mockProjectCommandRunner.VerifyWasCalledOnce().Plan(prjCtx)
 			case command.Apply:
-				mockProjectCommandRunner.VerifyWasCalledOnce().Apply(ctx)
+				mockProjectCommandRunner.VerifyWasCalledOnce().Apply(prjCtx)
 			}
 		})
 	}
@@ -316,10 +318,10 @@ func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir: mockWorkingDir,
 	}
-	ctx := command.ProjectContext{}
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn("", os.ErrNotExist)
+	prjCtx := command.ProjectContext{}
+	When(mockWorkingDir.GetWorkingDir(prjCtx.BaseRepo, prjCtx.Pull, prjCtx.Workspace)).ThenReturn("", os.ErrNotExist)
 
-	firstRes := runner.Apply(ctx)
+	firstRes := runner.Apply(prjCtx)
 	ErrEquals(t, "project has not been cloned–did you run plan?", firstRes.Error)
 }
 
@@ -336,7 +338,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 		},
 		Webhooks: mockSender,
 	}
-	ctx := command.ProjectContext{
+	prjCtx := command.ProjectContext{
 		ApplyRequirements: []string{"approved"},
 		PullReqStatus: models.PullReqStatus{
 			ApprovalStatus: models.ApprovalStatus{
@@ -346,9 +348,9 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	}
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.GetWorkingDir(prjCtx.BaseRepo, prjCtx.Pull, prjCtx.Workspace)).ThenReturn(tmp, nil)
 
-	firstRes := runner.Apply(ctx)
+	firstRes := runner.Apply(prjCtx)
 	Equals(t, "Pull request must be approved by at least one person other than the author before running apply.", firstRes.Failure)
 }
 
@@ -365,7 +367,7 @@ func TestDefaultProjectCommandRunner_ForceOverridesApplyReqs(t *testing.T) {
 		},
 		Webhooks: mockSender,
 	}
-	ctx := command.ProjectContext{
+	prjCtx := command.ProjectContext{
 		PullReqStatus: models.PullReqStatus{
 			ApprovalStatus: models.ApprovalStatus{
 				IsApproved: false,
@@ -376,9 +378,9 @@ func TestDefaultProjectCommandRunner_ForceOverridesApplyReqs(t *testing.T) {
 	}
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.GetWorkingDir(prjCtx.BaseRepo, prjCtx.Pull, prjCtx.Workspace)).ThenReturn(tmp, nil)
 
-	firstRes := runner.Apply(ctx)
+	firstRes := runner.Apply(prjCtx)
 	Equals(t, "", firstRes.Failure)
 }
 
@@ -394,7 +396,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 			WorkingDir: mockWorkingDir,
 		},
 	}
-	ctx := command.ProjectContext{
+	prjCtx := command.ProjectContext{
 		PullReqStatus: models.PullReqStatus{
 			Mergeable: false,
 		},
@@ -402,9 +404,9 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	}
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.GetWorkingDir(prjCtx.BaseRepo, prjCtx.Pull, prjCtx.Workspace)).ThenReturn(tmp, nil)
 
-	firstRes := runner.Apply(ctx)
+	firstRes := runner.Apply(prjCtx)
 	Equals(t, "Pull request must be mergeable before running apply.", firstRes.Failure)
 }
 
@@ -420,14 +422,14 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 			WorkingDir: mockWorkingDir,
 		},
 	}
-	ctx := command.ProjectContext{
+	prjCtx := command.ProjectContext{
 		ApplyRequirements: []string{"undiverged"},
 	}
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.GetWorkingDir(prjCtx.BaseRepo, prjCtx.Pull, prjCtx.Workspace)).ThenReturn(tmp, nil)
 
-	firstRes := runner.Apply(ctx)
+	firstRes := runner.Apply(prjCtx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", firstRes.Failure)
 }
 
@@ -535,7 +537,8 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				AnyString(),
 			)).ThenReturn(repoDir, nil)
 
-			ctx := command.ProjectContext{
+			ctx := context.Background()
+			prjCtx := command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
 				Steps:             c.steps,
 				Workspace:         "default",
@@ -549,13 +552,13 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				},
 			}
 
-			When(mockStepsRunner.Run(ctx, repoDir)).ThenReturn("run\napply\nplan\ninit", nil)
+			When(mockStepsRunner.Run(ctx, prjCtx, repoDir)).ThenReturn("run\napply\nplan\ninit", nil)
 
-			firstRes := runner.Apply(ctx)
+			firstRes := runner.Apply(prjCtx)
 			Equals(t, c.expOut, firstRes.ApplySuccess)
 			Equals(t, c.expFailure, firstRes.Failure)
 
-			mockStepsRunner.VerifyWasCalledOnce().Run(ctx, repoDir)
+			mockStepsRunner.VerifyWasCalledOnce().Run(ctx, prjCtx, repoDir)
 		})
 	}
 }
@@ -585,7 +588,8 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		AnyString(),
 	)).ThenReturn(repoDir, nil)
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{
@@ -599,12 +603,12 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 			Mergeable: true,
 		},
 	}
-	When(mockStepsRunner.Run(ctx, ".")).ThenReturn("apply", fmt.Errorf("something went wrong"))
+	When(mockStepsRunner.Run(ctx, prjCtx, ".")).ThenReturn("apply", fmt.Errorf("something went wrong"))
 
-	firstRes := runner.Apply(ctx)
+	firstRes := runner.Apply(prjCtx)
 	Assert(t, firstRes.ApplySuccess == "", "exp apply failure")
 
-	mockStepsRunner.VerifyWasCalledOnce().Run(ctx, repoDir)
+	mockStepsRunner.VerifyWasCalledOnce().Run(ctx, prjCtx, repoDir)
 }
 
 type mockURLGenerator struct{}

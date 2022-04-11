@@ -27,7 +27,7 @@ const (
 // TerraformExec brings the interface from TerraformClient into this package
 // without causing circular imports.
 type TerraformExec interface {
-	RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(ctx context.Context, prjCtx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
 	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
 }
 
@@ -42,8 +42,8 @@ type AsyncTFExec interface {
 	// Callers can use the input channel to pass stdin input to the command.
 	// If any error is passed on the out channel, there will be no
 	// further output (so callers are free to exit).
-	RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) <-chan helpers.Line
-	RunCommandAsyncWithInput(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string, input <-chan string) <-chan helpers.Line
+	RunCommandAsync(ctx context.Context, prjCtx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) <-chan helpers.Line
+	RunCommandAsyncWithInput(ctx context.Context, prjCtx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string, input <-chan string) <-chan helpers.Line
 }
 
 // StatusUpdater brings the interface from CommitStatusUpdater into this package
@@ -55,20 +55,20 @@ type StatusUpdater interface {
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 // Runner mirrors events.StepRunner as a way to bring it into this package
 type Runner interface {
-	Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error)
+	Run(ctx context.Context, prjCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_runner.go CustomRunner
 // CustomRunner runs custom run steps.
 type CustomRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
+	Run(ctx context.Context, prjCtx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_runner.go EnvRunner
 // EnvRunner runs env steps.
 type EnvRunner interface {
-	Run(ctx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error)
+	Run(ctx context.Context, prjCtx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error)
 }
 
 // MustConstraint returns a constraint. It panics on error.

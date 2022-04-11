@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -159,16 +160,16 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 	}
 }
 
-func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
+func (c *ConfTestExecutorWorkflow) Run(ctx context.Context, prjCtx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
 	policyArgs := []Arg{}
 	policySetNames := []string{}
-	ctx.Log.Debugf("policy sets, %s ", ctx.PolicySets)
-	for _, policySet := range ctx.PolicySets.PolicySets {
+	prjCtx.Log.Debugf("policy sets, %s ", prjCtx.PolicySets)
+	for _, policySet := range prjCtx.PolicySets.PolicySets {
 		path, err := c.SourceResolver.Resolve(policySet)
 
 		// Let's not fail the whole step because of a single failure. Log and fail silently
 		if err != nil {
-			ctx.Log.Errorf("Error resolving policyset %s. err: %s", policySet.Name, err.Error())
+			prjCtx.Log.Errorf("Error resolving policyset %s. err: %s", policySet.Name, err.Error())
 			continue
 		}
 
@@ -178,7 +179,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		policySetNames = append(policySetNames, policySet.Name)
 	}
 
-	inputFile := filepath.Join(workdir, ctx.GetShowResultFileName())
+	inputFile := filepath.Join(workdir, prjCtx.GetShowResultFileName())
 
 	args := ConftestTestCommandArgs{
 		PolicyArgs: policyArgs,
@@ -190,7 +191,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 	serializedArgs, err := args.build()
 
 	if err != nil {
-		ctx.Log.Warnf("No policies have been configured")
+		prjCtx.Log.Warnf("No policies have been configured")
 		return "", nil
 		// TODO: enable when we can pass policies in otherwise e2e tests with policy checks fail
 		// return "", errors.Wrap(err, "building args")

@@ -4,11 +4,10 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	valid "github.com/runatlantis/atlantis/server/core/config/valid"
+	"reflect"
+	"time"
 )
 
 type MockSourceResolver struct {
@@ -52,14 +51,14 @@ func (mock *MockSourceResolver) VerifyWasCalledOnce() *VerifierMockSourceResolve
 	}
 }
 
-func (mock *MockSourceResolver) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockSourceResolver {
+func (mock *MockSourceResolver) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockSourceResolver {
 	return &VerifierMockSourceResolver{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockSourceResolver) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockSourceResolver {
+func (mock *MockSourceResolver) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockSourceResolver {
 	return &VerifierMockSourceResolver{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -67,7 +66,7 @@ func (mock *MockSourceResolver) VerifyWasCalledInOrder(invocationCountMatcher pe
 	}
 }
 
-func (mock *MockSourceResolver) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockSourceResolver {
+func (mock *MockSourceResolver) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockSourceResolver {
 	return &VerifierMockSourceResolver{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -77,7 +76,7 @@ func (mock *MockSourceResolver) VerifyWasCalledEventually(invocationCountMatcher
 
 type VerifierMockSourceResolver struct {
 	mock                   *MockSourceResolver
-	invocationCountMatcher pegomock.InvocationCountMatcher
+	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

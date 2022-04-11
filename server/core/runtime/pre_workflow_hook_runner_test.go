@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -40,7 +41,8 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		t.Run(c.Command, func(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
-			ctx := models.PreWorkflowHookCommandContext{
+			ctx := context.Background()
+			prjCtx := models.PreWorkflowHookCommandContext{
 				BaseRepo: models.Repo{
 					Name:  "basename",
 					Owner: "baseowner",
@@ -61,7 +63,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 				},
 				Log: logger,
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir)
+			out, err := r.Run(ctx, prjCtx, c.Command, tmpDir)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

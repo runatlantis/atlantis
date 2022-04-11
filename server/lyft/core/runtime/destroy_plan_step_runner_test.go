@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -101,7 +102,8 @@ func TestRun_DestroyPlan(t *testing.T) {
 			stepRunner := lyftRuntime.DestroyPlanStepRunner{
 				StepRunner: &planStepRunner,
 			}
-			ctx := command.ProjectContext{
+			ctx := context.Background()
+			prjCtx := command.ProjectContext{
 				Log:                logger,
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
@@ -117,13 +119,13 @@ func TestRun_DestroyPlan(t *testing.T) {
 				},
 				Tags: c.tags,
 			}
-			When(terraform.RunCommandWithVersion(ctx, tmpDir, c.expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
+			When(terraform.RunCommandWithVersion(ctx, prjCtx, tmpDir, c.expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
 
-			output, err := stepRunner.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+			output, err := stepRunner.Run(ctx, prjCtx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 			Ok(t, err)
 
 			// Verify that we next called for the actual
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, c.expPlanArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, prjCtx, tmpDir, c.expPlanArgs, map[string]string(nil), tfVersion, "workspace")
 			Equals(t, "output", output)
 		})
 	}

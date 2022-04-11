@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hashicorp/go-getter"
@@ -87,7 +88,8 @@ func TestStepsRunner_Run(t *testing.T) {
 			repoDir, cleanup := TempDir(t)
 			defer cleanup()
 
-			ctx := command.ProjectContext{
+			ctx := context.Background()
+			prjCtx := command.ProjectContext{
 				Log:        logging.NewNoopLogger(t),
 				Steps:      c.steps,
 				Workspace:  "default",
@@ -96,26 +98,26 @@ func TestStepsRunner_Run(t *testing.T) {
 			expEnvs := map[string]string{
 				"key": "value",
 			}
-			When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
-			When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
-			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, "", repoDir, expEnvs)).ThenReturn("run", nil)
-			When(mockEnv.Run(ctx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
+			When(mockInit.Run(ctx, prjCtx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
+			When(mockPlan.Run(ctx, prjCtx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
+			When(mockApply.Run(ctx, prjCtx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
+			When(mockRun.Run(ctx, prjCtx, "", repoDir, expEnvs)).ThenReturn("run", nil)
+			When(mockEnv.Run(ctx, prjCtx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
 
-			runner.Run(ctx, repoDir)
+			runner.Run(ctx, prjCtx, repoDir)
 
 			for _, step := range c.expSteps {
 				switch step {
 				case "init":
-					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+					mockInit.VerifyWasCalledOnce().Run(ctx, prjCtx, nil, repoDir, expEnvs)
 				case "plan":
-					mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+					mockPlan.VerifyWasCalledOnce().Run(ctx, prjCtx, nil, repoDir, expEnvs)
 				case "apply":
-					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+					mockApply.VerifyWasCalledOnce().Run(ctx, prjCtx, nil, repoDir, expEnvs)
 				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs)
+					mockRun.VerifyWasCalledOnce().Run(ctx, prjCtx, "", repoDir, expEnvs)
 				case "env":
-					mockEnv.VerifyWasCalledOnce().Run(ctx, "", "value", repoDir, expEnvs)
+					mockEnv.VerifyWasCalledOnce().Run(ctx, prjCtx, "", "value", repoDir, expEnvs)
 				}
 			}
 		})
@@ -158,7 +160,8 @@ func TestStepsRuinner_RunEnvSteps(t *testing.T) {
 	repoDir, cleanup := TempDir(t)
 	defer cleanup()
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
 			{
@@ -197,7 +200,7 @@ func TestStepsRuinner_RunEnvSteps(t *testing.T) {
 		Workspace:  "default",
 		RepoRelDir: ".",
 	}
-	res, err := runner.Run(ctx, repoDir)
+	res, err := runner.Run(ctx, prjCtx, repoDir)
 	Ok(t, err)
 
 	Equals(t, "var=\n\nvar=value\n\ndynamic_var=dynamic_value\n\ndynamic_var=overridden\n", res)

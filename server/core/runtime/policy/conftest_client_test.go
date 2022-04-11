@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -159,7 +160,8 @@ func TestRun(t *testing.T) {
 		Name:   policySetName2,
 	}
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		PolicySets: valid.PolicySets{
 			PolicySets: []valid.PolicySet{
 				policySet1,
@@ -183,7 +185,7 @@ func TestRun(t *testing.T) {
 
 		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, nil)
 
-		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
+		result, err := subject.Run(ctx, prjCtx, executablePath, envs, workdir, extraArgs)
 
 		fmt.Println(result)
 
@@ -205,7 +207,7 @@ func TestRun(t *testing.T) {
 
 		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, nil)
 
-		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
+		result, err := subject.Run(ctx, prjCtx, executablePath, envs, workdir, extraArgs)
 
 		fmt.Println(result)
 
@@ -227,7 +229,7 @@ func TestRun(t *testing.T) {
 
 		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, nil)
 
-		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
+		result, err := subject.Run(ctx, prjCtx, executablePath, envs, workdir, extraArgs)
 
 		Ok(t, err)
 
@@ -246,7 +248,7 @@ func TestRun(t *testing.T) {
 
 		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedResult, nil)
 
-		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
+		result, err := subject.Run(ctx, prjCtx, executablePath, envs, workdir, extraArgs)
 
 		Ok(t, err)
 
@@ -266,7 +268,7 @@ func TestRun(t *testing.T) {
 
 		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, errors.New("exit status code 1"))
 
-		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
+		result, err := subject.Run(ctx, prjCtx, executablePath, envs, workdir, extraArgs)
 
 		Assert(t, result == expectedResult, "rseult is expected")
 		Assert(t, err != nil, "error is expected")

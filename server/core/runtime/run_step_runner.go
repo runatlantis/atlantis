@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -19,16 +20,16 @@ type RunStepRunner struct {
 	TerraformBinDir string
 }
 
-func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string) (string, error) {
+func (r *RunStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext, command string, path string, envs map[string]string) (string, error) {
 	tfVersion := r.DefaultTFVersion
-	if ctx.TerraformVersion != nil {
-		tfVersion = ctx.TerraformVersion
+	if prjCtx.TerraformVersion != nil {
+		tfVersion = prjCtx.TerraformVersion
 	}
 
-	err := r.TerraformExecutor.EnsureVersion(ctx.Log, tfVersion)
+	err := r.TerraformExecutor.EnsureVersion(prjCtx.Log, tfVersion)
 	if err != nil {
 		err = fmt.Errorf("%s: Downloading terraform Version %s", err, tfVersion.String())
-		ctx.Log.Debugf("error: %s", err)
+		prjCtx.Log.Debugf("error: %s", err)
 		return "", err
 	}
 
@@ -38,24 +39,24 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
 		"ATLANTIS_TERRAFORM_VERSION": tfVersion.String(),
-		"BASE_BRANCH_NAME":           ctx.Pull.BaseBranch,
-		"BASE_REPO_NAME":             ctx.BaseRepo.Name,
-		"BASE_REPO_OWNER":            ctx.BaseRepo.Owner,
-		"COMMENT_ARGS":               strings.Join(ctx.EscapedCommentArgs, ","),
+		"BASE_BRANCH_NAME":           prjCtx.Pull.BaseBranch,
+		"BASE_REPO_NAME":             prjCtx.BaseRepo.Name,
+		"BASE_REPO_OWNER":            prjCtx.BaseRepo.Owner,
+		"COMMENT_ARGS":               strings.Join(prjCtx.EscapedCommentArgs, ","),
 		"DIR":                        path,
-		"HEAD_BRANCH_NAME":           ctx.Pull.HeadBranch,
-		"HEAD_COMMIT":                ctx.Pull.HeadCommit,
-		"HEAD_REPO_NAME":             ctx.HeadRepo.Name,
-		"HEAD_REPO_OWNER":            ctx.HeadRepo.Owner,
+		"HEAD_BRANCH_NAME":           prjCtx.Pull.HeadBranch,
+		"HEAD_COMMIT":                prjCtx.Pull.HeadCommit,
+		"HEAD_REPO_NAME":             prjCtx.HeadRepo.Name,
+		"HEAD_REPO_OWNER":            prjCtx.HeadRepo.Owner,
 		"PATH":                       fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
-		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
-		"SHOWFILE":                   filepath.Join(path, ctx.GetShowResultFileName()),
-		"PROJECT_NAME":               ctx.ProjectName,
-		"PULL_AUTHOR":                ctx.Pull.Author,
-		"PULL_NUM":                   fmt.Sprintf("%d", ctx.Pull.Num),
-		"REPO_REL_DIR":               ctx.RepoRelDir,
-		"USER_NAME":                  ctx.User.Username,
-		"WORKSPACE":                  ctx.Workspace,
+		"PLANFILE":                   filepath.Join(path, GetPlanFilename(prjCtx.Workspace, prjCtx.ProjectName)),
+		"SHOWFILE":                   filepath.Join(path, prjCtx.GetShowResultFileName()),
+		"PROJECT_NAME":               prjCtx.ProjectName,
+		"PULL_AUTHOR":                prjCtx.Pull.Author,
+		"PULL_NUM":                   fmt.Sprintf("%d", prjCtx.Pull.Num),
+		"REPO_REL_DIR":               prjCtx.RepoRelDir,
+		"USER_NAME":                  prjCtx.User.Username,
+		"WORKSPACE":                  prjCtx.Workspace,
 	}
 
 	finalEnvVars := baseEnvVars
@@ -70,9 +71,9 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
-		ctx.Log.Debugf("error: %s", err)
+		prjCtx.Log.Debugf("error: %s", err)
 		return "", err
 	}
-	ctx.Log.Infof("successfully ran %q in %q", command, path)
+	prjCtx.Log.Infof("successfully ran %q in %q", command, path)
 	return string(out), nil
 }

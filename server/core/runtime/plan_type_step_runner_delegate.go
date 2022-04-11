@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"io/ioutil"
 	"path/filepath"
 
@@ -11,8 +12,8 @@ import (
 // NullRunner is a runner that isn't configured for a given plan type but outputs nothing
 type NullRunner struct{}
 
-func (p NullRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	ctx.Log.Debugf("runner not configured for plan type")
+func (p NullRunner) Run(ctx context.Context, prjCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	prjCtx.Log.Debugf("runner not configured for plan type")
 
 	return "", nil
 }
@@ -20,8 +21,8 @@ func (p NullRunner) Run(ctx command.ProjectContext, extraArgs []string, path str
 // RemoteBackendUnsupportedRunner is a runner that is responsible for outputting that the remote backend is unsupported
 type RemoteBackendUnsupportedRunner struct{}
 
-func (p RemoteBackendUnsupportedRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	ctx.Log.Debugf("runner not configured for remote backend")
+func (p RemoteBackendUnsupportedRunner) Run(ctx context.Context, cmdCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	cmdCtx.Log.Debugf("runner not configured for remote backend")
 
 	return "Remote backend is unsupported for this step.", nil
 }
@@ -49,8 +50,8 @@ func (p *PlanTypeStepRunnerDelegate) isRemotePlan(planFile string) (bool, error)
 	return IsRemotePlan(data), nil
 }
 
-func (p *PlanTypeStepRunnerDelegate) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+func (p *PlanTypeStepRunnerDelegate) Run(ctx context.Context, cmdCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	planFile := filepath.Join(path, GetPlanFilename(cmdCtx.Workspace, cmdCtx.ProjectName))
 	remotePlan, err := p.isRemotePlan(planFile)
 
 	if err != nil {
@@ -58,8 +59,8 @@ func (p *PlanTypeStepRunnerDelegate) Run(ctx command.ProjectContext, extraArgs [
 	}
 
 	if remotePlan {
-		return p.remotePlanRunner.Run(ctx, extraArgs, path, envs)
+		return p.remotePlanRunner.Run(ctx, cmdCtx, extraArgs, path, envs)
 	}
 
-	return p.defaultRunner.Run(ctx, extraArgs, path, envs)
+	return p.defaultRunner.Run(ctx, cmdCtx, extraArgs, path, envs)
 }

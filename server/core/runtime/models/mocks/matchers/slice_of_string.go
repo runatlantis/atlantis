@@ -3,8 +3,8 @@ package matchers
 
 import (
 	"reflect"
-
 	"github.com/petergtz/pegomock"
+	
 )
 
 func AnySliceOfString() []string {
@@ -15,18 +15,6 @@ func AnySliceOfString() []string {
 
 func EqSliceOfString(value []string) []string {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue []string
-	return nullValue
-}
-
-func NotEqSliceOfString(value []string) []string {
-	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
-	var nullValue []string
-	return nullValue
-}
-
-func SliceOfStringThat(matcher pegomock.ArgumentMatcher) []string {
-	pegomock.RegisterMatcher(matcher)
 	var nullValue []string
 	return nullValue
 }

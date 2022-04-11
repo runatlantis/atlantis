@@ -49,7 +49,8 @@ func TestRunPreHooks_Clone(t *testing.T) {
 	var newPull = fixtures.Pull
 	newPull.BaseRepo = fixtures.GithubRepo
 
-	ctx := &command.Context{
+	ctx := context.Background()
+	cmdCtx := &command.Context{
 		Pull:     newPull,
 		HeadRepo: fixtures.GithubRepo,
 		User:     fixtures.User,
@@ -95,12 +96,12 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		When(whWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)).ThenReturn(unlockFn, nil)
 		When(whWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
-		When(whPreWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, nil)
+		When(whPreWorkflowHookRunner.Run(ctx, pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, nil)
 
-		err := wh.RunPreHooks(context.TODO(), ctx)
+		err := wh.RunPreHooks(ctx, cmdCtx)
 
 		Ok(t, err)
-		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(pCtx, testHook.RunCommand, repoDir)
+		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(ctx, pCtx, testHook.RunCommand, repoDir)
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 	t.Run("success hooks not in cfg", func(t *testing.T) {
@@ -124,11 +125,11 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		wh.GlobalCfg = globalCfg
 
-		err := wh.RunPreHooks(context.TODO(), ctx)
+		err := wh.RunPreHooks(ctx, cmdCtx)
 
 		Ok(t, err)
 
-		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
+		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(ctx, pCtx, testHook.RunCommand, repoDir)
 		whWorkingDirLocker.VerifyWasCalled(Never()).TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)
 		whWorkingDir.VerifyWasCalled(Never()).Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)
 	})
@@ -150,11 +151,11 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		When(whWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)).ThenReturn(func() {}, errors.New("some error"))
 
-		err := wh.RunPreHooks(context.TODO(), ctx)
+		err := wh.RunPreHooks(context.TODO(), cmdCtx)
 
 		Assert(t, err != nil, "error not nil")
 		whWorkingDir.VerifyWasCalled(Never()).Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)
-		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
+		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(ctx, pCtx, testHook.RunCommand, repoDir)
 	})
 
 	t.Run("error cloning", func(t *testing.T) {
@@ -181,11 +182,11 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		When(whWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)).ThenReturn(unlockFn, nil)
 		When(whWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, errors.New("some error"))
 
-		err := wh.RunPreHooks(context.TODO(), ctx)
+		err := wh.RunPreHooks(context.TODO(), cmdCtx)
 
 		Assert(t, err != nil, "error not nil")
 
-		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
+		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(ctx, pCtx, testHook.RunCommand, repoDir)
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 
@@ -212,9 +213,9 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		When(whWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)).ThenReturn(unlockFn, nil)
 		When(whWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
-		When(whPreWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, errors.New("some error"))
+		When(whPreWorkflowHookRunner.Run(ctx, pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, errors.New("some error"))
 
-		err := wh.RunPreHooks(context.TODO(), ctx)
+		err := wh.RunPreHooks(context.TODO(), cmdCtx)
 
 		Assert(t, err != nil, "error not nil")
 		Assert(t, *unlockCalled == true, "unlock function called")

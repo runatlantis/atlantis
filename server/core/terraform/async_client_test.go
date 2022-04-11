@@ -1,6 +1,7 @@
 package terraform
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -27,7 +28,8 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	echoCommand := exec.Command("sh", "-c", "echo hello")
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log: logger,
 	}
 
@@ -39,7 +41,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	}
 
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(echoCommand, nil)
-	outCh := client.RunCommandAsync(ctx, path, args, map[string]string{}, nil, workspace)
+	outCh := client.RunCommandAsync(ctx, prjCtx, path, args, map[string]string{}, nil, workspace)
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -55,7 +57,8 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	workspace := "workspace"
 	logger := logging.NewNoopLogger(t)
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
@@ -85,7 +88,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	cat := exec.Command("sh", "-c", cmdStr)
 
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(cat, nil)
-	outCh := client.RunCommandAsync(ctx, path, args, map[string]string{}, nil, workspace)
+	outCh := client.RunCommandAsync(ctx, prjCtx, path, args, map[string]string{}, nil, workspace)
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -102,7 +105,8 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
@@ -112,7 +116,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		commandBuilder:          mockBuilder,
 	}
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(echoCommand, nil)
-	outCh := client.RunCommandAsync(ctx, path, args, map[string]string{}, nil, workspace)
+	outCh := client.RunCommandAsync(ctx, prjCtx, path, args, map[string]string{}, nil, workspace)
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -128,7 +132,8 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	echoCommand := exec.Command("sh", "-c", "echo dying && exit 1")
 	logger := logging.NewNoopLogger(t)
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
@@ -138,7 +143,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 		commandBuilder:          mockBuilder,
 	}
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(echoCommand, nil)
-	outCh := client.RunCommandAsync(ctx, path, args, map[string]string{}, nil, workspace)
+	outCh := client.RunCommandAsync(ctx, prjCtx, path, args, map[string]string{}, nil, workspace)
 
 	out, err := waitCh(outCh)
 	ErrEquals(t, fmt.Sprintf(`running "/bin/sh -c echo dying && exit 1" in %q: exit status 1`, path), err)
@@ -155,7 +160,8 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	echoCommand := exec.Command("sh", "-c", "read a && echo $a")
 	logger := logging.NewNoopLogger(t)
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log: logger,
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
@@ -168,7 +174,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	inCh := make(chan string)
 
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(echoCommand, nil)
-	outCh := client.RunCommandAsyncWithInput(ctx, path, args, map[string]string{}, nil, workspace, inCh)
+	outCh := client.RunCommandAsyncWithInput(ctx, prjCtx, path, args, map[string]string{}, nil, workspace, inCh)
 	inCh <- "echo me\n"
 
 	out, err := waitCh(outCh)

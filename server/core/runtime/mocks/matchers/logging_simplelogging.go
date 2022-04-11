@@ -3,9 +3,7 @@ package matchers
 
 import (
 	"reflect"
-
 	"github.com/petergtz/pegomock"
-
 	logging "github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -17,18 +15,6 @@ func AnyLoggingSimpleLogging() logging.SimpleLogging {
 
 func EqLoggingSimpleLogging(value logging.SimpleLogging) logging.SimpleLogging {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue logging.SimpleLogging
-	return nullValue
-}
-
-func NotEqLoggingSimpleLogging(value logging.SimpleLogging) logging.SimpleLogging {
-	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
-	var nullValue logging.SimpleLogging
-	return nullValue
-}
-
-func LoggingSimpleLoggingThat(matcher pegomock.ArgumentMatcher) logging.SimpleLogging {
-	pegomock.RegisterMatcher(matcher)
 	var nullValue logging.SimpleLogging
 	return nullValue
 }

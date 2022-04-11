@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -32,12 +33,14 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			delegate:         mockDelegate,
 		}
 
-		ctx := command.ProjectContext{}
+		ctx := context.Background()
+		prjCtx := command.ProjectContext{}
 
-		When(mockDelegate.Run(ctx, extraArgs, path, envs)).ThenReturn(expectedOut, nil)
+		When(mockDelegate.Run(ctx, prjCtx, extraArgs, path, envs)).ThenReturn(expectedOut, nil)
 
 		output, err := subject.Run(
 			ctx,
+			prjCtx,
 			extraArgs,
 			path,
 			envs,
@@ -47,21 +50,23 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 		Ok(t, err)
 	})
 
-	t.Run("ctx version success", func(t *testing.T) {
+	t.Run("prjCtx version success", func(t *testing.T) {
 		subject := &MinimumVersionStepRunnerDelegate{
 			defaultTfVersion: tfVersion11,
 			minimumVersion:   tfVersion12,
 			delegate:         mockDelegate,
 		}
 
-		ctx := command.ProjectContext{
+		ctx := context.Background()
+		prjCtx := command.ProjectContext{
 			TerraformVersion: tfVersion12,
 		}
 
-		When(mockDelegate.Run(ctx, extraArgs, path, envs)).ThenReturn(expectedOut, nil)
+		When(mockDelegate.Run(ctx, prjCtx, extraArgs, path, envs)).ThenReturn(expectedOut, nil)
 
 		output, err := subject.Run(
 			ctx,
+			prjCtx,
 			extraArgs,
 			path,
 			envs,
@@ -78,10 +83,12 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			delegate:         mockDelegate,
 		}
 
-		ctx := command.ProjectContext{}
+		ctx := context.Background()
+		prjCtx := command.ProjectContext{}
 
 		output, err := subject.Run(
 			ctx,
+			prjCtx,
 			extraArgs,
 			path,
 			envs,
@@ -93,19 +100,21 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 		Ok(t, err)
 	})
 
-	t.Run("ctx version failure", func(t *testing.T) {
+	t.Run("prjCtx version failure", func(t *testing.T) {
 		subject := &MinimumVersionStepRunnerDelegate{
 			defaultTfVersion: tfVersion12,
 			minimumVersion:   tfVersion12,
 			delegate:         mockDelegate,
 		}
 
-		ctx := command.ProjectContext{
+		ctx := context.Background()
+		prjCtx := command.ProjectContext{
 			TerraformVersion: tfVersion11,
 		}
 
 		output, err := subject.Run(
 			ctx,
+			prjCtx,
 			extraArgs,
 			path,
 			envs,

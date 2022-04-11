@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -17,7 +18,8 @@ func TestRunVersionStep(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	workspace := "default"
 
-	context := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log:                logger,
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,
@@ -44,8 +46,8 @@ func TestRunVersionStep(t *testing.T) {
 	}
 
 	t.Run("ensure runs", func(t *testing.T) {
-		_, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
-		terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, []string{"version"}, map[string]string(nil), tfVersion, "default")
+		_, err := s.Run(ctx, prjCtx, []string{}, tmpDir, map[string]string(nil))
+		terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, prjCtx, tmpDir, []string{"version"}, map[string]string(nil), tfVersion, "default")
 		Ok(t, err)
 	})
 }

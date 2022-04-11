@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -21,7 +22,8 @@ func TestShowStepRunnner(t *testing.T) {
 	resultPath := filepath.Join(path, "test-default.json")
 	envs := map[string]string{"key": "val"}
 	tfVersion, _ := version.NewVersion("0.12")
-	context := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Workspace:   "default",
 		ProjectName: "test",
 		Log:         logger,
@@ -39,10 +41,10 @@ func TestShowStepRunnner(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 
 		When(mockExecutor.RunCommandWithVersion(
-			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
+			ctx, prjCtx, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, prjCtx.Workspace,
 		)).ThenReturn("success", nil)
 
-		r, err := subject.Run(context, []string{}, path, envs)
+		r, err := subject.Run(ctx, prjCtx, []string{}, path, envs)
 
 		Ok(t, err)
 
@@ -58,7 +60,8 @@ func TestShowStepRunnner(t *testing.T) {
 
 		v, _ := version.NewVersion("0.13.0")
 
-		contextWithVersionOverride := command.ProjectContext{
+		ctx := context.Background()
+		prjCtx := command.ProjectContext{
 			Workspace:        "default",
 			ProjectName:      "test",
 			Log:              logger,
@@ -66,10 +69,10 @@ func TestShowStepRunnner(t *testing.T) {
 		}
 
 		When(mockExecutor.RunCommandWithVersion(
-			contextWithVersionOverride, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, v, context.Workspace,
+			ctx, prjCtx, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, v, prjCtx.Workspace,
 		)).ThenReturn("success", nil)
 
-		r, err := subject.Run(contextWithVersionOverride, []string{}, path, envs)
+		r, err := subject.Run(ctx, prjCtx, []string{}, path, envs)
 
 		Ok(t, err)
 
@@ -83,10 +86,10 @@ func TestShowStepRunnner(t *testing.T) {
 
 	t.Run("failure running command", func(t *testing.T) {
 		When(mockExecutor.RunCommandWithVersion(
-			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
+			ctx, prjCtx, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, prjCtx.Workspace,
 		)).ThenReturn("success", errors.New("error"))
 
-		_, err := subject.Run(context, []string{}, path, envs)
+		_, err := subject.Run(ctx, prjCtx, []string{}, path, envs)
 
 		Assert(t, err != nil, "error is returned")
 

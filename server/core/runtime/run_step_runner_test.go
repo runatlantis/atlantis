@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -113,7 +114,8 @@ func TestRunStepRunner_Run(t *testing.T) {
 		t.Run(c.Command, func(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
-			ctx := command.ProjectContext{
+			ctx := context.Background()
+			prjCtx := command.ProjectContext{
 				BaseRepo: models.Repo{
 					Name:  "basename",
 					Owner: "baseowner",
@@ -139,7 +141,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				ProjectName:        c.ProjectName,
 				EscapedCommentArgs: []string{"-target=resource1", "-target=resource2"},
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"})
+			out, err := r.Run(ctx, prjCtx, c.Command, tmpDir, map[string]string{"test": "var"})
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

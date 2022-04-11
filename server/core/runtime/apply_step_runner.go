@@ -23,48 +23,48 @@ type ApplyStepRunner struct {
 	AsyncTFExec         AsyncTFExec
 }
 
-func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	if a.hasTargetFlag(ctx, extraArgs) {
+func (a *ApplyStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	if a.hasTargetFlag(prjCtx, extraArgs) {
 		return "", errors.New("cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan")
 	}
 
-	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planPath := filepath.Join(path, GetPlanFilename(prjCtx.Workspace, prjCtx.ProjectName))
 	contents, err := ioutil.ReadFile(planPath)
 	if os.IsNotExist(err) {
-		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelDir, ctx.Workspace)
+		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", prjCtx.RepoRelDir, prjCtx.Workspace)
 	}
 	if err != nil {
 		return "", errors.Wrap(err, "unable to read planfile")
 	}
 
-	ctx.Log.Infof("starting apply")
+	prjCtx.Log.Infof("starting apply")
 	var out string
 
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
-		args := append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...)
-		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion, envs)
+		args := append(append([]string{"apply", "-input=false"}, extraArgs...), prjCtx.EscapedCommentArgs...)
+		out, err = a.runRemoteApply(ctx, prjCtx, args, path, planPath, prjCtx.TerraformVersion, envs)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
 		}
 	} else {
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
-		args := append(append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
-		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, ctx.TerraformVersion, ctx.Workspace)
+		args := append(append(append([]string{"apply", "-input=false"}, extraArgs...), prjCtx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
+		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, prjCtx, path, args, envs, prjCtx.TerraformVersion, prjCtx.Workspace)
 	}
 
 	// If the apply was successful, delete the plan.
 	if err == nil {
-		ctx.Log.Infof("apply successful, deleting planfile")
+		prjCtx.Log.Infof("apply successful, deleting planfile")
 		if removeErr := os.Remove(planPath); removeErr != nil {
-			ctx.Log.Warnf("failed to delete planfile after successful apply: %s", removeErr)
+			prjCtx.Log.Warnf("failed to delete planfile after successful apply: %s", removeErr)
 		}
 	}
 	return out, err
 }
 
-func (a *ApplyStepRunner) hasTargetFlag(ctx command.ProjectContext, extraArgs []string) bool {
+func (a *ApplyStepRunner) hasTargetFlag(prjCtx command.ProjectContext, extraArgs []string) bool {
 	isTargetFlag := func(s string) bool {
 		if s == "-target" {
 			return true
@@ -73,7 +73,7 @@ func (a *ApplyStepRunner) hasTargetFlag(ctx command.ProjectContext, extraArgs []
 		return split[0] == "-target"
 	}
 
-	for _, arg := range ctx.EscapedCommentArgs {
+	for _, arg := range prjCtx.EscapedCommentArgs {
 		if isTargetFlag(arg) {
 			return true
 		}
@@ -111,7 +111,8 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 // manual diff.
 // It also writes "yes" or "no" to the process to confirm the apply.
 func (a *ApplyStepRunner) runRemoteApply(
-	ctx command.ProjectContext,
+	ctx context.Context,
+	prjCtx command.ProjectContext,
 	applyArgs []string,
 	path string,
 	absPlanPath string,
@@ -127,16 +128,16 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	// updateStatusF will update the commit status and log any error.
 	updateStatusF := func(status models.CommitStatus, url string) {
-		if err := a.CommitStatusUpdater.UpdateProject(context.TODO(), ctx, command.Apply, status, url); err != nil {
-			ctx.Log.Errorf("unable to update status: %s", err)
+		if err := a.CommitStatusUpdater.UpdateProject(ctx, prjCtx, command.Apply, status, url); err != nil {
+			prjCtx.Log.Errorf("unable to update status: %s", err)
 		}
 	}
 
 	// Start the async command execution.
-	ctx.Log.Debugf("starting async tf remote operation")
+	prjCtx.Log.Debugf("starting async tf remote operation")
 	inCh := make(chan string)
 	defer close(inCh)
-	outCh := a.AsyncTFExec.RunCommandAsyncWithInput(ctx, filepath.Clean(path), applyArgs, envs, tfVersion, ctx.Workspace, inCh)
+	outCh := a.AsyncTFExec.RunCommandAsyncWithInput(ctx, prjCtx, filepath.Clean(path), applyArgs, envs, tfVersion, prjCtx.Workspace, inCh)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string
@@ -155,7 +156,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
-			ctx.Log.Debugf("remote run url found, updating commit status")
+			prjCtx.Log.Debugf("remote run url found, updating commit status")
 			updateStatusF(models.PendingCommitStatus, runURL)
 			nextLineIsRunURL = false
 		}
@@ -163,12 +164,12 @@ func (a *ApplyStepRunner) runRemoteApply(
 		// If the plan is complete and it's waiting for us to verify the apply,
 		// check if the plan is the same and if so, input "yes".
 		if a.atConfirmApplyPrompt(lines) {
-			ctx.Log.Debugf("remote apply is waiting for confirmation")
+			prjCtx.Log.Debugf("remote apply is waiting for confirmation")
 
 			// Check if the plan is as expected.
 			planChangedErr = a.remotePlanChanged(string(planfileBytes), strings.Join(lines, "\n"), tfVersion)
 			if planChangedErr != nil {
-				ctx.Log.Errorf("plan generated during apply does not match expected plan, aborting")
+				prjCtx.Log.Errorf("plan generated during apply does not match expected plan, aborting")
 				inCh <- "no\n"
 				// Need to continue so we read all the lines, otherwise channel
 				// sender (in TerraformClient) will block indefinitely waiting
@@ -176,12 +177,12 @@ func (a *ApplyStepRunner) runRemoteApply(
 				continue
 			}
 
-			ctx.Log.Debugf("plan generated during apply matches expected plan, continuing")
+			prjCtx.Log.Debugf("plan generated during apply matches expected plan, continuing")
 			inCh <- "yes\n"
 		}
 	}
 
-	ctx.Log.Debugf("async tf remote operation complete")
+	prjCtx.Log.Debugf("async tf remote operation complete")
 	output := strings.Join(lines, "\n")
 	if planChangedErr != nil {
 		updateStatusF(models.FailedCommitStatus, runURL)

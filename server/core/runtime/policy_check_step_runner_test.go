@@ -1,12 +1,14 @@
-package runtime
+package runtime_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -22,7 +24,8 @@ func TestRun(t *testing.T) {
 	workdir := "/path"
 	executablePath := "some/path/conftest"
 
-	context := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log:                logger,
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,
@@ -43,17 +46,17 @@ func TestRun(t *testing.T) {
 	}
 
 	executorWorkflow := mocks.NewMockVersionedExecutorWorkflow()
-	s := &PolicyCheckStepRunner{
-		versionEnsurer: executorWorkflow,
-		executor:       executorWorkflow,
+	s := &runtime.PolicyCheckStepRunner{
+		VersionEnsurer: executorWorkflow,
+		Executor:       executorWorkflow,
 	}
 
 	t.Run("success", func(t *testing.T) {
 		extraArgs := []string{"extra", "args"}
 		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)
-		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("Success!", nil)
+		When(executorWorkflow.Run(ctx, prjCtx, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("Success!", nil)
 
-		output, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
+		output, err := s.Run(ctx, prjCtx, extraArgs, workdir, map[string]string(nil))
 
 		Ok(t, err)
 		Equals(t, "Success!", output)
@@ -64,16 +67,16 @@ func TestRun(t *testing.T) {
 		expectedErr := errors.New("error ensuring version")
 		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn("", expectedErr)
 
-		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
+		_, err := s.Run(ctx, prjCtx, extraArgs, workdir, map[string]string(nil))
 
 		Assert(t, err != nil, "error is not nil")
 	})
 	t.Run("executor failure", func(t *testing.T) {
 		extraArgs := []string{"extra", "args"}
 		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)
-		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("", errors.New("error running executor"))
+		When(executorWorkflow.Run(ctx, prjCtx, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("", errors.New("error running executor"))
 
-		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
+		_, err := s.Run(ctx, prjCtx, extraArgs, workdir, map[string]string(nil))
 
 		Assert(t, err != nil, "error is not nil")
 	})

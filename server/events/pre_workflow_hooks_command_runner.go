@@ -64,6 +64,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 	}
 
 	err = w.runHooks(
+		ctx,
 		models.PreWorkflowHookCommandContext{
 			BaseRepo: baseRepo,
 			HeadRepo: headRepo,
@@ -81,13 +82,14 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 }
 
 func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
+	ctx context.Context,
 	cmdCtx models.PreWorkflowHookCommandContext,
 	preWorkflowHooks []*valid.PreWorkflowHook,
 	repoDir string,
 ) error {
 
 	for _, hook := range preWorkflowHooks {
-		_, err := w.PreWorkflowHookRunner.Run(cmdCtx, hook.RunCommand, repoDir)
+		_, err := w.PreWorkflowHookRunner.Run(ctx, cmdCtx, hook.RunCommand, repoDir)
 
 		if err != nil {
 			return err

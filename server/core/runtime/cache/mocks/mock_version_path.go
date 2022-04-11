@@ -4,11 +4,10 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	go_version "github.com/hashicorp/go-version"
 	pegomock "github.com/petergtz/pegomock"
+	"reflect"
+	"time"
 )
 
 type MockExecutionVersionCache struct {
@@ -52,14 +51,14 @@ func (mock *MockExecutionVersionCache) VerifyWasCalledOnce() *VerifierMockExecut
 	}
 }
 
-func (mock *MockExecutionVersionCache) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockExecutionVersionCache {
+func (mock *MockExecutionVersionCache) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockExecutionVersionCache {
 	return &VerifierMockExecutionVersionCache{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockExecutionVersionCache) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockExecutionVersionCache {
+func (mock *MockExecutionVersionCache) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockExecutionVersionCache {
 	return &VerifierMockExecutionVersionCache{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -67,7 +66,7 @@ func (mock *MockExecutionVersionCache) VerifyWasCalledInOrder(invocationCountMat
 	}
 }
 
-func (mock *MockExecutionVersionCache) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockExecutionVersionCache {
+func (mock *MockExecutionVersionCache) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockExecutionVersionCache {
 	return &VerifierMockExecutionVersionCache{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -77,7 +76,7 @@ func (mock *MockExecutionVersionCache) VerifyWasCalledEventually(invocationCount
 
 type VerifierMockExecutionVersionCache struct {
 	mock                   *MockExecutionVersionCache
-	invocationCountMatcher pegomock.InvocationCountMatcher
+	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

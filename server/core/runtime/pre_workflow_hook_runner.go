@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,28 +11,28 @@ import (
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
 type PreWorkflowHookRunner interface {
-	Run(ctx models.PreWorkflowHookCommandContext, command string, path string) (string, error)
+	Run(ctx context.Context, preCtx models.PreWorkflowHookCommandContext, command string, path string) (string, error)
 }
 
 type DefaultPreWorkflowHookRunner struct{}
 
-func (wh DefaultPreWorkflowHookRunner) Run(ctx models.PreWorkflowHookCommandContext, command string, path string) (string, error) {
+func (wh DefaultPreWorkflowHookRunner) Run(ctx context.Context, preCtx models.PreWorkflowHookCommandContext, command string, path string) (string, error) {
 	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
 
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
-		"BASE_BRANCH_NAME": ctx.Pull.BaseBranch,
-		"BASE_REPO_NAME":   ctx.BaseRepo.Name,
-		"BASE_REPO_OWNER":  ctx.BaseRepo.Owner,
+		"BASE_BRANCH_NAME": preCtx.Pull.BaseBranch,
+		"BASE_REPO_NAME":   preCtx.BaseRepo.Name,
+		"BASE_REPO_OWNER":  preCtx.BaseRepo.Owner,
 		"DIR":              path,
-		"HEAD_BRANCH_NAME": ctx.Pull.HeadBranch,
-		"HEAD_COMMIT":      ctx.Pull.HeadCommit,
-		"HEAD_REPO_NAME":   ctx.HeadRepo.Name,
-		"HEAD_REPO_OWNER":  ctx.HeadRepo.Owner,
-		"PULL_AUTHOR":      ctx.Pull.Author,
-		"PULL_NUM":         fmt.Sprintf("%d", ctx.Pull.Num),
-		"USER_NAME":        ctx.User.Username,
+		"HEAD_BRANCH_NAME": preCtx.Pull.HeadBranch,
+		"HEAD_COMMIT":      preCtx.Pull.HeadCommit,
+		"HEAD_REPO_NAME":   preCtx.HeadRepo.Name,
+		"HEAD_REPO_OWNER":  preCtx.HeadRepo.Owner,
+		"PULL_AUTHOR":      preCtx.Pull.Author,
+		"PULL_NUM":         fmt.Sprintf("%d", preCtx.Pull.Num),
+		"USER_NAME":        preCtx.User.Username,
 	}
 
 	finalEnvVars := baseEnvVars

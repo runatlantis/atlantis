@@ -3,9 +3,7 @@ package matchers
 
 import (
 	"reflect"
-
 	"github.com/petergtz/pegomock"
-
 	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -17,18 +15,6 @@ func AnyModelsPreWorkflowHookCommandContext() models.PreWorkflowHookCommandConte
 
 func EqModelsPreWorkflowHookCommandContext(value models.PreWorkflowHookCommandContext) models.PreWorkflowHookCommandContext {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue models.PreWorkflowHookCommandContext
-	return nullValue
-}
-
-func NotEqModelsPreWorkflowHookCommandContext(value models.PreWorkflowHookCommandContext) models.PreWorkflowHookCommandContext {
-	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
-	var nullValue models.PreWorkflowHookCommandContext
-	return nullValue
-}
-
-func ModelsPreWorkflowHookCommandContextThat(matcher pegomock.ArgumentMatcher) models.PreWorkflowHookCommandContext {
-	pegomock.RegisterMatcher(matcher)
 	var nullValue models.PreWorkflowHookCommandContext
 	return nullValue
 }

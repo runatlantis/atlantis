@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -30,22 +31,23 @@ type ShowStepRunner struct {
 	DefaultTFVersion  *version.Version
 }
 
-func (p *ShowStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (p *ShowStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	tfVersion := p.DefaultTFVersion
-	if ctx.TerraformVersion != nil {
-		tfVersion = ctx.TerraformVersion
+	if prjCtx.TerraformVersion != nil {
+		tfVersion = prjCtx.TerraformVersion
 	}
 
-	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
-	showResultFile := filepath.Join(path, ctx.GetShowResultFileName())
+	planFile := filepath.Join(path, GetPlanFilename(prjCtx.Workspace, prjCtx.ProjectName))
+	showResultFile := filepath.Join(path, prjCtx.GetShowResultFileName())
 
 	output, err := p.TerraformExecutor.RunCommandWithVersion(
 		ctx,
+		prjCtx,
 		path,
 		[]string{"show", "-json", filepath.Clean(planFile)},
 		envs,
 		tfVersion,
-		ctx.Workspace,
+		prjCtx.Workspace,
 	)
 
 	if err != nil {

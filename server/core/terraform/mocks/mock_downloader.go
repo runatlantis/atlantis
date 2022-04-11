@@ -4,11 +4,10 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	go_getter "github.com/hashicorp/go-getter"
 	pegomock "github.com/petergtz/pegomock"
+	"reflect"
+	"time"
 )
 
 type MockDownloader struct {
@@ -69,14 +68,14 @@ func (mock *MockDownloader) VerifyWasCalledOnce() *VerifierMockDownloader {
 	}
 }
 
-func (mock *MockDownloader) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockDownloader {
+func (mock *MockDownloader) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockDownloader {
 	return &VerifierMockDownloader{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockDownloader) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockDownloader {
+func (mock *MockDownloader) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockDownloader {
 	return &VerifierMockDownloader{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -84,7 +83,7 @@ func (mock *MockDownloader) VerifyWasCalledInOrder(invocationCountMatcher pegomo
 	}
 }
 
-func (mock *MockDownloader) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockDownloader {
+func (mock *MockDownloader) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockDownloader {
 	return &VerifierMockDownloader{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -94,7 +93,7 @@ func (mock *MockDownloader) VerifyWasCalledEventually(invocationCountMatcher peg
 
 type VerifierMockDownloader struct {
 	mock                   *MockDownloader
-	invocationCountMatcher pegomock.InvocationCountMatcher
+	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

@@ -1,6 +1,7 @@
 package terraform
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -28,7 +29,8 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	echoCommand := exec.Command("sh", "-c", "echo hello")
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log: logger,
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
@@ -52,7 +54,7 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion(t *testing.T) {
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(echoCommand, nil)
 
 	customEnvVars := map[string]string{}
-	out, err := client.RunCommandWithVersion(ctx, path, args, customEnvVars, nil, workspace)
+	out, err := client.RunCommandWithVersion(ctx, prjCtx, path, args, customEnvVars, nil, workspace)
 	Ok(t, err)
 	Equals(t, "hello\n", out)
 }
@@ -102,7 +104,8 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion_Error(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	echoCommand := exec.Command("sh", "-c", "echo dying && exit 1")
 
-	ctx := command.ProjectContext{
+	ctx := context.Background()
+	prjCtx := command.ProjectContext{
 		Log: logger,
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
@@ -125,7 +128,7 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion_Error(t *testing.T) {
 	}
 
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(echoCommand, nil)
-	out, err := client.RunCommandWithVersion(ctx, path, args, map[string]string{}, nil, workspace)
+	out, err := client.RunCommandWithVersion(ctx, prjCtx, path, args, map[string]string{}, nil, workspace)
 	ErrEquals(t, fmt.Sprintf(`running "/bin/sh -c echo dying && exit 1" in %q: exit status 1`, path), err)
 	// Test that we still get our output.
 	Equals(t, "dying\n", out)

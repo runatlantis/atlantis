@@ -4,10 +4,9 @@
 package mocks
 
 import (
+	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 	"time"
-
-	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockExec struct {
@@ -70,14 +69,14 @@ func (mock *MockExec) VerifyWasCalledOnce() *VerifierMockExec {
 	}
 }
 
-func (mock *MockExec) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockExec {
+func (mock *MockExec) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockExec {
 	return &VerifierMockExec{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockExec) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockExec {
+func (mock *MockExec) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockExec {
 	return &VerifierMockExec{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -85,7 +84,7 @@ func (mock *MockExec) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Inv
 	}
 }
 
-func (mock *MockExec) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockExec {
+func (mock *MockExec) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockExec {
 	return &VerifierMockExec{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -95,7 +94,7 @@ func (mock *MockExec) VerifyWasCalledEventually(invocationCountMatcher pegomock.
 
 type VerifierMockExec struct {
 	mock                   *MockExec
-	invocationCountMatcher pegomock.InvocationCountMatcher
+	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

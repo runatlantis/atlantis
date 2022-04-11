@@ -3,8 +3,9 @@ package matchers
 
 import (
 	"reflect"
-
 	"github.com/petergtz/pegomock"
+	
+
 )
 
 func AnyMapOfStringToString() map[string]string {
@@ -15,18 +16,6 @@ func AnyMapOfStringToString() map[string]string {
 
 func EqMapOfStringToString(value map[string]string) map[string]string {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue map[string]string
-	return nullValue
-}
-
-func NotEqMapOfStringToString(value map[string]string) map[string]string {
-	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
-	var nullValue map[string]string
-	return nullValue
-}
-
-func MapOfStringToStringThat(matcher pegomock.ArgumentMatcher) map[string]string {
-	pegomock.RegisterMatcher(matcher)
 	var nullValue map[string]string
 	return nullValue
 }
