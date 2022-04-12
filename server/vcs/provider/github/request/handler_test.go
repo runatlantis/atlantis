@@ -87,8 +87,8 @@ func TestHandle_CommentEvent(t *testing.T) {
 	secret := "secret"
 	eventTimestamp := time.Now()
 
-	log := logging.NewNoopLogger(t)
-	scope, _, err := metrics.NewLoggingScope(log, "atlantis")
+	log := logging.NewNoopCtxLogger(t)
+	scope, _, err := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 	assert.NoError(t, err)
 
 	rawRequest, err := http.NewRequestWithContext(
@@ -210,8 +210,8 @@ func TestHandle_PREvent(t *testing.T) {
 	secret := "secret"
 	eventTimestamp := time.Now()
 
-	log := logging.NewNoopLogger(t)
-	scope, _, err := metrics.NewLoggingScope(log, "atlantis")
+	log := logging.NewNoopCtxLogger(t)
+	scope, _, err := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 	assert.NoError(t, err)
 
 	rawRequest, err := http.NewRequestWithContext(

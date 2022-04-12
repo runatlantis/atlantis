@@ -927,6 +927,8 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             boltdb,
 		StaleCommandChecker:           staleCommandChecker,
+		Logger:                        ctxLogger,
+		LegacyLogger:                  logger,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
@@ -934,7 +936,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	autoplanner := &handlers.Autoplanner{
 		CommandRunner: commandRunner,
-		Logger:        logger,
 	}
 
 	pullCleaner := &events.PullClosedExecutor{
@@ -966,7 +967,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		// Use synchronous handler for testing purposes
 		&handlers.CommandHandler{
 			CommandRunner: commandRunner,
-			Logger:        logger,
 		},
 		ctxLogger,
 	)
@@ -983,7 +983,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	requestRouter := &events_controllers.RequestRouter{
 		Resolvers: []events_controllers.RequestResolver{
 			request.NewHandler(
-				logger,
+				ctxLogger,
 				statsScope,
 				nil,
 				commentHandler,

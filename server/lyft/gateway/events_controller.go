@@ -60,7 +60,7 @@ func NewVCSEventsController(
 	providerResolverInitializer := map[models.VCSHostType]func() events_controllers.RequestResolver{
 		models.Github: func() events_controllers.RequestResolver {
 			return request.NewHandler(
-				legacyLogger,
+				logger,
 				scope,
 				webhookSecret,
 				commentHandler,

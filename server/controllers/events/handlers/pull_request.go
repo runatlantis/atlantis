@@ -18,12 +18,11 @@ type eventTypeHandler interface {
 
 type Autoplanner struct {
 	CommandRunner events.CommandRunner
-	Logger        logging.SimpleLogging
 }
 
 func (p *Autoplanner) Handle(ctx context.Context, _ *http.CloneableRequest, event event_types.PullRequest) error {
 	p.CommandRunner.RunAutoplanCommand(
-		p.Logger,
+		ctx,
 		event.Pull.BaseRepo,
 		event.Pull.HeadRepo,
 		event.Pull,
@@ -34,13 +33,19 @@ func (p *Autoplanner) Handle(ctx context.Context, _ *http.CloneableRequest, even
 	return nil
 }
 
-type AsyncAutoplanner struct {
-	Autoplanner *Autoplanner
+type asyncAutoplanner struct {
+	autoplanner *Autoplanner
+	logger      logging.Logger
 }
 
-func (p *AsyncAutoplanner) Handle(ctx context.Context, request *http.CloneableRequest, event event_types.PullRequest) error {
-	go p.Autoplanner.Handle(ctx, request, event)
+func (p *asyncAutoplanner) Handle(ctx context.Context, request *http.CloneableRequest, event event_types.PullRequest) error {
+	go func() {
+		err := p.autoplanner.Handle(ctx, request, event)
 
+		if err != nil {
+			p.logger.ErrorContext(ctx, err.Error())
+		}
+	}()
 	return nil
 }
 
@@ -64,10 +69,11 @@ func NewPullRequestEvent(
 	pullCleaner events.PullCleaner,
 	logger logging.Logger,
 	commandRunner events.CommandRunner) *PullRequestEvent {
-	asyncAutoplanner := &AsyncAutoplanner{
-		Autoplanner: &Autoplanner{
+	asyncAutoplanner := &asyncAutoplanner{
+		autoplanner: &Autoplanner{
 			CommandRunner: commandRunner,
 		},
+		logger: logger,
 	}
 	return &PullRequestEvent{
 		RepoAllowlistChecker:    repoAllowlistChecker,

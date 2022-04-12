@@ -17,7 +17,10 @@ import (
 	"github.com/uber-go/tally"
 )
 
-const githubHeader = "X-Github-Event"
+const (
+	githubHeader    = "X-Github-Event"
+	requestIDHeader = "X-Github-Delivery"
+)
 
 // interfaces used in Handler
 
@@ -47,7 +50,7 @@ func (h *Matcher) Matches(request *http.CloneableRequest) bool {
 }
 
 func NewHandler(
-	logger logging.SimpleLogging,
+	logger logging.Logger,
 	scope tally.Scope,
 	webhookSecret []byte,
 	commentHandler *handlers.CommentEvent,
@@ -83,7 +86,7 @@ type Handler struct {
 	pullEventConverter    pullEventConverter
 	commentEventConverter commentEventConverter
 	webhookSecret         []byte
-	logger                logging.SimpleLogging
+	logger                logging.Logger
 	scope                 tally.Scope
 
 	Matcher
@@ -96,8 +99,12 @@ func (h *Handler) Handle(r *http.CloneableRequest) error {
 		return &errors.RequestValidationError{Err: err}
 	}
 
-	githubReqID := r.GetHeader("X-Github-Delivery")
-	logger := h.logger.With("gh-request-id", githubReqID)
+	ctx := context.WithValue(
+		r.GetRequest().Context(),
+		logging.RequestIDKey,
+		r.GetHeader(requestIDHeader),
+	)
+
 	scope := h.scope.SubScope("github.event")
 
 	event, err := h.parser.Parse(r, payload)
@@ -107,13 +114,13 @@ func (h *Handler) Handle(r *http.CloneableRequest) error {
 
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
-		err = h.handleGithubCommentEvent(event, logger, r)
+		err = h.handleGithubCommentEvent(ctx, event, r)
 		scope = scope.SubScope(fmt.Sprintf("comment.%s", *event.Action))
 	case *github.PullRequestEvent:
-		err = h.handleGithubPullRequestEvent(logger, event, r)
+		err = h.handleGithubPullRequestEvent(ctx, event, r)
 		scope = scope.SubScope(fmt.Sprintf("pr.%s", *event.Action))
 	default:
-		logger.Warnf("Ignoring unsupported event: %s", githubReqID)
+		h.logger.WarnContext(ctx, "Ignoring unsupported event")
 	}
 
 	if err != nil {
@@ -125,9 +132,9 @@ func (h *Handler) Handle(r *http.CloneableRequest) error {
 	return nil
 }
 
-func (h *Handler) handleGithubCommentEvent(event *github.IssueCommentEvent, logger logging.SimpleLogging, request *http.CloneableRequest) error {
+func (h *Handler) handleGithubCommentEvent(ctx context.Context, event *github.IssueCommentEvent, request *http.CloneableRequest) error {
 	if event.GetAction() != "created" {
-		logger.Warnf("Ignoring comment event since action was not created")
+		h.logger.WarnContext(ctx, "Ignoring comment event since action was not created")
 		return nil
 	}
 
@@ -137,15 +144,15 @@ func (h *Handler) handleGithubCommentEvent(event *github.IssueCommentEvent, logg
 		return &errors.EventParsingError{Err: err}
 	}
 
-	return h.commentHandler.Handle(context.TODO(), request, commentEvent)
+	return h.commentHandler.Handle(ctx, request, commentEvent)
 }
 
-func (h *Handler) handleGithubPullRequestEvent(logger logging.SimpleLogging, event *github.PullRequestEvent, request *http.CloneableRequest) error {
+func (h *Handler) handleGithubPullRequestEvent(ctx context.Context, event *github.PullRequestEvent, request *http.CloneableRequest) error {
 	pullEvent, err := h.pullEventConverter.Convert(event)
 
 	if err != nil {
 		return &errors.EventParsingError{Err: err}
 	}
 
-	return h.prHandler.Handle(context.TODO(), request, pullEvent)
+	return h.prHandler.Handle(ctx, request, pullEvent)
 }

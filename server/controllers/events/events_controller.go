@@ -110,7 +110,6 @@ func NewVCSEventsController(
 		vcsClient,
 		commandRunner,
 		logger,
-		legacyLogger,
 	)
 
 	// lazy map of resolver providers to their resolver
@@ -118,7 +117,7 @@ func NewVCSEventsController(
 	providerResolverInitializer := map[models.VCSHostType]func() RequestResolver{
 		models.Github: func() RequestResolver {
 			return github_request.NewHandler(
-				legacyLogger,
+				logger,
 				scope,
 				githubWebhookSecret,
 				commentHandler,

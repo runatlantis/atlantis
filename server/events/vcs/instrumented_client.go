@@ -80,7 +80,7 @@ func (c *InstrumentedGithubClient) GetContents(owner, repo, branch, path string)
 
 	//TODO: thread context and use related logging methods.
 	c.Logger.Debug("fetched contents", map[string]interface{}{
-		logging.RepositoryKey: repo,
+		logging.RepositoryKey.String(): repo,
 	})
 
 	return contents, err
@@ -110,8 +110,8 @@ func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoO
 
 	//TODO: thread context and use related logging methods.
 	c.Logger.Debug("fetched pull request", map[string]interface{}{
-		logging.RepositoryKey: fmt.Sprintf("%s/%s", repoOwner, repoName),
-		logging.PullNumKey:    strconv.Itoa(pullNum),
+		logging.RepositoryKey.String(): fmt.Sprintf("%s/%s", repoOwner, repoName),
+		logging.PullNumKey.String():    strconv.Itoa(pullNum),
 	})
 
 	return pull, err
@@ -213,8 +213,8 @@ func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, commen
 
 	//TODO: thread context and use related logging methods.
 	c.Logger.Debug("created pull request comment", map[string]interface{}{
-		logging.RepositoryKey: repo.FullName,
-		logging.PullNumKey:    strconv.Itoa(pullNum),
+		logging.RepositoryKey.String(): repo.FullName,
+		logging.PullNumKey.String():    strconv.Itoa(pullNum),
 	})
 	return nil
 }
@@ -236,8 +236,8 @@ func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum i
 
 	//TODO: thread context and use related logging methods.
 	c.Logger.Debug("hid previous comments", map[string]interface{}{
-		logging.RepositoryKey: repo.FullName,
-		logging.PullNumKey:    strconv.Itoa(pullNum),
+		logging.RepositoryKey.String(): repo.FullName,
+		logging.PullNumKey.String():    strconv.Itoa(pullNum),
 	})
 	return nil
 
@@ -307,11 +307,11 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 	// for now keeping this at info to debug weirdness we've been
 	// seeing with status api calls.
 	c.Logger.Info("updated vcs status", map[string]interface{}{
-		logging.RepositoryKey: request.Repo.FullName,
-		logging.PullNumKey:    strconv.Itoa(request.PullNum),
-		logging.SHAKey:        request.Ref,
-		"status-name":         request.StatusName,
-		"state":               request.State.String(),
+		logging.RepositoryKey.String(): request.Repo.FullName,
+		logging.PullNumKey.String():    strconv.Itoa(request.PullNum),
+		logging.SHAKey.String():        request.Ref,
+		"status-name":                  request.StatusName,
+		"state":                        request.State.String(),
 	})
 
 	executionSuccess.Inc(1)

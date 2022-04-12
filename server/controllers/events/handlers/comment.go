@@ -28,14 +28,12 @@ func NewCommentEvent(
 	commentCreator commentCreator,
 	commandRunner events.CommandRunner,
 	logger logging.Logger,
-	legacyLogger logging.SimpleLogging,
 ) *CommentEvent {
 	return &CommentEvent{
 		commentParser: commentParser,
 		commandHandler: &asyncHandler{
 			commandHandler: &CommandHandler{
 				CommandRunner: commandRunner,
-				Logger:        legacyLogger,
 			},
 			logger: logger,
 		},
@@ -71,12 +69,11 @@ type commandHandler interface {
 
 type CommandHandler struct {
 	CommandRunner events.CommandRunner
-	Logger        logging.SimpleLogging
 }
 
 func (h *CommandHandler) Handle(ctx context.Context, _ *http.CloneableRequest, event event_types.Comment, command *command.Comment) error {
 	h.CommandRunner.RunCommentCommand(
-		h.Logger,
+		ctx,
 		event.BaseRepo,
 		event.MaybeHeadRepo,
 		event.MaybePull,

@@ -13,20 +13,20 @@ import (
 
 func Repo(repo models.Repo) map[string]interface{} {
 	return map[string]interface{}{
-		logging.RepositoryKey: repo.FullName,
+		logging.RepositoryKey.String(): repo.FullName,
 	}
 }
 
 func PullRequest(pull models.PullRequest) map[string]interface{} {
 	return map[string]interface{}{
-		logging.RepositoryKey: pull.BaseRepo.FullName,
-		logging.PullNumKey:    strconv.Itoa(pull.Num),
-		logging.SHAKey:        pull.HeadCommit,
+		logging.RepositoryKey.String(): pull.BaseRepo.FullName,
+		logging.PullNumKey.String():    strconv.Itoa(pull.Num),
+		logging.SHAKey.String():        pull.HeadCommit,
 	}
 }
 
 func PullRequestWithErr(pull models.PullRequest, err error) map[string]interface{} {
 	kv := PullRequest(pull)
-	kv[logging.Err] = err
+	kv[logging.Err.String()] = err
 	return kv
 }

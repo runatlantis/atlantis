@@ -839,6 +839,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StaleCommandChecker:           staleCommandChecker,
 		CommitStatusUpdater:           commitStatusUpdater,
 		Logger:                        ctxLogger,
+		LegacyLogger:                  logger,
 	}
 
 	forceApplyCommandRunner := &events.ForceApplyCommandRunner{
