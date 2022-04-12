@@ -16,11 +16,11 @@ import (
 
 type assertingPRHandler struct {
 	expectedEvent   event_types.PullRequest
-	expectedRequest *httputils.CloneableRequest
+	expectedRequest *httputils.BufferedRequest
 	t               *testing.T
 }
 
-func (h *assertingPRHandler) Handle(ctx context.Context, request *httputils.CloneableRequest, event event_types.PullRequest) error {
+func (h *assertingPRHandler) Handle(ctx context.Context, request *httputils.BufferedRequest, event event_types.PullRequest) error {
 	assert.Equal(h.t, h.expectedRequest, request)
 	assert.Equal(h.t, h.expectedEvent, event)
 
@@ -35,7 +35,7 @@ func TestPREventHandler(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	request, err := httputils.NewCloneableRequest(rawRequest)
+	request, err := httputils.NewBufferedRequest(rawRequest)
 	assert.NoError(t, err)
 
 	event := event_types.PullRequest{

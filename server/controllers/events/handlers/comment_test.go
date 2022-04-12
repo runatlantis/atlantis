@@ -32,12 +32,12 @@ func (p *testCommentParser) Parse(comment string, vcsHost models.VCSHostType) ev
 
 type assertingCommentHandler struct {
 	expectedEvent   event_types.Comment
-	expectedRequest *httputils.CloneableRequest
+	expectedRequest *httputils.BufferedRequest
 	expectedCommand *command.Comment
 	t               *testing.T
 }
 
-func (h *assertingCommentHandler) Handle(ctx context.Context, request *httputils.CloneableRequest, event event_types.Comment, command *command.Comment) error {
+func (h *assertingCommentHandler) Handle(ctx context.Context, request *httputils.BufferedRequest, event event_types.Comment, command *command.Comment) error {
 	assert.Equal(h.t, h.expectedRequest, request)
 	assert.Equal(h.t, h.expectedEvent, event)
 	assert.Equal(h.t, h.expectedCommand, command)
@@ -57,7 +57,7 @@ func TestCommentHandler(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	request, err := httputils.NewCloneableRequest(rawRequest)
+	request, err := httputils.NewBufferedRequest(rawRequest)
 	assert.NoError(t, err)
 
 	event := event_types.Comment{}

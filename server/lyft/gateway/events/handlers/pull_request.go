@@ -41,7 +41,7 @@ type AsyncAutoplannerWorkerProxy struct {
 	logger logging.Logger
 }
 
-func (p *AsyncAutoplannerWorkerProxy) Handle(ctx context.Context, request *http.CloneableRequest, event event.PullRequest) error {
+func (p *AsyncAutoplannerWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, event event.PullRequest) error {
 	go func() {
 		err := p.proxy.Handle(ctx, request, event)
 
@@ -59,7 +59,7 @@ type SynchronousAutoplannerWorkerProxy struct {
 	legacyLogger      logging.SimpleLogging
 }
 
-func (p *SynchronousAutoplannerWorkerProxy) Handle(ctx context.Context, request *http.CloneableRequest, event event.PullRequest) error {
+func (p *SynchronousAutoplannerWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, event event.PullRequest) error {
 	if ok := p.autoplanValidator.InstrumentedIsValid(
 		p.legacyLogger,
 		event.Pull.BaseRepo,
@@ -90,10 +90,10 @@ type PullEventWorkerProxy struct {
 	logger    logging.Logger
 }
 
-func (p *PullEventWorkerProxy) Handle(ctx context.Context, request *http.CloneableRequest, event event.PullRequest) error {
+func (p *PullEventWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, event event.PullRequest) error {
 	buffer := bytes.NewBuffer([]byte{})
 
-	if err := request.GetRequest().Write(buffer); err != nil {
+	if err := request.GetRequestWithContext(ctx).Write(buffer); err != nil {
 		return errors.Wrap(err, "writing request to buffer")
 	}
 

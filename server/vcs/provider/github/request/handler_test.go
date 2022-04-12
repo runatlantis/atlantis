@@ -20,11 +20,11 @@ import (
 // mocks/test implementations
 type assertingPRHandler struct {
 	expectedInput   event.PullRequest
-	expectedRequest *httputils.CloneableRequest
+	expectedRequest *httputils.BufferedRequest
 	t               *testing.T
 }
 
-func (h assertingPRHandler) Handle(ctx context.Context, request *httputils.CloneableRequest, input event.PullRequest) error {
+func (h assertingPRHandler) Handle(ctx context.Context, request *httputils.BufferedRequest, input event.PullRequest) error {
 	assert.Equal(h.t, h.expectedRequest, request)
 	assert.Equal(h.t, h.expectedInput, input)
 
@@ -33,11 +33,11 @@ func (h assertingPRHandler) Handle(ctx context.Context, request *httputils.Clone
 
 type assertingCommentEventHandler struct {
 	expectedInput   event.Comment
-	expectedRequest *httputils.CloneableRequest
+	expectedRequest *httputils.BufferedRequest
 	t               *testing.T
 }
 
-func (h assertingCommentEventHandler) Handle(ctx context.Context, request *httputils.CloneableRequest, input event.Comment) error {
+func (h assertingCommentEventHandler) Handle(ctx context.Context, request *httputils.BufferedRequest, input event.Comment) error {
 	assert.Equal(h.t, h.expectedRequest, request)
 	assert.Equal(h.t, h.expectedInput, input)
 	return nil
@@ -48,7 +48,7 @@ type testValidator struct {
 	returnedError   error
 }
 
-func (d testValidator) Validate(r *httputils.CloneableRequest, secret []byte) ([]byte, error) {
+func (d testValidator) Validate(r *httputils.BufferedRequest, secret []byte) ([]byte, error) {
 	return d.returnedPayload, d.returnedError
 }
 
@@ -75,7 +75,7 @@ type testParser struct {
 	returnedParseWebhookError error
 }
 
-func (e *testParser) Parse(r *httputils.CloneableRequest, payload []byte) (interface{}, error) {
+func (e *testParser) Parse(r *httputils.BufferedRequest, payload []byte) (interface{}, error) {
 	return e.returnedEvent, e.returnedParseWebhookError
 }
 
@@ -98,7 +98,7 @@ func TestHandle_CommentEvent(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	request, err := httputils.NewCloneableRequest(rawRequest)
+	request, err := httputils.NewBufferedRequest(rawRequest)
 	assert.NoError(t, err)
 
 	internalEvent := event.Comment{
@@ -221,7 +221,7 @@ func TestHandle_PREvent(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	request, err := httputils.NewCloneableRequest(rawRequest)
+	request, err := httputils.NewBufferedRequest(rawRequest)
 	assert.NoError(t, err)
 
 	internalEvent := event.PullRequest{

@@ -6,11 +6,11 @@ import (
 )
 
 type webhookParser interface {
-	Parse(r *http.CloneableRequest, payload []byte) (interface{}, error)
+	Parse(r *http.BufferedRequest, payload []byte) (interface{}, error)
 }
 
 type parser struct{}
 
-func (e *parser) Parse(r *http.CloneableRequest, payload []byte) (interface{}, error) {
+func (e *parser) Parse(r *http.BufferedRequest, payload []byte) (interface{}, error) {
 	return github.ParseWebHook(github.WebHookType(r.GetRequest()), payload)
 }

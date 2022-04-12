@@ -23,10 +23,10 @@ type CommentEventWorkerProxy struct {
 	snsWriter Writer
 }
 
-func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.CloneableRequest, _ event.Comment, _ *command.Comment) error {
+func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, _ event.Comment, _ *command.Comment) error {
 	buffer := bytes.NewBuffer([]byte{})
 
-	if err := request.GetRequest().Write(buffer); err != nil {
+	if err := request.GetRequestWithContext(ctx).Write(buffer); err != nil {
 		return errors.Wrap(err, "writing request to buffer")
 	}
 

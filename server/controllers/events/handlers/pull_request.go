@@ -13,14 +13,14 @@ import (
 )
 
 type eventTypeHandler interface {
-	Handle(ctx context.Context, request *http.CloneableRequest, event event_types.PullRequest) error
+	Handle(ctx context.Context, request *http.BufferedRequest, event event_types.PullRequest) error
 }
 
 type Autoplanner struct {
 	CommandRunner events.CommandRunner
 }
 
-func (p *Autoplanner) Handle(ctx context.Context, _ *http.CloneableRequest, event event_types.PullRequest) error {
+func (p *Autoplanner) Handle(ctx context.Context, _ *http.BufferedRequest, event event_types.PullRequest) error {
 	p.CommandRunner.RunAutoplanCommand(
 		ctx,
 		event.Pull.BaseRepo,
@@ -38,7 +38,7 @@ type asyncAutoplanner struct {
 	logger      logging.Logger
 }
 
-func (p *asyncAutoplanner) Handle(ctx context.Context, request *http.CloneableRequest, event event_types.PullRequest) error {
+func (p *asyncAutoplanner) Handle(ctx context.Context, request *http.BufferedRequest, event event_types.PullRequest) error {
 	go func() {
 		err := p.autoplanner.Handle(ctx, request, event)
 
@@ -54,7 +54,7 @@ type PullCleaner struct {
 	Logger      logging.Logger
 }
 
-func (c *PullCleaner) Handle(ctx context.Context, _ *http.CloneableRequest, event event_types.PullRequest) error {
+func (c *PullCleaner) Handle(ctx context.Context, _ *http.BufferedRequest, event event_types.PullRequest) error {
 	if err := c.PullCleaner.CleanUpPull(event.Pull.BaseRepo, event.Pull); err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ type PullRequestEvent struct {
 	ClosedPullEventHandler  eventTypeHandler
 }
 
-func (h *PullRequestEvent) Handle(ctx context.Context, request *http.CloneableRequest, event event_types.PullRequest) error {
+func (h *PullRequestEvent) Handle(ctx context.Context, request *http.BufferedRequest, event event_types.PullRequest) error {
 	pull := event.Pull
 	baseRepo := pull.BaseRepo
 	eventType := event.EventType

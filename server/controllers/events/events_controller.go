@@ -52,11 +52,11 @@ const bitbucketServerRequestIDHeader = "X-Request-ID"
 const bitbucketServerSignatureHeader = "X-Hub-Signature"
 
 type commentEventHandler interface {
-	Handle(ctx context.Context, request *httputils.CloneableRequest, event event_types.Comment) error
+	Handle(ctx context.Context, request *httputils.BufferedRequest, event event_types.Comment) error
 }
 
 type prEventHandler interface {
-	Handle(ctx context.Context, request *httputils.CloneableRequest, event event_types.PullRequest) error
+	Handle(ctx context.Context, request *httputils.BufferedRequest, event event_types.PullRequest) error
 }
 
 func NewRequestResolvers(
@@ -155,11 +155,11 @@ func NewVCSEventsController(
 }
 
 type RequestHandler interface {
-	Handle(request *httputils.CloneableRequest) error
+	Handle(request *httputils.BufferedRequest) error
 }
 
 type RequestMatcher interface {
-	Matches(request *httputils.CloneableRequest) bool
+	Matches(request *httputils.BufferedRequest) bool
 }
 
 type RequestResolver interface {
@@ -174,7 +174,7 @@ type RequestRouter struct {
 
 func (p *RequestRouter) Route(w http.ResponseWriter, r *http.Request) {
 	// we do this to allow for multiple reads to the request body
-	request, err := httputils.NewCloneableRequest(r)
+	request, err := httputils.NewBufferedRequest(r)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -407,7 +407,7 @@ func (e *VCSEventsController) HandleBitbucketCloudCommentEvent(w http.ResponseWr
 	}
 	eventTimestamp := time.Now()
 	lvl := logging.Debug
-	cloneableRequest, err := httputils.NewCloneableRequest(request)
+	cloneableRequest, err := httputils.NewBufferedRequest(request)
 	if err != nil {
 		e.respond(w, lvl, http.StatusInternalServerError, err.Error())
 		return
@@ -440,7 +440,7 @@ func (e *VCSEventsController) HandleBitbucketServerCommentEvent(w http.ResponseW
 	}
 	eventTimestamp := time.Now()
 	lvl := logging.Debug
-	cloneableRequest, err := httputils.NewCloneableRequest(request)
+	cloneableRequest, err := httputils.NewBufferedRequest(request)
 	if err != nil {
 		e.respond(w, lvl, http.StatusInternalServerError, err.Error())
 		return
@@ -476,7 +476,7 @@ func (e *VCSEventsController) handleBitbucketCloudPullRequestEvent(w http.Respon
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
 
-	cloneableRequest, err := httputils.NewCloneableRequest(request)
+	cloneableRequest, err := httputils.NewBufferedRequest(request)
 	if err != nil {
 		e.respond(w, lvl, http.StatusInternalServerError, err.Error())
 		return
@@ -506,7 +506,7 @@ func (e *VCSEventsController) handleBitbucketServerPullRequestEvent(w http.Respo
 	e.Logger.Infof("identified event as type %q", pullEventType.String())
 	eventTimestamp := time.Now()
 	lvl := logging.Debug
-	cloneableRequest, err := httputils.NewCloneableRequest(request)
+	cloneableRequest, err := httputils.NewBufferedRequest(request)
 	if err != nil {
 		e.respond(w, lvl, http.StatusInternalServerError, err.Error())
 		return
@@ -560,7 +560,7 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 	}
 	eventTimestamp := time.Now()
 	lvl := logging.Debug
-	cloneableRequest, err := httputils.NewCloneableRequest(request)
+	cloneableRequest, err := httputils.NewBufferedRequest(request)
 	if err != nil {
 		e.respond(w, lvl, http.StatusInternalServerError, err.Error())
 		return
@@ -597,7 +597,7 @@ func (e *VCSEventsController) HandleGitlabMergeRequestEvent(w http.ResponseWrite
 	eventTimestamp := time.Now()
 
 	lvl := logging.Debug
-	cloneableRequest, err := httputils.NewCloneableRequest(request)
+	cloneableRequest, err := httputils.NewBufferedRequest(request)
 	if err != nil {
 		e.respond(w, lvl, http.StatusInternalServerError, err.Error())
 		return
@@ -647,7 +647,7 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 	}
 	eventTimestamp := time.Now()
 	lvl := logging.Debug
-	cloneableRequest, err := httputils.NewCloneableRequest(request)
+	cloneableRequest, err := httputils.NewBufferedRequest(request)
 	if err != nil {
 		e.respond(w, lvl, http.StatusInternalServerError, err.Error())
 		return
@@ -700,7 +700,7 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseW
 	e.Logger.Infof("identified event as type %q", pullEventType.String())
 	eventTimestamp := time.Now()
 	lvl := logging.Debug
-	cloneableRequest, err := httputils.NewCloneableRequest(request)
+	cloneableRequest, err := httputils.NewBufferedRequest(request)
 	if err != nil {
 		e.respond(w, lvl, http.StatusInternalServerError, err.Error())
 		return

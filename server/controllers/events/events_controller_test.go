@@ -304,12 +304,12 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 // atm.
 type noopPRHandler struct{}
 
-func (h noopPRHandler) Handle(ctx context.Context, request *httputils.CloneableRequest, event event_types.PullRequest) error {
+func (h noopPRHandler) Handle(ctx context.Context, request *httputils.BufferedRequest, event event_types.PullRequest) error {
 	return nil
 }
 
 type noopCommentHandler struct{}
 
-func (h noopCommentHandler) Handle(ctx context.Context, request *httputils.CloneableRequest, event event_types.Comment) error {
+func (h noopCommentHandler) Handle(ctx context.Context, request *httputils.BufferedRequest, event event_types.Comment) error {
 	return nil
 }

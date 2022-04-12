@@ -24,7 +24,7 @@ import (
 )
 
 type requestValidator interface {
-	Validate(r *http.CloneableRequest, secret []byte) ([]byte, error)
+	Validate(r *http.BufferedRequest, secret []byte) ([]byte, error)
 }
 
 // validator handles checking if GitHub requests are signed
@@ -35,14 +35,14 @@ type validator struct{}
 // If secret is not empty, it checks that the request was signed
 // by secret and returns an error if it was not.
 // If secret is empty, it does not check if the request was signed.
-func (d validator) Validate(r *http.CloneableRequest, secret []byte) ([]byte, error) {
+func (d validator) Validate(r *http.BufferedRequest, secret []byte) ([]byte, error) {
 	if len(secret) != 0 {
 		return d.validateAgainstSecret(r, secret)
 	}
 	return d.validateWithoutSecret(r)
 }
 
-func (d validator) validateAgainstSecret(r *http.CloneableRequest, secret []byte) ([]byte, error) {
+func (d validator) validateAgainstSecret(r *http.BufferedRequest, secret []byte) ([]byte, error) {
 	payload, err := github.ValidatePayload(r.GetRequest(), secret)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (d validator) validateAgainstSecret(r *http.CloneableRequest, secret []byte
 	return payload, nil
 }
 
-func (d validator) validateWithoutSecret(r *http.CloneableRequest) ([]byte, error) {
+func (d validator) validateWithoutSecret(r *http.BufferedRequest) ([]byte, error) {
 	switch ct := r.GetHeader("Content-Type"); ct {
 	case "application/json":
 		body, err := r.GetBody()

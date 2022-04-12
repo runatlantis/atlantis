@@ -64,14 +64,14 @@ func NewCommentEventWithCommandHandler(
 // commandHandler is the handler responsible for running a specific command
 // after it's been parsed from a comment.
 type commandHandler interface {
-	Handle(ctx context.Context, request *http.CloneableRequest, event event_types.Comment, command *command.Comment) error
+	Handle(ctx context.Context, request *http.BufferedRequest, event event_types.Comment, command *command.Comment) error
 }
 
 type CommandHandler struct {
 	CommandRunner events.CommandRunner
 }
 
-func (h *CommandHandler) Handle(ctx context.Context, _ *http.CloneableRequest, event event_types.Comment, command *command.Comment) error {
+func (h *CommandHandler) Handle(ctx context.Context, _ *http.BufferedRequest, event event_types.Comment, command *command.Comment) error {
 	h.CommandRunner.RunCommentCommand(
 		ctx,
 		event.BaseRepo,
@@ -90,7 +90,7 @@ type asyncHandler struct {
 	logger         logging.Logger
 }
 
-func (h *asyncHandler) Handle(ctx context.Context, request *http.CloneableRequest, event event_types.Comment, command *command.Comment) error {
+func (h *asyncHandler) Handle(ctx context.Context, request *http.BufferedRequest, event event_types.Comment, command *command.Comment) error {
 	go func() {
 		err := h.commandHandler.Handle(ctx, request, event, command)
 
@@ -109,7 +109,7 @@ type CommentEvent struct {
 	logger               logging.Logger
 }
 
-func (h *CommentEvent) Handle(ctx context.Context, request *http.CloneableRequest, event event_types.Comment) error {
+func (h *CommentEvent) Handle(ctx context.Context, request *http.BufferedRequest, event event_types.Comment) error {
 	comment := event.Comment
 	vcsHost := event.VCSHost
 	baseRepo := event.BaseRepo

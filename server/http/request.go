@@ -9,10 +9,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ClonableRequest wraps an http request to provide a safe method of cloning before
-// a request body is closed.
-// It does this by providing a safe way to read a request body.  Since this is a server
-// request we do not need to close the Body as per the documentation:
+// BufferedRequest wraps an http request and contains a buffer of the request body,
+// in addition to safe access to the request body and underlying request.
+// BufferedRequest does not provide access to the original http request and instead
+// vends copies of it.  This is to ensure that the original request body can be read
+// multiple times and removes the need to think about this from the consumer end.
+//
+// Note: the OG request body must not have been closed before construction of this object.
+//
+// Since this is a server request we do not need to close the original Body as per the documentation:
 //
 // " For server requests, the Request Body is always non-nil
 //   but will return EOF immediately when no body is present.
@@ -20,56 +25,55 @@ import (
 //   Handler does not need to. "
 //
 // Note: This should not be used for client requests at this time.
-type CloneableRequest struct {
+type BufferedRequest struct {
 	request *http.Request
+	body    *bytes.Buffer
 }
 
-func NewCloneableRequest(r *http.Request) (*CloneableRequest, error) {
-	wrapped := &CloneableRequest{
-		request: r,
-	}
-
-	clone, err := wrapped.Clone(r.Context())
-
+func NewBufferedRequest(r *http.Request) (*BufferedRequest, error) {
+	body, err := getBody(r)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating request clone")
+		return nil, errors.Wrap(err, "reading request body")
 	}
-	return clone, nil
+
+	wrapped := &BufferedRequest{
+		// clone the request because we've already read and closed the body of the OG.
+		request: clone(r.Context(), r, body.Bytes()),
+		body:    body,
+	}
+
+	return wrapped, nil
 }
 
 // GetHeader gets a specific header given a key
-func (r *CloneableRequest) GetHeader(key string) string {
+func (r *BufferedRequest) GetHeader(key string) string {
 	return r.request.Header.Get(key)
 }
 
 // GetBody returns a copy of the request body
-func (r *CloneableRequest) GetBody() (io.ReadCloser, error) {
-	b, err := getBody(r.request)
-	if err != nil {
-		return nil, errors.Wrap(err, "reading request body")
-	}
-	return io.NopCloser(b), nil
+func (r *BufferedRequest) GetBody() (io.ReadCloser, error) {
+	copy := bytes.NewBuffer(r.body.Bytes())
+	return io.NopCloser(copy), nil
 }
 
-// GetRequest returns the underlying request as an escape hatch.
-// Note: Using this is risky since the body can be modified/closed
-// directly through this object.
-// Use with caution.
-func (r *CloneableRequest) GetRequest() *http.Request {
-	return r.request
+// GetRequest returns a clone of the underlying request in this struct
+// Note: reading the request body directly from the returned object, will close it
+// it's recommended to always be reading the body from GetBody instead.
+func (r *BufferedRequest) GetRequest() *http.Request {
+	return r.GetRequestWithContext(r.request.Context())
 }
 
-// Clone's a request and provides a new CloneableRequest
-func (r *CloneableRequest) Clone(ctx context.Context) (*CloneableRequest, error) {
-	clone := r.request.Clone(ctx)
+func (r *BufferedRequest) GetRequestWithContext(ctx context.Context) *http.Request {
+	return clone(ctx, r.request, r.body.Bytes())
+}
 
-	body, err := getBody(r.request)
+// Clone's a request and provides a new BufferedRequest
+func clone(ctx context.Context, request *http.Request, body []byte) *http.Request {
+	clone := request.Clone(ctx)
 
-	if err != nil {
-		return nil, errors.Wrap(err, "cloning request body")
-	}
-	clone.Body = io.NopCloser(body)
-	return &CloneableRequest{request: clone}, nil
+	// create one copy for underlying request and one for the new wrapper
+	clone.Body = io.NopCloser(bytes.NewBuffer(body))
+	return clone
 }
 
 func getBody(request *http.Request) (*bytes.Buffer, error) {

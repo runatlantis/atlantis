@@ -26,11 +26,11 @@ const (
 
 // event handler interfaces
 type commentEventHandler interface {
-	Handle(ctx context.Context, request *http.CloneableRequest, event event_types.Comment) error
+	Handle(ctx context.Context, request *http.BufferedRequest, event event_types.Comment) error
 }
 
 type prEventHandler interface {
-	Handle(ctx context.Context, request *http.CloneableRequest, event event_types.PullRequest) error
+	Handle(ctx context.Context, request *http.BufferedRequest, event event_types.PullRequest) error
 }
 
 // converter interfaces
@@ -45,7 +45,7 @@ type commentEventConverter interface {
 // Matcher matches a provided request against some condition
 type Matcher struct{}
 
-func (h *Matcher) Matches(request *http.CloneableRequest) bool {
+func (h *Matcher) Matches(request *http.BufferedRequest) bool {
 	return request.GetHeader(githubHeader) != ""
 }
 
@@ -92,7 +92,7 @@ type Handler struct {
 	Matcher
 }
 
-func (h *Handler) Handle(r *http.CloneableRequest) error {
+func (h *Handler) Handle(r *http.BufferedRequest) error {
 	// Validate the request against the optional webhook secret.
 	payload, err := h.validator.Validate(r, h.webhookSecret)
 	if err != nil {
@@ -132,7 +132,7 @@ func (h *Handler) Handle(r *http.CloneableRequest) error {
 	return nil
 }
 
-func (h *Handler) handleGithubCommentEvent(ctx context.Context, event *github.IssueCommentEvent, request *http.CloneableRequest) error {
+func (h *Handler) handleGithubCommentEvent(ctx context.Context, event *github.IssueCommentEvent, request *http.BufferedRequest) error {
 	if event.GetAction() != "created" {
 		h.logger.WarnContext(ctx, "Ignoring comment event since action was not created")
 		return nil
@@ -147,7 +147,7 @@ func (h *Handler) handleGithubCommentEvent(ctx context.Context, event *github.Is
 	return h.commentHandler.Handle(ctx, request, commentEvent)
 }
 
-func (h *Handler) handleGithubPullRequestEvent(ctx context.Context, event *github.PullRequestEvent, request *http.CloneableRequest) error {
+func (h *Handler) handleGithubPullRequestEvent(ctx context.Context, event *github.PullRequestEvent, request *http.BufferedRequest) error {
 	pullEvent, err := h.pullEventConverter.Convert(event)
 
 	if err != nil {
