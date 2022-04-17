@@ -52,7 +52,7 @@ func TestMetrics_Validate_Success(t *testing.T) {
 		subject     raw.Metrics
 	}{
 		{
-			description: "success",
+			description: "success with stats config",
 			subject: raw.Metrics{
 				Statsd: &raw.Statsd{
 					Host: "127.0.0.1",
@@ -62,6 +62,26 @@ func TestMetrics_Validate_Success(t *testing.T) {
 		},
 		{
 			description: "missing stats",
+		},
+		{
+			description: "success with prometheus config",
+			subject: raw.Metrics{
+				Prometheus: &raw.Prometheus{
+					Endpoint: "/metrics",
+				},
+			},
+		},
+		{
+			description: "success with both configs",
+			subject: raw.Metrics{
+				Statsd: &raw.Statsd{
+					Host: "127.0.0.1",
+					Port: "8125",
+				},
+				Prometheus: &raw.Prometheus{
+					Endpoint: "/metrics",
+				},
+			},
 		},
 	}
 
