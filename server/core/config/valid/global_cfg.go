@@ -49,7 +49,7 @@ type Statsd struct {
 }
 
 type Prometheus struct {
-	Enabled bool
+	Endpoint string
 }
 
 // Repo is the final parsed version of server-side repo config.

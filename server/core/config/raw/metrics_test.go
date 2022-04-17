@@ -16,6 +16,8 @@ func TestMetrics_Unmarshal(t *testing.T) {
 statsd:
   host: 127.0.0.1
   port: 8125
+prometheus:
+  endpoint: /metrics
 `
 
 		var result raw.Metrics
@@ -30,6 +32,9 @@ statsd:
 	"statsd": {
 		"host": "127.0.0.1",
 		"port": "8125"
+	},
+	"prometheus": {
+		"endpoint": "/metrics"
 	}
 }		
 `
@@ -103,6 +108,14 @@ func TestMetrics_Validate_Error(t *testing.T) {
 				Statsd: &raw.Statsd{
 					Host: "127.0.1",
 					Port: "8125",
+				},
+			},
+		},
+		{
+			description: "invalid endpoint",
+			subject: raw.Metrics{
+				Prometheus: &raw.Prometheus{
+					Endpoint: "",
 				},
 			},
 		},

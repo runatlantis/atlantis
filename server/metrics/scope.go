@@ -49,7 +49,7 @@ func newReporter(cfg valid.Metrics, logger logging.SimpleLogging) (tally.BaseSta
 	}
 
 	// return prometheus metrics if configured
-	if cfg.Prometheus != nil && cfg.Prometheus.Enabled {
+	if cfg.Prometheus != nil {
 		return tallyprom.NewReporter(tallyprom.Options{}), nil
 	}
 
