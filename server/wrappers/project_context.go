@@ -17,7 +17,7 @@ func WrapProjectContext(
 	}
 }
 
-func (p *projectContext) WithPolicyChecks(
+func (p *projectContext) EnablePolicyChecks(
 	commentBuilder events.CommentBuilder,
 ) *projectContext {
 	p.ProjectCommandContextBuilder = &events.PolicyCheckProjectContextBuilder{

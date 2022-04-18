@@ -24,7 +24,6 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -42,7 +41,6 @@ const (
 	ADWebhookUserFlag          = "azuredevops-webhook-user"
 	ADTokenFlag                = "azuredevops-token" // nolint: gosec
 	ADUserFlag                 = "azuredevops-user"
-	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
 	AutoplanFileListFlag       = "autoplan-file-list"
 	BitbucketBaseURLFlag       = "bitbucket-base-url"
@@ -57,9 +55,7 @@ const (
 	DisableApplyFlag           = "disable-apply"
 	DisableAutoplanFlag        = "disable-autoplan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
-	DisableRepoLockingFlag     = "disable-repo-locking"
 	EnablePlatformModeFlag     = "enable-platform-mode"
-	EnablePolicyChecksFlag     = "enable-policy-checks"
 	EnableRegExpCmdFlag        = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat   = "enable-diff-markdown-format"
 	FFOwnerFlag                = "ff-owner"
@@ -91,17 +87,11 @@ const (
 	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
 	RepoWhitelistFlag            = "repo-whitelist"
 	RepoAllowlistFlag            = "repo-allowlist"
-	RequireApprovalFlag          = "require-approval"
-	RequireSQUnlockedFlag        = "require-unlocked"
-	RequireMergeableFlag         = "require-mergeable"
-	SkipCloneNoChanges           = "skip-clone-no-changes"
 	SlackTokenFlag               = "slack-token"
 	SSLCertFileFlag              = "ssl-cert-file"
 	SSLKeyFileFlag               = "ssl-key-file"
 	TFDownloadURLFlag            = "tf-download-url"
 	VCSStatusName                = "vcs-status-name"
-	TFEHostnameFlag              = "tfe-hostname"
-	TFETokenFlag                 = "tfe-token"
 	WriteGitCredsFlag            = "write-git-creds"
 	LyftAuditJobsSnsTopicArnFlag = "lyft-audit-jobs-sns-topic-arn"
 	LyftGatewaySnsTopicArnFlag   = "lyft-gateway-sns-topic-arn"
@@ -122,7 +112,6 @@ const (
 	DefaultStatsNamespace   = "atlantis"
 	DefaultPort             = 4141
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
-	DefaultTFEHostname      = "app.terraform.io"
 	DefaultVCSStatusName    = "atlantis"
 )
 
@@ -286,15 +275,6 @@ var stringFlags = map[string]stringFlag{
 		description:  "Base URL to download Terraform versions from.",
 		defaultValue: DefaultTFDownloadURL,
 	},
-	TFEHostnameFlag: {
-		description:  "Hostname of your Terraform Enterprise installation. If using Terraform Cloud no need to set.",
-		defaultValue: DefaultTFEHostname,
-	},
-	TFETokenFlag: {
-		description: "API token for Terraform Cloud/Enterprise. This will be used to generate a ~/.terraformrc file." +
-			" Only set if using TFC/E as a remote backend." +
-			" Should be specified via the ATLANTIS_TFE_TOKEN environment variable for security.",
-	},
 	DefaultTFVersionFlag: {
 		description: "Terraform version to default to (ex. v0.12.0). Will download if not yet on disk." +
 			" If not set, Atlantis uses the terraform binary in its PATH.",
@@ -326,13 +306,6 @@ var stringFlags = map[string]stringFlag{
 }
 
 var boolFlags = map[string]boolFlag{
-	AllowRepoConfigFlag: {
-		description: "Allow repositories to use atlantis.yaml files to customize the commands Atlantis runs." +
-			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
-			" on the Atlantis server.",
-		defaultValue: false,
-		hidden:       true,
-	},
 	DisableApplyAllFlag: {
 		description:  "Disable \"atlantis apply\" command without any flags (i.e. apply all). A specific project/workspace/directory has to be specified for applies.",
 		defaultValue: false,
@@ -345,15 +318,8 @@ var boolFlags = map[string]boolFlag{
 		description:  "Disable atlantis auto planning feature",
 		defaultValue: false,
 	},
-	DisableRepoLockingFlag: {
-		description: "Disable atlantis locking repos",
-	},
 	EnablePlatformModeFlag: {
 		description:  "Enable Atlantis to run in platform mode, where it will run plan and policy checks inside the PR and run plan and apply after PR is merged.",
-		defaultValue: false,
-	},
-	EnablePolicyChecksFlag: {
-		description:  "Enable atlantis to run user defined policy checks.  This is explicitly disabled for TFE/TFC backends since plan files are inaccessible.",
 		defaultValue: false,
 	},
 	EnableRegExpCmdFlag: {
@@ -373,20 +339,6 @@ var boolFlags = map[string]boolFlag{
 			"VCS support is limited to: GitHub.",
 		defaultValue: false,
 	},
-	RequireApprovalFlag: {
-		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
-		defaultValue: false,
-		hidden:       true,
-	},
-	RequireMergeableFlag: {
-		description:  "Require pull requests to be mergeable before allowing the apply command to be run.",
-		defaultValue: false,
-		hidden:       true,
-	},
-	RequireSQUnlockedFlag: {
-		description:  "Require pull requests to be \"Unlocked\" before allowing the apply command to be run.",
-		defaultValue: false,
-	},
 	DisableMarkdownFoldingFlag: {
 		description:  "Toggle off folding in markdown output.",
 		defaultValue: false,
@@ -394,10 +346,6 @@ var boolFlags = map[string]boolFlag{
 	WriteGitCredsFlag: {
 		description: "Write out a .git-credentials file with the provider user and token to allow cloning private modules over HTTPS or SSH." +
 			" This writes secrets to disk and should only be enabled in a secure environment.",
-		defaultValue: false,
-	},
-	SkipCloneNoChanges: {
-		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
 		defaultValue: false,
 	},
 }
@@ -649,9 +597,6 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.VCSStatusName == "" {
 		c.VCSStatusName = DefaultVCSStatusName
 	}
-	if c.TFEHostname == "" {
-		c.TFEHostname = DefaultTFEHostname
-	}
 	if c.MaxProjectsPerPR == 0 {
 		c.MaxProjectsPerPR = events.InfiniteProjectsPerPR
 	}
@@ -739,10 +684,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig, logger logging.Logger
 		}
 	}
 
-	if userConfig.TFEHostname != DefaultTFEHostname && userConfig.TFEToken == "" {
-		return fmt.Errorf("if setting --%s, must set --%s", TFEHostnameFlag, TFETokenFlag)
-	}
-
 	_, patternErr := fileutils.NewPatternMatcher(strings.Split(userConfig.AutoplanFileList, ","))
 	if patternErr != nil {
 		return errors.Wrapf(patternErr, "invalid pattern in --%s, %s", AutoplanFileListFlag, userConfig.AutoplanFileList)
@@ -819,14 +760,6 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig, logger loggi
 func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	var applyReqs []string
 	var deprecatedFlags []string
-	if userConfig.RequireApproval {
-		deprecatedFlags = append(deprecatedFlags, RequireApprovalFlag)
-		applyReqs = append(applyReqs, valid.ApprovedApplyReq)
-	}
-	if userConfig.RequireMergeable {
-		deprecatedFlags = append(deprecatedFlags, RequireMergeableFlag)
-		applyReqs = append(applyReqs, valid.MergeableApplyReq)
-	}
 
 	// Build up strings with what the recommended yaml and json config should
 	// be instead of using the deprecated flags.
@@ -836,11 +769,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		yamlCfg += fmt.Sprintf("\n  apply_requirements: [%s]", strings.Join(applyReqs, ", "))
 		jsonCfg += fmt.Sprintf(`, "apply_requirements":["%s"]`, strings.Join(applyReqs, "\", \""))
 
-	}
-	if userConfig.AllowRepoConfig {
-		deprecatedFlags = append(deprecatedFlags, AllowRepoConfigFlag)
-		yamlCfg += "\n  allowed_overrides: [apply_requirements, workflow]\n  allow_custom_workflows: true"
-		jsonCfg += `, "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true`
 	}
 	jsonCfg += "}]}"
 

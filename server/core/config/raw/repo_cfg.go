@@ -16,18 +16,14 @@ const DefaultParallelPlan = false
 // DefaultParallelPolicyCheck is the default setting for parallel plan
 const DefaultParallelPolicyCheck = false
 
-// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
-const DefaultDeleteSourceBranchOnMerge = false
-
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
 type RepoCfg struct {
-	Version                   *int                `yaml:"version,omitempty"`
-	Projects                  []Project           `yaml:"projects,omitempty"`
-	Workflows                 map[string]Workflow `yaml:"workflows,omitempty"`
-	PolicySets                PolicySets          `yaml:"policies,omitempty"`
-	ParallelApply             *bool               `yaml:"parallel_apply,omitempty"`
-	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
-	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
+	Version       *int                `yaml:"version,omitempty"`
+	Projects      []Project           `yaml:"projects,omitempty"`
+	Workflows     map[string]Workflow `yaml:"workflows,omitempty"`
+	PolicySets    PolicySets          `yaml:"policies,omitempty"`
+	ParallelApply *bool               `yaml:"parallel_apply,omitempty"`
+	ParallelPlan  *bool               `yaml:"parallel_plan,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
@@ -70,12 +66,11 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 	}
 
 	return valid.RepoCfg{
-		Version:                   *r.Version,
-		Projects:                  validProjects,
-		Workflows:                 validWorkflows,
-		ParallelApply:             parallelApply,
-		ParallelPlan:              parallelPlan,
-		ParallelPolicyCheck:       parallelPlan,
-		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
+		Version:             *r.Version,
+		Projects:            validProjects,
+		Workflows:           validWorkflows,
+		ParallelApply:       parallelApply,
+		ParallelPlan:        parallelPlan,
+		ParallelPolicyCheck: parallelPlan,
 	}
 }

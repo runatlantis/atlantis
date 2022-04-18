@@ -41,7 +41,7 @@ func setupAutoplan(t *testing.T) *vcsmocks.MockClient {
 	}
 	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
 	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyContextContext(), matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
-	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
+	globalCfg := valid.NewGlobalCfg()
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 	autoplanValidator = gateway.AutoplanValidator{

@@ -47,7 +47,6 @@ type MarkdownRenderer struct {
 	DisableApplyAll          bool
 	DisableApply             bool
 	DisableMarkdownFolding   bool
-	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
 }
 
@@ -56,7 +55,6 @@ type commonData struct {
 	Command                  string
 	DisableApplyAll          bool
 	DisableApply             bool
-	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
 }
 
@@ -83,7 +81,6 @@ type planSuccessData struct {
 	PlanSummary              string
 	PlanWasDeleted           bool
 	DisableApply             bool
-	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
 }
 
@@ -106,7 +103,6 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, vcsH
 		Command:                  commandStr,
 		DisableApplyAll:          m.DisableApplyAll || m.DisableApply,
 		DisableApply:             m.DisableApply,
-		DisableRepoLocking:       m.DisableRepoLocking,
 		EnableDiffMarkdownFormat: m.EnableDiffMarkdownFormat,
 	}
 	if res.Error != nil {
@@ -148,7 +144,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				Failure: result.Failure,
 			})
 		} else if result.PlanSuccess != nil {
-			resultData.Rendered = m.renderTemplate(m.getProjectPlanSuccessTmpl(templateOverrides, vcsHost, result.PlanSuccess.TerraformOutput), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+			resultData.Rendered = m.renderTemplate(m.getProjectPlanSuccessTmpl(templateOverrides, vcsHost, result.PlanSuccess.TerraformOutput), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), DisableApply: common.DisableApply, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
 			resultData.Rendered = m.renderTemplate(m.getProjectPolicyCheckSuccessTmpl(templateOverrides, vcsHost, result.PolicyCheckSuccess.PolicyCheckOutput), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})

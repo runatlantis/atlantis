@@ -15,14 +15,15 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var globalCfgArgs = valid.GlobalCfgArgs{
-	AllowRepoCfg:  true,
-	MergeableReq:  false,
-	ApprovedReq:   false,
-	UnDivergedReq: false,
+var globalCfg = valid.GlobalCfg{
+	Repos: []valid.Repo{
+		{
+			IDRegex:              regexp.MustCompile(".*"),
+			AllowCustomWorkflows: Bool(true),
+			AllowedOverrides:     []string{"apply_requirements", "workflow"},
+		},
+	},
 }
-
-var globalCfg = valid.NewGlobalCfgFromArgs(globalCfgArgs)
 
 func TestHasRepoCfg_DirDoesNotExist(t *testing.T) {
 	r := config.ParserValidator{}
@@ -108,13 +109,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 			r := config.ParserValidator{}
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "")
 			ErrContains(t, c.expErr, err)
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
-			_, err = r.ParseGlobalCfg(confPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			_, err = r.ParseGlobalCfg(confPath, valid.NewGlobalCfg())
 			ErrContains(t, c.expErr, err)
 		})
 	}
@@ -1100,38 +1095,20 @@ workflows:
 	Ok(t, err)
 
 	r := config.ParserValidator{}
-	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  false,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
-	}
 
-	_, err = r.ParseRepoCfg(tmpDir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "repo_id")
+	_, err = r.ParseRepoCfg(tmpDir, valid.NewGlobalCfg(), "repo_id")
 	ErrEquals(t, "repo config not allowed to set 'workflow' key: server-side config needs 'allowed_overrides: [workflow]'", err)
 }
 
 func TestParseGlobalCfg_NotExist(t *testing.T) {
 	r := config.ParserValidator{}
-	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  false,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
-	}
-	_, err := r.ParseGlobalCfg("/not/exist", valid.NewGlobalCfgFromArgs(globalCfgArgs))
+	_, err := r.ParseGlobalCfg("/not/exist", valid.NewGlobalCfg())
 	ErrEquals(t, "unable to read /not/exist file: open /not/exist: no such file or directory", err)
 }
 
 func TestParseGlobalCfg(t *testing.T) {
-	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  false,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
-	}
 
-	defaultCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	defaultCfg := valid.NewGlobalCfg()
 	preWorkflowHook := &valid.PreWorkflowHook{
 		StepName:   "run",
 		RunCommand: "custom workflow command",
@@ -1224,7 +1201,7 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   allowed_overrides: [invalid]`,
-			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\", \"workflow\" and \"delete_source_branch_on_merge\" are supported.).).",
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\" and \"workflow\" are supported.).).",
 		},
 		"invalid apply_requirement": {
 			input: `repos:
@@ -1307,7 +1284,7 @@ repos:
   pre_workflow_hooks:
     - run: custom workflow command
   workflow: custom1
-  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge]
+  allowed_overrides: [apply_requirements, workflow]
   allow_custom_workflows: true
 - id: /.*/
   branch: /(master|main)/
@@ -1343,16 +1320,17 @@ policies:
 					defaultCfg.Repos[0],
 					{
 						ID:                   "github.com/owner/repo",
-						ApplyRequirements:    []string{"approved", "mergeable"},
+						ApplyRequirements:    []string{"approved", "mergeable", "policies_passed"},
 						PreWorkflowHooks:     preWorkflowHooks,
 						Workflow:             &customWorkflow1,
-						AllowedOverrides:     []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"},
+						AllowedOverrides:     []string{"apply_requirements", "workflow"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
-						IDRegex:          regexp.MustCompile(".*"),
-						BranchRegex:      regexp.MustCompile("(master|main)"),
-						PreWorkflowHooks: preWorkflowHooks,
+						IDRegex:           regexp.MustCompile(".*"),
+						BranchRegex:       regexp.MustCompile("(master|main)"),
+						ApplyRequirements: []string{"policies_passed"},
+						PreWorkflowHooks:  preWorkflowHooks,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1442,10 +1420,9 @@ workflows:
 								},
 							},
 						},
-						AllowedWorkflows:          []string{},
-						AllowedOverrides:          []string{},
-						AllowCustomWorkflows:      Bool(false),
-						DeleteSourceBranchOnMerge: Bool(false),
+						AllowedWorkflows:     []string{},
+						AllowedOverrides:     []string{},
+						AllowCustomWorkflows: Bool(false),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1476,14 +1453,7 @@ workflows:
 			path := filepath.Join(tmp, "conf.yaml")
 			Ok(t, ioutil.WriteFile(path, []byte(c.input), 0600))
 
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
-
-			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfg())
 
 			if c.expErr != "" {
 				expErr := strings.Replace(c.expErr, "<tmp>", path, -1)
@@ -1514,11 +1484,7 @@ workflows:
 }
 
 func TestParseGlobalCfg_PlatformMode(t *testing.T) {
-	globalCfgArgs := valid.GlobalCfgArgs{
-		PlatformModeEnabled: true,
-	}
-
-	defaultCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	defaultCfg := valid.NewGlobalCfg().EnablePlatformMode()
 	preWorkflowHook := &valid.PreWorkflowHook{
 		StepName:   "run",
 		RunCommand: "custom workflow command",
@@ -1580,7 +1546,7 @@ func TestParseGlobalCfg_PlatformMode(t *testing.T) {
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
-	defaultWorkflow := globalCfg.Workflows["default"]
+	defaultWorkflow := defaultCfg.Workflows["default"]
 
 	cases := map[string]struct {
 		input  string
@@ -1615,7 +1581,7 @@ repos:
     - run: custom workflow command
   pull_request_workflow: custom1
   deployment_workflow: custom1
-  allowed_overrides: [apply_requirements, pull_request_workflow, deployment_workflow, workflow, delete_source_branch_on_merge]
+  allowed_overrides: [apply_requirements, pull_request_workflow, deployment_workflow, workflow]
   allow_custom_workflows: true
 - id: /.*/
   branch: /(master|main)/
@@ -1663,13 +1629,15 @@ policies:
 						PreWorkflowHooks:     preWorkflowHooks,
 						PullRequestWorkflow:  &customPulRequestWorkflow1,
 						DeploymentWorkflow:   &customDeploymentWorkflow1,
-						AllowedOverrides:     []string{"apply_requirements", "pull_request_workflow", "deployment_workflow", "workflow", "delete_source_branch_on_merge"},
+						ApplyRequirements:    []string{"policies_passed"},
+						AllowedOverrides:     []string{"apply_requirements", "pull_request_workflow", "deployment_workflow", "workflow"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
-						IDRegex:          regexp.MustCompile(".*"),
-						BranchRegex:      regexp.MustCompile("(master|main)"),
-						PreWorkflowHooks: preWorkflowHooks,
+						IDRegex:           regexp.MustCompile(".*"),
+						BranchRegex:       regexp.MustCompile("(master|main)"),
+						ApplyRequirements: []string{"policies_passed"},
+						PreWorkflowHooks:  preWorkflowHooks,
 					},
 				},
 				Workflows: defaultCfg.Workflows,
@@ -1752,10 +1720,9 @@ deployment_workflows:
 								Steps: nil,
 							},
 						},
-						AllowedWorkflows:          []string{},
-						AllowedOverrides:          []string{},
-						AllowCustomWorkflows:      Bool(false),
-						DeleteSourceBranchOnMerge: Bool(false),
+						AllowedWorkflows:     []string{},
+						AllowedOverrides:     []string{},
+						AllowCustomWorkflows: Bool(false),
 					},
 				},
 				Workflows: defaultCfg.Workflows,
@@ -1796,7 +1763,7 @@ deployment_workflows:
 			path := filepath.Join(tmp, "conf.yaml")
 			Ok(t, ioutil.WriteFile(path, []byte(c.input), 0600))
 
-			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfg().EnablePlatformMode())
 
 			if c.expErr != "" {
 				expErr := strings.Replace(c.expErr, "<tmp>", path, -1)
@@ -1867,7 +1834,6 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
-	globalCfgArgs := valid.GlobalCfgArgs{}
 
 	cases := map[string]struct {
 		json   string
@@ -1880,7 +1846,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 		},
 		"empty object": {
 			json: "{}",
-			exp:  valid.NewGlobalCfgFromArgs(globalCfgArgs),
+			exp:  valid.NewGlobalCfg(),
 		},
 		"setting all keys": {
 			json: `
@@ -1934,10 +1900,10 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 `,
 			exp: valid.GlobalCfg{
 				Repos: []valid.Repo{
-					valid.NewGlobalCfgFromArgs(globalCfgArgs).Repos[0],
+					valid.NewGlobalCfg().Repos[0],
 					{
 						IDRegex:              regexp.MustCompile(".*"),
-						ApplyRequirements:    []string{"mergeable", "approved"},
+						ApplyRequirements:    []string{"mergeable", "approved", "policies_passed"},
 						Workflow:             &customWorkflow,
 						AllowedWorkflows:     []string{"custom"},
 						AllowedOverrides:     []string{"workflow", "apply_requirements"},
@@ -1946,13 +1912,13 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					{
 						ID:                   "github.com/owner/repo",
 						IDRegex:              nil,
-						ApplyRequirements:    nil,
+						ApplyRequirements:    []string{"policies_passed"},
 						AllowedOverrides:     nil,
 						AllowCustomWorkflows: nil,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"default": valid.NewGlobalCfgFromArgs(globalCfgArgs).Workflows["default"],
+					"default": valid.NewGlobalCfg().Workflows["default"],
 					"custom":  customWorkflow,
 				},
 				PolicySets: valid.PolicySets{
@@ -1971,13 +1937,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			pv := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
-			cfg, err := pv.ParseGlobalCfgJSON(c.json, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			cfg, err := pv.ParseGlobalCfgJSON(c.json, valid.NewGlobalCfg())
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
@@ -2053,8 +2013,7 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
-	globalCfgArgs := valid.GlobalCfgArgs{PlatformModeEnabled: true}
-	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	globalCfg := valid.NewGlobalCfg().EnablePlatformMode()
 
 	cases := map[string]struct {
 		json   string
@@ -2136,8 +2095,8 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 				Repos: []valid.Repo{
 					globalCfg.Repos[0],
 					{
-						IDRegex: regexp.MustCompile(".*"),
-						// ApplyRequirements:           []string{"mergeable", "approved"},
+						IDRegex:                     regexp.MustCompile(".*"),
+						ApplyRequirements:           []string{"policies_passed"},
 						PullRequestWorkflow:         &customPullRequestWorkflow,
 						DeploymentWorkflow:          &customDeploymentWorkflow,
 						AllowedPullRequestWorkflows: []string{"custom"},
@@ -2148,7 +2107,7 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 					{
 						ID:                          "github.com/owner/repo",
 						IDRegex:                     nil,
-						ApplyRequirements:           nil,
+						ApplyRequirements:           []string{"policies_passed"},
 						AllowedOverrides:            nil,
 						AllowedPullRequestWorkflows: nil,
 						AllowedDeploymentWorkflows:  nil,
@@ -2244,13 +2203,8 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
 			Ok(t, ioutil.WriteFile(v3Path, []byte("version: 3\n"+cfg), 0600))
 
 			p := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
-			v2Cfg, err := p.ParseRepoCfg(v2Dir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "")
+
+			v2Cfg, err := p.ParseRepoCfg(v2Dir, globalCfg, "")
 			if c.expV2Err != "" {
 				ErrEquals(t, c.expV2Err, err)
 			} else {
@@ -2258,24 +2212,10 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
 				Equals(t, c.expV2, v2Cfg.Workflows["custom"].Plan.Steps[0].RunCommand)
 				Equals(t, c.expV2, v2Cfg.Workflows["custom"].Apply.Steps[0].RunCommand)
 			}
-			globalCfgArgs = valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
-			v3Cfg, err := p.ParseRepoCfg(v3Dir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "")
+			v3Cfg, err := p.ParseRepoCfg(v3Dir, globalCfg, "")
 			Ok(t, err)
 			Equals(t, c.in, v3Cfg.Workflows["custom"].Plan.Steps[0].RunCommand)
 			Equals(t, c.in, v3Cfg.Workflows["custom"].Apply.Steps[0].RunCommand)
 		})
 	}
 }
-
-// String is a helper routine that allocates a new string value
-// to store v and returns a pointer to it.
-func String(v string) *string { return &v }
-
-// Bool is a helper routine that allocates a new bool value
-// to store v and returns a pointer to it.
-func Bool(v bool) *bool { return &v }

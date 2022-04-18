@@ -6,8 +6,8 @@
 
 {{ if not .DisableApply }}* :arrow_forward: To **apply** this plan, comment:
     * `{{.ApplyCmd}}`
-{{end}}{{ if not .DisableRepoLocking }}* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})
-{{end}}* :repeat: To **plan** this project again, comment:
+{{end}}* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})
+* :repeat: To **plan** this project again, comment:
     * `{{.RePlanCmd}}`
 </details>
 {{.PlanSummary}}{{ if .HasDiverged }}

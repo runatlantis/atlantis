@@ -56,7 +56,6 @@ var testFlags = map[string]interface{}{
 	ADWebhookPasswordFlag:        "ad-wh-pass",
 	ADWebhookUserFlag:            "ad-wh-user",
 	AtlantisURLFlag:              "url",
-	AllowRepoConfigFlag:          true,
 	AutoplanFileListFlag:         "**/*.tf,**/*.yml",
 	BitbucketBaseURLFlag:         "https://bitbucket-base-url.com",
 	BitbucketTokenFlag:           "bitbucket-token",
@@ -68,7 +67,6 @@ var testFlags = map[string]interface{}{
 	DisableApplyAllFlag:          true,
 	DisableApplyFlag:             true,
 	DisableMarkdownFoldingFlag:   true,
-	DisableRepoLockingFlag:       true,
 	GHHostnameFlag:               "ghhostname",
 	GHTokenFlag:                  "token",
 	GHUserFlag:                   "user",
@@ -87,15 +85,10 @@ var testFlags = map[string]interface{}{
 	PortFlag:                     8181,
 	ParallelPoolSize:             100,
 	RepoAllowlistFlag:            "github.com/runatlantis/atlantis",
-	RequireApprovalFlag:          true,
-	RequireMergeableFlag:         true,
-	SkipCloneNoChanges:           true,
 	SlackTokenFlag:               "slack-token",
 	SSLCertFileFlag:              "cert-file",
 	SSLKeyFileFlag:               "key-file",
 	TFDownloadURLFlag:            "https://my-hostname.com",
-	TFEHostnameFlag:              "my-hostname",
-	TFETokenFlag:                 "my-token",
 	VCSStatusName:                "my-status",
 	WriteGitCredsFlag:            true,
 	LyftAuditJobsSnsTopicArnFlag: "",
@@ -104,7 +97,6 @@ var testFlags = map[string]interface{}{
 	LyftWorkerQueueUrlFlag:       "",
 	DisableAutoplanFlag:          true,
 	EnablePlatformModeFlag:       false,
-	EnablePolicyChecksFlag:       false,
 	EnableRegExpCmdFlag:          false,
 	EnableDiffMarkdownFormat:     false,
 }
@@ -691,18 +683,6 @@ func TestExecute_RepoCfgFlags(t *testing.T) {
 	}, t)
 	err := c.Execute()
 	ErrEquals(t, "cannot use --repo-config and --repo-config-json at the same time", err)
-}
-
-// Can't use both --tfe-hostname flag without --tfe-token.
-func TestExecute_TFEHostnameOnly(t *testing.T) {
-	c := setup(map[string]interface{}{
-		GHUserFlag:        "user",
-		GHTokenFlag:       "token",
-		RepoAllowlistFlag: "github.com",
-		TFEHostnameFlag:   "not-app.terraform.io",
-	}, t)
-	err := c.Execute()
-	ErrEquals(t, "if setting --tfe-hostname, must set --tfe-token", err)
 }
 
 // Can't use both --repo-allowlist and --repo-whitelist

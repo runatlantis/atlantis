@@ -172,7 +172,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 
 	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyContextContext(), matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
 
-	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
+	globalCfg := valid.NewGlobalCfg()
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	staleCommandChecker = mocks.NewMockStaleCommandChecker()

@@ -1,3 +1,5 @@
+repos:
+  - id: /.*/
 policies:
   owners:
     users:
@@ -13,4 +15,3 @@ workflows:
         - show
         - policy_check:
             extra_args: ["--all-namespaces"]
-        

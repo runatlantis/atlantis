@@ -250,12 +250,6 @@ Values are chosen in this order:
   ```
   Disable atlantis auto planning
 
-* ### `--disable-repo-locking`
-  ```bash
-  atlantis server --disable-repo-locking
-  ```
-  Stops atlantis locking projects and or workspaces when running terraform
-
 * ### `--enable-policy-checks`
   <Badge text="beta" type="warn"/>
   ```bash

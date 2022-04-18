@@ -35,7 +35,6 @@ type Repo struct {
 	AllowedDeploymentWorkflows  []string          `yaml:"allowed_deployment_workflows,omitempty" json:"allowed_deployment_workflows,omitempty"`
 	AllowedOverrides            []string          `yaml:"allowed_overrides" json:"allowed_overrides"`
 	AllowCustomWorkflows        *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
-	DeleteSourceBranchOnMerge   *bool             `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
 	TemplateOverrides           map[string]string `yaml:"template_overrides,omitempty" json:"template_overrides,omitempty"`
 }
 
@@ -108,17 +107,11 @@ func (g GlobalCfg) Validate() error {
 }
 
 func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
-	// assumes: globalcfg is always initialized with one repo .*
-	applyReqs := defaultCfg.Repos[0].ApplyRequirements
-
 	var globalApplyReqs []string
 
-	for _, req := range applyReqs {
-		for _, nonOverrideableReq := range valid.NonOverrideableApplyReqs {
-			if req == nonOverrideableReq {
-				globalApplyReqs = append(globalApplyReqs, req)
-			}
-		}
+	policySets := g.PolicySets.ToValid()
+	if policySets.HasPolicies() {
+		globalApplyReqs = append(globalApplyReqs, valid.PoliciesPassedApplyReq)
 	}
 
 	defaultRepo := &defaultCfg.Repos[0]
@@ -161,7 +154,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 		Workflows:            validWorkflows,
 		PullRequestWorkflows: validPullRequestWorkflows,
 		DeploymentWorkflows:  validDeploymentWorkflows,
-		PolicySets:           g.PolicySets.ToValid(),
+		PolicySets:           policySets,
 		Metrics:              g.Metrics.ToValid(),
 		Jobs:                 g.Jobs.ToValid(),
 	}
@@ -211,10 +204,9 @@ func (r Repo) Validate() error {
 		for _, o := range overrides {
 			if o != valid.ApplyRequirementsKey &&
 				o != valid.WorkflowKey &&
-				o != valid.DeleteSourceBranchOnMergeKey &&
 				o != valid.PullRequestWorkflowKey &&
 				o != valid.DeploymentWorkflowKey {
-				return fmt.Errorf("%q is not a valid override, only %q, %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey)
+				return fmt.Errorf("%q is not a valid override, only %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey)
 			}
 		}
 		return nil
@@ -226,11 +218,6 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
-	deleteSourceBranchOnMergeValid := func(value interface{}) error {
-		//TOBE IMPLEMENTED
-		return nil
-	}
-
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.ID, validation.Required, validation.By(idValid)),
 		validation.Field(&r.Branch, validation.By(branchValid)),
@@ -239,7 +226,6 @@ func (r Repo) Validate() error {
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
 		validation.Field(&r.PullRequestWorkflow, validation.By(workflowExists)),
 		validation.Field(&r.DeploymentWorkflow, validation.By(workflowExists)),
-		validation.Field(&r.DeleteSourceBranchOnMerge, validation.By(deleteSourceBranchOnMergeValid)),
 	)
 }
 
@@ -326,7 +312,6 @@ OUTER:
 		AllowedDeploymentWorkflows:  r.AllowedDeploymentWorkflows,
 		AllowedOverrides:            r.AllowedOverrides,
 		AllowCustomWorkflows:        r.AllowCustomWorkflows,
-		DeleteSourceBranchOnMerge:   r.DeleteSourceBranchOnMerge,
 		TemplateOverrides:           r.TemplateOverrides,
 	}
 }

@@ -21,7 +21,6 @@ type Repo struct {
 	AllowedDeploymentWorkflows  []string
 	AllowedOverrides            []string
 	AllowCustomWorkflows        *bool
-	DeleteSourceBranchOnMerge   *bool
 	TemplateOverrides           map[string]string
 }
 

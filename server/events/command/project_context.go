@@ -18,7 +18,6 @@ const (
 )
 
 type ContextFlags struct {
-	DeleteSourceBranchOnMerge,
 	ParallelApply,
 	ParallelPlan,
 	ForceApply bool
@@ -49,33 +48,32 @@ func NewProjectContext(
 	}
 
 	return ProjectContext{
-		CommandName:               cmd,
-		ApplyCmd:                  applyCmd,
-		BaseRepo:                  ctx.Pull.BaseRepo,
-		EscapedCommentArgs:        escapedCommentArgs,
-		DeleteSourceBranchOnMerge: contextFlags.DeleteSourceBranchOnMerge,
-		ParallelApplyEnabled:      contextFlags.ParallelApply,
-		ParallelPlanEnabled:       contextFlags.ParallelPlan,
-		AutoplanEnabled:           projCfg.AutoplanEnabled,
-		Steps:                     steps,
-		HeadRepo:                  ctx.HeadRepo,
-		Log:                       ctx.Log,
-		Scope:                     scope,
-		ProjectPlanStatus:         projectPlanStatus,
-		Pull:                      ctx.Pull,
-		ProjectName:               projCfg.Name,
-		ApplyRequirements:         projCfg.ApplyRequirements,
-		RePlanCmd:                 planCmd,
-		RepoRelDir:                projCfg.RepoRelDir,
-		RepoConfigVersion:         projCfg.RepoCfgVersion,
-		TerraformVersion:          projCfg.TerraformVersion,
-		User:                      ctx.User,
-		ForceApply:                contextFlags.ForceApply,
-		Workspace:                 projCfg.Workspace,
-		PolicySets:                policySets,
-		Tags:                      projCfg.Tags,
-		PullReqStatus:             pullStatus,
-		JobID:                     uuid.New().String(),
+		CommandName:          cmd,
+		ApplyCmd:             applyCmd,
+		BaseRepo:             ctx.Pull.BaseRepo,
+		EscapedCommentArgs:   escapedCommentArgs,
+		ParallelApplyEnabled: contextFlags.ParallelApply,
+		ParallelPlanEnabled:  contextFlags.ParallelPlan,
+		AutoplanEnabled:      projCfg.AutoplanEnabled,
+		Steps:                steps,
+		HeadRepo:             ctx.HeadRepo,
+		Log:                  ctx.Log,
+		Scope:                scope,
+		ProjectPlanStatus:    projectPlanStatus,
+		Pull:                 ctx.Pull,
+		ProjectName:          projCfg.Name,
+		ApplyRequirements:    projCfg.ApplyRequirements,
+		RePlanCmd:            planCmd,
+		RepoRelDir:           projCfg.RepoRelDir,
+		RepoConfigVersion:    projCfg.RepoCfgVersion,
+		TerraformVersion:     projCfg.TerraformVersion,
+		User:                 ctx.User,
+		ForceApply:           contextFlags.ForceApply,
+		Workspace:            projCfg.Workspace,
+		PolicySets:           policySets,
+		Tags:                 projCfg.Tags,
+		PullReqStatus:        pullStatus,
+		JobID:                uuid.New().String(),
 	}
 }
 
@@ -148,8 +146,6 @@ type ProjectContext struct {
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
 	PolicySets valid.PolicySets
-	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
-	DeleteSourceBranchOnMerge bool
 	// UUID for atlantis logs
 	JobID string
 }

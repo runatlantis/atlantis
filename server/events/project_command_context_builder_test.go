@@ -59,10 +59,9 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			},
 		}
 		contextFlags := &command.ContextFlags{
-			DeleteSourceBranchOnMerge: false,
-			ParallelApply:             false,
-			ParallelPlan:              false,
-			ForceApply:                false,
+			ParallelApply: false,
+			ParallelPlan:  false,
+			ForceApply:    false,
 		}
 		result := subject.BuildProjectContext(commandCtx, command.Plan, projCfg, []string{}, "some/dir", contextFlags)
 
@@ -84,10 +83,9 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			},
 		}
 		contextFlags := &command.ContextFlags{
-			DeleteSourceBranchOnMerge: false,
-			ParallelApply:             true,
-			ParallelPlan:              false,
-			ForceApply:                false,
+			ParallelApply: true,
+			ParallelPlan:  false,
+			ForceApply:    false,
 		}
 		result := subject.BuildProjectContext(commandCtx, command.Plan, projCfg, []string{}, "some/dir", contextFlags)
 

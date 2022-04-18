@@ -15,17 +15,16 @@ const (
 )
 
 type Project struct {
-	Dir                       string
-	Workspace                 string
-	Name                      *string
-	WorkflowName              *string
-	PullRequestWorkflowName   *string
-	DeploymentWorkflowName    *string
-	TerraformVersion          *version.Version
-	Autoplan                  Autoplan
-	ApplyRequirements         []string
-	DeleteSourceBranchOnMerge *bool
-	Tags                      map[string]string
+	Dir                     string
+	Workspace               string
+	Name                    *string
+	WorkflowName            *string
+	PullRequestWorkflowName *string
+	DeploymentWorkflowName  *string
+	TerraformVersion        *version.Version
+	Autoplan                Autoplan
+	ApplyRequirements       []string
+	Tags                    map[string]string
 }
 
 // GetName returns the name of the project or an empty string if there is no
@@ -54,9 +53,6 @@ func (p Project) ValidateAllowedOverrides(allowedOverrides []string) error {
 	}
 	if p.ApplyRequirements != nil && !sliceContains(allowedOverrides, ApplyRequirementsKey) {
 		return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ApplyRequirementsKey, AllowedOverridesKey, ApplyRequirementsKey)
-	}
-	if p.DeleteSourceBranchOnMerge != nil && !sliceContains(allowedOverrides, DeleteSourceBranchOnMergeKey) {
-		return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", DeleteSourceBranchOnMergeKey, AllowedOverridesKey, DeleteSourceBranchOnMergeKey)
 	}
 
 	return nil

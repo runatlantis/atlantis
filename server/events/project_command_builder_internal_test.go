@@ -566,13 +566,7 @@ projects:
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
-			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg())
 			Ok(t, err)
 
 			if c.repoCfg != "" {
@@ -580,14 +574,13 @@ projects:
 			}
 
 			builder := &DefaultProjectCommandBuilder{
-				ParserValidator:    &config.ParserValidator{},
-				ProjectFinder:      &DefaultProjectFinder{},
-				VCSClient:          vcsClient,
-				WorkingDir:         workingDir,
-				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
-				GlobalCfg:          globalCfg,
-				PendingPlanFinder:  &DefaultPendingPlanFinder{},
-				SkipCloneNoChanges: false,
+				ParserValidator:   &config.ParserValidator{},
+				ProjectFinder:     &DefaultProjectFinder{},
+				VCSClient:         vcsClient,
+				WorkingDir:        workingDir,
+				WorkingDirLocker:  NewDefaultWorkingDirLocker(),
+				GlobalCfg:         globalCfg,
+				PendingPlanFinder: &DefaultPendingPlanFinder{},
 				ProjectCommandContextBuilder: &projectCommandContextBuilder{
 					CommentBuilder: &CommentParser{},
 				},
@@ -764,7 +757,7 @@ projects:
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, ioutil.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}))
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg())
 			Ok(t, err)
 
 			if c.repoCfg != "" {
@@ -772,14 +765,13 @@ projects:
 			}
 
 			builder := &DefaultProjectCommandBuilder{
-				ParserValidator:    &config.ParserValidator{},
-				ProjectFinder:      &DefaultProjectFinder{},
-				VCSClient:          vcsClient,
-				WorkingDir:         workingDir,
-				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
-				GlobalCfg:          globalCfg,
-				PendingPlanFinder:  &DefaultPendingPlanFinder{},
-				SkipCloneNoChanges: true,
+				ParserValidator:   &config.ParserValidator{},
+				ProjectFinder:     &DefaultProjectFinder{},
+				VCSClient:         vcsClient,
+				WorkingDir:        workingDir,
+				WorkingDirLocker:  NewDefaultWorkingDirLocker(),
+				GlobalCfg:         globalCfg,
+				PendingPlanFinder: &DefaultPendingPlanFinder{},
 				ProjectCommandContextBuilder: &projectCommandContextBuilder{
 					CommentBuilder: &CommentParser{},
 				},
@@ -976,14 +968,7 @@ workflows:
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
-
-			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg())
 			Ok(t, err)
 
 			if c.repoCfg != "" {
@@ -1002,7 +987,6 @@ workflows:
 				WorkingDirLocker:             NewDefaultWorkingDirLocker(),
 				GlobalCfg:                    globalCfg,
 				PendingPlanFinder:            &DefaultPendingPlanFinder{},
-				SkipCloneNoChanges:           true,
 				ProjectCommandContextBuilder: contextBuilder,
 				AutoplanFileList:             "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			}

@@ -24,8 +24,6 @@ const (
 	DefaultParallelApplyEnabled = false
 	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
 	DefaultParallelPlanEnabled = false
-	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
-	DefaultDeleteSourceBranchOnMerge = false
 	// InfiniteProjectLimitPerPR is the default setting for number of projects per PR.
 	// this is set to -1 to signify no limit.
 	InfiniteProjectsPerPR = -1
@@ -40,7 +38,6 @@ func NewProjectCommandBuilder(
 	workingDirLocker WorkingDirLocker,
 	globalCfg valid.GlobalCfg,
 	pendingPlanFinder *DefaultPendingPlanFinder,
-	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	AutoplanFileList string,
 	logger logging.SimpleLogging,
@@ -54,7 +51,6 @@ func NewProjectCommandBuilder(
 		WorkingDirLocker:             workingDirLocker,
 		GlobalCfg:                    globalCfg,
 		PendingPlanFinder:            pendingPlanFinder,
-		SkipCloneNoChanges:           skipCloneNoChanges,
 		EnableRegExpCmd:              EnableRegExpCmd,
 		AutoplanFileList:             AutoplanFileList,
 		ProjectCommandContextBuilder: projectContextBuilder,
@@ -122,7 +118,6 @@ type DefaultProjectCommandBuilder struct {
 	GlobalCfg                    valid.GlobalCfg
 	PendingPlanFinder            *DefaultPendingPlanFinder
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
-	SkipCloneNoChanges           bool
 	EnableRegExpCmd              bool
 	AutoplanFileList             string
 	EnableDiffMarkdownFormat     bool
@@ -185,33 +180,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 	}
 	ctx.Log.Debugf("%d files were modified in this pull request", len(modifiedFiles))
 
-	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
-		hasRepoCfg, repoCfgData, err := p.VCSClient.DownloadRepoConfigFile(ctx.Pull)
-		if err != nil {
-			return nil, errors.Wrapf(err, "downloading %s", config.AtlantisYAMLFilename)
-		}
-
-		if hasRepoCfg {
-			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID())
-			if err != nil {
-				return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
-			}
-			ctx.Log.Infof("successfully parsed remote %s file", config.AtlantisYAMLFilename)
-			matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "")
-			if err != nil {
-				return nil, err
-			}
-			ctx.Log.Infof("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
-			if len(matchingProjects) == 0 {
-				ctx.Log.Infof("skipping repo clone since no project was modified")
-				return []command.ProjectContext{}, nil
-			}
-			// NOTE: We discard this work here and end up doing it again after
-			// cloning to ensure all the return values are set properly with
-			// the actual clone directory.
-		}
-	}
-
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
 
@@ -253,10 +221,9 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			ctx.Log.Debugf("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
 			contextFlags := &command.ContextFlags{
-				ForceApply:                forceApply,
-				ParallelApply:             repoCfg.ParallelApply,
-				ParallelPlan:              repoCfg.ParallelPlan,
-				DeleteSourceBranchOnMerge: mergedCfg.DeleteSourceBranchOnMerge,
+				ForceApply:    forceApply,
+				ParallelApply: repoCfg.ParallelApply,
+				ParallelPlan:  repoCfg.ParallelPlan,
 			}
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
@@ -282,10 +249,9 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
 
 			contextFlags := &command.ContextFlags{
-				ForceApply:                forceApply,
-				ParallelApply:             DefaultParallelApplyEnabled,
-				ParallelPlan:              DefaultParallelPlanEnabled,
-				DeleteSourceBranchOnMerge: pCfg.DeleteSourceBranchOnMerge,
+				ForceApply:    forceApply,
+				ParallelApply: DefaultParallelApplyEnabled,
+				ParallelPlan:  DefaultParallelPlanEnabled,
 			}
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
@@ -565,7 +531,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				mp,
 				*repoCfgPtr,
 			)
-			contextFlags.DeleteSourceBranchOnMerge = projCfg.DeleteSourceBranchOnMerge
 
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
@@ -584,8 +549,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 			repoRelDir,
 			workspace,
 		)
-
-		contextFlags.DeleteSourceBranchOnMerge = projCfg.DeleteSourceBranchOnMerge
 
 		projCtxs = append(projCtxs,
 			p.ProjectCommandContextBuilder.BuildProjectContext(

@@ -316,7 +316,6 @@ func TestProject_ValidateDeploymentWorkflowAllowed(t *testing.T) {
 
 func TestProject_ValidateAllowedOverrides(t *testing.T) {
 	workflowName := "custom"
-	deleteSourceBranch := true
 	cases := map[string]struct {
 		allowedOverrides []string
 		overrideKey      string
@@ -351,31 +350,22 @@ func TestProject_ValidateAllowedOverrides(t *testing.T) {
 			},
 			expErr: "repo config not allowed to set 'apply_requirements' key: server-side config needs 'allowed_overrides: [apply_requirements]'",
 		},
-		"delete_source_branch_on_merge is not allowed override": {
-			allowedOverrides: []string{},
-			project: valid.Project{
-				DeleteSourceBranchOnMerge: &deleteSourceBranch,
-			},
-			expErr: "repo config not allowed to set 'delete_source_branch_on_merge' key: server-side config needs 'allowed_overrides: [delete_source_branch_on_merge]'",
-		},
 		"no errors when allowed override": {
-			allowedOverrides: []string{"apply_requirements", "deployment_workflow", "pull_request_workflow", "workflow", "delete_source_branch_on_merge"},
+			allowedOverrides: []string{"apply_requirements", "deployment_workflow", "pull_request_workflow", "workflow"},
 			project: valid.Project{
-				DeleteSourceBranchOnMerge: &deleteSourceBranch,
-				ApplyRequirements:         []string{"mergeable"},
-				DeploymentWorkflowName:    &workflowName,
-				WorkflowName:              &workflowName,
-				PullRequestWorkflowName:   &workflowName,
+				ApplyRequirements:       []string{"mergeable"},
+				DeploymentWorkflowName:  &workflowName,
+				WorkflowName:            &workflowName,
+				PullRequestWorkflowName: &workflowName,
 			},
 		},
 		"no errors if override attributes nil": {
-			allowedOverrides: []string{"apply_requirements", "deployment_workflow", "pull_request_workflow", "workflow", "delete_source_branch_on_merge"},
+			allowedOverrides: []string{"apply_requirements", "deployment_workflow", "pull_request_workflow", "workflow"},
 			project: valid.Project{
-				DeleteSourceBranchOnMerge: nil,
-				ApplyRequirements:         nil,
-				DeploymentWorkflowName:    nil,
-				WorkflowName:              nil,
-				PullRequestWorkflowName:   nil,
+				ApplyRequirements:       nil,
+				DeploymentWorkflowName:  nil,
+				WorkflowName:            nil,
+				PullRequestWorkflowName: nil,
 			},
 		},
 	}

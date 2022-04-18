@@ -17,7 +17,6 @@ const (
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type UserConfig struct {
-	AllowRepoConfig            bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL                string `mapstructure:"atlantis-url"`
 	AutoplanFileList           string `mapstructure:"autoplan-file-list"`
 	AzureDevopsToken           string `mapstructure:"azuredevops-token"`
@@ -34,9 +33,8 @@ type UserConfig struct {
 	DisableApply               bool   `mapstructure:"disable-apply"`
 	DisableAutoplan            bool   `mapstructure:"disable-autoplan"`
 	DisableMarkdownFolding     bool   `mapstructure:"disable-markdown-folding"`
-	DisableRepoLocking         bool   `mapstructure:"disable-repo-locking"`
 	EnablePlatformMode         bool   `mapstructure:"enable-platform-mode"`
-	EnablePolicyChecksFlag     bool   `mapstructure:"enable-policy-checks"`
+	EnablePolicyChecks         bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd            bool   `mapstructure:"enable-regexp-cmd"`
 	EnableDiffMarkdownFormat   bool   `mapstructure:"enable-diff-markdown-format"`
 	FFOwner                    string `mapstructure:"ff-owner"`
@@ -69,25 +67,16 @@ type UserConfig struct {
 	// RepoWhitelist is deprecated in favour of RepoAllowlist.
 	RepoWhitelist string `mapstructure:"repo-whitelist"`
 
-	// RequireApproval is whether to require pull request approval before
-	// allowing terraform apply's to be run.
-	RequireApproval bool `mapstructure:"require-approval"`
-	// RequireMergeable is whether to require pull requests to be mergeable before
-	// allowing terraform apply's to run.
-	RequireMergeable bool `mapstructure:"require-mergeable"`
 	// RequireUnDiverged is whether to require pull requests to rebase default branch before
 	// allowing terraform apply's to run.
 	RequireUnDiverged bool `mapstructure:"require-undiverged"`
 	// RequireSQUnlocked is whether to require pull requests to be unlocked before running
 	// terraform apply.
 	RequireSQUnlocked        bool            `mapstructure:"require-unlocked"`
-	SkipCloneNoChanges       bool            `mapstructure:"skip-clone-no-changes"`
 	SlackToken               string          `mapstructure:"slack-token"`
 	SSLCertFile              string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile               string          `mapstructure:"ssl-key-file"`
 	TFDownloadURL            string          `mapstructure:"tf-download-url"`
-	TFEHostname              string          `mapstructure:"tfe-hostname"`
-	TFEToken                 string          `mapstructure:"tfe-token"`
 	VCSStatusName            string          `mapstructure:"vcs-status-name"`
 	DefaultTFVersion         string          `mapstructure:"default-tf-version"`
 	Webhooks                 []WebhookConfig `mapstructure:"webhooks"`

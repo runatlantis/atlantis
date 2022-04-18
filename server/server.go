@@ -183,24 +183,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	mergeabilityChecker := vcs.NewLyftPullMergeabilityChecker(userConfig.VCSStatusName)
 
-	policyChecksEnabled := false
-	if userConfig.EnablePolicyChecksFlag {
-		logger.Infof("Policy Checks are enabled")
-		policyChecksEnabled = true
-	}
-
 	validator := &cfgParser.ParserValidator{}
 
-	globalCfg := valid.NewGlobalCfgFromArgs(
-		valid.GlobalCfgArgs{
-			AllowRepoCfg:        userConfig.AllowRepoConfig,
-			MergeableReq:        userConfig.RequireMergeable,
-			ApprovedReq:         userConfig.RequireApproval,
-			UnDivergedReq:       userConfig.RequireUnDiverged,
-			SQUnLockedReq:       userConfig.RequireSQUnlocked,
-			PolicyCheckEnabled:  userConfig.EnablePolicyChecksFlag,
-			PlatformModeEnabled: userConfig.EnablePlatformMode,
-		})
+	globalCfg := valid.NewGlobalCfg()
+
+	if userConfig.EnablePlatformMode {
+		globalCfg = globalCfg.EnablePlatformMode()
+	}
+
 	if userConfig.RepoConfig != "" {
 		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
 		if err != nil {
@@ -396,23 +386,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var projectCmdOutputHandler jobs.ProjectCommandOutputHandler
 	// When TFE is enabled log streaming is not necessary.
 
-	if userConfig.TFEToken != "" {
-		projectCmdOutputHandler = &jobs.NoopProjectOutputHandler{}
-	} else {
-		projectCmdOutput := make(chan *jobs.ProjectCmdOutputLine)
-		projectCmdOutputHandler = jobs.NewAsyncProjectCommandOutputHandler(
-			projectCmdOutput,
-			logger,
-			jobStore,
-		)
-	}
+	projectCmdOutput := make(chan *jobs.ProjectCmdOutputLine)
+	projectCmdOutputHandler = jobs.NewAsyncProjectCommandOutputHandler(
+		projectCmdOutput,
+		logger,
+		jobStore,
+	)
 
 	terraformClient, err := terraform.NewClient(
 		logger,
 		binDir,
 		cacheDir,
-		userConfig.TFEToken,
-		userConfig.TFEHostname,
 		userConfig.DefaultTFVersion,
 		config.DefaultTFVersionFlag,
 		userConfig.TFDownloadURL,
@@ -429,7 +413,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DisableApplyAll:          userConfig.DisableApplyAll,
 		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
 		DisableApply:             userConfig.DisableApply,
-		DisableRepoLocking:       userConfig.DisableRepoLocking,
 		EnableDiffMarkdownFormat: userConfig.EnableDiffMarkdownFormat,
 	}
 
@@ -439,11 +422,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	var lockingClient locking.Locker
 	var applyLockingClient locking.ApplyLocker
-	if userConfig.DisableRepoLocking {
-		lockingClient = locking.NewNoOpLocker()
-	} else {
-		lockingClient = locking.NewClient(boltdb)
-	}
+
+	lockingClient = locking.NewClient(boltdb)
 	applyLockingClient = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
@@ -539,9 +519,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WrapProjectContext(events.NewPRProjectCommandContextBuilder(commentParser)).
 		WithInstrumentation(statsScope)
 
-	if policyChecksEnabled {
-		projectContextBuilder = projectContextBuilder.WithPolicyChecks(commentParser)
-		prProjectContextBuilder = prProjectContextBuilder.WithPolicyChecks(commentParser)
+	if userConfig.EnablePolicyChecks {
+		projectContextBuilder = projectContextBuilder.EnablePolicyChecks(commentParser)
+		prProjectContextBuilder = prProjectContextBuilder.EnablePolicyChecks(commentParser)
 	}
 
 	projectCommandBuilder := events.NewProjectCommandBuilder(
@@ -553,7 +533,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		workingDirLocker,
 		globalCfg,
 		pendingPlanFinder,
-		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
 		userConfig.AutoplanFileList,
 		logger,
@@ -569,7 +548,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		workingDirLocker,
 		globalCfg,
 		pendingPlanFinder,
-		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
 		userConfig.AutoplanFileList,
 		logger,

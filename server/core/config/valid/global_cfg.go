@@ -24,7 +24,6 @@ const AllowedOverridesKey = "allowed_overrides"
 const AllowCustomWorkflowsKey = "allow_custom_workflows"
 
 const DefaultWorkflowName = "default"
-const DeleteSourceBranchOnMergeKey = "delete_source_branch_on_merge"
 
 // NonOverrideableApplyReqs will get applied across all "repos" in the server side config.
 // If repo config is allowed overrides, they can override this.
@@ -99,20 +98,19 @@ type Statsd struct {
 }
 
 type MergedProjectCfg struct {
-	ApplyRequirements         []string
-	Workflow                  Workflow
-	PullRequestWorkflow       Workflow
-	DeploymentWorkflow        Workflow
-	AllowedWorkflows          []string
-	RepoRelDir                string
-	Workspace                 string
-	Name                      string
-	AutoplanEnabled           bool
-	TerraformVersion          *version.Version
-	RepoCfgVersion            int
-	PolicySets                PolicySets
-	DeleteSourceBranchOnMerge bool
-	Tags                      map[string]string
+	ApplyRequirements   []string
+	Workflow            Workflow
+	PullRequestWorkflow Workflow
+	DeploymentWorkflow  Workflow
+	AllowedWorkflows    []string
+	RepoRelDir          string
+	Workspace           string
+	Name                string
+	AutoplanEnabled     bool
+	TerraformVersion    *version.Version
+	RepoCfgVersion      int
+	PolicySets          PolicySets
+	Tags                map[string]string
 }
 
 // PreWorkflowHook is a map of custom run commands to run before workflows.
@@ -168,18 +166,7 @@ var DefaultLocklessPlanStage = Stage{
 	},
 }
 
-type GlobalCfgArgs struct {
-	AllowRepoCfg        bool
-	MergeableReq        bool
-	ApprovedReq         bool
-	UnDivergedReq       bool
-	SQUnLockedReq       bool
-	PolicyCheckEnabled  bool
-	PlatformModeEnabled bool
-	PreWorkflowHooks    []*PreWorkflowHook
-}
-
-func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
+func NewGlobalCfg() GlobalCfg {
 	defaultWorkflow := Workflow{
 		Name:        DefaultWorkflowName,
 		Apply:       DefaultApplyStage,
@@ -187,42 +174,15 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 		PolicyCheck: DefaultPolicyCheckStage,
 	}
 
-	// Must construct slices here instead of using a `var` declaration because
-	// we treat nil slices differently.
-	applyReqs := []string{}
-	if args.MergeableReq {
-		applyReqs = append(applyReqs, MergeableApplyReq)
-	}
-	if args.ApprovedReq {
-		applyReqs = append(applyReqs, ApprovedApplyReq)
-	}
-	if args.UnDivergedReq {
-		applyReqs = append(applyReqs, UnDivergedApplyReq)
-	}
-	if args.SQUnLockedReq {
-		applyReqs = append(applyReqs, SQUnlockedApplyReq)
-	}
-	if args.PolicyCheckEnabled {
-		applyReqs = append(applyReqs, PoliciesPassedApplyReq)
-	}
-
-	var deleteSourceBranchOnMerge, allowCustomWorkflows bool
-	allowedOverrides := []string{}
-	if args.AllowRepoCfg {
-		allowedOverrides = []string{ApplyRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey}
-		allowCustomWorkflows = true
-	}
-
+	var allowCustomWorkflows bool
 	repo := Repo{
-		IDRegex:                   regexp.MustCompile(".*"),
-		BranchRegex:               regexp.MustCompile(".*"),
-		ApplyRequirements:         applyReqs,
-		PreWorkflowHooks:          args.PreWorkflowHooks,
-		Workflow:                  &defaultWorkflow,
-		AllowedWorkflows:          []string{},
-		AllowCustomWorkflows:      &allowCustomWorkflows,
-		AllowedOverrides:          allowedOverrides,
-		DeleteSourceBranchOnMerge: &deleteSourceBranchOnMerge,
+		IDRegex:              regexp.MustCompile(".*"),
+		BranchRegex:          regexp.MustCompile(".*"),
+		Workflow:             &defaultWorkflow,
+		AllowedWorkflows:     []string{},
+		ApplyRequirements:    []string{},
+		AllowCustomWorkflows: &allowCustomWorkflows,
+		AllowedOverrides:     []string{},
 	}
 
 	globalCfg := GlobalCfg{
@@ -232,41 +192,41 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 		},
 	}
 
-	if args.PlatformModeEnabled {
-		globalCfg.WorkflowMode = PlatformWorkflowMode
-
-		// defaultPullRequstWorkflow is only used in platform mode. By default it does not
-		// support apply stage, and plan stage run with -lock=false flag
-		pullRequestWorkflow := Workflow{
-			Name:        DefaultWorkflowName,
-			Plan:        DefaultLocklessPlanStage,
-			PolicyCheck: DefaultPolicyCheckStage,
-		}
-
-		deploymentWorkflow := Workflow{
-			Name:  DefaultWorkflowName,
-			Apply: DefaultApplyStage,
-			Plan:  DefaultPlanStage,
-		}
-
-		if args.AllowRepoCfg {
-			repo.AllowedOverrides = append(repo.AllowedOverrides, PullRequestWorkflowKey, DeploymentWorkflowKey)
-		}
-
-		globalCfg.PullRequestWorkflows = map[string]Workflow{
-			DefaultWorkflowName: pullRequestWorkflow,
-		}
-		globalCfg.DeploymentWorkflows = map[string]Workflow{
-			DefaultWorkflowName: deploymentWorkflow,
-		}
-
-		repo.DeploymentWorkflow = &deploymentWorkflow
-		repo.PullRequestWorkflow = &pullRequestWorkflow
-	}
-
 	globalCfg.Repos = []Repo{repo}
 
 	return globalCfg
+}
+
+func (g GlobalCfg) EnablePlatformMode() GlobalCfg {
+	g.WorkflowMode = PlatformWorkflowMode
+
+	// defaultPullRequstWorkflow is only used in platform mode. By default it does not
+	// support apply stage, and plan stage run with -lock=false flag
+	pullRequestWorkflow := Workflow{
+		Name:        DefaultWorkflowName,
+		Plan:        DefaultLocklessPlanStage,
+		PolicyCheck: DefaultPolicyCheckStage,
+	}
+
+	deploymentWorkflow := Workflow{
+		Name:  DefaultWorkflowName,
+		Apply: DefaultApplyStage,
+		Plan:  DefaultPlanStage,
+	}
+
+	g.PullRequestWorkflows = map[string]Workflow{
+		DefaultWorkflowName: pullRequestWorkflow,
+	}
+	g.DeploymentWorkflows = map[string]Workflow{
+		DefaultWorkflowName: deploymentWorkflow,
+	}
+
+	repo := &g.Repos[0]
+
+	repo.DeploymentWorkflow = &deploymentWorkflow
+	repo.PullRequestWorkflow = &pullRequestWorkflow
+
+	return g
 }
 
 func (g GlobalCfg) PlatformModeEnabled() bool {
@@ -282,13 +242,11 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 	var pullRequestWorkflow Workflow
 	var deploymentWorkflow Workflow
 	var allowCustomWorkflows bool
-	var deleteSourceBranchOnMerge bool
 
 	repo := g.foldMatchingRepos(repoID)
 
 	applyReqs = repo.ApplyRequirements
 	allowCustomWorkflows = *repo.AllowCustomWorkflows
-	deleteSourceBranchOnMerge = *repo.DeleteSourceBranchOnMerge
 	workflow = *repo.Workflow
 
 	// If platform mode is enabled there will be at least default workflows,
@@ -341,20 +299,6 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 			}
 
 			log.Debugf("overriding server-defined %s with repo-specified deployment_workflow: %q", DeploymentWorkflowKey, workflow.Name)
-		case DeleteSourceBranchOnMergeKey:
-			//We check whether the server configured value and repo-root level
-			//config is different. If it is then we change to the more granular.
-			if rCfg.DeleteSourceBranchOnMerge != nil && deleteSourceBranchOnMerge != *rCfg.DeleteSourceBranchOnMerge {
-				log.Debugf("overriding server-defined %s with repo settings: [%t]", DeleteSourceBranchOnMergeKey, rCfg.DeleteSourceBranchOnMerge)
-				deleteSourceBranchOnMerge = *rCfg.DeleteSourceBranchOnMerge
-			}
-			//Then we check whether the more granular project based config is
-			//different. If it is then we set it.
-			if proj.DeleteSourceBranchOnMerge != nil && deleteSourceBranchOnMerge != *proj.DeleteSourceBranchOnMerge {
-				log.Debugf("overriding repo-root-defined %s with repo settings: [%t]", DeleteSourceBranchOnMergeKey, *proj.DeleteSourceBranchOnMerge)
-				deleteSourceBranchOnMerge = *proj.DeleteSourceBranchOnMerge
-			}
-			log.Debugf("merged deleteSourceBranchOnMerge: [%t]", deleteSourceBranchOnMerge)
 		}
 		log.Debugf("MergeProjectCfg completed")
 	}
@@ -369,19 +313,18 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 	}
 
 	return MergedProjectCfg{
-		ApplyRequirements:         applyReqs,
-		Workflow:                  workflow,
-		PullRequestWorkflow:       pullRequestWorkflow,
-		DeploymentWorkflow:        deploymentWorkflow,
-		RepoRelDir:                proj.Dir,
-		Workspace:                 proj.Workspace,
-		Name:                      proj.GetName(),
-		AutoplanEnabled:           proj.Autoplan.Enabled,
-		TerraformVersion:          proj.TerraformVersion,
-		RepoCfgVersion:            rCfg.Version,
-		PolicySets:                g.PolicySets,
-		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
-		Tags:                      proj.Tags,
+		ApplyRequirements:   applyReqs,
+		Workflow:            workflow,
+		PullRequestWorkflow: pullRequestWorkflow,
+		DeploymentWorkflow:  deploymentWorkflow,
+		RepoRelDir:          proj.Dir,
+		Workspace:           proj.Workspace,
+		Name:                proj.GetName(),
+		AutoplanEnabled:     proj.Autoplan.Enabled,
+		TerraformVersion:    proj.TerraformVersion,
+		RepoCfgVersion:      rCfg.Version,
+		PolicySets:          g.PolicySets,
+		Tags:                proj.Tags,
 	}
 }
 
@@ -392,15 +335,14 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 	repo := g.foldMatchingRepos(repoID)
 
 	mrgPrj := MergedProjectCfg{
-		ApplyRequirements:         repo.ApplyRequirements,
-		Workflow:                  *repo.Workflow,
-		RepoRelDir:                repoRelDir,
-		Workspace:                 workspace,
-		Name:                      "",
-		AutoplanEnabled:           DefaultAutoPlanEnabled,
-		TerraformVersion:          nil,
-		PolicySets:                g.PolicySets,
-		DeleteSourceBranchOnMerge: *repo.DeleteSourceBranchOnMerge,
+		ApplyRequirements: repo.ApplyRequirements,
+		Workflow:          *repo.Workflow,
+		RepoRelDir:        repoRelDir,
+		Workspace:         workspace,
+		Name:              "",
+		AutoplanEnabled:   DefaultAutoPlanEnabled,
+		TerraformVersion:  nil,
+		PolicySets:        g.PolicySets,
 	}
 
 	return mrgPrj
@@ -438,9 +380,6 @@ func (g GlobalCfg) foldMatchingRepos(repoID string) Repo {
 			}
 			if repo.AllowCustomWorkflows != nil {
 				foldedRepo.AllowCustomWorkflows = repo.AllowCustomWorkflows
-			}
-			if repo.DeleteSourceBranchOnMerge != nil {
-				foldedRepo.DeleteSourceBranchOnMerge = repo.DeleteSourceBranchOnMerge
 			}
 		}
 	}
