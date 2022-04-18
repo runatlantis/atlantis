@@ -814,7 +814,6 @@ func (s *Server) Start() error {
 	if ok {
 		s.Router.Handle(s.CommandRunner.GlobalCfg.Metrics.Prometheus.Endpoint, r.HTTPHandler())
 	}
-	s.Router.HandleFunc("/testing", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("OK")) }).Methods("GET")
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
