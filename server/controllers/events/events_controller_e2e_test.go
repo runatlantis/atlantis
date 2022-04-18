@@ -912,9 +912,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	}
 	staleCommandChecker := &testStaleCommandChecker{}
 	commandRunner := &events.DefaultCommandRunner{
-		EventParser:                   eventParser,
 		VCSClient:                     vcsClient,
-		GithubPullGetter:              ghClient,
 		GlobalCfg:                     globalCfg,
 		StatsScope:                    statsScope,
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
@@ -986,6 +984,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 				false,
 				repoConverter,
 				pullConverter,
+				ghClient,
 			),
 		},
 	}

@@ -75,8 +75,8 @@ func (h *CommandHandler) Handle(ctx context.Context, _ *http.BufferedRequest, ev
 	h.CommandRunner.RunCommentCommand(
 		ctx,
 		event.BaseRepo,
-		event.MaybeHeadRepo,
-		event.MaybePull,
+		event.HeadRepo,
+		event.Pull,
 		event.User,
 		event.PullNum,
 		command,

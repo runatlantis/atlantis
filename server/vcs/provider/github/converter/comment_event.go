@@ -5,18 +5,25 @@ import (
 	"time"
 
 	"github.com/google/go-github/v31/github"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/vcs/types/event"
 )
 
+// PullGetter makes API calls to get pull requests.
+type PullGetter interface {
+	// GetPullRequest gets the pull request with id pullNum for the repo.
+	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
+}
+
 type CommentEventConverter struct {
-	RepoConverter RepoConverter
+	PullConverter PullConverter
+	PullGetter    PullGetter
 }
 
 // Convert converts github issue comment events to our internal representation
-// TODO: remove named methods and return CommentEvent directly /techdebt
 func (e CommentEventConverter) Convert(comment *github.IssueCommentEvent) (event.Comment, error) {
-	baseRepo, err := e.RepoConverter.Convert(comment.Repo)
+	baseRepo, err := e.PullConverter.RepoConverter.Convert(comment.Repo)
 	if err != nil {
 		return event.Comment{}, err
 	}
@@ -37,14 +44,24 @@ func (e CommentEventConverter) Convert(comment *github.IssueCommentEvent) (event
 		eventTimestamp = *comment.Comment.CreatedAt
 	}
 
+	ghPull, err := e.PullGetter.GetPullRequest(baseRepo, pullNum)
+	if err != nil {
+		return event.Comment{}, errors.Wrap(err, "getting pull from github")
+	}
+
+	pull, err := e.PullConverter.Convert(ghPull)
+	if err != nil {
+		return event.Comment{}, errors.Wrap(err, "converting pull request type")
+	}
+
 	return event.Comment{
-		BaseRepo:      baseRepo,
-		MaybeHeadRepo: nil,
-		MaybePull:     nil,
-		User:          user,
-		PullNum:       pullNum,
-		VCSHost:       models.Github,
-		Timestamp:     eventTimestamp,
-		Comment:       comment.GetComment().GetBody(),
+		BaseRepo:  pull.BaseRepo,
+		HeadRepo:  pull.HeadRepo,
+		Pull:      pull,
+		User:      user,
+		PullNum:   pullNum,
+		VCSHost:   models.Github,
+		Timestamp: eventTimestamp,
+		Comment:   comment.GetComment().GetBody(),
 	}, nil
 }

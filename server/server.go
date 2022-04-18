@@ -803,11 +803,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                     vcsClient,
-		GithubPullGetter:              githubClient,
-		GitlabMergeRequestGetter:      gitlabClient,
-		AzureDevopsPullGetter:         azuredevopsClient,
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
-		EventParser:                   eventParser,
 		GlobalCfg:                     globalCfg,
 		StatsScope:                    cmdStatsScope,
 		DisableAutoplan:               userConfig.DisableAutoplan,
@@ -947,6 +943,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		supportedVCSHosts,
 		repoConverter,
 		pullConverter,
+		githubClient,
 	)
 
 	defaultEventsController := events_controllers.NewVCSEventsController(
@@ -969,6 +966,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		[]byte(userConfig.AzureDevopsWebhookPassword),
 		repoConverter,
 		pullConverter,
+		githubClient,
+		azuredevopsClient,
+		gitlabClient,
 	)
 
 	var vcsPostHandler sqs.VCSPostHandler

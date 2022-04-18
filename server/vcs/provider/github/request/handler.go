@@ -58,6 +58,7 @@ func NewHandler(
 	allowDraftPRs bool,
 	repoConverter converter.RepoConverter,
 	pullConverter converter.PullConverter,
+	pullGetter converter.PullGetter,
 ) *Handler {
 	return &Handler{
 		Matcher:        Matcher{},
@@ -70,7 +71,10 @@ func NewHandler(
 			AllowDraftPRs: allowDraftPRs,
 		},
 		commentEventConverter: converter.CommentEventConverter{
-			RepoConverter: repoConverter,
+			PullConverter: converter.PullConverter{
+				RepoConverter: repoConverter,
+			},
+			PullGetter: pullGetter,
 		},
 		webhookSecret: webhookSecret,
 		logger:        logger,

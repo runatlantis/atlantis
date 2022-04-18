@@ -10,6 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	gateway_handlers "github.com/runatlantis/atlantis/server/lyft/gateway/events/handlers"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	converters "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/request"
 	"github.com/uber-go/tally"
@@ -31,6 +32,7 @@ func NewVCSEventsController(
 	supportedVCSProviders []models.VCSHostType,
 	repoConverter converters.RepoConverter,
 	pullConverter converters.PullConverter,
+	githubClient converter.PullGetter,
 ) *VCSEventsController {
 	pullEventWorkerProxy := gateway_handlers.NewPullEventWorkerProxy(
 		snsWriter, logger,
@@ -68,6 +70,7 @@ func NewVCSEventsController(
 				allowDraftPRs,
 				repoConverter,
 				pullConverter,
+				githubClient,
 			)
 		},
 	}

@@ -5,17 +5,31 @@ import (
 
 	"github.com/google/go-github/v31/github"
 	"github.com/mohae/deepcopy"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	. "github.com/runatlantis/atlantis/testing"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestCommentEvent_Convert(t *testing.T) {
-	repoConverter := RepoConverter{
-		GithubUser:  "github-user",
-		GithubToken: "github-token",
-	}
-	subject := CommentEventConverter{
-		RepoConverter: repoConverter,
+const (
+	GithubUser  = "github-user"
+	GithubToken = "github-token"
+)
+
+type MockPullGetter struct {
+	pull *github.PullRequest
+	err  error
+}
+
+func (p MockPullGetter) GetPullRequest(_ models.Repo, _ int) (*github.PullRequest, error) {
+	return p.pull, p.err
+}
+
+func setup(t *testing.T) (github.IssueCommentEvent, models.Repo, models.PullRequest, PullConverter) {
+	pullConverter := PullConverter{
+		RepoConverter: RepoConverter{
+			GithubUser:  GithubUser,
+			GithubToken: GithubToken,
+		},
 	}
 
 	comment := github.IssueCommentEvent{
@@ -30,30 +44,8 @@ func TestCommentEvent_Convert(t *testing.T) {
 		},
 	}
 
-	testComment := deepcopy.Copy(comment).(github.IssueCommentEvent)
-	testComment.Comment = nil
-	_, err := subject.Convert(&testComment)
-	ErrEquals(t, "comment.user.login is null", err)
-
-	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
-	testComment.Comment.User = nil
-	_, err = subject.Convert(&testComment)
-	ErrEquals(t, "comment.user.login is null", err)
-
-	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
-	testComment.Comment.User.Login = nil
-	_, err = subject.Convert(&testComment)
-	ErrEquals(t, "comment.user.login is null", err)
-
-	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
-	testComment.Issue = nil
-	_, err = subject.Convert(&testComment)
-	ErrEquals(t, "issue.number is null", err)
-
 	// this should be successful
-	commentEvent, err := subject.Convert(&comment)
-	Ok(t, err)
-	Equals(t, models.Repo{
+	modelRepo := models.Repo{
 		Owner:             *comment.Repo.Owner.Login,
 		FullName:          *comment.Repo.FullName,
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
@@ -63,9 +55,112 @@ func TestCommentEvent_Convert(t *testing.T) {
 			Hostname: "github.com",
 			Type:     models.Github,
 		},
-	}, commentEvent.BaseRepo)
-	Equals(t, models.User{
+	}
+
+	modelPull := models.PullRequest{
+		Num:        *Pull.Number,
+		HeadCommit: *Pull.Head.SHA,
+		URL:        *Pull.HTMLURL,
+		HeadBranch: *Pull.Head.Ref,
+		BaseBranch: *Pull.Base.Ref,
+		Author:     *Pull.User.Login,
+		State:      models.OpenPullState,
+		BaseRepo:   modelRepo,
+		HeadRepo:   modelRepo,
+		UpdatedAt:  *Pull.UpdatedAt,
+	}
+
+	return comment, modelRepo, modelPull, pullConverter
+}
+
+func TestCommentEvent_Convert_Success(t *testing.T) {
+	// setup
+	comment, modelRepo, modelPull, pullConverter := setup(t)
+	githubPullGetter := MockPullGetter{
+		pull: &Pull,
+		err:  nil,
+	}
+
+	// act
+	subject := CommentEventConverter{
+		PullConverter: pullConverter,
+		PullGetter:    githubPullGetter,
+	}
+	commentEvent, err := subject.Convert(&comment)
+
+	// assert
+	assert.NoError(t, err)
+	assert.Equal(t, modelRepo, commentEvent.BaseRepo)
+	assert.Equal(t, models.User{
 		Username: *comment.Comment.User.Login,
 	}, commentEvent.User)
-	Equals(t, *comment.Issue.Number, commentEvent.PullNum)
+	assert.Equal(t, *comment.Issue.Number, commentEvent.PullNum)
+	assert.Equal(t, modelPull, commentEvent.Pull)
+}
+
+func TestCommentEvent_Convert_Fail(t *testing.T) {
+	// setup
+	comment, _, _, pullConverter := setup(t)
+	subject := CommentEventConverter{
+		PullConverter: pullConverter,
+	}
+
+	// act and assert
+	testComment := deepcopy.Copy(comment).(github.IssueCommentEvent)
+	testComment.Comment = nil
+	_, err := subject.Convert(&testComment)
+	assert.EqualError(t, err, "comment.user.login is null")
+
+	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
+	testComment.Comment.User = nil
+	_, err = subject.Convert(&testComment)
+	assert.EqualError(t, err, "comment.user.login is null")
+
+	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
+	testComment.Comment.User.Login = nil
+	_, err = subject.Convert(&testComment)
+	assert.EqualError(t, err, "comment.user.login is null")
+
+	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
+	testComment.Issue = nil
+	_, err = subject.Convert(&testComment)
+	assert.EqualError(t, err, "issue.number is null")
+}
+
+func TestRunCommentCommand_GithubPullError(t *testing.T) {
+	// setup
+	comment, _, _, pullConverter := setup(t)
+	githubPullGetter := MockPullGetter{
+		pull: nil,
+		err:  errors.New("err"),
+	}
+
+	// act
+	subject := CommentEventConverter{
+		PullConverter: pullConverter,
+		PullGetter:    githubPullGetter,
+	}
+	_, err := subject.Convert(&comment)
+
+	// assert
+	assert.EqualError(t, err, "getting pull from github: err")
+}
+
+func TestRunCommentCommand_GithubPullParseError(t *testing.T) {
+	// setup
+	comment, _, _, pullConverter := setup(t)
+	githubPullGetter := MockPullGetter{
+		pull: &github.PullRequest{},
+		err:  nil,
+	}
+
+	// act
+	subject := CommentEventConverter{
+		PullConverter: pullConverter,
+		PullGetter:    githubPullGetter,
+	}
+	_, err := subject.Convert(&comment)
+
+	// assert
+	assert.EqualError(t, err, "converting pull request type: head.sha is null")
 }
