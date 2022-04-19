@@ -819,6 +819,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	forceApplyCommandRunner := &events.ForceApplyCommandRunner{
 		CommandRunner: commandRunner,
 		VCSClient:     vcsClient,
+		Logger:        ctxLogger,
 	}
 
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
