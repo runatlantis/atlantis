@@ -30,7 +30,8 @@ func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo,
 		Description: descrip,
 		DetailsURL:  "",
 	}
-	return d.Client.UpdateStatus(ctx, request)
+	_, err := d.Client.UpdateStatus(ctx, request)
+	return err
 }
 
 func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int) error {
@@ -56,10 +57,11 @@ func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.
 		DetailsURL:  "",
 	}
 
-	return d.Client.UpdateStatus(ctx, request)
+	_, err := d.Client.UpdateStatus(ctx, request)
+	return err
 }
 
-func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string) error {
+func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string) (string, error) {
 	projectID := projectCtx.ProjectName
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", projectCtx.RepoRelDir, projectCtx.Workspace)
@@ -77,6 +79,7 @@ func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx Project
 		State:       status,
 		Description: description,
 		DetailsURL:  url,
+		StatusId:    projectCtx.StatusId,
 	}
 
 	return d.Client.UpdateStatus(ctx, request)

@@ -31,5 +31,5 @@ type CommitStatusUpdater interface {
 	UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int) error
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
-	UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string) error
+	UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string) (string, error)
 }

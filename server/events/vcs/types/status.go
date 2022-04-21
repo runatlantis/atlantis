@@ -11,4 +11,5 @@ type UpdateStatusRequest struct {
 	StatusName  string
 	Description string
 	DetailsURL  string
+	StatusId    string
 }

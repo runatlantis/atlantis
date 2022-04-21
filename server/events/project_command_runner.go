@@ -97,7 +97,7 @@ type ProjectCommandRunner interface {
 type JobURLSetter interface {
 	// SetJobURLWithStatus sets the commit status for the project represented by
 	// ctx and updates the status with and url to a job.
-	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus) error
+	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_job_closer.go JobCloser

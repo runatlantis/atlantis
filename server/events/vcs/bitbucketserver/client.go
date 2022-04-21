@@ -215,7 +215,7 @@ func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (boo
 }
 
 // UpdateStatus updates the status of a commit.
-func (b *Client) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
+func (b *Client) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
 	bbState := "FAILED"
 
 	switch request.State {
@@ -243,10 +243,10 @@ func (b *Client) UpdateStatus(ctx context.Context, request types.UpdateStatusReq
 
 	path := fmt.Sprintf("%s/rest/build-status/1.0/commits/%s", b.BaseURL, request.Ref)
 	if err != nil {
-		return errors.Wrap(err, "json encoding")
+		return "", errors.Wrap(err, "json encoding")
 	}
 	_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
-	return err
+	return "", err
 }
 
 // MarkdownPullLink specifies the character used in a pull request comment.
