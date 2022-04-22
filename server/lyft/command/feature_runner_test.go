@@ -16,7 +16,7 @@ import (
 )
 
 var dbUpdater *events.DBUpdater
-var pullUpdater *events.PullOutputUpdater
+var outputUpdater *events.PullOutputUpdater
 var policyCheckCommandRunner *events.PolicyCheckCommandRunner
 var planCommandRunner *events.PlanCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner

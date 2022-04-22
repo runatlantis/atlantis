@@ -829,7 +829,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		DB: boltdb,
 	}
 
-	pullUpdater := &events.PullOutputUpdater{
+	outputUpdater := &events.PullOutputUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            vcsClient,
 		MarkdownRenderer:     &events.MarkdownRenderer{},
@@ -845,7 +845,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
 		dbUpdater,
-		pullUpdater,
+		outputUpdater,
 		e2eStatusUpdater,
 		prjCmdRunner,
 		parallelPoolSize,
@@ -859,7 +859,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		projectCommandBuilder,
 		prjCmdRunner,
 		dbUpdater,
-		pullUpdater,
+		outputUpdater,
 		policyCheckCommandRunner,
 		parallelPoolSize,
 	)
@@ -868,7 +868,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
-		pullUpdater,
+		outputUpdater,
 		dbUpdater,
 	)
 
@@ -878,7 +878,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
-		pullUpdater,
+		outputUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
 		parallelPoolSize,
@@ -887,7 +887,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	var applyCommandRunner command.Runner
 	e2ePullReqStatusFetcher := lyft_vcs.NewSQBasedPullStatusFetcher(ghClient, vcs.NewLyftPullMergeabilityChecker("atlantis"))
 	if userConfig.EnablePlatformMode {
-		applyCommandRunner = apply.NewDisabledRunner(pullUpdater)
+		applyCommandRunner = apply.NewDisabledRunner(outputUpdater)
 	} else {
 		applyCommandRunner = events.NewApplyCommandRunner(
 			vcsClient,
@@ -896,7 +896,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 			e2eStatusUpdater,
 			projectCommandBuilder,
 			prjCmdRunner,
-			pullUpdater,
+			outputUpdater,
 			dbUpdater,
 			parallelPoolSize,
 			e2ePullReqStatusFetcher,

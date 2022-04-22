@@ -12,14 +12,14 @@ func NewApprovePoliciesCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApprovePoliciesCommandBuilder,
 	prjCommandRunner ProjectApprovePoliciesCommandRunner,
-	pullUpdater OutputUpdater,
+	outputUpdater OutputUpdater,
 	dbUpdater *DBUpdater,
 ) *ApprovePoliciesCommandRunner {
 	return &ApprovePoliciesCommandRunner{
 		commitStatusUpdater: commitStatusUpdater,
 		prjCmdBuilder:       prjCommandBuilder,
 		prjCmdRunner:        prjCommandRunner,
-		pullUpdater:         pullUpdater,
+		pullUpdater:         outputUpdater,
 		dbUpdater:           dbUpdater,
 	}
 }

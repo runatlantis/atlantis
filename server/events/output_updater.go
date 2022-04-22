@@ -5,6 +5,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/types"
 )
@@ -37,18 +38,8 @@ type ChecksOutputUpdater struct {
 }
 
 func (c *ChecksOutputUpdater) Update(ctx *command.Context, cmd PullCommand, res command.Result) {
-	// Log if we got any errors or failures.
-	if res.Error != nil {
-		ctx.Log.Errorf(res.Error.Error())
-	} else if res.Failure != "" {
-		ctx.Log.Warnf(res.Failure)
-	}
-
-	var templateOverrides map[string]string
-	repoCfg := c.GlobalCfg.MatchingRepo(ctx.Pull.BaseRepo.ID())
-	if repoCfg != nil {
-		templateOverrides = repoCfg.TemplateOverrides
-	}
+	logErrorsAndFailures(ctx, res)
+	templateOverrides := getTemplateOverridesForRepo(ctx.Pull.BaseRepo, c.GlobalCfg)
 
 	// Update all projects
 	for _, projectResult := range res.ProjectResults {
@@ -73,12 +64,8 @@ type PullOutputUpdater struct {
 }
 
 func (c *PullOutputUpdater) Update(ctx *command.Context, cmd PullCommand, res command.Result) {
-	// Log if we got any errors or failures.
-	if res.Error != nil {
-		ctx.Log.Errorf(res.Error.Error())
-	} else if res.Failure != "" {
-		ctx.Log.Warnf(res.Failure)
-	}
+	logErrorsAndFailures(ctx, res)
+	templateOverrides := getTemplateOverridesForRepo(ctx.Pull.BaseRepo, c.GlobalCfg)
 
 	// HidePrevCommandComments will hide old comments left from previous runs to reduce
 	// clutter in a pull/merge request. This will not delete the comment, since the
@@ -89,14 +76,24 @@ func (c *PullOutputUpdater) Update(ctx *command.Context, cmd PullCommand, res co
 		}
 	}
 
-	var templateOverrides map[string]string
-	repoCfg := c.GlobalCfg.MatchingRepo(ctx.Pull.BaseRepo.ID())
-	if repoCfg != nil {
-		templateOverrides = repoCfg.TemplateOverrides
-	}
-
 	comment := c.MarkdownRenderer.Render(res, cmd.CommandName(), ctx.Pull.BaseRepo.VCSHost.Type, templateOverrides)
 	if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, comment, cmd.CommandName().String()); err != nil {
 		ctx.Log.Errorf("unable to comment: %s", err)
 	}
+}
+
+func logErrorsAndFailures(ctx *command.Context, res command.Result) {
+	if res.Error != nil {
+		ctx.Log.Errorf(res.Error.Error())
+	} else if res.Failure != "" {
+		ctx.Log.Warnf(res.Failure)
+	}
+}
+
+func getTemplateOverridesForRepo(repo models.Repo, cfg valid.GlobalCfg) map[string]string {
+	repoCfg := cfg.MatchingRepo(repo.ID())
+	if repoCfg != nil {
+		return repoCfg.TemplateOverrides
+	}
+	return map[string]string{}
 }
