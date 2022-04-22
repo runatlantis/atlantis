@@ -1308,8 +1308,8 @@ func (t *testGithubClient) PullIsApproved(repo models.Repo, pull models.PullRequ
 func (t *testGithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	return false, nil
 }
-func (t *testGithubClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
-	return nil
+func (t *testGithubClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
+	return "", nil
 }
 func (t *testGithubClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return "", nil

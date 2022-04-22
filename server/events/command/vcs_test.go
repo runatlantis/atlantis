@@ -193,7 +193,7 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 			titleBuilder := vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}
 			s := command.VCSStatusUpdater{Client: client, TitleBuilder: titleBuilder}
 			ctx := context.Background()
-			err := s.UpdateProject(ctx, command.ProjectContext{
+			_, err := s.UpdateProject(ctx, command.ProjectContext{
 				ProjectName: c.projectName,
 				RepoRelDir:  c.repoRelDir,
 				Workspace:   c.workspace,
@@ -260,7 +260,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 			titleBuilder := vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}
 			s := command.VCSStatusUpdater{Client: client, TitleBuilder: titleBuilder}
 			ctx := context.Background()
-			err := s.UpdateProject(ctx, command.ProjectContext{
+			_, err := s.UpdateProject(ctx, command.ProjectContext{
 				RepoRelDir: ".",
 				Workspace:  "default",
 			},
@@ -287,7 +287,7 @@ func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) 
 	titleBuilder := vcs.StatusTitleBuilder{TitlePrefix: "custom"}
 	s := command.VCSStatusUpdater{Client: client, TitleBuilder: titleBuilder}
 	ctx := context.Background()
-	err := s.UpdateProject(ctx, command.ProjectContext{
+	_, err := s.UpdateProject(ctx, command.ProjectContext{
 		RepoRelDir: ".",
 		Workspace:  "default",
 	},

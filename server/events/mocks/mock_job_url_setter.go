@@ -4,12 +4,11 @@
 package mocks
 
 import (
+	pegomock "github.com/petergtz/pegomock"
+	command "github.com/runatlantis/atlantis/server/events/command"
+	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
-
-	pegomock "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/events/command"
-	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
 type MockJobURLSetter struct {
@@ -27,19 +26,23 @@ func NewMockJobURLSetter(options ...pegomock.Option) *MockJobURLSetter {
 func (mock *MockJobURLSetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockJobURLSetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockJobURLSetter) SetJobURLWithStatus(_param0 command.ProjectContext, _param1 command.Name, _param2 models.CommitStatus) error {
+func (mock *MockJobURLSetter) SetJobURLWithStatus(_param0 command.ProjectContext, _param1 command.Name, _param2 models.CommitStatus) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockJobURLSetter().")
 	}
 	params := []pegomock.Param{_param0, _param1, _param2}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("SetJobURLWithStatus", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
+	result := pegomock.GetGenericMockFrom(mock).Invoke("SetJobURLWithStatus", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 string
+	var ret1 error
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(error)
+			ret0 = result[0].(string)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
 		}
 	}
-	return ret0
+	return ret0, ret1
 }
 
 func (mock *MockJobURLSetter) VerifyWasCalledOnce() *VerifierMockJobURLSetter {

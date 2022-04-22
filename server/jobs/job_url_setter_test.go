@@ -26,8 +26,8 @@ func TestJobURLSetter(t *testing.T) {
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
 
 		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn(url, nil)
-		When(projectStatusUpdater.UpdateProject(context.TODO(), ctx, command.Plan, models.PendingCommitStatus, url)).ThenReturn(nil)
-		err := jobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus)
+		When(projectStatusUpdater.UpdateProject(context.TODO(), ctx, command.Plan, models.PendingCommitStatus, url)).ThenReturn("", nil)
+		_, err := jobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus)
 		Ok(t, err)
 
 		projectStatusUpdater.VerifyWasCalledOnce().UpdateProject(context.TODO(), ctx, command.Plan, models.PendingCommitStatus, "url-to-project-jobs")
@@ -40,7 +40,7 @@ func TestJobURLSetter(t *testing.T) {
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
 
 		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn("url-to-project-jobs", errors.New("some error"))
-		err := jobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus)
+		_, err := jobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus)
 		assert.Error(t, err)
 	})
 }

@@ -161,7 +161,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 				Owner:    "runatlantis",
 				Name:     "atlantis",
 			}
-			err = client.UpdateStatus(context.TODO(), types.UpdateStatusRequest{
+			_, err = client.UpdateStatus(context.TODO(), types.UpdateStatusRequest{
 				Repo:        repo,
 				PullNum:     1,
 				Ref:         "sha",
