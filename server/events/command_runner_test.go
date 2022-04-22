@@ -57,7 +57,7 @@ var staleCommandChecker *mocks.MockStaleCommandChecker
 // these were all split out from default command runner in an effort to improve
 // readability however the tests were kept as is.
 var dbUpdater *events.DBUpdater
-var pullUpdater *events.PullUpdater
+var pullUpdater *events.PullOutputUpdater
 var policyCheckCommandRunner *events.PolicyCheckCommandRunner
 var approvePoliciesCommandRunner *events.ApprovePoliciesCommandRunner
 var planCommandRunner *events.PlanCommandRunner
@@ -89,7 +89,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		DB: defaultBoltDB,
 	}
 
-	pullUpdater = &events.PullUpdater{
+	pullUpdater = &events.PullOutputUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            vcsClient,
 		MarkdownRenderer:     &events.MarkdownRenderer{},

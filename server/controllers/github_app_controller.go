@@ -59,7 +59,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 
 	// TODO: unify this in a single inject.go file
 	mergeabilityChecker := vcs.NewLyftPullMergeabilityChecker(g.GithubStatusName)
-	client, err := vcs.NewGithubClient(g.GithubHostname, creds, g.Logger, mergeabilityChecker)
+	client, err := vcs.NewGithubClient(g.GithubHostname, creds, g.Logger, mergeabilityChecker, false)
 
 	if err != nil {
 		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)

@@ -25,7 +25,7 @@ type AutoplanValidator struct {
 	GlobalCfg                     valid.GlobalCfg
 	CommitStatusUpdater           events.CommitStatusUpdater
 	PrjCmdBuilder                 events.ProjectPlanCommandBuilder
-	PullUpdater                   *events.PullUpdater
+	PullUpdater                   events.OutputUpdater
 	WorkingDir                    events.WorkingDir
 	WorkingDirLocker              events.WorkingDirLocker
 }
@@ -79,7 +79,7 @@ func (r *AutoplanValidator) isValid(logger logging.SimpleLogging, baseRepo model
 		if cloneErr := r.WorkingDir.Delete(baseRepo, pull); cloneErr != nil {
 			ctx.Log.With("err", cloneErr).Warnf("unable to delete clone after autoplan failed")
 		}
-		r.PullUpdater.UpdatePull(ctx, events.AutoplanCommand{}, command.Result{Error: err})
+		r.PullUpdater.Update(ctx, events.AutoplanCommand{}, command.Result{Error: err})
 		return false, errors.Wrap(err, "Failed building autoplan commands")
 	}
 	unlockFn, err := r.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)

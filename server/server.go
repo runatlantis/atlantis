@@ -95,6 +95,8 @@ const (
 	// terraformPluginCacheDir is the name of the dir inside our data dir
 	// where we tell terraform to cache plugins and modules.
 	TerraformPluginCacheDirName = "plugin-cache"
+
+	UseChecksApi = true
 )
 
 // Server runs the Atlantis web server.
@@ -239,7 +241,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		rawGithubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger, mergeabilityChecker)
+		rawGithubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger, mergeabilityChecker, UseChecksApi)
 		if err != nil {
 			return nil, err
 		}
@@ -620,12 +622,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DB: boltdb,
 	}
 
-	pullUpdater := &events.PullUpdater{
-		HidePrevPlanComments: userConfig.HidePrevPlanComments,
-		VCSClient:            vcsClient,
-		MarkdownRenderer:     markdownRenderer,
-		GlobalCfg:            globalCfg,
-	}
+	outputUpdater := events.NewOutputUpdater(vcsClient, markdownRenderer, globalCfg, UseChecksApi, userConfig.HidePrevPlanComments)
 
 	session, err := aws.NewSession()
 	if err != nil {
@@ -693,7 +690,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
 		dbUpdater,
-		pullUpdater,
+		outputUpdater,
 		commitStatusUpdater,
 		prjCmdRunner,
 		userConfig.ParallelPoolSize,
@@ -707,7 +704,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandBuilder,
 		prjCmdRunner,
 		dbUpdater,
-		pullUpdater,
+		outputUpdater,
 		policyCheckCommandRunner,
 		userConfig.ParallelPoolSize,
 	)
@@ -719,7 +716,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
-		pullUpdater,
+		outputUpdater,
 		dbUpdater,
 		userConfig.ParallelPoolSize,
 		pullReqStatusFetcher,
@@ -729,7 +726,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
-		pullUpdater,
+		outputUpdater,
 		dbUpdater,
 	)
 
@@ -739,7 +736,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
-		pullUpdater,
+		outputUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
 		userConfig.ParallelPoolSize,
@@ -753,7 +750,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		prProjectCommandBuilder,
 		prPrjCmdRunner,
 		dbUpdater,
-		pullUpdater,
+		outputUpdater,
 		policyCheckCommandRunner,
 		userConfig.ParallelPoolSize,
 	)
@@ -762,7 +759,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		prProjectCommandBuilder,
 		prPrjCmdRunner,
-		pullUpdater,
+		outputUpdater,
 		dbUpdater,
 	)
 
@@ -778,7 +775,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		featureAllocator,
 		userConfig.EnablePlatformMode,
 		logger,
-		apply.NewDisabledRunner(pullUpdater),
+		apply.NewDisabledRunner(outputUpdater),
 		applyCommandRunner,
 	)
 
@@ -916,7 +913,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GlobalCfg:                     globalCfg,
 		CommitStatusUpdater:           commitStatusUpdater,
 		PrjCmdBuilder:                 projectCommandBuilder,
-		PullUpdater:                   pullUpdater,
+		PullUpdater:                   outputUpdater,
 		WorkingDir:                    workingDir,
 		WorkingDirLocker:              workingDirLocker,
 	}
