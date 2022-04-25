@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -48,6 +49,30 @@ type ApplyCommandRunner struct {
 	pullReqStatusFetcher vcs.PullReqStatusFetcher
 }
 
+func (p *ApplyCommandRunner) updateCombinedCommitStatusAndLogError(ctx *command.Context, status models.CommitStatus, cmdName fmt.Stringer) {
+	baseRepo := ctx.Pull.BaseRepo
+	pull := ctx.Pull
+	statusID, err := p.commitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, status, cmdName, ctx.StatusID)
+	if err != nil {
+		ctx.Log.Warnf("unable to update commit status: %s", err)
+	}
+
+	// Assign the status ID to the commandContext for updates later in the workflow
+	ctx.StatusID = statusID
+}
+
+func (p *ApplyCommandRunner) updateCombinedCountCommitStatusAndLogError(ctx *command.Context, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int) {
+	baseRepo := ctx.Pull.BaseRepo
+	pull := ctx.Pull
+	statusID, err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, status, cmdName, numSuccess, numTotal, ctx.StatusID)
+	if err != nil {
+		ctx.Log.Warnf("unable to update commit status: %s", err)
+	}
+
+	// Assign the status ID to the commandContext for updates later in the workflow
+	ctx.StatusID = statusID
+}
+
 func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
@@ -79,9 +104,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 		return
 	}
 
-	if err = a.commitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
-		ctx.Log.Warnf("unable to update commit status: %s", err)
-	}
+	a.updateCombinedCommitStatusAndLogError(ctx, models.PendingCommitStatus, cmd.CommandName())
 
 	// Get the mergeable status before we set any build statuses of our own.
 	// We do this here because when we set a "Pending" status, if users have
@@ -101,9 +124,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 
 	if err != nil {
-		if statusErr := a.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warnf("unable to update commit status: %s", statusErr)
-		}
+		a.updateCombinedCommitStatusAndLogError(ctx, models.FailedCommitStatus, cmd.CommandName())
 		a.pullUpdater.Update(ctx, cmd, command.Result{Error: err})
 		return
 	}
@@ -157,17 +178,7 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 		status = models.PendingCommitStatus
 	}
 
-	if err := a.commitStatusUpdater.UpdateCombinedCount(
-		context.TODO(),
-		ctx.Pull.BaseRepo,
-		ctx.Pull,
-		status,
-		command.Apply,
-		numSuccess,
-		len(pullStatus.Projects),
-	); err != nil {
-		ctx.Log.Warnf("unable to update commit status: %s", err)
-	}
+	a.updateCombinedCountCommitStatusAndLogError(ctx, status, command.Apply, numSuccess, len(pullStatus.Projects))
 }
 
 // applyAllDisabledComment is posted when apply all commands (i.e. "atlantis apply")

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -31,6 +32,30 @@ type AutoplanValidator struct {
 }
 
 const DefaultWorkspace = "default"
+
+func (p *AutoplanValidator) updateCombinedCommitStatusAndLogError(ctx *command.Context, status models.CommitStatus, cmdName fmt.Stringer) {
+	baseRepo := ctx.Pull.BaseRepo
+	pull := ctx.Pull
+	statusID, err := p.CommitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, status, cmdName, ctx.StatusID)
+	if err != nil {
+		ctx.Log.Warnf("unable to update commit status: %s", err)
+	}
+
+	// Assign the status ID to the commandContext for updates later in the workflow
+	ctx.StatusID = statusID
+}
+
+func (p *AutoplanValidator) updateCombinedCountCommitStatusAndLogError(ctx *command.Context, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int) {
+	baseRepo := ctx.Pull.BaseRepo
+	pull := ctx.Pull
+	statusID, err := p.CommitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, status, cmdName, numSuccess, numTotal, ctx.StatusID)
+	if err != nil {
+		ctx.Log.Warnf("unable to update commit status: %s", err)
+	}
+
+	// Assign the status ID to the commandContext for updates later in the workflow
+	ctx.StatusID = statusID
+}
 
 func (r *AutoplanValidator) createLogger(logger logging.SimpleLogging, repoName string, pullNum int) logging.SimpleLogging {
 	return logger.With(
@@ -66,9 +91,7 @@ func (r *AutoplanValidator) isValid(logger logging.SimpleLogging, baseRepo model
 
 	projectCmds, err := r.PrjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
-		if statusErr := r.CommitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
-			ctx.Log.Warnf("unable to update commit status: %w", statusErr)
-		}
+		r.updateCombinedCommitStatusAndLogError(ctx, models.FailedCommitStatus, command.Plan)
 		// If error happened after clone was made, we should clean it up here too
 		unlockFn, lockErr := r.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
 		if lockErr != nil {
@@ -95,9 +118,7 @@ func (r *AutoplanValidator) isValid(logger logging.SimpleLogging, baseRepo model
 	if len(projectCmds) == 0 {
 		ctx.Log.Infof("no modified projects have been found")
 		for _, cmd := range []command.Name{command.Plan, command.Apply, command.PolicyCheck} {
-			if err := r.CommitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, cmd, 0, 0); err != nil {
-				ctx.Log.Warnf("unable to update commit status: %s", err)
-			}
+			r.updateCombinedCountCommitStatusAndLogError(ctx, models.SuccessCommitStatus, cmd, 0, 0)
 		}
 		return false, nil
 	}

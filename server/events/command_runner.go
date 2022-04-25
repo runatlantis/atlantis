@@ -94,6 +94,18 @@ type DefaultCommandRunner struct {
 	LegacyLogger                  logging.SimpleLogging
 }
 
+func (p *DefaultCommandRunner) updateCombinedCommitStatusAndLogError(ctx *command.Context, status models.CommitStatus, cmdName fmt.Stringer) {
+	baseRepo := ctx.Pull.BaseRepo
+	pull := ctx.Pull
+	statusID, err := p.CommitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, status, cmdName, ctx.StatusID)
+	if err != nil {
+		ctx.Log.Warnf("unable to update commit status: %s", err)
+	}
+
+	// Assign the status ID to the commandContext for updates later in the workflow
+	ctx.StatusID = statusID
+}
+
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(ctx context.Context, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
@@ -139,7 +151,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(ctx context.Context, baseRepo 
 
 	if err := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmdCtx); err != nil {
 		c.Logger.ErrorContext(ctx, "Error running pre-workflow hooks", fields.PullRequestWithErr(pull, err))
-		c.CommitStatusUpdater.UpdateCombined(ctx, cmdCtx.HeadRepo, cmdCtx.Pull, models.FailedCommitStatus, command.Plan)
+		c.updateCombinedCommitStatusAndLogError(cmdCtx, models.FailedCommitStatus, command.Plan)
 		return
 	}
 
@@ -201,7 +213,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(ctx context.Context, baseRepo m
 
 	if err := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmdCtx); err != nil {
 		c.Logger.ErrorContext(ctx, "Error running pre-workflow hooks", fields.PullRequestWithErr(pull, err))
-		c.CommitStatusUpdater.UpdateCombined(ctx, cmdCtx.HeadRepo, cmdCtx.Pull, models.FailedCommitStatus, cmd.Name)
+		c.updateCombinedCommitStatusAndLogError(cmdCtx, models.FailedCommitStatus, cmd.Name)
 		return
 	}
 

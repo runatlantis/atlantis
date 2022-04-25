@@ -25,10 +25,10 @@ import (
 type CommitStatusUpdater interface {
 	// UpdateCombined updates the combined status of the head commit of pull.
 	// A combined status represents all the projects modified in the pull.
-	UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer) error
+	UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, statusID string) (string, error)
 	// UpdateCombinedCount updates the combined status to reflect the
 	// numSuccess out of numTotal.
-	UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int) error
+	UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int, statusID string) (string, error)
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
 	UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string) (string, error)
