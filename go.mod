@@ -37,7 +37,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.11.0
 	github.com/stretchr/testify v1.7.1
-	github.com/urfave/cli v1.22.5
+	github.com/urfave/cli v1.22.7
 	github.com/urfave/negroni v1.0.0
 	github.com/xanzy/go-gitlab v0.59.0
 	go.etcd.io/bbolt v1.3.6
