@@ -5,18 +5,18 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
-func NewDisabledRunner(outputUpdater events.OutputUpdater) *DisabledRunner {
+func NewDisabledRunner(commitOutputUpdater events.CommitOutputUpdater) *DisabledRunner {
 	return &DisabledRunner{
-		outputUpdater: outputUpdater,
+		commitOutputUpdater: commitOutputUpdater,
 	}
 }
 
 type DisabledRunner struct {
-	outputUpdater events.OutputUpdater
+	commitOutputUpdater events.CommitOutputUpdater
 }
 
 func (r *DisabledRunner) Run(ctx *command.Context, cmd *command.Comment) {
-	r.outputUpdater.Update(
+	r.commitOutputUpdater.Update(
 		ctx,
 		cmd,
 		command.Result{

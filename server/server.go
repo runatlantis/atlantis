@@ -622,7 +622,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DB: boltdb,
 	}
 
-	outputUpdater := events.NewOutputUpdater(vcsClient, markdownRenderer, globalCfg, UseChecksApi, userConfig.HidePrevPlanComments)
+	commitOutputUpdater := events.NewCommitOutputUpdater(vcsClient, markdownRenderer, globalCfg, UseChecksApi, userConfig.HidePrevPlanComments)
 
 	session, err := aws.NewSession()
 	if err != nil {
@@ -690,7 +690,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
 		dbUpdater,
-		outputUpdater,
+		commitOutputUpdater,
 		commitStatusUpdater,
 		prjCmdRunner,
 		userConfig.ParallelPoolSize,
@@ -704,7 +704,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandBuilder,
 		prjCmdRunner,
 		dbUpdater,
-		outputUpdater,
+		commitOutputUpdater,
 		policyCheckCommandRunner,
 		userConfig.ParallelPoolSize,
 	)
@@ -716,7 +716,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
-		outputUpdater,
+		commitOutputUpdater,
 		dbUpdater,
 		userConfig.ParallelPoolSize,
 		pullReqStatusFetcher,
@@ -726,7 +726,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
-		outputUpdater,
+		commitOutputUpdater,
 		dbUpdater,
 	)
 
@@ -736,7 +736,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
-		outputUpdater,
+		commitOutputUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
 		userConfig.ParallelPoolSize,
@@ -750,7 +750,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		prProjectCommandBuilder,
 		prPrjCmdRunner,
 		dbUpdater,
-		outputUpdater,
+		commitOutputUpdater,
 		policyCheckCommandRunner,
 		userConfig.ParallelPoolSize,
 	)
@@ -759,7 +759,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		prProjectCommandBuilder,
 		prPrjCmdRunner,
-		outputUpdater,
+		commitOutputUpdater,
 		dbUpdater,
 	)
 
@@ -775,7 +775,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		featureAllocator,
 		userConfig.EnablePlatformMode,
 		logger,
-		apply.NewDisabledRunner(outputUpdater),
+		apply.NewDisabledRunner(commitOutputUpdater),
 		applyCommandRunner,
 	)
 
@@ -913,7 +913,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GlobalCfg:                     globalCfg,
 		CommitStatusUpdater:           commitStatusUpdater,
 		PrjCmdBuilder:                 projectCommandBuilder,
-		PullUpdater:                   outputUpdater,
+		PullUpdater:                   commitOutputUpdater,
 		WorkingDir:                    workingDir,
 		WorkingDirLocker:              workingDirLocker,
 	}

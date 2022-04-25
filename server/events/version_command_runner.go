@@ -5,24 +5,24 @@ import (
 )
 
 func NewVersionCommandRunner(
-	outputUpdater OutputUpdater,
+	commitOutputUpdater CommitOutputUpdater,
 	prjCmdBuilder ProjectVersionCommandBuilder,
 	prjCmdRunner ProjectVersionCommandRunner,
 	parallelPoolSize int,
 ) *VersionCommandRunner {
 	return &VersionCommandRunner{
-		outputUpdater:    outputUpdater,
-		prjCmdBuilder:    prjCmdBuilder,
-		prjCmdRunner:     prjCmdRunner,
-		parallelPoolSize: parallelPoolSize,
+		commitOutputUpdater: commitOutputUpdater,
+		prjCmdBuilder:       prjCmdBuilder,
+		prjCmdRunner:        prjCmdRunner,
+		parallelPoolSize:    parallelPoolSize,
 	}
 }
 
 type VersionCommandRunner struct {
-	outputUpdater    OutputUpdater
-	prjCmdBuilder    ProjectVersionCommandBuilder
-	prjCmdRunner     ProjectVersionCommandRunner
-	parallelPoolSize int
+	commitOutputUpdater CommitOutputUpdater
+	prjCmdBuilder       ProjectVersionCommandBuilder
+	prjCmdRunner        ProjectVersionCommandRunner
+	parallelPoolSize    int
 }
 
 func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
@@ -47,7 +47,7 @@ func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 		result = runProjectCmds(projectCmds, v.prjCmdRunner.Version)
 	}
 
-	v.outputUpdater.Update(ctx, cmd, result)
+	v.commitOutputUpdater.Update(ctx, cmd, result)
 }
 
 func (v *VersionCommandRunner) isParallelEnabled(cmds []command.ProjectContext) bool {

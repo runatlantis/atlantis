@@ -829,7 +829,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		DB: boltdb,
 	}
 
-	outputUpdater := &events.PullOutputUpdater{
+	commitOutputUpdater := &events.PullCommitOutputUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            vcsClient,
 		MarkdownRenderer:     &events.MarkdownRenderer{},
@@ -845,7 +845,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
 		dbUpdater,
-		outputUpdater,
+		commitOutputUpdater,
 		e2eStatusUpdater,
 		prjCmdRunner,
 		parallelPoolSize,
@@ -859,7 +859,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		projectCommandBuilder,
 		prjCmdRunner,
 		dbUpdater,
-		outputUpdater,
+		commitOutputUpdater,
 		policyCheckCommandRunner,
 		parallelPoolSize,
 	)
@@ -868,7 +868,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
-		outputUpdater,
+		commitOutputUpdater,
 		dbUpdater,
 	)
 
@@ -878,7 +878,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
-		outputUpdater,
+		commitOutputUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
 		parallelPoolSize,
@@ -887,7 +887,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	var applyCommandRunner command.Runner
 	e2ePullReqStatusFetcher := lyft_vcs.NewSQBasedPullStatusFetcher(ghClient, vcs.NewLyftPullMergeabilityChecker("atlantis"))
 	if userConfig.EnablePlatformMode {
-		applyCommandRunner = apply.NewDisabledRunner(outputUpdater)
+		applyCommandRunner = apply.NewDisabledRunner(commitOutputUpdater)
 	} else {
 		applyCommandRunner = events.NewApplyCommandRunner(
 			vcsClient,
@@ -896,7 +896,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 			e2eStatusUpdater,
 			projectCommandBuilder,
 			prjCmdRunner,
-			outputUpdater,
+			commitOutputUpdater,
 			dbUpdater,
 			parallelPoolSize,
 			e2ePullReqStatusFetcher,

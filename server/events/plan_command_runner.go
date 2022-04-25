@@ -16,7 +16,7 @@ func NewPlanCommandRunner(
 	projectCommandBuilder ProjectPlanCommandBuilder,
 	projectCommandRunner ProjectPlanCommandRunner,
 	dbUpdater *DBUpdater,
-	outputUpdater OutputUpdater,
+	commitOutputUpdater CommitOutputUpdater,
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
 	parallelPoolSize int,
 ) *PlanCommandRunner {
@@ -28,7 +28,7 @@ func NewPlanCommandRunner(
 		prjCmdBuilder:            projectCommandBuilder,
 		prjCmdRunner:             projectCommandRunner,
 		dbUpdater:                dbUpdater,
-		outputUpdater:            outputUpdater,
+		commitOutputUpdater:      commitOutputUpdater,
 		policyCheckCommandRunner: policyCheckCommandRunner,
 		parallelPoolSize:         parallelPoolSize,
 	}
@@ -42,7 +42,7 @@ type PlanCommandRunner struct {
 	prjCmdBuilder            ProjectPlanCommandBuilder
 	prjCmdRunner             ProjectPlanCommandRunner
 	dbUpdater                *DBUpdater
-	outputUpdater            OutputUpdater
+	commitOutputUpdater      CommitOutputUpdater
 	policyCheckCommandRunner *PolicyCheckCommandRunner
 	parallelPoolSize         int
 }
@@ -56,7 +56,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warnf("unable to update commit status: %s", statusErr)
 		}
-		p.outputUpdater.Update(ctx, AutoplanCommand{}, command.Result{Error: err})
+		p.commitOutputUpdater.Update(ctx, AutoplanCommand{}, command.Result{Error: err})
 		return
 	}
 
@@ -94,7 +94,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
 
-	p.outputUpdater.Update(ctx, AutoplanCommand{}, result)
+	p.commitOutputUpdater.Update(ctx, AutoplanCommand{}, result)
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
@@ -132,7 +132,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warnf("unable to update commit status: %s", statusErr)
 		}
-		p.outputUpdater.Update(ctx, cmd, command.Result{Error: err})
+		p.commitOutputUpdater.Update(ctx, cmd, command.Result{Error: err})
 		return
 	}
 
@@ -147,7 +147,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
 
-	p.outputUpdater.Update(
+	p.commitOutputUpdater.Update(
 		ctx,
 		cmd,
 		result)

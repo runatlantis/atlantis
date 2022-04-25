@@ -9,14 +9,14 @@ import (
 
 func NewPolicyCheckCommandRunner(
 	dbUpdater *DBUpdater,
-	outputUpdater OutputUpdater,
+	commitOutputUpdater CommitOutputUpdater,
 	commitStatusUpdater CommitStatusUpdater,
 	projectCommandRunner ProjectPolicyCheckCommandRunner,
 	parallelPoolSize int,
 ) *PolicyCheckCommandRunner {
 	return &PolicyCheckCommandRunner{
 		dbUpdater:           dbUpdater,
-		outputUpdater:       outputUpdater,
+		commitOutputUpdater: commitOutputUpdater,
 		commitStatusUpdater: commitStatusUpdater,
 		prjCmdRunner:        projectCommandRunner,
 		parallelPoolSize:    parallelPoolSize,
@@ -25,7 +25,7 @@ func NewPolicyCheckCommandRunner(
 
 type PolicyCheckCommandRunner struct {
 	dbUpdater           *DBUpdater
-	outputUpdater       OutputUpdater
+	commitOutputUpdater CommitOutputUpdater
 	commitStatusUpdater CommitStatusUpdater
 	prjCmdRunner        ProjectPolicyCheckCommandRunner
 	parallelPoolSize    int
@@ -57,7 +57,7 @@ func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.Proj
 		result = runProjectCmds(cmds, p.prjCmdRunner.PolicyCheck)
 	}
 
-	p.outputUpdater.Update(ctx, PolicyCheckCommand{}, result)
+	p.commitOutputUpdater.Update(ctx, PolicyCheckCommand{}, result)
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {

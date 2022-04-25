@@ -34,7 +34,7 @@ func setupAutoplan(t *testing.T) *vcsmocks.MockClient {
 	workingDirLocker = mocks.NewMockWorkingDirLocker()
 	vcsClient := vcsmocks.NewMockClient()
 	drainer = &events.Drainer{}
-	outputUpdater := &events.PullOutputUpdater{
+	commitOutputUpdater := &events.PullCommitOutputUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            vcsClient,
 		MarkdownRenderer:     &events.MarkdownRenderer{},
@@ -50,7 +50,7 @@ func setupAutoplan(t *testing.T) *vcsmocks.MockClient {
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		Drainer:                       drainer,
 		GlobalCfg:                     globalCfg,
-		PullUpdater:                   outputUpdater,
+		PullUpdater:                   commitOutputUpdater,
 		PrjCmdBuilder:                 projectCommandBuilder,
 		CommitStatusUpdater:           commitStatusUpdater,
 		WorkingDir:                    workingDir,

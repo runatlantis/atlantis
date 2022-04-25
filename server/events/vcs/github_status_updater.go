@@ -46,33 +46,5 @@ type GithubStatusCheckUpdater struct {
 
 func (c *GithubStatusCheckUpdater) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
 	// TODO: Implement update status Github Checks
-	// If checkRunId is nil, it is a new check run
-	// If not nil, we update the existing check ru.n
-
-	// status := request.State.String()
-	// if request.StatusId == "" {
-	// 	// Create a check run
-	// 	checkRunId, _, err := c.client.Checks.CreateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, github.CreateCheckRunOptions{
-	// 		Name:       request.StatusName,
-	// 		HeadSHA:    request.Ref,
-	// 		DetailsURL: &request.DetailsURL,
-	// 		Status:     &status,
-	// 	})
-	// 	return *checkRunId.ExternalID, err
-	// }
-
-	// checkRunId, _ := strconv.Atoi(request.StatusId)
-	// updateOptions := github.UpdateCheckRunOptions{
-	// 	Name:       request.StatusName,
-	// 	HeadSHA:    &request.Ref,
-	// 	DetailsURL: &request.DetailsURL,
-	// 	Status:     &status,
-	// 	Output: &github.CheckRunOutput{
-	// 		Title: &request.StatusName,
-	// 		Text:  &request.Description,
-	// 	},
-	// }
-	// checkRun, _, err := c.client.Checks.UpdateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, int64(checkRunId), updateOptions)
-	// return *checkRun.ExternalID, err
 	return "", nil
 }

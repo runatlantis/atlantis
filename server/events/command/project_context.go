@@ -149,7 +149,7 @@ type ProjectContext struct {
 	// UUID for atlantis logs
 	JobID string
 
-	// ID for the status check being used
+	// Status ID is the identifier for the status check
 	StatusId string
 }
 

@@ -16,7 +16,7 @@ func NewApplyCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
 	prjCmdRunner ProjectApplyCommandRunner,
-	outputUpdater OutputUpdater,
+	commitOutputUpdater CommitOutputUpdater,
 	dbUpdater *DBUpdater,
 	parallelPoolSize int,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
@@ -28,7 +28,7 @@ func NewApplyCommandRunner(
 		commitStatusUpdater:  commitStatusUpdater,
 		prjCmdBuilder:        prjCommandBuilder,
 		prjCmdRunner:         prjCmdRunner,
-		pullUpdater:          outputUpdater,
+		pullUpdater:          commitOutputUpdater,
 		dbUpdater:            dbUpdater,
 		parallelPoolSize:     parallelPoolSize,
 		pullReqStatusFetcher: pullReqStatusFetcher,
@@ -42,7 +42,7 @@ type ApplyCommandRunner struct {
 	commitStatusUpdater  CommitStatusUpdater
 	prjCmdBuilder        ProjectApplyCommandBuilder
 	prjCmdRunner         ProjectApplyCommandRunner
-	pullUpdater          OutputUpdater
+	pullUpdater          CommitOutputUpdater
 	dbUpdater            *DBUpdater
 	parallelPoolSize     int
 	pullReqStatusFetcher vcs.PullReqStatusFetcher

@@ -1,29 +1,26 @@
 package events
 
 import (
-	"context"
-
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/types"
 )
 
-type OutputUpdater interface {
+type CommitOutputUpdater interface {
 	Update(ctx *command.Context, cmd PullCommand, res command.Result)
 }
 
-func NewOutputUpdater(client vcs.Client, markdownRenderer *MarkdownRenderer, globalCfg valid.GlobalCfg, useCheckApi bool, hidePrevComments bool) OutputUpdater {
+func NewCommitOutputUpdater(client vcs.Client, markdownRenderer *MarkdownRenderer, globalCfg valid.GlobalCfg, useCheckApi bool, hidePrevComments bool) CommitOutputUpdater {
 	if useCheckApi {
-		return &ChecksOutputUpdater{
+		return &ChecksCommitOutputUpdater{
 			VCSClient:        client,
 			MarkdownRenderer: markdownRenderer,
 			GlobalCfg:        globalCfg,
 		}
 	}
 
-	return &PullOutputUpdater{
+	return &PullCommitOutputUpdater{
 		VCSClient:            client,
 		MarkdownRenderer:     markdownRenderer,
 		GlobalCfg:            globalCfg,
@@ -31,39 +28,27 @@ func NewOutputUpdater(client vcs.Client, markdownRenderer *MarkdownRenderer, glo
 	}
 }
 
-type ChecksOutputUpdater struct {
+type ChecksCommitOutputUpdater struct {
 	VCSClient        vcs.Client
 	MarkdownRenderer *MarkdownRenderer
 	GlobalCfg        valid.GlobalCfg
 }
 
-func (c *ChecksOutputUpdater) Update(ctx *command.Context, cmd PullCommand, res command.Result) {
+func (c *ChecksCommitOutputUpdater) Update(ctx *command.Context, cmd PullCommand, res command.Result) {
 	logErrorsAndFailures(ctx, res)
-	templateOverrides := getTemplateOverridesForRepo(ctx.Pull.BaseRepo, c.GlobalCfg)
+	getTemplateOverridesForRepo(ctx.Pull.BaseRepo, c.GlobalCfg)
 
-	// Update all projects
-	for _, projectResult := range res.ProjectResults {
-		comment := c.MarkdownRenderer.Render(res, cmd.CommandName(), ctx.Pull.BaseRepo.VCSHost.Type, templateOverrides)
-		request := types.UpdateStatusRequest{
-			Description: comment,
-			StatusId:    projectResult.StatusId,
-		}
-
-		// Can be certain check Id is present
-		if _, err := c.VCSClient.UpdateStatus(context.TODO(), request); err != nil {
-			ctx.Log.Errorf("unable to comment: %s", err)
-		}
-	}
+	// TODO: Update GithubChecks output
 }
 
-type PullOutputUpdater struct {
+type PullCommitOutputUpdater struct {
 	HidePrevPlanComments bool
 	VCSClient            vcs.Client
 	MarkdownRenderer     *MarkdownRenderer
 	GlobalCfg            valid.GlobalCfg
 }
 
-func (c *PullOutputUpdater) Update(ctx *command.Context, cmd PullCommand, res command.Result) {
+func (c *PullCommitOutputUpdater) Update(ctx *command.Context, cmd PullCommand, res command.Result) {
 	logErrorsAndFailures(ctx, res)
 	templateOverrides := getTemplateOverridesForRepo(ctx.Pull.BaseRepo, c.GlobalCfg)
 
