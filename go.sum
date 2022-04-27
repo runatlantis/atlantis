@@ -364,6 +364,9 @@ github.com/mattn/go-runewidth v0.0.4/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzp
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/mcdafydd/go-azuredevops v0.12.1 h1:WxwLVyGuJ8oL7uWQp1/J6GefX1wMQQZUHWRGsrm+uE8=
 github.com/mcdafydd/go-azuredevops v0.12.1/go.mod h1:B4UDyn7WEj1/97f45j3VnzEfkWKe05+/dCcAPdOET4A=
+github.com/mdlayher/genetlink v0.0.0-20190313224034-60417448a851/go.mod h1:EsbsAEUEs15qC1cosAwxgCWV0Qhd8TmkxnA9Kw1Vhl4=
+github.com/mdlayher/netlink v0.0.0-20190313131330-258ea9dff42c/go.mod h1:eQB3mZE4aiYnlUsyGGCOpPETfdQq4Jhsgf1fk3cwQaA=
+github.com/mdlayher/taskstats v0.0.0-20190313225729-7cbba52ee072/go.mod h1:sGdS7A6CAETR53zkdjGkgoFlh1vSm7MtX+i8XfEsTMA=
 github.com/microcosm-cc/bluemonday v1.0.18 h1:6HcxvXDAi3ARt3slx6nTesbvorIc3QeTzBNRvWktHBo=
 github.com/microcosm-cc/bluemonday v1.0.18/go.mod h1:Z0r70sCuXHig8YpBzCc5eGHAap2K7e/u082ZUpDRRqM=
 github.com/miekg/dns v1.1.26/go.mod h1:bPDLeHnStXmXAq1m/Ch/hvfNHr14JKNPMBo3VZKjuso=
@@ -447,8 +450,8 @@ github.com/segmentio/fasthash v0.0.0-20180216231524-a72b379d632e h1:uO75wNGioszj
 github.com/segmentio/fasthash v0.0.0-20180216231524-a72b379d632e/go.mod h1:tm/wZFQ8e24NYaBGIlnO2WGCAi67re4HHuOm0sftE/M=
 github.com/segmentio/objconv v1.0.1 h1:QjfLzwriJj40JibCV3MGSEiAoXixbp4ybhwfTB8RXOM=
 github.com/segmentio/objconv v1.0.1/go.mod h1:auayaH5k3137Cl4SoXTgrzQcuQDmvuVtZgS0fb1Ahys=
-github.com/segmentio/stats/v4 v4.6.2 h1:++YfKPTOPTZxE1DvavnpeBvB3hlDIm7IM+ULFzbCxCU=
-github.com/segmentio/stats/v4 v4.6.2/go.mod h1:gycE91tyiQw6xg3MT674cVi+CfQ69qHsoNNhXG0C7YQ=
+github.com/segmentio/stats/v4 v4.6.3 h1:Eqxr1x3Ri57FXqCCvQg9WNBlKFeUf2RhrKKnUiXhZFw=
+github.com/segmentio/stats/v4 v4.6.3/go.mod h1:gycE91tyiQw6xg3MT674cVi+CfQ69qHsoNNhXG0C7YQ=
 github.com/segmentio/vpcinfo v0.1.10/go.mod h1:KEIWiWRE/KLh90mOzOY0QkFWT7ObUYLp978tICtquqU=
 github.com/sergi/go-diff v1.0.0 h1:Kpca3qRNrduNnOQeazBd0ysaKrUJiIuISHxogkT9RPQ=
 github.com/sergi/go-diff v1.0.0/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=

@@ -338,7 +338,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		true,
 		projectCmdOutputHandler)
 
-	dd := datadog.NewClient("localhost:8125")
+	dd := datadog.NewClientWith(datadog.ClientConfig{
+		Address:              "localhost:8125",
+		DistributionPrefixes: []string{"dist_"},
+	})
 	stats.Register(dd)
 	defer stats.Flush()
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
