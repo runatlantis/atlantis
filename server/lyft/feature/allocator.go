@@ -107,8 +107,6 @@ func (r *PercentageBasedAllocator) ShouldAllocate(featureID Name, fullRepoName s
 	repo := ffuser.NewUser(fullRepoName)
 	shouldAllocate, err := ffclient.BoolVariation(string(featureID), repo, false)
 
-	r.logger.Debugf("feature %s allocation: %t for repo: %s", featureID, shouldAllocate, fullRepoName)
-
 	// if we error out we shouldn't enable the feature, could be risky
 	// Note: if the feature doesn't exist, the library returns the default value.
 	if err != nil {

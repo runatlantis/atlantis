@@ -54,7 +54,6 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 		g.respond(w, logging.Debug, http.StatusOK, "Ignoring callback, missing code query parameter")
 	}
 
-	g.Logger.Debugf("Exchanging GitHub app code for app credentials")
 	creds := &vcs.GithubAnonymousCredentials{}
 
 	// TODO: unify this in a single inject.go file
@@ -71,8 +70,6 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return
 	}
-
-	g.Logger.Debugf("Found credentials for GitHub app %q with id %d", app.Name, app.ID)
 
 	err = templates.GithubAppSetupTemplate.Execute(w, templates.GithubSetupData{
 		Target:        "",

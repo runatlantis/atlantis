@@ -50,7 +50,6 @@ func (p *PlanStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext,
 	planCmd := p.buildPlanCmd(prjCtx, extraArgs, path, tfVersion, planFile)
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, prjCtx, filepath.Clean(path), planCmd, envs, tfVersion, prjCtx.Workspace)
 	if p.isRemoteOpsErrorf(output, err) {
-		prjCtx.Log.Debugf("detected that this project is using TFE remote ops")
 		return p.remotePlan(ctx, prjCtx, extraArgs, path, tfVersion, planFile, envs)
 	}
 	if err != nil {
@@ -255,7 +254,6 @@ func (p *PlanStepRunner) runRemotePlan(
 	}
 
 	// Start the async command execution.
-	prjCtx.Log.Debugf("starting async tf remote operation")
 	outCh := p.AsyncTFExec.RunCommandAsync(ctx, prjCtx, filepath.Clean(path), cmdArgs, envs, tfVersion, prjCtx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
@@ -275,13 +273,11 @@ func (p *PlanStepRunner) runRemotePlan(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
-			prjCtx.Log.Debugf("remote run url found, updating commit status")
 			updateStatusF(models.PendingCommitStatus, runURL)
 			nextLineIsRunURL = false
 		}
 	}
 
-	prjCtx.Log.Debugf("async tf remote operation complete")
 	output := strings.Join(lines, "\n")
 	if err != nil {
 		updateStatusF(models.FailedCommitStatus, runURL)

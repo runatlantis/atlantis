@@ -70,7 +70,6 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx context.Context, prjCtx comma
 		}
 		cmd.Env = envVars
 
-		prjCtx.Log.Debugf("starting %q in %q", cmd.String(), path)
 		err = cmd.Start()
 		if err != nil {
 			err = errors.Wrapf(err, "running %q in %q", cmd.String(), path)
@@ -83,7 +82,6 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx context.Context, prjCtx comma
 		// This function will exit when inCh is closed which we do in our defer.
 		go func() {
 			for line := range input {
-				prjCtx.Log.Debugf("writing %q to remote command's stdin", line)
 				_, err := io.WriteString(stdin, line)
 				if err != nil {
 					prjCtx.Log.Errorf(errors.Wrapf(err, "writing %q to process", line).Error())

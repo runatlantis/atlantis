@@ -34,7 +34,6 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 			return err
 		}
 		if hasLine {
-			logger.Debugf("git credentials file has expected contents, not modifying")
 			return nil
 		}
 

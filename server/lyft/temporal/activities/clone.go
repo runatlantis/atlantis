@@ -68,7 +68,6 @@ func Clone(ctx context.Context, request CloneActivityRequest) (CloneActivityResp
 			sanitizedErrMsg := sanitizeGitCredentials(err.Error(), headRepo)
 			return CloneActivityResponse{}, fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
 		}
-		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
 	}
 	return CloneActivityResponse{Dir: cloneDir}, nil
 }

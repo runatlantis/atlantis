@@ -79,7 +79,7 @@ func (c *InstrumentedGithubClient) GetContents(owner, repo, branch, path string)
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched contents", map[string]interface{}{
+	c.Logger.Info("fetched contents", map[string]interface{}{
 		logging.RepositoryKey.String(): repo,
 	})
 
@@ -109,7 +109,7 @@ func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoO
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched pull request", map[string]interface{}{
+	c.Logger.Info("fetched pull request", map[string]interface{}{
 		logging.RepositoryKey.String(): fmt.Sprintf("%s/%s", repoOwner, repoName),
 		logging.PullNumKey.String():    strconv.Itoa(pullNum),
 	})
@@ -136,7 +136,7 @@ func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.P
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched vcs repo checks", fields.PullRequest(pull))
+	c.Logger.Info("fetched vcs repo checks", fields.PullRequest(pull))
 
 	return statuses, err
 }
@@ -160,7 +160,7 @@ func (c *InstrumentedGithubClient) GetRepoStatuses(repo models.Repo, pull models
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched vcs repo statuses", fields.PullRequest(pull))
+	c.Logger.Info("fetched vcs repo statuses", fields.PullRequest(pull))
 
 	return statuses, err
 }
@@ -190,7 +190,7 @@ func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.Pull
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched pull request modified files", fields.PullRequest(pull))
+	c.Logger.Info("fetched pull request modified files", fields.PullRequest(pull))
 
 	return files, err
 
@@ -212,7 +212,7 @@ func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, commen
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("created pull request comment", map[string]interface{}{
+	c.Logger.Info("created pull request comment", map[string]interface{}{
 		logging.RepositoryKey.String(): repo.FullName,
 		logging.PullNumKey.String():    strconv.Itoa(pullNum),
 	})
@@ -235,7 +235,7 @@ func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum i
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("hid previous comments", map[string]interface{}{
+	c.Logger.Info("hid previous comments", map[string]interface{}{
 		logging.RepositoryKey.String(): repo.FullName,
 		logging.PullNumKey.String():    strconv.Itoa(pullNum),
 	})
@@ -261,7 +261,7 @@ func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRe
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched pull request approval status", fields.PullRequest(pull))
+	c.Logger.Info("fetched pull request approval status", fields.PullRequest(pull))
 
 	return approvalStatus, err
 
@@ -284,7 +284,7 @@ func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullR
 
 	executionSuccess.Inc(1)
 	//TODO: thread context and use related logging methods.
-	c.Logger.Debug("fetched pull request mergeability", fields.PullRequest(pull))
+	c.Logger.Info("fetched pull request mergeability", fields.PullRequest(pull))
 
 	return mergeable, err
 }

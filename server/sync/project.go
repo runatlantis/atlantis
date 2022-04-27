@@ -68,7 +68,6 @@ func (p *ProjectSyncer) sync(
 		result.Failure = lockResponse.LockFailureReason
 		return
 	}
-	ctx.Log.Debugf("acquired lock for project")
 
 	result = execute(ctx)
 	if result.Error != nil {

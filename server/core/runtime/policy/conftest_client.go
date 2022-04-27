@@ -163,7 +163,6 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 func (c *ConfTestExecutorWorkflow) Run(ctx context.Context, prjCtx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
 	policyArgs := []Arg{}
 	policySetNames := []string{}
-	prjCtx.Log.Debugf("policy sets, %s ", prjCtx.PolicySets)
 	for _, policySet := range prjCtx.PolicySets.PolicySets {
 		path, err := c.SourceResolver.Resolve(policySet)
 

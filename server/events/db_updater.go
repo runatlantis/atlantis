@@ -17,11 +17,9 @@ func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, resu
 	var filtered []command.ProjectResult
 	for _, r := range results {
 		if _, ok := r.Error.(DirNotExistErr); ok {
-			ctx.Log.Debugf("ignoring error result from project at dir %q workspace %q because it is dir not exist error", r.RepoRelDir, r.Workspace)
 			continue
 		}
 		filtered = append(filtered, r)
 	}
-	ctx.Log.Debugf("updating DB with pull results")
 	return c.DB.UpdatePullWithResults(pull, filtered)
 }

@@ -74,8 +74,6 @@ func (f *FileWorkDirIterator) ListCurrentWorkingDirPulls() ([]models.PullRequest
 			return errors.Wrapf(err, "parsing pull num %s", pathComponents[2])
 		}
 
-		f.Log.Debugf("Fetching pull for %s/%s #%d", ownerName, repoName, pullNum)
-
 		pull, err := f.GithubClient.GetPullRequestFromName(repoName, ownerName, pullNum)
 
 		if err != nil {

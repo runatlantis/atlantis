@@ -54,7 +54,6 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *command.Co
 		// If there were no projects modified, we set successful commit statuses
 		// with 0/0 projects approve_policies successfully because some users require
 		// the Atlantis status to be passing for all pull requests.
-		ctx.Log.Debugf("setting VCS status to success with no projects found")
 		if err := a.commitStatusUpdater.UpdateCombinedCount(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
 			ctx.Log.Warnf("unable to update commit status: %s", err)
 		}

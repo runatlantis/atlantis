@@ -2,13 +2,11 @@ package valid
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
-
 	"github.com/graymeta/stow"
 	"github.com/graymeta/stow/s3"
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
+	"regexp"
 )
 
 const MergeableApplyReq = "mergeable"
@@ -236,7 +234,6 @@ func (g GlobalCfg) PlatformModeEnabled() bool {
 // MergeProjectCfg merges proj and rCfg with the global config to return a
 // final config. It assumes that all configs have been validated.
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
-	log.Debugf("MergeProjectCfg started")
 	var applyReqs []string
 	var workflow Workflow
 	var pullRequestWorkflow Workflow
@@ -261,7 +258,6 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		switch key {
 		case ApplyRequirementsKey:
 			if proj.ApplyRequirements != nil {
-				log.Debugf("overriding server-defined %s with repo settings: [%s]", ApplyRequirementsKey, strings.Join(proj.ApplyRequirements, ","))
 				applyReqs = proj.ApplyRequirements
 			}
 		case WorkflowKey:
@@ -279,7 +275,6 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				if w, ok := rCfg.Workflows[name]; allowCustomWorkflows && ok {
 					workflow = w
 				}
-				log.Debugf("overriding server-defined %s with repo-specified workflow: %q", WorkflowKey, workflow.Name)
 			}
 		case PullRequestWorkflowKey:
 			if proj.PullRequestWorkflowName != nil {
@@ -288,8 +283,6 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 					pullRequestWorkflow = w
 				}
 			}
-
-			log.Debugf("overriding server-defined %s with repo-specified pull_request_workflow: %q", PullRequestWorkflowKey, workflow.Name)
 		case DeploymentWorkflowKey:
 			if proj.DeploymentWorkflowName != nil {
 				name := *proj.DeploymentWorkflowName
@@ -297,19 +290,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 					deploymentWorkflow = w
 				}
 			}
-
-			log.Debugf("overriding server-defined %s with repo-specified deployment_workflow: %q", DeploymentWorkflowKey, workflow.Name)
 		}
-		log.Debugf("MergeProjectCfg completed")
-	}
-
-	if g.PlatformModeEnabled() {
-		log.Debugf("final settings: %s: %s, %s: %s, %s: %s",
-			WorkflowKey, workflow.Name, DeploymentWorkflowKey, deploymentWorkflow.Name, PullRequestWorkflowKey, pullRequestWorkflow.Name)
-
-	} else {
-		log.Debugf("final settings: %s: [%s], %s: %s",
-			ApplyRequirementsKey, strings.Join(applyReqs, ","), WorkflowKey, workflow.Name)
 	}
 
 	return MergedProjectCfg{
@@ -331,7 +312,6 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 // DefaultProjCfg returns the default project config for all projects under the
 // repo with id repoID. It is used when there is no repo config.
 func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
-	log.Debugf("building config based on server-side config")
 	repo := g.foldMatchingRepos(repoID)
 
 	mrgPrj := MergedProjectCfg{

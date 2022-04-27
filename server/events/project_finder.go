@@ -84,7 +84,6 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error) {
 	var projects []valid.Project
 	for _, project := range config.Projects {
-		log.Debugf("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
 		var whenModifiedRelToRepoRoot []string
 		for _, wm := range project.Autoplan.WhenModified {
 			wm = strings.TrimSpace(wm)
@@ -115,11 +114,9 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 		for _, file := range modifiedFiles {
 			match, err := pm.Matches(file)
 			if err != nil {
-				log.Debugf("match err for file %q: %s", file, err)
 				continue
 			}
 			if match {
-				log.Debugf("file %q matched pattern", file)
 				// If we're checking using an atlantis.yaml file we downloaded
 				// directly from the repo (when doing a no-clone check) then
 				// absRepoDir will be empty. Since we didn't clone the repo
@@ -131,8 +128,6 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 					_, err := os.Stat(filepath.Join(absRepoDir, project.Dir))
 					if err == nil {
 						projects = append(projects, project)
-					} else {
-						log.Debugf("project at dir %q not included because dir does not exist", project.Dir)
 					}
 				} else {
 					projects = append(projects, project)
@@ -157,7 +152,6 @@ func (p *DefaultProjectFinder) filterToFileList(log logging.SimpleLogging, files
 		}
 		match, err := patternMatcher.Matches(fileName)
 		if err != nil {
-			log.Debugf("filter err for file %q: %s", fileName, err)
 			continue
 		}
 		if match {

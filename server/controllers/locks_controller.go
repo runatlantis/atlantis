@@ -147,8 +147,6 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		if err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
 			l.Logger.Warnf("failed commenting on pull request: %s", err)
 		}
-	} else {
-		l.Logger.Debugf("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
 	}
 	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id %q", id)
 }

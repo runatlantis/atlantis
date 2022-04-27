@@ -64,7 +64,6 @@ func buildContext(
 	repoDir string,
 	contextFlags *command.ContextFlags,
 ) []command.ProjectContext {
-	ctx.Log.Debugf("Building project command context for %s", cmdName)
 	projectCmds := make([]command.ProjectContext, 0)
 
 	// If TerraformVersion not defined in config file look for a
@@ -142,13 +141,11 @@ func getTfVersion(ctx *command.Context, absProjDir string) *version.Version {
 	re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
 	matched := re.FindStringSubmatch(requiredVersionSetting)
 	if len(matched) == 0 {
-		ctx.Log.Debugf("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
 		return nil
 	}
-	ctx.Log.Debugf("found required_version setting of %q", requiredVersionSetting)
 	version, err := version.NewVersion(matched[1])
 	if err != nil {
-		ctx.Log.Debugf(err.Error())
+		ctx.Log.Errorf(err.Error())
 		return nil
 	}
 

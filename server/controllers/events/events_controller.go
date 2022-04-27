@@ -302,7 +302,6 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitLab")
 			return
 		}
-		e.Logger.Debugf("handling GitLab post")
 		e.handleGitlabPost(w, r)
 		return
 	} else if r.Header.Get(bitbucketEventTypeHeader) != "" {
@@ -313,7 +312,6 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 				e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Bitbucket Cloud")
 				return
 			}
-			e.Logger.Debugf("handling Bitbucket Cloud post")
 			e.handleBitbucketCloudPost(w, r)
 			return
 		} else if r.Header.Get(bitbucketServerRequestIDHeader) != "" {
@@ -321,7 +319,6 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 				e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Bitbucket Server")
 				return
 			}
-			e.Logger.Debugf("handling Bitbucket Server post")
 			e.handleBitbucketServerPost(w, r)
 			return
 		}
@@ -330,7 +327,6 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support AzureDevops")
 			return
 		}
-		e.Logger.Debugf("handling AzureDevops post")
 		e.handleAzureDevopsPost(w, r)
 		return
 	}
@@ -348,11 +344,9 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 	}
 	switch eventType {
 	case bitbucketcloud.PullCreatedHeader, bitbucketcloud.PullUpdatedHeader, bitbucketcloud.PullFulfilledHeader, bitbucketcloud.PullRejectedHeader:
-		e.Logger.Debugf("handling as pull request state changed event")
 		e.handleBitbucketCloudPullRequestEvent(w, eventType, body, reqID, r)
 		return
 	case bitbucketcloud.PullCommentCreatedHeader:
-		e.Logger.Debugf("handling as comment created event")
 		e.HandleBitbucketCloudCommentEvent(w, body, reqID, r)
 		return
 	default:
@@ -384,11 +378,9 @@ func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r
 	}
 	switch eventType {
 	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader, bitbucketserver.PullDeletedHeader:
-		e.Logger.Debugf("handling as pull request state changed event")
 		e.handleBitbucketServerPullRequestEvent(w, eventType, body, reqID, r)
 		return
 	case bitbucketserver.PullCommentCreatedHeader:
-		e.Logger.Debugf("handling as comment created event")
 		e.HandleBitbucketServerCommentEvent(w, body, reqID, r)
 		return
 	default:
@@ -403,7 +395,6 @@ func (e *VCSEventsController) handleAzureDevopsPost(w http.ResponseWriter, r *ht
 		e.respond(w, logging.Warn, http.StatusUnauthorized, err.Error())
 		return
 	}
-	e.Logger.Debugf("request valid")
 
 	azuredevopsReqID := "Request-Id=" + r.Header.Get("Request-Id")
 	event, err := azuredevops.ParseWebHook(payload)
@@ -413,10 +404,8 @@ func (e *VCSEventsController) handleAzureDevopsPost(w http.ResponseWriter, r *ht
 	}
 	switch event.PayloadType {
 	case azuredevops.PullRequestCommentedEvent:
-		e.Logger.Debugf("handling as pull request commented event")
 		e.HandleAzureDevopsPullRequestCommentedEvent(w, event, azuredevopsReqID, r)
 	case azuredevops.PullRequestEvent:
-		e.Logger.Debugf("handling as pull request event")
 		e.HandleAzureDevopsPullRequestEvent(w, event, azuredevopsReqID, r)
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event: %v %s", event.PayloadType, azuredevopsReqID)
@@ -556,17 +545,13 @@ func (e *VCSEventsController) handleGitlabPost(w http.ResponseWriter, r *http.Re
 		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
 		return
 	}
-	e.Logger.Debugf("request valid")
 
 	switch event := event.(type) {
 	case gitlab.MergeCommentEvent:
-		e.Logger.Debugf("handling as comment event")
 		e.HandleGitlabCommentEvent(w, event, r)
 	case gitlab.MergeEvent:
-		e.Logger.Debugf("handling as pull request event")
 		e.HandleGitlabMergeRequestEvent(w, event, r)
 	case gitlab.CommitCommentEvent:
-		e.Logger.Debugf("comments on commits are not supported, only comments on merge requests")
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment on commit event")
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event")

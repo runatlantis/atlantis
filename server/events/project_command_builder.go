@@ -132,7 +132,6 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 	var autoplanEnabled []command.ProjectContext
 	for _, projCtx := range projCtxs {
 		if !projCtx.AutoplanEnabled {
-			ctx.Log.Debugf("ignoring project at dir %q, workspace: %q because autoplan is disabled", projCtx.RepoRelDir, projCtx.Workspace)
 			continue
 		}
 		autoplanEnabled = append(autoplanEnabled, projCtx)
@@ -178,7 +177,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 	if err != nil {
 		return nil, err
 	}
-	ctx.Log.Debugf("%d files were modified in this pull request", len(modifiedFiles))
 
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
@@ -188,7 +186,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		ctx.Log.Warnf("workspace was locked")
 		return nil, err
 	}
-	ctx.Log.Debugf("got workspace lock")
 	defer unlockFn()
 
 	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
@@ -218,7 +215,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		ctx.Log.Infof("%d projects are to be planned based on their when_modified config", len(matchingProjects))
 
 		for _, mp := range matchingProjects {
-			ctx.Log.Debugf("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
 			contextFlags := &command.ContextFlags{
 				ForceApply:    forceApply,
@@ -245,7 +241,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		}
 		ctx.Log.Infof("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
-			ctx.Log.Debugf("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
 
 			contextFlags := &command.ContextFlags{
@@ -277,14 +272,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	}
 
 	var pcc []command.ProjectContext
-	ctx.Log.Debugf("building plan command")
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
 		return pcc, err
 	}
 	defer unlockFn()
 
-	ctx.Log.Debugf("cloning repository")
 	_, _, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return pcc, err
@@ -524,7 +517,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		repoRelDir = projCfg.RepoRelDir
 		workspace = projCfg.Workspace
 		for _, mp := range matchingProjects {
-			ctx.Log.Debugf("Merging config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			projCfg = p.GlobalCfg.MergeProjectCfg(
 				ctx.Log,
 				ctx.Pull.BaseRepo.ID(),

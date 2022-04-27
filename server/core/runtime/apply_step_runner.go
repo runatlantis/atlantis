@@ -134,7 +134,6 @@ func (a *ApplyStepRunner) runRemoteApply(
 	}
 
 	// Start the async command execution.
-	prjCtx.Log.Debugf("starting async tf remote operation")
 	inCh := make(chan string)
 	defer close(inCh)
 	outCh := a.AsyncTFExec.RunCommandAsyncWithInput(ctx, prjCtx, filepath.Clean(path), applyArgs, envs, tfVersion, prjCtx.Workspace, inCh)
@@ -156,7 +155,6 @@ func (a *ApplyStepRunner) runRemoteApply(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
-			prjCtx.Log.Debugf("remote run url found, updating commit status")
 			updateStatusF(models.PendingCommitStatus, runURL)
 			nextLineIsRunURL = false
 		}
@@ -164,8 +162,6 @@ func (a *ApplyStepRunner) runRemoteApply(
 		// If the plan is complete and it's waiting for us to verify the apply,
 		// check if the plan is the same and if so, input "yes".
 		if a.atConfirmApplyPrompt(lines) {
-			prjCtx.Log.Debugf("remote apply is waiting for confirmation")
-
 			// Check if the plan is as expected.
 			planChangedErr = a.remotePlanChanged(string(planfileBytes), strings.Join(lines, "\n"), tfVersion)
 			if planChangedErr != nil {
@@ -177,12 +173,10 @@ func (a *ApplyStepRunner) runRemoteApply(
 				continue
 			}
 
-			prjCtx.Log.Debugf("plan generated during apply matches expected plan, continuing")
 			inCh <- "yes\n"
 		}
 	}
 
-	prjCtx.Log.Debugf("async tf remote operation complete")
 	output := strings.Join(lines, "\n")
 	if planChangedErr != nil {
 		updateStatusF(models.FailedCommitStatus, runURL)

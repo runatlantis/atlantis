@@ -13,8 +13,6 @@ import (
 type NullRunner struct{}
 
 func (p NullRunner) Run(ctx context.Context, prjCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	prjCtx.Log.Debugf("runner not configured for plan type")
-
 	return "", nil
 }
 
@@ -22,8 +20,6 @@ func (p NullRunner) Run(ctx context.Context, prjCtx command.ProjectContext, extr
 type RemoteBackendUnsupportedRunner struct{}
 
 func (p RemoteBackendUnsupportedRunner) Run(ctx context.Context, cmdCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	cmdCtx.Log.Debugf("runner not configured for remote backend")
-
 	return "Remote backend is unsupported for this step.", nil
 }
 
