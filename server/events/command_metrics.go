@@ -71,7 +71,7 @@ func (ic *instrumentedStepRunner) Run(ctx models.ProjectCommandContext, extraArg
 		ic.stats.Incr("steps.error", tags...)
 		return out, err
 	}
-	ic.stats.ClockAt("steps.dist_duration", start, tags...).Stop()
+	ic.stats.ClockAt("dist_duration", start, tags...).Stop()
 	ic.stats.Incr("steps.success", tags...)
 	return out, err
 }
@@ -95,7 +95,7 @@ func (ic *instrumentedCustomRunner) Run(ctx models.ProjectCommandContext, cmd st
 		ic.stats.Incr("steps.error", tags...)
 		return out, err
 	}
-	ic.stats.ClockAt("steps.dist_duration", start, tags...).Stop()
+	ic.stats.ClockAt("dist_duration", start, tags...).Stop()
 	ic.stats.Incr("steps.success", tags...)
 	return out, err
 }
@@ -119,7 +119,7 @@ func (ic *instrumentedRunner) Run(ctx models.ProjectCommandContext, extraArgs []
 		ic.stats.Incr("steps.error", tags...)
 		return out, err
 	}
-	ic.stats.ClockAt("steps.dist_duration", start, tags...).Stop()
+	ic.stats.ClockAt("dist_duration", start, tags...).Stop()
 	ic.stats.Incr("steps.success", tags...)
 	return out, err
 }

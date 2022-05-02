@@ -340,7 +340,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	dd := datadog.NewClientWith(datadog.ClientConfig{
 		Address:              "localhost:8125",
-		DistributionPrefixes: []string{"steps.dist_"},
+		DistributionPrefixes: []string{"dist_"},
 	})
 	stats.Register(dd)
 	defer stats.Flush()
