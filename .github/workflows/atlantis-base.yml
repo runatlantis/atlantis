@@ -41,7 +41,7 @@ jobs:
     - run: echo "TODAY=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
 
     - name: Build and push atlantis-base:${{env.TODAY}} image
-      uses: docker/build-push-action@v2
+      uses: docker/build-push-action@v3
       with:
         context: docker-base
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
