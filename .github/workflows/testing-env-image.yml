@@ -20,7 +20,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@v1
+      uses: docker/setup-qemu-action@v2
       with:
         image: tonistiigi/binfmt:latest
         platforms: arm64,arm
