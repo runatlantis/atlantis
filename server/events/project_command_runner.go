@@ -74,7 +74,7 @@ type EnvStepRunner interface {
 
 type MultiEnvStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error)
+	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
