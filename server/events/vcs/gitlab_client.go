@@ -217,6 +217,11 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 			continue;
 		}
 
+		// Ignore any commit statuses with status skipped
+		if status.Status == "skipped" {
+			continue;
+		}
+
 		// If any commit-status != success, reject it
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
 			return false, nil
