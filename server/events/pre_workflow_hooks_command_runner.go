@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -10,7 +11,7 @@ import (
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
 
 type PreWorkflowHooksCommandRunner interface {
-	RunPreHooks(ctx *CommandContext) error
+	RunPreHooks(ctx *command.Context) error
 }
 
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
@@ -24,7 +25,7 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
 func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
-	ctx *CommandContext,
+	ctx *command.Context,
 ) error {
 	pull := ctx.Pull
 	baseRepo := pull.BaseRepo
@@ -46,14 +47,14 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 
 	log.Debug("pre-hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
+	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace, DefaultRepoRelDir)
 	if err != nil {
 		return err
 	}
 	log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := w.WorkingDir.Clone(log, headRepo, pull, DefaultWorkspace)
+	repoDir, _, err := w.WorkingDir.Clone(log, headRepo, pull, DefaultWorkspace, DefaultRepoRelDir)
 	if err != nil {
 		return err
 	}

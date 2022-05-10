@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	locking "github.com/runatlantis/atlantis/server/core/locking"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	locking "github.com/runatlantis/atlantis/server/core/locking"
 )
 
 type MockApplyLockChecker struct {

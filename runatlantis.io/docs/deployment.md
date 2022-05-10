@@ -12,7 +12,7 @@ This page covers getting Atlantis up and running in your infrastructure.
 ### Runtime
 Atlantis is a simple [Go](https://golang.org/) app. It receives webhooks from
 your Git host and executes Terraform commands locally. There is an official
-Atlantis [Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
+Atlantis [Docker image](https://ghcr.io/runatlantis/atlantis).
 
 ### Routing
 Atlantis and your Git host need to be able to route and communicate with one another. Your Git host needs to be able to send webhooks to Atlantis and Atlantis needs to be able to make API calls to your Git host.
@@ -536,14 +536,14 @@ Cloud Storage Backend and TLS certs: [https://github.com/sethvargo/atlantis-on-g
 Once you're done, see [Next Steps](#next-steps).
 
 ### Docker
-Atlantis has an [official](https://hub.docker.com/r/runatlantis/atlantis/) Docker image: `runatlantis/atlantis`.
+Atlantis has an [official](https://ghcr.io/runatlantis/atlantis) Docker image: `ghcr.io/runatlantis/atlantis`.
 
 #### Customization
 If you need to modify the Docker image that we provide, for instance to add the terragrunt binary, you can do something like this:
 
 1. Create a custom docker file
     ```dockerfile
-    FROM runatlantis/atlantis:{latest version}
+    FROM ghcr.io/runatlantis/atlantis:{latest version}
 
     # copy a terraform binary of the version you need
     COPY terragrunt /usr/local/bin/terragrunt
@@ -567,7 +567,7 @@ Another option is [Azure Container Instances](https://docs.microsoft.com/en-us/a
 ### Roll Your Own
 If you want to roll your own Atlantis installation, you can get the `atlantis`
 binary from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
-or use the [official Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
+or use the [official Docker image](https://ghcr.io/runatlantis/atlantis).
 
 #### Startup Command
 The exact flags to `atlantis server` depends on your Git host:

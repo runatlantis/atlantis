@@ -72,6 +72,7 @@ type EnvStepRunner interface {
 	Run(ctx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error)
 }
 
+// MultiEnvStepRunner runs multienv steps.
 type MultiEnvStepRunner interface {
 	// Run cmd in path.
 	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)

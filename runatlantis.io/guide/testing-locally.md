@@ -147,7 +147,7 @@ you can use your own user. Here we'll create the access token that Atlantis uses
 set commit statuses.
 
 ### GitHub or GitHub Enterprise Access Token
-- follow [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)
+- follow [https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token)
 - create a token with **repo** scope
 - set the token as an environment variable
 ```
@@ -311,8 +311,8 @@ If you'd like to `apply`, type a comment: `atlantis apply`. You can use the `-d`
 Atlantis at a specific plan. Otherwise it tries to apply the plan for the root directory.
 
 ## Real-time logs
-The [real-time terraform output](/logs/README.md) for your command can be found by clicking into the status check for a given project in a PR which
-links to the log-streaming UI. This is a terminal UI where you can view your commands executing in real-time. 
+The [real-time terraform output](/docs/streaming-logs.md) for your command can be found by clicking into the status check for a given project in a PR which
+links to the log-streaming UI. This is a terminal UI where you can view your commands executing in real-time.
 
 ## Next Steps
 * If things are working as expected you can `Ctrl-C` the `atlantis server` command and the `ngrok` command.
