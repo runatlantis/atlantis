@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -53,7 +54,7 @@ type LockURLGenerator interface {
 // `terraform plan`.
 type StepRunner interface {
 	// Run runs the step.
-	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error)
+	Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
@@ -61,19 +62,19 @@ type StepRunner interface {
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
 	// Run cmd in path.
-	Run(ctx models.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error)
+	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
 
 // EnvStepRunner runs env steps.
 type EnvStepRunner interface {
-	Run(ctx models.ProjectCommandContext, cmd string, value string, path string, envs map[string]string) (string, error)
+	Run(ctx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error)
 }
 
 type MultiEnvStepRunner interface {
 	// Run cmd in path.
-	Run(ctx models.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error)
+	Run(ctx command.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -88,27 +89,27 @@ type WebhooksSender interface {
 
 type ProjectPlanCommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
-	Plan(ctx models.ProjectCommandContext) models.ProjectResult
+	Plan(ctx command.ProjectContext) command.ProjectResult
 }
 
 type ProjectApplyCommandRunner interface {
 	// Apply runs terraform apply for the project described by ctx.
-	Apply(ctx models.ProjectCommandContext) models.ProjectResult
+	Apply(ctx command.ProjectContext) command.ProjectResult
 }
 
 type ProjectPolicyCheckCommandRunner interface {
 	// PolicyCheck runs OPA defined policies for the project desribed by ctx.
-	PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult
+	PolicyCheck(ctx command.ProjectContext) command.ProjectResult
 }
 
 type ProjectApprovePoliciesCommandRunner interface {
 	// Approves any failing OPA policies.
-	ApprovePolicies(ctx models.ProjectCommandContext) models.ProjectResult
+	ApprovePolicies(ctx command.ProjectContext) command.ProjectResult
 }
 
 type ProjectVersionCommandRunner interface {
 	// Version runs terraform version for the project described by ctx.
-	Version(ctx models.ProjectCommandContext) models.ProjectResult
+	Version(ctx command.ProjectContext) command.ProjectResult
 }
 
 // ProjectCommandRunner runs project commands. A project command is a command
@@ -126,13 +127,13 @@ type ProjectCommandRunner interface {
 type JobURLSetter interface {
 	// SetJobURLWithStatus sets the commit status for the project represented by
 	// ctx and updates the status with and url to a job.
-	SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error
+	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus) error
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
 
 type JobMessageSender interface {
-	Send(ctx models.ProjectCommandContext, msg string, operationComplete bool)
+	Send(ctx command.ProjectContext, msg string, operationComplete bool)
 }
 
 // ProjectOutputWrapper is a decorator that creates a new PR status check per project.
@@ -143,19 +144,19 @@ type ProjectOutputWrapper struct {
 	JobURLSetter     JobURLSetter
 }
 
-func (p *ProjectOutputWrapper) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
-	result := p.updateProjectPRStatus(models.PlanCommand, ctx, p.ProjectCommandRunner.Plan)
+func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectResult {
+	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
 	p.JobMessageSender.Send(ctx, "", OperationComplete)
 	return result
 }
 
-func (p *ProjectOutputWrapper) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
-	result := p.updateProjectPRStatus(models.ApplyCommand, ctx, p.ProjectCommandRunner.Apply)
+func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
+	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
 	p.JobMessageSender.Send(ctx, "", OperationComplete)
 	return result
 }
 
-func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName models.CommandName, ctx models.ProjectCommandContext, execute func(ctx models.ProjectCommandContext) models.ProjectResult) models.ProjectResult {
+func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult) command.ProjectResult {
 	// Create a PR status to track project's plan status. The status will
 	// include a link to view the progress of atlantis plan command in real
 	// time
@@ -202,10 +203,10 @@ type DefaultProjectCommandRunner struct {
 }
 
 // Plan runs terraform plan for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
 	planSuccess, failure, err := p.doPlan(ctx)
-	return models.ProjectResult{
-		Command:     models.PlanCommand,
+	return command.ProjectResult{
+		Command:     command.Plan,
 		PlanSuccess: planSuccess,
 		Error:       err,
 		Failure:     failure,
@@ -216,10 +217,10 @@ func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) mod
 }
 
 // PolicyCheck evaluates policies defined with Rego for the project described by ctx.
-func (p *DefaultProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
-	return models.ProjectResult{
-		Command:            models.PolicyCheckCommand,
+	return command.ProjectResult{
+		Command:            command.PolicyCheck,
 		PolicyCheckSuccess: policySuccess,
 		Error:              err,
 		Failure:            failure,
@@ -230,10 +231,10 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandConte
 }
 
 // Apply runs terraform apply for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
 	applyOut, failure, err := p.doApply(ctx)
-	return models.ProjectResult{
-		Command:      models.ApplyCommand,
+	return command.ProjectResult{
+		Command:      command.Apply,
 		Failure:      failure,
 		Error:        err,
 		ApplySuccess: applyOut,
@@ -243,10 +244,10 @@ func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) mo
 	}
 }
 
-func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx models.ProjectCommandContext) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
 	approvedOut, failure, err := p.doApprovePolicies(ctx)
-	return models.ProjectResult{
-		Command:            models.PolicyCheckCommand,
+	return command.ProjectResult{
+		Command:            command.PolicyCheck,
 		Failure:            failure,
 		Error:              err,
 		PolicyCheckSuccess: approvedOut,
@@ -256,10 +257,10 @@ func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx models.ProjectCommandC
 	}
 }
 
-func (p *DefaultProjectCommandRunner) Version(ctx models.ProjectCommandContext) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectResult {
 	versionOut, failure, err := p.doVersion(ctx)
-	return models.ProjectResult{
-		Command:        models.VersionCommand,
+	return command.ProjectResult{
+		Command:        command.Version,
 		Failure:        failure,
 		Error:          err,
 		VersionSuccess: versionOut,
@@ -269,7 +270,7 @@ func (p *DefaultProjectCommandRunner) Version(ctx models.ProjectCommandContext) 
 	}
 }
 
-func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx models.ProjectCommandContext) (*models.PolicyCheckSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
 
 	// TODO: Make this a bit smarter
 	// without checking some sort of state that the policy check has indeed passed this is likely to cause issues
@@ -279,7 +280,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx models.ProjectComman
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandContext) (*models.PolicyCheckSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	// This should already be acquired from the prior plan operation.
 	// if for some reason an unlock happens between the plan and policy check step
@@ -299,7 +300,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
 	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
 	if err != nil {
 		return nil, "", err
 	}
@@ -307,7 +308,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 
 	// we shouldn't attempt to clone this again. If changes occur to the pull request while the plan is happening
 	// that shouldn't affect this particular operation.
-	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir)
 	if err != nil {
 
 		// let's unlock here since something probably nuked our directory between the plan and policy check phase
@@ -350,7 +351,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (*models.PlanSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*models.PlanSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
 	if err != nil {
@@ -362,14 +363,14 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
 	if err != nil {
 		return nil, "", err
 	}
 	defer unlockFn()
 
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir)
 	if cloneErr != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -399,8 +400,8 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) (applyOut string, failure string, err error) {
-	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
+func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (applyOut string, failure string, err error) {
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", "", errors.New("project has not been cloned–did you run plan?")
@@ -418,7 +419,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
 	if err != nil {
 		return "", "", err
 	}
@@ -442,8 +443,8 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 	return strings.Join(outputs, "\n"), "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext) (versionOut string, failure string, err error) {
-	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
+func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (versionOut string, failure string, err error) {
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", "", errors.New("project has not been cloned–did you run plan?")
@@ -456,7 +457,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
 	if err != nil {
 		return "", "", err
 	}
@@ -470,7 +471,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext
 	return strings.Join(outputs, "\n"), "", nil
 }
 
-func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
+func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.ProjectContext, absPath string) ([]string, error) {
 	var outputs []string
 
 	envs := make(map[string]string)
@@ -501,6 +502,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 		case "multienv":
 			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs)
 		}
+
 		if out != "" {
 			outputs = append(outputs, out)
 		}
