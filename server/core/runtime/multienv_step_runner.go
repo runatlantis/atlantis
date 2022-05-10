@@ -1,8 +1,7 @@
 package runtime
 
 import (
-	"encoding/json"
-
+	"fmt"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -29,25 +28,23 @@ type MultiEnvStepRunner struct {
 func (r *MultiEnvStepRunner) Run(ctx models.ProjectCommandContext, command string, path string, envs map[string]string) (string, error) {
 	res, err := r.RunStepRunner.Run(ctx, command, path, envs)
 	if err == nil {
-		var callerResult MultiEnvCallerResult
-		err = json.Unmarshal([]byte(res), &callerResult)
-		if err == nil {
-			if callerResult.Success {
-				if len(callerResult.Result) > 0 {
-					var sb strings.Builder
-					sb.WriteString("Dynamic environment variables added:\n")
-					for _, item := range callerResult.Result {
-						envs[item.Name] = item.Value
-						sb.WriteString(item.Name)
-						sb.WriteString("\n")
-					}
-					return sb.String(), nil
+		envVars := strings.Split(res, ",")
+		if len(envVars) > 0 {
+			var sb strings.Builder
+			sb.WriteString("Dynamic environment variables added:\n")
+			for _, item := range envVars {
+				nameValue := strings.Split(item, "=")
+				if len(nameValue) == 2 {
+					envs[nameValue[0]] = nameValue[1]
+					sb.WriteString(nameValue[0])
+					sb.WriteString("\n")
+				} else {
+					return "", fmt.Errorf("Invalid environment variable definition: %s", item)
 				}
-				return "No dynamic environment variable added", nil
 			}
-			return callerResult.ErrorMessage, nil
+			return sb.String(), nil
 		}
-		return "Parsing the json result of the multienv step failed, json content: " + res, err
+		return "No dynamic environment variable added", nil
 	}
 	return "", err
 }
