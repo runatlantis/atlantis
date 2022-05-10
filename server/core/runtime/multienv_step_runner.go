@@ -3,6 +3,8 @@ package runtime
 import (
 	"fmt"
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 // EnvStepRunner set environment variables.
