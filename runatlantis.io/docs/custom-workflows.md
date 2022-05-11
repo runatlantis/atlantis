@@ -419,18 +419,8 @@ to all steps defined **below** the `multienv` step.
 | multienv | string | none    | no       | Run a custom command and add set              |
 |          |        |         |          | environment variables according to the result |
 The result of the executed command must have a fixed format:
-```yaml
-{ 
-  "success":true, 
-  "errorMessage":null, 
-  "result": 
-    [ 
-      {"name":"TF_VAR_VARIABLE_ONE","value":"value1"},
-      {"name":"TF_VAR_VARIABLE_TWO","value":"value2"}, 
-      {"name":"TF_VAR_VARIABLE_THREE","value":"value3"} 
-    ] 
-}
-```
+EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3
+
 The name-value pairs in the result are getting added as envinronment variables if success is true otherwise the workflow execution stops with error and the errorMessage is getting displayed.
 
 ::: tip Notes
