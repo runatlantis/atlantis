@@ -47,5 +47,5 @@ jobs:
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
-          ghcr.io/runatlantis/atlantis-base:${{env.TODAY}}
-          ghcr.io/runatlantis/atlantis-base:latest
+          ghcr.io/${{ github.repository_owner }}/atlantis-base:${{env.TODAY}}
+          ghcr.io/${{ github.repository_owner }}/atlantis-base:latest
