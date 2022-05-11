@@ -7,6 +7,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -41,7 +42,7 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 		t.Run(c.Command, func(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				BaseRepo: models.Repo{
 					Name:  "basename",
 					Owner: "baseowner",
