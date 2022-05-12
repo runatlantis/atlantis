@@ -421,7 +421,7 @@ to all steps defined **below** the `multienv` step.
 The result of the executed command must have a fixed format:
 EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3
 
-The name-value pairs in the result are getting added as envinronment variables if success is true otherwise the workflow execution stops with error and the errorMessage is getting displayed.
+The name-value pairs in the result are added as environment variables if success is true otherwise the workflow execution stops with error and the errorMessage is getting displayed.
 
 ::: tip Notes
 * `multienv` `command`'s can use any of the built-in environment variables available
