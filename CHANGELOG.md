@@ -1,3 +1,11 @@
+# v0.19.3
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.3
+
 # v0.19.2
 
 Bug fix release for github and update docs to reflect the docker registry support change.
