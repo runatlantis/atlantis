@@ -131,7 +131,7 @@ projects:
 			defer cleanup()
 
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), AnyString())).ThenReturn(tmpDir, false, nil)
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 			if c.AtlantisYAML != "" {
@@ -398,8 +398,8 @@ projects:
 				defer cleanup()
 
 				workingDir := mocks.NewMockWorkingDir()
-				When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), AnyString())).ThenReturn(tmpDir, false, nil)
-				When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), AnyString())).ThenReturn(tmpDir, nil)
+				When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
+				When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
 				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 				if c.AtlantisYAML != "" {
@@ -553,8 +553,8 @@ projects:
 			defer cleanup()
 
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), AnyString())).ThenReturn(tmpDir, false, nil)
-			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), AnyString())).ThenReturn(tmpDir, nil)
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
+			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
@@ -618,53 +618,31 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	RegisterMockTestingT(t)
 	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
 		"workspace1": map[string]interface{}{
-			"OBZG62TFMN2DC===": map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf":          nil,
-					"workspace.tfplan": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf": nil,
-				},
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
 			},
-			"OBZG62TFMN2DE===": map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf":          nil,
-					"workspace.tfplan": nil,
-				},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
 			},
 		},
 		"workspace2": map[string]interface{}{
-			"OBZG62TFMN2DC===": map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf":          nil,
-					"workspace.tfplan": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf": nil,
-				},
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
 			},
-			"OBZG62TFMN2DE===": map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf":          nil,
-					"workspace.tfplan": nil,
-				},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
 			},
 		},
 	})
 	defer cleanup()
 	// Initialize git repos in each workspace so that the .tfplan files get
 	// picked up.
-	runCmd(t, filepath.Join(tmpDir, "workspace1", "OBZG62TFMN2DC==="), "git", "init")
-	runCmd(t, filepath.Join(tmpDir, "workspace1", "OBZG62TFMN2DE==="), "git", "init")
-	runCmd(t, filepath.Join(tmpDir, "workspace2", "OBZG62TFMN2DC==="), "git", "init")
-	runCmd(t, filepath.Join(tmpDir, "workspace2", "OBZG62TFMN2DE==="), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.GetPullDir(
@@ -752,15 +730,11 @@ projects:
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		AnyString(),
-		AnyString(),
-	)).ThenReturn(repoDir, false, nil)
+		AnyString())).ThenReturn(repoDir, false, nil)
 	When(workingDir.GetWorkingDir(
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		AnyString(),
-		AnyString(),
-	)).ThenReturn(repoDir, nil)
+		AnyString())).ThenReturn(repoDir, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg:  true,
@@ -838,8 +812,8 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			defer cleanup()
 
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), AnyString())).ThenReturn(tmpDir, false, nil)
-			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), AnyString())).ThenReturn(tmpDir, nil)
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
+			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 
@@ -1019,16 +993,12 @@ projects:
 				matchers.AnyPtrToLoggingSimpleLogger(),
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
-				AnyString(),
-				AnyString(),
-			)).ThenReturn(tmpDir, false, nil)
+				AnyString())).ThenReturn(tmpDir, false, nil)
 
 			When(workingDir.GetWorkingDir(
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
-				AnyString(),
-				AnyString(),
-			)).ThenReturn(tmpDir, nil)
+				AnyString())).ThenReturn(tmpDir, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:  true,
@@ -1135,7 +1105,7 @@ projects:
 	})
 	Ok(t, err)
 	Equals(t, 0, len(actCtxs))
-	workingDir.VerifyWasCalled(Never()).Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), AnyString())
+	workingDir.VerifyWasCalled(Never()).Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())
 }
 
 func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanCommand(t *testing.T) {
@@ -1149,7 +1119,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	workingDir := mocks.NewMockWorkingDir()
-	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), AnyString())).ThenReturn(tmpDir, false, nil)
+	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
 	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 
@@ -1202,53 +1172,31 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	RegisterMockTestingT(t)
 	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
 		"workspace1": map[string]interface{}{
-			"OBZG62TFMN2DC===": map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf":          nil,
-					"workspace.tfplan": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf": nil,
-				},
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
 			},
-			"OBZG62TFMN2DE===": map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf":          nil,
-					"workspace.tfplan": nil,
-				},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
 			},
 		},
 		"workspace2": map[string]interface{}{
-			"OBZG62TFMN2DC===": map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf":          nil,
-					"workspace.tfplan": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf": nil,
-				},
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
 			},
-			"OBZG62TFMN2DE===": map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf":          nil,
-					"workspace.tfplan": nil,
-				},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
 			},
 		},
 	})
 	defer cleanup()
 	// Initialize git repos in each workspace so that the .tfplan files get
 	// picked up.
-	runCmd(t, filepath.Join(tmpDir, "workspace1", "OBZG62TFMN2DC==="), "git", "init")
-	runCmd(t, filepath.Join(tmpDir, "workspace1", "OBZG62TFMN2DE==="), "git", "init")
-	runCmd(t, filepath.Join(tmpDir, "workspace2", "OBZG62TFMN2DC==="), "git", "init")
-	runCmd(t, filepath.Join(tmpDir, "workspace2", "OBZG62TFMN2DE==="), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.GetPullDir(
