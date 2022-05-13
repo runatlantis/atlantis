@@ -550,6 +550,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		EnvStepRunner: &runtime.EnvStepRunner{
 			RunStepRunner: runStepRunner,
 		},
+		MultiEnvStepRunner: &runtime.MultiEnvStepRunner{
+			RunStepRunner: runStepRunner,
+		},
 		VersionStepRunner: &runtime.VersionStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
