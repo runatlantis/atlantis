@@ -68,7 +68,6 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
-		AnyString(),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
 		matchers.AnyPtrToLoggingSimpleLogger(),
@@ -249,7 +248,7 @@ func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 		WorkingDir: mockWorkingDir,
 	}
 	ctx := command.ProjectContext{}
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir)).ThenReturn("", os.ErrNotExist)
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn("", os.ErrNotExist)
 
 	res := runner.Apply(ctx)
 	ErrEquals(t, "project has not been cloned–did you run plan?", res.Error)
@@ -271,7 +270,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	}
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Pull request must be approved by at least one person other than the author before running apply.", res.Failure)
@@ -296,7 +295,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	}
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Pull request must be mergeable before running apply.", res.Failure)
@@ -318,7 +317,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	}
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
@@ -437,7 +436,6 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
 				AnyString(),
-				AnyString(),
 			)).ThenReturn(repoDir, nil)
 
 			ctx := command.ProjectContext{
@@ -510,7 +508,6 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
-		AnyString(),
 	)).ThenReturn(repoDir, nil)
 
 	ctx := command.ProjectContext{
@@ -566,7 +563,6 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		AnyString(),
 		AnyString(),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
