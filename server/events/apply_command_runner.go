@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -58,29 +59,29 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	// raises an error
 	// We will log failure as warning
 	if err != nil {
-		ctx.Log.Warnf("checking global apply lock: %s", err)
+		ctx.Log.Warn(fmt.Sprintf("checking global apply lock: %s", err))
 	}
 
 	if locked {
-		ctx.Log.Infof("ignoring apply command since apply disabled globally")
+		ctx.Log.Info("ignoring apply command since apply disabled globally")
 		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyDisabledComment, command.Apply.String()); err != nil {
-			ctx.Log.Errorf("unable to comment on pull request: %s", err)
+			ctx.Log.Error(fmt.Sprintf("unable to comment on pull request: %s", err))
 		}
 
 		return
 	}
 
 	if a.DisableApplyAll && !cmd.IsForSpecificProject() {
-		ctx.Log.Infof("ignoring apply command without flags since apply all is disabled")
+		ctx.Log.Info("ignoring apply command without flags since apply all is disabled")
 		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyAllDisabledComment, command.Apply.String()); err != nil {
-			ctx.Log.Errorf("unable to comment on pull request: %s", err)
+			ctx.Log.Error(fmt.Sprintf("unable to comment on pull request: %s", err))
 		}
 
 		return
 	}
 
 	if err = a.commitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
-		ctx.Log.Warnf("unable to update commit status: %s", err)
+		ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
 	}
 
 	// Get the mergeable status before we set any build statuses of our own.
@@ -94,7 +95,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 		// We want to continue because not all apply's will need this status,
 		// only if they rely on the mergeability requirement.
 		// All PullRequestStatus fields are set to false by default when error.
-		ctx.Log.Warnf("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+		ctx.Log.Warn(fmt.Sprintf("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err))
 	}
 
 	var projectCmds []command.ProjectContext
@@ -102,7 +103,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 
 	if err != nil {
 		if statusErr := a.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warnf("unable to update commit status: %s", statusErr)
+			ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		a.pullUpdater.UpdatePull(ctx, cmd, command.Result{Error: err})
 		return
@@ -111,7 +112,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	// Only run commands in parallel if enabled
 	var result command.Result
 	if a.isParallelEnabled(projectCmds) {
-		ctx.Log.Infof("Running applies in parallel")
+		ctx.Log.Info(fmt.Sprintf("Running applies in parallel"))
 		result = runProjectCmdsParallel(projectCmds, a.prjCmdRunner.Apply, a.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, a.prjCmdRunner.Apply)
@@ -124,7 +125,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
-		ctx.Log.Errorf("writing results: %s", err)
+		ctx.Log.Error(fmt.Sprintf("writing results: %s", err))
 		return
 	}
 
@@ -166,7 +167,7 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 		numSuccess,
 		len(pullStatus.Projects),
 	); err != nil {
-		ctx.Log.Warnf("unable to update commit status: %s", err)
+		ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
 	}
 }
 

@@ -53,7 +53,7 @@ type GithubClient struct {
 	client              *github.Client
 	v4MutateClient      *graphql.Client
 	ctx                 context.Context
-	logger              logging.SimpleLogging
+	logger              logging.Logger
 	mergeabilityChecker MergeabilityChecker
 }
 
@@ -72,7 +72,7 @@ type GithubAppTemporarySecrets struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging, mergeabilityChecker MergeabilityChecker) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.Logger, mergeabilityChecker MergeabilityChecker) (*GithubClient, error) {
 	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
@@ -124,7 +124,7 @@ func (g *GithubClient) GetRateLimits() (*github.RateLimits, error) {
 	rateLimits, resp, err := g.client.RateLimits(g.ctx)
 
 	if err != nil {
-		g.logger.Errorf("error retrieving rate limits: %s", err)
+		g.logger.Error("error retrieving rate limits", map[string]interface{}{"err": err})
 		return nil, errors.Wrap(err, "retrieving rate limits")
 	}
 

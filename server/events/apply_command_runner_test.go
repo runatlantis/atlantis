@@ -44,7 +44,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			logger := logging.NewNoopLogger(t)
+			logger := logging.NewNoopCtxLogger(t)
 			vcsClient := setup(t)
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")

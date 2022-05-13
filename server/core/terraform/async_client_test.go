@@ -25,7 +25,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		"ARG1=$ARG1",
 	}
 	workspace := "workspace"
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	echoCommand := exec.Command("sh", "-c", "echo hello")
 
 	ctx := context.Background()
@@ -55,7 +55,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		"ARG1=$ARG1",
 	}
 	workspace := "workspace"
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
@@ -103,7 +103,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	workspace := "workspace"
 	echoCommand := exec.Command("sh", "-c", "echo stderr >&2")
 
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
@@ -130,7 +130,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	}
 	workspace := "workspace"
 	echoCommand := exec.Command("sh", "-c", "echo dying && exit 1")
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
@@ -158,7 +158,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	}
 	workspace := "workspace"
 	echoCommand := exec.Command("sh", "-c", "read a && echo $a")
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{

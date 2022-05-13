@@ -94,7 +94,7 @@ func TestRun_DestroyPlan(t *testing.T) {
 			// Using version >= 0.10 here so we don't expect any env commands.
 			terraform := mocks.NewMockClient()
 			tfVersion, _ := version.NewVersion("0.10.0")
-			logger := logging.NewNoopLogger(t)
+			logger := logging.NewNoopCtxLogger(t)
 			planStepRunner := runtime.PlanStepRunner{
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,

@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -18,7 +19,7 @@ type WorkDirIterator interface {
 }
 
 type FileWorkDirIterator struct {
-	Log          logging.SimpleLogging
+	Log          logging.Logger
 	DataDir      string
 	GithubClient vcs.GithubPullRequestGetter
 	EventParser  EventParsing
@@ -28,7 +29,7 @@ func NewFileWorkDirIterator(
 	githubClient vcs.GithubPullRequestGetter,
 	eventParser EventParsing,
 	dataDir string,
-	log logging.SimpleLogging,
+	log logging.Logger,
 ) *FileWorkDirIterator {
 	return &FileWorkDirIterator{
 		Log:          log,
@@ -44,7 +45,7 @@ func (f *FileWorkDirIterator) ListCurrentWorkingDirPulls() ([]models.PullRequest
 	baseFilePath := filepath.Join(f.DataDir, workingDirPrefix)
 
 	if _, err := os.Stat(baseFilePath); os.IsNotExist(err) {
-		f.Log.Warnf("cannot list working dirs, %s doesn't exist", baseFilePath)
+		f.Log.Warn(fmt.Sprintf("cannot list working dirs, %s doesn't exist", baseFilePath))
 		return results, nil
 	}
 
@@ -85,7 +86,7 @@ func (f *FileWorkDirIterator) ListCurrentWorkingDirPulls() ([]models.PullRequest
 				return errors.Wrapf(err, "fetching pull for %s", filepath.Join(pathComponents...))
 			}
 
-			f.Log.Warnf("%s/%s/#%d not found, %s", ownerName, repoName, pullNum, notFoundErr)
+			f.Log.Warn(fmt.Sprintf("%s/%s/#%d not found, %s", ownerName, repoName, pullNum, notFoundErr))
 
 			return fs.SkipDir
 		}

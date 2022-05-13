@@ -22,7 +22,7 @@ func TestListCurrentWorkingDirPulls(t *testing.T) {
 
 	mockGHClient := vcsmocks.NewMockGithubPullRequestGetter()
 	mockEventParser := eventmocks.NewMockEventParsing()
-	log := logging.NewNoopLogger(t)
+	log := logging.NewNoopCtxLogger(t)
 
 	t.Run("repos subdir not exist", func(t *testing.T) {
 

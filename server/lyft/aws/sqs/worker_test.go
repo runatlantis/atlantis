@@ -87,7 +87,7 @@ func TestWorker_Success(t *testing.T) {
 		Queue:            queue,
 		QueueURL:         "testUrl",
 		MessageProcessor: handler,
-		Logger:           logging.NewNoopLogger(t),
+		Logger:           logging.NewNoopCtxLogger(t),
 	}
 
 	wg.Add(1)
@@ -125,7 +125,7 @@ func TestWorker_Error(t *testing.T) {
 		Queue:            queue,
 		QueueURL:         "testUrl",
 		MessageProcessor: handler,
-		Logger:           logging.NewNoopLogger(t),
+		Logger:           logging.NewNoopCtxLogger(t),
 	}
 
 	wg.Add(1)
@@ -170,7 +170,7 @@ func TestWorker_HandlerError(t *testing.T) {
 		Queue:            queue,
 		QueueURL:         "testUrl",
 		MessageProcessor: handler,
-		Logger:           logging.NewNoopLogger(t),
+		Logger:           logging.NewNoopCtxLogger(t),
 	}
 
 	wg.Add(1)

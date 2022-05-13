@@ -13,7 +13,7 @@ import (
 	tallystatsd "github.com/uber-go/tally/statsd"
 )
 
-func NewLoggingScope(logger logging.SimpleLogging, statsNamespace string) (tally.Scope, io.Closer, error) {
+func NewLoggingScope(logger logging.Logger, statsNamespace string) (tally.Scope, io.Closer, error) {
 	reporter, err := newReporter(valid.Metrics{}, logger)
 
 	if err != nil {
@@ -28,7 +28,7 @@ func NewLoggingScope(logger logging.SimpleLogging, statsNamespace string) (tally
 	return scope, closer, nil
 }
 
-func NewScope(cfg valid.Metrics, logger logging.SimpleLogging, statsNamespace string) (tally.Scope, io.Closer, error) {
+func NewScope(cfg valid.Metrics, logger logging.Logger, statsNamespace string) (tally.Scope, io.Closer, error) {
 	reporter, err := newReporter(cfg, logger)
 
 	if err != nil {
@@ -43,7 +43,7 @@ func NewScope(cfg valid.Metrics, logger logging.SimpleLogging, statsNamespace st
 	return scope, closer, nil
 }
 
-func newReporter(cfg valid.Metrics, logger logging.SimpleLogging) (tally.StatsReporter, error) {
+func newReporter(cfg valid.Metrics, logger logging.Logger) (tally.StatsReporter, error) {
 	if cfg.Statsd == nil {
 		// return logging reporter and proceed
 		return newLoggingReporter(logger), nil

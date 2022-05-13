@@ -32,7 +32,7 @@ type multiplexor struct {
 	registry     PartitionRegistry
 }
 
-func NewMultiplexor(log logging.SimpleLogging, keyGenerator PartitionKeyGenerator, registry PartitionRegistry) Multiplexor {
+func NewMultiplexor(log logging.Logger, keyGenerator PartitionKeyGenerator, registry PartitionRegistry) Multiplexor {
 	upgrader := websocket.Upgrader{}
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	return &multiplexor{

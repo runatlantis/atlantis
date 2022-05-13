@@ -95,7 +95,6 @@ func NewRequestResolvers(
 }
 
 func NewVCSEventsController(
-	legacyLogger logging.SimpleLogging,
 	scope tally.Scope,
 	githubWebhookSecret []byte,
 	allowDraftPRs bool,
@@ -155,7 +154,6 @@ func NewVCSEventsController(
 
 	return &VCSEventsController{
 		RequestRouter:                   router,
-		Logger:                          legacyLogger,
 		Scope:                           scope,
 		Parser:                          eventParser,
 		CommentParser:                   commentParser,

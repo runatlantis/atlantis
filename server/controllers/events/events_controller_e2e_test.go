@@ -652,7 +652,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	logger := logging.NewNoopLogger(t)
 	ctxLogger := logging.NewNoopCtxLogger(t)
-	featureAllocator, _ := feature.NewStringSourcedAllocator(logger)
+	featureAllocator, _ := feature.NewStringSourcedAllocator(ctxLogger)
 	terraformClient, err := terraform.NewE2ETestClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", downloader, false, projectCmdOutputHandler, featureAllocator)
 	Ok(t, err)
 
@@ -715,7 +715,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{},
 	}
-	statsScope, _, err := metrics.NewLoggingScope(logger, "atlantis")
+	statsScope, _, err := metrics.NewLoggingScope(ctxLogger, "atlantis")
 	Ok(t, err)
 
 	projectContextBuilder := wrappers.
@@ -743,7 +743,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		&events.DefaultPendingPlanFinder{},
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-		logger,
+		ctxLogger,
 		events.InfiniteProjectsPerPR,
 	)
 
@@ -753,7 +753,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	conftestVersion, err := version.NewVersion(ConftestVersion)
 	Ok(t, err)
 
-	conftextExec := policy.NewConfTestExecutorWorkflow(logger, binDir, downloader)
+	conftextExec := policy.NewConfTestExecutorWorkflow(ctxLogger, binDir, downloader)
 
 	// swapping out version cache to something that always returns local contest
 	// binary
@@ -837,7 +837,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
-		Logger:           logger,
+		Logger:           ctxLogger,
 		WorkingDir:       workingDir,
 		WorkingDirLocker: locker,
 		DB:               boltdb,
@@ -921,7 +921,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		PullStatusFetcher:             boltdb,
 		StaleCommandChecker:           staleCommandChecker,
 		Logger:                        ctxLogger,
-		LegacyLogger:                  logger,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
@@ -1275,7 +1274,7 @@ func (m *testLockURLGenerator) GenerateLockURL(lockID string) string {
 
 type testWebhookSender struct{}
 
-func (w *testWebhookSender) Send(log logging.SimpleLogging, result webhooks.ApplyResult) error {
+func (w *testWebhookSender) Send(log logging.Logger, result webhooks.ApplyResult) error {
 	return nil
 }
 

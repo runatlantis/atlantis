@@ -133,7 +133,7 @@ type ConfTestExecutorWorkflow struct {
 	Exec                   runtime_models.Exec
 }
 
-func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir string, conftestDownloder terraform.Downloader) *ConfTestExecutorWorkflow {
+func NewConfTestExecutorWorkflow(log logging.Logger, versionRootDir string, conftestDownloder terraform.Downloader) *ConfTestExecutorWorkflow {
 	downloader := ConfTestVersionDownloader{
 		downloader: conftestDownloder,
 	}
@@ -141,7 +141,7 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 
 	if err != nil {
 		// conftest default versions are not essential to service startup so let's not block on it.
-		log.Warnf("failed to get default conftest version. Will attempt request scoped lazy loads %s", err.Error())
+		log.Warn(fmt.Sprintf("failed to get default conftest version. Will attempt request scoped lazy loads %s", err.Error()))
 	}
 
 	versionCache := cache.NewExecutionVersionLayeredLoadingCache(
@@ -168,7 +168,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx context.Context, prjCtx command.Proje
 
 		// Let's not fail the whole step because of a single failure. Log and fail silently
 		if err != nil {
-			prjCtx.Log.Errorf("Error resolving policyset %s. err: %s", policySet.Name, err.Error())
+			prjCtx.Log.Error(fmt.Sprintf("Error resolving policyset %s. err: %s", policySet.Name, err.Error()))
 			continue
 		}
 
@@ -190,7 +190,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx context.Context, prjCtx command.Proje
 	serializedArgs, err := args.build()
 
 	if err != nil {
-		prjCtx.Log.Warnf("No policies have been configured")
+		prjCtx.Log.Warn("No policies have been configured")
 		return "", nil
 		// TODO: enable when we can pass policies in otherwise e2e tests with policy checks fail
 		// return "", errors.Wrap(err, "building args")
@@ -207,7 +207,7 @@ func (c *ConfTestExecutorWorkflow) sanitizeOutput(inputFile string, output strin
 	return strings.Replace(output, inputFile, "<redacted plan file>", -1)
 }
 
-func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log logging.SimpleLogging, v *version.Version) (string, error) {
+func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log logging.Logger, v *version.Version) (string, error) {
 	// we have no information to proceed so fail hard
 	if c.DefaultConftestVersion == nil && v == nil {
 		return "", errors.New("no conftest version configured/specified")

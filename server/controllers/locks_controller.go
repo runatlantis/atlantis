@@ -21,7 +21,7 @@ type LocksController struct {
 	AtlantisVersion    string
 	AtlantisURL        *url.URL
 	Locker             locking.Locker
-	Logger             logging.SimpleLogging
+	Logger             logging.Logger
 	ApplyLocker        locking.ApplyLocker
 	VCSClient          vcs.Client
 	LockDetailTemplate templates.TemplateWriter
@@ -93,7 +93,7 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 
 	err = l.LockDetailTemplate.Execute(w, viewData)
 	if err != nil {
-		l.Logger.Errorf(err.Error())
+		l.Logger.Error(err.Error())
 	}
 }
 
@@ -129,23 +129,23 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	if lock.Pull.BaseRepo != (models.Repo{}) {
 		unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace)
 		if err != nil {
-			l.Logger.Errorf("unable to obtain working dir lock when trying to delete old plans: %s", err)
+			l.Logger.Error(fmt.Sprintf("unable to obtain working dir lock when trying to delete old plans: %s", err))
 		} else {
 			defer unlock()
 			// nolint: vetshadow
 			if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
-				l.Logger.Errorf("unable to delete workspace: %s", err)
+				l.Logger.Error(fmt.Sprintf("unable to delete workspace: %s", err))
 			}
 		}
 		if err := l.DB.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
-			l.Logger.Errorf("unable to update project status: %s", err)
+			l.Logger.Error(fmt.Sprintf("unable to update project status: %s", err))
 		}
 
 		// Once the lock has been deleted, comment back on the pull request.
 		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
 		if err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
-			l.Logger.Warnf("failed commenting on pull request: %s", err)
+			l.Logger.Warn(fmt.Sprintf("failed commenting on pull request: %s", err))
 		}
 	}
 	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id %q", id)
@@ -155,7 +155,18 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 // level to log at, code is the HTTP response code.
 func (l *LocksController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
 	response := fmt.Sprintf(format, args...)
-	l.Logger.Log(lvl, response)
+	switch lvl {
+	case logging.Error:
+		l.Logger.Error(response)
+	case logging.Info:
+		l.Logger.Info(response)
+	case logging.Warn:
+		l.Logger.Warn(response)
+	case logging.Debug:
+		l.Logger.Debug(response)
+	default:
+		l.Logger.Error(response)
+	}
 	w.WriteHeader(responseCode)
 	fmt.Fprintln(w, response)
 }

@@ -253,7 +253,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		workingDir := mocks.NewMockWorkingDir()
 		locker := lockmocks.NewMockLocker()
 		client := vcsmocks.NewMockClient()
-		logger := logging.NewNoopLogger(t)
+		logger := logging.NewNoopCtxLogger(t)
 
 		pullClosedExecutor := events.PullClosedExecutor{
 			Locker:                   locker,

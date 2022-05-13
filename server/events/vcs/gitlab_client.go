@@ -54,7 +54,7 @@ var commonMarkSupported = MustConstraint(">=11.1")
 var gitlabClientUnderTest = false
 
 // NewGitlabClient returns a valid GitLab client.
-func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging) (*GitlabClient, error) {
+func NewGitlabClient(hostname string, token string, logger logging.Logger) (*GitlabClient, error) {
 	client := &GitlabClient{}
 
 	// Create the client differently depending on the base URL.
@@ -80,9 +80,9 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 		// doesn't give good error messages in this case.
 		ips, err := net.LookupIP(url.Hostname())
 		if err != nil {
-			logger.Warnf("unable to resolve %q: %s", url.Hostname(), err)
+			logger.Warn(fmt.Sprintf("unable to resolve %q: %s", url.Hostname(), err))
 		} else if len(ips) == 0 {
-			logger.Warnf("found no IPs while resolving %q", url.Hostname())
+			logger.Warn(fmt.Sprintf("found no IPs while resolving %q", url.Hostname()))
 		}
 
 		// Now we're ready to construct the client.
@@ -102,7 +102,7 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 		if err != nil {
 			return nil, err
 		}
-		logger.Infof("determined GitLab is running version %s", client.Version.String())
+		logger.Info(fmt.Sprintf("determined GitLab is running version %s", client.Version.String()))
 	}
 
 	return client, nil

@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -72,7 +73,7 @@ func (p *ProjectSyncer) sync(
 	result = execute(ctx)
 	if result.Error != nil {
 		if unlockErr := lockResponse.UnlockFn(); unlockErr != nil {
-			ctx.Log.Errorf("error unlocking state after %s error: %v", cmdName, unlockErr)
+			ctx.Log.Error(fmt.Sprintf("error unlocking state after %s error: %v", cmdName, unlockErr))
 		}
 		return
 	}

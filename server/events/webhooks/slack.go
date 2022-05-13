@@ -50,7 +50,7 @@ func NewSlack(r *regexp.Regexp, channel string, client SlackClient) (*SlackWebho
 }
 
 // Send sends the webhook to Slack if the workspace matches the regex.
-func (s *SlackWebhook) Send(log logging.SimpleLogging, applyResult ApplyResult) error {
+func (s *SlackWebhook) Send(log logging.Logger, applyResult ApplyResult) error {
 	if !s.WorkspaceRegex.MatchString(applyResult.Workspace) {
 		return nil
 	}

@@ -17,7 +17,7 @@ import (
 )
 
 func TestShowStepRunnner(t *testing.T) {
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	path, _ := ioutil.TempDir("", "")
 	resultPath := filepath.Join(path, "test-default.json")
 	envs := map[string]string{"key": "val"}

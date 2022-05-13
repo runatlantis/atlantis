@@ -90,7 +90,7 @@ func TestStepsRunner_Run(t *testing.T) {
 
 			ctx := context.Background()
 			prjCtx := command.ProjectContext{
-				Log:        logging.NewNoopLogger(t),
+				Log:        logging.NewNoopCtxLogger(t),
 				Steps:      c.steps,
 				Workspace:  "default",
 				RepoRelDir: ".",
@@ -162,7 +162,7 @@ func TestStepsRuinner_RunEnvSteps(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logging.NewNoopLogger(t),
+		Log: logging.NewNoopCtxLogger(t),
 		Steps: []valid.Step{
 			{
 				StepName:   "run",

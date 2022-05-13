@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"fmt"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -17,6 +18,6 @@ type Runner struct {
 
 func (r *Runner) Run(ctx *command.Context, cmd *command.Comment) {
 	if err := r.vcsClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, "I'm a platform mode plan runner", command.Plan.String()); err != nil {
-		ctx.Log.Errorf("unable to comment: %s", err)
+		ctx.Log.Error(fmt.Sprintf("unable to comment: %s", err))
 	}
 }

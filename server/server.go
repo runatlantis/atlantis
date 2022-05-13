@@ -105,7 +105,6 @@ type Server struct {
 	Port                          int
 	PreWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 	CommandRunner                 *events.DefaultCommandRunner
-	Logger                        logging.SimpleLogging
 	CtxLogger                     logging.Logger
 	StatsScope                    tally.Scope
 	StatsCloser                   io.Closer
@@ -156,12 +155,6 @@ type WebhookConfig struct {
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
-	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
-
-	if err != nil {
-		return nil, err
-	}
-
 	ctxLogger, err := logging.NewLoggerFromLevel(userConfig.ToLogLevel())
 	if err != nil {
 		return nil, err
@@ -203,7 +196,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
-	statsScope, closer, err := metrics.NewScope(globalCfg.Metrics, logger, userConfig.StatsNamespace)
+	statsScope, closer, err := metrics.NewScope(globalCfg.Metrics, ctxLogger, userConfig.StatsNamespace)
 
 	if err != nil {
 		return nil, errors.Wrapf(err, "instantiating metrics scope")
@@ -239,7 +232,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		rawGithubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger, mergeabilityChecker)
+		rawGithubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, ctxLogger, mergeabilityChecker)
 		if err != nil {
 			return nil, err
 		}
@@ -249,7 +242,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
 		var err error
-		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, logger)
+		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, ctxLogger)
 		if err != nil {
 			return nil, err
 		}
@@ -291,12 +284,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
 		}
 		if userConfig.GithubUser != "" {
-			if err := events.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger, false); err != nil {
+			if err := events.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, ctxLogger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.GitlabUser != "" {
-			if err := events.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger, false); err != nil {
+			if err := events.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, ctxLogger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -307,12 +300,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			if bitbucketBaseURL == "https://api.bitbucket.org" {
 				bitbucketBaseURL = "bitbucket.org"
 			}
-			if err := events.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger, false); err != nil {
+			if err := events.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, ctxLogger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.AzureDevopsUser != "" {
-			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger, false); err != nil {
+			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, ctxLogger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -353,7 +346,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			Repo:   userConfig.FFRepo,
 			Branch: userConfig.FFBranch,
 			Path:   userConfig.FFPath,
-		}, githubClient, logger)
+		}, githubClient, ctxLogger)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing feature allocator")
@@ -376,7 +369,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	projectJobsScope := statsScope.SubScope("getprojectjobs")
 
-	storageBackend, err := jobs.NewStorageBackend(globalCfg.Jobs, logger, featureAllocator, projectJobsScope)
+	storageBackend, err := jobs.NewStorageBackend(globalCfg.Jobs, ctxLogger, featureAllocator, projectJobsScope)
 	if err != nil {
 		return nil, errors.Wrapf(err, "initializing storage backend")
 	}
@@ -389,12 +382,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	projectCmdOutput := make(chan *jobs.ProjectCmdOutputLine)
 	projectCmdOutputHandler = jobs.NewAsyncProjectCommandOutputHandler(
 		projectCmdOutput,
-		logger,
+		ctxLogger,
 		jobStore,
 	)
 
 	terraformClient, err := terraform.NewClient(
-		logger,
 		binDir,
 		cacheDir,
 		userConfig.DefaultTFVersion,
@@ -450,7 +442,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
-		Logger:           logger,
+		Logger:           ctxLogger,
 		WorkingDir:       workingDir,
 		WorkingDirLocker: workingDirLocker,
 		DB:               boltdb,
@@ -458,11 +450,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
 		statsScope,
-		logger,
+		ctxLogger,
 		&events.PullClosedExecutor{
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
-			Logger:                   logger,
+			Logger:                   ctxLogger,
 			DB:                       boltdb,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
@@ -494,7 +486,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	drainer := &events.Drainer{}
 	statusController := &controllers.StatusController{
-		Logger:  logger,
+		Logger:  ctxLogger,
 		Drainer: drainer,
 	}
 
@@ -535,7 +527,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pendingPlanFinder,
 		userConfig.EnableRegExpCmd,
 		userConfig.AutoplanFileList,
-		logger,
+		ctxLogger,
 		userConfig.MaxProjectsPerPR,
 	)
 
@@ -550,7 +542,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pendingPlanFinder,
 		userConfig.EnableRegExpCmd,
 		userConfig.AutoplanFileList,
-		logger,
+		ctxLogger,
 		userConfig.MaxProjectsPerPR,
 	)
 
@@ -575,7 +567,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing show step runner")
 	}
 
-	conftestExecutor := policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{})
+	conftestExecutor := policy.NewConfTestExecutorWorkflow(ctxLogger, binDir, &terraform.DefaultDownloader{})
 	policyCheckStepRunner, err := runtime.NewPolicyCheckStepRunner(
 		defaultTfVersion,
 		conftestExecutor,
@@ -769,7 +761,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	featuredPlanRunner := lyftCommands.NewPlatformModeFeatureRunner(
 		featureAllocator,
 		userConfig.EnablePlatformMode,
-		logger,
+		ctxLogger,
 		prPlanCommandRunner,
 		planCommandRunner,
 	)
@@ -777,7 +769,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	featuredApplyRunner := lyftCommands.NewPlatformModeFeatureRunner(
 		featureAllocator,
 		userConfig.EnablePlatformMode,
-		logger,
+		ctxLogger,
 		apply.NewDisabledRunner(pullUpdater),
 		applyCommandRunner,
 	)
@@ -785,7 +777,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	featuredPolicyCheckRunner := lyftCommands.NewPlatformModeFeatureRunner(
 		featureAllocator,
 		userConfig.EnablePlatformMode,
-		logger,
+		ctxLogger,
 		prApprovePoliciesCommandRunner,
 		approvePoliciesCommandRunner,
 	)
@@ -813,7 +805,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StaleCommandChecker:           staleCommandChecker,
 		CommitStatusUpdater:           commitStatusUpdater,
 		Logger:                        ctxLogger,
-		LegacyLogger:                  logger,
 	}
 
 	forceApplyCommandRunner := &events.ForceApplyCommandRunner{
@@ -831,7 +822,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisURL:        parsedURL,
 		Locker:             lockingClient,
 		ApplyLocker:        applyLockingClient,
-		Logger:             logger,
+		Logger:             ctxLogger,
 		VCSClient:          vcsClient,
 		LockDetailTemplate: templates.LockTemplate,
 		WorkingDir:         workingDir,
@@ -842,7 +833,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	wsMux := websocket.NewInstrumentedMultiplexor(
 		websocket.NewMultiplexor(
-			logger,
+			ctxLogger,
 			controllers.JobIDKeyGenerator{},
 			projectCmdOutputHandler,
 		),
@@ -852,7 +843,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	jobsController := &controllers.JobsController{
 		AtlantisVersion:          config.AtlantisVersion,
 		AtlantisURL:              parsedURL,
-		Logger:                   logger,
+		Logger:                   ctxLogger,
 		ProjectJobsTemplate:      templates.ProjectJobsTemplate,
 		ProjectJobsErrorTemplate: templates.ProjectJobsErrorTemplate,
 		Db:                       boltdb,
@@ -862,7 +853,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	githubAppController := &controllers.GithubAppController{
 		AtlantisURL:         parsedURL,
-		Logger:              logger,
+		Logger:              ctxLogger,
 		GithubSetupComplete: githubAppEnabled,
 		GithubHostname:      userConfig.GithubHostname,
 		GithubOrg:           userConfig.GithubOrg,
@@ -874,15 +865,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			githubClient,
 			eventParser,
 			userConfig.DataDir,
-			logger,
+			ctxLogger,
 		),
 		statsScope,
-		logger,
+		ctxLogger,
 		&events.PullClosedExecutor{
 			VCSClient:                vcsClient,
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
-			Logger:                   logger,
+			Logger:                   ctxLogger,
 			DB:                       boltdb,
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 
@@ -895,7 +886,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			VCSClient:                vcsClient,
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
-			Logger:                   logger,
+			Logger:                   ctxLogger,
 			DB:                       boltdb,
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 
@@ -931,7 +922,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	gatewayEventsController := gateway.NewVCSEventsController(
-		logger,
 		statsScope,
 		[]byte(userConfig.GithubWebhookSecret),
 		userConfig.PlanDrafts,
@@ -948,7 +938,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 
 	defaultEventsController := events_controllers.NewVCSEventsController(
-		logger,
 		statsScope,
 		[]byte(userConfig.GithubWebhookSecret),
 		userConfig.PlanDrafts,
@@ -974,33 +963,43 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	var vcsPostHandler sqs.VCSPostHandler
 	lyftMode := userConfig.ToLyftMode()
-	//TODO: remove logs after testing is complete
 	switch lyftMode {
 	case Default: // default eventsController handles POST
 		vcsPostHandler = defaultEventsController
-		logger.Infof("running Atlantis in default mode")
+		ctxLogger.Info("running Atlantis in default mode")
 	case Gateway: // gateway eventsController handles POST
 		vcsPostHandler = gatewayEventsController
-		logger.With("sns", userConfig.LyftGatewaySnsTopicArn).Infof("running Atlantis in gateway mode")
+		ctxLogger.Info("running Atlantis in gateway mode", map[string]interface{}{
+			"sns": userConfig.LyftGatewaySnsTopicArn,
+		})
 	case Hybrid: // gateway eventsController handles POST, and SQS worker is set up to handle messages via default eventsController
 		vcsPostHandler = gatewayEventsController
-		worker, err := sqs.NewGatewaySQSWorker(ctx, statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController)
+		worker, err := sqs.NewGatewaySQSWorker(ctx, statsScope, ctxLogger, userConfig.LyftWorkerQueueURL, defaultEventsController)
 		if err != nil {
-			logger.With("err", err).Errorf("unable to set up worker")
+			ctxLogger.Error("unable to set up worker", map[string]interface{}{
+				"err": err,
+			})
 			cancel()
 			return nil, errors.Wrapf(err, "setting up sqs handler for hybrid mode")
 		}
 		go worker.Work(ctx)
-		logger.With("queue", userConfig.LyftWorkerQueueURL, "sns", userConfig.LyftGatewaySnsTopicArn).Infof("running Atlantis in hybrid mode")
+		ctxLogger.Info("running Atlantis in hybrid mode", map[string]interface{}{
+			"sns":   userConfig.LyftGatewaySnsTopicArn,
+			"queue": userConfig.LyftWorkerQueueURL,
+		})
 	case Worker: // an SQS worker is set up to handle messages via default eventsController
-		worker, err := sqs.NewGatewaySQSWorker(ctx, statsScope, logger, userConfig.LyftWorkerQueueURL, defaultEventsController)
+		worker, err := sqs.NewGatewaySQSWorker(ctx, statsScope, ctxLogger, userConfig.LyftWorkerQueueURL, defaultEventsController)
 		if err != nil {
-			logger.With("err", err).Errorf("unable to set up worker")
+			ctxLogger.Error("unable to set up worker", map[string]interface{}{
+				"err": err,
+			})
 			cancel()
 			return nil, errors.Wrapf(err, "setting up sqs handler for worker mode")
 		}
 		go worker.Work(ctx)
-		logger.With("queue", userConfig.LyftWorkerQueueURL).Infof("running Atlantis in worker mode")
+		ctxLogger.Info("running Atlantis in worker mode", map[string]interface{}{
+			"queue": userConfig.LyftWorkerQueueURL,
+		})
 	}
 
 	return &Server{
@@ -1010,7 +1009,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Port:                          userConfig.Port,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		CommandRunner:                 commandRunner,
-		Logger:                        logger,
 		CtxLogger:                     ctxLogger,
 		StatsScope:                    statsScope,
 		StatsCloser:                   closer,
@@ -1063,10 +1061,9 @@ func (s *Server) Start() error {
 		PrintStack: false,
 		StackAll:   false,
 		StackSize:  1024 * 8,
-	}, NewRequestLogger(s.Logger))
+	}, NewRequestLogger(s.CtxLogger))
 	n.UseHandler(s.Router)
 
-	defer s.Logger.Close()
 	defer s.CtxLogger.Close()
 
 	// Ensure server gracefully drains connections when stopped.
@@ -1082,7 +1079,7 @@ func (s *Server) Start() error {
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
 	go func() {
-		s.Logger.Infof("Atlantis started - listening on port %v", s.Port)
+		s.CtxLogger.Info(fmt.Sprintf("Atlantis started - listening on port %v", s.Port))
 
 		var err error
 		if s.SSLCertFile != "" && s.SSLKeyFile != "" {
@@ -1092,23 +1089,23 @@ func (s *Server) Start() error {
 		}
 
 		if err != nil && err != http.ErrServerClosed {
-			s.Logger.Errorf(err.Error())
+			s.CtxLogger.Error(err.Error())
 		}
 	}()
 	<-stop
 
 	// Shutdown sqs polling. Any received messages being processed will either succeed/fail depending on if drainer started.
 	if s.LyftMode == Hybrid || s.LyftMode == Worker {
-		s.Logger.Warnf("Received interrupt. Shutting down the sqs handler")
+		s.CtxLogger.Warn("Received interrupt. Shutting down the sqs handler")
 		s.CancelWorker()
 	}
 
-	s.Logger.Warnf("Received interrupt. Waiting for in-progress operations to complete")
+	s.CtxLogger.Warn("Received interrupt. Waiting for in-progress operations to complete")
 	s.waitForDrain()
 
 	// flush stats before shutdown
 	if err := s.StatsCloser.Close(); err != nil {
-		s.Logger.Errorf(err.Error())
+		s.CtxLogger.Error(err.Error())
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
@@ -1129,10 +1126,10 @@ func (s *Server) waitForDrain() {
 	for {
 		select {
 		case <-drainComplete:
-			s.Logger.Infof("All in-progress operations complete, shutting down")
+			s.CtxLogger.Info("All in-progress operations complete, shutting down")
 			return
 		case <-ticker.C:
-			s.Logger.Infof("Waiting for in-progress operations to complete, current in-progress ops: %d", s.Drainer.GetStatus().InProgressOps)
+			s.CtxLogger.Info(fmt.Sprintf("Waiting for in-progress operations to complete, current in-progress ops: %d", s.Drainer.GetStatus().InProgressOps))
 		}
 	}
 }
@@ -1163,7 +1160,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	applyCmdLock, err := s.ApplyLocker.CheckApplyLock()
-	s.Logger.Infof("Apply Lock: %v", applyCmdLock)
+	s.CtxLogger.Info(fmt.Sprintf("Apply Lock: %v", applyCmdLock))
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err)
@@ -1185,7 +1182,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		CleanedBasePath: s.AtlantisURL.Path,
 	})
 	if err != nil {
-		s.Logger.Errorf(err.Error())
+		s.CtxLogger.Error(err.Error())
 	}
 }
 

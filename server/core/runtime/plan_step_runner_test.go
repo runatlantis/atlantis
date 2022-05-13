@@ -34,7 +34,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.8")
 
 	workspace := "default"
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
 		Log:                logger,
@@ -120,7 +120,7 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 
 	ctx := context.Background()
 	tfVersion, _ := version.NewVersion("0.8")
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	workspace := "notdefault"
 	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
@@ -170,7 +170,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 			terraform := mocks.NewMockClient()
 
 			tfVersion, _ := version.NewVersion(c.tfVersion)
-			logger := logging.NewNoopLogger(t)
+			logger := logging.NewNoopCtxLogger(t)
 			ctx := context.Background()
 			prjCtx := command.ProjectContext{
 				Log:                logger,
@@ -269,7 +269,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 		t.Run(c.tfVersion, func(t *testing.T) {
 			terraform := mocks.NewMockClient()
 			tfVersion, _ := version.NewVersion(c.tfVersion)
-			logger := logging.NewNoopLogger(t)
+			logger := logging.NewNoopCtxLogger(t)
 			ctx := context.Background()
 			prjCtx := command.ProjectContext{
 				Log:                logger,
@@ -346,7 +346,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.10.0")
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
 		Log:                logger,
@@ -424,7 +424,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 
 	// Using version >= 0.10 here so we don't expect any env commands.
 	tfVersion, _ := version.NewVersion("0.10.0")
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
@@ -490,7 +490,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.10.0")
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
@@ -762,7 +762,7 @@ locally at this time.
 	for name, remoteOpsErr := range cases {
 		t.Run(name, func(t *testing.T) {
 
-			logger := logging.NewNoopLogger(t)
+			logger := logging.NewNoopCtxLogger(t)
 			// Now that mocking is set up, we're ready to run the plan.
 			ctx := context.Background()
 			prjCtx := command.ProjectContext{

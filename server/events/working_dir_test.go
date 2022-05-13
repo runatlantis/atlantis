@@ -41,7 +41,7 @@ func TestClone_NoneExisting(t *testing.T) {
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 
-	cloneDir, _, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
@@ -91,7 +91,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
@@ -140,7 +140,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	_, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	_, hasDiverged, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
@@ -152,7 +152,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
@@ -190,7 +190,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	_, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	_, hasDiverged, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
@@ -202,7 +202,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
@@ -245,7 +245,7 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	_, _, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	_, _, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
@@ -276,7 +276,7 @@ func TestClone_NoReclone(t *testing.T) {
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
-	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
@@ -312,7 +312,7 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
-	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		HeadCommit: expCommit,
@@ -378,7 +378,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 		DataDir:       repoDir,
 		CheckoutMerge: true,
 	}
-	_, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{CloneURL: repoDir}, models.PullRequest{
+	_, hasDiverged, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{CloneURL: repoDir}, models.PullRequest{
 		BaseRepo:   models.Repo{CloneURL: repoDir},
 		HeadBranch: "second-pr",
 		BaseBranch: "master",
@@ -389,7 +389,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	// Run it again but without the checkout merge strategy. It should return
 	// false.
 	wd.CheckoutMerge = false
-	_, hasDiverged, err = wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	_, hasDiverged, err = wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "second-pr",
 		BaseBranch: "master",
@@ -452,13 +452,13 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 		DataDir:       repoDir,
 		CheckoutMerge: true,
 	}
-	hasDiverged := wd.HasDiverged(logging.NewNoopLogger(t), repoDir+"/repos/0/default")
+	hasDiverged := wd.HasDiverged(logging.NewNoopCtxLogger(t), repoDir+"/repos/0/default")
 	Equals(t, hasDiverged, true)
 
 	// Run it again but without the checkout merge strategy. It should return
 	// false.
 	wd.CheckoutMerge = false
-	hasDiverged = wd.HasDiverged(logging.NewNoopLogger(t), repoDir+"/repos/0/default")
+	hasDiverged = wd.HasDiverged(logging.NewNoopCtxLogger(t), repoDir+"/repos/0/default")
 	Equals(t, hasDiverged, false)
 }
 

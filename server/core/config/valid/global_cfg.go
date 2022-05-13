@@ -233,7 +233,7 @@ func (g GlobalCfg) PlatformModeEnabled() bool {
 
 // MergeProjectCfg merges proj and rCfg with the global config to return a
 // final config. It assumes that all configs have been validated.
-func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
+func (g GlobalCfg) MergeProjectCfg(log logging.Logger, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
 	var applyReqs []string
 	var workflow Workflow
 	var pullRequestWorkflow Workflow
@@ -311,7 +311,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 
 // DefaultProjCfg returns the default project config for all projects under the
 // repo with id repoID. It is used when there is no repo config.
-func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
+func (g GlobalCfg) DefaultProjCfg(log logging.Logger, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
 	repo := g.foldMatchingRepos(repoID)
 
 	mrgPrj := MergedProjectCfg{

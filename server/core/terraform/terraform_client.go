@@ -47,7 +47,7 @@ type Client interface {
 	RunCommandWithVersion(ctx context.Context, prjCtx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
-	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
+	EnsureVersion(log logging.Logger, v *version.Version) error
 }
 
 type DefaultClient struct {
@@ -84,7 +84,6 @@ var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
 // NewClientWithDefaultVersion creates a new terraform client and pre-fetches the default version
 func NewClientWithVersionCache(
-	log logging.SimpleLogging,
 	binDir string,
 	cacheDir string,
 	defaultVersionStr string,
@@ -152,7 +151,6 @@ func NewE2ETestClient(
 ) (*DefaultClient, error) {
 	versionCache := cache.NewLocalBinaryCache("terraform")
 	return NewClientWithVersionCache(
-		log,
 		binDir,
 		cacheDir,
 		defaultVersionStr,
@@ -167,7 +165,6 @@ func NewE2ETestClient(
 }
 
 func NewClient(
-	log logging.SimpleLogging,
 	binDir string,
 	cacheDir string,
 	defaultVersionStr string,
@@ -189,7 +186,6 @@ func NewClient(
 		loader.loadVersion,
 	)
 	return NewClientWithVersionCache(
-		log,
 		binDir,
 		cacheDir,
 		defaultVersionStr,
@@ -214,7 +210,7 @@ func (c *DefaultClient) TerraformBinDir() string {
 	return c.binDir
 }
 
-func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Version) error {
+func (c *DefaultClient) EnsureVersion(log logging.Logger, v *version.Version) error {
 	if v == nil {
 		v = c.defaultVersion
 	}
@@ -263,10 +259,10 @@ func (c *DefaultClient) RunCommandWithVersion(ctx context.Context, prjCtx comman
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", cmd.String(), path)
-		prjCtx.Log.Errorf(err.Error())
+		prjCtx.Log.Error(err.Error())
 		return ansi.Strip(string(out)), err
 	}
-	prjCtx.Log.Infof("successfully ran %q in %q", cmd.String(), path)
+	prjCtx.Log.Info(fmt.Sprintf("successfully ran %q in %q", cmd.String(), path))
 
 	return ansi.Strip(string(out)), nil
 }

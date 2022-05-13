@@ -211,7 +211,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			allowlist, err := events.NewRepoAllowlistChecker("*")
 			Ok(t, err)
 			logger := logging.NewNoopLogger(t)
-			scope, _, _ := metrics.NewLoggingScope(logger, "null")
+			scope, _, _ := metrics.NewLoggingScope(logging.NewNoopCtxLogger(t), "null")
 			ec := &events_controllers.VCSEventsController{
 				Parser: &events.EventParser{
 					BitbucketUser:      "bb-user",
@@ -303,7 +303,7 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope, _, _ := metrics.NewLoggingScope(logging.NewNoopCtxLogger(t), "null")
 	e := events_controllers.VCSEventsController{
 
 		Logger:                       logger,

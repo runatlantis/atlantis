@@ -14,7 +14,6 @@ import (
 func NewAsynchronousAutoplannerWorkerProxy(
 	autoplanValidator EventValidator,
 	logger logging.Logger,
-	legacyLogger logging.SimpleLogging,
 	workerProxy *PullEventWorkerProxy,
 ) *AsyncAutoplannerWorkerProxy {
 	return &AsyncAutoplannerWorkerProxy{
@@ -22,14 +21,13 @@ func NewAsynchronousAutoplannerWorkerProxy(
 			autoplanValidator: autoplanValidator,
 			workerProxy:       workerProxy,
 			logger:            logger,
-			legacyLogger:      legacyLogger,
 		},
 		logger: logger,
 	}
 }
 
 type EventValidator interface {
-	InstrumentedIsValid(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) bool
+	InstrumentedIsValid(ctx context.Context, logger logging.Logger, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) bool
 }
 
 type Writer interface {
@@ -56,12 +54,12 @@ type SynchronousAutoplannerWorkerProxy struct {
 	autoplanValidator EventValidator
 	workerProxy       *PullEventWorkerProxy
 	logger            logging.Logger
-	legacyLogger      logging.SimpleLogging
 }
 
 func (p *SynchronousAutoplannerWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, event event.PullRequest) error {
 	if ok := p.autoplanValidator.InstrumentedIsValid(
-		p.legacyLogger,
+		ctx,
+		p.logger,
 		event.Pull.BaseRepo,
 		event.Pull.HeadRepo,
 		event.Pull,

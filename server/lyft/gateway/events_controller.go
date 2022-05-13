@@ -19,7 +19,6 @@ import (
 const githubHeader = "X-Github-Event"
 
 func NewVCSEventsController(
-	legacyLogger logging.SimpleLogging,
 	scope tally.Scope,
 	webhookSecret []byte,
 	allowDraftPRs bool,
@@ -39,7 +38,7 @@ func NewVCSEventsController(
 	)
 
 	asyncAutoplannerWorkerProxy := gateway_handlers.NewAsynchronousAutoplannerWorkerProxy(
-		autoplanValidator, logger, legacyLogger, pullEventWorkerProxy,
+		autoplanValidator, logger, pullEventWorkerProxy,
 	)
 
 	prHandler := handlers.NewPullRequestEventWithEventTypeHandlers(

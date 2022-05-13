@@ -35,7 +35,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 
 		RegisterMockTestingT(t)
 
-		logger := logging.NewNoopLogger(t)
+		logger := logging.NewNoopCtxLogger(t)
 
 		r := runtime.DefaultPreWorkflowHookRunner{}
 		t.Run(c.Command, func(t *testing.T) {

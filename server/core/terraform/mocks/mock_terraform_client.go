@@ -47,7 +47,7 @@ func (mock *MockClient) RunCommandWithVersion(ctx context.Context, prjCtx comman
 	return ret0, ret1
 }
 
-func (mock *MockClient) EnsureVersion(log logging.SimpleLogging, v *go_version.Version) error {
+func (mock *MockClient) EnsureVersion(log logging.Logger, v *go_version.Version) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
@@ -69,14 +69,14 @@ func (mock *MockClient) VerifyWasCalledOnce() *VerifierMockClient {
 	}
 }
 
-func (mock *MockClient) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockClient {
+func (mock *MockClient) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockClient {
+func (mock *MockClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -84,7 +84,7 @@ func (mock *MockClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.M
 	}
 }
 
-func (mock *MockClient) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockClient {
+func (mock *MockClient) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -94,7 +94,7 @@ func (mock *MockClient) VerifyWasCalledEventually(invocationCountMatcher pegomoc
 
 type VerifierMockClient struct {
 	mock                   *MockClient
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -150,7 +150,7 @@ func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArg
 	return
 }
 
-func (verifier *VerifierMockClient) EnsureVersion(log logging.SimpleLogging, v *go_version.Version) *MockClient_EnsureVersion_OngoingVerification {
+func (verifier *VerifierMockClient) EnsureVersion(log logging.Logger, v *go_version.Version) *MockClient_EnsureVersion_OngoingVerification {
 	params := []pegomock.Param{log, v}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "EnsureVersion", params, verifier.timeout)
 	return &MockClient_EnsureVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -161,17 +161,17 @@ type MockClient_EnsureVersion_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockClient_EnsureVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, *go_version.Version) {
+func (c *MockClient_EnsureVersion_OngoingVerification) GetCapturedArguments() (logging.Logger, *go_version.Version) {
 	log, v := c.GetAllCapturedArguments()
 	return log[len(log)-1], v[len(v)-1]
 }
 
-func (c *MockClient_EnsureVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []*go_version.Version) {
+func (c *MockClient_EnsureVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.Logger, _param1 []*go_version.Version) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+		_param0 = make([]logging.Logger, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(logging.SimpleLogging)
+			_param0[u] = param.(logging.Logger)
 		}
 		_param1 = make([]*go_version.Version, len(c.methodInvocations))
 		for u, param := range params[1] {

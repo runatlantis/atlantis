@@ -31,7 +31,7 @@ type Context struct {
 	Scope    tally.Scope
 	// User is the user that triggered this command.
 	User models.User
-	Log  logging.SimpleLogging
+	Log  logging.Logger
 
 	// Current PR state
 	PullRequestStatus models.PullReqStatus

@@ -23,7 +23,7 @@ var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 
 func TestFeatureAllocatorRunner(t *testing.T) {
 	featureAllocator := featureMocks.NewMockAllocator()
-	testLogger := logging.NewNoopLogger(t)
+	testLogger := logging.NewNoopCtxLogger(t)
 	// platformModeRunner := plan.NewRunner(vcsClient)
 	cases := []struct {
 		description         string

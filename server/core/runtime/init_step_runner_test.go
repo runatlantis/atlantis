@@ -49,7 +49,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 		t.Run(c.version, func(t *testing.T) {
 			terraform := mocks.NewMockClient()
 
-			logger := logging.NewNoopLogger(t)
+			logger := logging.NewNoopCtxLogger(t)
 			ctx := context.Background()
 			prjCtx := command.ProjectContext{
 				Workspace:  "workspace",
@@ -84,7 +84,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 	// If there was an error during init then we want the output to be returned.
 	RegisterMockTestingT(t)
 	tfClient := mocks.NewMockClient()
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	When(tfClient.RunCommandWithVersion(matchers.AnyContextContext(), matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", errors.New("error"))
 
@@ -116,7 +116,7 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 	runCmd(t, repoDir, "git", "add", ".terraform.lock.hcl")
 	runCmd(t, repoDir, "git", "commit", "-m", "add .terraform.lock.hcl")
 
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	prjCtx := command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
@@ -154,7 +154,7 @@ func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
 		Workspace:  "workspace",
@@ -189,7 +189,7 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
 
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
 		Workspace:  "workspace",
@@ -257,7 +257,7 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 		t.Run(c.description, func(t *testing.T) {
 			terraform := mocks.NewMockClient()
 
-			logger := logging.NewNoopLogger(t)
+			logger := logging.NewNoopCtxLogger(t)
 			ctx := context.Background()
 			prjCtx := command.ProjectContext{
 				Workspace:  "workspace",
@@ -295,7 +295,7 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
 
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 
 	tfVersion, _ := version.NewVersion("0.14.0")
 	ctx := context.Background()

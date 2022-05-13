@@ -61,7 +61,7 @@ func TestAuditProjectCommandsWrapper(t *testing.T) {
 				prjRslt.Failure = "oh-no"
 			}
 
-			logger := logging.NewNoopLogger(t)
+			logger := logging.NewNoopCtxLogger(t)
 
 			scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 

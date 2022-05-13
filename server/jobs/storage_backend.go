@@ -26,7 +26,7 @@ type StorageBackend interface {
 	Write(key string, logs []string, fullRepoName string) (bool, error)
 }
 
-func NewStorageBackend(jobs valid.Jobs, logger logging.SimpleLogging, featureAllocator feature.Allocator, scope tally.Scope) (StorageBackend, error) {
+func NewStorageBackend(jobs valid.Jobs, logger logging.Logger, featureAllocator feature.Allocator, scope tally.Scope) (StorageBackend, error) {
 
 	if jobs.StorageBackend == nil {
 		return &NoopStorageBackend{}, nil
@@ -62,7 +62,7 @@ func NewStorageBackend(jobs valid.Jobs, logger logging.SimpleLogging, featureAll
 
 type storageBackend struct {
 	location      stow.Location
-	logger        logging.SimpleLogging
+	logger        logging.Logger
 	containerName string
 }
 
@@ -108,7 +108,7 @@ func (s *storageBackend) Read(key string) (logs []string, err error) {
 		return stow.Walk(container, key, PageSize, readContainerFn)
 	}
 
-	s.logger.Infof("reading object for job: %s in container: %s", key, s.containerName)
+	s.logger.Info(fmt.Sprintf("reading object for job: %s in container: %s", key, s.containerName))
 	err = stow.WalkContainers(s.location, s.containerName, PageSize, readLocationFn)
 	return
 }
@@ -139,11 +139,11 @@ func (s *storageBackend) Write(key string, logs []string, _ string) (bool, error
 			return errors.Wrapf(err, "uploading object for job: %s", key)
 		}
 
-		s.logger.Infof("successfully uploaded object for job: %s", key)
+		s.logger.Info(fmt.Sprintf("successfully uploaded object for job: %s", key))
 		return nil
 	}
 
-	s.logger.Infof("uploading object for job: %s to container: %s", key, s.containerName)
+	s.logger.Info(fmt.Sprintf("uploading object for job: %s to container: %s", key, s.containerName))
 	err := stow.WalkContainers(s.location, s.containerName, PageSize, writeFn)
 	if err != nil {
 		return false, err
@@ -185,13 +185,13 @@ type FeatureAwareStorageBackend struct {
 	StorageBackend
 
 	FeatureAllocator feature.Allocator
-	Logger           logging.SimpleLogging
+	Logger           logging.Logger
 }
 
 func (f *FeatureAwareStorageBackend) Read(key string) ([]string, error) {
 	shouldAllocate, err := f.FeatureAllocator.ShouldAllocate(feature.LogPersistence, "")
 	if err != nil {
-		f.Logger.Errorf("unable to allocate for feature: %s, error: %s", feature.LogPersistence, err)
+		f.Logger.Error(fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.LogPersistence, err))
 	}
 
 	if shouldAllocate {
@@ -203,7 +203,7 @@ func (f *FeatureAwareStorageBackend) Read(key string) ([]string, error) {
 func (f *FeatureAwareStorageBackend) Write(key string, logs []string, fullRepoName string) (bool, error) {
 	shouldAllocate, err := f.FeatureAllocator.ShouldAllocate(feature.LogPersistence, fullRepoName)
 	if err != nil {
-		f.Logger.Errorf("unable to allocate for feature: %s, error: %s", feature.LogPersistence, err)
+		f.Logger.Error(fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.LogPersistence, err))
 	}
 
 	if shouldAllocate {

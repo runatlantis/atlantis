@@ -18,7 +18,7 @@ import (
 
 func TestRun(t *testing.T) {
 	RegisterMockTestingT(t)
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	workspace := "default"
 	v, _ := version.NewVersion("1.0")
 	workdir := "/path"

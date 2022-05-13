@@ -143,12 +143,13 @@ func (h *Handler) handleGithubCommentEvent(ctx context.Context, event *github.Is
 	}
 
 	commentEvent, err := h.commentEventConverter.Convert(event)
-
 	if err != nil {
 		return &errors.EventParsingError{Err: err}
 	}
+	ctxWithRepo := context.WithValue(ctx, logging.RepositoryKey, commentEvent.BaseRepo.FullName)
+	ctxWithPull := context.WithValue(ctxWithRepo, logging.PullNumKey, commentEvent.PullNum)
 
-	return h.commentHandler.Handle(ctx, request, commentEvent)
+	return h.commentHandler.Handle(ctxWithPull, request, commentEvent)
 }
 
 func (h *Handler) handleGithubPullRequestEvent(ctx context.Context, event *github.PullRequestEvent, request *http.BufferedRequest) error {
@@ -157,6 +158,9 @@ func (h *Handler) handleGithubPullRequestEvent(ctx context.Context, event *githu
 	if err != nil {
 		return &errors.EventParsingError{Err: err}
 	}
+	ctxWithRepo := context.WithValue(ctx, logging.RepositoryKey, pullEvent.Pull.BaseRepo.FullName)
+	ctxWithPull := context.WithValue(ctxWithRepo, logging.PullNumKey, pullEvent.Pull.Num)
+	ctxWithSha := context.WithValue(ctxWithPull, logging.SHAKey, pullEvent.Pull.HeadCommit)
 
-	return h.prHandler.Handle(ctx, request, pullEvent)
+	return h.prHandler.Handle(ctxWithSha, request, pullEvent)
 }

@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -18,7 +19,7 @@ type DeleteLockCommand interface {
 // DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
 type DefaultDeleteLockCommand struct {
 	Locker           locking.Locker
-	Logger           logging.SimpleLogging
+	Logger           logging.Logger
 	WorkingDir       WorkingDir
 	WorkingDirLocker WorkingDirLocker
 	DB               *db.BoltDB
@@ -66,15 +67,15 @@ func (l *DefaultDeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
 	}
 	unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace)
 	if err != nil {
-		l.Logger.Errorf("unable to obtain working dir lock when trying to delete old plans: %s", err)
+		l.Logger.Error(fmt.Sprintf("unable to obtain working dir lock when trying to delete old plans: %s", err))
 	} else {
 		defer unlock()
 		// nolint: vetshadow
 		if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
-			l.Logger.Errorf("unable to delete workspace: %s", err)
+			l.Logger.Error(fmt.Sprintf("unable to delete workspace: %s", err))
 		}
 	}
 	if err := l.DB.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
-		l.Logger.Errorf("unable to delete project status: %s", err)
+		l.Logger.Error(fmt.Sprintf("unable to delete project status: %s", err))
 	}
 }

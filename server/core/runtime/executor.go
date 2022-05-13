@@ -23,5 +23,5 @@ type Executor interface {
 
 // ExecutorVersionEnsurer ensures a given version exists and outputs a path to the executable
 type ExecutorVersionEnsurer interface {
-	EnsureExecutorVersion(log logging.SimpleLogging, v *version.Version) (string, error)
+	EnsureExecutorVersion(log logging.Logger, v *version.Version) (string, error)
 }

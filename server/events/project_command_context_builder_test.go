@@ -39,7 +39,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 	}
 
 	commandCtx := &command.Context{
-		Log:        logging.NewNoopLogger(t),
+		Log:        logging.NewNoopCtxLogger(t),
 		PullStatus: pullStatus,
 		Scope:      scope,
 	}

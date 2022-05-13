@@ -2,6 +2,7 @@ package scheduled
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
@@ -20,7 +21,7 @@ import (
 )
 
 type ExecutorService struct {
-	log logging.SimpleLogging
+	log logging.Logger
 
 	// jobs
 	garbageCollector      JobDefinition
@@ -31,7 +32,7 @@ type ExecutorService struct {
 func NewExecutorService(
 	workingDirIterator events.WorkDirIterator,
 	statsScope tally.Scope,
-	log logging.SimpleLogging,
+	log logging.Logger,
 	closedPullCleaner events.PullCleaner,
 	openPullCleaner events.PullCleaner,
 	githubClient *vcs.GithubClient,
@@ -86,7 +87,7 @@ type JobDefinition struct {
 }
 
 func (s *ExecutorService) Run() {
-	s.log.Infof("Scheduled Executor Service started")
+	s.log.Info("Scheduled Executor Service started")
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -103,12 +104,12 @@ func (s *ExecutorService) Run() {
 
 	<-interrupt
 
-	s.log.Warnf("Received interrupt. Attempting to Shut down scheduled executor service")
+	s.log.Warn("Received interrupt. Attempting to Shut down scheduled executor service")
 
 	cancel()
 	wg.Wait()
 
-	s.log.Warnf("All jobs completed, exiting.")
+	s.log.Warn("All jobs completed, exiting.")
 }
 
 func (s *ExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGroup, jd JobDefinition) {
@@ -123,14 +124,14 @@ func (s *ExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGrou
 		// Keep the recovery outside the select to ensure that we don't infinitely panic.
 		defer func() {
 			if r := recover(); r != nil {
-				s.log.Errorf("Recovered from panic: %v", r)
+				s.log.Error(fmt.Sprintf("Recovered from panic: %v", r))
 			}
 		}()
 
 		for {
 			select {
 			case <-ctx.Done():
-				s.log.Warnf("Received interrupt, cancelling job")
+				s.log.Warn(fmt.Sprintf("Received interrupt, cancelling job"))
 				return
 			case <-ticker.C:
 				jd.Job.Run()
@@ -145,7 +146,7 @@ type Job interface {
 }
 
 type RateLimitStatsPublisher struct {
-	log    logging.SimpleLogging
+	log    logging.Logger
 	stats  tally.Scope
 	client *vcs.GithubClient
 }
@@ -197,7 +198,7 @@ func (t *GCStalePullTemplate) Execute(wr io.Writer, data interface{}) error {
 type GarbageCollector struct {
 	workingDirIterator events.WorkDirIterator
 	stats              tally.Scope
-	log                logging.SimpleLogging
+	log                logging.Logger
 	closedPullCleaner  events.PullCleaner
 	openPullCleaner    events.PullCleaner
 }
@@ -208,7 +209,7 @@ func (g *GarbageCollector) Run() {
 	pulls, err := g.workingDirIterator.ListCurrentWorkingDirPulls()
 
 	if err != nil {
-		g.log.Errorf("error listing pulls %s", err)
+		g.log.Error(fmt.Sprintf("error listing pulls %s", err))
 		errCounter.Inc(1)
 	}
 
@@ -223,20 +224,25 @@ func (g *GarbageCollector) Run() {
 	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
 
 	for _, pull := range pulls {
-		logger := g.log.With(fmtLogSrc(pull.BaseRepo, pull.Num)...)
-
 		if pull.State == models.OpenPullState {
 			openPullsCounter.Inc(1)
 
 			if pull.UpdatedAt.Before(thirtyDaysAgo) {
 				updatedthirtyDaysAgoOpenPullsCounter.Inc(1)
 
-				logger.Warnf("Pull hasn't been updated for more than 30 days.")
+				g.log.Warn("Pull hasn't been updated for more than 30 days.", map[string]interface{}{
+					"repository": pull.BaseRepo.FullName,
+					"pull-num":   strconv.Itoa(pull.Num),
+				})
 
 				err := g.openPullCleaner.CleanUpPull(pull.BaseRepo, pull)
 
 				if err != nil {
-					logger.Errorf("Error cleaning up open pulls that haven't been updated in 30 days %s", err)
+					g.log.Error("Error cleaning up open pulls that haven't been updated in 30 days", map[string]interface{}{
+						"repository": pull.BaseRepo.FullName,
+						"pull-num":   strconv.Itoa(pull.Num),
+						"err":        err,
+					})
 					errCounter.Inc(1)
 					return
 				}
@@ -252,23 +258,22 @@ func (g *GarbageCollector) Run() {
 		if pull.ClosedAt.Before(fiveMinutesAgo) {
 			fiveMinutesAgoClosedPullsCounter.Inc(1)
 
-			logger.Warnf("Pull closed for more than 5 minutes but data still on disk")
+			g.log.Warn("Pull closed for more than 5 minutes but data still on disk", map[string]interface{}{
+				"repository": pull.BaseRepo.FullName,
+				"pull-num":   strconv.Itoa(pull.Num),
+			})
 
 			err := g.closedPullCleaner.CleanUpPull(pull.BaseRepo, pull)
 
 			if err != nil {
-				logger.Errorf("Error cleaning up 5 minutes old closed pulls %s", err)
+				g.log.Error("Error cleaning up 5 minutes old closed pulls", map[string]interface{}{
+					"repository": pull.BaseRepo.FullName,
+					"pull-num":   strconv.Itoa(pull.Num),
+					"err":        err,
+				})
 				errCounter.Inc(1)
 				return
 			}
 		}
-	}
-}
-
-// taken from other parts of the code, would be great to have this in a shared spot
-func fmtLogSrc(repo models.Repo, pullNum int) []interface{} {
-	return []interface{}{
-		"repository", repo.FullName,
-		"pull-num", strconv.Itoa(pullNum),
 	}
 }

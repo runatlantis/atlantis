@@ -34,7 +34,6 @@ import (
 // Test that if terraform is not in PATH and we didn't set the default-tf flag
 // that we error.
 func TestNewClient_NoTF(t *testing.T) {
-	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	defer cleanup()
@@ -43,7 +42,7 @@ func TestNewClient_NoTF(t *testing.T) {
 	defer tempSetEnv(t, "PATH", tmp)()
 
 	allocator := fmocks.NewMockAllocator()
-	_, err := terraform.NewClient(logger, binDir, cacheDir, "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
+	_, err := terraform.NewClient(binDir, cacheDir, "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
 	ErrEquals(t, "getting default version: terraform not found in $PATH. Set --default-tf-version or download terraform from https://www.terraform.io/downloads.html", err)
 }
 
@@ -51,12 +50,11 @@ func TestNewClient_NoTF(t *testing.T) {
 // that we use it.
 func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 	fakeBinOut := "Terraform v0.11.10\n"
-	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log:        logging.NewNoopLogger(t),
+		Log:        logging.NewNoopCtxLogger(t),
 		Workspace:  "default",
 		RepoRelDir: ".",
 		BaseRepo:   models.Repo{FullName: "owner/repo"},
@@ -71,7 +69,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 
 	allocator := fmocks.NewMockAllocator()
 
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
+	c, err := terraform.NewClient(binDir, cacheDir, "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -90,7 +88,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log:        logging.NewNoopLogger(t),
+		Log:        logging.NewNoopCtxLogger(t),
 		Workspace:  "default",
 		RepoRelDir: ".",
 		BaseRepo:   models.Repo{FullName: "owner/repo"},
@@ -104,7 +102,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 
 	allocator := fmocks.NewMockAllocator()
 
-	c, err := terraform.NewClient(logging.NewNoopLogger(t), binDir, cacheDir, "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
+	c, err := terraform.NewClient(binDir, cacheDir, "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -117,13 +115,12 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 
 // Test that we get an error if the terraform version flag is malformed.
 func TestNewClient_BadVersion(t *testing.T) {
-	logger := logging.NewNoopLogger(t)
 	_, binDir, cacheDir, cleanup := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	defer cleanup()
 	allocator := fmocks.NewMockAllocator()
 
-	_, err := terraform.NewClient(logger, binDir, cacheDir, "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
+	_, err := terraform.NewClient(binDir, cacheDir, "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
 	ErrEquals(t, "getting default version: parsing version malformed: Malformed version: malformed", err)
 }
 

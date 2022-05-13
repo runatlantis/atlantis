@@ -18,7 +18,7 @@ import (
 )
 
 func createTestProjectCmdContext(t *testing.T) command.ProjectContext {
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	return command.ProjectContext{
 		BaseRepo: models.Repo{
 			Name:  "test-repo",
@@ -47,7 +47,7 @@ func createTestProjectCmdContext(t *testing.T) command.ProjectContext {
 }
 
 func createProjectCommandOutputHandler(t *testing.T) (jobs.ProjectCommandOutputHandler, *mocks.MockJobStore) {
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	prjCmdOutputChan := make(chan *jobs.ProjectCmdOutputLine)
 	jobStore := mocks.NewMockJobStore()
 	prjCmdOutputHandler := jobs.NewAsyncProjectCommandOutputHandler(

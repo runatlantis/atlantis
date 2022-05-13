@@ -58,14 +58,14 @@ type Allocator interface {
 // at the time of writing, go-feature-flag is primarily used as the backend for this allocator:
 // https://thomaspoignant.github.io/go-feature-flag/
 type PercentageBasedAllocator struct {
-	logger logging.SimpleLogging
+	logger logging.Logger
 }
 
-func NewGHSourcedAllocator(repoConfig RepoConfig, githubClient vcs.IGithubClient, logger logging.SimpleLogging) (Allocator, error) {
+func NewGHSourcedAllocator(repoConfig RepoConfig, githubClient vcs.IGithubClient, logger logging.Logger) (Allocator, error) {
 
 	// default to local config if no github client is provided.
 	if githubClient == nil {
-		logger.Warnf("no github client provided, defaulting to local config for feature allocation.")
+		logger.Warn("no github client provided, defaulting to local config for feature allocation.")
 		return NoopAllocator{}, nil
 	}
 
@@ -88,7 +88,7 @@ func NewGHSourcedAllocator(repoConfig RepoConfig, githubClient vcs.IGithubClient
 // This is used for e2e testing.  This should reflect the configuration we intend to test.
 //
 // External configuration shouldn't be dialed up to 100 unless we've tested that scenario here.
-func NewStringSourcedAllocator(logger logging.SimpleLogging) (Allocator, error) {
+func NewStringSourcedAllocator(logger logging.Logger) (Allocator, error) {
 	err := ffclient.Init(
 		ffclient.Config{
 			Context:   context.Background(),

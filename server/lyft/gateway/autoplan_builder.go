@@ -2,8 +2,7 @@ package gateway
 
 import (
 	"context"
-	"strconv"
-
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
@@ -32,59 +31,50 @@ type AutoplanValidator struct {
 
 const DefaultWorkspace = "default"
 
-func (r *AutoplanValidator) createLogger(logger logging.SimpleLogging, repoName string, pullNum int) logging.SimpleLogging {
-	return logger.With(
-		"repository", repoName,
-		"pull-num", strconv.Itoa(pullNum),
-	)
-}
-
-func (r *AutoplanValidator) isValid(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) (bool, error) {
+func (r *AutoplanValidator) isValid(ctx context.Context, logger logging.Logger, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) (bool, error) {
 	if opStarted := r.Drainer.StartOp(); !opStarted {
 		return false, errors.New("atlantis is shutting down, cannot process current event")
 	}
 	defer r.Drainer.OpDone()
+	defer r.logPanics(ctx, logger)
 
-	log := r.createLogger(logger, baseRepo.FullName, pull.Num)
-	defer r.logPanics(log)
-
-	ctx := &command.Context{
+	cmdCtx := &command.Context{
 		User:     user,
-		Log:      log,
+		Log:      logger,
 		Scope:    r.Scope,
 		Pull:     pull,
 		HeadRepo: headRepo,
 		Trigger:  command.AutoTrigger,
 	}
-	if !r.validateCtxAndComment(ctx) {
+	if !r.validateCtxAndComment(cmdCtx, ctx) {
 		return false, errors.New("invalid command context")
 	}
-	err := r.PreWorkflowHooksCommandRunner.RunPreHooks(context.TODO(), ctx)
+	err := r.PreWorkflowHooksCommandRunner.RunPreHooks(context.TODO(), cmdCtx)
 	if err != nil {
-		ctx.Log.Errorf("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
+		cmdCtx.Log.ErrorContext(ctx, fmt.Sprintf("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan))
 	}
 
-	projectCmds, err := r.PrjCmdBuilder.BuildAutoplanCommands(ctx)
+	projectCmds, err := r.PrjCmdBuilder.BuildAutoplanCommands(cmdCtx)
 	if err != nil {
 		if statusErr := r.CommitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
-			ctx.Log.Warnf("unable to update commit status: %w", statusErr)
+			cmdCtx.Log.WarnContext(ctx, fmt.Sprintf("unable to update commit status: %v", statusErr))
 		}
 		// If error happened after clone was made, we should clean it up here too
 		unlockFn, lockErr := r.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
 		if lockErr != nil {
-			ctx.Log.Warnf("workspace was locked")
+			cmdCtx.Log.WarnContext(ctx, "workspace was locked")
 			return false, errors.Wrap(err, lockErr.Error())
 		}
 		defer unlockFn()
 		if cloneErr := r.WorkingDir.Delete(baseRepo, pull); cloneErr != nil {
-			ctx.Log.With("err", cloneErr).Warnf("unable to delete clone after autoplan failed")
+			cmdCtx.Log.WarnContext(ctx, "unable to delete clone after autoplan failed", map[string]interface{}{"err": cloneErr})
 		}
-		r.PullUpdater.UpdatePull(ctx, events.AutoplanCommand{}, command.Result{Error: err})
+		r.PullUpdater.UpdatePull(cmdCtx, events.AutoplanCommand{}, command.Result{Error: err})
 		return false, errors.Wrap(err, "Failed building autoplan commands")
 	}
 	unlockFn, err := r.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
 	if err != nil {
-		ctx.Log.Warnf("workspace was locked")
+		cmdCtx.Log.WarnContext(ctx, "workspace was locked")
 		return false, err
 	}
 	defer unlockFn()
@@ -93,10 +83,10 @@ func (r *AutoplanValidator) isValid(logger logging.SimpleLogging, baseRepo model
 		return false, errors.Wrap(err, "Failed deleting cloned repo")
 	}
 	if len(projectCmds) == 0 {
-		ctx.Log.Infof("no modified projects have been found")
+		cmdCtx.Log.InfoContext(ctx, "no modified projects have been found")
 		for _, cmd := range []command.Name{command.Plan, command.Apply, command.PolicyCheck} {
 			if err := r.CommitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, cmd, 0, 0); err != nil {
-				ctx.Log.Warnf("unable to update commit status: %s", err)
+				cmdCtx.Log.WarnContext(ctx, fmt.Sprintf("unable to update commit status: %s", err))
 			}
 		}
 		return false, nil
@@ -104,15 +94,13 @@ func (r *AutoplanValidator) isValid(logger logging.SimpleLogging, baseRepo model
 	return true, nil
 }
 
-func (r *AutoplanValidator) InstrumentedIsValid(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) bool {
+func (r *AutoplanValidator) InstrumentedIsValid(ctx context.Context, logger logging.Logger, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) bool {
 	timer := r.Scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
-	isValid, err := r.isValid(logger, baseRepo, headRepo, pull, user)
-
-	log := r.createLogger(logger, baseRepo.FullName, pull.Num)
+	isValid, err := r.isValid(ctx, logger, baseRepo, headRepo, pull, user)
 
 	if err != nil {
-		log.Errorf(err.Error())
+		logger.ErrorContext(ctx, err.Error())
 		r.Scope.Counter(metrics.ExecutionErrorMetric).Inc(1)
 		return false
 	}
@@ -124,27 +112,27 @@ func (r *AutoplanValidator) InstrumentedIsValid(logger logging.SimpleLogging, ba
 	return true
 }
 
-func (r *AutoplanValidator) logPanics(logger logging.SimpleLogging) {
+func (r *AutoplanValidator) logPanics(ctx context.Context, logger logging.Logger) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
-		logger.Errorf("PANIC: %s\n%s", err, stack)
+		logger.ErrorContext(ctx, fmt.Sprintf("PANIC: %s\n%s", err, stack))
 	}
 }
 
-func (r *AutoplanValidator) validateCtxAndComment(ctx *command.Context) bool {
-	if ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
-		ctx.Log.Infof("command was run on a fork pull request which is disallowed")
+func (r *AutoplanValidator) validateCtxAndComment(cmdCtx *command.Context, ctx context.Context) bool {
+	if cmdCtx.HeadRepo.Owner != cmdCtx.Pull.BaseRepo.Owner {
+		cmdCtx.Log.InfoContext(ctx, "command was run on a fork pull request which is disallowed")
 		return false
 	}
 
-	if ctx.Pull.State != models.OpenPullState {
-		ctx.Log.Infof("command was run on closed pull request")
+	if cmdCtx.Pull.State != models.OpenPullState {
+		cmdCtx.Log.InfoContext(ctx, "command was run on closed pull request")
 		return false
 	}
 
-	repo := r.GlobalCfg.MatchingRepo(ctx.Pull.BaseRepo.ID())
-	if !repo.BranchMatches(ctx.Pull.BaseBranch) {
-		ctx.Log.Infof("command was run on a pull request which doesn't match base branches")
+	repo := r.GlobalCfg.MatchingRepo(cmdCtx.Pull.BaseRepo.ID())
+	if !repo.BranchMatches(cmdCtx.Pull.BaseBranch) {
+		cmdCtx.Log.InfoContext(ctx, "command was run on a pull request which doesn't match base branches")
 		// just ignore it to allow us to use any git workflows without malicious intentions.
 		return false
 	}

@@ -66,12 +66,12 @@ type AsyncProjectCommandOutputHandler struct {
 
 	// Map to track jobs in a pull request
 	pullToJobMapping sync.Map
-	logger           logging.SimpleLogging
+	logger           logging.Logger
 }
 
 func NewAsyncProjectCommandOutputHandler(
 	projectCmdOutput chan *ProjectCmdOutputLine,
-	logger logging.SimpleLogging,
+	logger logging.Logger,
 	jobStore JobStore,
 ) ProjectCommandOutputHandler {
 	return &AsyncProjectCommandOutputHandler{
@@ -122,7 +122,7 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 		// Append new log to the output buffer for the job
 		err := p.JobStore.AppendOutput(msg.JobID, msg.Line)
 		if err != nil {
-			p.logger.Warnf("appending log: %s for job: %s", msg.Line, msg.JobID, err)
+			p.logger.Warn(fmt.Sprintf("appending log: %s for job: %s: %v", msg.Line, msg.JobID, err))
 		}
 	}
 }
@@ -130,7 +130,7 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 func (p *AsyncProjectCommandOutputHandler) Register(jobID string, connection chan string) {
 	job, err := p.JobStore.Get(jobID)
 	if err != nil || job == nil {
-		p.logger.Errorf(fmt.Sprintf("getting job: %s", jobID), err)
+		p.logger.Error(fmt.Sprintf("getting job: %s, err: %v", jobID, err))
 		return
 	}
 
@@ -155,7 +155,7 @@ func (p *AsyncProjectCommandOutputHandler) CloseJob(jobID string, repo models.Re
 
 	// Update job status and persist to storage if configured
 	if err := p.JobStore.SetJobCompleteStatus(jobID, repo.FullName, Complete); err != nil {
-		p.logger.Errorf("updating jobs status to complete", err)
+		p.logger.Error(fmt.Sprintf("updating jobs status to complete, %v", err))
 	}
 }
 

@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -8,7 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-func NewWriter(log logging.SimpleLogging) *Writer {
+func NewWriter(log logging.Logger) *Writer {
 	upgrader := websocket.Upgrader{}
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	return &Writer{
@@ -21,7 +22,7 @@ type Writer struct {
 	upgrader websocket.Upgrader
 
 	//TODO: Remove dependency on atlantis logger here if we upstream this.
-	log logging.SimpleLogging
+	log logging.Logger
 }
 
 func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan string) error {
@@ -34,14 +35,14 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 	// block on reading our input channel
 	for msg := range input {
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte("\r"+msg+"\n")); err != nil {
-			w.log.Warnf("Failed to write ws message: %s", err)
+			w.log.Warn(fmt.Sprintf("Failed to write ws message: %s", err))
 			return err
 		}
 	}
 
 	// close ws conn after input channel is closed
 	if err = conn.Close(); err != nil {
-		w.log.Warnf("Failed to close ws connection: %s", err)
+		w.log.Warn(fmt.Sprintf("Failed to close ws connection: %s", err))
 	}
 	return nil
 }

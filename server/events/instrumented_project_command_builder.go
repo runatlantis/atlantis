@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -8,7 +9,7 @@ import (
 
 type InstrumentedProjectCommandBuilder struct {
 	ProjectCommandBuilder
-	Logger logging.SimpleLogging
+	Logger logging.Logger
 }
 
 func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, comment *command.Comment) ([]command.ProjectContext, error) {
@@ -24,7 +25,7 @@ func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Cont
 
 	if err != nil {
 		executionError.Inc(1)
-		b.Logger.Errorf("Error building apply commands: %s", err)
+		b.Logger.Error(fmt.Sprintf("Error building apply commands: %s", err))
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -45,7 +46,7 @@ func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.C
 
 	if err != nil {
 		executionError.Inc(1)
-		b.Logger.Errorf("Error building auto plan commands: %s", err)
+		b.Logger.Error(fmt.Sprintf("Error building auto plan commands: %s", err))
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -66,7 +67,7 @@ func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Conte
 
 	if err != nil {
 		executionError.Inc(1)
-		b.Logger.Errorf("Error building plan commands: %s", err)
+		b.Logger.Error(fmt.Sprintf("Error building plan commands: %s", err))
 	} else {
 		executionSuccess.Inc(1)
 	}

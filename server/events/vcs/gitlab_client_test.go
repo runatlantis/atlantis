@@ -57,7 +57,7 @@ func TestNewGitlabClient_BaseURL(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Hostname, func(t *testing.T) {
-			log := logging.NewNoopLogger(t)
+			log := logging.NewNoopCtxLogger(t)
 			client, err := NewGitlabClient(c.Hostname, "token", log)
 			Ok(t, err)
 			Equals(t, c.ExpBaseURL, client.Client.BaseURL().String())

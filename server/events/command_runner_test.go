@@ -71,7 +71,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	vcsClient := vcsmocks.NewMockClient()
 	githubClient := vcsmocks.NewMockIGithubClient()
-	logger = logging.NewNoopLogger(t)
+	logger = logging.NewNoopCtxLogger(t)
 	projectCommandRunner = mocks.NewMockProjectCommandRunner()
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
@@ -173,7 +173,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		VCSClient:                     vcsClient,
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
 		Logger:                        logging.NewNoopCtxLogger(t),
-		LegacyLogger:                  logging.NewNoopLogger(t),
 		GlobalCfg:                     globalCfg,
 		StatsScope:                    scope,
 		Drainer:                       drainer,

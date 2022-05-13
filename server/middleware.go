@@ -20,13 +20,13 @@ import (
 )
 
 // NewRequestLogger creates a RequestLogger.
-func NewRequestLogger(logger logging.SimpleLogging) *RequestLogger {
+func NewRequestLogger(logger logging.Logger) *RequestLogger {
 	return &RequestLogger{logger}
 }
 
 // RequestLogger logs requests and their response codes.
 type RequestLogger struct {
-	logger logging.SimpleLogging
+	logger logging.Logger
 }
 
 // ServeHTTP implements the middleware function. It logs all requests at DEBUG level.

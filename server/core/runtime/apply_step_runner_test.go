@@ -57,7 +57,7 @@ func TestRun_Success(t *testing.T) {
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
 	err := ioutil.WriteFile(planPath, nil, 0600)
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
 		Log:                logger,
@@ -90,7 +90,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	planPath := filepath.Join(tmpDir, "projectname-default.tfplan")
 	err := ioutil.WriteFile(planPath, nil, 0600)
 
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
 		Log:                logger,
@@ -124,7 +124,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	err := ioutil.WriteFile(planPath, nil, 0600)
 	Ok(t, err)
 
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	tfVersion, _ := version.NewVersion("0.11.0")
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
@@ -154,7 +154,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 // Apply ignores the -target flag when used with a planfile so we should give
 // an error if it's being used with -target.
 func TestRun_UsingTarget(t *testing.T) {
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	cases := []struct {
 		commentFlags []string
 		extraArgs    []string
@@ -263,7 +263,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	tfVersion, _ := version.NewVersion("0.11.0")
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log:                logging.NewNoopLogger(t),
+		Log:                logging.NewNoopCtxLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
@@ -326,7 +326,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 
 	ctx := context.Background()
 	output, err := o.Run(ctx, command.ProjectContext{
-		Log:                logging.NewNoopLogger(t),
+		Log:                logging.NewNoopCtxLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},

@@ -26,10 +26,10 @@ type Worker struct {
 	Queue            Queue
 	QueueURL         string
 	MessageProcessor MessageProcessor
-	Logger           logging.SimpleLogging
+	Logger           logging.Logger
 }
 
-func NewGatewaySQSWorker(ctx context.Context, scope tally.Scope, logger logging.SimpleLogging, queueURL string, postHandler VCSPostHandler) (*Worker, error) {
+func NewGatewaySQSWorker(ctx context.Context, scope tally.Scope, logger logging.Logger, queueURL string, postHandler VCSPostHandler) (*Worker, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading aws config for sqs worker")
@@ -63,7 +63,7 @@ func (w *Worker) Work(ctx context.Context) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		w.Logger.Infof("start processing sqs messages")
+		w.Logger.Info("start processing sqs messages")
 		w.processMessage(ctx, messages)
 	}()
 	request := &sqs.ReceiveMessageInput{
@@ -71,7 +71,7 @@ func (w *Worker) Work(ctx context.Context) {
 		MaxNumberOfMessages: 10, //max number of batch-able messages
 		WaitTimeSeconds:     20, //max duration long polling
 	}
-	w.Logger.Infof("start receiving sqs messages")
+	w.Logger.Info("start receiving sqs messages")
 	w.receiveMessages(ctx, messages, request)
 	wg.Wait()
 }
@@ -81,12 +81,12 @@ func (w *Worker) receiveMessages(ctx context.Context, messages chan types.Messag
 		select {
 		case <-ctx.Done():
 			close(messages)
-			w.Logger.Infof("closed sqs messages channel")
+			w.Logger.Info("closed sqs messages channel")
 			return
 		default:
 			response, err := w.Queue.ReceiveMessage(ctx, request)
 			if err != nil {
-				w.Logger.With("err", err).Warnf("unable to receive sqs message")
+				w.Logger.Warn("unable to receive sqs message", map[string]interface{}{"err": err})
 				continue
 			}
 			for _, message := range response.Messages {
@@ -101,7 +101,7 @@ func (w *Worker) processMessage(ctx context.Context, messages chan types.Message
 	for message := range messages {
 		err := w.MessageProcessor.ProcessMessage(message)
 		if err != nil {
-			w.Logger.With("err", err).Errorf("unable to process sqs message")
+			w.Logger.Error("unable to process sqs message", map[string]interface{}{"err": err})
 			continue
 		}
 
@@ -111,7 +111,7 @@ func (w *Worker) processMessage(ctx context.Context, messages chan types.Message
 			ReceiptHandle: message.ReceiptHandle,
 		})
 		if err != nil {
-			w.Logger.With("err", err).Warnf("unable to delete processed sqs message")
+			w.Logger.Warn("unable to delete processed sqs message", map[string]interface{}{"err": err})
 		}
 	}
 }

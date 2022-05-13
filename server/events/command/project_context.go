@@ -107,7 +107,7 @@ type ProjectContext struct {
 	// be the same as BaseRepo.
 	HeadRepo models.Repo
 	// Log is a logger that's been set up for this context.
-	Log logging.SimpleLogging
+	Log logging.Logger
 	// Scope is the scope for reporting stats setup for this context
 	Scope tally.Scope
 	// PullReqStatus holds state about the PR that requires additional computation outside models.PullRequest

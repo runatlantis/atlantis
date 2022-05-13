@@ -16,7 +16,7 @@ import (
 // used for authenticating with git over HTTPS
 // It will create the file in home/.git-credentials
 // If ghAccessToken is true we will look for a line starting with https://x-access-token and ending with gitHostname and replace it.
-func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home string, logger logging.SimpleLogging, ghAccessToken bool) error {
+func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home string, logger logging.Logger, ghAccessToken bool) error {
 	const credsFilename = ".git-credentials"
 	credsFile := filepath.Join(home, credsFilename)
 	credsFileContentsPattern := `https://%s:%s@%s`
@@ -27,7 +27,7 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 		if err := ioutil.WriteFile(credsFile, []byte(config), 0600); err != nil {
 			return errors.Wrapf(err, "writing generated %s file with user, token and hostname to %s", credsFilename, credsFile)
 		}
-		logger.Infof("wrote git credentials to %s", credsFile)
+		logger.Info(fmt.Sprintf("wrote git credentials to %s", credsFile))
 	} else {
 		hasLine, err := fileHasLine(config, credsFile)
 		if err != nil {
@@ -42,13 +42,13 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 			if err := fileLineReplace(config, gitUser, gitHostname, credsFile); err != nil {
 				return errors.Wrap(err, "replacing git credentials line for github app")
 			}
-			logger.Infof("updated git app credentials in %s", credsFile)
+			logger.Info(fmt.Sprintf("updated git app credentials in %s", credsFile))
 		} else {
 			// Otherwise we need to append the line.
 			if err := fileAppend(config, credsFile); err != nil {
 				return err
 			}
-			logger.Infof("wrote git credentials to %s", credsFile)
+			logger.Info(fmt.Sprintf("wrote git credentials to %s", credsFile))
 		}
 	}
 
@@ -56,13 +56,13 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 	if out, err := credentialCmd.CombinedOutput(); err != nil {
 		return errors.Wrapf(err, "There was an error running %s: %s", strings.Join(credentialCmd.Args, " "), string(out))
 	}
-	logger.Infof("successfully ran %s", strings.Join(credentialCmd.Args, " "))
+	logger.Info(fmt.Sprintf("successfully ran %s", strings.Join(credentialCmd.Args, " ")))
 
 	urlCmd := exec.Command("git", "config", "--global", fmt.Sprintf("url.https://%s@%s.insteadOf", gitUser, gitHostname), fmt.Sprintf("ssh://git@%s", gitHostname)) // nolint: gosec
 	if out, err := urlCmd.CombinedOutput(); err != nil {
 		return errors.Wrapf(err, "There was an error running %s: %s", strings.Join(urlCmd.Args, " "), string(out))
 	}
-	logger.Infof("successfully ran %s", strings.Join(urlCmd.Args, " "))
+	logger.Info(fmt.Sprintf("successfully ran %s", strings.Join(urlCmd.Args, " ")))
 	return nil
 }
 

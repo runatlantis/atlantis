@@ -59,7 +59,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		WithSync(mockLocker, mockURLGenerator{})
 
 	When(mockLocker.TryLock(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyLoggingLogger(),
 		matchers.AnyModelsPullRequest(),
 		matchers.AnyModelsUser(),
 		AnyString(),
@@ -71,7 +71,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	repoDir, cleanup := TempDir(t)
 	defer cleanup()
 	When(mockWorkingDir.Clone(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyLoggingLogger(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
@@ -79,7 +79,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logging.NewNoopLogger(t),
+		Log: logging.NewNoopCtxLogger(t),
 		Steps: []valid.Step{
 			{
 				StepName:    "env",
@@ -116,7 +116,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 func TestDefaultProjectCommandRunner_PlanWithSync(t *testing.T) {
 	RegisterMockTestingT(t)
 	prjCtx := command.ProjectContext{
-		Log: logging.NewNoopLogger(t),
+		Log: logging.NewNoopCtxLogger(t),
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{
 				FullName: "test",
@@ -177,7 +177,7 @@ func TestDefaultProjectCommandRunner_PlanWithSync(t *testing.T) {
 			)
 
 			targetCtx := command.ProjectContext{
-				Log: logging.NewNoopLogger(t),
+				Log: logging.NewNoopCtxLogger(t),
 				Pull: models.PullRequest{
 					BaseRepo: models.Repo{
 						FullName: "test",
@@ -206,7 +206,7 @@ func TestDefaultProjectCommandRunner_PlanWithSync(t *testing.T) {
 func TestProjectOutputWrapper(t *testing.T) {
 	RegisterMockTestingT(t)
 	prjCtx := command.ProjectContext{
-		Log: logging.NewNoopLogger(t),
+		Log: logging.NewNoopCtxLogger(t),
 		Steps: []valid.Step{
 			{
 				StepName: "plan",
@@ -428,6 +428,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	When(mockWorkingDir.GetWorkingDir(prjCtx.BaseRepo, prjCtx.Pull, prjCtx.Workspace)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.HasDiverged(matchers.AnyLoggingLogger(), AnyString())).ThenReturn(true)
 
 	firstRes := runner.Apply(prjCtx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", firstRes.Failure)
@@ -539,7 +540,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 
 			ctx := context.Background()
 			prjCtx := command.ProjectContext{
-				Log:               logging.NewNoopLogger(t),
+				Log:               logging.NewNoopCtxLogger(t),
 				Steps:             c.steps,
 				Workspace:         "default",
 				ApplyRequirements: c.applyReqs,
@@ -590,7 +591,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logging.NewNoopLogger(t),
+		Log: logging.NewNoopCtxLogger(t),
 		Steps: []valid.Step{
 			{
 				StepName: "apply",

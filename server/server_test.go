@@ -16,6 +16,7 @@ package server_test
 import (
 	"bytes"
 	"errors"
+	"github.com/runatlantis/atlantis/server/logging"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +31,6 @@ import (
 	tMocks "github.com/runatlantis/atlantis/server/controllers/templates/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -82,7 +82,7 @@ func TestIndex_Success(t *testing.T) {
 		Router:          r,
 		AtlantisVersion: atlantisVersion,
 		AtlantisURL:     u,
-		Logger:          logging.NewNoopLogger(t),
+		CtxLogger:       logging.NewNoopCtxLogger(t),
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()

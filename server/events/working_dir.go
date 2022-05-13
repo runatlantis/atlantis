@@ -41,11 +41,11 @@ type WorkingDir interface {
 	// absolute path to the root of the cloned repo. It also returns
 	// a boolean indicating if we should warn users that the branch we're
 	// merging into has been updated since we cloned it.
-	Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, projectCloneDir string) (string, bool, error)
+	Clone(log logging.Logger, headRepo models.Repo, p models.PullRequest, projectCloneDir string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
-	HasDiverged(log logging.SimpleLogging, cloneDir string) bool
+	HasDiverged(log logging.Logger, cloneDir string) bool
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
@@ -76,7 +76,7 @@ type FileWorkspace struct {
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(
-	log logging.SimpleLogging,
+	log logging.Logger,
 	headRepo models.Repo,
 	p models.PullRequest,
 	projectCloneDir string) (string, bool, error) {
@@ -98,7 +98,7 @@ func (w *FileWorkspace) Clone(
 		revParseCmd.Dir = cloneDir
 		outputRevParseCmd, err := revParseCmd.CombinedOutput()
 		if err != nil {
-			log.Warnf("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
+			log.Warn(fmt.Sprintf("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd)))
 			return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
 		}
 		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
@@ -122,7 +122,7 @@ func (w *FileWorkspace) Clone(
 // Then users won't be getting the merge functionality they expected.
 // If there are any errors we return false since we prefer things to succeed
 // vs. stopping the plan/apply.
-func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
+func (w *FileWorkspace) warnDiverged(log logging.Logger, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that master has diverged if we're using
 		// the checkout merge strategy. If we're just checking out the branch,
@@ -155,19 +155,19 @@ func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullReq
 		output, err := cmd.CombinedOutput()
 
 		if err != nil {
-			log.Warnf("getting remote update failed: %s", string(output))
+			log.Warn(fmt.Sprintf("getting remote update failed: %s", string(output)))
 			return false
 		}
 	}
 
 	hasDiverged := w.HasDiverged(log, cloneDir)
 	if hasDiverged {
-		log.Infof("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
+		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
 	}
 	return hasDiverged
 }
 
-func (w *FileWorkspace) HasDiverged(log logging.SimpleLogging, cloneDir string) bool {
+func (w *FileWorkspace) HasDiverged(log logging.Logger, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
 		// we assume false here for 'branch' strategy.
@@ -178,14 +178,14 @@ func (w *FileWorkspace) HasDiverged(log logging.SimpleLogging, cloneDir string) 
 	statusUnoCmd.Dir = cloneDir
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
 	if err != nil {
-		log.Warnf("getting repo status has failed: %s", string(outputStatusUno))
+		log.Warn(fmt.Sprintf("getting repo status has failed: %s", string(outputStatusUno)))
 		return false
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
 	return hasDiverged
 }
 
-func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
+func (w *FileWorkspace) forceClone(log logging.Logger,
 	cloneDir string,
 	headRepo models.Repo,
 	p models.PullRequest) error {
@@ -196,7 +196,7 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	}
 
 	// Create the directory and parents if necessary.
-	log.Infof("creating dir %q", cloneDir)
+	log.Info(fmt.Sprintf("creating dir %q", cloneDir))
 	if err := os.MkdirAll(cloneDir, 0700); err != nil {
 		return errors.Wrap(err, "creating new workspace")
 	}

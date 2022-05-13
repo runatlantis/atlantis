@@ -15,7 +15,7 @@ import (
 
 func TestRunVersionStep(t *testing.T) {
 	RegisterMockTestingT(t)
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	workspace := "default"
 
 	ctx := context.Background()

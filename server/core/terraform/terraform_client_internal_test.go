@@ -26,7 +26,7 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion(t *testing.T) {
 		"ARG1=$ARG1",
 	}
 	workspace := "workspace"
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	echoCommand := exec.Command("sh", "-c", "echo hello")
 
 	ctx := context.Background()
@@ -101,7 +101,7 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion_Error(t *testing.T) {
 		"ARG1=$ARG1",
 	}
 	workspace := "workspace"
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 	echoCommand := exec.Command("sh", "-c", "echo dying && exit 1")
 
 	ctx := context.Background()

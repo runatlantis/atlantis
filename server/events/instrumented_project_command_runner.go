@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 )
@@ -27,7 +28,6 @@ func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute fun
 	ctx.SetScope("project")
 
 	scope := ctx.Scope
-	ctx.Log = ctx.Log.With("project", ctx.ProjectName)
 	logger := ctx.Log
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
@@ -41,17 +41,17 @@ func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute fun
 
 	if result.Error != nil {
 		executionError.Inc(1)
-		logger.Errorf("Error running %s operation: %s", commandName, result.Error.Error())
+		logger.Error(fmt.Sprintf("Error running %s operation: %s", commandName, result.Error.Error()), map[string]interface{}{"project": ctx.ProjectName})
 		return result
 	}
 
 	if result.Failure != "" {
 		executionFailure.Inc(1)
-		logger.Errorf("Failure running %s operation: %s", commandName, result.Failure)
+		logger.Error(fmt.Sprintf("Failure running %s operation: %s", commandName, result.Failure), map[string]interface{}{"project": ctx.ProjectName})
 		return result
 	}
 
-	logger.Infof("%s success. output available at: %s", commandName, ctx.Pull.URL)
+	logger.Info(fmt.Sprintf("%s success. output available at: %s", commandName, ctx.Pull.URL), map[string]interface{}{"project": ctx.ProjectName})
 
 	executionSuccess.Inc(1)
 	return result

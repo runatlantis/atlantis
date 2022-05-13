@@ -45,7 +45,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 		GithubHostname: testServer,
 	}
 
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 
 	cloneDir, _, err := gwd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
@@ -79,7 +79,7 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 		"",
 	)
 
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopCtxLogger(t)
 
 	headRepo := baseRepo
 

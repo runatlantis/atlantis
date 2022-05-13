@@ -14,6 +14,7 @@
 package events
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,11 +34,11 @@ type ProjectFinder interface {
 	// DetermineProjects returns the list of projects that were modified based on
 	// the modifiedFiles. The list will be de-duplicated.
 	// absRepoDir is the path to the cloned repo on disk.
-	DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project
+	DetermineProjects(log logging.Logger, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project
 	// DetermineProjectsViaConfig returns the list of projects that were modified
 	// based on modifiedFiles and the repo's config.
 	// absRepoDir is the path to the cloned repo on disk.
-	DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
+	DetermineProjectsViaConfig(log logging.Logger, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
 }
 
 // ignoredFilenameFragments contains filename fragments to ignore while looking at changes
@@ -47,15 +48,15 @@ var ignoredFilenameFragments = []string{"terraform.tfstate", "terraform.tfstate.
 type DefaultProjectFinder struct{}
 
 // See ProjectFinder.DetermineProjects.
-func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project {
+func (p *DefaultProjectFinder) DetermineProjects(log logging.Logger, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project {
 	var projects []models.Project
 
 	modifiedTerraformFiles := p.filterToFileList(log, modifiedFiles, autoplanFileList)
 	if len(modifiedTerraformFiles) == 0 {
 		return projects
 	}
-	log.Infof("filtered modified files to %d .tf or terragrunt.hcl files: %v",
-		len(modifiedTerraformFiles), modifiedTerraformFiles)
+	log.Info(fmt.Sprintf("filtered modified files to %d .tf or terragrunt.hcl files: %v",
+		len(modifiedTerraformFiles), modifiedTerraformFiles))
 
 	var dirs []string
 	for _, modifiedFile := range modifiedTerraformFiles {
@@ -75,13 +76,13 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 	for _, p := range exists {
 		projects = append(projects, models.NewProject(repoFullName, p))
 	}
-	log.Infof("there are %d modified project(s) at path(s): %v",
-		len(projects), strings.Join(exists, ", "))
+	log.Info(fmt.Sprintf("there are %d modified project(s) at path(s): %v",
+		len(projects), strings.Join(exists, ", ")))
 	return projects
 }
 
 // See ProjectFinder.DetermineProjectsViaConfig.
-func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error) {
+func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.Logger, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error) {
 	var projects []valid.Project
 	for _, project := range config.Projects {
 		var whenModifiedRelToRepoRoot []string
@@ -140,7 +141,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 }
 
 // filterToFileList filters out files not included in the file list
-func (p *DefaultProjectFinder) filterToFileList(log logging.SimpleLogging, files []string, fileList string) []string {
+func (p *DefaultProjectFinder) filterToFileList(log logging.Logger, files []string, fileList string) []string {
 	var filtered []string
 	patterns := strings.Split(fileList, ",")
 	// Ignore pattern matcher error here as it was checked for errors in server validation

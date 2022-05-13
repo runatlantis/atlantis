@@ -14,7 +14,7 @@ import (
 // GithubAppController handles the creation and setup of a new GitHub app
 type GithubAppController struct {
 	AtlantisURL         *url.URL
-	Logger              logging.SimpleLogging
+	Logger              logging.Logger
 	GithubSetupComplete bool
 	GithubHostname      string
 	GithubOrg           string
@@ -45,13 +45,13 @@ type githubAppRequest struct {
 func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Request) {
 
 	if g.GithubSetupComplete {
-		g.respond(w, logging.Error, http.StatusBadRequest, "Atlantis already has GitHub credentials")
+		g.respond(w, http.StatusBadRequest, "Atlantis already has GitHub credentials")
 		return
 	}
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		g.respond(w, logging.Debug, http.StatusOK, "Ignoring callback, missing code query parameter")
+		g.respond(w, http.StatusOK, "Ignoring callback, missing code query parameter")
 	}
 
 	creds := &vcs.GithubAnonymousCredentials{}
@@ -61,13 +61,13 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 	client, err := vcs.NewGithubClient(g.GithubHostname, creds, g.Logger, mergeabilityChecker)
 
 	if err != nil {
-		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
+		g.respond(w, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return
 	}
 
 	app, err := client.ExchangeCode(code)
 	if err != nil {
-		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
+		g.respond(w, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return
 	}
 
@@ -80,7 +80,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 		URL:           app.URL,
 	})
 	if err != nil {
-		g.Logger.Errorf(err.Error())
+		g.Logger.Error(err.Error())
 	}
 }
 
@@ -88,7 +88,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 
 	if g.GithubSetupComplete {
-		g.respond(w, logging.Error, http.StatusBadRequest, "Atlantis already has GitHub credentials")
+		g.respond(w, http.StatusBadRequest, "Atlantis already has GitHub credentials")
 		return
 	}
 
@@ -136,7 +136,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 
 	jsonManifest, err := json.MarshalIndent(manifest, "", " ")
 	if err != nil {
-		g.respond(w, logging.Error, http.StatusBadRequest, "Failed to serialize manifest: %s", err)
+		g.respond(w, http.StatusBadRequest, "Failed to serialize manifest: %s", err)
 		return
 	}
 
@@ -145,13 +145,13 @@ func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 		Manifest: string(jsonManifest),
 	})
 	if err != nil {
-		g.Logger.Errorf(err.Error())
+		g.Logger.Error(err.Error())
 	}
 }
 
-func (g *GithubAppController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
+func (g *GithubAppController) respond(w http.ResponseWriter, code int, format string, args ...interface{}) {
 	response := fmt.Sprintf(format, args...)
-	g.Logger.Log(lvl, response)
+	g.Logger.Error(response)
 	w.WriteHeader(code)
 	fmt.Fprintln(w, response)
 }

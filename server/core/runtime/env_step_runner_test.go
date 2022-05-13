@@ -71,7 +71,7 @@ func TestEnvStepRunner_Run(t *testing.T) {
 				User: models.User{
 					Username: "acme-user",
 				},
-				Log:              logging.NewNoopLogger(t),
+				Log:              logging.NewNoopCtxLogger(t),
 				Workspace:        "myworkspace",
 				RepoRelDir:       "mydir",
 				TerraformVersion: tfVersion,

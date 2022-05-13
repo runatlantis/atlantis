@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	context "context"
 )
 
@@ -15,6 +16,18 @@ func AnyContextContext() context.Context {
 
 func EqContextContext(value context.Context) context.Context {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue context.Context
+	return nullValue
+}
+
+func NotEqContextContext(value context.Context) context.Context {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue context.Context
+	return nullValue
+}
+
+func ContextContextThat(matcher pegomock.ArgumentMatcher) context.Context {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue context.Context
 	return nullValue
 }

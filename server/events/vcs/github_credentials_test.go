@@ -16,7 +16,7 @@ func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 
 	anonCreds := &vcs.GithubAnonymousCredentials{}
 	mergeabilityChecker := vcs.NewPullMergeabilityChecker("atlantis")
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, logging.NewNoopLogger(t), mergeabilityChecker)
+	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, logging.NewNoopCtxLogger(t), mergeabilityChecker)
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode("good-code")
 	Ok(t, err)
@@ -41,7 +41,7 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 
 	anonCreds := &vcs.GithubAnonymousCredentials{}
 	mergeabilityChecker := vcs.NewPullMergeabilityChecker("atlantis")
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, logging.NewNoopLogger(t), mergeabilityChecker)
+	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, logging.NewNoopCtxLogger(t), mergeabilityChecker)
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode("good-code")
 	Ok(t, err)
@@ -51,7 +51,7 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 		Key:      []byte(fixtures.GithubPrivateKey),
 		Hostname: testServer,
 	}
-	_, err = vcs.NewGithubClient(testServer, appCreds, logging.NewNoopLogger(t), mergeabilityChecker)
+	_, err = vcs.NewGithubClient(testServer, appCreds, logging.NewNoopCtxLogger(t), mergeabilityChecker)
 	Ok(t, err)
 
 	token, err := appCreds.GetToken()

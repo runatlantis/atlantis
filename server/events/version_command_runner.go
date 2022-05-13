@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
@@ -30,18 +31,18 @@ func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	var projectCmds []command.ProjectContext
 	projectCmds, err = v.prjCmdBuilder.BuildVersionCommands(ctx, cmd)
 	if err != nil {
-		ctx.Log.Warnf("Error %s", err)
+		ctx.Log.Warn(fmt.Sprintf("Error %s", err))
 	}
 
 	if len(projectCmds) == 0 {
-		ctx.Log.Infof("no projects to run version in")
+		ctx.Log.Info("no projects to run version in")
 		return
 	}
 
 	// Only run commands in parallel if enabled
 	var result command.Result
 	if v.isParallelEnabled(projectCmds) {
-		ctx.Log.Infof("Running version in parallel")
+		ctx.Log.Info("Running version in parallel")
 		result = runProjectCmdsParallel(projectCmds, v.prjCmdRunner.Version, v.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, v.prjCmdRunner.Version)

@@ -28,7 +28,7 @@ func (g JobIDKeyGenerator) Generate(r *http.Request) (string, error) {
 type JobsController struct {
 	AtlantisVersion          string
 	AtlantisURL              *url.URL
-	Logger                   logging.SimpleLogging
+	Logger                   logging.Logger
 	ProjectJobsTemplate      templates.TemplateWriter
 	ProjectJobsErrorTemplate templates.TemplateWriter
 	Db                       *db.BoltDB
@@ -41,7 +41,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 	jobID, err := j.KeyGenerator.Generate(r)
 
 	if err != nil {
-		j.respond(w, logging.Error, http.StatusBadRequest, err.Error())
+		j.respond(w, http.StatusBadRequest, err.Error())
 		return err
 	}
 
@@ -52,7 +52,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err = j.ProjectJobsTemplate.Execute(w, viewData); err != nil {
-		j.Logger.Errorf(err.Error())
+		j.Logger.Error(err.Error())
 		return err
 	}
 
@@ -71,7 +71,7 @@ func (j *JobsController) getProjectJobsWS(w http.ResponseWriter, r *http.Request
 	err := j.WsMux.Handle(w, r)
 
 	if err != nil {
-		j.respond(w, logging.Error, http.StatusBadRequest, err.Error())
+		j.respond(w, http.StatusBadRequest, err.Error())
 		return err
 	}
 
@@ -90,9 +90,9 @@ func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (j *JobsController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
+func (j *JobsController) respond(w http.ResponseWriter, responseCode int, format string, args ...interface{}) {
 	response := fmt.Sprintf(format, args...)
-	j.Logger.Log(lvl, response)
+	j.Logger.Error(response)
 	w.WriteHeader(responseCode)
 	fmt.Fprintln(w, response)
 }

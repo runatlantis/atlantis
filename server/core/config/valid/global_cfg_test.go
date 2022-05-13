@@ -671,7 +671,7 @@ policies:
 
 			Equals(t,
 				c.exp,
-				global.MergeProjectCfg(logging.NewNoopLogger(t), c.repoID, c.proj, valid.RepoCfg{}))
+				global.MergeProjectCfg(logging.NewNoopCtxLogger(t), c.repoID, c.proj, valid.RepoCfg{}))
 		})
 	}
 }
@@ -870,7 +870,7 @@ repos:
 			}
 
 			global.PolicySets = emptyPolicySets
-			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopLogger(t), c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
+			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopCtxLogger(t), c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
 		})
 	}
 }

@@ -11,7 +11,7 @@ import (
 
 // StatusController handles the status of Atlantis.
 type StatusController struct {
-	Logger  logging.SimpleLogging
+	Logger  logging.Logger
 	Drainer *events.Drainer
 }
 

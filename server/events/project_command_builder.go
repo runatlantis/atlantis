@@ -40,7 +40,7 @@ func NewProjectCommandBuilder(
 	pendingPlanFinder *DefaultPendingPlanFinder,
 	EnableRegExpCmd bool,
 	AutoplanFileList string,
-	logger logging.SimpleLogging,
+	logger logging.Logger,
 	limit int,
 ) ProjectCommandBuilder {
 	var projectCommandBuilder ProjectCommandBuilder = &DefaultProjectCommandBuilder{
@@ -183,7 +183,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
-		ctx.Log.Warnf("workspace was locked")
+		ctx.Log.Warn("workspace was locked")
 		return nil, err
 	}
 	defer unlockFn()
@@ -207,12 +207,12 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 		}
-		ctx.Log.Infof("successfully parsed %s file", config.AtlantisYAMLFilename)
+		ctx.Log.Info(fmt.Sprintf("successfully parsed %s file", config.AtlantisYAMLFilename))
 		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
 		if err != nil {
 			return nil, err
 		}
-		ctx.Log.Infof("%d projects are to be planned based on their when_modified config", len(matchingProjects))
+		ctx.Log.Info(fmt.Sprintf("%d projects are to be planned based on their when_modified config", len(matchingProjects)))
 
 		for _, mp := range matchingProjects {
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
@@ -234,12 +234,12 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 	} else {
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.
-		ctx.Log.Infof("found no %s file", config.AtlantisYAMLFilename)
+		ctx.Log.Info(fmt.Sprintf("found no %s file", config.AtlantisYAMLFilename))
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList)
 		if err != nil {
 			return nil, errors.Wrapf(err, "finding modified projects: %s", modifiedFiles)
 		}
-		ctx.Log.Infof("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
+		ctx.Log.Info(fmt.Sprintf("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects))
 		for _, mp := range modifiedProjects {
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
 
