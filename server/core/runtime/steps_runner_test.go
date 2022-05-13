@@ -162,7 +162,8 @@ func TestStepsRuinner_RunEnvSteps(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logging.NewNoopCtxLogger(t),
+		Log:        logging.NewNoopCtxLogger(t),
+		RequestCtx: context.TODO(),
 		Steps: []valid.Step{
 			{
 				StepName:   "run",

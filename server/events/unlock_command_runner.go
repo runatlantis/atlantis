@@ -32,10 +32,10 @@ func (u *UnlockCommandRunner) Run(
 	_, err := u.deleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
 	if err != nil {
 		vcsMessage = "Failed to delete PR locks"
-		ctx.Log.Error(fmt.Sprintf("failed to delete locks by pull %s", err.Error()))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("failed to delete locks by pull %s", err.Error()))
 	}
 
 	if commentErr := u.vcsClient.CreateComment(baseRepo, pullNum, vcsMessage, command.Unlock.String()); commentErr != nil {
-		ctx.Log.Error(fmt.Sprintf("unable to comment: %s", commentErr))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to comment: %s", commentErr))
 	}
 }

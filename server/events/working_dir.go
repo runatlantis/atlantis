@@ -97,8 +97,15 @@ func (w *FileWorkspace) Clone(
 		revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
 		revParseCmd.Dir = cloneDir
 		outputRevParseCmd, err := revParseCmd.CombinedOutput()
+		logFields := map[string]interface{}{
+			"repository": headRepo.FullName,
+			"pull-num":   p.Num,
+			"workspace":  projectCloneDir,
+		}
 		if err != nil {
-			log.Warn(fmt.Sprintf("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd)))
+			log.Warn(
+				fmt.Sprintf("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd)),
+				logFields)
 			return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
 		}
 		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
@@ -148,6 +155,12 @@ func (w *FileWorkspace) warnDiverged(log logging.Logger, p models.PullRequest, h
 		},
 	}
 
+	logFields := map[string]interface{}{
+		"repository": headRepo.FullName,
+		"pull-num":   p.Num,
+		"workspace":  cloneDir,
+	}
+
 	for _, args := range cmds {
 		cmd := exec.Command(args[0], args[1:]...) // nolint: gosec
 		cmd.Dir = cloneDir
@@ -155,14 +168,14 @@ func (w *FileWorkspace) warnDiverged(log logging.Logger, p models.PullRequest, h
 		output, err := cmd.CombinedOutput()
 
 		if err != nil {
-			log.Warn(fmt.Sprintf("getting remote update failed: %s", string(output)))
+			log.Warn(fmt.Sprintf("getting remote update failed: %s", string(output)), logFields)
 			return false
 		}
 	}
 
 	hasDiverged := w.HasDiverged(log, cloneDir)
 	if hasDiverged {
-		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
+		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits", logFields)
 	}
 	return hasDiverged
 }
@@ -189,6 +202,11 @@ func (w *FileWorkspace) forceClone(log logging.Logger,
 	cloneDir string,
 	headRepo models.Repo,
 	p models.PullRequest) error {
+	logFields := map[string]interface{}{
+		"repository": headRepo.FullName,
+		"pull-num":   p.Num,
+		"workspace":  cloneDir,
+	}
 
 	err := os.RemoveAll(cloneDir)
 	if err != nil {
@@ -196,7 +214,7 @@ func (w *FileWorkspace) forceClone(log logging.Logger,
 	}
 
 	// Create the directory and parents if necessary.
-	log.Info(fmt.Sprintf("creating dir %q", cloneDir))
+	log.Info(fmt.Sprintf("creating dir %q", cloneDir), logFields)
 	if err := os.MkdirAll(cloneDir, 0700); err != nil {
 		return errors.Wrap(err, "creating new workspace")
 	}

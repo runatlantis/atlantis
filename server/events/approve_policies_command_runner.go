@@ -37,25 +37,25 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *command.Co
 	pull := ctx.Pull
 
 	if err := a.commitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
-		ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
+		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
 
 	projectCmds, err := a.prjCmdBuilder.BuildApprovePoliciesCommands(ctx, cmd)
 	if err != nil {
 		if statusErr := a.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck); statusErr != nil {
-			ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", statusErr))
+			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		a.pullUpdater.UpdatePull(ctx, cmd, command.Result{Error: err})
 		return
 	}
 
 	if len(projectCmds) == 0 {
-		ctx.Log.Info(fmt.Sprintf("determined there was no project to run approve_policies in"))
+		ctx.Log.InfoContext(ctx.RequestCtx, fmt.Sprintf("determined there was no project to run approve_policies in"))
 		// If there were no projects modified, we set successful commit statuses
 		// with 0/0 projects approve_policies successfully because some users require
 		// the Atlantis status to be passing for all pull requests.
 		if err := a.commitStatusUpdater.UpdateCombinedCount(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
-			ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
+			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 		}
 		return
 	}
@@ -70,7 +70,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *command.Co
 
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
-		ctx.Log.Error(fmt.Sprintf("writing results: %s", err))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("writing results: %s", err))
 		return
 	}
 
@@ -109,6 +109,6 @@ func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *command.Context, 
 	}
 
 	if err := a.commitStatusUpdater.UpdateCombinedCount(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, numSuccess, len(pullStatus.Projects)); err != nil {
-		ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
+		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
 }

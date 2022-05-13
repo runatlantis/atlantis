@@ -30,7 +30,8 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logger,
+		Log:        logger,
+		RequestCtx: context.TODO(),
 	}
 
 	mockBuilder := mocks.NewMockcommandBuilder()
@@ -59,7 +60,8 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logger,
+		Log:        logger,
+		RequestCtx: context.TODO(),
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
@@ -107,7 +109,8 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logger,
+		Log:        logger,
+		RequestCtx: context.TODO(),
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
@@ -134,7 +137,8 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logger,
+		Log:        logger,
+		RequestCtx: context.TODO(),
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
@@ -162,7 +166,8 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logger,
+		Log:        logger,
+		RequestCtx: context.TODO(),
 	}
 	mockBuilder := mocks.NewMockcommandBuilder()
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()

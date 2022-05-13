@@ -168,7 +168,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx context.Context, prjCtx command.Proje
 
 		// Let's not fail the whole step because of a single failure. Log and fail silently
 		if err != nil {
-			prjCtx.Log.Error(fmt.Sprintf("Error resolving policyset %s. err: %s", policySet.Name, err.Error()))
+			prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("Error resolving policyset %s. err: %s", policySet.Name, err.Error()))
 			continue
 		}
 
@@ -190,7 +190,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx context.Context, prjCtx command.Proje
 	serializedArgs, err := args.build()
 
 	if err != nil {
-		prjCtx.Log.Warn("No policies have been configured")
+		prjCtx.Log.WarnContext(prjCtx.RequestCtx, "No policies have been configured")
 		return "", nil
 		// TODO: enable when we can pass policies in otherwise e2e tests with policy checks fail
 		// return "", errors.Wrap(err, "building args")

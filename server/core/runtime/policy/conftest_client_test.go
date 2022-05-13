@@ -171,6 +171,7 @@ func TestRun(t *testing.T) {
 		ProjectName: "testproj",
 		Workspace:   "default",
 		Log:         log,
+		RequestCtx:  context.TODO(),
 	}
 
 	t.Run("success", func(t *testing.T) {

@@ -22,7 +22,7 @@ func (i *InitStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext,
 	terraformLockfilePath := filepath.Join(path, lockFileName)
 	terraformLockFileTracked, err := common.IsFileTracked(path, lockFileName)
 	if err != nil {
-		prjCtx.Log.Warn(fmt.Sprintf("Error checking if %s is tracked in %s", lockFileName, path))
+		prjCtx.Log.WarnContext(prjCtx.RequestCtx, fmt.Sprintf("Error checking if %s is tracked in %s", lockFileName, path))
 
 	}
 	// If .terraform.lock.hcl is not tracked in git and it exists prior to init
@@ -31,7 +31,7 @@ func (i *InitStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext,
 	if common.FileExists(terraformLockfilePath) && !terraformLockFileTracked {
 		delErr := os.Remove(terraformLockfilePath)
 		if delErr != nil {
-			prjCtx.Log.Info(fmt.Sprintf("Error Deleting `%s`", lockFileName))
+			prjCtx.Log.InfoContext(prjCtx.RequestCtx, fmt.Sprintf("Error Deleting `%s`", lockFileName))
 		}
 	}
 
@@ -45,7 +45,7 @@ func (i *InitStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext,
 
 	// If we're running < 0.9 we have to use `terraform get` instead of `init`.
 	if MustConstraint("< 0.9.0").Check(tfVersion) {
-		prjCtx.Log.Info(fmt.Sprintf("running terraform version %s so will use `get` instead of `init`", tfVersion))
+		prjCtx.Log.InfoContext(prjCtx.RequestCtx, fmt.Sprintf("running terraform version %s so will use `get` instead of `init`", tfVersion))
 		terraformInitVerb = []string{"get"}
 		terraformInitArgs = []string{}
 	}

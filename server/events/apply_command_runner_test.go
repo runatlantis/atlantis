@@ -1,6 +1,7 @@
 package events_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -50,12 +51,13 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 			modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
 			ctx := &command.Context{
-				User:     fixtures.User,
-				Log:      logger,
-				Pull:     modelPull,
-				HeadRepo: fixtures.GithubRepo,
-				Trigger:  command.CommentTrigger,
-				Scope:    scopeNull,
+				User:       fixtures.User,
+				Log:        logger,
+				Pull:       modelPull,
+				HeadRepo:   fixtures.GithubRepo,
+				Trigger:    command.CommentTrigger,
+				Scope:      scopeNull,
+				RequestCtx: context.TODO(),
 			}
 
 			When(applyLockChecker.CheckApplyLock()).ThenReturn(locking.ApplyCommandLock{Locked: c.ApplyLocked}, c.ApplyLockError)

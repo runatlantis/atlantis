@@ -650,10 +650,9 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	// TODO: we should compare this output against what we post on github
 	projectCmdOutputHandler := &jobs.NoopProjectOutputHandler{}
 
-	logger := logging.NewNoopLogger(t)
 	ctxLogger := logging.NewNoopCtxLogger(t)
 	featureAllocator, _ := feature.NewStringSourcedAllocator(ctxLogger)
-	terraformClient, err := terraform.NewE2ETestClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", downloader, false, projectCmdOutputHandler, featureAllocator)
+	terraformClient, err := terraform.NewE2ETestClient(binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", downloader, false, projectCmdOutputHandler, featureAllocator)
 	Ok(t, err)
 
 	// Set real dependencies here.
@@ -990,7 +989,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	ctrl := events_controllers.VCSEventsController{
 		RequestRouter:                requestRouter,
-		Logger:                       logger,
+		Logger:                       ctxLogger,
 		Scope:                        statsScope,
 		Parser:                       eventParser,
 		CommentParser:                commentParser,

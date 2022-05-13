@@ -129,11 +129,11 @@ func escapeArgs(args []string) []string {
 func getTfVersion(ctx *command.Context, absProjDir string) *version.Version {
 	module, diags := tfconfig.LoadModule(absProjDir)
 	if diags.HasErrors() {
-		ctx.Log.Error(fmt.Sprintf("trying to detect required version: %s", diags.Error()))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("trying to detect required version: %s", diags.Error()))
 		return nil
 	}
 	if len(module.RequiredCore) != 1 {
-		ctx.Log.Info(fmt.Sprintf("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore)))
+		ctx.Log.InfoContext(ctx.RequestCtx, fmt.Sprintf("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore)))
 		return nil
 	}
 	requiredVersionSetting := module.RequiredCore[0]
@@ -146,10 +146,10 @@ func getTfVersion(ctx *command.Context, absProjDir string) *version.Version {
 	}
 	version, err := version.NewVersion(matched[1])
 	if err != nil {
-		ctx.Log.Error(err.Error())
+		ctx.Log.ErrorContext(ctx.RequestCtx, err.Error())
 		return nil
 	}
 
-	ctx.Log.Info(fmt.Sprintf("detected module requires version: %q", version.String()))
+	ctx.Log.InfoContext(ctx.RequestCtx, fmt.Sprintf("detected module requires version: %q", version.String()))
 	return version
 }

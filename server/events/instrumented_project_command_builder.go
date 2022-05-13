@@ -25,7 +25,7 @@ func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Cont
 
 	if err != nil {
 		executionError.Inc(1)
-		b.Logger.Error(fmt.Sprintf("Error building apply commands: %s", err))
+		b.Logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("Error building apply commands: %s", err))
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -46,7 +46,7 @@ func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.C
 
 	if err != nil {
 		executionError.Inc(1)
-		b.Logger.Error(fmt.Sprintf("Error building auto plan commands: %s", err))
+		b.Logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("Error building auto plan commands: %s", err))
 	} else {
 		executionSuccess.Inc(1)
 	}
@@ -67,7 +67,7 @@ func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Conte
 
 	if err != nil {
 		executionError.Inc(1)
-		b.Logger.Error(fmt.Sprintf("Error building plan commands: %s", err))
+		b.Logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("Error building plan commands: %s", err))
 	} else {
 		executionSuccess.Inc(1)
 	}

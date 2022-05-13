@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -77,6 +78,7 @@ workflows:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -128,6 +130,7 @@ projects:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -179,6 +182,7 @@ projects:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -238,6 +242,7 @@ projects:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{},
@@ -381,6 +386,7 @@ workflows:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -436,6 +442,7 @@ projects:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -494,6 +501,7 @@ workflows:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPlanSteps:  []string{},
 			expApplySteps: []string{},
@@ -536,6 +544,7 @@ projects:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -591,7 +600,8 @@ projects:
 			for _, cmd := range []command.Name{command.Plan, command.Apply} {
 				t.Run(cmd.String(), func(t *testing.T) {
 					ctxs, err := builder.buildProjectCommandCtx(&command.Context{
-						Log: logger,
+						RequestCtx: context.TODO(),
+						Log:        logger,
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
@@ -727,6 +737,7 @@ projects:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -789,6 +800,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							Mergeable: true,
 						},
+						RequestCtx: context.TODO(),
 					}, cmd, "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", false)
 
 					if c.expErr != "" {
@@ -883,6 +895,7 @@ repos:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPolicyCheckSteps: []string{"show", "policy_check"},
 		},
@@ -939,6 +952,7 @@ workflows:
 				User:              models.User{},
 				Workspace:         "myworkspace",
 				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
 			},
 			expPolicyCheckSteps: []string{"policy_check"},
 		},
@@ -993,7 +1007,8 @@ workflows:
 			cmd := command.PolicyCheck
 			t.Run(cmd.String(), func(t *testing.T) {
 				ctxs, err := builder.buildProjectCommandCtx(&command.Context{
-					Log: logger,
+					RequestCtx: context.TODO(),
+					Log:        logger,
 					Pull: models.PullRequest{
 						BaseRepo: baseRepo,
 					},

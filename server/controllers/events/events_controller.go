@@ -154,6 +154,7 @@ func NewVCSEventsController(
 
 	return &VCSEventsController{
 		RequestRouter:                   router,
+		Logger:                          logger,
 		Scope:                           scope,
 		Parser:                          eventParser,
 		CommentParser:                   commentParser,
@@ -253,7 +254,7 @@ func (p *RequestRouter) Route(w http.ResponseWriter, r *http.Request) {
 // VCS host, ex. GitHub.
 // TODO: migrate all provider specific request handling into packaged resolver similar to github
 type VCSEventsController struct {
-	Logger                       logging.SimpleLogging
+	Logger                       logging.Logger
 	Scope                        tally.Scope
 	CommentParser                events.CommentParsing
 	Parser                       events.EventParsing
@@ -483,7 +484,7 @@ func (e *VCSEventsController) handleBitbucketCloudPullRequestEvent(w http.Respon
 		return
 	}
 	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType)
-	e.Logger.Infof("identified event as type %q", pullEventType.String())
+	e.Logger.Info(fmt.Sprintf("identified event as type %q", pullEventType.String()))
 	eventTimestamp := time.Now()
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -515,7 +516,7 @@ func (e *VCSEventsController) handleBitbucketServerPullRequestEvent(w http.Respo
 		return
 	}
 	pullEventType := e.Parser.GetBitbucketServerPullEventType(eventType)
-	e.Logger.Infof("identified event as type %q", pullEventType.String())
+	e.Logger.Info(fmt.Sprintf("identified event as type %q", pullEventType.String()))
 	eventTimestamp := time.Now()
 	lvl := logging.Debug
 	cloneableRequest, err := httputils.NewBufferedRequest(request)
@@ -607,7 +608,7 @@ func (e *VCSEventsController) HandleGitlabMergeRequestEvent(w http.ResponseWrite
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	e.Logger.Infof("identified event as type %q", pullEventType.String())
+	e.Logger.Info(fmt.Sprintf("identified event as type %q", pullEventType.String()))
 	eventTimestamp := time.Now()
 
 	lvl := logging.Debug
@@ -717,7 +718,7 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseW
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, azuredevopsReqID)
 		return
 	}
-	e.Logger.Infof("identified event as type %q", pullEventType.String())
+	e.Logger.Info(fmt.Sprintf("identified event as type %q", pullEventType.String()))
 	eventTimestamp := time.Now()
 	lvl := logging.Debug
 	cloneableRequest, err := httputils.NewBufferedRequest(request)
@@ -751,7 +752,18 @@ func (e *VCSEventsController) supportsHost(h models.VCSHostType) bool {
 
 func (e *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
 	response := fmt.Sprintf(format, args...)
-	e.Logger.Log(lvl, response)
+	switch lvl {
+	case logging.Error:
+		e.Logger.Error(response)
+	case logging.Info:
+		e.Logger.Info(response)
+	case logging.Warn:
+		e.Logger.Warn(response)
+	case logging.Debug:
+		e.Logger.Debug(response)
+	default:
+		e.Logger.Error(response)
+	}
 	w.WriteHeader(code)
 	fmt.Fprintln(w, response)
 }

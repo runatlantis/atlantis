@@ -148,8 +148,9 @@ func (h *Handler) handleGithubCommentEvent(ctx context.Context, event *github.Is
 	}
 	ctxWithRepo := context.WithValue(ctx, logging.RepositoryKey, commentEvent.BaseRepo.FullName)
 	ctxWithPull := context.WithValue(ctxWithRepo, logging.PullNumKey, commentEvent.PullNum)
+	ctxWithSha := context.WithValue(ctxWithPull, logging.SHAKey, commentEvent.Pull.HeadCommit)
 
-	return h.commentHandler.Handle(ctxWithPull, request, commentEvent)
+	return h.commentHandler.Handle(ctxWithSha, request, commentEvent)
 }
 
 func (h *Handler) handleGithubPullRequestEvent(ctx context.Context, event *github.PullRequestEvent, request *http.BufferedRequest) error {

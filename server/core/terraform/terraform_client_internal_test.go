@@ -31,7 +31,8 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logger,
+		RequestCtx: context.TODO(),
+		Log:        logger,
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
 			Owner:    "owner",
@@ -106,7 +107,8 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion_Error(t *testing.T) {
 
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
-		Log: logger,
+		RequestCtx: context.TODO(),
+		Log:        logger,
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
 			Owner:    "owner",

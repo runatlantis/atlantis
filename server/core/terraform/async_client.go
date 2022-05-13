@@ -57,7 +57,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx context.Context, prjCtx comma
 
 		cmd, err := c.commandBuilder.Build(v, workspace, path, args)
 		if err != nil {
-			prjCtx.Log.Error(err.Error())
+			prjCtx.Log.ErrorContext(prjCtx.RequestCtx, err.Error())
 			outCh <- helpers.Line{Err: err}
 			return
 		}
@@ -73,7 +73,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx context.Context, prjCtx comma
 		err = cmd.Start()
 		if err != nil {
 			err = errors.Wrapf(err, "running %q in %q", cmd.String(), path)
-			prjCtx.Log.Error(err.Error())
+			prjCtx.Log.ErrorContext(prjCtx.RequestCtx, err.Error())
 			outCh <- helpers.Line{Err: err}
 			return
 		}
@@ -84,7 +84,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx context.Context, prjCtx comma
 			for line := range input {
 				_, err := io.WriteString(stdin, line)
 				if err != nil {
-					prjCtx.Log.Error(errors.Wrapf(err, "writing %q to process", line).Error())
+					prjCtx.Log.ErrorContext(prjCtx.RequestCtx, errors.Wrapf(err, "writing %q to process", line).Error())
 				}
 			}
 		}()
@@ -125,10 +125,10 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx context.Context, prjCtx comma
 		// We're done now. Send an error if there was one.
 		if err != nil {
 			err = errors.Wrapf(err, "running %q in %q", cmd.String(), path)
-			prjCtx.Log.Error(err.Error())
+			prjCtx.Log.ErrorContext(prjCtx.RequestCtx, err.Error())
 			outCh <- helpers.Line{Err: err}
 		} else {
-			prjCtx.Log.Info(fmt.Sprintf("successfully ran %q in %q", cmd.String(), path))
+			prjCtx.Log.InfoContext(prjCtx.RequestCtx, fmt.Sprintf("successfully ran %q in %q", cmd.String(), path))
 		}
 	}()
 

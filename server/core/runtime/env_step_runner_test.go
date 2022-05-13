@@ -76,6 +76,7 @@ func TestEnvStepRunner_Run(t *testing.T) {
 				RepoRelDir:       "mydir",
 				TerraformVersion: tfVersion,
 				ProjectName:      c.ProjectName,
+				RequestCtx:       context.TODO(),
 			}
 			value, err := envRunner.Run(ctx, prjCtx, c.Command, c.Value, tmpDir, map[string]string(nil))
 			if c.ExpErr != "" {

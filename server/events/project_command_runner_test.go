@@ -60,6 +60,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	When(mockLocker.TryLock(
 		matchers.AnyLoggingLogger(),
+		matchers.AnyContextContext(),
 		matchers.AnyModelsPullRequest(),
 		matchers.AnyModelsUser(),
 		AnyString(),
@@ -116,7 +117,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 func TestDefaultProjectCommandRunner_PlanWithSync(t *testing.T) {
 	RegisterMockTestingT(t)
 	prjCtx := command.ProjectContext{
-		Log: logging.NewNoopCtxLogger(t),
+		RequestCtx: context.TODO(),
+		Log:        logging.NewNoopCtxLogger(t),
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{
 				FullName: "test",

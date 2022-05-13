@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -74,6 +75,7 @@ func NewProjectContext(
 		Tags:                 projCfg.Tags,
 		PullReqStatus:        pullStatus,
 		JobID:                uuid.New().String(),
+		RequestCtx:           ctx.RequestCtx,
 	}
 }
 
@@ -148,6 +150,8 @@ type ProjectContext struct {
 	PolicySets valid.PolicySets
 	// UUID for atlantis logs
 	JobID string
+	// RequestCtx is the context generated when request is first received from VCS
+	RequestCtx context.Context
 }
 
 // ProjectCloneDir creates relative path to clone the repo to. If we are running

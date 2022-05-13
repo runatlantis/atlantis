@@ -68,14 +68,14 @@ func (p *AuditProjectCommandWrapper) Apply(ctx command.ProjectContext) command.P
 
 	if result.Error != nil || result.Failure != "" {
 		if err := p.emit(ctx, AtlantisJobStateFailure, atlantisJobEvent); err != nil {
-			ctx.Log.Error(fmt.Sprintf("failed to emit atlantis job event %v", err))
+			ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("failed to emit atlantis job event %v", err))
 		}
 
 		return result
 	}
 
 	if err := p.emit(ctx, AtlantisJobStateSuccess, atlantisJobEvent); err != nil {
-		ctx.Log.Error(fmt.Sprintf("failed to emit atlantis job event %v", err))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("failed to emit atlantis job event %v", err))
 	}
 
 	return result

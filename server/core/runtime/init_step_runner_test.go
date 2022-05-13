@@ -55,6 +55,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 				Workspace:  "workspace",
 				RepoRelDir: ".",
 				Log:        logger,
+				RequestCtx: context.TODO(),
 			}
 
 			tfVersion, _ := version.NewVersion(c.version)
@@ -99,6 +100,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
+		RequestCtx: context.TODO(),
 	}, nil, "/path", map[string]string(nil))
 	ErrEquals(t, "error", err)
 	Equals(t, "output", output)
@@ -160,6 +162,7 @@ func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
+		RequestCtx: context.TODO(),
 	}
 
 	tfVersion, _ := version.NewVersion("0.14.0")
@@ -195,6 +198,7 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
+		RequestCtx: context.TODO(),
 	}
 
 	tfVersion, _ := version.NewVersion("0.13.0")
@@ -263,6 +267,7 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 				Workspace:  "workspace",
 				RepoRelDir: ".",
 				Log:        logger,
+				RequestCtx: context.TODO(),
 			}
 
 			tfVersion, _ := version.NewVersion("0.10.0")

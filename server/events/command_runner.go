@@ -103,7 +103,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(ctx context.Context, baseRepo 
 	}
 	defer c.Drainer.OpDone()
 
-	ctx = newCtx(ctx, baseRepo.FullName, pull.Num)
+	//ctx = newCtx(ctx, baseRepo.FullName, pull.Num)
 	defer c.logPanics(ctx)
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
@@ -124,8 +124,9 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(ctx context.Context, baseRepo 
 		PullStatus:       status,
 		Trigger:          command.AutoTrigger,
 		TriggerTimestamp: timestamp,
+		RequestCtx:       ctx,
 	}
-	if !c.validateCtxAndComment(ctx, cmdCtx) {
+	if !c.validateCtxAndComment(cmdCtx) {
 		return
 	}
 	if c.DisableAutoplan {
@@ -161,7 +162,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(ctx context.Context, baseRepo m
 	}
 	defer c.Drainer.OpDone()
 
-	ctx = newCtx(ctx, baseRepo.FullName, pullNum)
+	//ctx = newCtx(ctx, baseRepo.FullName, pullNum)
 	defer c.logPanics(ctx)
 
 	scope := c.StatsScope.SubScope("comment")
@@ -187,9 +188,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(ctx context.Context, baseRepo m
 		Trigger:          command.CommentTrigger,
 		Scope:            scope,
 		TriggerTimestamp: timestamp,
+		RequestCtx:       ctx,
 	}
 
-	if !c.validateCtxAndComment(ctx, cmdCtx) {
+	if !c.validateCtxAndComment(cmdCtx) {
 		return
 	}
 
@@ -214,26 +216,26 @@ func newCtx(ctx context.Context, repoFullName string, pullNum int) context.Conte
 	return context.WithValue(ctx, logging.PullNumKey, strconv.Itoa(pullNum))
 }
 
-func (c *DefaultCommandRunner) validateCtxAndComment(ctx context.Context, cmdCtx *command.Context) bool {
+func (c *DefaultCommandRunner) validateCtxAndComment(cmdCtx *command.Context) bool {
 	if cmdCtx.HeadRepo.Owner != cmdCtx.Pull.BaseRepo.Owner {
-		c.Logger.InfoContext(ctx, "command was run on a fork pull request which is disallowed")
+		c.Logger.InfoContext(cmdCtx.RequestCtx, "command was run on a fork pull request which is disallowed")
 		if err := c.VCSClient.CreateComment(cmdCtx.Pull.BaseRepo, cmdCtx.Pull.Num, "Atlantis commands can't be run on fork pull requests.", ""); err != nil {
-			c.Logger.ErrorContext(ctx, err.Error())
+			c.Logger.ErrorContext(cmdCtx.RequestCtx, err.Error())
 		}
 		return false
 	}
 
 	if cmdCtx.Pull.State != models.OpenPullState {
-		c.Logger.InfoContext(ctx, "command was run on closed pull request")
+		c.Logger.InfoContext(cmdCtx.RequestCtx, "command was run on closed pull request")
 		if err := c.VCSClient.CreateComment(cmdCtx.Pull.BaseRepo, cmdCtx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
-			c.Logger.ErrorContext(ctx, err.Error())
+			c.Logger.ErrorContext(cmdCtx.RequestCtx, err.Error())
 		}
 		return false
 	}
 
 	repo := c.GlobalCfg.MatchingRepo(cmdCtx.Pull.BaseRepo.ID())
 	if !repo.BranchMatches(cmdCtx.Pull.BaseBranch) {
-		c.Logger.InfoContext(ctx, "command was run on a pull request which doesn't match base branches")
+		c.Logger.InfoContext(cmdCtx.RequestCtx, "command was run on a pull request which doesn't match base branches")
 		// just ignore it to allow us to use any git workflows without malicious intentions.
 		return false
 	}

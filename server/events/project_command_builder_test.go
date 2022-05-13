@@ -1,6 +1,7 @@
 package events_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -157,6 +158,7 @@ projects:
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
+				RequestCtx: context.TODO(),
 				PullRequestStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -422,11 +424,12 @@ projects:
 				var err error
 				if cmdName == command.Plan {
 					actCtxs, err = builder.BuildPlanCommands(&command.Context{
-						Log:   logger,
-						Scope: scope,
+						RequestCtx: context.TODO(),
+						Log:        logger,
+						Scope:      scope,
 					}, &c.Cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope}, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope, RequestCtx: context.TODO()}, &c.Cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -566,8 +569,9 @@ projects:
 
 			ctxs, err := builder.BuildPlanCommands(
 				&command.Context{
-					Log:   logger,
-					Scope: scope,
+					Log:        logger,
+					Scope:      scope,
+					RequestCtx: context.TODO(),
 				},
 				&command.Comment{
 					RepoRelDir:  "",
@@ -648,8 +652,9 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 
 	ctxs, err := builder.BuildApplyCommands(
 		&command.Context{
-			Log:   logger,
-			Scope: scope,
+			Log:        logger,
+			Scope:      scope,
+			RequestCtx: context.TODO(),
 		},
 		&command.Comment{
 			RepoRelDir:  "",
@@ -723,11 +728,12 @@ projects:
 	)
 
 	ctx := &command.Context{
-		HeadRepo: models.Repo{},
-		Pull:     models.PullRequest{},
-		User:     models.User{},
-		Log:      logging.NewNoopCtxLogger(t),
-		Scope:    scope,
+		RequestCtx: context.TODO(),
+		HeadRepo:   models.Repo{},
+		Pull:       models.PullRequest{},
+		User:       models.User{},
+		Log:        logging.NewNoopCtxLogger(t),
+		Scope:      scope,
 	}
 	_, err = builder.BuildPlanCommands(ctx, &command.Comment{
 		RepoRelDir:  ".",
@@ -794,8 +800,9 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			var actCtxs []command.ProjectContext
 			var err error
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
-				Log:   logger,
-				Scope: scope,
+				RequestCtx: context.TODO(),
+				Log:        logger,
+				Scope:      scope,
 			}, &command.Comment{
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
@@ -966,8 +973,9 @@ projects:
 
 			actCtxs, err := builder.BuildPlanCommands(
 				&command.Context{
-					Log:   logger,
-					Scope: scope,
+					RequestCtx: context.TODO(),
+					Log:        logger,
+					Scope:      scope,
 				},
 				&command.Comment{
 					RepoRelDir: "",
@@ -1029,8 +1037,9 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		PullRequestStatus: models.PullReqStatus{
 			Mergeable: true,
 		},
-		Log:   logger,
-		Scope: scope,
+		RequestCtx: context.TODO(),
+		Log:        logger,
+		Scope:      scope,
 	})
 
 	Ok(t, err)
@@ -1100,8 +1109,9 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 
 	ctxs, err := builder.BuildVersionCommands(
 		&command.Context{
-			Log:   logger,
-			Scope: scope,
+			RequestCtx: context.TODO(),
+			Log:        logger,
+			Scope:      scope,
 		},
 		&command.Comment{
 			RepoRelDir:  "",

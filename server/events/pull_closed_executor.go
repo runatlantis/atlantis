@@ -81,10 +81,14 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
+	logFields := map[string]interface{}{
+		"repository": repo.FullName,
+		"pull-num":   pull.Num,
+	}
 	pullStatus, err := p.DB.GetPullStatus(pull)
 	if err != nil {
 		// Log and continue to clean up other resources.
-		p.Logger.Error(fmt.Sprintf("retrieving pull status: %s", err))
+		p.Logger.Error(fmt.Sprintf("retrieving pull status: %s", err), logFields)
 	}
 
 	if pullStatus != nil {
@@ -113,7 +117,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 
 	// Delete pull from DB.
 	if err := p.DB.DeletePullStatus(pull); err != nil {
-		p.Logger.Error(fmt.Sprintf("deleting pull from db: %s", err))
+		p.Logger.Error(fmt.Sprintf("deleting pull from db: %s", err), logFields)
 	}
 
 	// If there are no locks then there's no need to comment.

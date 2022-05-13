@@ -210,8 +210,8 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			RegisterMockTestingT(t)
 			allowlist, err := events.NewRepoAllowlistChecker("*")
 			Ok(t, err)
-			logger := logging.NewNoopLogger(t)
-			scope, _, _ := metrics.NewLoggingScope(logging.NewNoopCtxLogger(t), "null")
+			ctxLogger := logging.NewNoopCtxLogger(t)
+			scope, _, _ := metrics.NewLoggingScope(ctxLogger, "null")
 			ec := &events_controllers.VCSEventsController{
 				Parser: &events.EventParser{
 					BitbucketUser:      "bb-user",
@@ -223,7 +223,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 				RepoAllowlistChecker: allowlist,
 				SupportedVCSHosts:    []models.VCSHostType{models.BitbucketServer},
 				VCSClient:            nil,
-				Logger:               logger,
+				Logger:               ctxLogger,
 				Scope:                scope,
 			}
 
@@ -302,11 +302,10 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 	vcsmock := vcsmocks.NewMockClient()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
-	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logging.NewNoopCtxLogger(t), "null")
+	ctxLogger := logging.NewNoopCtxLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(ctxLogger, "null")
 	e := events_controllers.VCSEventsController{
-
-		Logger:                       logger,
+		Logger:                       ctxLogger,
 		Scope:                        scope,
 		Parser:                       p,
 		CommentEventHandler:          noopCommentHandler{},

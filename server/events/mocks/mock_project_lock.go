@@ -4,6 +4,7 @@
 package mocks
 
 import (
+	context "context"
 	pegomock "github.com/petergtz/pegomock"
 	events "github.com/runatlantis/atlantis/server/events"
 	models "github.com/runatlantis/atlantis/server/events/models"
@@ -27,11 +28,11 @@ func NewMockProjectLocker(options ...pegomock.Option) *MockProjectLocker {
 func (mock *MockProjectLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockProjectLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockProjectLocker) TryLock(log logging.Logger, pull models.PullRequest, user models.User, workspace string, project models.Project) (*events.TryLockResponse, error) {
+func (mock *MockProjectLocker) TryLock(log logging.Logger, requestCtx context.Context, pull models.PullRequest, user models.User, workspace string, project models.Project) (*events.TryLockResponse, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectLocker().")
 	}
-	params := []pegomock.Param{log, pull, user, workspace, project}
+	params := []pegomock.Param{log, requestCtx, pull, user, workspace, project}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", params, []reflect.Type{reflect.TypeOf((**events.TryLockResponse)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *events.TryLockResponse
 	var ret1 error
@@ -83,8 +84,8 @@ type VerifierMockProjectLocker struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockProjectLocker) TryLock(log logging.Logger, pull models.PullRequest, user models.User, workspace string, project models.Project) *MockProjectLocker_TryLock_OngoingVerification {
-	params := []pegomock.Param{log, pull, user, workspace, project}
+func (verifier *VerifierMockProjectLocker) TryLock(log logging.Logger, requestCtx context.Context, pull models.PullRequest, user models.User, workspace string, project models.Project) *MockProjectLocker_TryLock_OngoingVerification {
+	params := []pegomock.Param{log, requestCtx, pull, user, workspace, project}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLock", params, verifier.timeout)
 	return &MockProjectLocker_TryLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -94,33 +95,37 @@ type MockProjectLocker_TryLock_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockProjectLocker_TryLock_OngoingVerification) GetCapturedArguments() (logging.Logger, models.PullRequest, models.User, string, models.Project) {
-	log, pull, user, workspace, project := c.GetAllCapturedArguments()
-	return log[len(log)-1], pull[len(pull)-1], user[len(user)-1], workspace[len(workspace)-1], project[len(project)-1]
+func (c *MockProjectLocker_TryLock_OngoingVerification) GetCapturedArguments() (logging.Logger, context.Context, models.PullRequest, models.User, string, models.Project) {
+	log, requestCtx, pull, user, workspace, project := c.GetAllCapturedArguments()
+	return log[len(log)-1], requestCtx[len(requestCtx)-1], pull[len(pull)-1], user[len(user)-1], workspace[len(workspace)-1], project[len(project)-1]
 }
 
-func (c *MockProjectLocker_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.Logger, _param1 []models.PullRequest, _param2 []models.User, _param3 []string, _param4 []models.Project) {
+func (c *MockProjectLocker_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.Logger, _param1 []context.Context, _param2 []models.PullRequest, _param3 []models.User, _param4 []string, _param5 []models.Project) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]logging.Logger, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(logging.Logger)
 		}
-		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		_param1 = make([]context.Context, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequest)
+			_param1[u] = param.(context.Context)
 		}
-		_param2 = make([]models.User, len(c.methodInvocations))
+		_param2 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[2] {
-			_param2[u] = param.(models.User)
+			_param2[u] = param.(models.PullRequest)
 		}
-		_param3 = make([]string, len(c.methodInvocations))
+		_param3 = make([]models.User, len(c.methodInvocations))
 		for u, param := range params[3] {
-			_param3[u] = param.(string)
+			_param3[u] = param.(models.User)
 		}
-		_param4 = make([]models.Project, len(c.methodInvocations))
+		_param4 = make([]string, len(c.methodInvocations))
 		for u, param := range params[4] {
-			_param4[u] = param.(models.Project)
+			_param4[u] = param.(string)
+		}
+		_param5 = make([]models.Project, len(c.methodInvocations))
+		for u, param := range params[5] {
+			_param5[u] = param.(models.Project)
 		}
 	}
 	return

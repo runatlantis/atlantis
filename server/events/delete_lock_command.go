@@ -66,16 +66,24 @@ func (l *DefaultDeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
 		return
 	}
 	unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace)
+	logFields := map[string]interface{}{
+		"repository": lock.Pull.BaseRepo.FullName,
+		"pull-num":   lock.Pull.Num,
+		"workspace":  lock.Workspace,
+	}
 	if err != nil {
-		l.Logger.Error(fmt.Sprintf("unable to obtain working dir lock when trying to delete old plans: %s", err))
+		l.Logger.Error(
+			fmt.Sprintf("unable to obtain working dir lock when trying to delete old plans: %s", err),
+			logFields,
+		)
 	} else {
 		defer unlock()
 		// nolint: vetshadow
 		if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
-			l.Logger.Error(fmt.Sprintf("unable to delete workspace: %s", err))
+			l.Logger.Error(fmt.Sprintf("unable to delete workspace: %s", err), logFields)
 		}
 	}
 	if err := l.DB.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
-		l.Logger.Error(fmt.Sprintf("unable to delete project status: %s", err))
+		l.Logger.Error(fmt.Sprintf("unable to delete project status: %s", err), logFields)
 	}
 }

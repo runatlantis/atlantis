@@ -29,7 +29,7 @@ func (r *RunStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext, 
 	err := r.TerraformExecutor.EnsureVersion(prjCtx.Log, tfVersion)
 	if err != nil {
 		err = fmt.Errorf("%s: Downloading terraform Version %s", err, tfVersion.String())
-		prjCtx.Log.Error(fmt.Sprintf("error: %s", err))
+		prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("error: %s", err))
 		return "", err
 	}
 
@@ -71,9 +71,9 @@ func (r *RunStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext, 
 
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
-		prjCtx.Log.Error(fmt.Sprintf("error: %s", err))
+		prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("error: %s", err))
 		return "", err
 	}
-	prjCtx.Log.Info(fmt.Sprintf("successfully ran %q in %q", command, path))
+	prjCtx.Log.InfoContext(prjCtx.RequestCtx, fmt.Sprintf("successfully ran %q in %q", command, path))
 	return string(out), nil
 }

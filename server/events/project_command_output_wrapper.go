@@ -31,7 +31,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	// include a link to view the progress of atlantis plan command in real
 	// time
 	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus); err != nil {
-		ctx.Log.Error(fmt.Sprintf("updating project PR status %v", err))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
 
 	// ensures we are differentiating between project level command and overall command
@@ -39,14 +39,14 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 
 	if result.Error != nil || result.Failure != "" {
 		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus); err != nil {
-			ctx.Log.Error(fmt.Sprintf("updating project PR status %v", err))
+			ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 		}
 
 		return result
 	}
 
 	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus); err != nil {
-		ctx.Log.Error(fmt.Sprintf("updating project PR status %v", err))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
 
 	return result

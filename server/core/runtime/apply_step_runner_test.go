@@ -64,6 +64,7 @@ func TestRun_Success(t *testing.T) {
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
+		RequestCtx:         context.TODO(),
 	}
 	Ok(t, err)
 
@@ -98,6 +99,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 		RepoRelDir:         ".",
 		ProjectName:        "projectname",
 		EscapedCommentArgs: []string{"comment", "args"},
+		RequestCtx:         context.TODO(),
 	}
 	Ok(t, err)
 
@@ -133,6 +135,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
 		Log:                logger,
+		RequestCtx:         context.TODO(),
 	}
 
 	RegisterMockTestingT(t)
@@ -222,6 +225,7 @@ func TestRun_UsingTarget(t *testing.T) {
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
 				EscapedCommentArgs: c.commentFlags,
+				RequestCtx:         context.TODO(),
 			}, c.extraArgs, tmpDir, map[string]string(nil))
 			Equals(t, "", output)
 			if c.expErr {
@@ -268,6 +272,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
+		RequestCtx:         context.TODO(),
 	}
 	output, err := o.Run(ctx, prjCtx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	<-tfExec.DoneCh
@@ -331,6 +336,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
+		RequestCtx:         context.TODO(),
 	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	<-tfExec.DoneCh
 	ErrEquals(t, `Plan generated during apply phase did not match plan generated during plan phase.

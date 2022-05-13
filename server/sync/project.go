@@ -59,7 +59,7 @@ func (p *ProjectSyncer) sync(
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockResponse, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
+	lockResponse, err := p.Locker.TryLock(ctx.Log, ctx.RequestCtx, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
 	if err != nil {
 		result.Error = errors.Wrap(err, "acquiring lock")
 		return

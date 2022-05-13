@@ -136,7 +136,6 @@ func NewClientWithVersionCache(
 }
 
 func NewE2ETestClient(
-	log logging.SimpleLogging,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -259,10 +258,10 @@ func (c *DefaultClient) RunCommandWithVersion(ctx context.Context, prjCtx comman
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", cmd.String(), path)
-		prjCtx.Log.Error(err.Error())
+		prjCtx.Log.ErrorContext(prjCtx.RequestCtx, err.Error())
 		return ansi.Strip(string(out)), err
 	}
-	prjCtx.Log.Info(fmt.Sprintf("successfully ran %q in %q", cmd.String(), path))
+	prjCtx.Log.InfoContext(prjCtx.RequestCtx, fmt.Sprintf("successfully ran %q in %q", cmd.String(), path))
 
 	return ansi.Strip(string(out)), nil
 }

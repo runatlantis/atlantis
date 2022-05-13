@@ -55,7 +55,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
-			ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", statusErr))
+			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		p.pullUpdater.UpdatePull(ctx, AutoplanCommand{}, command.Result{Error: err})
 		return
@@ -64,31 +64,31 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
 
 	if len(projectCmds) == 0 {
-		ctx.Log.Info("determined there was no project to run plan in")
+		ctx.Log.InfoContext(ctx.RequestCtx, "determined there was no project to run plan in")
 		// If there were no projects modified, we set successful commit statuses
 		// with 0/0 projects planned/policy_checked/applied successfully because some users require
 		// the Atlantis status to be passing for all pull requests.
 		if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
-			ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
+			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 		}
 		if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
-			ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
+			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 		}
 		if err := p.commitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
-			ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
+			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 		}
 		return
 	}
 
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
 	if err := p.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-		ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
+		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
 
 	// Only run commands in parallel if enabled
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
+		ctx.Log.InfoContext(ctx.RequestCtx, "Running plans in parallel")
 		result = runProjectCmdsParallel(projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
@@ -98,7 +98,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
-		ctx.Log.Error(fmt.Sprintf("writing results: %s", err))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("writing results: %s", err))
 	}
 
 	p.updateCommitStatus(ctx, pullStatus)
@@ -106,7 +106,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
 	if len(policyCheckCmds) > 0 && !result.HasErrors() {
 		// Run policy_check command
-		ctx.Log.Info("Running policy_checks for all plans")
+		ctx.Log.InfoContext(ctx.RequestCtx, "Running policy_checks for all plans")
 
 		// refresh ctx's view of pull status since we just wrote to it.
 		// realistically each command should refresh this at the start,
@@ -124,13 +124,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 	pull := ctx.Pull
 
 	if err = p.commitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.PendingCommitStatus, command.Plan); err != nil {
-		ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
+		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
 
 	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
 	if err != nil {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
-			ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", statusErr))
+			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		p.pullUpdater.UpdatePull(ctx, cmd, command.Result{Error: err})
 		return
@@ -141,7 +141,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 	// Only run commands in parallel if enabled
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
-		ctx.Log.Info(fmt.Sprintf("Running applies in parallel"))
+		ctx.Log.InfoContext(ctx.RequestCtx, fmt.Sprintf("Running applies in parallel"))
 		result = runProjectCmdsParallel(projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
@@ -154,7 +154,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
-		ctx.Log.Error(fmt.Sprintf("writing results: %s", err))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("writing results: %s", err))
 		return
 	}
 
@@ -163,7 +163,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
 	if len(result.ProjectResults) > 0 && !result.HasErrors() {
-		ctx.Log.Info(fmt.Sprintf("Running policy check for %s", cmd.String()))
+		ctx.Log.InfoContext(ctx.RequestCtx, fmt.Sprintf("Running policy check for %s", cmd.String()))
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	}
 }
@@ -200,7 +200,7 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		numSuccess,
 		len(pullStatus.Projects),
 	); err != nil {
-		ctx.Log.Warn(fmt.Sprintf("unable to update commit status: %s", err))
+		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
 }
 
@@ -208,10 +208,10 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 func (p *PlanCommandRunner) deletePlans(ctx *command.Context) {
 	pullDir, err := p.workingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
-		ctx.Log.Error(fmt.Sprintf("getting pull dir: %s", err))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("getting pull dir: %s", err))
 	}
 	if err := p.pendingPlanFinder.DeletePlans(pullDir); err != nil {
-		ctx.Log.Error(fmt.Sprintf("deleting pending plans: %s", err))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("deleting pending plans: %s", err))
 	}
 }
 
@@ -229,7 +229,7 @@ func (p *PlanCommandRunner) partitionProjectCmds(
 		case command.PolicyCheck:
 			policyCheckCmds = append(policyCheckCmds, cmd)
 		default:
-			ctx.Log.Error(fmt.Sprintf("%s is not supported", cmd.CommandName))
+			ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("%s is not supported", cmd.CommandName))
 		}
 	}
 	return

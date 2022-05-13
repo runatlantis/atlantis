@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -42,4 +43,5 @@ type Context struct {
 
 	// Time Atlantis received VCS event, triggering command to be executed
 	TriggerTimestamp time.Time
+	RequestCtx       context.Context
 }

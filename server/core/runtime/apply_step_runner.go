@@ -37,7 +37,7 @@ func (a *ApplyStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext
 		return "", errors.Wrap(err, "unable to read planfile")
 	}
 
-	prjCtx.Log.Info("starting apply")
+	prjCtx.Log.InfoContext(prjCtx.RequestCtx, "starting apply")
 	var out string
 
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
@@ -56,9 +56,9 @@ func (a *ApplyStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext
 
 	// If the apply was successful, delete the plan.
 	if err == nil {
-		prjCtx.Log.Info("apply successful, deleting planfile")
+		prjCtx.Log.InfoContext(prjCtx.RequestCtx, "apply successful, deleting planfile")
 		if removeErr := os.Remove(planPath); removeErr != nil {
-			prjCtx.Log.Warn(fmt.Sprintf("failed to delete planfile after successful apply: %s", removeErr))
+			prjCtx.Log.WarnContext(prjCtx.RequestCtx, fmt.Sprintf("failed to delete planfile after successful apply: %s", removeErr))
 		}
 	}
 	return out, err
@@ -129,7 +129,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 	// updateStatusF will update the commit status and log any error.
 	updateStatusF := func(status models.CommitStatus, url string) {
 		if err := a.CommitStatusUpdater.UpdateProject(ctx, prjCtx, command.Apply, status, url); err != nil {
-			prjCtx.Log.Error(fmt.Sprintf("unable to update status: %s", err))
+			prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("unable to update status: %s", err))
 		}
 	}
 
@@ -165,7 +165,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 			// Check if the plan is as expected.
 			planChangedErr = a.remotePlanChanged(string(planfileBytes), strings.Join(lines, "\n"), tfVersion)
 			if planChangedErr != nil {
-				prjCtx.Log.Error(fmt.Sprintf("plan generated during apply does not match expected plan, aborting"))
+				prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("plan generated during apply does not match expected plan, aborting"))
 				inCh <- "no\n"
 				// Need to continue so we read all the lines, otherwise channel
 				// sender (in TerraformClient) will block indefinitely waiting

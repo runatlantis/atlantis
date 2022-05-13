@@ -41,17 +41,17 @@ func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute fun
 
 	if result.Error != nil {
 		executionError.Inc(1)
-		logger.Error(fmt.Sprintf("Error running %s operation: %s", commandName, result.Error.Error()), map[string]interface{}{"project": ctx.ProjectName})
+		logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("Error running %s operation: %s", commandName, result.Error.Error()), map[string]interface{}{"project": ctx.ProjectName})
 		return result
 	}
 
 	if result.Failure != "" {
 		executionFailure.Inc(1)
-		logger.Error(fmt.Sprintf("Failure running %s operation: %s", commandName, result.Failure), map[string]interface{}{"project": ctx.ProjectName})
+		logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("Failure running %s operation: %s", commandName, result.Failure), map[string]interface{}{"project": ctx.ProjectName})
 		return result
 	}
 
-	logger.Info(fmt.Sprintf("%s success. output available at: %s", commandName, ctx.Pull.URL), map[string]interface{}{"project": ctx.ProjectName})
+	logger.InfoContext(ctx.RequestCtx, fmt.Sprintf("%s success. output available at: %s", commandName, ctx.Pull.URL), map[string]interface{}{"project": ctx.ProjectName})
 
 	executionSuccess.Inc(1)
 	return result

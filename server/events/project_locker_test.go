@@ -14,6 +14,7 @@
 package events_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -53,7 +54,7 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 		},
 		nil,
 	)
-	res, err := locker.TryLock(logging.NewNoopCtxLogger(t), expPull, expUser, expWorkspace, expProject)
+	res, err := locker.TryLock(logging.NewNoopCtxLogger(t), context.TODO(), expPull, expUser, expWorkspace, expProject)
 	link, _ := mockClient.MarkdownPullLink(lockingPull)
 	Ok(t, err)
 	Equals(t, &events.TryLockResponse{
@@ -90,7 +91,7 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 		},
 		nil,
 	)
-	res, err := locker.TryLock(logging.NewNoopCtxLogger(t), expPull, expUser, expWorkspace, expProject)
+	res, err := locker.TryLock(logging.NewNoopCtxLogger(t), context.TODO(), expPull, expUser, expWorkspace, expProject)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
 
@@ -129,7 +130,7 @@ func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 		},
 		nil,
 	)
-	res, err := locker.TryLock(logging.NewNoopCtxLogger(t), expPull, expUser, expWorkspace, expProject)
+	res, err := locker.TryLock(logging.NewNoopCtxLogger(t), context.TODO(), expPull, expUser, expWorkspace, expProject)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
 

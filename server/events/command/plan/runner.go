@@ -18,6 +18,6 @@ type Runner struct {
 
 func (r *Runner) Run(ctx *command.Context, cmd *command.Comment) {
 	if err := r.vcsClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, "I'm a platform mode plan runner", command.Plan.String()); err != nil {
-		ctx.Log.Error(fmt.Sprintf("unable to comment: %s", err))
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to comment: %s", err))
 	}
 }

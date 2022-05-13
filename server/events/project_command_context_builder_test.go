@@ -1,6 +1,7 @@
 package events_test
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
@@ -42,6 +43,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 		Log:        logging.NewNoopCtxLogger(t),
 		PullStatus: pullStatus,
 		Scope:      scope,
+		RequestCtx: context.TODO(),
 	}
 
 	expectedApplyCmt := "Apply Comment"

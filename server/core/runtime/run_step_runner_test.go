@@ -135,6 +135,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 					Username: "acme-user",
 				},
 				Log:                logger,
+				RequestCtx:         context.TODO(),
 				Workspace:          "myworkspace",
 				RepoRelDir:         "mydir",
 				TerraformVersion:   projVersion,

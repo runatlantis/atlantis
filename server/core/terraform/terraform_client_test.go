@@ -54,6 +54,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
+		RequestCtx: context.TODO(),
 		Log:        logging.NewNoopCtxLogger(t),
 		Workspace:  "default",
 		RepoRelDir: ".",
@@ -88,6 +89,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
+		RequestCtx: context.TODO(),
 		Log:        logging.NewNoopCtxLogger(t),
 		Workspace:  "default",
 		RepoRelDir: ".",
