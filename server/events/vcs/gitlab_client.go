@@ -212,6 +212,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	for _, status := range statuses {
+		// Ignore any commit statuses with 'altantis/apply' as prefix
 		if strings.HasPrefix(status.Name, fmt.Sprintf("atlantis/%s", command.Apply.String())) {
 			continue
 		}
