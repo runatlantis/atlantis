@@ -3,6 +3,7 @@ package events
 import (
 	"fmt"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"strings"
 )
@@ -53,7 +54,7 @@ func (u *UnlockCommandRunner) Run(
 	u.commentOnDequeuedPullRequests(ctx, dequeueStatus)
 }
 
-func (u *UnlockCommandRunner) commentOnDequeuedPullRequests(ctx *CommandContext, dequeueStatus models.DequeueStatus) {
+func (u *UnlockCommandRunner) commentOnDequeuedPullRequests(ctx *command.Context, dequeueStatus models.DequeueStatus) {
 	locksByPullRequest := groupByPullRequests(dequeueStatus.ProjectLocks)
 	for pullRequestNumber, projectLocks := range locksByPullRequest {
 		planVcsMessage := buildCommentOnDequeuedPullRequest(projectLocks)

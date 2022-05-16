@@ -506,7 +506,6 @@ type EnqueueStatus struct {
 	ProjectLocksInFront int
 }
 
-// TODO monikma extend the tests
 type DequeueStatus struct {
 	// the PR's lock that should be planned next
 	ProjectLocks []ProjectLock
