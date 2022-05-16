@@ -1,6 +1,8 @@
 package events
 
-import "github.com/runatlantis/atlantis/server/events/models"
+import (
+	"github.com/runatlantis/atlantis/server/events/command"
+)
 
 func NewVersionCommandRunner(
 	pullUpdater *PullUpdater,
@@ -28,9 +30,9 @@ type VersionCommandRunner struct {
 	silenceVCSStatusNoProjects bool
 }
 
-func (v *VersionCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
+func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	var err error
-	var projectCmds []models.ProjectCommandContext
+	var projectCmds []command.ProjectContext
 	projectCmds, err = v.prjCmdBuilder.BuildVersionCommands(ctx, cmd)
 	if err != nil {
 		ctx.Log.Warn("Error %s", err)
@@ -42,7 +44,7 @@ func (v *VersionCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	}
 
 	// Only run commands in parallel if enabled
-	var result CommandResult
+	var result command.Result
 	if v.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running version in parallel")
 		result = runProjectCmdsParallel(projectCmds, v.prjCmdRunner.Version, v.parallelPoolSize)
@@ -53,6 +55,6 @@ func (v *VersionCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	v.pullUpdater.updatePull(ctx, cmd, result)
 }
 
-func (v *VersionCommandRunner) isParallelEnabled(cmds []models.ProjectCommandContext) bool {
+func (v *VersionCommandRunner) isParallelEnabled(cmds []command.ProjectContext) bool {
 	return len(cmds) > 0 && cmds[0].ParallelPolicyCheckEnabled
 }

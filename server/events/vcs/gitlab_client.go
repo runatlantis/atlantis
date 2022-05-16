@@ -24,6 +24,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
 	version "github.com/hashicorp/go-version"
@@ -211,7 +212,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	for _, status := range statuses {
-		if !strings.HasSuffix(status.Name, fmt.Sprintf("/%s", models.ApplyCommand.String())) {
+		if !strings.HasSuffix(status.Name, fmt.Sprintf("/%s", command.Apply.String())) {
 			if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
 				return false, nil
 			}
@@ -232,10 +233,10 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 // UpdateStatus updates the build status of a commit.
 func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
-	gitlabState := gitlab.Failed
+	gitlabState := gitlab.Pending
 	switch state {
 	case models.PendingCommitStatus:
-		gitlabState = gitlab.Pending
+		gitlabState = gitlab.Running
 	case models.FailedCommitStatus:
 		gitlabState = gitlab.Failed
 	case models.SuccessCommitStatus:

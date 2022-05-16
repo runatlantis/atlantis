@@ -29,6 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/shurcooL/githubv4"
+	"golang.org/x/oauth2"
 )
 
 // maxCommentLength is the maximum number of chars allowed in a single comment
@@ -40,6 +41,7 @@ type GithubClient struct {
 	user           string
 	client         *github.Client
 	v4MutateClient *graphql.Client
+	v4QueryClient  *githubv4.Client
 	ctx            context.Context
 	logger         logging.SimpleLogging
 }
@@ -91,6 +93,16 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 		transport,
 		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
 	)
+	token, err := credentials.GetToken()
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to get GitHub token")
+	}
+	src := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+	httpClient := oauth2.NewClient(context.Background(), src)
+	// Use the client from shurcooL's githubv4 library for queries.
+	v4QueryClient := githubv4.NewEnterpriseClient(graphqlURL, httpClient)
 
 	user, err := credentials.GetUser()
 	logger.Debug("GH User: %s", user)
@@ -102,6 +114,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 		user:           user,
 		client:         client,
 		v4MutateClient: v4MutateClient,
+		v4QueryClient:  v4QueryClient,
 		ctx:            context.Background(),
 		logger:         logger,
 	}, nil
@@ -290,8 +303,6 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		return false, errors.Wrap(err, "getting pull request")
 	}
 	state := githubPR.GetMergeableState()
-	status, _ := g.GetCombinedStatus(repo, githubPR.GetHead().GetSHA())
-
 	// We map our mergeable check to when the GitHub merge button is clickable.
 	// This corresponds to the following states:
 	// clean: No conflicts, all requirements satisfied.
@@ -301,27 +312,9 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
-	//
-	// We should not dismiss the PR if the only our "atlantis/apply" status is pending/failing
-	if state == "blocked" {
-		applyStatus := false
-		for _, s := range status.Statuses {
-			if strings.Contains(s.GetContext(), "atlantis/apply") {
-				applyStatus = true
-				continue
-			}
-			if s.GetContext() != "atlantis/apply" && s.GetState() != "success" {
-				// If any other status is pending/failing mark as non-mergeable
-				return false, nil
-			}
-		}
-		return applyStatus, nil
-	}
-
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
 		return false, nil
 	}
-
 	return true, nil
 }
 
@@ -350,14 +343,6 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 		}
 	}
 	return pull, err
-}
-
-func (g *GithubClient) GetCombinedStatus(repo models.Repo, ref string) (*github.CombinedStatus, error) {
-	opts := github.ListOptions{
-		PerPage: 300,
-	}
-	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, ref, &opts)
-	return status, err
 }
 
 // UpdateStatus updates the status badge on the pull request.
@@ -461,7 +446,7 @@ func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) (
 	var teamNames []string
 	ctx := context.Background()
 	for {
-		err := g.v4MutateClient.Query(ctx, &q, variables)
+		err := g.v4QueryClient.Query(ctx, &q, variables)
 		if err != nil {
 			return nil, err
 		}

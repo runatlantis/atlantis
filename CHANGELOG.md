@@ -1,3 +1,34 @@
+# v0.19.3
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.3
+
+# v0.19.2
+
+Bug fix release for github and update docs to reflect the docker registry support change.
+
+## What's Changed
+
+* fix: fix unmarshall error in graphql call by @raymondchen625 in https://github.com/runatlantis/atlantis/pull/2128
+* docs: update docker registry link to ghcr by @marceloboeira in https://github.com/runatlantis/atlantis/pull/2130
+
+# v0.19.1
+
+Bug fix release, most importantly fixing the wrong version number associated with v0.19.0.
+
+And it also contains fixes for `bitbucketcloud` and `gitlab`.
+
+## What's Changed
+
+* build(deps): bump actions/checkout from 2 to 3 by @dependabot in https://github.com/runatlantis/atlantis/pull/2119
+* build(deps): bump github.com/xanzy/go-gitlab from 0.55.1 to 0.58.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/2118
+* fix(bitbucketcloud): Ensure status key has at most 40 characters by @maxbrunet in https://github.com/runatlantis/atlantis/pull/2037
+* fix(gitlab-client): change `pending` to `running` state by @syphernl in https://github.com/runatlantis/atlantis/pull/1971
+* fix(bitbucketcloud)!: Use AccountID as username instead of Nickname by @maxbrunet in https://github.com/runatlantis/atlantis/pull/2034
+
 # v0.19.0
 
 Feature release for:

@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"strings"
@@ -28,7 +29,7 @@ type UnlockCommandRunner struct {
 }
 
 func (u *UnlockCommandRunner) Run(
-	ctx *CommandContext,
+	ctx *command.Context,
 	cmd *CommentCommand,
 ) {
 	baseRepo := ctx.Pull.BaseRepo
@@ -46,14 +47,14 @@ func (u *UnlockCommandRunner) Run(
 		return
 	}
 
-	if commentErr := u.vcsClient.CreateComment(baseRepo, pullNum, vcsMessage, models.UnlockCommand.String()); commentErr != nil {
+	if commentErr := u.vcsClient.CreateComment(baseRepo, pullNum, vcsMessage, command.Unlock.String()); commentErr != nil {
 		ctx.Log.Err("unable to comment on PR %s: %s", pullNum, commentErr)
 	}
 
 	u.commentOnDequeuedPullRequests(ctx, dequeueStatus)
 }
 
-func (u *UnlockCommandRunner) commentOnDequeuedPullRequests(ctx *CommandContext, dequeueStatus models.DequeueStatus) {
+func (u *UnlockCommandRunner) commentOnDequeuedPullRequests(ctx *command.Context, dequeueStatus models.DequeueStatus) {
 	locksByPullRequest := groupByPullRequests(dequeueStatus.ProjectLocks)
 	for pullRequestNumber, projectLocks := range locksByPullRequest {
 		planVcsMessage := buildCommentOnDequeuedPullRequest(projectLocks)

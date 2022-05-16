@@ -17,3 +17,4 @@ atlantis
 
 # gitreleaser
 dist/
+tmp-CHANGELOG.md

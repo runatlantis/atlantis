@@ -23,6 +23,7 @@ const (
 	ApplyStepName       = "apply"
 	InitStepName        = "init"
 	EnvStepName         = "env"
+	MultiEnvStepName    = "multienv"
 )
 
 // Step represents a single action/command to perform. In YAML, it can be set as
@@ -81,6 +82,7 @@ func (s Step) validStepName(stepName string) bool {
 		stepName == PlanStepName ||
 		stepName == ApplyStepName ||
 		stepName == EnvStepName ||
+		stepName == MultiEnvStepName ||
 		stepName == ShowStepName ||
 		stepName == PolicyCheckStepName
 }
@@ -191,7 +193,7 @@ func (s Step) Validate() error {
 				len(keys), strings.Join(keys, ","))
 		}
 		for stepName := range elem {
-			if stepName != RunStepName {
+			if stepName != RunStepName && stepName != MultiEnvStepName {
 				return fmt.Errorf("%q is not a valid step type", stepName)
 			}
 		}
@@ -251,9 +253,9 @@ func (s Step) ToValid() valid.Step {
 	if len(s.StringVal) > 0 {
 		// After validation we assume there's only one key and it's a valid
 		// step name so we just use the first one.
-		for _, v := range s.StringVal {
+		for stepName, v := range s.StringVal {
 			return valid.Step{
-				StepName:   RunStepName,
+				StepName:   stepName,
 				RunCommand: v,
 			}
 		}

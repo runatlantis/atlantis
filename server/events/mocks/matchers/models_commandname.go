@@ -2,32 +2,32 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
 	"reflect"
 
-	models "github.com/runatlantis/atlantis/server/events/models"
+	"github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
-func AnyModelsCommandName() models.CommandName {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(models.CommandName))(nil)).Elem()))
-	var nullValue models.CommandName
+func AnyModelsCommandName() command.Name {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(command.Name))(nil)).Elem()))
+	var nullValue command.Name
 	return nullValue
 }
 
-func EqModelsCommandName(value models.CommandName) models.CommandName {
+func EqModelsCommandName(value command.Name) command.Name {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue models.CommandName
+	var nullValue command.Name
 	return nullValue
 }
 
-func NotEqModelsCommandName(value models.CommandName) models.CommandName {
+func NotEqModelsCommandName(value command.Name) command.Name {
 	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
-	var nullValue models.CommandName
+	var nullValue command.Name
 	return nullValue
 }
 
-func ModelsCommandNameThat(matcher pegomock.ArgumentMatcher) models.CommandName {
+func ModelsCommandNameThat(matcher pegomock.ArgumentMatcher) command.Name {
 	pegomock.RegisterMatcher(matcher)
-	var nullValue models.CommandName
+	var nullValue command.Name
 	return nullValue
 }
