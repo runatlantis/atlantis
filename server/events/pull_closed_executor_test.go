@@ -26,6 +26,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -197,7 +198,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		// Create Log streaming resources
 		prjCmdOutput := make(chan *jobs.ProjectCmdOutputLine)
 		prjCmdOutHandler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutput, logger)
-		ctx := models.ProjectCommandContext{
+		ctx := command.ProjectContext{
 			BaseRepo:    fixtures.GithubRepo,
 			Pull:        fixtures.Pull,
 			ProjectName: *fixtures.Project.Name,
@@ -233,7 +234,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 			panic(errors.Wrap(err, "could not create bucket"))
 		}
 		db, _ := db.NewWithDB(boltDB, lockBucket, configBucket)
-		result := []models.ProjectResult{
+		result := []command.ProjectResult{
 			{
 				RepoRelDir:  fixtures.GithubRepo.FullName,
 				Workspace:   "default",

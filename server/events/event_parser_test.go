@@ -25,6 +25,7 @@ import (
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/server/events/vcs/fixtures"
 	. "github.com/runatlantis/atlantis/testing"
@@ -650,18 +651,18 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.RepoRelDir, func(t *testing.T) {
-			cmd := events.NewCommentCommand(c.RepoRelDir, nil, models.PlanCommand, false, false, "workspace", "")
+			cmd := events.NewCommentCommand(c.RepoRelDir, nil, command.Plan, false, false, "workspace", "")
 			Equals(t, c.ExpDir, cmd.RepoRelDir)
 		})
 	}
 }
 
 func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
-	cmd := events.NewCommentCommand("", nil, models.PlanCommand, false, false, "", "")
+	cmd := events.NewCommentCommand("", nil, command.Plan, false, false, "", "")
 	Equals(t, events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
-		Name:        models.PlanCommand,
+		Name:        command.Plan,
 		Verbose:     false,
 		Workspace:   "",
 		ProjectName: "",
@@ -669,19 +670,19 @@ func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
-	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, models.PlanCommand, true, false, "workspace", "project")
+	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, command.Plan, true, false, "workspace", "project")
 	Equals(t, events.CommentCommand{
 		Workspace:   "workspace",
 		RepoRelDir:  "dir",
 		Verbose:     true,
 		Flags:       []string{"a", "b"},
-		Name:        models.PlanCommand,
+		Name:        command.Plan,
 		ProjectName: "project",
 	}, *cmd)
 }
 
 func TestAutoplanCommand_CommandName(t *testing.T) {
-	Equals(t, models.PlanCommand, (events.AutoplanCommand{}).CommandName())
+	Equals(t, command.Plan, (events.AutoplanCommand{}).CommandName())
 }
 
 func TestAutoplanCommand_IsVerbose(t *testing.T) {
@@ -693,11 +694,11 @@ func TestAutoplanCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_CommandName(t *testing.T) {
-	Equals(t, models.PlanCommand, (events.CommentCommand{
-		Name: models.PlanCommand,
+	Equals(t, command.Plan, (events.CommentCommand{
+		Name: command.Plan,
 	}).CommandName())
-	Equals(t, models.ApplyCommand, (events.CommentCommand{
-		Name: models.ApplyCommand,
+	Equals(t, command.Apply, (events.CommentCommand{
+		Name: command.Apply,
 	}).CommandName())
 }
 
@@ -719,7 +720,7 @@ func TestCommentCommand_String(t *testing.T) {
 	Equals(t, exp, (events.CommentCommand{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},
-		Name:        models.PlanCommand,
+		Name:        command.Plan,
 		Verbose:     true,
 		Workspace:   "myworkspace",
 		ProjectName: "myproject",
@@ -769,7 +770,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
 		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
 		BaseBranch: "master",
-		Author:     "lkysow",
+		Author:     "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -785,7 +786,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		},
 	}, headRepo)
 	Equals(t, models.User{
-		Username: "lkysow",
+		Username: "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 	}, user)
 	Equals(t, "my comment", comment)
 }
@@ -855,7 +856,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/16",
 		HeadBranch: "Luke/maintf-edited-online-with-bitbucket-1560433073473",
 		BaseBranch: "master",
-		Author:     "Luke",
+		Author:     "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -871,7 +872,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		},
 	}, headRepo)
 	Equals(t, models.User{
-		Username: "Luke",
+		Username: "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 	}, user)
 }
 

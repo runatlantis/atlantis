@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	assetfs "github.com/elazarl/go-bindata-assetfs"
 )
 
 func bindataRead(data []byte, name string) ([]byte, error) {

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -24,11 +25,11 @@ func TestJobURLSetter(t *testing.T) {
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
 
 		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn(url, nil)
-		When(projectStatusUpdater.UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, url)).ThenReturn(nil)
-		err := jobURLSetter.SetJobURLWithStatus(ctx, models.PlanCommand, models.PendingCommitStatus)
+		When(projectStatusUpdater.UpdateProject(ctx, command.Plan, models.PendingCommitStatus, url)).ThenReturn(nil)
+		err := jobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus)
 		Ok(t, err)
 
-		projectStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, "url-to-project-jobs")
+		projectStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.PendingCommitStatus, "url-to-project-jobs")
 	})
 
 	t.Run("update project status with project jobs url error", func(t *testing.T) {
@@ -38,7 +39,7 @@ func TestJobURLSetter(t *testing.T) {
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
 
 		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn("url-to-project-jobs", errors.New("some error"))
-		err := jobURLSetter.SetJobURLWithStatus(ctx, models.PlanCommand, models.PendingCommitStatus)
+		err := jobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus)
 		assert.Error(t, err)
 	})
 }

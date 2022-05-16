@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	events "github.com/runatlantis/atlantis/server/events"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	events "github.com/runatlantis/atlantis/server/events"
 )
 
 type MockPendingPlanFinder struct {

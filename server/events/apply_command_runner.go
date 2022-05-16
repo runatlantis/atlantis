@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -62,7 +63,7 @@ type ApplyCommandRunner struct {
 	silenceVCSStatusNoProjects bool
 }
 
-func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
+func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
@@ -77,7 +78,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 
 	if locked {
 		ctx.Log.Info("ignoring apply command since apply disabled globally")
-		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyDisabledComment, models.ApplyCommand.String()); err != nil {
+		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyDisabledComment, command.Apply.String()); err != nil {
 			ctx.Log.Err("unable to comment on pull request: %s", err)
 		}
 
@@ -86,11 +87,15 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 
 	if a.DisableApplyAll && !cmd.IsForSpecificProject() {
 		ctx.Log.Info("ignoring apply command without flags since apply all is disabled")
-		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyAllDisabledComment, models.ApplyCommand.String()); err != nil {
+		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyAllDisabledComment, command.Apply.String()); err != nil {
 			ctx.Log.Err("unable to comment on pull request: %s", err)
 		}
 
 		return
+	}
+
+	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
 	// Get the mergeable status before we set any build statuses of our own.
@@ -107,18 +112,14 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
 	}
 
-	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
-
-	var projectCmds []models.ProjectCommandContext
+	var projectCmds []command.ProjectContext
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 
 	if err != nil {
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
+		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
 		return
 	}
 
@@ -130,7 +131,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 			// with 0/0 projects applied successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := a.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.ApplyCommand, 0, 0); err != nil {
+			if err := a.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		}
@@ -138,7 +139,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	}
 
 	// Only run commands in parallel if enabled
-	var result CommandResult
+	var result command.Result
 	if a.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running applies in parallel")
 		result = runProjectCmdsParallel(projectCmds, a.prjCmdRunner.Apply, a.parallelPoolSize)
@@ -170,11 +171,11 @@ func (a *ApplyCommandRunner) IsLocked() (bool, error) {
 	return lock.Locked, err
 }
 
-func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []models.ProjectCommandContext) bool {
+func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []command.ProjectContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelApplyEnabled
 }
 
-func (a *ApplyCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus models.PullStatus) {
+func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus
@@ -194,7 +195,7 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus 
 		ctx.Pull.BaseRepo,
 		ctx.Pull,
 		status,
-		models.ApplyCommand,
+		command.Apply,
 		numSuccess,
 		len(pullStatus.Projects),
 	); err != nil {

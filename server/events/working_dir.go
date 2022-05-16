@@ -62,6 +62,10 @@ type FileWorkspace struct {
 	// TestingOverrideBaseCloneURL can be used during testing to override the
 	// URL of the base repo to be cloned. If it's empty then we clone normally.
 	TestingOverrideBaseCloneURL string
+	// GithubAppEnabled is true if we should fetch the ref "pull/PR_NUMBER/head"
+	// from the "origin" remote. If this is false, we fetch "+refs/heads/$HEAD_BRANCH"
+	// from the "head" remote.
+	GithubAppEnabled bool
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -220,6 +224,12 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 		// get merge conflicts if our clone doesn't have the commits that the
 		// branch we're merging branched off at.
 		// See https://groups.google.com/forum/#!topic/git-users/v3MkuuiDJ98.
+		fetchRef := fmt.Sprintf("+refs/heads/%s:", p.HeadBranch)
+		fetchRemote := "head"
+		if w.GithubAppEnabled {
+			fetchRef = fmt.Sprintf("pull/%d/head:", p.Num)
+			fetchRemote = "origin"
+		}
 		cmds = [][]string{
 			{
 				"git", "clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir,
@@ -228,7 +238,7 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 				"git", "remote", "add", "head", headCloneURL,
 			},
 			{
-				"git", "fetch", "head", fmt.Sprintf("+refs/heads/%s:", p.HeadBranch),
+				"git", "fetch", fetchRemote, fetchRef,
 			},
 			// We use --no-ff because we always want there to be a merge commit.
 			// This way, our branch will look the same regardless if the merge

@@ -326,7 +326,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-app-id="00000"
   ```
-  GitHub app ID. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/reference/apps#installations).
+  GitHub app ID. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/apps/installations).
 
   ::: tip
   A GitHub app can be created by starting Atlantis first, then pointing your browser at
@@ -348,7 +348,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-app-key-file="path/to/app-key.pem"
   ```
-  Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/reference/apps#installations).
+  Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/apps/installations).
 
 - ### `--gh-app-key`
   ```bash
@@ -599,6 +599,12 @@ Values are chosen in this order:
   atlantis server --ssl-cert-file="/etc/ssl/private/my-cert.key"
   ```
   File containing x509 private key matching `--ssl-cert-file`.
+
+* ### `--stats-namespace`
+  ```bash
+  atlantis server --stats-namespace="myatlantis"
+  ```
+  Namespace for emitting stats/metrics. See (stats.html#Metrics/Stats)
 
 * ### `--tf-download-url`
   ```bash

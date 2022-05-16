@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	bolt "go.etcd.io/bbolt"
 )
@@ -300,10 +301,10 @@ func (b *BoltDB) GetQueueByLock(project models.Project, workspace string) ([]mod
 // LockCommand attempts to create a new lock for a CommandName.
 // If the lock doesn't exists, it will create a lock and return a pointer to it.
 // If the lock already exists, it will return an "lock already exists" error
-func (b *BoltDB) LockCommand(cmdName models.CommandName, lockTime time.Time) (*models.CommandLock, error) {
-	lock := models.CommandLock{
+func (b *BoltDB) LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error) {
+	lock := command.Lock{
 		CommandName: cmdName,
-		LockMetadata: models.LockMetadata{
+		LockMetadata: command.LockMetadata{
 			UnixTime: lockTime.Unix(),
 		},
 	}
@@ -331,7 +332,7 @@ func (b *BoltDB) LockCommand(cmdName models.CommandName, lockTime time.Time) (*m
 
 // UnlockCommand removes CommandName lock if present.
 // If there are no lock it returns an error.
-func (b *BoltDB) UnlockCommand(cmdName models.CommandName) error {
+func (b *BoltDB) UnlockCommand(cmdName command.Name) error {
 	transactionErr := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.globalLocksBucketName)
 
@@ -351,8 +352,8 @@ func (b *BoltDB) UnlockCommand(cmdName models.CommandName) error {
 
 // CheckCommandLock checks if CommandName lock was set.
 // If the lock exists return the pointer to the lock object, otherwise return nil
-func (b *BoltDB) CheckCommandLock(cmdName models.CommandName) (*models.CommandLock, error) {
-	cmdLock := models.CommandLock{}
+func (b *BoltDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
+	cmdLock := command.Lock{}
 
 	found := false
 
@@ -448,7 +449,7 @@ func (b *BoltDB) GetLock(p models.Project, workspace string) (*models.ProjectLoc
 
 // UpdatePullWithResults updates pull's status with the latest project results.
 // It returns the new PullStatus object.
-func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []models.ProjectResult) (models.PullStatus, error) {
+func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
 	key, err := b.pullKey(pull)
 	if err != nil {
 		return models.PullStatus{}, err
@@ -587,7 +588,7 @@ func (b *BoltDB) pullKey(pull models.PullRequest) ([]byte, error) {
 		nil
 }
 
-func (b *BoltDB) commandLockKey(cmdName models.CommandName) string {
+func (b *BoltDB) commandLockKey(cmdName command.Name) string {
 	return fmt.Sprintf("%s/lock", cmdName)
 }
 
@@ -616,7 +617,7 @@ func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.
 	return bucket.Put(key, serialized)
 }
 
-func (b *BoltDB) projectResultToProject(p models.ProjectResult) models.ProjectStatus {
+func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
 	return models.ProjectStatus{
 		Workspace:   p.Workspace,
 		RepoRelDir:  p.RepoRelDir,

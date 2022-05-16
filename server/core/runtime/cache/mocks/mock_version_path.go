@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	go_version "github.com/hashicorp/go-version"
-	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 	"time"
+
+	go_version "github.com/hashicorp/go-version"
+	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockExecutionVersionCache struct {

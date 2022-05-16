@@ -4,9 +4,10 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockWorkingDirLocker struct {
@@ -24,11 +25,11 @@ func NewMockWorkingDirLocker(options ...pegomock.Option) *MockWorkingDirLocker {
 func (mock *MockWorkingDirLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockWorkingDirLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string) (func(), error) {
+func (mock *MockWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string) (func(), error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
 	}
-	params := []pegomock.Param{repoFullName, pullNum, workspace}
+	params := []pegomock.Param{repoFullName, pullNum, workspace, path}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 func()
 	var ret1 error

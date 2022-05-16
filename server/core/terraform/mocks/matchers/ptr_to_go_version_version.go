@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
 	"reflect"
+
+	"github.com/petergtz/pegomock"
 
 	go_version "github.com/hashicorp/go-version"
 )
