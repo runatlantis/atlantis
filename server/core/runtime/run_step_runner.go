@@ -108,6 +108,7 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 	}()
 
 	err = cmd.Wait()
+	wg.Wait()
 
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output.String())
@@ -115,7 +116,6 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		return "", err
 	}
 	ctx.Log.Info("successfully ran %q in %q", command, path)
-	wg.Wait()
 	return ansi.Strip(output.String()), nil
 }
 
