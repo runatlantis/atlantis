@@ -282,7 +282,7 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 		_, outCh, err := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
 
 		var lines []string
-		if err != nil {
+		if err == nil {
 			for line := range outCh {
 				if line.Err != nil {
 					err = line.Err
