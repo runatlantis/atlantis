@@ -85,13 +85,17 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
-	cmd.Start()
+	if err := cmd.Start(); err != nil {
+		err = fmt.Errorf("%s: unable to start command %q", err, command)
+		ctx.Log.Debug("error: %s", err)
+		return "", err
+	}
 
-	var output bytes.Buffer
-	var mutex sync.Mutex
+	output := &bytes.Buffer{}
+	mutex := &sync.Mutex{}
 
-	go r.streamOutput(ctx, stdout, &output, &mutex)
-	go r.streamOutput(ctx, stderr, &output, &mutex)
+	go r.streamOutput(ctx, stdout, output, mutex)
+	go r.streamOutput(ctx, stderr, output, mutex)
 
 	err = cmd.Wait()
 
@@ -104,7 +108,7 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 	return ansi.Strip(output.String()), nil
 }
 
-func (r RunStepRunner) streamOutput(ctx command.ProjectContext, reader io.Reader, buffer *bytes.Buffer, mutex *sync.Mutex) {
+func (r RunStepRunner) streamOutput(ctx command.ProjectContext, reader io.Reader, buffer io.StringWriter, mutex *sync.Mutex) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
