@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/jobs"
 )
@@ -64,7 +65,7 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
 
-	runner := NewShellCommandRunner(command, finalEnvVars, path, r.ProjectCmdOutputHandler)
+	runner := models.NewShellCommandRunner(command, finalEnvVars, path, r.ProjectCmdOutputHandler)
 	output, err := runner.Run(ctx)
 
 	if err != nil {

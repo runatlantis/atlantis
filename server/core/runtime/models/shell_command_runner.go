@@ -1,4 +1,4 @@
-package runtime
+package models
 
 import (
 	"bufio"
@@ -48,7 +48,7 @@ func NewShellCommandRunner(command string, environ []string, workingDir string, 
 }
 
 func (s *ShellCommandRunner) Run(ctx command.ProjectContext) (string, error) {
-	_, outCh := s.runCommandAsync(ctx)
+	_, outCh := s.RunCommandAsync(ctx)
 
 	outbuf := new(strings.Builder)
 	var err error
@@ -72,7 +72,7 @@ func (s *ShellCommandRunner) Run(ctx command.ProjectContext) (string, error) {
 // Callers can use the input channel to pass stdin input to the command.
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
-func (s *ShellCommandRunner) runCommandAsync(ctx command.ProjectContext) (chan<- string, <-chan Line) {
+func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<- string, <-chan Line) {
 	outCh := make(chan Line)
 	inCh := make(chan string)
 

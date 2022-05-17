@@ -253,28 +253,29 @@ func (p *PlanStepRunner) runRemotePlan(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfVersion, ctx.Workspace)
+	_, outCh, err := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string
-	var err error
 
-	for line := range outCh {
-		if line.Err != nil {
-			err = line.Err
-			break
-		}
-		lines = append(lines, line.Line)
+	if err != nil {
+		for line := range outCh {
+			if line.Err != nil {
+				err = line.Err
+				break
+			}
+			lines = append(lines, line.Line)
 
-		// Here we're checking for the run url and updating the status
-		// if found.
-		if line.Line == lineBeforeRunURL {
-			nextLineIsRunURL = true
-		} else if nextLineIsRunURL {
-			runURL = strings.TrimSpace(line.Line)
-			ctx.Log.Debug("remote run url found, updating commit status")
-			updateStatusF(models.PendingCommitStatus, runURL)
-			nextLineIsRunURL = false
+			// Here we're checking for the run url and updating the status
+			// if found.
+			if line.Line == lineBeforeRunURL {
+				nextLineIsRunURL = true
+			} else if nextLineIsRunURL {
+				runURL = strings.TrimSpace(line.Line)
+				ctx.Log.Debug("remote run url found, updating commit status")
+				updateStatusF(models.PendingCommitStatus, runURL)
+				nextLineIsRunURL = false
+			}
 		}
 	}
 
