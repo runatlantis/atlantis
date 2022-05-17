@@ -1,14 +1,19 @@
 package runtime
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/jobs"
 )
 
 // RunStepRunner runs custom commands.
@@ -16,7 +21,8 @@ type RunStepRunner struct {
 	TerraformExecutor TerraformExec
 	DefaultTFVersion  *version.Version
 	// TerraformBinDir is the directory where Atlantis downloads Terraform binaries.
-	TerraformBinDir string
+	TerraformBinDir         string
+	ProjectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
 
 func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string) (string, error) {
@@ -66,13 +72,45 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
 	cmd.Env = finalEnvVars
-	out, err := cmd.CombinedOutput()
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		err = fmt.Errorf("%s: unable to create stdout buffer", err)
+		ctx.Log.Debug("error: %s", err)
+		return "", err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		err = fmt.Errorf("%s: unable to create stderr buffer", err)
+		ctx.Log.Debug("error: %s", err)
+		return "", err
+	}
+	cmd.Start()
+
+	var output bytes.Buffer
+	var mutex sync.Mutex
+
+	go r.streamOutput(ctx, stdout, &output, &mutex)
+	go r.streamOutput(ctx, stderr, &output, &mutex)
+
+	err = cmd.Wait()
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
+		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output.String())
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
 	ctx.Log.Info("successfully ran %q in %q", command, path)
-	return string(out), nil
+	return string(output.String()), nil
+}
+
+func (r RunStepRunner) streamOutput(ctx command.ProjectContext, reader io.Reader, buffer *bytes.Buffer, mutex *sync.Mutex) {
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Text()
+		r.ProjectCmdOutputHandler.Send(ctx, line, false)
+		mutex.Lock()
+		buffer.WriteString(line)
+		buffer.WriteString("\n")
+		mutex.Unlock()
+	}
 }

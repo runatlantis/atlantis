@@ -30,6 +30,7 @@ import (
 	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -537,9 +538,11 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	tfClient := tmocks.NewMockClient()
 	tfVersion, err := version.NewVersion("0.12.0")
 	Ok(t, err)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	run := runtime.RunStepRunner{
-		TerraformExecutor: tfClient,
-		DefaultTFVersion:  tfVersion,
+		TerraformExecutor:       tfClient,
+		DefaultTFVersion:        tfVersion,
+		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	env := runtime.EnvStepRunner{
 		RunStepRunner: &run,
