@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -91,7 +90,7 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		return "", err
 	}
 
-	output := new(bytes.Buffer)
+	output := new(strings.Builder)
 	mutex := new(sync.Mutex)
 
 	// Use a waitgroup to block until our stdout/err copying is complete.

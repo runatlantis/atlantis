@@ -46,6 +46,10 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ExpOut:  "your main.tf file does not provide default region.\ncheck\n",
 		},
 		{
+			Command: `echo "\e[0;32mgreen"`,
+			ExpOut:  "green\n",
+		},
+		{
 			Command: "echo 'a",
 			ExpErr:  "exit status 2: running \"echo 'a\" in",
 		},
