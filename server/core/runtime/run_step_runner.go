@@ -91,11 +91,21 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		return "", err
 	}
 
-	output := &bytes.Buffer{}
-	mutex := &sync.Mutex{}
+	output := new(bytes.Buffer)
+	mutex := new(sync.Mutex)
 
-	go r.streamOutput(ctx, stdout, output, mutex)
-	go r.streamOutput(ctx, stderr, output, mutex)
+	// Use a waitgroup to block until our stdout/err copying is complete.
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
+	go func() {
+		r.streamOutput(ctx, stdout, output, mutex)
+		wg.Done()
+	}()
+	go func() {
+		r.streamOutput(ctx, stderr, output, mutex)
+		wg.Done()
+	}()
 
 	err = cmd.Wait()
 
@@ -105,6 +115,7 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		return "", err
 	}
 	ctx.Log.Info("successfully ran %q in %q", command, path)
+	wg.Wait()
 	return ansi.Strip(output.String()), nil
 }
 
