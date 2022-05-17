@@ -118,14 +118,14 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 	return ansi.Strip(output.String()), nil
 }
 
-func (r RunStepRunner) streamOutput(ctx command.ProjectContext, reader io.Reader, buffer io.StringWriter, mutex *sync.Mutex) {
+func (r RunStepRunner) streamOutput(ctx command.ProjectContext, reader io.Reader, buffer io.StringWriter, mutex sync.Locker) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
 		r.ProjectCmdOutputHandler.Send(ctx, line, false)
 		mutex.Lock()
-		buffer.WriteString(line)
-		buffer.WriteString("\n")
+		_, _ = buffer.WriteString(line)
+		_, _ = buffer.WriteString("\n")
 		mutex.Unlock()
 	}
 }
