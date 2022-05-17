@@ -28,7 +28,6 @@ type Line struct {
 // `ProjectCommandOutputHandler`.
 type ShellCommandRunner struct {
 	command       string
-	environ       []string
 	workingDir    string
 	outputHandler jobs.ProjectCommandOutputHandler
 	cmd           *exec.Cmd
