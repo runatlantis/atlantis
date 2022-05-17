@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -74,18 +75,18 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 	cmd.Env = finalEnvVars
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		err = fmt.Errorf("%s: unable to create stdout buffer", err)
+		err = errors.Wrap(err, "opening stdout stream")
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		err = fmt.Errorf("%s: unable to create stderr buffer", err)
+		err = errors.Wrap(err, "opening stderr stream")
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
 	if err := cmd.Start(); err != nil {
-		err = fmt.Errorf("%s: unable to start command %q", err, command)
+		err = errors.Wrapf(err, "starting command %q", command)
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
