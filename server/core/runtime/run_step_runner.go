@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
@@ -100,7 +101,7 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		return "", err
 	}
 	ctx.Log.Info("successfully ran %q in %q", command, path)
-	return string(output.String()), nil
+	return ansi.Strip(output.String()), nil
 }
 
 func (r RunStepRunner) streamOutput(ctx command.ProjectContext, reader io.Reader, buffer *bytes.Buffer, mutex *sync.Mutex) {
