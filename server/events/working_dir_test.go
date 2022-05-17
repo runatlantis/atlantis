@@ -464,7 +464,7 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 
 func initRepo(t *testing.T) (string, func()) {
 	repoDir, cleanup := TempDir(t)
-	runCmd(t, repoDir, "git", "init")
+	runCmd(t, repoDir, "git", "init", "--initial-branch=master")
 	runCmd(t, repoDir, "touch", ".gitkeep")
 	runCmd(t, repoDir, "git", "add", ".gitkeep")
 	runCmd(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
