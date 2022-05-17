@@ -13,7 +13,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	"github.com/runatlantis/atlantis/server/core/terraform"
+	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -371,11 +371,11 @@ type remoteApplyMock struct {
 }
 
 // RunCommandAsync fakes out running terraform async.
-func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line, error) {
 	r.CalledArgs = args
 
 	in := make(chan string)
-	out := make(chan terraform.Line)
+	out := make(chan runtimemodels.Line)
 
 	// We use a wait group to ensure our sending and receiving routines have
 	// completed.
@@ -398,15 +398,15 @@ func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path strin
 	// Asynchronously send the lines we're supposed to.
 	go func() {
 		for _, line := range strings.Split(r.LinesToSend, "\n") {
-			out <- terraform.Line{Line: line}
+			out <- runtimemodels.Line{Line: line}
 		}
 		if r.Err != nil {
-			out <- terraform.Line{Err: r.Err}
+			out <- runtimemodels.Line{Err: r.Err}
 		}
 		close(out)
 		wg.Done()
 	}()
-	return in, out
+	return in, out, nil
 }
 
 var preConfirmOutFmt = `

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
+	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -211,7 +212,8 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	_, outCh := client.RunCommandAsync(ctx, tmp, args, map[string]string{}, nil, "workspace")
+	_, outCh, err := client.RunCommandAsync(ctx, tmp, args, map[string]string{}, nil, "workspace")
+	Ok(t, err)
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -260,7 +262,8 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		_, err = f.WriteString(s)
 		Ok(t, err)
 	}
-	_, outCh := client.RunCommandAsync(ctx, tmp, []string{filename}, map[string]string{}, nil, "workspace")
+	_, outCh, err := client.RunCommandAsync(ctx, tmp, []string{filename}, map[string]string{}, nil, "workspace")
+	Ok(t, err)
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -297,7 +300,8 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		overrideTF:              "echo",
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
+	_, outCh, err := client.RunCommandAsync(ctx, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
+	Ok(t, err)
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -334,7 +338,8 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 		overrideTF:              "echo",
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
+	_, outCh, err := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
+	Ok(t, err)
 
 	out, err := waitCh(outCh)
 	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
@@ -373,7 +378,8 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
-	inCh, outCh := client.RunCommandAsync(ctx, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
+	inCh, outCh, err := client.RunCommandAsync(ctx, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
+	Ok(t, err)
 	inCh <- "echo me\n"
 
 	out, err := waitCh(outCh)
@@ -381,7 +387,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	Equals(t, "echo me", out)
 }
 
-func waitCh(ch <-chan Line) (string, error) {
+func waitCh(ch <-chan runtimemodels.Line) (string, error) {
 	var ls []string
 	for line := range ch {
 		if line.Err != nil {
