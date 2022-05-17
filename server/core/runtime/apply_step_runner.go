@@ -91,7 +91,7 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 	applyStartText := `  Terraform will perform the actions described above.
   Only 'yes' will be accepted to approve.
 
-  Enter a value: 
+  Enter a value:
 `
 	applyStartIdx := strings.Index(out, applyStartText)
 	if applyStartIdx < 0 {
@@ -139,7 +139,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 	var runURL string
 	var planChangedErr error
 
-	if err != nil {
+	if err == nil {
 		for line := range outCh {
 			if line.Err != nil {
 				err = line.Err

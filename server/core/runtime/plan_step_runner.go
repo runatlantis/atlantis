@@ -258,7 +258,7 @@ func (p *PlanStepRunner) runRemotePlan(
 	nextLineIsRunURL := false
 	var runURL string
 
-	if err != nil {
+	if err == nil {
 		for line := range outCh {
 			if line.Err != nil {
 				err = line.Err
