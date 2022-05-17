@@ -1,19 +1,13 @@
 package runtime
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
@@ -38,9 +32,6 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
-
-	cmd := exec.Command("sh", "-c", command) // #nosec
-	cmd.Dir = path
 
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
@@ -72,61 +63,15 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 	for key, val := range envs {
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
-	cmd.Env = finalEnvVars
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		err = errors.Wrap(err, "opening stdout stream")
-		ctx.Log.Debug("error: %s", err)
-		return "", err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		err = errors.Wrap(err, "opening stderr stream")
-		ctx.Log.Debug("error: %s", err)
-		return "", err
-	}
-	if err := cmd.Start(); err != nil {
-		err = errors.Wrapf(err, "starting command %q", command)
-		ctx.Log.Debug("error: %s", err)
-		return "", err
-	}
 
-	output := new(strings.Builder)
-	mutex := new(sync.Mutex)
-
-	// Use a waitgroup to block until our stdout/err copying is complete.
-	wg := new(sync.WaitGroup)
-	wg.Add(2)
-
-	go func() {
-		r.streamOutput(ctx, stdout, output, mutex)
-		wg.Done()
-	}()
-	go func() {
-		r.streamOutput(ctx, stderr, output, mutex)
-		wg.Done()
-	}()
-
-	err = cmd.Wait()
-	wg.Wait()
+	runner := NewShellCommandRunner(command, finalEnvVars, path, r.ProjectCmdOutputHandler)
+	output, err := runner.Run(ctx)
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output.String())
+		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output)
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
 	ctx.Log.Info("successfully ran %q in %q", command, path)
-	return ansi.Strip(output.String()), nil
-}
-
-func (r RunStepRunner) streamOutput(ctx command.ProjectContext, reader io.Reader, buffer io.StringWriter, mutex sync.Locker) {
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		line := scanner.Text()
-		r.ProjectCmdOutputHandler.Send(ctx, line, false)
-		mutex.Lock()
-		_, _ = buffer.WriteString(line)
-		_, _ = buffer.WriteString("\n")
-		mutex.Unlock()
-	}
+	return output, nil
 }
