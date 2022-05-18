@@ -133,50 +133,48 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	inCh, outCh, err := a.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), applyArgs, envs, tfVersion, ctx.Workspace)
+	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), applyArgs, envs, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string
 	var planChangedErr error
 
-	if err == nil {
-		for line := range outCh {
-			if line.Err != nil {
-				err = line.Err
-				break
+	for line := range outCh {
+		if line.Err != nil {
+			err = line.Err
+			break
+		}
+		lines = append(lines, line.Line)
+
+		// Here we're checking for the run url and updating the status
+		// if found.
+		if line.Line == lineBeforeRunURL {
+			nextLineIsRunURL = true
+		} else if nextLineIsRunURL {
+			runURL = strings.TrimSpace(line.Line)
+			ctx.Log.Debug("remote run url found, updating commit status")
+			updateStatusF(models.PendingCommitStatus, runURL)
+			nextLineIsRunURL = false
+		}
+
+		// If the plan is complete and it's waiting for us to verify the apply,
+		// check if the plan is the same and if so, input "yes".
+		if a.atConfirmApplyPrompt(lines) {
+			ctx.Log.Debug("remote apply is waiting for confirmation")
+
+			// Check if the plan is as expected.
+			planChangedErr = a.remotePlanChanged(string(planfileBytes), strings.Join(lines, "\n"), tfVersion)
+			if planChangedErr != nil {
+				ctx.Log.Err("plan generated during apply does not match expected plan, aborting")
+				inCh <- "no\n"
+				// Need to continue so we read all the lines, otherwise channel
+				// sender (in TerraformClient) will block indefinitely waiting
+				// for us to read.
+				continue
 			}
-			lines = append(lines, line.Line)
 
-			// Here we're checking for the run url and updating the status
-			// if found.
-			if line.Line == lineBeforeRunURL {
-				nextLineIsRunURL = true
-			} else if nextLineIsRunURL {
-				runURL = strings.TrimSpace(line.Line)
-				ctx.Log.Debug("remote run url found, updating commit status")
-				updateStatusF(models.PendingCommitStatus, runURL)
-				nextLineIsRunURL = false
-			}
-
-			// If the plan is complete and it's waiting for us to verify the apply,
-			// check if the plan is the same and if so, input "yes".
-			if a.atConfirmApplyPrompt(lines) {
-				ctx.Log.Debug("remote apply is waiting for confirmation")
-
-				// Check if the plan is as expected.
-				planChangedErr = a.remotePlanChanged(string(planfileBytes), strings.Join(lines, "\n"), tfVersion)
-				if planChangedErr != nil {
-					ctx.Log.Err("plan generated during apply does not match expected plan, aborting")
-					inCh <- "no\n"
-					// Need to continue so we read all the lines, otherwise channel
-					// sender (in TerraformClient) will block indefinitely waiting
-					// for us to read.
-					continue
-				}
-
-				ctx.Log.Debug("plan generated during apply matches expected plan, continuing")
-				inCh <- "yes\n"
-			}
+			ctx.Log.Debug("plan generated during apply matches expected plan, continuing")
+			inCh <- "yes\n"
 		}
 	}
 

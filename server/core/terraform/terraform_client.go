@@ -279,17 +279,16 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 // See Client.RunCommandWithVersion.
 func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
 	if isAsyncEligibleCommand(args[0]) {
-		_, outCh, err := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
+		_, outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
 
 		var lines []string
-		if err == nil {
-			for line := range outCh {
-				if line.Err != nil {
-					err = line.Err
-					break
-				}
-				lines = append(lines, line.Line)
+		var err error
+		for line := range outCh {
+			if line.Err != nil {
+				err = line.Err
+				break
 			}
+			lines = append(lines, line.Line)
 		}
 		output := strings.Join(lines, "\n")
 
@@ -378,10 +377,17 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, w
 // Callers can use the input channel to pass stdin input to the command.
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
-func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan models.Line, error) {
+func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan models.Line) {
 	cmd, envVars, err := c.prepCmd(ctx.Log, v, workspace, path, args)
 	if err != nil {
-		return nil, nil, err
+		outCh := make(chan models.Line)
+		inCh := make(chan string)
+		go func() {
+			outCh <- models.Line{Err: err}
+			close(outCh)
+			close(inCh)
+		}()
+		return inCh, outCh
 	}
 
 	for key, val := range customEnvVars {
@@ -390,7 +396,7 @@ func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string,
 
 	runner := models.NewShellCommandRunner(cmd, envVars, path, c.projectCmdOutputHandler)
 	inCh, outCh := runner.RunCommandAsync(ctx)
-	return inCh, outCh, nil
+	return inCh, outCh
 }
 
 // MustConstraint will parse one or more constraints from the given

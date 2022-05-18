@@ -371,7 +371,7 @@ type remoteApplyMock struct {
 }
 
 // RunCommandAsync fakes out running terraform async.
-func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line, error) {
+func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line) {
 	r.CalledArgs = args
 
 	in := make(chan string)
@@ -406,7 +406,7 @@ func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path strin
 		close(out)
 		wg.Done()
 	}()
-	return in, out, nil
+	return in, out
 }
 
 var preConfirmOutFmt = `

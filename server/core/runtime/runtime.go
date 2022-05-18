@@ -41,7 +41,7 @@ type AsyncTFExec interface {
 	// Callers can use the input channel to pass stdin input to the command.
 	// If any error is passed on the out channel, there will be no
 	// further output (so callers are free to exit).
-	RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line, error)
+	RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line)
 }
 
 // StatusUpdater brings the interface from CommitStatusUpdater into this package

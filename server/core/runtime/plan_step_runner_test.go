@@ -885,7 +885,7 @@ type remotePlanMock struct {
 	CalledArgs []string
 }
 
-func (r *remotePlanMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line, error) {
+func (r *remotePlanMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line) {
 	r.CalledArgs = args
 	in := make(chan string)
 	out := make(chan runtimemodels.Line)
@@ -896,7 +896,7 @@ func (r *remotePlanMock) RunCommandAsync(ctx command.ProjectContext, path string
 		close(out)
 		close(in)
 	}()
-	return in, out, nil
+	return in, out
 }
 
 func stringSliceEquals(a, b []string) bool {

@@ -212,8 +212,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	_, outCh, err := client.RunCommandAsync(ctx, tmp, args, map[string]string{}, nil, "workspace")
-	Ok(t, err)
+	_, outCh := client.RunCommandAsync(ctx, tmp, args, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -262,8 +261,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		_, err = f.WriteString(s)
 		Ok(t, err)
 	}
-	_, outCh, err := client.RunCommandAsync(ctx, tmp, []string{filename}, map[string]string{}, nil, "workspace")
-	Ok(t, err)
+	_, outCh := client.RunCommandAsync(ctx, tmp, []string{filename}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -300,8 +298,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		overrideTF:              "echo",
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	_, outCh, err := client.RunCommandAsync(ctx, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
-	Ok(t, err)
+	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -338,8 +335,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 		overrideTF:              "echo",
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	_, outCh, err := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
-	Ok(t, err)
+	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
@@ -378,8 +374,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
-	inCh, outCh, err := client.RunCommandAsync(ctx, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
-	Ok(t, err)
+	inCh, outCh := client.RunCommandAsync(ctx, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
 	inCh <- "echo me\n"
 
 	out, err := waitCh(outCh)
