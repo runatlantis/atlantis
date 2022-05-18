@@ -380,6 +380,9 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, w
 func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan models.Line) {
 	cmd, envVars, err := c.prepCmd(ctx.Log, v, workspace, path, args)
 	if err != nil {
+		// The signature of `RunCommandAsync` doesn't provide for returning an immediate error, only one
+		// once reading the output. Since we won't be spawning a process, simulate that by sending the
+		// errorcustomEnvVars to the output channel.
 		outCh := make(chan models.Line)
 		inCh := make(chan string)
 		go func() {
