@@ -429,6 +429,19 @@ func (g *GithubClient) UpdateStatus(ctx context.Context, request types.UpdateSta
 	return err
 }
 
+// [WENGINES-4643] TODO: Move the checks implementation to UpdateStatus once github checks is stable
+// UpdateChecksStatus updates the status check
+func (g *GithubClient) UpdateChecksStatus(ctx context.Context, request types.UpdateStatusRequest) error {
+	// TODO: Implement updating github checks
+	// - Get all checkruns for this SHA
+	// - Match the UpdateReqIdentifier with the check run. If it exists, update the checkrun. If it does not, create a new check run.
+
+	// Checks uses Status and Conlusion. Need to map models.CommitStatus to Status and Conclusion
+	// Status -> queued, in_progress, completed
+	// Conclusion -> failure, neutral, cancelled, timed_out, or action_required. (Optional. Required if you provide a status of "completed".)
+	return nil
+}
+
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
 func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil

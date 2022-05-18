@@ -15,11 +15,12 @@ import (
 )
 
 // NewInstrumentedGithubClient creates a client proxy responsible for gathering stats and logging
-func NewInstrumentedGithubClient(client *GithubClient, statsScope tally.Scope, logger logging.Logger) IGithubClient {
+func NewInstrumentedGithubClient(client *GithubClient, checksEnabledGHClient Client, statsScope tally.Scope, logger logging.Logger) IGithubClient {
 	scope := statsScope.SubScope("github")
 
+	// [WENGINES-4643] TODO: Remove checksEnabledGHClient with client once gitub checks is stable.
 	instrumentedGHClient := &InstrumentedClient{
-		Client:     client,
+		Client:     checksEnabledGHClient,
 		StatsScope: scope,
 		Logger:     logger,
 	}

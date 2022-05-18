@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
@@ -24,7 +25,7 @@ type AutoplanValidator struct {
 	GlobalCfg                     valid.GlobalCfg
 	CommitStatusUpdater           events.CommitStatusUpdater
 	PrjCmdBuilder                 events.ProjectPlanCommandBuilder
-	PullUpdater                   *events.PullUpdater
+	OutputUpdater                 events.OutputUpdater
 	WorkingDir                    events.WorkingDir
 	WorkingDirLocker              events.WorkingDirLocker
 }
@@ -70,7 +71,7 @@ func (r *AutoplanValidator) isValid(ctx context.Context, logger logging.Logger, 
 		if cloneErr := r.WorkingDir.Delete(baseRepo, pull); cloneErr != nil {
 			cmdCtx.Log.WarnContext(cmdCtx.RequestCtx, "unable to delete clone after autoplan failed", map[string]interface{}{"err": cloneErr})
 		}
-		r.PullUpdater.UpdatePull(cmdCtx, events.AutoplanCommand{}, command.Result{Error: err})
+		r.OutputUpdater.UpdateOutput(cmdCtx, events.AutoplanCommand{}, command.Result{Error: err})
 		return false, errors.Wrap(err, "Failed building autoplan commands")
 	}
 	unlockFn, err := r.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
