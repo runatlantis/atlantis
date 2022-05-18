@@ -14,18 +14,16 @@
 package events_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var noopLogger = logging.NewNoopLogger()
 var modifiedRepo = "owner/repo"
 var m = events.DefaultProjectFinder{}
 var nestedModules1 string
@@ -47,7 +45,7 @@ func setupTmpRepos(t *testing.T) {
 	//   modules/
 	//     main.tf
 	var err error
-	nestedModules1, err = ioutil.TempDir("", "")
+	nestedModules1, err = os.MkdirTemp("", "")
 	Ok(t, err)
 	err = os.MkdirAll(filepath.Join(nestedModules1, "project1/modules"), 0700)
 	Ok(t, err)
@@ -79,7 +77,7 @@ func setupTmpRepos(t *testing.T) {
 	//    main.tf
 	//  project2/
 	//    main.tf
-	topLevelModules, err = ioutil.TempDir("", "")
+	topLevelModules, err = os.MkdirTemp("", "")
 	Ok(t, err)
 	for _, path := range []string{"modules", "project1", "project2"} {
 		err = os.MkdirAll(filepath.Join(topLevelModules, path), 0700)
@@ -93,7 +91,8 @@ func setupTmpRepos(t *testing.T) {
 	// env/
 	//   staging.tfvars
 	//   production.tfvars
-	envDir, err = ioutil.TempDir("", "")
+	//   global-env-config.auto.tfvars.json
+	envDir, err = os.MkdirTemp("", "")
 	Ok(t, err)
 	err = os.MkdirAll(filepath.Join(envDir, "env"), 0700)
 	Ok(t, err)
@@ -104,114 +103,162 @@ func setupTmpRepos(t *testing.T) {
 }
 
 func TestDetermineProjects(t *testing.T) {
+	noopLogger := logging.NewNoopLogger(t)
 	setupTmpRepos(t)
 
+	defaultAutoplanFileList := "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+
 	cases := []struct {
-		description     string
-		files           []string
-		expProjectPaths []string
-		repoDir         string
+		description      string
+		files            []string
+		expProjectPaths  []string
+		repoDir          string
+		autoplanFileList string
 	}{
 		{
 			"If no files were modified then should return an empty list",
 			nil,
 			nil,
 			nestedModules1,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should ignore non .tf files and return an empty list",
 			[]string{"non-tf", "non.tf.suffix"},
 			nil,
 			nestedModules1,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should ignore .tflint.hcl files and return an empty list",
 			[]string{".tflint.hcl", "project1/.tflint.hcl"},
 			nil,
 			nestedModules1,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should plan in the parent directory from modules if that dir has a main.tf",
 			[]string{"project1/modules/main.tf"},
 			[]string{"project1"},
 			nestedModules1,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should plan in the parent directory from modules if that dir has a main.tf",
 			[]string{"modules/main.tf"},
 			[]string{"."},
 			nestedModules2,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should plan in the parent directory from modules when module is in a subdir if that dir has a main.tf",
 			[]string{"modules/subdir/main.tf"},
 			[]string{"."},
 			nestedModules2,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should not plan in the parent directory from modules if that dir does not have a main.tf",
 			[]string{"modules/main.tf"},
 			[]string{},
 			topLevelModules,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should not plan in the parent directory from modules if that dir does not have a main.tf",
 			[]string{"modules/main.tf", "project1/main.tf"},
 			[]string{"project1"},
 			topLevelModules,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should ignore tfstate files and return an empty list",
 			[]string{"terraform.tfstate", "terraform.tfstate.backup", "parent/terraform.tfstate", "parent/terraform.tfstate.backup"},
 			nil,
 			nestedModules1,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should return '.' when changed file is at root",
 			[]string{"a.tf"},
 			[]string{"."},
 			nestedModules2,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should return directory when changed file is in a dir",
 			[]string{"project1/a.tf"},
 			[]string{"project1"},
 			nestedModules1,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should return parent dir when changed file is in an env/ dir",
 			[]string{"env/staging.tfvars"},
 			[]string{"."},
 			envDir,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should de-duplicate when multiple files changed in the same dir",
 			[]string{"env/staging.tfvars", "main.tf", "other.tf"},
 			[]string{"."},
 			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should ignore changes in a dir that was deleted",
 			[]string{"wasdeleted/main.tf"},
 			[]string{},
 			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should not ignore terragrunt.hcl files",
 			[]string{"terragrunt.hcl"},
 			[]string{"."},
 			nestedModules2,
+			defaultAutoplanFileList,
 		},
 		{
 			"Should find terragrunt.hcl file inside a nested directory",
 			[]string{"project1/terragrunt.hcl"},
 			[]string{"project1"},
 			nestedModules1,
+			defaultAutoplanFileList,
+		},
+		{
+			"Should find packer files and ignore default tf files",
+			[]string{"project1/image.pkr.hcl", "project2/main.tf"},
+			[]string{"project1"},
+			topLevelModules,
+			"**/*.pkr.hcl",
+		},
+		{
+			"Should find yaml files in addition to defaults",
+			[]string{"project1/ansible.yml", "project2/main.tf"},
+			[]string{"project1", "project2"},
+			topLevelModules,
+			"**/*.tf,**/*.yml",
+		},
+		{
+			"Should find yaml files unless excluded",
+			[]string{"project1/ansible.yml", "project2/config.yml"},
+			[]string{"project1"},
+			topLevelModules,
+			"**/*.yml,!project2/*.yml",
+		},
+		{
+			"Should not ignore .terraform.lock.hcl files",
+			[]string{"project1/.terraform.lock.hcl"},
+			[]string{"project1"},
+			nestedModules1,
+			defaultAutoplanFileList,
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			projects := m.DetermineProjects(noopLogger, c.files, modifiedRepo, c.repoDir)
+			projects := m.DetermineProjects(noopLogger, c.files, modifiedRepo, c.repoDir, c.autoplanFileList)
 
 			// Extract the paths from the projects. We use a slice here instead of a
 			// map so we can test whether there are duplicates returned.
@@ -245,6 +292,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	// main.tf
 	// project1/
 	//   main.tf
+	//   terraform.tfvars.json
 	// project2/
 	//   main.tf
 	//   terraform.tfvars
@@ -254,7 +302,8 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
 		"main.tf": nil,
 		"project1": map[string]interface{}{
-			"main.tf": nil,
+			"main.tf":               nil,
+			"terraform.tfvars.json": nil,
 		},
 		"project2": map[string]interface{}{
 			"main.tf":          nil,
@@ -456,7 +505,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			pf := events.DefaultProjectFinder{}
-			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(), c.modified, c.config, tmpDir)
+			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(t), c.modified, c.config, tmpDir)
 			Ok(t, err)
 			Equals(t, len(c.expProjPaths), len(projects))
 			for i, proj := range projects {

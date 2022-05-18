@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
 type MockDeleteLockCommand struct {
@@ -44,19 +45,23 @@ func (mock *MockDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, e
 	return ret0, ret1
 }
 
-func (mock *MockDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) error {
+func (mock *MockDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) (int, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDeleteLockCommand().")
 	}
 	params := []pegomock.Param{repoFullName, pullNum}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLocksByPull", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
+	result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLocksByPull", params, []reflect.Type{reflect.TypeOf((*int)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 int
+	var ret1 error
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(error)
+			ret0 = result[0].(int)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
 		}
 	}
-	return ret0
+	return ret0, ret1
 }
 
 func (mock *MockDeleteLockCommand) VerifyWasCalledOnce() *VerifierMockDeleteLockCommand {
@@ -66,14 +71,14 @@ func (mock *MockDeleteLockCommand) VerifyWasCalledOnce() *VerifierMockDeleteLock
 	}
 }
 
-func (mock *MockDeleteLockCommand) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockDeleteLockCommand {
+func (mock *MockDeleteLockCommand) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockDeleteLockCommand {
 	return &VerifierMockDeleteLockCommand{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockDeleteLockCommand) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockDeleteLockCommand {
+func (mock *MockDeleteLockCommand) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockDeleteLockCommand {
 	return &VerifierMockDeleteLockCommand{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -81,7 +86,7 @@ func (mock *MockDeleteLockCommand) VerifyWasCalledInOrder(invocationCountMatcher
 	}
 }
 
-func (mock *MockDeleteLockCommand) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockDeleteLockCommand {
+func (mock *MockDeleteLockCommand) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockDeleteLockCommand {
 	return &VerifierMockDeleteLockCommand{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -91,7 +96,7 @@ func (mock *MockDeleteLockCommand) VerifyWasCalledEventually(invocationCountMatc
 
 type VerifierMockDeleteLockCommand struct {
 	mock                   *MockDeleteLockCommand
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

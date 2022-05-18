@@ -68,7 +68,12 @@ docker-compose up --detach --build
 
 ## Running Tests In Docker:
 ```
-docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis runatlantis/testing-env make test
+docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis ghcr.io/runatlantis/testing-env:latest make test
+```
+
+Or to run the integration tests
+```
+docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis ghcr.io/runatlantis/testing-env:latest make test-all
 ```
 
 ## Calling Your Local Atlantis From GitHub
@@ -139,7 +144,7 @@ Each interface that is mocked has a `go:generate` command above it, e.g.
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
 type ProjectCommandBuilder interface {
-	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
+	BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error)
 }
 ```
 
@@ -160,10 +165,11 @@ go get github.com/petergtz/pegomock/...
 1. Create a pull request and merge to master
 1. Check out master and fetch latest
 1. Run `make release`
+    1. If you get `signal: killed` errors, bump up your Docker resources to have more memory, e.g. 6 G.B.
 1. Go to https://github.com/runatlantis/atlantis/releases and click "Draft a new release"
     1. Prefix version with `v`
     1. The title of the release is the same as the tag (ex. v0.2.2)
     1. Fill in description by copying from the CHANGELOG just without the Downloads section
     1. Drag in binaries made with `make release`
-1. Re-run master branch build to ensure tag gets pushed to Docker hub: https://hub.docker.com/r/runatlantis/atlantis/tags/
+1. Re-run master branch build to ensure tag gets pushed to Github: https://github.com/runatlantis/atlantis/pkgs/container/atlantis
 1. Update the default version in `Chart.yaml` in [the official Helm chart](https://github.com/runatlantis/helm-charts/blob/main/charts/atlantis/values.yaml).

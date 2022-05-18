@@ -3,18 +3,31 @@ package matchers
 
 import (
 	"reflect"
+
 	"github.com/petergtz/pegomock"
-	events "github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
-func AnyPtrToEventsCommandContext() *events.CommandContext {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(*events.CommandContext))(nil)).Elem()))
-	var nullValue *events.CommandContext
+func AnyPtrToEventsCommandContext() *command.Context {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(*command.Context))(nil)).Elem()))
+	var nullValue *command.Context
 	return nullValue
 }
 
-func EqPtrToEventsCommandContext(value *events.CommandContext) *events.CommandContext {
+func EqPtrToEventsCommandContext(value *command.Context) *command.Context {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue *events.CommandContext
+	var nullValue *command.Context
+	return nullValue
+}
+
+func NotEqPtrToEventsCommandContext(value *command.Context) *command.Context {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *command.Context
+	return nullValue
+}
+
+func PtrToEventsCommandContextThat(matcher pegomock.ArgumentMatcher) *command.Context {
+	pegomock.RegisterMatcher(matcher)
+	var nullValue *command.Context
 	return nullValue
 }

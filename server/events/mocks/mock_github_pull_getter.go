@@ -53,14 +53,14 @@ func (mock *MockGithubPullGetter) VerifyWasCalledOnce() *VerifierMockGithubPullG
 	}
 }
 
-func (mock *MockGithubPullGetter) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockGithubPullGetter {
+func (mock *MockGithubPullGetter) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockGithubPullGetter {
 	return &VerifierMockGithubPullGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockGithubPullGetter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGithubPullGetter {
+func (mock *MockGithubPullGetter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGithubPullGetter {
 	return &VerifierMockGithubPullGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -68,7 +68,7 @@ func (mock *MockGithubPullGetter) VerifyWasCalledInOrder(invocationCountMatcher 
 	}
 }
 
-func (mock *MockGithubPullGetter) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockGithubPullGetter {
+func (mock *MockGithubPullGetter) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockGithubPullGetter {
 	return &VerifierMockGithubPullGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -78,7 +78,7 @@ func (mock *MockGithubPullGetter) VerifyWasCalledEventually(invocationCountMatch
 
 type VerifierMockGithubPullGetter struct {
 	mock                   *MockGithubPullGetter
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

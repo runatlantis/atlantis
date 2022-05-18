@@ -1,14 +1,13 @@
 package events
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/runtime"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pending_plan_finder.go PendingPlanFinder
@@ -43,7 +42,7 @@ func (p *DefaultPendingPlanFinder) Find(pullDir string) ([]PendingPlan, error) {
 }
 
 func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPlan, []string, error) {
-	workspaceDirs, err := ioutil.ReadDir(pullDir)
+	workspaceDirs, err := os.ReadDir(pullDir)
 	if err != nil {
 		return nil, nil, err
 	}

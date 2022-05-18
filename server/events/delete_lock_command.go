@@ -1,8 +1,8 @@
 package events
 
 import (
-	"github.com/runatlantis/atlantis/server/events/db"
-	"github.com/runatlantis/atlantis/server/events/locking"
+	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -12,13 +12,13 @@ import (
 // DeleteLockCommand is the first step after a command request has been parsed.
 type DeleteLockCommand interface {
 	DeleteLock(id string) (*models.ProjectLock, error)
-	DeleteLocksByPull(repoFullName string, pullNum int) error
+	DeleteLocksByPull(repoFullName string, pullNum int) (int, error)
 }
 
 // DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
 type DefaultDeleteLockCommand struct {
 	Locker           locking.Locker
-	Logger           *logging.SimpleLogger
+	Logger           logging.SimpleLogging
 	WorkingDir       WorkingDir
 	WorkingDirLocker WorkingDirLocker
 	DB               *db.BoltDB
@@ -39,21 +39,23 @@ func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, e
 }
 
 // DeleteLocksByPull handles deleting all locks for the pull request
-func (l *DefaultDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) error {
+func (l *DefaultDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) (int, error) {
 	locks, err := l.Locker.UnlockByPull(repoFullName, pullNum)
+	numLocks := len(locks)
 	if err != nil {
-		return err
+		return numLocks, err
 	}
-	if len(locks) == 0 {
-		return nil
+	if numLocks == 0 {
+		l.Logger.Debug("No locks found for pull")
+		return numLocks, nil
 	}
 
-	for i := 0; i < len(locks); i++ {
+	for i := 0; i < numLocks; i++ {
 		lock := locks[i]
 		l.deleteWorkingDir(lock)
 	}
 
-	return nil
+	return numLocks, nil
 }
 
 func (l *DefaultDeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
@@ -61,9 +63,10 @@ func (l *DefaultDeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
 	// installations of Atlantis will have locks in their DB that do not have
 	// this field on PullRequest. We skip deleting the working dir in this case.
 	if lock.Pull.BaseRepo == (models.Repo{}) {
+		l.Logger.Debug("Not deleting the working dir.")
 		return
 	}
-	unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace)
+	unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace, lock.Project.Path)
 	if err != nil {
 		l.Logger.Err("unable to obtain working dir lock when trying to delete old plans: %s", err)
 	} else {

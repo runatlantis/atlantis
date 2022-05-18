@@ -12,10 +12,12 @@ type UserConfig struct {
 	AllowRepoConfig            bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL                string `mapstructure:"atlantis-url"`
 	Automerge                  bool   `mapstructure:"automerge"`
+	AutoplanFileList           string `mapstructure:"autoplan-file-list"`
 	AzureDevopsToken           string `mapstructure:"azuredevops-token"`
 	AzureDevopsUser            string `mapstructure:"azuredevops-user"`
 	AzureDevopsWebhookPassword string `mapstructure:"azuredevops-webhook-password"`
 	AzureDevopsWebhookUser     string `mapstructure:"azuredevops-webhook-user"`
+	AzureDevOpsHostname        string `mapstructure:"azuredevops-hostname"`
 	BitbucketBaseURL           string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken             string `mapstructure:"bitbucket-token"`
 	BitbucketUser              string `mapstructure:"bitbucket-user"`
@@ -26,13 +28,20 @@ type UserConfig struct {
 	DisableApply               bool   `mapstructure:"disable-apply"`
 	DisableAutoplan            bool   `mapstructure:"disable-autoplan"`
 	DisableMarkdownFolding     bool   `mapstructure:"disable-markdown-folding"`
+	DisableRepoLocking         bool   `mapstructure:"disable-repo-locking"`
+	EnablePolicyChecksFlag     bool   `mapstructure:"enable-policy-checks"`
+	EnableRegExpCmd            bool   `mapstructure:"enable-regexp-cmd"`
+	EnableDiffMarkdownFormat   bool   `mapstructure:"enable-diff-markdown-format"`
 	GithubHostname             string `mapstructure:"gh-hostname"`
 	GithubToken                string `mapstructure:"gh-token"`
 	GithubUser                 string `mapstructure:"gh-user"`
 	GithubWebhookSecret        string `mapstructure:"gh-webhook-secret"`
 	GithubOrg                  string `mapstructure:"gh-org"`
 	GithubAppID                int64  `mapstructure:"gh-app-id"`
-	GithubAppKey               string `mapstructure:"gh-app-key-file"`
+	GithubAppKey               string `mapstructure:"gh-app-key"`
+	GithubAppKeyFile           string `mapstructure:"gh-app-key-file"`
+	GithubAppSlug              string `mapstructure:"gh-app-slug"`
+	GithubTeamAllowlist        string `mapstructure:"gh-team-allowlist"`
 	GitlabHostname             string `mapstructure:"gitlab-hostname"`
 	GitlabToken                string `mapstructure:"gitlab-token"`
 	GitlabUser                 string `mapstructure:"gitlab-user"`
@@ -40,6 +49,7 @@ type UserConfig struct {
 	HidePrevPlanComments       bool   `mapstructure:"hide-prev-plan-comments"`
 	LogLevel                   string `mapstructure:"log-level"`
 	ParallelPoolSize           int    `mapstructure:"parallel-pool-size"`
+	StatsNamespace             string `mapstructure:"stats-namespace"`
 	PlanDrafts                 bool   `mapstructure:"allow-draft-prs"`
 	Port                       int    `mapstructure:"port"`
 	RepoConfig                 string `mapstructure:"repo-config"`
@@ -53,12 +63,20 @@ type UserConfig struct {
 	RequireApproval bool `mapstructure:"require-approval"`
 	// RequireMergeable is whether to require pull requests to be mergeable before
 	// allowing terraform apply's to run.
-	RequireMergeable    bool `mapstructure:"require-mergeable"`
+	RequireMergeable bool `mapstructure:"require-mergeable"`
+	// SilenceNoProjects is whether Atlantis should respond to a PR if no projects are found.
+	SilenceNoProjects bool `mapstructure:"silence-no-projects"`
+	// RequireUnDiverged is whether to require pull requests to rebase default branch before
+	// allowing terraform apply's to run.
+	RequireUnDiverged   bool `mapstructure:"require-undiverged"`
 	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found.
 	SilenceVCSStatusNoPlans bool `mapstructure:"silence-vcs-status-no-plans"`
-	SilenceAllowlistErrors  bool `mapstructure:"silence-allowlist-errors"`
+	// SilenceVCSStatusNoProjects is whether autoplan should set commit status if no projects
+	// are found.
+	SilenceVCSStatusNoProjects bool `mapstructure:"silence-vcs-status-no-projects"`
+	SilenceAllowlistErrors     bool `mapstructure:"silence-allowlist-errors"`
 	// SilenceWhitelistErrors is deprecated in favour of SilenceAllowlistErrors
 	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
 	SkipCloneNoChanges     bool            `mapstructure:"skip-clone-no-changes"`
@@ -71,6 +89,9 @@ type UserConfig struct {
 	VCSStatusName          string          `mapstructure:"vcs-status-name"`
 	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
 	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
+	WebBasicAuth           bool            `mapstructure:"web-basic-auth"`
+	WebUsername            string          `mapstructure:"web-username"`
+	WebPassword            string          `mapstructure:"web-password"`
 	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
 }
 

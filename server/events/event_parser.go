@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-github/v31/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
@@ -36,20 +37,39 @@ const usagesCols = 90
 // PullCommand is a command to run on a pull request.
 type PullCommand interface {
 	// CommandName is the name of the command we're running.
-	CommandName() models.CommandName
+	CommandName() command.Name
 	// IsVerbose is true if the output of this command should be verbose.
 	IsVerbose() bool
 	// IsAutoplan is true if this is an autoplan command vs. a comment command.
 	IsAutoplan() bool
 }
 
+// PolicyCheckCommand is a policy_check command that is automatically triggered
+// after successful plan command.
+type PolicyCheckCommand struct{}
+
+// CommandName is policy_check.
+func (c PolicyCheckCommand) CommandName() command.Name {
+	return command.PolicyCheck
+}
+
+// IsVerbose is false for policy_check commands.
+func (c PolicyCheckCommand) IsVerbose() bool {
+	return false
+}
+
+// IsAutoplan is true for policy_check commands.
+func (c PolicyCheckCommand) IsAutoplan() bool {
+	return false
+}
+
 // AutoplanCommand is a plan command that is automatically triggered when a
 // pull request is opened or updated.
 type AutoplanCommand struct{}
 
-// CommandName is Plan.
-func (c AutoplanCommand) CommandName() models.CommandName {
-	return models.PlanCommand
+// CommandName is plan.
+func (c AutoplanCommand) CommandName() command.Name {
+	return command.Plan
 }
 
 // IsVerbose is false for autoplan commands.
@@ -71,7 +91,9 @@ type CommentCommand struct {
 	// ex. atlantis plan -- -target=resource
 	Flags []string
 	// Name is the name of the command the comment specified.
-	Name models.CommandName
+	Name command.Name
+	// AutoMergeDisabled is true if the command should not automerge after apply.
+	AutoMergeDisabled bool
 	// Verbose is true if the command should output verbosely.
 	Verbose bool
 	// Workspace is the name of the Terraform workspace to run the command in.
@@ -91,7 +113,7 @@ func (c CommentCommand) IsForSpecificProject() bool {
 }
 
 // CommandName returns the name of this command.
-func (c CommentCommand) CommandName() models.CommandName {
+func (c CommentCommand) CommandName() command.Name {
 	return c.Name
 }
 
@@ -111,7 +133,7 @@ func (c CommentCommand) String() string {
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name models.CommandName, verbose bool, workspace string, project string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, verbose, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -121,12 +143,13 @@ func NewCommentCommand(repoRelDir string, flags []string, name models.CommandNam
 		}
 	}
 	return &CommentCommand{
-		RepoRelDir:  repoRelDir,
-		Flags:       flags,
-		Name:        name,
-		Verbose:     verbose,
-		Workspace:   workspace,
-		ProjectName: project,
+		RepoRelDir:        repoRelDir,
+		Flags:             flags,
+		Name:              name,
+		Verbose:           verbose,
+		Workspace:         workspace,
+		AutoMergeDisabled: autoMergeDisabled,
+		ProjectName:       project,
 	}
 }
 
@@ -347,12 +370,12 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		URL:        *event.PullRequest.Links.HTML.HREF,
 		HeadBranch: *event.PullRequest.Source.Branch.Name,
 		BaseBranch: *event.PullRequest.Destination.Branch.Name,
-		Author:     *event.Actor.Nickname,
+		Author:     *event.Actor.AccountID,
 		State:      prState,
 		BaseRepo:   baseRepo,
 	}
 	user = models.User{
-		Username: *event.Actor.Nickname,
+		Username: *event.Actor.AccountID,
 	}
 	return
 }
@@ -614,7 +637,9 @@ func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo 
 // event given the Bitbucket Server header.
 func (e *EventParser) GetBitbucketServerPullEventType(eventTypeHeader string) models.PullRequestEventType {
 	switch eventTypeHeader {
-	case bitbucketserver.PullCreatedHeader:
+	// PullFromRefUpdatedHeader event occurs on OPEN state pull request
+	// so no additional checks are needed.
+	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullFromRefUpdatedHeader:
 		return models.OpenedPullEvent
 	case bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader, bitbucketserver.PullDeletedHeader:
 		return models.ClosedPullEvent
@@ -764,6 +789,7 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 		err = errors.New("url is null")
 		return
 	}
+
 	headBranch := pull.GetSourceRefName()
 	if headBranch == "" {
 		err = errors.New("sourceRefName (branch name) is null")
@@ -829,19 +855,22 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	teamProject := adRepo.GetProject()
 	parent := adRepo.GetParentRepository()
 	owner := ""
+
+	uri, err := url.Parse(adRepo.GetWebURL())
+	if err != nil {
+		return models.Repo{}, err
+	}
+
 	if parent != nil {
 		owner = parent.GetName()
 	} else {
-		uri, err := url.Parse(adRepo.GetWebURL())
-		if err != nil {
-			return models.Repo{}, err
-		}
+
 		if strings.Contains(uri.Host, "visualstudio.com") {
 			owner = strings.Split(uri.Host, ".")[0]
 		} else if strings.Contains(uri.Host, "dev.azure.com") {
 			owner = strings.Split(uri.Path, "/")[1]
 		} else {
-			owner = ""
+			owner = strings.Split(uri.Path, "/")[1] // to support owner for self hosted
 		}
 	}
 
@@ -850,7 +879,14 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	// https://docs.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#switch-existing-organizations-to-use-the-new-domain-name-url
 	project := teamProject.GetName()
 	repo := adRepo.GetName()
-	cloneURL := fmt.Sprintf("https://dev.azure.com/%s/%s/_git/%s", owner, project, repo)
+
+	host := uri.Host
+	if host == "" {
+		host = "dev.azure.com"
+	}
+
+	cloneURL := fmt.Sprintf("https://%s/%s/%s/_git/%s", host, owner, project, repo)
+	fmt.Println("%", cloneURL)
 	fullName := fmt.Sprintf("%s/%s/%s", owner, project, repo)
 	return models.NewRepo(models.AzureDevops, fullName, cloneURL, e.AzureDevopsUser, e.AzureDevopsToken)
 }

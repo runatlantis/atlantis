@@ -4,11 +4,12 @@
 package mocks
 
 import (
+	"reflect"
+	"time"
+
 	pegomock "github.com/petergtz/pegomock"
 	webhooks "github.com/runatlantis/atlantis/server/events/webhooks"
 	logging "github.com/runatlantis/atlantis/server/logging"
-	"reflect"
-	"time"
 )
 
 type MockSender struct {
@@ -26,7 +27,7 @@ func NewMockSender(options ...pegomock.Option) *MockSender {
 func (mock *MockSender) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockSender) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockSender) Send(log *logging.SimpleLogger, applyResult webhooks.ApplyResult) error {
+func (mock *MockSender) Send(log logging.SimpleLogging, applyResult webhooks.ApplyResult) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSender().")
 	}
@@ -48,14 +49,14 @@ func (mock *MockSender) VerifyWasCalledOnce() *VerifierMockSender {
 	}
 }
 
-func (mock *MockSender) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockSender {
+func (mock *MockSender) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockSender {
 	return &VerifierMockSender{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockSender) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockSender {
+func (mock *MockSender) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockSender {
 	return &VerifierMockSender{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -63,7 +64,7 @@ func (mock *MockSender) VerifyWasCalledInOrder(invocationCountMatcher pegomock.M
 	}
 }
 
-func (mock *MockSender) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockSender {
+func (mock *MockSender) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockSender {
 	return &VerifierMockSender{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -73,12 +74,12 @@ func (mock *MockSender) VerifyWasCalledEventually(invocationCountMatcher pegomoc
 
 type VerifierMockSender struct {
 	mock                   *MockSender
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockSender) Send(log *logging.SimpleLogger, applyResult webhooks.ApplyResult) *MockSender_Send_OngoingVerification {
+func (verifier *VerifierMockSender) Send(log logging.SimpleLogging, applyResult webhooks.ApplyResult) *MockSender_Send_OngoingVerification {
 	params := []pegomock.Param{log, applyResult}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Send", params, verifier.timeout)
 	return &MockSender_Send_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -89,17 +90,17 @@ type MockSender_Send_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockSender_Send_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, webhooks.ApplyResult) {
+func (c *MockSender_Send_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, webhooks.ApplyResult) {
 	log, applyResult := c.GetAllCapturedArguments()
 	return log[len(log)-1], applyResult[len(applyResult)-1]
 }
 
-func (c *MockSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []webhooks.ApplyResult) {
+func (c *MockSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []webhooks.ApplyResult) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*logging.SimpleLogger, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(*logging.SimpleLogger)
+			_param0[u] = param.(logging.SimpleLogging)
 		}
 		_param1 = make([]webhooks.ApplyResult, len(c.methodInvocations))
 		for u, param := range params[1] {

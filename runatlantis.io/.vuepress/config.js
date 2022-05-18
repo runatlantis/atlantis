@@ -64,13 +64,17 @@ module.exports = {
                         ['configuring-atlantis', 'Overview'],
                         'server-configuration',
                         'server-side-repo-config',
+                        'pre-workflow-hooks',
+                        'post-workflow-hooks',
+                        'policy-checking',
                         'custom-workflows',
                         'repo-level-atlantis-yaml',
                         'upgrading-atlantis-yaml',
                         'apply-requirements',
                         'checkout-strategy',
                         'terraform-versions',
-                        'terraform-cloud'
+                        'terraform-cloud',
+                        'using-slack-hooks'
                     ]
                 },
                 {
@@ -89,6 +93,13 @@ module.exports = {
                         'autoplanning',
                         'automerging',
                         'security'
+                    ]
+                },
+                {
+                    title: 'Real-time Terraform Logs',
+                    collapsable: true,
+                    children: [
+                        'streaming-logs'
                     ]
                 },
                 {

@@ -16,7 +16,7 @@ package events_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -25,6 +25,7 @@ import (
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/server/events/vcs/fixtures"
 	. "github.com/runatlantis/atlantis/testing"
@@ -325,7 +326,7 @@ func TestParseGithubPull(t *testing.T) {
 func TestParseGitlabMergeEvent(t *testing.T) {
 	t.Log("should properly parse a gitlab merge event")
 	path := filepath.Join("testdata", "gitlab-merge-request-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	var event *gitlab.MergeEvent
 	err = json.Unmarshal(bytes, &event)
@@ -382,7 +383,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 // i.e. instead of under an owner/repo it's under an owner/group/subgroup/repo.
 func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 	path := filepath.Join("testdata", "gitlab-merge-request-event-subgroup.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	var event *gitlab.MergeEvent
 	err = json.Unmarshal(bytes, &event)
@@ -457,7 +458,7 @@ func TestParseGitlabMergeEvent_ActionType(t *testing.T) {
 	}
 
 	path := filepath.Join("testdata", "gitlab-merge-request-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	mergeEventJSON := string(bytes)
 
@@ -479,7 +480,7 @@ func TestParseGitlabMergeEvent_ActionType(t *testing.T) {
 func TestParseGitlabMergeRequest(t *testing.T) {
 	t.Log("should properly parse a gitlab merge request")
 	path := filepath.Join("testdata", "gitlab-get-merge-request.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -517,7 +518,7 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 
 func TestParseGitlabMergeRequest_Subgroup(t *testing.T) {
 	path := filepath.Join("testdata", "gitlab-get-merge-request-subgroup.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -552,7 +553,7 @@ func TestParseGitlabMergeRequest_Subgroup(t *testing.T) {
 func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	t.Log("should properly parse a gitlab merge comment event")
 	path := filepath.Join("testdata", "gitlab-merge-request-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	var event *gitlab.MergeCommentEvent
 	err = json.Unmarshal(bytes, &event)
@@ -589,7 +590,7 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 // Should properly parse a gitlab merge comment event from a subgroup repo.
 func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 	path := filepath.Join("testdata", "gitlab-merge-request-comment-event-subgroup.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	var event *gitlab.MergeCommentEvent
 	err = json.Unmarshal(bytes, &event)
@@ -650,18 +651,18 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.RepoRelDir, func(t *testing.T) {
-			cmd := events.NewCommentCommand(c.RepoRelDir, nil, models.PlanCommand, false, "workspace", "")
+			cmd := events.NewCommentCommand(c.RepoRelDir, nil, command.Plan, false, false, "workspace", "")
 			Equals(t, c.ExpDir, cmd.RepoRelDir)
 		})
 	}
 }
 
 func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
-	cmd := events.NewCommentCommand("", nil, models.PlanCommand, false, "", "")
+	cmd := events.NewCommentCommand("", nil, command.Plan, false, false, "", "")
 	Equals(t, events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
-		Name:        models.PlanCommand,
+		Name:        command.Plan,
 		Verbose:     false,
 		Workspace:   "",
 		ProjectName: "",
@@ -669,19 +670,19 @@ func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
-	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, models.PlanCommand, true, "workspace", "project")
+	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, command.Plan, true, false, "workspace", "project")
 	Equals(t, events.CommentCommand{
 		Workspace:   "workspace",
 		RepoRelDir:  "dir",
 		Verbose:     true,
 		Flags:       []string{"a", "b"},
-		Name:        models.PlanCommand,
+		Name:        command.Plan,
 		ProjectName: "project",
 	}, *cmd)
 }
 
 func TestAutoplanCommand_CommandName(t *testing.T) {
-	Equals(t, models.PlanCommand, (events.AutoplanCommand{}).CommandName())
+	Equals(t, command.Plan, (events.AutoplanCommand{}).CommandName())
 }
 
 func TestAutoplanCommand_IsVerbose(t *testing.T) {
@@ -693,11 +694,11 @@ func TestAutoplanCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_CommandName(t *testing.T) {
-	Equals(t, models.PlanCommand, (events.CommentCommand{
-		Name: models.PlanCommand,
+	Equals(t, command.Plan, (events.CommentCommand{
+		Name: command.Plan,
 	}).CommandName())
-	Equals(t, models.ApplyCommand, (events.CommentCommand{
-		Name: models.ApplyCommand,
+	Equals(t, command.Apply, (events.CommentCommand{
+		Name: command.Apply,
 	}).CommandName())
 }
 
@@ -719,7 +720,7 @@ func TestCommentCommand_String(t *testing.T) {
 	Equals(t, exp, (events.CommentCommand{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},
-		Name:        models.PlanCommand,
+		Name:        command.Plan,
 		Verbose:     true,
 		Workspace:   "myworkspace",
 		ProjectName: "myproject",
@@ -738,7 +739,7 @@ func TestParseBitbucketCloudCommentEvent_EmptyObject(t *testing.T) {
 
 func TestParseBitbucketCloudCommentEvent_CommitHashMissing(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	emptyCommitHash := strings.Replace(string(bytes), `        "hash": "e0624da46d3a",`, "", -1)
 	_, _, _, _, _, err = parser.ParseBitbucketCloudPullCommentEvent([]byte(emptyCommitHash))
@@ -747,7 +748,7 @@ func TestParseBitbucketCloudCommentEvent_CommitHashMissing(t *testing.T) {
 
 func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	pull, baseRepo, headRepo, user, comment, err := parser.ParseBitbucketCloudPullCommentEvent(bytes)
 	Ok(t, err)
@@ -769,7 +770,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
 		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
 		BaseBranch: "master",
-		Author:     "lkysow",
+		Author:     "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -785,14 +786,14 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		},
 	}, headRepo)
 	Equals(t, models.User{
-		Username: "lkysow",
+		Username: "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 	}, user)
 	Equals(t, "my comment", comment)
 }
 
 func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -831,7 +832,7 @@ func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 
 func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-cloud-pull-event-created.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -855,7 +856,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/16",
 		HeadBranch: "Luke/maintf-edited-online-with-bitbucket-1560433073473",
 		BaseBranch: "master",
-		Author:     "Luke",
+		Author:     "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -871,7 +872,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		},
 	}, headRepo)
 	Equals(t, models.User{
-		Username: "Luke",
+		Username: "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 	}, user)
 }
 
@@ -894,7 +895,7 @@ func TestParseBitbucketCloudPullEvent_States(t *testing.T) {
 		},
 	} {
 		path := filepath.Join("testdata", c.JSON)
-		bytes, err := ioutil.ReadFile(path)
+		bytes, err := os.ReadFile(path)
 		if err != nil {
 			Ok(t, err)
 		}
@@ -950,7 +951,7 @@ func TestParseBitbucketServerCommentEvent_EmptyObject(t *testing.T) {
 
 func TestParseBitbucketServerCommentEvent_CommitHashMissing(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-server-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -961,7 +962,7 @@ func TestParseBitbucketServerCommentEvent_CommitHashMissing(t *testing.T) {
 
 func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-server-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -1008,7 +1009,7 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 
 func TestParseBitbucketServerCommentEvent_MultipleStates(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-server-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -1043,7 +1044,7 @@ func TestParseBitbucketServerCommentEvent_MultipleStates(t *testing.T) {
 
 func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-server-pull-event-merged.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -1307,6 +1308,182 @@ func TestParseAzureDevopsPull(t *testing.T) {
 		BaseBranch: "targetBranch",
 		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
 		Num:        ADPull.GetPullRequestID(),
+		State:      models.OpenPullState,
+		BaseRepo:   expBaseRepo,
+	}, actPull)
+	Equals(t, expBaseRepo, actBaseRepo)
+	Equals(t, expBaseRepo, actHeadRepo)
+}
+
+func TestParseAzureDevopsSelfHostedRepo(t *testing.T) {
+	// this should be successful
+	repo := ADSelfRepo
+	repo.ParentRepository = nil
+	r, err := parser.ParseAzureDevopsRepo(&repo)
+	Ok(t, err)
+	Equals(t, models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@devops.abc.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@devops.abc.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "devops.abc.com",
+			Type:     models.AzureDevops,
+		},
+	}, r)
+
+}
+
+func TestParseAzureDevopsSelfHostedPullEvent(t *testing.T) {
+	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(ADSelfPullEvent)
+	Ok(t, err)
+
+	testPull := deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.LastMergeSourceCommit.CommitID = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.URL = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "url is null", err)
+	testEvent := deepcopy.Copy(ADSelfPullEvent).(azuredevops.Event)
+	resource := deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
+	resource.CreatedBy = nil
+	testEvent.Resource = resource
+	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
+	ErrEquals(t, "CreatedBy is null", err)
+
+	testEvent = deepcopy.Copy(ADSelfPullEvent).(azuredevops.Event)
+	resource = deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
+	resource.CreatedBy.UniqueName = azuredevops.String("")
+	testEvent.Resource = resource
+	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
+	ErrEquals(t, "CreatedBy.UniqueName is null", err)
+
+	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseAzureDevopsPullEvent(ADSelfPullEvent)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@devops.abc.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@devops.abc.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "devops.abc.com",
+			Type:     models.AzureDevops,
+		},
+	}
+	Equals(t, expBaseRepo, actBaseRepo)
+	Equals(t, expBaseRepo, actHeadRepo)
+	Equals(t, models.PullRequest{
+		URL:        ADSelfPull.GetURL(),
+		Author:     ADSelfPull.CreatedBy.GetUniqueName(),
+		HeadBranch: "feature/sourceBranch",
+		BaseBranch: "targetBranch",
+		HeadCommit: ADSelfPull.LastMergeSourceCommit.GetCommitID(),
+		Num:        ADSelfPull.GetPullRequestID(),
+		State:      models.OpenPullState,
+		BaseRepo:   expBaseRepo,
+	}, actPull)
+	Equals(t, models.OpenedPullEvent, evType)
+	Equals(t, models.User{Username: "user@example.com"}, actUser)
+}
+
+func TestParseAzureDevopsSelfHostedPullEvent_EventType(t *testing.T) {
+	cases := []struct {
+		action string
+		exp    models.PullRequestEventType
+	}{
+		{
+			action: "git.pullrequest.updated",
+			exp:    models.UpdatedPullEvent,
+		},
+		{
+			action: "git.pullrequest.created",
+			exp:    models.OpenedPullEvent,
+		},
+		{
+			action: "git.pullrequest.updated",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			action: "anything_else",
+			exp:    models.OtherPullEvent,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.action, func(t *testing.T) {
+			event := deepcopy.Copy(ADSelfPullEvent).(azuredevops.Event)
+			if c.exp == models.ClosedPullEvent {
+				event = deepcopy.Copy(ADSelfPullClosedEvent).(azuredevops.Event)
+			}
+			event.EventType = c.action
+			_, actType, _, _, _, err := parser.ParseAzureDevopsPullEvent(event)
+			Ok(t, err)
+			Equals(t, c.exp, actType)
+		})
+	}
+}
+
+func TestParseAzureSelfHostedDevopsPull(t *testing.T) {
+	testPull := deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.LastMergeSourceCommit.CommitID = nil
+	_, _, _, err := parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.URL = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "url is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.SourceRefName = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "sourceRefName (branch name) is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.TargetRefName = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "targetRefName (branch name) is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.CreatedBy = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "CreatedBy is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.CreatedBy.UniqueName = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "CreatedBy.UniqueName is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.PullRequestID = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "pullRequestId is null", err)
+
+	actPull, actBaseRepo, actHeadRepo, err := parser.ParseAzureDevopsPull(&ADSelfPull)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@devops.abc.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@devops.abc.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "devops.abc.com",
+			Type:     models.AzureDevops,
+		},
+	}
+	Equals(t, models.PullRequest{
+		URL:        ADSelfPull.GetURL(),
+		Author:     ADSelfPull.CreatedBy.GetUniqueName(),
+		HeadBranch: "feature/sourceBranch",
+		BaseBranch: "targetBranch",
+		HeadCommit: ADSelfPull.LastMergeSourceCommit.GetCommitID(),
+		Num:        ADSelfPull.GetPullRequestID(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, actPull)

@@ -16,19 +16,20 @@ package vcs
 import (
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 // If the hostname is github.com, should use normal BaseURL.
 func TestNewGithubClient_GithubCom(t *testing.T) {
-	client, err := NewGithubClient("github.com", &GithubUserCredentials{"user", "pass"}, nil)
+	client, err := NewGithubClient("github.com", &GithubUserCredentials{"user", "pass"}, logging.NewNoopLogger(t))
 	Ok(t, err)
 	Equals(t, "https://api.github.com/", client.client.BaseURL.String())
 }
 
 // If the hostname is a non-github hostname should use the right BaseURL.
 func TestNewGithubClient_NonGithub(t *testing.T) {
-	client, err := NewGithubClient("example.com", &GithubUserCredentials{"user", "pass"}, nil)
+	client, err := NewGithubClient("example.com", &GithubUserCredentials{"user", "pass"}, logging.NewNoopLogger(t))
 	Ok(t, err)
 	Equals(t, "https://example.com/api/v3/", client.client.BaseURL.String())
 	// If possible in the future, test the GraphQL client's URL as well. But at the

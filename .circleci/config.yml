@@ -2,26 +2,21 @@ version: 2
 jobs:
   test:
     docker:
-    - image: runatlantis/testing-env:latest
-      environment:
-        GOFLAGS: "-mod=vendor"
+    - image: ghcr.io/runatlantis/testing-env:2021.08.31
     steps:
     - checkout
-    - run: make test-coverage
-    - run:
-        name: post coverage to codecov.io
-        command: bash <(curl -s https://codecov.io/bash)
+    - run: make test-all
     - run: make check-fmt
     - run: make check-lint
   e2e:
     docker:
-    - image: circleci/golang:1.14 # If you update this, update it in the Makefile too
+    - image: circleci/golang:1.17 # If you update this, update it in the Makefile too
       environment:
         # This version of TF will be downloaded before Atlantis is started.
         # We do this instead of setting --default-tf-version because setting
         # that flag starts the download asynchronously so we'd have a race
         # condition.
-        TERRAFORM_VERSION: 0.14.2
+        TERRAFORM_VERSION: 1.1.9
     steps:
     - checkout
     - run: make build-service
@@ -34,7 +29,7 @@ jobs:
   website_link_check:
     docker:
       # This image's Dockerfile is at runatlantis.io/Dockerfile
-    - image: runatlantis/ci-link-checker:0.1
+    - image: ghcr.io/runatlantis/ci-link-checker:2021.06.22
     steps:
     - checkout
     - run: yarn install
@@ -49,49 +44,9 @@ jobs:
           muffet \
             -e 'https://github\.com/runatlantis/atlantis/edit/master/.*' \
             -e 'https://github.com/helm/charts/tree/master/stable/atlantis#customization' \
+            --buffer-size 8192 \
             http://localhost:8080/
 
-  # Build and push 'latest' Docker tag.
-  docker_master:
-    docker:
-    - image: circleci/golang:1.14 # If you update this, update it in the Makefile too
-      environment:
-        GOFLAGS: "-mod=vendor"
-    steps:
-    - checkout
-    - run: make build-service
-    - setup_remote_docker
-    - run:
-        name: Build image
-        command: |
-          if [ "${CIRCLE_BRANCH}" == "master" ]; then
-            docker build -t runatlantis/atlantis:latest .
-          fi
-    - run:
-        name: Push image
-        command: |
-          if [ "${CIRCLE_BRANCH}" == "master" ]; then
-            docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-            docker push runatlantis/atlantis:latest
-          fi
-  # Build and push Docker tag.
-  docker_tag:
-    docker:
-    - image: circleci/golang:1.14 # If you update this, update it in the Makefile too
-      environment:
-        GOFLAGS: "-mod=vendor"
-    steps:
-    - checkout
-    - run: make build-service
-    - setup_remote_docker
-    - run:
-        name: Build and tag
-        command: |
-          if [ -n "${CIRCLE_TAG}" ]; then
-            docker build -t "runatlantis/atlantis:${CIRCLE_TAG}" .
-            docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-            docker push "runatlantis/atlantis:${CIRCLE_TAG}"
-          fi
 workflows:
   version: 2
   branch:
@@ -99,23 +54,14 @@ workflows:
     - test:
         filters:
           branches:
-            ignore: /.*-docs/
+            ignore: /docs\/./
     - e2e:
+        context:
+          - atlantis-e2e-tests
         requires: [test]
         filters:
           branches:
-            ignore: /.*-docs/
-    - docker_master:
-        requires: [e2e]
-        filters:
-          branches:
-            only: master
+            # Ignore fork PRs since they don't have access to
+            # the atlantis-e2e-tests context (and also doc PRs).
+            ignore: /(pull\/\d+)|(docs\/.*)/
     - website_link_check
-  tag:
-    jobs:
-    - docker_tag:
-        filters:
-          branches:
-            ignore: /.*/
-          tags:
-            only: /^v.*/

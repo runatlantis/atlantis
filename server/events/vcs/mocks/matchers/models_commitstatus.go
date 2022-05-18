@@ -3,7 +3,9 @@ package matchers
 
 import (
 	"reflect"
+
 	"github.com/petergtz/pegomock"
+
 	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -15,6 +17,18 @@ func AnyModelsCommitStatus() models.CommitStatus {
 
 func EqModelsCommitStatus(value models.CommitStatus) models.CommitStatus {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue models.CommitStatus
+	return nullValue
+}
+
+func NotEqModelsCommitStatus(value models.CommitStatus) models.CommitStatus {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue models.CommitStatus
+	return nullValue
+}
+
+func ModelsCommitStatusThat(matcher pegomock.ArgumentMatcher) models.CommitStatus {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue models.CommitStatus
 	return nullValue
 }

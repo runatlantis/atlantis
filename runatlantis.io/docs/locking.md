@@ -43,8 +43,8 @@ You can click on a lock to view its details:
 ## Unlocking
 The project and workspace will be automatically unlocked when the PR is merged or closed.
 
-To unlock the project and workspace without completing an `apply` and merging, click the link
-at the bottom of the plan comment to discard the plan and delete the lock where
+To unlock the project and workspace without completing an `apply` and merging, comment `atlantis unlock` on the PR,
+or click the link at the bottom of the plan comment to discard the plan and delete the lock where
 it says **"To discard this plan click here"**:
 
 ![Locks View](./images/lock-delete-comment.png)
@@ -64,5 +64,5 @@ Atlantis is doing is running `terraform plan` and `apply` and so all of the
 locking built in to those commands by Terraform isn't affected.
 
 In more detail, Terraform state locking locks the state while you run `terraform apply`
-so that multiple apply's can't run concurrently. Atlantis's locking is at a higher
+so that multiple applies can't run concurrently. Atlantis's locking is at a higher
 level because it prevents multiple pull requests from working on the same state.

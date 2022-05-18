@@ -3,7 +3,9 @@ package matchers
 
 import (
 	"reflect"
+
 	"github.com/petergtz/pegomock"
+
 	go_gitlab "github.com/xanzy/go-gitlab"
 )
 
@@ -15,6 +17,18 @@ func AnyGoGitlabMergeCommentEvent() go_gitlab.MergeCommentEvent {
 
 func EqGoGitlabMergeCommentEvent(value go_gitlab.MergeCommentEvent) go_gitlab.MergeCommentEvent {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue go_gitlab.MergeCommentEvent
+	return nullValue
+}
+
+func NotEqGoGitlabMergeCommentEvent(value go_gitlab.MergeCommentEvent) go_gitlab.MergeCommentEvent {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue go_gitlab.MergeCommentEvent
+	return nullValue
+}
+
+func GoGitlabMergeCommentEventThat(matcher pegomock.ArgumentMatcher) go_gitlab.MergeCommentEvent {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue go_gitlab.MergeCommentEvent
 	return nullValue
 }

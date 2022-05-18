@@ -3,7 +3,9 @@ package matchers
 
 import (
 	"reflect"
+
 	"github.com/petergtz/pegomock"
+
 	slack "github.com/nlopes/slack"
 )
 
@@ -15,6 +17,18 @@ func AnySliceOfSlackChannel() []slack.Channel {
 
 func EqSliceOfSlackChannel(value []slack.Channel) []slack.Channel {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue []slack.Channel
+	return nullValue
+}
+
+func NotEqSliceOfSlackChannel(value []slack.Channel) []slack.Channel {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue []slack.Channel
+	return nullValue
+}
+
+func SliceOfSlackChannelThat(matcher pegomock.ArgumentMatcher) []slack.Channel {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue []slack.Channel
 	return nullValue
 }

@@ -3,7 +3,9 @@ package matchers
 
 import (
 	"reflect"
+
 	"github.com/petergtz/pegomock"
+
 	http "net/http"
 )
 
@@ -15,6 +17,18 @@ func AnyPtrToHttpClient() *http.Client {
 
 func EqPtrToHttpClient(value *http.Client) *http.Client {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue *http.Client
+	return nullValue
+}
+
+func NotEqPtrToHttpClient(value *http.Client) *http.Client {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *http.Client
+	return nullValue
+}
+
+func PtrToHttpClientThat(matcher pegomock.ArgumentMatcher) *http.Client {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue *http.Client
 	return nullValue
 }

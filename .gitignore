@@ -13,3 +13,8 @@ helm/test-values.yaml
 *.swp
 golangci-lint
 atlantis
+.devcontainer
+
+# gitreleaser
+dist/
+tmp-CHANGELOG.md

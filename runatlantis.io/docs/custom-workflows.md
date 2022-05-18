@@ -103,6 +103,18 @@ workflows:
           extra_args: ["-lock=false"]
 ```
 
+If [policy checking](https://www.runatlantis.io/docs/policy-checking.html#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
+
+```yaml
+workflows:
+  myworkflow:
+    policy_check:
+      steps:
+      - show
+      - policy_check:
+          extra_args: ["--all-namespaces"]
+```
+
 ### Custom init/plan/apply Commands
 If you want to customize `terraform init`, `plan` or `apply` in ways that
 aren't supported by `extra_args`, you can completely override those commands.
@@ -116,19 +128,19 @@ workflows:
   myworkflow:
     plan:
       steps:
-      - run: terraform init -input=false -no-color
+      - run: terraform init -input=false
       
       # If you're using workspaces you need to select the workspace using the
       # $WORKSPACE environment variable.
-      - run: terraform workspace select -no-color $WORKSPACE
+      - run: terraform workspace select $WORKSPACE
       
       # You MUST output the plan using -out $PLANFILE because Atlantis expects
       # plans to be in a specific location.
-      - run: terraform plan -input=false -refresh -no-color -out $PLANFILE
+      - run: terraform plan -input=false -refresh -out $PLANFILE
     apply:
       steps:
       # Again, you must use the $PLANFILE environment variable.
-      - run: terraform apply -no-color $PLANFILE
+      - run: terraform apply $PLANFILE
 ```
 
 ### Terragrunt
@@ -152,7 +164,8 @@ If using the server `repos.yaml` file, you would use the following config:
 
 ```yaml
 # repos.yaml
-# Specify TERRAGRUNT_TFPATH environment variable to accomodate setting --default-tf-version
+# Specify TERRAGRUNT_TFPATH environment variable to accommodate setting --default-tf-version
+# Generate json plan via terragrunt for policy checks
 repos:
 - id: "/.*/"
   workflow: terragrunt
@@ -163,13 +176,14 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt plan -no-color -out=$PLANFILE
+      - run: terragrunt plan -out=$PLANFILE
+      - run: terragrunt show -json $PLANFILE > $SHOWFILE
     apply:
       steps:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt apply -no-color $PLANFILE
+      - run: terragrunt apply $PLANFILE
 ```
 
 If using the repo's `atlantis.yaml` file you would use the following config:
@@ -187,13 +201,13 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt plan -no-color -out $PLANFILE
+      - run: terragrunt plan -out $PLANFILE
     apply:
       steps:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt apply -no-color $PLANFILE
+      - run: terragrunt apply $PLANFILE
 ```
 
 **NOTE:** If using the repo's `atlantis.yaml` file, you will need to specify each directory that is a Terragrunt project.
@@ -256,7 +270,7 @@ workflows:
       - init:
           extra_args: [-backend-config=production.backend.tfvars]
       - plan:
-          extra_args: [-var-file=production.tfvars
+          extra_args: [-var-file=production.tfvars]
 ```
 ::: warning NOTE
 We have to use a custom `run` step to `rm -rf .terraform` because otherwise Terraform
@@ -344,11 +358,15 @@ Or a custom command
   * `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
   either be generated (by plan) or already exist (if running apply). Can be used to
   override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PLANFILE`.
+  * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
+  either be generated (by show) or already exist (if running policy checks). Can be used to
+  override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
   * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
   * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
   * `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.
   * `HEAD_REPO_OWNER` - Owner of the repository that is getting merged into the base repository, ex. `acme-corp`.
   * `HEAD_BRANCH_NAME` - Name of the head branch of the pull request (the branch that is getting merged into the base)
+  * `HEAD_COMMIT` - The sha256 that points to the head of the branch that is being pull requested into the base. If the pull request is from Bitbucket Cloud the string will only be 12 characters long because Bitbucket Cloud truncates its commit IDs.
   * `BASE_BRANCH_NAME` - Name of the base branch of the pull request (the branch that the pull request is getting merged into)
   * `PROJECT_NAME` - Name of the project configured in `atlantis.yaml`. If no project name is configured this will be an empty string.
   * `PULL_NUM` - Pull request number or ID, ex. `2`.
@@ -389,3 +407,24 @@ as the environment variable value.
 * `env` `command`'s can use any of the built-in environment variables available
   to `run` commands. 
 :::
+
+#### Multiple Environment Variables `multienv` Command
+The `multienv` command allows you to set dynamic number of multiple environment variables that will be available
+to all steps defined **below** the `multienv` step.
+```yaml
+- multienv: custom-command
+```
+| Key      | Type   | Default | Required | Description                                   |
+|----------|--------|---------|----------|-----------------------------------------------|
+| multienv | string | none    | no       | Run a custom command and add set              |
+|          |        |         |          | environment variables according to the result |
+The result of the executed command must have a fixed format:
+EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3
+
+The name-value pairs in the result are added as environment variables if success is true otherwise the workflow execution stops with error and the errorMessage is getting displayed.
+
+::: tip Notes
+* `multienv` `command`'s can use any of the built-in environment variables available
+  to `run` commands. 
+:::
+

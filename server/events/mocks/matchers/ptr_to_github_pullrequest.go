@@ -4,8 +4,9 @@ package matchers
 import (
 	"reflect"
 
-	github "github.com/google/go-github/v31/github"
 	"github.com/petergtz/pegomock"
+
+	github "github.com/google/go-github/v31/github"
 )
 
 func AnyPtrToGithubPullRequest() *github.PullRequest {
@@ -16,6 +17,18 @@ func AnyPtrToGithubPullRequest() *github.PullRequest {
 
 func EqPtrToGithubPullRequest(value *github.PullRequest) *github.PullRequest {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue *github.PullRequest
+	return nullValue
+}
+
+func NotEqPtrToGithubPullRequest(value *github.PullRequest) *github.PullRequest {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *github.PullRequest
+	return nullValue
+}
+
+func PtrToGithubPullRequestThat(matcher pegomock.ArgumentMatcher) *github.PullRequest {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue *github.PullRequest
 	return nullValue
 }

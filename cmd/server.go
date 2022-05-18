@@ -20,11 +20,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/pkg/fileutils"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -40,10 +41,12 @@ const (
 	ADWebhookUserFlag          = "azuredevops-webhook-user"
 	ADTokenFlag                = "azuredevops-token" // nolint: gosec
 	ADUserFlag                 = "azuredevops-user"
+	ADHostnameFlag             = "azuredevops-hostname"
 	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
 	AutomergeFlag              = "automerge"
+	AutoplanFileListFlag       = "autoplan-file-list"
 	BitbucketBaseURLFlag       = "bitbucket-base-url"
 	BitbucketTokenFlag         = "bitbucket-token"
 	BitbucketUserFlag          = "bitbucket-user"
@@ -56,11 +59,18 @@ const (
 	DisableApplyFlag           = "disable-apply"
 	DisableAutoplanFlag        = "disable-autoplan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
+	DisableRepoLockingFlag     = "disable-repo-locking"
+	EnablePolicyChecksFlag     = "enable-policy-checks"
+	EnableRegExpCmdFlag        = "enable-regexp-cmd"
+	EnableDiffMarkdownFormat   = "enable-diff-markdown-format"
 	GHHostnameFlag             = "gh-hostname"
+	GHTeamAllowlistFlag        = "gh-team-allowlist"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
 	GHAppIDFlag                = "gh-app-id"
+	GHAppKeyFlag               = "gh-app-key"
 	GHAppKeyFileFlag           = "gh-app-key-file"
+	GHAppSlugFlag              = "gh-app-slug"
 	GHOrganizationFlag         = "gh-org"
 	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
 	GitlabHostnameFlag         = "gitlab-hostname"
@@ -70,6 +80,7 @@ const (
 	HidePrevPlanComments       = "hide-prev-plan-comments"
 	LogLevelFlag               = "log-level"
 	ParallelPoolSize           = "parallel-pool-size"
+	StatsNamespace             = "stats-namespace"
 	AllowDraftPRs              = "allow-draft-prs"
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
@@ -79,6 +90,7 @@ const (
 	RepoAllowlistFlag          = "repo-allowlist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
+	SilenceNoProjectsFlag      = "silence-no-projects"
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
 	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
@@ -93,10 +105,15 @@ const (
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
+	WebBasicAuthFlag           = "web-basic-auth"
+	WebUsernameFlag            = "web-username"
+	WebPasswordFlag            = "web-password"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser      = ""
 	DefaultADBasicPassword  = ""
+	DefaultADHostname       = "dev.azure.com"
+	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
@@ -104,10 +121,14 @@ const (
 	DefaultGitlabHostname   = "gitlab.com"
 	DefaultLogLevel         = "info"
 	DefaultParallelPoolSize = 15
+	DefaultStatsNamespace   = "atlantis"
 	DefaultPort             = 4141
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
 	DefaultVCSStatusName    = "atlantis"
+	DefaultWebBasicAuth     = false
+	DefaultWebUsername      = "atlantis"
+	DefaultWebPassword      = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -129,8 +150,19 @@ var stringFlags = map[string]stringFlag{
 		description:  "Azure DevOps basic HTTP authentication username for inbound webhooks.",
 		defaultValue: "",
 	},
+	ADHostnameFlag: {
+		description:  "Azure DevOps hostname to support cloud and self hosted instances.",
+		defaultValue: "dev.azure.com",
+	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
+	},
+	AutoplanFileListFlag: {
+		description: "Comma separated list of file patterns that Atlantis will use to check if a directory contains modified files that should trigger project planning." +
+			" Patterns use the dockerignore (https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax." +
+			" Use single quotes to avoid shell expansion of '*'. Defaults to '" + DefaultAutoplanFileList + "'." +
+			" A custom Workflow that uses autoplan 'when_modified' will ignore this value.",
+		defaultValue: DefaultAutoplanFileList,
 	},
 	BitbucketUserFlag: {
 		description: "Bitbucket username of API user.",
@@ -170,6 +202,17 @@ var stringFlags = map[string]stringFlag{
 		description:  "Hostname of your Github Enterprise installation. If using github.com, no need to set.",
 		defaultValue: DefaultGHHostname,
 	},
+	GHTeamAllowlistFlag: {
+		description: "Comma separated list of key-value pairs representing the GitHub teams and the operations that " +
+			"the members of a particular team are allowed to perform. " +
+			"The format is {team}:{command},{team}:{command}. " +
+			"Valid values for 'command' are 'plan', 'apply' and '*', e.g. 'dev:plan,ops:apply,devops:*'" +
+			"This example gives the users from the 'dev' GitHub team the permissions to execute the 'plan' command, " +
+			"the 'ops' team the permissions to execute the 'apply' command, " +
+			"and allows the 'devops' team to perform any operation. If this argument is not provided, the default value (*:*) " +
+			"will be used and the default behavior will be to not check permissions " +
+			"and to allow users from any team to perform any operation.",
+	},
 	GHUserFlag: {
 		description:  "GitHub username of API user.",
 		defaultValue: "",
@@ -177,9 +220,16 @@ var stringFlags = map[string]stringFlag{
 	GHTokenFlag: {
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
 	},
+	GHAppKeyFlag: {
+		description:  "The GitHub App's private key",
+		defaultValue: "",
+	},
 	GHAppKeyFileFlag: {
 		description:  "A path to a file containing the GitHub App's private key",
 		defaultValue: "",
+	},
+	GHAppSlugFlag: {
+		description: "The Github app slug (ie. the URL-friendly name of your GitHub App)",
 	},
 	GHOrganizationFlag: {
 		description:  "The name of the GitHub organization to use during the creation of a Github App for Atlantis",
@@ -210,6 +260,10 @@ var stringFlags = map[string]stringFlag{
 	LogLevelFlag: {
 		description:  "Log level. Either debug, info, warn, or error.",
 		defaultValue: DefaultLogLevel,
+	},
+	StatsNamespace: {
+		description:  "Namespace for aggregating stats.",
+		defaultValue: DefaultStatsNamespace,
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
@@ -257,6 +311,14 @@ var stringFlags = map[string]stringFlag{
 		description:  "Name used to identify Atlantis for pull request statuses.",
 		defaultValue: DefaultVCSStatusName,
 	},
+	WebUsernameFlag: {
+		description:  "Username used for Web Basic Authentication on Atlantis HTTP Middleware",
+		defaultValue: DefaultWebUsername,
+	},
+	WebPasswordFlag: {
+		description:  "Password used for Web Basic Authentication on Atlantis HTTP Middleware",
+		defaultValue: DefaultWebPassword,
+	},
 }
 
 var boolFlags = map[string]boolFlag{
@@ -287,6 +349,21 @@ var boolFlags = map[string]boolFlag{
 		description:  "Disable atlantis auto planning feature",
 		defaultValue: false,
 	},
+	DisableRepoLockingFlag: {
+		description: "Disable atlantis locking repos",
+	},
+	EnablePolicyChecksFlag: {
+		description:  "Enable atlantis to run user defined policy checks.  This is explicitly disabled for TFE/TFC backends since plan files are inaccessible.",
+		defaultValue: false,
+	},
+	EnableRegExpCmdFlag: {
+		description:  "Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.",
+		defaultValue: false,
+	},
+	EnableDiffMarkdownFormat: {
+		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
+		defaultValue: false,
+	},
 	AllowDraftPRs: {
 		description:  "Enable autoplan for Github Draft Pull Requests",
 		defaultValue: false,
@@ -305,6 +382,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Require pull requests to be mergeable before allowing the apply command to be run.",
 		defaultValue: false,
 		hidden:       true,
+	},
+	SilenceNoProjectsFlag: {
+		description:  "Silences Atlants from responding to PRs when it finds no projects.",
+		defaultValue: false,
 	},
 	SilenceForkPRErrorsFlag: {
 		description:  "Silences the posting of fork pull requests not allowed error comments.",
@@ -335,6 +416,10 @@ var boolFlags = map[string]boolFlag{
 	SkipCloneNoChanges: {
 		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
 		defaultValue: false,
+	},
+	WebBasicAuthFlag: {
+		description:  "Switches on or off the Basic Authentication on the HTTP Middleware interface",
+		defaultValue: DefaultWebBasicAuth,
 	},
 }
 var intFlags = map[string]intFlag{
@@ -388,7 +473,7 @@ type ServerCmd struct {
 	// Useful for testing to keep the logs clean.
 	SilenceOutput   bool
 	AtlantisVersion string
-	Logger          *logging.SimpleLogger
+	Logger          logging.SimpleLogging
 }
 
 // ServerCreator creates servers.
@@ -546,6 +631,12 @@ func (s *ServerCmd) run() error {
 }
 
 func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+	if c.AzureDevOpsHostname == "" {
+		c.AzureDevOpsHostname = DefaultADHostname
+	}
+	if c.AutoplanFileList == "" {
+		c.AutoplanFileList = DefaultAutoplanFileList
+	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
 	}
@@ -567,6 +658,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.ParallelPoolSize == 0 {
 		c.ParallelPoolSize = DefaultParallelPoolSize
 	}
+	if c.StatsNamespace == "" {
+		c.StatsNamespace = DefaultStatsNamespace
+	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
 	}
@@ -578,6 +672,12 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname
+	}
+	if c.WebUsername == "" {
+		c.WebUsername = DefaultWebUsername
+	}
+	if c.WebPassword == "" {
+		c.WebPassword = DefaultWebPassword
 	}
 }
 
@@ -598,12 +698,19 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	// The following combinations are valid.
 	// 1. github user and token set
-	// 2. gitlab user and token set
-	// 3. bitbucket user and token set
-	// 4. azuredevops user and token set
-	// 5. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GithubAppID == 0) != (userConfig.GithubAppKey == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+	// 2. github app ID and (key file set or key set)
+	// 3. gitlab user and token set
+	// 4. bitbucket user and token set
+	// 5. azuredevops user and token set
+	// 6. any combination of the above
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+		return vcsErr
+	}
+	if (userConfig.GithubAppID != 0) && ((userConfig.GithubAppKey == "") && (userConfig.GithubAppKeyFile == "")) {
+		return vcsErr
+	}
+	if (userConfig.GithubAppID == 0) && ((userConfig.GithubAppKey != "") || (userConfig.GithubAppKeyFile != "")) {
 		return vcsErr
 	}
 	// At this point, we know that there can't be a single user/token without
@@ -661,6 +768,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if userConfig.TFEHostname != DefaultTFEHostname && userConfig.TFEToken == "" {
 		return fmt.Errorf("if setting --%s, must set --%s", TFEHostnameFlag, TFETokenFlag)
+	}
+
+	_, patternErr := fileutils.NewPatternMatcher(strings.Split(userConfig.AutoplanFileList, ","))
+	if patternErr != nil {
+		return errors.Wrapf(patternErr, "invalid pattern in --%s, %s", AutoplanFileListFlag, userConfig.AutoplanFileList)
 	}
 
 	return nil

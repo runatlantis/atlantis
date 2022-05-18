@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/bradleyfalzon/ghinstallation"
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
 )
@@ -18,7 +18,7 @@ import (
 type GithubCredentials interface {
 	Client() (*http.Client, error)
 	GetToken() (string, error)
-	GetUser() string
+	GetUser() (string, error)
 }
 
 // GithubAnonymousCredentials expose no credentials.
@@ -31,8 +31,8 @@ func (c *GithubAnonymousCredentials) Client() (*http.Client, error) {
 }
 
 // GetUser returns the username for these credentials.
-func (c *GithubAnonymousCredentials) GetUser() string {
-	return "anonymous"
+func (c *GithubAnonymousCredentials) GetUser() (string, error) {
+	return "anonymous", nil
 }
 
 // GetToken returns an empty token.
@@ -56,8 +56,8 @@ func (c *GithubUserCredentials) Client() (*http.Client, error) {
 }
 
 // GetUser returns the username for these credentials.
-func (c *GithubUserCredentials) GetUser() string {
-	return c.User
+func (c *GithubUserCredentials) GetUser() (string, error) {
+	return c.User, nil
 }
 
 // GetToken returns the user token.
@@ -68,11 +68,12 @@ func (c *GithubUserCredentials) GetToken() (string, error) {
 // GithubAppCredentials implements GithubCredentials for github app installation token flow.
 type GithubAppCredentials struct {
 	AppID          int64
-	KeyPath        string
+	Key            []byte
 	Hostname       string
 	apiURL         *url.URL
 	installationID int64
 	tr             *ghinstallation.Transport
+	AppSlug        string
 }
 
 // Client returns a github app installation client.
@@ -85,8 +86,29 @@ func (c *GithubAppCredentials) Client() (*http.Client, error) {
 }
 
 // GetUser returns the username for these credentials.
-func (c *GithubAppCredentials) GetUser() string {
-	return ""
+func (c *GithubAppCredentials) GetUser() (string, error) {
+	// Keeping backwards compatibility since this flag is optional
+	if c.AppSlug == "" {
+		return "", nil
+	}
+	client, err := c.Client()
+
+	if err != nil {
+		return "", errors.Wrap(err, "initializing client")
+	}
+
+	ghClient := github.NewClient(client)
+	ghClient.BaseURL = c.getAPIURL()
+	ctx := context.Background()
+
+	app, _, err := ghClient.Apps.Get(ctx, c.AppSlug)
+
+	if err != nil {
+		return "", errors.Wrap(err, "getting app details")
+	}
+	// Currently there is no way to get the bot's login info, so this is a
+	// hack until Github exposes that.
+	return fmt.Sprintf("%s[bot]", app.GetName()), nil
 }
 
 // GetToken returns a fresh installation token.
@@ -106,7 +128,7 @@ func (c *GithubAppCredentials) getInstallationID() (int64, error) {
 
 	tr := http.DefaultTransport
 	// A non-installation transport
-	t, err := ghinstallation.NewAppsTransportKeyFromFile(tr, c.AppID, c.KeyPath)
+	t, err := ghinstallation.NewAppsTransport(tr, c.AppID, c.Key)
 	if err != nil {
 		return 0, err
 	}
@@ -141,7 +163,7 @@ func (c *GithubAppCredentials) transport() (*ghinstallation.Transport, error) {
 	}
 
 	tr := http.DefaultTransport
-	itr, err := ghinstallation.NewKeyFromFile(tr, c.AppID, installationID, c.KeyPath)
+	itr, err := ghinstallation.New(tr, c.AppID, installationID, c.Key)
 	if err == nil {
 		apiURL := c.getAPIURL()
 		itr.BaseURL = strings.TrimSuffix(apiURL.String(), "/")

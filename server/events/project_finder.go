@@ -17,10 +17,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 
 	"github.com/docker/docker/pkg/fileutils"
 	"github.com/pkg/errors"
@@ -34,11 +33,11 @@ type ProjectFinder interface {
 	// DetermineProjects returns the list of projects that were modified based on
 	// the modifiedFiles. The list will be de-duplicated.
 	// absRepoDir is the path to the cloned repo on disk.
-	DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string, absRepoDir string) []models.Project
+	DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project
 	// DetermineProjectsViaConfig returns the list of projects that were modified
 	// based on modifiedFiles and the repo's config.
 	// absRepoDir is the path to the cloned repo on disk.
-	DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
+	DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
 }
 
 // ignoredFilenameFragments contains filename fragments to ignore while looking at changes
@@ -48,10 +47,10 @@ var ignoredFilenameFragments = []string{"terraform.tfstate", "terraform.tfstate.
 type DefaultProjectFinder struct{}
 
 // See ProjectFinder.DetermineProjects.
-func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string, absRepoDir string) []models.Project {
+func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project {
 	var projects []models.Project
 
-	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
+	modifiedTerraformFiles := p.filterToFileList(log, modifiedFiles, autoplanFileList)
 	if len(modifiedTerraformFiles) == 0 {
 		return projects
 	}
@@ -82,7 +81,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 }
 
 // See ProjectFinder.DetermineProjectsViaConfig.
-func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error) {
+func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error) {
 	var projects []valid.Project
 	for _, project := range config.Projects {
 		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
@@ -145,13 +144,23 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 	return projects, nil
 }
 
-// filterToTerraform filters non-terraform files from files.
-func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
+// filterToFileList filters out files not included in the file list
+func (p *DefaultProjectFinder) filterToFileList(log logging.SimpleLogging, files []string, fileList string) []string {
 	var filtered []string
-	fileNameRe, _ := regexp.Compile(`^.*(\.tf|\.tfvars)$`)
+	patterns := strings.Split(fileList, ",")
+	// Ignore pattern matcher error here as it was checked for errors in server validation
+	patternMatcher, _ := fileutils.NewPatternMatcher(patterns)
 
 	for _, fileName := range files {
-		if !p.shouldIgnore(fileName) && (fileNameRe.MatchString(fileName) || filepath.Base(fileName) == "terragrunt.hcl") {
+		if p.shouldIgnore(fileName) {
+			continue
+		}
+		match, err := patternMatcher.Matches(fileName)
+		if err != nil {
+			log.Debug("filter err for file %q: %s", fileName, err)
+			continue
+		}
+		if match {
 			filtered = append(filtered, fileName)
 		}
 	}
