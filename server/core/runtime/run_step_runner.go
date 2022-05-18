@@ -73,6 +73,5 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
-	ctx.Log.Info("successfully ran %q in %q", command, path)
 	return output, nil
 }
