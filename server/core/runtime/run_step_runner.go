@@ -21,7 +21,7 @@ type RunStepRunner struct {
 	ProjectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
 
-func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string) (string, error) {
+func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, streamOutput bool) (string, error) {
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -65,7 +65,7 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
 
-	runner := models.NewShellCommandRunner(command, finalEnvVars, path, r.ProjectCmdOutputHandler)
+	runner := models.NewShellCommandRunner(command, finalEnvVars, path, streamOutput, r.ProjectCmdOutputHandler)
 	output, err := runner.Run(ctx)
 
 	if err != nil {

@@ -30,10 +30,11 @@ type ShellCommandRunner struct {
 	command       string
 	workingDir    string
 	outputHandler jobs.ProjectCommandOutputHandler
+	streamOutput  bool
 	cmd           *exec.Cmd
 }
 
-func NewShellCommandRunner(command string, environ []string, workingDir string, outputHandler jobs.ProjectCommandOutputHandler) *ShellCommandRunner {
+func NewShellCommandRunner(command string, environ []string, workingDir string, streamOutput bool, outputHandler jobs.ProjectCommandOutputHandler) *ShellCommandRunner {
 	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Env = environ
 	cmd.Dir = workingDir
@@ -42,6 +43,7 @@ func NewShellCommandRunner(command string, environ []string, workingDir string, 
 		command:       command,
 		workingDir:    workingDir,
 		outputHandler: outputHandler,
+		streamOutput:  streamOutput,
 		cmd:           cmd,
 	}
 }
@@ -120,7 +122,9 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 			for scanner.Scan() {
 				message := scanner.Text()
 				outCh <- Line{Line: message}
-				s.outputHandler.Send(ctx, message, false)
+				if s.streamOutput {
+					s.outputHandler.Send(ctx, message, false)
+				}
 			}
 			wg.Done()
 		}()
@@ -129,7 +133,9 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 			for scanner.Scan() {
 				message := scanner.Text()
 				outCh <- Line{Line: message}
-				s.outputHandler.Send(ctx, message, false)
+				if s.streamOutput {
+					s.outputHandler.Send(ctx, message, false)
+				}
 			}
 			wg.Done()
 		}()
