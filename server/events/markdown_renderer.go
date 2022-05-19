@@ -248,43 +248,39 @@ func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interfac
 
 // todo: refactor to remove duplication #refactor
 var singleProjectApplyTmpl = template.Must(template.New("").Parse(
-	"{{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
+	"{{$result := index .Results 0}}{{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
-	"{{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" +
+	"{{$result := index .Results 0}}{{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" +
 		"\n" +
 		"{{ if ne .DisableApplyAll true  }}---\n" +
-		"* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
-		"    * `atlantis apply`\n" +
-		"* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:\n" +
-		"    * `atlantis unlock`{{ end }}" + logTmpl))
+		"* :fast_forward: To **apply** all unapplied plans from this pull request, comment: `atlantis apply`\n" +
+		"* :put_litter_in_its_place: To delete all plans and locks for the PR, comment: `atlantis unlock`{{ end }}" + logTmpl))
 var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
-	"{{$result := index .Results 0}}Ran {{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
+	"{{$result := index .Results 0}}{{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
 		"{{$result.Rendered}}\n" + logTmpl))
 var singleProjectVersionSuccessTmpl = template.Must(template.New("").Parse(
-	"{{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
+	"{{$result := index .Results 0}}{{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var singleProjectVersionUnsuccessfulTmpl = template.Must(template.New("").Parse(
-	"{{$result := index .Results 0}}Ran {{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
+	"{{$result := index .Results 0}}{{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var approveAllProjectsTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Approved Policies for {{ len .Results }} projects:\n\n" +
 		"{{ range $result := .Results }}" +
 		"1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{end}}\n" + logTmpl))
 var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
-	"Ran {{.Command}} for {{ len .Results }} projects:\n\n" +
+	"{{.Command}} for {{ len .Results }} projects:\n\n" +
 		"{{ range $result := .Results }}" +
 		"1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{end}}\n" +
 		"{{ $disableApplyAll := .DisableApplyAll }}{{ range $i, $result := .Results }}" +
 		"### {{add $i 1}}. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{$result.Rendered}}\n\n" +
-		"{{ if ne $disableApplyAll true }}---\n{{end}}{{end}}{{ if ne .DisableApplyAll true }}{{ if and (gt (len .Results) 0) (not .PlansDeleted) }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
-		"    * `atlantis apply`\n" +
-		"* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:\n" +
-		"    * `atlantis unlock`" +
+		"{{ if ne $disableApplyAll true }}---\n{{end}}{{end}}{{ if ne .DisableApplyAll true }}{{ if and (gt (len .Results) 0) (not .PlansDeleted) }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment: `atlantis apply`\n" +
+		"* :put_litter_in_its_place: To delete all plans and locks for the PR, comment: `atlantis unlock`\n" +
 		"{{end}}{{end}}" +
 		logTmpl))
 var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
-	"Ran {{.Command}} for {{ len .Results }} projects:\n\n" +
+	"{{.Command}} for {{ len .Results }} projects:\n\n" +
 		"{{ range $result := .Results }}" +
 		"1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{end}}\n" +
@@ -294,7 +290,7 @@ var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMa
 		"---\n{{end}}" +
 		logTmpl))
 var multiProjectVersionTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
-	"Ran {{.Command}} for {{ len .Results }} projects:\n\n" +
+	"{{.Command}} for {{ len .Results }} projects:\n\n" +
 		"{{ range $result := .Results }}" +
 		"1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{end}}\n" +
@@ -336,20 +332,16 @@ var policyCheckSuccessWrappedTmpl = template.Must(template.New("").Parse(
 
 // policyCheckNextSteps are instructions appended after successful plans as to what
 // to do next.
-var policyCheckNextSteps = "* :arrow_forward: To **apply** this plan, comment:\n" +
-	"    * `{{.ApplyCmd}}`\n" +
+var policyCheckNextSteps = "* :arrow_forward: To **apply** this plan, comment: `{{.ApplyCmd}}`\n" +
 	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n" +
-	"* :repeat: To re-run policies **plan** this project again by commenting:\n" +
-	"    * `{{.RePlanCmd}}`"
+	"* :repeat: To re-run policies **plan** this project again by commenting: `{{.RePlanCmd}}`"
 
 // planNextSteps are instructions appended after successful plans as to what
 // to do next.
 var planNextSteps = "{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}" +
-	"{{ if not .DisableApply }}* :arrow_forward: To **apply** this plan, comment:\n" +
-	"    * `{{.ApplyCmd}}`\n{{end}}" +
+	"{{ if not .DisableApply }}* :arrow_forward: To **apply** this plan, comment: `{{.ApplyCmd}}`\n{{end}}" +
 	"{{ if not .DisableRepoLocking }}* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n{{end}}" +
-	"* :repeat: To **plan** this project again, comment:\n" +
-	"    * `{{.RePlanCmd}}`{{end}}"
+	"* :repeat: To **plan** this project again, comment: `{{.RePlanCmd}}`{{end}}"
 var applyUnwrappedSuccessTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.Output}}\n" +
@@ -372,10 +364,8 @@ var unwrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"{{.Error}}\n" +
 	"```" +
 	"{{ if eq .Command \"Policy Check\" }}" +
-	"\n* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:\n" +
-	"    * `atlantis approve_policies`\n" +
-	"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.\n" +
-	"{{ end }}"
+	"\n* :heavy_check_mark: To **approve** failing policies, a policy owner can comment: `atlantis approve_policies`\n" +
+	"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.{{ end }}"
 var wrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"<details><summary>Show Output</summary>\n\n" +
 	"```\n" +
