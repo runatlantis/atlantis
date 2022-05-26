@@ -16,6 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/gateway"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/vcs/markdown"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -38,7 +39,7 @@ func setupAutoplan(t *testing.T) *vcsmocks.MockClient {
 	pullUpdater := &events.PullOutputUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            vcsClient,
-		MarkdownRenderer:     &events.MarkdownRenderer{},
+		MarkdownRenderer:     &markdown.Renderer{},
 	}
 	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
 	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyContextContext(), matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)

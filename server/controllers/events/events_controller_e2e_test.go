@@ -35,6 +35,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/command/apply"
+	"github.com/runatlantis/atlantis/server/vcs/markdown"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -831,7 +832,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	pullUpdater := &events.PullOutputUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            vcsClient,
-		MarkdownRenderer:     &events.MarkdownRenderer{},
+		MarkdownRenderer:     &markdown.Renderer{},
 	}
 
 	deleteLockCommand := &events.DefaultDeleteLockCommand{

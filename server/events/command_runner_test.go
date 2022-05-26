@@ -38,6 +38,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/vcs/markdown"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -92,7 +93,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	pullUpdater = &events.PullOutputUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            vcsClient,
-		MarkdownRenderer:     &events.MarkdownRenderer{},
+		MarkdownRenderer:     &markdown.Renderer{},
 	}
 
 	parallelPoolSize := 1

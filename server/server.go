@@ -75,6 +75,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 	lyft_checks "github.com/runatlantis/atlantis/server/lyft/checks"
+	"github.com/runatlantis/atlantis/server/vcs/markdown"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
 )
@@ -409,12 +410,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
-	markdownRenderer := &events.MarkdownRenderer{
-		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
-		DisableApplyAll:          userConfig.DisableApplyAll,
+
+	templateResolver := markdown.TemplateResolver{
 		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
+		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
+		GlobalCfg:                globalCfg,
+	}
+	markdownRenderer := &markdown.Renderer{
+		DisableApplyAll:          userConfig.DisableApplyAll,
 		DisableApply:             userConfig.DisableApply,
 		EnableDiffMarkdownFormat: userConfig.EnableDiffMarkdownFormat,
+		TemplateResolver:         templateResolver,
 	}
 
 	boltdb, err := db.New(userConfig.DataDir)
@@ -624,7 +630,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	pullOutputUpdater := events.PullOutputUpdater{
 		VCSClient:            vcsClient,
 		MarkdownRenderer:     markdownRenderer,
-		GlobalCfg:            globalCfg,
 		HidePrevPlanComments: userConfig.HidePrevPlanComments,
 	}
 
@@ -632,7 +637,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:        vcsClient,
 		MarkdownRenderer: markdownRenderer,
 		TitleBuilder:     vcs.StatusTitleBuilder{TitlePrefix: userConfig.VCSStatusName},
-		GlobalCfg:        globalCfg,
 	}
 
 	// [WENGINES-4643] TODO: Remove pullOutputUpdater once github checks is stable
