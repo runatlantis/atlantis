@@ -17,6 +17,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 
 	"github.com/shurcooL/githubv4"
@@ -330,6 +331,235 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	Equals(t, "6", gotMinimizeCalls[0].Variables.Input.SubjectID)
 	Equals(t, "9", gotMinimizeCalls[2].Variables.Input.SubjectID)
 	Equals(t, githubv4.ReportedContentClassifiersOutdated, gotMinimizeCalls[0].Variables.Input.Classifier)
+}
+
+func TestGithubClient_UpdateChecksStatus(t *testing.T) {
+
+	listCheckRunRespFormat := `
+	{
+		"total_count": 1,
+		"check_runs": [
+		  {
+			"id": 1,
+			"head_sha": "ce587453ced02b1526dfb4cb910479d431683101",
+			"status": "completed",
+			"conclusion": "neutral",
+			"started_at": "2018-05-04T01:14:52Z",
+			"completed_at": "2018-05-04T01:14:52Z",
+			"name": "%s",
+			"check_suite": {
+			  "id": 5
+			}
+		  }
+		]
+	  }
+	`
+
+	cases := []struct {
+		name                 string
+		newCheckRunName      string
+		existingCheckRunName string
+		listCheckRunResp     string
+	}{
+		{
+			name:             "create new check run when check run dne",
+			newCheckRunName:  "atlantis/apply",
+			listCheckRunResp: fmt.Sprintf(listCheckRunRespFormat, "atlantis/plan"),
+		},
+		{
+			name:                 "update check run when check run exists",
+			existingCheckRunName: "atlantis/apply",
+			listCheckRunResp:     fmt.Sprintf(listCheckRunRespFormat, "atlantis/apply"),
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v3/repos/owner/repo/commits/sha/check-runs?per_page=100":
+						_, err := w.Write([]byte(c.listCheckRunResp))
+						Ok(t, err)
+
+					case "/api/v3/repos/owner/repo/check-runs":
+						// parse req and assert CreateNewCheckRun was called for new check run
+						body, err := ioutil.ReadAll(r.Body)
+						Ok(t, err)
+						m := make(map[string]interface{})
+						err = json.Unmarshal(body, &m)
+						Ok(t, err)
+						assert.Equal(t, c.newCheckRunName, m["name"])
+					case "/api/v3/repos/owner/repo/check-runs/1":
+						// parse req and assert UpdateCheckRun was called for existing check run
+						body, err := ioutil.ReadAll(r.Body)
+						Ok(t, err)
+						m := make(map[string]interface{})
+						err = json.Unmarshal(body, &m)
+						Ok(t, err)
+						assert.Equal(t, c.existingCheckRunName, m["name"])
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			mergeabilityChecker := vcs.NewPullMergeabilityChecker("atlantis")
+			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, logging.NewNoopCtxLogger(t), mergeabilityChecker)
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			req := types.UpdateStatusRequest{
+				Repo: models.Repo{
+					FullName:          "owner/repo",
+					Owner:             "owner",
+					Name:              "repo",
+					CloneURL:          "",
+					SanitizedCloneURL: "",
+					VCSHost: models.VCSHost{
+						Type:     models.Github,
+						Hostname: "github.com",
+					},
+				},
+				PullNum:     1,
+				State:       models.PendingCommitStatus,
+				Description: "description",
+				DetailsURL:  "https://google.com",
+				Ref:         "sha",
+			}
+
+			if c.newCheckRunName != "" {
+				req.StatusName = c.newCheckRunName
+			} else {
+				req.StatusName = c.existingCheckRunName
+			}
+
+			err = client.UpdateChecksStatus(context.TODO(), req)
+			Ok(t, err)
+		})
+	}
+}
+
+func TestGithubClient_UpdateChecksStatus_ConclusionWhenStatusComplete(t *testing.T) {
+	checkRunName := "atlantis/apply"
+	listCheckRunResp := `
+	{
+		"total_count": 1,
+		"check_runs": [
+		  {
+			"id": 1,
+			"head_sha": "ce587453ced02b1526dfb4cb910479d431683101",
+			"status": "completed",
+			"conclusion": "neutral",
+			"started_at": "2018-05-04T01:14:52Z",
+			"completed_at": "2018-05-04T01:14:52Z",
+			"name": "%s",
+			"check_suite": {
+			  "id": 5
+			}
+		  }
+		]
+	  }
+	`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo/commits/sha/check-runs?per_page=100":
+				_, err := w.Write([]byte(fmt.Sprintf(listCheckRunResp, checkRunName)))
+				Ok(t, err)
+			case "/api/v3/repos/owner/repo/check-runs/1":
+				body, err := ioutil.ReadAll(r.Body)
+				Ok(t, err)
+				m := make(map[string]interface{})
+				err = json.Unmarshal(body, &m)
+				Ok(t, err)
+
+				// assert conclusion was set to success when status is complete
+				assert.Equal(t, checkRunName, m["name"])
+				assert.Equal(t, "success", m["conclusion"])
+
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	mergeabilityChecker := vcs.NewPullMergeabilityChecker("atlantis")
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, logging.NewNoopCtxLogger(t), mergeabilityChecker)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	err = client.UpdateChecksStatus(context.TODO(), types.UpdateStatusRequest{
+		Repo: models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.Github,
+				Hostname: "github.com",
+			},
+		},
+		PullNum:     1,
+		State:       models.SuccessCommitStatus,
+		StatusName:  checkRunName,
+		Description: "description",
+		DetailsURL:  "https://google.com",
+		Ref:         "sha",
+	})
+	Ok(t, err)
+
+}
+
+func TestGithubClient_UpdateChecksStatus_ErrorWhenListCheckRunsFails(t *testing.T) {
+	listCheckRunResp := `error response`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo/commits/sha/check-runs?per_page=100":
+				_, err := w.Write([]byte(listCheckRunResp))
+				Ok(t, err)
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	mergeabilityChecker := vcs.NewPullMergeabilityChecker("atlantis")
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, logging.NewNoopCtxLogger(t), mergeabilityChecker)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	err = client.UpdateChecksStatus(context.TODO(), types.UpdateStatusRequest{
+		Repo: models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.Github,
+				Hostname: "github.com",
+			},
+		},
+		PullNum:     1,
+		State:       models.PendingCommitStatus,
+		StatusName:  "atlantis/plan",
+		Description: "description",
+		DetailsURL:  "https://google.com",
+		Ref:         "sha",
+	})
+	assert.Error(t, err)
 }
 
 func TestGithubClient_UpdateStatus(t *testing.T) {

@@ -127,7 +127,7 @@ func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.P
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	statuses, err := c.GhClient.GetRepoChecks(repo, pull)
+	statuses, err := c.GhClient.GetRepoChecks(repo, pull.HeadCommit)
 
 	if err != nil {
 		executionError.Inc(1)

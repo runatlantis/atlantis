@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -49,19 +50,53 @@ type ChecksOutputUpdater struct {
 
 func (c *ChecksOutputUpdater) UpdateOutput(ctx *command.Context, cmd PullCommand, res command.Result) {
 
+	if res.Error != nil || res.Failure != "" {
+		output := c.MarkdownRenderer.Render(res, cmd.CommandName(), ctx.Pull.BaseRepo)
+		updateStatusReq := types.UpdateStatusRequest{
+			Repo:        ctx.HeadRepo,
+			Ref:         ctx.Pull.HeadCommit,
+			StatusName:  c.TitleBuilder.Build(cmd.CommandName().String()),
+			PullNum:     ctx.Pull.Num,
+			Description: fmt.Sprintf("%s failed", strings.Title(cmd.CommandName().String())),
+			Output:      output,
+			State:       models.FailedCommitStatus,
+		}
+
+		if err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
+			ctx.Log.Error("updable to update check run", map[string]interface{}{
+				"error": err.Error(),
+			})
+		}
+		return
+	}
+
 	// iterate through all project results and the update the github check
 	for _, projectResult := range res.ProjectResults {
 		statusName := c.TitleBuilder.Build(cmd.CommandName().String(), vcs.StatusTitleOptions{
 			ProjectName: projectResult.ProjectName,
 		})
 
+		// Description is a required field
+		var description string
+		var state models.CommitStatus
+		if projectResult.Error != nil || projectResult.Failure != "" {
+			description = fmt.Sprintf("%s failed for %s", strings.Title(projectResult.Command.String()), projectResult.ProjectName)
+			state = models.FailedCommitStatus
+		} else {
+			description = fmt.Sprintf("%s succeeded for %s", strings.Title(projectResult.Command.String()), projectResult.ProjectName)
+			state = models.SuccessCommitStatus
+		}
+
+		// TODO: Make the mark down rendered project specific
 		output := c.MarkdownRenderer.Render(res, cmd.CommandName(), ctx.Pull.BaseRepo)
 		updateStatusReq := types.UpdateStatusRequest{
 			Repo:        ctx.HeadRepo,
 			Ref:         ctx.Pull.HeadCommit,
 			StatusName:  statusName,
 			PullNum:     ctx.Pull.Num,
-			Description: output,
+			Description: description,
+			Output:      output,
+			State:       state,
 		}
 
 		if err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
