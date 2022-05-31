@@ -41,4 +41,4 @@ jobs:
           repository: ${{ secrets.PARENT_REPOSITORY }}
           issue-number: ${{ steps.cpr.outputs.pull-request-number }}"
           body: |
-            /ptal #orchestration-prs
+            /ptal #workflow-engines-prs
