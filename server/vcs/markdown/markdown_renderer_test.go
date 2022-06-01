@@ -1942,3 +1942,265 @@ Plan: 1 to add, 1 to change, 1 to destroy.
 		})
 	}
 }
+
+func TestRenderProjectCustomTemplate(t *testing.T) {
+	cases := []struct {
+		Description       string
+		Command           command.Name
+		ProjectResult     command.ProjectResult
+		VCSHost           models.VCSHostType
+		Expected          string
+		TemplateOverrides map[string]string
+	}{
+		{
+			"Default Plan",
+			command.Plan,
+			command.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+			models.Github,
+			`$$$diff
+
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $$
+* :put_litter_in_its_place: To **delete** this plan click [here]()
+* :repeat: To **plan** this project again, comment:
+    * $$
+`,
+			map[string]string{},
+		},
+		{
+			"Plan Override",
+			command.Plan,
+			command.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+			models.Github,
+			"Custom Template",
+			map[string]string{"project_plan_success": "testdata/custom_template.tmpl"},
+		},
+		{
+			"Default Apply",
+			command.Plan,
+			command.ProjectResult{
+				ApplySuccess: "Apply Output",
+			},
+			models.Github,
+			`$$$diff
+Apply Output
+$$$`,
+			map[string]string{},
+		},
+		{
+			"Apply Override",
+			command.Apply,
+			command.ProjectResult{
+				ApplySuccess: "Apply Output",
+			},
+			models.Github,
+			"Custom Template",
+			map[string]string{"project_apply_success": "testdata/custom_template.tmpl"},
+		},
+	}
+	for _, c := range cases {
+
+		templateResolver := TemplateResolver{
+			GlobalCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{
+						ID:                testRepo.ID(),
+						TemplateOverrides: c.TemplateOverrides,
+					},
+				},
+			},
+		}
+		r := Renderer{
+			TemplateResolver: templateResolver,
+		}
+		expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+		t.Run(fmt.Sprintf("%s_%t", c.Description, false), func(t *testing.T) {
+			s := r.RenderProject(c.ProjectResult, c.Command, testRepo)
+			fmt.Println(s)
+			Equals(t, expWithBackticks, s)
+		})
+	}
+
+}
+
+func TestRenderProjectRenderErrorf(t *testing.T) {
+	err := errors.New("err")
+	cases := []struct {
+		Description string
+		Command     command.Name
+		Error       error
+		Expected    string
+	}{
+		{
+			"plan error",
+			command.Plan,
+			err,
+			"**Plan Error**\n```\nerr\n```",
+		},
+		{
+			"apply error",
+			command.Apply,
+			err,
+			"**Apply Error**\n```\nerr\n```",
+		},
+		{
+			"policy check error",
+			command.PolicyCheck,
+			err,
+			"**Policy Check Error**\n```\nerr\n```",
+		},
+	}
+	r := Renderer{}
+	for _, c := range cases {
+		res := command.ProjectResult{
+			Error: c.Error,
+		}
+		t.Run(c.Description, func(t *testing.T) {
+			s := r.RenderProject(res, c.Command, testRepo)
+			Equals(t, c.Expected, s)
+		})
+	}
+}
+
+func TestRenderProjectFailure(t *testing.T) {
+	cases := []struct {
+		Description string
+		Command     command.Name
+		Failure     string
+		Expected    string
+	}{
+		{
+			"apply failure",
+			command.Apply,
+			"failure",
+			"**Apply Failed**: failure",
+		},
+		{
+			"plan failure",
+			command.Plan,
+			"failure",
+			"**Plan Failed**: failure",
+		},
+		{
+			"policy check failure",
+			command.PolicyCheck,
+			"failure",
+			"**Policy Check Failed**\n```\nfailure\n```" +
+				"\n* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.\n",
+		},
+	}
+	r := Renderer{}
+	for _, c := range cases {
+		res := command.ProjectResult{
+			Failure: c.Failure,
+		}
+		t.Run(c.Description, func(t *testing.T) {
+			s := r.RenderProject(res, c.Command, testRepo)
+			Equals(t, c.Expected, s)
+		})
+	}
+}
+
+func TestRenderProjectErrAndFailure(t *testing.T) {
+	r := Renderer{}
+	res := command.ProjectResult{
+		Error:   errors.New("error"),
+		Failure: "failure",
+	}
+	s := r.RenderProject(res, command.Plan, testRepo)
+	Equals(t, "**Plan Error**\n```\nerror\n```", s)
+}
+
+func TestRenderProjectDisableApply(t *testing.T) {
+	cases := []struct {
+		Description   string
+		Command       command.Name
+		ProjectResult command.ProjectResult
+		VCSHost       models.VCSHostType
+		Expected      string
+		DisableApply  bool
+	}{
+		{
+			"successful plan with disable apply not set",
+			command.Plan,
+			command.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "terraform-output",
+					LockURL:         "lock-url",
+					RePlanCmd:       "atlantis plan -d path -w workspace",
+					ApplyCmd:        "atlantis apply -d path -w workspace",
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+			models.Github,
+			`$$$diff
+terraform-output
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+`,
+			false,
+		},
+		{
+			"successful plan with disable apply set",
+			command.Plan,
+			command.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "terraform-output",
+					LockURL:         "lock-url",
+					RePlanCmd:       "atlantis plan -d path -w workspace",
+					ApplyCmd:        "atlantis apply -d path -w workspace",
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+			models.Github,
+			`$$$diff
+terraform-output
+$$$
+
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+`,
+			true,
+		},
+	}
+	for _, c := range cases {
+		r := Renderer{
+			DisableApply: c.DisableApply,
+		}
+		t.Run(c.Description, func(t *testing.T) {
+			s := r.RenderProject(c.ProjectResult, c.Command, testRepo)
+			fmt.Print(s)
+			expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+			Equals(t, expWithBackticks, s)
+		})
+	}
+}
+
+func TestRenderProjectFolding(t *testing.T) {
+	mr := Renderer{
+		TemplateResolver: TemplateResolver{
+			DisableMarkdownFolding: true,
+		},
+	}
+
+	rendered := mr.RenderProject(command.ProjectResult{
+		RepoRelDir: ".",
+		Workspace:  "default",
+		Error:      errors.New(strings.Repeat("line\n", 13)),
+	}, command.Plan, testRepo)
+	Equals(t, false, strings.Contains(rendered, "<details>"))
+}

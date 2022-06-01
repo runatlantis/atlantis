@@ -67,10 +67,10 @@ type projectResultTmplData struct {
 	Rendered    string
 }
 
-// Render formats the data into a markdown string.
+// Render formats the data into a markdown string for a command.
 // nolint: interfacer
 func (m *Renderer) Render(res command.Result, cmdName command.Name, baseRepo models.Repo) string {
-	commandStr := strings.Title(strings.Replace(cmdName.String(), "_", " ", -1))
+	commandStr := strings.Title(strings.ReplaceAll(cmdName.String(), "_", " "))
 	common := commonData{
 		Command:                  commandStr,
 		DisableApplyAll:          m.DisableApplyAll || m.DisableApply,
@@ -83,20 +83,31 @@ func (m *Renderer) Render(res command.Result, cmdName command.Name, baseRepo mod
 	if res.Failure != "" {
 		return m.renderTemplate(template.Must(template.New("").Parse(failureWithLogTmpl)), failureData{res.Failure, common})
 	}
-	return m.renderProjectResults(res.ProjectResults, common, baseRepo)
+
+	return m.renderProjectResults(res.ProjectResults, common, cmdName, baseRepo)
 }
 
-func (m *Renderer) renderProjectResults(results []command.ProjectResult, common commonData, baseRepo models.Repo) string {
+// RenderProject formats the data into a markdown string for a project
+func (m *Renderer) RenderProject(prjRes command.ProjectResult, cmdName command.Name, baseRepo models.Repo) string {
+	commandStr := strings.Title(strings.ReplaceAll(cmdName.String(), "_", " "))
+	common := commonData{
+		Command:                  commandStr,
+		DisableApply:             m.DisableApply,
+		EnableDiffMarkdownFormat: m.EnableDiffMarkdownFormat,
+	}
+	template, templateData := m.TemplateResolver.ResolveProject(prjRes, baseRepo, common)
+	return m.renderTemplate(template, templateData)
+}
+
+func (m *Renderer) renderProjectResults(results []command.ProjectResult, common commonData, cmdName command.Name, baseRepo models.Repo) string {
 	// render project results
 	var prjResultTmplData []projectResultTmplData
 	for _, result := range results {
-		template, templateData := m.TemplateResolver.ResolveProject(result, baseRepo, common)
-		renderedOutput := m.renderTemplate(template, templateData)
 		prjResultTmplData = append(prjResultTmplData, projectResultTmplData{
 			Workspace:   result.Workspace,
 			RepoRelDir:  result.RepoRelDir,
 			ProjectName: result.ProjectName,
-			Rendered:    renderedOutput,
+			Rendered:    m.RenderProject(result, cmdName, baseRepo),
 		})
 	}
 
