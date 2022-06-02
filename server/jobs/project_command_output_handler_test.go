@@ -3,7 +3,6 @@ package jobs_test
 import (
 	"sync"
 	"testing"
-	"time"
 
 	. "github.com/petergtz/pegomock"
 	"github.com/stretchr/testify/assert"
@@ -99,49 +98,34 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 	t.Run("copies buffer to new channels", func(t *testing.T) {
 		var wg sync.WaitGroup
+		var receivedMsg string
 
 		projectOutputHandler, jobStore := createProjectCommandOutputHandler(t)
+
+		// Mocking the job store acts like populating the buffer
 		When(jobStore.Get(AnyString())).ThenReturn(&jobs.Job{
 			Output: []string{Msg},
 			Status: jobs.Processing,
 		}, nil)
 
-		// send first message to populate the buffer
-		projectOutputHandler.Send(ctx, Msg)
-		time.Sleep(10 * time.Millisecond)
-
 		ch := make(chan string)
-
-		receivedMsgs := []string{}
-
-		wg.Add(1)
-		// read from channel asynchronously
 		go func() {
 			for msg := range ch {
-				receivedMsgs = append(receivedMsgs, msg)
-
-				// we're only expecting two messages here.
-				if len(receivedMsgs) >= 2 {
-					wg.Done()
-				}
+				receivedMsg = msg
+				wg.Done()
 			}
 		}()
 
-		// register channel and backfill from buffer
-		// Note: We call this synchronously because otherwise
-		// there could be a race where we are unable to register the channel
-		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		wg.Add(1)
 
-		projectOutputHandler.Send(ctx, Msg)
+		// Register the channel and wait for msg in the buffer to be read
+		projectOutputHandler.Register(ctx.JobID, ch)
 		wg.Wait()
+
 		close(ch)
 
-		expectedMsgs := []string{Msg, Msg}
-		assert.Equal(t, len(expectedMsgs), len(receivedMsgs))
-		for i := range expectedMsgs {
-			assert.Equal(t, expectedMsgs[i], receivedMsgs[i])
-		}
+		// Assert received msg is copied from the buffer
+		assert.Equal(t, receivedMsg, Msg)
 	})
 
 	t.Run("clean up all jobs when PR is closed", func(t *testing.T) {

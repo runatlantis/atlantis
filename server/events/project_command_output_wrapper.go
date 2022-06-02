@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
@@ -16,12 +17,22 @@ type ProjectOutputWrapper struct {
 
 func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectResult {
 	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
+
+	// A job needs to be closed if a log streaming job has been registered in our log handler which happens in the
+	// step runner when the first tf output for the operation is streamed. However, there's no way to tell is the operation reached
+	// the step runner and a job has been registered. So, we just assume that a job exists for now and close it.
+	// If the job does not exist, we log an error.
 	p.JobCloser.CloseJob(ctx.JobID, ctx.BaseRepo)
 	return result
 }
 
 func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
 	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
+
+	// A job needs to be closed if a log streaming job has been registered in our log handler which happens in the
+	// step runner when the first tf output for the operation is streamed. However, there's no way to tell is the operation reached
+	// the step runner and a job has been registered. So, we just assume that a job exists for now and close it.
+	// If the job does not exist, we log an error.
 	p.JobCloser.CloseJob(ctx.JobID, ctx.BaseRepo)
 	return result
 }
