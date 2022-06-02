@@ -113,7 +113,9 @@ type CommentParseResult struct {
 // - atlantis version
 // - atlantis approve_policies
 //
-func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) CommentParseResult {
+func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) CommentParseResult {
+	comment := strings.TrimSpace(rawComment)
+
 	if multiLineRegex.MatchString(comment) {
 		return CommentParseResult{Ignore: true}
 	}
@@ -427,7 +429,7 @@ var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terr
 // `atlantis unlock` with flags.
 
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
-	`atlantis unlock	
+	`atlantis unlock
 
   Unlocks the entire PR and discards all plans in this PR.
   Arguments or flags are not supported at the moment.
