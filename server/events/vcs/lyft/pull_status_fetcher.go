@@ -14,7 +14,7 @@ const LockValue = "lock"
 type PullClient interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
 	GetRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error)
-	GetRepoChecks(repo models.Repo, pull models.PullRequest) ([]*github.CheckRun, error)
+	GetRepoChecks(repo models.Repo, commitSHA string) ([]*github.CheckRun, error)
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error)
 }
 
@@ -48,7 +48,7 @@ func (s *SQBasedPullStatusFetcher) FetchPullStatus(repo models.Repo, pull models
 		return pullStatus, errors.Wrap(err, "fetching repo statuses")
 	}
 
-	checks, err := s.client.GetRepoChecks(repo, pull)
+	checks, err := s.client.GetRepoChecks(repo, pull.HeadCommit)
 	if err != nil {
 		return pullStatus, errors.Wrap(err, "fetching repo checks")
 	}

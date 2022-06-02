@@ -50,7 +50,7 @@ type IGithubClient interface {
 
 	GetContents(owner, repo, branch, path string) ([]byte, error)
 	GetRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error)
-	GetRepoChecks(repo models.Repo, pull models.PullRequest) ([]*github.CheckRun, error)
+	GetRepoChecks(repo models.Repo, commitSHA string) ([]*github.CheckRun, error)
 }
 
 // InstrumentedGithubClient should delegate to the underlying InstrumentedClient for vcs provider-agnostic
@@ -118,7 +118,7 @@ func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoO
 	return pull, err
 }
 
-func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.PullRequest) ([]*github.CheckRun, error) {
+func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, commitSHA string) ([]*github.CheckRun, error) {
 	scope := c.StatsScope.SubScope("get_repo_checks")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
@@ -127,7 +127,7 @@ func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.P
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	statuses, err := c.GhClient.GetRepoChecks(repo, pull.HeadCommit)
+	statuses, err := c.GhClient.GetRepoChecks(repo, commitSHA)
 
 	if err != nil {
 		executionError.Inc(1)
@@ -137,7 +137,7 @@ func (c *InstrumentedGithubClient) GetRepoChecks(repo models.Repo, pull models.P
 	executionSuccess.Inc(1)
 
 	//TODO: thread context and use related logging methods.
-	c.Logger.Info("fetched vcs repo checks", fields.PullRequest(pull))
+	c.Logger.Info("fetched vcs repo checks", map[string]interface{}{"commitSHA": commitSHA})
 
 	return statuses, err
 }

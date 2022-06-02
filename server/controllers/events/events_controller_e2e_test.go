@@ -1328,7 +1328,7 @@ func (t *testGithubClient) GetRepoStatuses(repo models.Repo, pull models.PullReq
 	return []*github.RepoStatus{}, nil
 
 }
-func (t *testGithubClient) GetRepoChecks(repo models.Repo, pull models.PullRequest) ([]*github.CheckRun, error) {
+func (t *testGithubClient) GetRepoChecks(repo models.Repo, commitSHA string) ([]*github.CheckRun, error) {
 	return []*github.CheckRun{}, nil
 
 }

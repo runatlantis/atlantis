@@ -4,12 +4,13 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
+	context "context"
 	github "github.com/google/go-github/v31/github"
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	types "github.com/runatlantis/atlantis/server/events/vcs/types"
+	"reflect"
+	"time"
 )
 
 type MockIGithubClient struct {
@@ -141,7 +142,7 @@ func (mock *MockIGithubClient) GetPullRequestFromName(_param0 string, _param1 st
 	return ret0, ret1
 }
 
-func (mock *MockIGithubClient) GetRepoChecks(_param0 models.Repo, _param1 models.PullRequest) ([]*github.CheckRun, error) {
+func (mock *MockIGithubClient) GetRepoChecks(_param0 models.Repo, _param1 string) ([]*github.CheckRun, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockIGithubClient().")
 	}
@@ -266,11 +267,11 @@ func (mock *MockIGithubClient) SupportsSingleFileDownload(_param0 models.Repo) b
 	return ret0
 }
 
-func (mock *MockIGithubClient) UpdateStatus(_param0 models.Repo, _param1 models.PullRequest, _param2 models.CommitStatus, _param3 string, _param4 string, _param5 string) error {
+func (mock *MockIGithubClient) UpdateStatus(_param0 context.Context, _param1 types.UpdateStatusRequest) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockIGithubClient().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5}
+	params := []pegomock.Param{_param0, _param1}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdateStatus", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -520,7 +521,7 @@ func (c *MockIGithubClient_GetPullRequestFromName_OngoingVerification) GetAllCap
 	return
 }
 
-func (verifier *VerifierMockIGithubClient) GetRepoChecks(_param0 models.Repo, _param1 models.PullRequest) *MockIGithubClient_GetRepoChecks_OngoingVerification {
+func (verifier *VerifierMockIGithubClient) GetRepoChecks(_param0 models.Repo, _param1 string) *MockIGithubClient_GetRepoChecks_OngoingVerification {
 	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetRepoChecks", params, verifier.timeout)
 	return &MockIGithubClient_GetRepoChecks_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -531,21 +532,21 @@ type MockIGithubClient_GetRepoChecks_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockIGithubClient_GetRepoChecks_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
+func (c *MockIGithubClient_GetRepoChecks_OngoingVerification) GetCapturedArguments() (models.Repo, string) {
 	_param0, _param1 := c.GetAllCapturedArguments()
 	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
-func (c *MockIGithubClient_GetRepoChecks_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
+func (c *MockIGithubClient_GetRepoChecks_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.Repo)
 		}
-		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequest)
+			_param1[u] = param.(string)
 		}
 	}
 	return
@@ -733,8 +734,8 @@ func (c *MockIGithubClient_SupportsSingleFileDownload_OngoingVerification) GetAl
 	return
 }
 
-func (verifier *VerifierMockIGithubClient) UpdateStatus(_param0 models.Repo, _param1 models.PullRequest, _param2 models.CommitStatus, _param3 string, _param4 string, _param5 string) *MockIGithubClient_UpdateStatus_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5}
+func (verifier *VerifierMockIGithubClient) UpdateStatus(_param0 context.Context, _param1 types.UpdateStatusRequest) *MockIGithubClient_UpdateStatus_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateStatus", params, verifier.timeout)
 	return &MockIGithubClient_UpdateStatus_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -744,37 +745,21 @@ type MockIGithubClient_UpdateStatus_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockIGithubClient_UpdateStatus_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, string, string, string) {
-	_param0, _param1, _param2, _param3, _param4, _param5 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1], _param3[len(_param3)-1], _param4[len(_param4)-1], _param5[len(_param5)-1]
+func (c *MockIGithubClient_UpdateStatus_OngoingVerification) GetCapturedArguments() (context.Context, types.UpdateStatusRequest) {
+	_param0, _param1 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
-func (c *MockIGithubClient_UpdateStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []string, _param4 []string, _param5 []string) {
+func (c *MockIGithubClient_UpdateStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []context.Context, _param1 []types.UpdateStatusRequest) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(c.methodInvocations))
+		_param0 = make([]context.Context, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(models.Repo)
+			_param0[u] = param.(context.Context)
 		}
-		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		_param1 = make([]types.UpdateStatusRequest, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequest)
-		}
-		_param2 = make([]models.CommitStatus, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.(models.CommitStatus)
-		}
-		_param3 = make([]string, len(c.methodInvocations))
-		for u, param := range params[3] {
-			_param3[u] = param.(string)
-		}
-		_param4 = make([]string, len(c.methodInvocations))
-		for u, param := range params[4] {
-			_param4[u] = param.(string)
-		}
-		_param5 = make([]string, len(c.methodInvocations))
-		for u, param := range params[5] {
-			_param5[u] = param.(string)
+			_param1[u] = param.(types.UpdateStatusRequest)
 		}
 	}
 	return

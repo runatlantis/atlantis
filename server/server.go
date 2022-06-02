@@ -175,6 +175,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
 	var azuredevopsClient *vcs.AzureDevopsClient
+	var featureAllocator feature.Allocator
 
 	mergeabilityChecker := vcs.NewLyftPullMergeabilityChecker(userConfig.VCSStatusName)
 
@@ -202,18 +203,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	if err != nil {
 		return nil, errors.Wrapf(err, "instantiating metrics scope")
-	}
-
-	featureAllocator, err := feature.NewGHSourcedAllocator(
-		feature.RepoConfig{
-			Owner:  userConfig.FFOwner,
-			Repo:   userConfig.FFRepo,
-			Branch: userConfig.FFBranch,
-			Path:   userConfig.FFPath,
-		}, githubClient, ctxLogger)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "initializing feature allocator")
 	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
@@ -250,6 +239,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		rawGithubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, ctxLogger, mergeabilityChecker)
 		if err != nil {
 			return nil, err
+		}
+
+		featureAllocator, err = feature.NewGHSourcedAllocator(
+			feature.RepoConfig{
+				Owner:  userConfig.FFOwner,
+				Repo:   userConfig.FFRepo,
+				Branch: userConfig.FFBranch,
+				Path:   userConfig.FFPath,
+			}, rawGithubClient, ctxLogger)
+
+		if err != nil {
+			return nil, errors.Wrap(err, "initializing feature allocator")
 		}
 
 		// [WENGINES-4643] TODO: Remove this wrapped client once github checks is stable
