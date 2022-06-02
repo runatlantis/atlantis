@@ -498,14 +498,28 @@ func (g *GithubClient) UpdateChecksStatus(ctx context.Context, request types.Upd
 
 	status, conclusion := g.resolveChecksStatus(request.State)
 	checkRunOutput := github.CheckRunOutput{
-		Title:   &request.StatusName,
-		Summary: &request.Description,
+		Title: &request.StatusName,
 	}
 	if request.Output != "" {
 		checkRunOutput.Text = &request.Output
 	}
 
 	if checkRun := g.findCheckRun(request.StatusName, checkRuns); checkRun != nil {
+
+		summary := request.Description
+		// Append job URL if project command
+		if strings.Contains(request.StatusName, ":") {
+
+			// URL in update request takes precedence over the URL in the check run
+			// checkrun URL could be stale from previous operation
+			if request.DetailsURL != "" {
+				summary = fmt.Sprintf("%s\n[Logs](%s)", request.Description, request.DetailsURL)
+			} else if checkRun.DetailsURL != nil {
+				summary = fmt.Sprintf("%s\n[Logs](%s)", request.Description, *checkRun.DetailsURL)
+			}
+		}
+		checkRunOutput.Summary = &summary
+
 		updateCheckRunOpts := github.UpdateCheckRunOptions{
 			Name:    request.StatusName,
 			HeadSHA: &request.Ref,
@@ -529,12 +543,16 @@ func (g *GithubClient) UpdateChecksStatus(ctx context.Context, request types.Upd
 		Name:    request.StatusName,
 		HeadSHA: request.Ref,
 		Status:  &status,
-		Output:  &checkRunOutput,
 	}
 
-	if request.DetailsURL != "" {
+	summary := request.Description
+	// Append job URL if project command
+	if strings.Contains(request.StatusName, ":") && request.DetailsURL != "" {
 		createCheckRunOpts.DetailsURL = &request.DetailsURL
+		summary = fmt.Sprintf("%s\n[Logs](%s)", summary, request.DetailsURL)
 	}
+	checkRunOutput.Summary = &summary
+	createCheckRunOpts.Output = &checkRunOutput
 
 	// Conclusion is required if status is Completed
 	if status == Completed.String() {

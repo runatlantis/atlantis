@@ -77,7 +77,7 @@ func (c *ChecksOutputUpdater) UpdateOutput(ctx *command.Context, cmd PullCommand
 		})
 
 		// Description is a required field
-		description := fmt.Sprintf("**Project**: `%s` **Dir**: `%s` **Workspace**: `%s`", projectResult.ProjectName, projectResult.RepoRelDir, projectResult.Workspace)
+		description := fmt.Sprintf("**Project**: `%s`\n**Dir**: `%s`\n**Workspace**: `%s`", projectResult.ProjectName, projectResult.RepoRelDir, projectResult.Workspace)
 
 		var state models.CommitStatus
 		if projectResult.Error != nil || projectResult.Failure != "" {

@@ -562,6 +562,82 @@ func TestGithubClient_UpdateChecksStatus_ErrorWhenListCheckRunsFails(t *testing.
 	assert.Error(t, err)
 }
 
+func TestGithubClient_UpdateChecksStatus_RequestDetailsURLTakesPrecedence(t *testing.T) {
+	checkRunName := "atlantis/apply: my-project"
+	detailsURL := "https://google.com"
+	listCheckRunResp := `
+	{
+		"total_count": 1,
+		"check_runs": [
+		  {
+			"id": 1,
+			"head_sha": "ce587453ced02b1526dfb4cb910479d431683101",
+			"status": "completed",
+			"conclusion": "neutral",
+			"started_at": "2018-05-04T01:14:52Z",
+			"completed_at": "2018-05-04T01:14:52Z",
+			"details_url": "https://example.com",
+			"name": "%s",
+			"check_suite": {
+			  "id": 5
+			}
+		  }
+		]
+	  }
+	`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo/commits/sha/check-runs?per_page=100":
+				_, err := w.Write([]byte(fmt.Sprintf(listCheckRunResp, checkRunName)))
+				Ok(t, err)
+			case "/api/v3/repos/owner/repo/check-runs/1":
+				body, err := ioutil.ReadAll(r.Body)
+				Ok(t, err)
+				m := make(map[string]interface{})
+				err = json.Unmarshal(body, &m)
+				Ok(t, err)
+
+				// assert updateReq details URL takes precedence over checkRun's details URL
+				assert.Equal(t, checkRunName, m["name"])
+				assert.Equal(t, detailsURL, m["details_url"])
+
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	mergeabilityChecker := vcs.NewPullMergeabilityChecker("atlantis")
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, logging.NewNoopCtxLogger(t), mergeabilityChecker)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	err = client.UpdateChecksStatus(context.TODO(), types.UpdateStatusRequest{
+		Repo: models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.Github,
+				Hostname: "github.com",
+			},
+		},
+		PullNum:     1,
+		State:       models.SuccessCommitStatus,
+		StatusName:  checkRunName,
+		Description: "description",
+		DetailsURL:  detailsURL,
+		Ref:         "sha",
+	})
+	Ok(t, err)
+}
+
 func TestGithubClient_UpdateStatus(t *testing.T) {
 	cases := []struct {
 		status   models.CommitStatus
