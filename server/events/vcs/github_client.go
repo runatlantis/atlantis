@@ -87,6 +87,9 @@ func (e CheckStatus) String() string {
 // by GitHub.
 const (
 	maxCommentLength = 65536
+
+	// Reference: https://github.com/github/docs/issues/3765
+	maxChecksOutputLength = 65535
 )
 
 // allows for custom handling of github 404s
@@ -491,6 +494,15 @@ func (g *GithubClient) findCheckRun(statusName string, checkRuns []*github.Check
 
 // [WENGINES-4643] TODO: Move the checks implementation to UpdateStatus once github checks is stable
 func (g *GithubClient) UpdateChecksStatus(ctx context.Context, request types.UpdateStatusRequest) error {
+
+	// Cap the output string if it exceeds the max checks output length
+	var output string
+	if len(request.Output) > maxChecksOutputLength {
+		output = request.Output[:maxChecksOutputLength]
+	} else {
+		output = request.Output
+	}
+
 	checkRuns, err := g.GetRepoChecks(request.Repo, request.Ref)
 	if err != nil {
 		return err
@@ -501,7 +513,7 @@ func (g *GithubClient) UpdateChecksStatus(ctx context.Context, request types.Upd
 		Title: &request.StatusName,
 	}
 	if request.Output != "" {
-		checkRunOutput.Text = &request.Output
+		checkRunOutput.Text = &output
 	}
 
 	if checkRun := g.findCheckRun(request.StatusName, checkRuns); checkRun != nil {
