@@ -474,6 +474,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	statusController := &controllers.StatusController{
 		Logger:  logger,
 		Drainer: drainer,
+		AtlantisVersion: config.AtlantisVersion,
 	}
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             vcsClient,

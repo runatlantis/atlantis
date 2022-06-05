@@ -11,13 +11,15 @@ import (
 
 // StatusController handles the status of Atlantis.
 type StatusController struct {
-	Logger  logging.SimpleLogging
-	Drainer *events.Drainer
+	Logger          logging.SimpleLogging
+	Drainer         *events.Drainer
+	AtlantisVersion string
 }
 
 type StatusResponse struct {
-	ShuttingDown  bool `json:"shutting_down"`
-	InProgressOps int  `json:"in_progress_operations"`
+	ShuttingDown    bool   `json:"shutting_down"`
+	InProgressOps   int    `json:"in_progress_operations"`
+	AtlantisVersion string `json:"version"`
 }
 
 // Get is the GET /status route.
@@ -26,6 +28,7 @@ func (d *StatusController) Get(w http.ResponseWriter, r *http.Request) {
 	data, err := json.MarshalIndent(&StatusResponse{
 		ShuttingDown:  status.ShuttingDown,
 		InProgressOps: status.InProgressOps,
+		AtlantisVersion: d.AtlantisVersion,
 	}, "", "  ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
