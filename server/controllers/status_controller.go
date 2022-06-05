@@ -26,8 +26,8 @@ type StatusResponse struct {
 func (d *StatusController) Get(w http.ResponseWriter, r *http.Request) {
 	status := d.Drainer.GetStatus()
 	data, err := json.MarshalIndent(&StatusResponse{
-		ShuttingDown:  status.ShuttingDown,
-		InProgressOps: status.InProgressOps,
+		ShuttingDown:    status.ShuttingDown,
+		InProgressOps:   status.InProgressOps,
 		AtlantisVersion: d.AtlantisVersion,
 	}, "", "  ")
 	if err != nil {

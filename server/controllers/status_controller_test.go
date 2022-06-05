@@ -20,8 +20,8 @@ func TestStatusController_Startup(t *testing.T) {
 	w := httptest.NewRecorder()
 	dr := &events.Drainer{}
 	d := &controllers.StatusController{
-		Logger:  logger,
-		Drainer: dr,
+		Logger:          logger,
+		Drainer:         dr,
 		AtlantisVersion: "1.0.0",
 	}
 	d.Get(w, r)
@@ -44,8 +44,8 @@ func TestStatusController_InProgress(t *testing.T) {
 	dr.StartOp()
 
 	d := &controllers.StatusController{
-		Logger:  logger,
-		Drainer: dr,
+		Logger:          logger,
+		Drainer:         dr,
 		AtlantisVersion: "1.0.0",
 	}
 	d.Get(w, r)
@@ -68,8 +68,8 @@ func TestStatusController_Shutdown(t *testing.T) {
 	dr.ShutdownBlocking()
 
 	d := &controllers.StatusController{
-		Logger:  logger,
-		Drainer: dr,
+		Logger:          logger,
+		Drainer:         dr,
 		AtlantisVersion: "1.0.0",
 	}
 	d.Get(w, r)

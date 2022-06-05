@@ -472,8 +472,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	drainer := &events.Drainer{}
 	statusController := &controllers.StatusController{
-		Logger:  logger,
-		Drainer: drainer,
+		Logger:          logger,
+		Drainer:         drainer,
 		AtlantisVersion: config.AtlantisVersion,
 	}
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
