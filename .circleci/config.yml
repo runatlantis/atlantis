@@ -16,7 +16,7 @@ jobs:
         # We do this instead of setting --default-tf-version because setting
         # that flag starts the download asynchronously so we'd have a race
         # condition.
-        TERRAFORM_VERSION: 1.1.9
+        TERRAFORM_VERSION: 1.2.0
     steps:
     - checkout
     - run: make build-service
@@ -44,6 +44,7 @@ jobs:
           muffet \
             -e 'https://github\.com/runatlantis/atlantis/edit/master/.*' \
             -e 'https://github.com/helm/charts/tree/master/stable/atlantis#customization' \
+            --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
             http://localhost:8080/
 

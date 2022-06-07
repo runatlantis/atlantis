@@ -47,7 +47,7 @@ jobs:
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
-          ghcr.io/runatlantis/atlantis:dev
+          ghcr.io/${{ github.repository_owner }}/atlantis:dev
 
     # Publish release to container registry
     - name: populate release version
@@ -62,8 +62,8 @@ jobs:
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
-          ghcr.io/runatlantis/atlantis:${{ env.RELEASE_VERSION }}
-          ghcr.io/runatlantis/atlantis:latest
+          ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_VERSION }}
+          ghcr.io/${{ github.repository_owner }}/atlantis:latest
 
     - name: Build and push atlantis:${{ env.RELEASE_VERSION }} image for stable release
       if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, '-pre.')) }}
@@ -73,5 +73,5 @@ jobs:
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
-          ghcr.io/runatlantis/atlantis:${{ env.RELEASE_VERSION }}
-          ghcr.io/runatlantis/atlantis:prerelease-latest
+          ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_VERSION }}
+          ghcr.io/${{ github.repository_owner }}/atlantis:prerelease-latest
