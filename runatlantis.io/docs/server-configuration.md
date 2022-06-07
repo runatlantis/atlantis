@@ -140,11 +140,14 @@ Values are chosen in this order:
   ```
   Azure DevOps basic authentication password for inbound webhooks (see
   https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops).
-  SECURITY WARNING: If not specified, Atlantis won't be able to validate that the
+  
+  ::: warning SECURITY WARNING
+  If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure DevOps org. This means that an
   attacker could spoof calls to Atlantis and cause it to perform malicious
   actions. Should be specified via the ATLANTIS_AZUREDEVOPS_BASIC_AUTH environment
   variable.
+  :::
 
 * ### `--azuredevops-webhook-user`
   ```bash
