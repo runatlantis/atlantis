@@ -552,11 +552,11 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	// Use a real GitHub json response and edit the mergeable_state field.
 	jsBytes, err := os.ReadFile("fixtures/github-pull-request.json")
 	Ok(t, err)
-	prJson := string(jsBytes)
+	prJSON := string(jsBytes)
 
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
-			response := strings.Replace(prJson,
+			response := strings.Replace(prJSON,
 				`"mergeable_state": "clean"`,
 				fmt.Sprintf(`"mergeable_state": "%s"`, c.state),
 				1,
@@ -580,10 +580,10 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 						w.Write([]byte(response)) // nolint: errcheck
 						return
 					case "/api/v3/repos/owner/repo/commits/headBranch/status":
-						w.Write([]byte(responseStatus)) // nolint: errcheck
+						w.Write(responseStatus) // nolint: errcheck
 						return
 					case "/api/v3/repos/owner/repo/branches/baseBranch/protection/required_status_checks":
-						w.Write([]byte(responseRequiredChecks)) // nolint: errcheck
+						w.Write(responseRequiredChecks) // nolint: errcheck
 						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
