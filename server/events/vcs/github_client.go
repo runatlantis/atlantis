@@ -351,7 +351,7 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 				}
 			}
 		}
-		g.logger.Debug("Blocked only by atalantis/apply")
+		g.logger.Debug("Blocked only by atlantis/apply")
 		return true, nil
 
 	}
