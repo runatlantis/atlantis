@@ -564,8 +564,8 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 			responseStatus, _ := json.Marshal(map[string][]map[string]string{
 				"statuses": {{
 					"context": c.requiredCheckName,
-					"state": c.requiredCheckStatus,
-				},},
+					"state":   c.requiredCheckStatus,
+				}},
 			})
 			responseRequiredChecks, _ := json.Marshal(map[string][]string{
 				"contexts": {
@@ -608,7 +608,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 					Hostname: "github.com",
 				},
 			}, models.PullRequest{
-				Num: 1,
+				Num:        1,
 				HeadBranch: "headBranch",
 				BaseBranch: "baseBranch",
 			})

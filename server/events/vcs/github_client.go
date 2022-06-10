@@ -343,7 +343,7 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 				if strings.HasPrefix(status.GetContext(), fmt.Sprintf("atlantis/%s", command.Apply.String())) {
 					continue
 				}
-				if status.GetContext() == requiredCheck  {
+				if status.GetContext() == requiredCheck {
 					if status.GetState() == "failure" || status.GetState() == "pending" {
 						g.logger.Debug("Failed check %v", requiredCheck)
 						return false, nil
