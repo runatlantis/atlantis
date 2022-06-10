@@ -339,8 +339,8 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		}
 		for _, status := range allStatuses {
 			for _, requiredCheck := range requiredChecks.Contexts {
-				// Ignore any commit statuses with 'altantis/apply' as prefix
-				if strings.HasPrefix(status.GetContext(), fmt.Sprintf("atlantis/%s", command.Apply.String())) {
+				// Ignore any commit statuses with 'atlantis/apply' as prefix
+				if strings.HasPrefix(status.GetContext(), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
 					continue
 				}
 				if status.GetContext() == requiredCheck {
