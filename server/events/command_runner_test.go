@@ -107,6 +107,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 
 	parallelPoolSize := 1
 	SilenceNoProjects := false
+	StatusName := "atlantis-test"
 	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
@@ -151,6 +152,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		parallelPoolSize,
 		SilenceNoProjects,
 		false,
+		StatusName,
 		pullReqStatusFetcher,
 	)
 
@@ -781,7 +783,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 		},
 	})
 
-	When(ch.VCSClient.PullIsMergeable(fixtures.GithubRepo, modelPull)).ThenReturn(true, nil)
+	When(ch.VCSClient.PullIsMergeable(fixtures.GithubRepo, modelPull, "atlantis-test")).ThenReturn(true, nil)
 
 	When(projectCommandBuilder.BuildApplyCommands(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).Then(func(args []Param) ReturnValues {
 		return ReturnValues{
