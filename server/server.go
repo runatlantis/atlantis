@@ -631,6 +631,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
+		userConfig.VCSStatusName,
 		pullReqStatusFetcher,
 	)
 
