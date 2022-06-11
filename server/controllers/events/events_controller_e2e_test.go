@@ -872,6 +872,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	locker := events.NewDefaultWorkingDirLocker()
 	parser := &config.ParserValidator{}
 
+	deleteLockCommand := mocks.NewMockDeleteLockCommand()
+
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg: true,
 		MergeableReq: false,
@@ -1024,6 +1026,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		boltdb,
+		deleteLockCommand,
 	)
 
 	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
