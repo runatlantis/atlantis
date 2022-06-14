@@ -47,16 +47,10 @@ func NewStorageBackend(jobs valid.Jobs, logger logging.Logger, featureAllocator 
 		containerName: containerName,
 	}
 
-	instrumentedStorageBackend := InstrumenetedStorageBackend{
+	return &InstrumenetedStorageBackend{
 		StorageBackend: storageBackend,
 		readFailures:   scope.SubScope("storage_backend").Counter("read_failure"),
 		writeFailures:  scope.SubScope("storage_backend").Counter("write_failure"),
-	}
-
-	return &FeatureAwareStorageBackend{
-		StorageBackend:   &instrumentedStorageBackend,
-		FeatureAllocator: featureAllocator,
-		Logger:           logger,
 	}, nil
 }
 
@@ -177,39 +171,6 @@ func (i *InstrumenetedStorageBackend) Write(key string, logs []string, fullRepoN
 		i.writeFailures.Inc(1)
 	}
 	return ok, err
-}
-
-// TODO: [ORCA-4524] Remove feature flag after this feature is stable
-// Wraps feature flag around storage backend
-type FeatureAwareStorageBackend struct {
-	StorageBackend
-
-	FeatureAllocator feature.Allocator
-	Logger           logging.Logger
-}
-
-func (f *FeatureAwareStorageBackend) Read(key string) ([]string, error) {
-	shouldAllocate, err := f.FeatureAllocator.ShouldAllocate(feature.LogPersistence, "")
-	if err != nil {
-		f.Logger.Error(fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.LogPersistence, err))
-	}
-
-	if shouldAllocate {
-		return f.StorageBackend.Read(key)
-	}
-	return []string{}, nil
-}
-
-func (f *FeatureAwareStorageBackend) Write(key string, logs []string, fullRepoName string) (bool, error) {
-	shouldAllocate, err := f.FeatureAllocator.ShouldAllocate(feature.LogPersistence, fullRepoName)
-	if err != nil {
-		f.Logger.Error(fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.LogPersistence, err))
-	}
-
-	if shouldAllocate {
-		return f.StorageBackend.Write(key, logs, fullRepoName)
-	}
-	return false, nil
 }
 
 // Used when log persistence is not configured
