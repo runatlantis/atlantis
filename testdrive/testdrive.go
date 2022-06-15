@@ -145,15 +145,22 @@ Follow these instructions to create a token (we don't store any tokens):
 		colorstring.Println("[green]=> terraform found in $PATH![reset]")
 	}
 
-	// Download ngrok.
-	colorstring.Println("=> downloading ngrok  ")
-	s.Start()
-	ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
-	if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
-		return errors.Wrapf(err, "downloading and unzipping ngrok")
+	// Detect /tmp/ngrok and install it if not installed.
+	_, err := exec.LookPath("/tmp/ngrok")
+	if err != nil {
+	      colorstring.Println("[yellow]=> ngrok not found in $PATH.[reset]")
+	      colorstring.Println("=> downloading ngrok  ")
+	      s.Start()
+	      ngrokDownloadURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
+	      if err = downloadAndUnzip(ngrokDownloadURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
+		  return errors.Wrapf(err, "downloading and unzipping ngrok")
+	      }
+
+	      colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
+	} else {
+	      colorstring.Println("[green]=> ngrok found in $PATH![reset]")
 	}
 	s.Stop()
-	colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
 
 	// Create ngrok tunnel.
 	colorstring.Println("=> creating secure tunnel")
