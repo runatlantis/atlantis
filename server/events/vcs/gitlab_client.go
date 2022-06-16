@@ -193,7 +193,7 @@ func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 // See:
 // - https://gitlab.com/gitlab-org/gitlab-ee/issues/3169
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
-func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
 	if err != nil {
 		return false, err
@@ -212,8 +212,8 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	for _, status := range statuses {
-		// Ignore any commit statuses with 'altantis/apply' as prefix
-		if strings.HasPrefix(status.Name, fmt.Sprintf("atlantis/%s", command.Apply.String())) {
+		// Ignore any commit statuses with 'atlantis/apply' as prefix
+		if strings.HasPrefix(status.Name, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {

@@ -475,6 +475,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 }
 
 func TestGithubClient_PullIsMergeable(t *testing.T) {
+	vcsStatusName := "atlantis-test"
 	cases := []struct {
 		state               string
 		requiredCheckName   string
@@ -531,13 +532,13 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 		},
 		{
 			"blocked",
-			"atlantis/apply",
+			fmt.Sprintf("%s/apply", vcsStatusName),
 			"failure",
 			true,
 		},
 		{
 			"blocked",
-			"atlantis/apply",
+			fmt.Sprintf("%s/apply", vcsStatusName),
 			"pending",
 			true,
 		},
@@ -611,7 +612,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 				Num:        1,
 				HeadBranch: "headBranch",
 				BaseBranch: "baseBranch",
-			})
+			}, vcsStatusName)
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})

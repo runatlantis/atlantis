@@ -250,33 +250,34 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	gitlabClientUnderTest = true
+	vcsStatusName := "atlantis-test"
 	cases := []struct {
 		statusName string
 		status     models.CommitStatus
 		expState   bool
 	}{
 		{
-			"atlantis/apply: resource/default",
+			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
 			true,
 		},
 		{
-			"atlantis/apply",
+			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			true,
 		},
 		{
-			"atlantis/plan: resource/default",
+			fmt.Sprintf("%s/plan: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
 			false,
 		},
 		{
-			"atlantis/plan",
+			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.PendingCommitStatus,
 			false,
 		},
 		{
-			"atlantis/plan",
+			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.SuccessCommitStatus,
 			true,
 		},
@@ -325,7 +326,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				Num:        1,
 				BaseRepo:   repo,
 				HeadCommit: "sha",
-			})
+			}, vcsStatusName)
 			Ok(t, err)
 			Equals(t, c.expState, mergeable)
 		})

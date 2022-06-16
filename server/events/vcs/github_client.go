@@ -298,7 +298,7 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
-func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	githubPR, err := g.GetPullRequest(repo, pull.Num)
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
@@ -339,8 +339,8 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		}
 		for _, status := range allStatuses {
 			for _, requiredCheck := range requiredChecks.Contexts {
-				// Ignore any commit statuses with 'altantis/apply' as prefix
-				if strings.HasPrefix(status.GetContext(), fmt.Sprintf("atlantis/%s", command.Apply.String())) {
+				// Ignore any commit statuses with 'atlantis/apply' as prefix
+				if strings.HasPrefix(status.GetContext(), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
 					continue
 				}
 				if status.GetContext() == requiredCheck {
