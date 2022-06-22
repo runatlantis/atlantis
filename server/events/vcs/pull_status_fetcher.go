@@ -6,7 +6,7 @@ import (
 )
 
 type PullReqStatusFetcher interface {
-	FetchPullStatus(repo models.Repo, pull models.PullRequest) (models.PullReqStatus, error)
+	FetchPullStatus(repo models.Repo, pull models.PullRequest, vcsstatusname string) (models.PullReqStatus, error)
 }
 
 type pullReqStatusFetcher struct {
@@ -19,13 +19,13 @@ func NewPullReqStatusFetcher(client Client) PullReqStatusFetcher {
 	}
 }
 
-func (f *pullReqStatusFetcher) FetchPullStatus(repo models.Repo, pull models.PullRequest) (pullStatus models.PullReqStatus, err error) {
+func (f *pullReqStatusFetcher) FetchPullStatus(repo models.Repo, pull models.PullRequest, vcsstatusname string) (pullStatus models.PullReqStatus, err error) {
 	approvalStatus, err := f.client.PullIsApproved(repo, pull)
 	if err != nil {
 		return pullStatus, errors.Wrapf(err, "fetching pull approval status for repo: %s, and pull number: %d", repo.FullName, pull.Num)
 	}
 
-	mergeable, err := f.client.PullIsMergeable(repo, pull)
+	mergeable, err := f.client.PullIsMergeable(repo, pull, vcsstatusname)
 	if err != nil {
 		return pullStatus, errors.Wrapf(err, "fetching mergeability status for repo: %s, and pull number: %d", repo.FullName, pull.Num)
 	}

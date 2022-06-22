@@ -62,7 +62,7 @@ type StepRunner interface {
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
+	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
@@ -70,6 +70,12 @@ type CustomStepRunner interface {
 // EnvStepRunner runs env steps.
 type EnvStepRunner interface {
 	Run(ctx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error)
+}
+
+// MultiEnvStepRunner runs multienv steps.
+type MultiEnvStepRunner interface {
+	// Run cmd in path.
+	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -189,6 +195,7 @@ type DefaultProjectCommandRunner struct {
 	VersionStepRunner          StepRunner
 	RunStepRunner              CustomStepRunner
 	EnvStepRunner              EnvStepRunner
+	MultiEnvStepRunner         MultiEnvStepRunner
 	PullApprovedChecker        runtime.PullApprovedChecker
 	WorkingDir                 WorkingDir
 	Webhooks                   WebhooksSender
@@ -486,13 +493,15 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "version":
 			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs)
+			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs, true)
 		case "env":
 			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out
 			// We reset out to the empty string because we don't want it to
 			// be printed to the PR, it's solely to set the environment variable.
 			out = ""
+		case "multienv":
+			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs)
 		}
 
 		if out != "" {

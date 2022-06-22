@@ -756,7 +756,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
+			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest(), "atlantis-test")).ThenReturn(true, nil)
 			When(vcsClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(models.ApprovalStatus{
 				IsApproved: true,
 			}, nil)
@@ -872,6 +872,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	locker := events.NewDefaultWorkingDirLocker()
 	parser := &config.ParserValidator{}
 
+	deleteLockCommand := mocks.NewMockDeleteLockCommand()
+
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg: true,
 		MergeableReq: false,
@@ -973,8 +975,9 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 			TerraformExecutor: terraformClient,
 		},
 		RunStepRunner: &runtime.RunStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
+			TerraformExecutor:       terraformClient,
+			DefaultTFVersion:        defaultTFVersion,
+			ProjectCmdOutputHandler: projectCmdOutputHandler,
 		},
 		WorkingDir:       workingDir,
 		Webhooks:         &mockWebhookSender{},
@@ -1024,6 +1027,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		boltdb,
+		deleteLockCommand,
 	)
 
 	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
@@ -1042,6 +1046,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		false,
+		"atlantis-test",
 		e2ePullReqStatusFetcher,
 	)
 
