@@ -22,6 +22,7 @@ func NewPlanCommandRunner(
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	pullStatusFetcher PullStatusFetcher,
+	deleteLockCommand DeleteLockCommand,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -39,6 +40,7 @@ func NewPlanCommandRunner(
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		pullStatusFetcher:          pullStatusFetcher,
+		deleteLockCommand:          deleteLockCommand,
 	}
 }
 
@@ -64,6 +66,7 @@ type PlanCommandRunner struct {
 	autoMerger                 *AutoMerger
 	parallelPoolSize           int
 	pullStatusFetcher          PullStatusFetcher
+	deleteLockCommand          DeleteLockCommand
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -104,6 +107,13 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
 	if err := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
 		ctx.Log.Warn("unable to update plan commit status: %s", err)
+	}
+
+	// discard previous plans that might not be relevant anymore
+	ctx.Log.Debug("deleting locks and workdir(s) with previous plans")
+	_, err = p.deleteLockCommand.DeleteLocksByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
+	if err != nil {
+		ctx.Log.Err("deleting locks: %s", err)
 	}
 
 	// Only run commands in parallel if enabled
@@ -179,6 +189,16 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
+
+	// if the plan is generic, new plans will be generated based on changes
+	// discard previous plans that might not be relevant anymore
+	if !cmd.IsForSpecificProject() {
+		ctx.Log.Debug("deleting locks and workdir(s) with previous plans")
+		_, err = p.deleteLockCommand.DeleteLocksByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
+		if err != nil {
+			ctx.Log.Err("deleting locks: %s", err)
+		}
+	}
 
 	// Only run commands in parallel if enabled
 	var result command.Result

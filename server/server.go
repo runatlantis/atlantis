@@ -405,8 +405,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
-		DataDir:       userConfig.DataDir,
-		CheckoutMerge: userConfig.CheckoutStrategy == "merge",
+		DataDir:          userConfig.DataDir,
+		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
+		GithubAppEnabled: githubAppEnabled,
 	}
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir
 	if githubAppEnabled {
@@ -467,14 +468,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	runStepRunner := &runtime.RunStepRunner{
-		TerraformExecutor: terraformClient,
-		DefaultTFVersion:  defaultTfVersion,
-		TerraformBinDir:   terraformClient.TerraformBinDir(),
+		TerraformExecutor:       terraformClient,
+		DefaultTFVersion:        defaultTfVersion,
+		TerraformBinDir:         terraformClient.TerraformBinDir(),
+		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	drainer := &events.Drainer{}
 	statusController := &controllers.StatusController{
-		Logger:  logger,
-		Drainer: drainer,
+		Logger:          logger,
+		Drainer:         drainer,
+		AtlantisVersion: config.AtlantisVersion,
 	}
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             vcsClient,
@@ -551,6 +554,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		EnvStepRunner: &runtime.EnvStepRunner{
 			RunStepRunner: runStepRunner,
 		},
+		MultiEnvStepRunner: &runtime.MultiEnvStepRunner{
+			RunStepRunner: runStepRunner,
+		},
 		VersionStepRunner: &runtime.VersionStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
@@ -610,6 +616,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		boltdb,
+		deleteLockCommand,
 	)
 
 	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
@@ -627,6 +634,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
+		userConfig.VCSStatusName,
 		pullReqStatusFetcher,
 	)
 
