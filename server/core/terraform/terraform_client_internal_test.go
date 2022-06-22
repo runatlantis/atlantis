@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
+	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -381,7 +382,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	Equals(t, "echo me", out)
 }
 
-func waitCh(ch <-chan Line) (string, error) {
+func waitCh(ch <-chan runtimemodels.Line) (string, error) {
 	var ls []string
 	for line := range ch {
 		if line.Err != nil {

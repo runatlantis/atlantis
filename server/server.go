@@ -466,9 +466,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	runStepRunner := &runtime.RunStepRunner{
-		TerraformExecutor: terraformClient,
-		DefaultTFVersion:  defaultTfVersion,
-		TerraformBinDir:   terraformClient.TerraformBinDir(),
+		TerraformExecutor:       terraformClient,
+		DefaultTFVersion:        defaultTfVersion,
+		TerraformBinDir:         terraformClient.TerraformBinDir(),
+		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	drainer := &events.Drainer{}
 	statusController := &controllers.StatusController{
