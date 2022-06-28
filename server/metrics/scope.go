@@ -10,44 +10,55 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/uber-go/tally"
+	tallyprom "github.com/uber-go/tally/prometheus"
 	tallystatsd "github.com/uber-go/tally/statsd"
 )
 
 func NewLoggingScope(logger logging.SimpleLogging, statsNamespace string) (tally.Scope, io.Closer, error) {
-	reporter, err := newReporter(valid.Metrics{}, logger)
-
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "initializing stats reporter")
-	}
-
-	scope, closer := tally.NewRootScope(tally.ScopeOptions{
-		Prefix:   statsNamespace,
-		Reporter: reporter,
-	}, time.Second)
-
-	return scope, closer, nil
+	scope, _, closer, err := NewScope(valid.Metrics{}, logger, statsNamespace)
+	return scope, closer, err
 }
 
-func NewScope(cfg valid.Metrics, logger logging.SimpleLogging, statsNamespace string) (tally.Scope, io.Closer, error) {
+func NewScope(cfg valid.Metrics, logger logging.SimpleLogging, statsNamespace string) (tally.Scope, tally.BaseStatsReporter, io.Closer, error) {
 	reporter, err := newReporter(cfg, logger)
 
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "initializing stats reporter")
+		return nil, nil, nil, errors.Wrap(err, "initializing stats reporter")
 	}
 
-	scope, closer := tally.NewRootScope(tally.ScopeOptions{
-		Prefix:   statsNamespace,
-		Reporter: reporter,
-	}, time.Second)
+	scopeOpts := tally.ScopeOptions{
+		Prefix: statsNamespace,
+	}
 
-	return scope, closer, nil
+	if r, ok := reporter.(tally.StatsReporter); ok {
+		scopeOpts.Reporter = r
+	} else if r, ok := reporter.(tally.CachedStatsReporter); ok {
+		scopeOpts.CachedReporter = r
+		scopeOpts.Separator = tallyprom.DefaultSeparator
+	}
+
+	scope, closer := tally.NewRootScope(scopeOpts, time.Second)
+	return scope, reporter, closer, nil
 }
 
-func newReporter(cfg valid.Metrics, logger logging.SimpleLogging) (tally.StatsReporter, error) {
-	if cfg.Statsd == nil {
-		// return logging reporter and proceed
-		return newLoggingReporter(logger), nil
+func newReporter(cfg valid.Metrics, logger logging.SimpleLogging) (tally.BaseStatsReporter, error) {
+
+	// return statsd metrics if configured
+	if cfg.Statsd != nil {
+		return newStatsReporter(cfg, logger)
 	}
+
+	// return prometheus metrics if configured
+	if cfg.Prometheus != nil {
+		return tallyprom.NewReporter(tallyprom.Options{}), nil
+	}
+
+	// return logging reporter and proceed
+	return newLoggingReporter(logger), nil
+
+}
+
+func newStatsReporter(cfg valid.Metrics, logger logging.SimpleLogging) (tally.StatsReporter, error) {
 
 	statsdCfg := cfg.Statsd
 
