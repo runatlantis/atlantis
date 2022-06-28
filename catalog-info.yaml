@@ -1,0 +1,25 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: atlantis
+  description: Application for automating Terraform via pull requests
+  annotations:
+    github.com/project-slug: segmentio/atlantis-system
+    buildkite.com/project-slug: segment/atlantis-system
+    segment.io/security-tier: "2"
+    datadoghq.com/dashboard-url: https://segment.datadoghq.com/dashboard/wxd-rbk-f4c
+  tags:
+    - Go
+  links:
+    - title: Datadog
+      url: https://segment.datadoghq.com/dashboard/wxd-rbk-f4c
+    - title: Runbook
+      url: https://segment.atlassian.net/l/c/LN91uYPE
+    - title: Atlantis Locks
+      url: https://atlantis.segment.com/
+    - title: Atlantis Docs
+      url: https://www.runatlantis.io/docs/
+spec:
+  type: service
+  lifecycle: production
+  owner: dg-ci-team
