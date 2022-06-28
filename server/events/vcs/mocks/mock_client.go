@@ -170,7 +170,7 @@ func (mock *MockClient) GetTeamNamesForUser(repo models.Repo, user models.User) 
 	return ret0, ret1
 }
 
-func (mock *MockClient) PullIsMergeable(_param0 models.Repo, _param1 models.PullRequest) (bool, error) {
+func (mock *MockClient) PullIsMergeable(_param0 models.Repo, _param1 models.PullRequest, vcsstatusname string) (bool, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}

@@ -167,7 +167,7 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}

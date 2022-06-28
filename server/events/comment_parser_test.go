@@ -280,6 +280,10 @@ func TestParse_Multiline(t *testing.T) {
 		"atlantis plan\n\n",
 		"atlantis plan\r\n",
 		"atlantis plan\r\n\r\n",
+		"\natlantis plan",
+		"\r\natlantis plan",
+		"\natlantis plan\n",
+		"\r\natlantis plan\r\n",
 	}
 	for _, comment := range comments {
 		t.Run(comment, func(t *testing.T) {
@@ -845,7 +849,7 @@ var ApprovePolicyUsage = `Usage of approve_policies:
       --verbose   Append Atlantis log to comment.
 `
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
-	`atlantis unlock	
+	`atlantis unlock
 
   Unlocks the entire PR and discards all plans in this PR.
   Arguments or flags are not supported at the moment.

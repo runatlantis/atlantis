@@ -39,6 +39,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
 	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/prometheus"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -94,6 +95,7 @@ type Server struct {
 	CommandRunner                  *events.DefaultCommandRunner
 	Logger                         logging.SimpleLogging
 	StatsScope                     tally.Scope
+	StatsReporter                  tally.BaseStatsReporter
 	StatsCloser                    io.Closer
 	Locker                         locking.Locker
 	ApplyLocker                    locking.ApplyLocker
@@ -188,7 +190,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
-	statsScope, closer, err := metrics.NewScope(globalCfg.Metrics, logger, userConfig.StatsNamespace)
+	statsScope, statsReporter, closer, err := metrics.NewScope(globalCfg.Metrics, logger, userConfig.StatsNamespace)
 
 	if err != nil {
 		return nil, errors.Wrapf(err, "instantiating metrics scope")
@@ -466,9 +468,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	runStepRunner := &runtime.RunStepRunner{
-		TerraformExecutor: terraformClient,
-		DefaultTFVersion:  defaultTfVersion,
-		TerraformBinDir:   terraformClient.TerraformBinDir(),
+		TerraformExecutor:       terraformClient,
+		DefaultTFVersion:        defaultTfVersion,
+		TerraformBinDir:         terraformClient.TerraformBinDir(),
+		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	drainer := &events.Drainer{}
 	statusController := &controllers.StatusController{
@@ -630,6 +633,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
+		userConfig.VCSStatusName,
 		pullReqStatusFetcher,
 	)
 
@@ -770,6 +774,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommandRunner:                  commandRunner,
 		Logger:                         logger,
 		StatsScope:                     statsScope,
+		StatsReporter:                  statsReporter,
 		StatsCloser:                    closer,
 		Locker:                         lockingClient,
 		ApplyLocker:                    applyLockingClient,
@@ -811,6 +816,11 @@ func (s *Server) Start() error {
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
 	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
 	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
+
+	r, ok := s.StatsReporter.(prometheus.Reporter)
+	if ok {
+		s.Router.Handle(s.CommandRunner.GlobalCfg.Metrics.Prometheus.Endpoint, r.HTTPHandler())
+	}
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),

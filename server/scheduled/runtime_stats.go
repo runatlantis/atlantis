@@ -46,38 +46,43 @@ type runtimeMetrics struct {
 
 func NewRuntimeStats(scope tally.Scope) *RuntimeStatCollector {
 	runtimeScope := scope.SubScope("runtime")
+	cpuScope := runtimeScope.SubScope("cpu")
+	memoryScope := runtimeScope.SubScope("memory")
+	heapScope := memoryScope.SubScope("heap")
+	stackScope := memoryScope.SubScope("stack")
+	gcScope := memoryScope.SubScope("gc")
 	runtimeMetrics := runtimeMetrics{
 		// cpu
-		cpuGoroutines: runtimeScope.Gauge("cpu.goroutines"),
-		cpuCgoCalls:   runtimeScope.Gauge("cpu.cgo_calls"),
+		cpuGoroutines: cpuScope.Gauge("goroutines"),
+		cpuCgoCalls:   cpuScope.Gauge("cgo_calls"),
 		// memory
-		memoryAlloc:   runtimeScope.Gauge("memory.alloc"),
-		memoryTotal:   runtimeScope.Gauge("memory.total"),
-		memorySys:     runtimeScope.Gauge("memory.sys"),
-		memoryLookups: runtimeScope.Gauge("memory.lookups"),
-		memoryMalloc:  runtimeScope.Gauge("memory.malloc"),
-		memoryFrees:   runtimeScope.Gauge("memory.frees"),
+		memoryAlloc:   memoryScope.Gauge("alloc"),
+		memoryTotal:   memoryScope.Gauge("total"),
+		memorySys:     memoryScope.Gauge("sys"),
+		memoryLookups: memoryScope.Gauge("lookups"),
+		memoryMalloc:  memoryScope.Gauge("malloc"),
+		memoryFrees:   memoryScope.Gauge("frees"),
 		// heap
-		memoryHeapAlloc:    runtimeScope.Gauge("memory.heap.alloc"),
-		memoryHeapSys:      runtimeScope.Gauge("memory.heap.sys"),
-		memoryHeapIdle:     runtimeScope.Gauge("memory.heap.idle"),
-		memoryHeapInuse:    runtimeScope.Gauge("memory.heap.inuse"),
-		memoryHeapReleased: runtimeScope.Gauge("memory.heap.released"),
-		memoryHeapObjects:  runtimeScope.Gauge("memory.heap.objects"),
+		memoryHeapAlloc:    heapScope.Gauge("alloc"),
+		memoryHeapSys:      heapScope.Gauge("sys"),
+		memoryHeapIdle:     heapScope.Gauge("idle"),
+		memoryHeapInuse:    heapScope.Gauge("inuse"),
+		memoryHeapReleased: heapScope.Gauge("released"),
+		memoryHeapObjects:  heapScope.Gauge("objects"),
 		// stack
-		memoryStackInuse:       runtimeScope.Gauge("memory.stack.inuse"),
-		memoryStackSys:         runtimeScope.Gauge("memory.stack.sys"),
-		memoryStackMSpanInuse:  runtimeScope.Gauge("memory.stack.mspan_inuse"),
-		memoryStackMSpanSys:    runtimeScope.Gauge("memory.stack.sys"),
-		memoryStackMCacheInuse: runtimeScope.Gauge("memory.stack.mcache_inuse"),
-		memoryStackMCacheSys:   runtimeScope.Gauge("memory.stack.mcache_sys"),
-		memoryOtherSys:         runtimeScope.Gauge("memory.othersys"),
+		memoryStackInuse:       stackScope.Gauge("inuse"),
+		memoryStackSys:         stackScope.Gauge("sys"),
+		memoryStackMSpanInuse:  stackScope.Gauge("mspan_inuse"),
+		memoryStackMSpanSys:    stackScope.Gauge("sys"),
+		memoryStackMCacheInuse: stackScope.Gauge("mcache_inuse"),
+		memoryStackMCacheSys:   stackScope.Gauge("mcache_sys"),
+		memoryOtherSys:         memoryScope.Gauge("othersys"),
 		// GC
-		memoryGCSys:        runtimeScope.Gauge("memory.gc.sys"),
-		memoryGCNext:       runtimeScope.Gauge("memory.gc.next"),
-		memoryGCLast:       runtimeScope.Gauge("memory.gc.last"),
-		memoryGCPauseTotal: runtimeScope.Gauge("memory.gc.pause_total"),
-		memoryGCCount:      runtimeScope.Gauge("memory.gc.count"),
+		memoryGCSys:        gcScope.Gauge("sys"),
+		memoryGCNext:       gcScope.Gauge("next"),
+		memoryGCLast:       gcScope.Gauge("last"),
+		memoryGCPauseTotal: gcScope.Gauge("pause_total"),
+		memoryGCCount:      gcScope.Gauge("count"),
 	}
 
 	return &RuntimeStatCollector{

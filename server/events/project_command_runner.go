@@ -62,7 +62,7 @@ type StepRunner interface {
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
+	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
@@ -493,7 +493,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "version":
 			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs)
+			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs, true)
 		case "env":
 			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out
