@@ -209,7 +209,10 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 
 	defer sem.Release(1)
 	if acquired := sem.TryAcquire(1); !acquired {
-		sem.Acquire(context.TODO(), 1)
+		err := sem.Acquire(context.TODO(), 1)
+		if err != nil {
+			return errors.Wrap(err, "waiting for repository to be cloned")
+		}
 		return nil
 	}
 
