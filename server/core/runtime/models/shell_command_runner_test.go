@@ -58,7 +58,7 @@ func TestShellCommandRunner_Run(t *testing.T) {
 			Ok(t, err)
 			Equals(t, expectedOutput, output)
 			for _, line := range c.ExpLines {
-				projectCmdOutputHandler.VerifyWasCalledOnce().Send(ctx, line, false)
+				projectCmdOutputHandler.VerifyWasCalledOnce().Send(ctx, line)
 			}
 
 			// And again with streaming disabled. Everything should be the same except the
@@ -69,7 +69,7 @@ func TestShellCommandRunner_Run(t *testing.T) {
 			output, err = runner.Run(ctx)
 			Ok(t, err)
 			Equals(t, expectedOutput, output)
-			projectCmdOutputHandler.VerifyWasCalled(Never()).Send(matchers.AnyModelsProjectCommandContext(), AnyString(), EqBool(false))
+			projectCmdOutputHandler.VerifyWasCalled(Never()).Send(matchers.AnyModelsProjectCommandContext(), AnyString())
 		})
 	}
 }

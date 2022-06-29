@@ -37,7 +37,7 @@ type ProjectCmdOutputLine struct {
 
 type ProjectCommandOutputHandler interface {
 	// Send will enqueue the msg and wait for Handle() to receive the message.
-	Send(ctx command.ProjectContext, msg string, operationComplete bool)
+	Send(ctx command.ProjectContext, msg string)
 
 	// Listens for msg from channel
 	Handle()
@@ -84,7 +84,7 @@ func NewAsyncProjectCommandOutputHandler(
 	}
 }
 
-func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg string, operationComplete bool) {
+func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg string) {
 	p.projectCmdOutput <- &ProjectCmdOutputLine{
 		JobID: ctx.JobID,
 		JobInfo: JobInfo{
@@ -96,8 +96,7 @@ func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg 
 				Workspace:   ctx.Workspace,
 			},
 		},
-		Line:              msg,
-		OperationComplete: operationComplete,
+		Line: msg,
 	}
 }
 
@@ -192,7 +191,7 @@ func (p *AsyncProjectCommandOutputHandler) GetJobIDMapForPull(pullInfo PullInfo)
 // NoopProjectOutputHandler is a mock that doesn't do anything
 type NoopProjectOutputHandler struct{}
 
-func (p *NoopProjectOutputHandler) Send(ctx command.ProjectContext, msg string, operationComplete bool) {
+func (p *NoopProjectOutputHandler) Send(ctx command.ProjectContext, msg string) {
 }
 
 func (p *NoopProjectOutputHandler) Handle() {

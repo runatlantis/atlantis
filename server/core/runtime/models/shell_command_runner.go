@@ -123,7 +123,7 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 				message := scanner.Text()
 				outCh <- Line{Line: message}
 				if s.streamOutput {
-					s.outputHandler.Send(ctx, message, false)
+					s.outputHandler.Send(ctx, message)
 				}
 			}
 			wg.Done()
@@ -134,7 +134,7 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 				message := scanner.Text()
 				outCh <- Line{Line: message}
 				if s.streamOutput {
-					s.outputHandler.Send(ctx, message, false)
+					s.outputHandler.Send(ctx, message)
 				}
 			}
 			wg.Done()
