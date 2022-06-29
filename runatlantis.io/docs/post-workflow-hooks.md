@@ -6,6 +6,8 @@ workflows](custom-workflows.html#custom-run-command) in that they are run
 outside of Atlantis commands. Which means they do not surface their output
 back to the PR as a comment.
 
+Post workflow hooks also only allow `run` commands.
+
 [[toc]]
 
 ## Usage
