@@ -176,14 +176,14 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt plan -out=$PLANFILE
+      - run: terragrunt plan -input=false -out=$PLANFILE
       - run: terragrunt show -json $PLANFILE > $SHOWFILE
     apply:
       steps:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt apply $PLANFILE
+      - run: terragrunt apply -input=false $PLANFILE
 ```
 
 If using the repo's `atlantis.yaml` file you would use the following config:
