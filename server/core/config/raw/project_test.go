@@ -42,7 +42,8 @@ autoplan:
   when_modified: []
   enabled: false
 apply_requirements:
-- mergeable`,
+- mergeable
+execution_order_group: 10`,
 			exp: raw.Project{
 				Name:             String("myname"),
 				Dir:              String("mydir"),
@@ -53,7 +54,8 @@ apply_requirements:
 					WhenModified: []string{},
 					Enabled:      Bool(false),
 				},
-				ApplyRequirements: []string{"mergeable"},
+				ApplyRequirements:   []string{"mergeable"},
+				ExecutionOrderGroup: Int(10),
 			},
 		},
 	}
@@ -281,8 +283,9 @@ func TestProject_ToValid(t *testing.T) {
 					WhenModified: []string{"hi"},
 					Enabled:      Bool(false),
 				},
-				ApplyRequirements: []string{"approved"},
-				Name:              String("myname"),
+				ApplyRequirements:   []string{"approved"},
+				Name:                String("myname"),
+				ExecutionOrderGroup: Int(10),
 			},
 			exp: valid.Project{
 				Dir:              ".",
@@ -293,8 +296,9 @@ func TestProject_ToValid(t *testing.T) {
 					WhenModified: []string{"hi"},
 					Enabled:      false,
 				},
-				ApplyRequirements: []string{"approved"},
-				Name:              String("myname"),
+				ApplyRequirements:   []string{"approved"},
+				Name:                String("myname"),
+				ExecutionOrderGroup: 10,
 			},
 		},
 		{

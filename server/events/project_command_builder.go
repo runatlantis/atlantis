@@ -3,6 +3,7 @@ package events
 import (
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -329,6 +330,10 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		}
 	}
 
+	sort.Slice(projCtxs, func(i, j int) bool {
+		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
+	})
+
 	return projCtxs, nil
 }
 
@@ -466,6 +471,11 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *command.Cont
 		}
 		cmds = append(cmds, commentCmds...)
 	}
+
+	sort.Slice(cmds, func(i, j int) bool {
+		return cmds[i].ExecutionOrderGroup < cmds[j].ExecutionOrderGroup
+	})
+
 	return cmds, nil
 }
 
