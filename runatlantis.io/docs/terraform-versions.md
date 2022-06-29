@@ -21,7 +21,7 @@ terraform {
   required_version = "0.12.0"
 }
 ```
-See [Terraform `required_version`](https://www.terraform.io/language/settings#specifying-a-required-terraform-version) for reference.
+See [Terraform `required_version`](https://www.terraform.io/language/settings) for reference.
 
 ::: tip NOTE
 Atlantis will automatically download the version specified.
