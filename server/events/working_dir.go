@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -27,6 +28,8 @@ import (
 )
 
 const workingDirPrefix = "repos"
+
+var cloneLocks sync.Map
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_working_dir.go WorkingDir
 //go:generate pegomock generate -m --use-experimental-model-gen --package events WorkingDir
@@ -198,6 +201,15 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	cloneDir string,
 	headRepo models.Repo,
 	p models.PullRequest) error {
+
+	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
+	mutex := value.(*sync.Mutex)
+
+	defer mutex.Unlock()
+	if locked := mutex.TryLock(); !locked {
+		mutex.Lock()
+		return nil
+	}
 
 	err := os.RemoveAll(cloneDir)
 	if err != nil {
