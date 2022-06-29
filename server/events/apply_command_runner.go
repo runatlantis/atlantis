@@ -22,6 +22,7 @@ func NewApplyCommandRunner(
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
+	VCSStatusName string,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
@@ -38,6 +39,7 @@ func NewApplyCommandRunner(
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		VCSStatusName:              VCSStatusName,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 	}
 }
@@ -60,6 +62,7 @@ type ApplyCommandRunner struct {
 	SilenceNoProjects bool
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
+	VCSStatusName              string
 	silenceVCSStatusNoProjects bool
 }
 
@@ -94,22 +97,22 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
+	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
+
 	// Get the mergeable status before we set any build statuses of our own.
 	// We do this here because when we set a "Pending" status, if users have
 	// required the Atlantis status checks to pass, then we've now changed
 	// the mergeability status of the pull request.
 	// This sets the approved, mergeable, and sqlocked status in the context.
-	ctx.PullRequestStatus, err = a.pullReqStatusFetcher.FetchPullStatus(baseRepo, pull)
+	ctx.PullRequestStatus, err = a.pullReqStatusFetcher.FetchPullStatus(baseRepo, pull, a.VCSStatusName)
 	if err != nil {
 		// On error we continue the request with mergeable assumed false.
 		// We want to continue because not all apply's will need this status,
 		// only if they rely on the mergeability requirement.
 		// All PullRequestStatus fields are set to false by default when error.
 		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
-	}
-
-	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
 	var projectCmds []command.ProjectContext

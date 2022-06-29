@@ -2,9 +2,8 @@
 
 Atlantis supports streaming terraform logs in real time by default. Currently, only two commands are supported
 
-* terraform init
-* terraform plan
-* terraform apply
+* atlantis plan
+* atlantis apply
 
 ::: warning
 As of now, custom workflow outputs and other terraform commands are not supported

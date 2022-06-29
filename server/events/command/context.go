@@ -23,7 +23,7 @@ type Context struct {
 	// HeadRepo is the repository that is getting merged into the BaseRepo.
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.
-	// See https://help.github.com/articles/about-pull-request-merges/.
+	// See https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/about-pull-request-merges
 	HeadRepo models.Repo
 	Pull     models.PullRequest
 	Scope    tally.Scope

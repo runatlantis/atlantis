@@ -27,16 +27,17 @@ type JobInfo struct {
 }
 
 type ProjectCmdOutputLine struct {
-	JobID   string
-	JobInfo JobInfo
-	Line    string
+	JobID             string
+	JobInfo           JobInfo
+	Line              string
+	OperationComplete bool
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_output_handler.go ProjectCommandOutputHandler
 
 type ProjectCommandOutputHandler interface {
 	// Send will enqueue the msg and wait for Handle() to receive the message.
-	Send(ctx command.ProjectContext, msg string)
+	Send(ctx command.ProjectContext, msg string, operationComplete bool)
 
 	// Listens for msg from channel
 	Handle()
@@ -83,7 +84,7 @@ func NewAsyncProjectCommandOutputHandler(
 	}
 }
 
-func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg string) {
+func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg string, operationComplete bool) {
 	p.projectCmdOutput <- &ProjectCmdOutputLine{
 		JobID: ctx.JobID,
 		JobInfo: JobInfo{
@@ -95,7 +96,8 @@ func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg 
 				Workspace:   ctx.Workspace,
 			},
 		},
-		Line: msg,
+		Line:              msg,
+		OperationComplete: operationComplete,
 	}
 }
 
@@ -190,7 +192,7 @@ func (p *AsyncProjectCommandOutputHandler) GetJobIDMapForPull(pullInfo PullInfo)
 // NoopProjectOutputHandler is a mock that doesn't do anything
 type NoopProjectOutputHandler struct{}
 
-func (p *NoopProjectOutputHandler) Send(ctx command.ProjectContext, msg string) {
+func (p *NoopProjectOutputHandler) Send(ctx command.ProjectContext, msg string, operationComplete bool) {
 }
 
 func (p *NoopProjectOutputHandler) Handle() {

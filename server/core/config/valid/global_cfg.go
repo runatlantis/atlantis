@@ -79,12 +79,17 @@ func (s *S3) GetContainerName() string {
 }
 
 type Metrics struct {
-	Statsd *Statsd
+	Statsd     *Statsd
+	Prometheus *Prometheus
 }
 
 type Statsd struct {
 	Port string
 	Host string
+}
+
+type Prometheus struct {
+	Endpoint string
 }
 
 // Repo is the final parsed version of server-side repo config.

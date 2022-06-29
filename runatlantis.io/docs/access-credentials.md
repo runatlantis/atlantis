@@ -24,7 +24,7 @@ generate an access token. Read on for the instructions for your specific Git hos
 * [Azure DevOps](#azure-devops)
 
 ### GitHub user
-- Create a Personal Access Token by following: [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)
+- Create a Personal Access Token by following: [https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token)
 - Create the token with **repo** scope
 - Record the access token
 ::: warning
@@ -57,7 +57,7 @@ Only a single installation per GitHub App is supported at the moment.
 - Record the access token
 
 ### Bitbucket Cloud (bitbucket.org)
-- Create an App Password by following [https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/#Create-an-app-password](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/#Create-an-app-password)
+- Create an App Password by following [https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 - Label the password "atlantis"
 - Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - Record the access token

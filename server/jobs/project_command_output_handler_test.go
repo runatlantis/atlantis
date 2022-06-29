@@ -90,7 +90,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		projectOutputHandler.Register(ctx.JobID, ch)
 
 		wg.Add(1)
-		projectOutputHandler.Send(ctx, Msg)
+		projectOutputHandler.Send(ctx, Msg, false)
 		wg.Wait()
 		close(ch)
 
@@ -109,7 +109,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		}, nil)
 
 		// send first message to populate the buffer
-		projectOutputHandler.Send(ctx, Msg)
+		projectOutputHandler.Send(ctx, Msg, false)
 		time.Sleep(10 * time.Millisecond)
 
 		ch := make(chan string)
@@ -135,7 +135,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// before sending messages due to the way we lock our buffer memory cache
 		projectOutputHandler.Register(ctx.JobID, ch)
 
-		projectOutputHandler.Send(ctx, Msg)
+		projectOutputHandler.Send(ctx, Msg, false)
 		wg.Wait()
 		close(ch)
 
@@ -170,8 +170,8 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 			}
 		}()
 
-		projectOutputHandler.Send(ctx, Msg)
-		projectOutputHandler.Send(ctx, "Complete")
+		projectOutputHandler.Send(ctx, Msg, false)
+		projectOutputHandler.Send(ctx, "Complete", false)
 
 		pullContext := jobs.PullInfo{
 			PullNum:     ctx.Pull.Num,

@@ -140,11 +140,14 @@ Values are chosen in this order:
   ```
   Azure DevOps basic authentication password for inbound webhooks (see
   https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops).
-  SECURITY WARNING: If not specified, Atlantis won't be able to validate that the
+  
+  ::: warning SECURITY WARNING
+  If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure DevOps org. This means that an
   attacker could spoof calls to Atlantis and cause it to perform malicious
   actions. Should be specified via the ATLANTIS_AZUREDEVOPS_BASIC_AUTH environment
   variable.
+  :::
 
 * ### `--azuredevops-webhook-user`
   ```bash
@@ -326,7 +329,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-app-id="00000"
   ```
-  GitHub app ID. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/reference/apps#installations).
+  GitHub app ID. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/apps/installations).
 
   ::: tip
   A GitHub app can be created by starting Atlantis first, then pointing your browser at
@@ -348,7 +351,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-app-key-file="path/to/app-key.pem"
   ```
-  Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/reference/apps#installations).
+  Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/apps/installations).
 
 - ### `--gh-app-key`
   ```bash
