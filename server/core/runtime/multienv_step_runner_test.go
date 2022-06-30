@@ -26,6 +26,16 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 			ExpOut:  "Dynamic environment variables added:\nTF_VAR_REPODEFINEDVARIABLE_ONE\n",
 			Version: "v1.2.3",
 		},
+		{
+			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_TWO=value=1='`,
+			ExpOut:  "Dynamic environment variables added:\nTF_VAR_REPODEFINEDVARIABLE_TWO\n",
+			Version: "v1.2.3",
+		},
+		{
+			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_NO_VALUE'`,
+			ExpErr: "Invalid environment variable definition: TF_VAR_REPODEFINEDVARIABLE_NO_VALUE",
+			Version: "v1.2.3",
+		},
 	}
 	RegisterMockTestingT(t)
 	tfClient := mocks.NewMockClient()
