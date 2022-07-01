@@ -634,6 +634,14 @@ Values are chosen in this order:
   ```
   A token for Terraform Cloud/Terraform Enterprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
 
+* ### `--var-file-allowlist`
+  ```bash
+  atlantis server --var-file-allowlist='/path/to/tfvars/dir'
+  ```
+  Comma-separated list of additional directory paths where [variable definition files](https://www.terraform.io/language/values/variables#variable-definitions-tfvars-files) can be read from.
+  The paths in this argument should be absolute paths. Relative paths and globbing are currently not supported.
+  If this argument is not provided, it defaults to Atlantis' data directory, determined by the `--data-dir` argument.
+
 * ### `--vcs-status-name`
   ```bash
   atlantis server --vcs-status-name="atlantis-dev"

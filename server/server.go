@@ -673,6 +673,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	varFileAllowlistChecker, err := events.NewVarFileAllowlistChecker(userConfig.VarFileAllowlist)
+	if err != nil {
+		return nil, err
+	}
 
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                      vcsClient,
@@ -694,6 +698,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              boltdb,
 		TeamAllowlistChecker:           githubTeamAllowlistChecker,
+		VarFileAllowlistChecker:        varFileAllowlistChecker,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {

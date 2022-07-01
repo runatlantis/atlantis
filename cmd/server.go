@@ -101,6 +101,7 @@ const (
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
 	TFDownloadURLFlag          = "tf-download-url"
+	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
@@ -306,6 +307,10 @@ var stringFlags = map[string]stringFlag{
 	DefaultTFVersionFlag: {
 		description: "Terraform version to default to (ex. v0.12.0). Will download if not yet on disk." +
 			" If not set, Atlantis uses the terraform binary in its PATH.",
+	},
+	VarFileAllowlistFlag: {
+		description: "Comma-separated list of additional paths where variable definition files can be read from." +
+			" If this argument is not provided, it defaults to Atlantis' data directory, determined by the --data-dir argument.",
 	},
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
@@ -609,6 +614,7 @@ func (s *ServerCmd) run() error {
 	if err := s.setDataDir(&userConfig); err != nil {
 		return err
 	}
+	s.setVarFileAllowlist(&userConfig)
 	if err := s.deprecationWarnings(&userConfig); err != nil {
 		return err
 	}
@@ -812,6 +818,14 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 	}
 	userConfig.DataDir = finalPath
 	return nil
+}
+
+// setVarFileAllowlist checks if var-file-allowlist is unassigned and makes it default to data-dir for better backward
+// compatibility.
+func (s *ServerCmd) setVarFileAllowlist(userConfig *server.UserConfig) {
+	if userConfig.VarFileAllowlist == "" {
+		userConfig.VarFileAllowlist = userConfig.DataDir
+	}
 }
 
 // trimAtSymbolFromUsers trims @ from the front of the github and gitlab usernames
