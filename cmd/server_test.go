@@ -102,6 +102,7 @@ var testFlags = map[string]interface{}{
 	SSLKeyFileFlag:             "key-file",
 	TFDownloadURLFlag:          "https://my-hostname.com",
 	TFEHostnameFlag:            "my-hostname",
+	TFELocalExecutionModeFlag:  true,
 	TFETokenFlag:               "my-token",
 	VCSStatusName:              "my-status",
 	WriteGitCredsFlag:          true,

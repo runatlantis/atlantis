@@ -103,6 +103,7 @@ const (
 	TFDownloadURLFlag          = "tf-download-url"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
+	TFELocalExecutionModeFlag  = "tfe-local-execution-mode"
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
 	WebBasicAuthFlag           = "web-basic-auth"
@@ -415,6 +416,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	SkipCloneNoChanges: {
 		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
+		defaultValue: false,
+	},
+	TFELocalExecutionModeFlag: {
+		description:  "Enable if you're using local execution mode (instead of TFE/C's remote execution mode).",
 		defaultValue: false,
 	},
 	WebBasicAuthFlag: {
