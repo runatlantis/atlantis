@@ -6,6 +6,8 @@ services:
         ports:
         - 4040:4040
         environment:
+            # https://dashboard.ngrok.com/get-started/your-authtoken
+            NGROK_AUTH: REPLACE-WITH-YOUR-TOKEN
             NGROK_PROTOCOL: http
             NGROK_PORT: atlantis:4141
         depends_on:
