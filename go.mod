@@ -23,7 +23,7 @@ require (
 	github.com/hashicorp/go-version v1.5.0
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20200806211835-c481b8bfa41e
 	github.com/mcdafydd/go-azuredevops v0.12.1
-	github.com/microcosm-cc/bluemonday v1.0.18
+	github.com/microcosm-cc/bluemonday v1.0.19
 	github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/moby v20.10.17+incompatible
