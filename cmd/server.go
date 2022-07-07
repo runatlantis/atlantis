@@ -20,8 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/docker/pkg/fileutils"
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/moby/moby/pkg/fileutils"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
