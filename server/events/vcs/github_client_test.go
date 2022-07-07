@@ -425,7 +425,7 @@ func TestGithubClient_UpdateChecksStatus(t *testing.T) {
 					},
 				},
 				PullNum:     1,
-				State:       models.PendingCommitStatus,
+				State:       models.SuccessCommitStatus,
 				Description: "description",
 				DetailsURL:  "https://google.com",
 				Ref:         "sha",
@@ -509,6 +509,82 @@ func TestGithubClient_UpdateChecksStatus_ConclusionWhenStatusComplete(t *testing
 		},
 		PullNum:     1,
 		State:       models.SuccessCommitStatus,
+		StatusName:  checkRunName,
+		Description: "description",
+		DetailsURL:  "https://google.com",
+		Ref:         "sha",
+	})
+	Ok(t, err)
+
+}
+
+// Test to ensure we are creating a new check run when a checkrun with the same name exists
+// but the state is Pending, i.e it is a re-run for the same operation.
+func TestGithubClient_UpdateChecksStatus_CreateNewCheckRunWhenPendingStatus(t *testing.T) {
+	checkRunName := "atlantis/apply"
+	listCheckRunResp := `
+	{
+		"total_count": 1,
+		"check_runs": [
+		  {
+			"id": 1,
+			"head_sha": "ce587453ced02b1526dfb4cb910479d431683101",
+			"status": "completed",
+			"conclusion": "neutral",
+			"started_at": "2018-05-04T01:14:52Z",
+			"completed_at": "2018-05-04T01:14:52Z",
+			"name": "%s",
+			"check_suite": {
+			  "id": 5
+			}
+		  }
+		]
+	  }
+	`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo/commits/sha/check-runs?per_page=100":
+				_, err := w.Write([]byte(fmt.Sprintf(listCheckRunResp, checkRunName)))
+				Ok(t, err)
+			case "/api/v3/repos/owner/repo/check-runs":
+				body, err := ioutil.ReadAll(r.Body)
+				Ok(t, err)
+				m := make(map[string]interface{})
+				err = json.Unmarshal(body, &m)
+				Ok(t, err)
+
+				// assert new checkrun was created
+				assert.Equal(t, checkRunName, m["name"])
+
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	mergeabilityChecker := vcs.NewPullMergeabilityChecker("atlantis")
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, logging.NewNoopCtxLogger(t), mergeabilityChecker)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	err = client.UpdateChecksStatus(context.TODO(), types.UpdateStatusRequest{
+		Repo: models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.Github,
+				Hostname: "github.com",
+			},
+		},
+		PullNum:     1,
+		State:       models.PendingCommitStatus,
 		StatusName:  checkRunName,
 		Description: "description",
 		DetailsURL:  "https://google.com",

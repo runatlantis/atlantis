@@ -516,8 +516,9 @@ func (g *GithubClient) UpdateChecksStatus(ctx context.Context, request types.Upd
 		checkRunOutput.Text = &output
 	}
 
-	if checkRun := g.findCheckRun(request.StatusName, checkRuns); checkRun != nil {
-
+	// Update checkrun if it exists and if it's not a rerun
+	// request.state is pending only when an operation starts. So, if the checkrun exists and the state is pending, it is a rerun.
+	if checkRun := g.findCheckRun(request.StatusName, checkRuns); checkRun != nil && request.State != models.PendingCommitStatus {
 		summary := request.Description
 		// Append job URL if project command
 		if strings.Contains(request.StatusName, ":") {
