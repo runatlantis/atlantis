@@ -122,6 +122,7 @@ type DefaultCommandRunner struct {
 	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
 	PullStatusFetcher              PullStatusFetcher
 	TeamAllowlistChecker           *TeamAllowlistChecker
+	VarFileAllowlistChecker        *VarFileAllowlistChecker
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -205,6 +206,15 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 	return true, nil
 }
 
+// checkVarFilesInPlanCommandAllowlisted checks if paths in a 'plan' command are allowlisted.
+func (c *DefaultCommandRunner) checkVarFilesInPlanCommandAllowlisted(cmd *CommentCommand) error {
+	if cmd == nil || cmd.CommandName() != command.Plan {
+		return nil
+	}
+
+	return c.VarFileAllowlistChecker.Check(cmd.Flags)
+}
+
 // RunCommentCommand executes the command.
 // We take in a pointer for maybeHeadRepo because for some events there isn't
 // enough data to construct the Repo model and callers might want to wait until
@@ -238,6 +248,15 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 	if !ok {
 		c.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, cmd)
+		return
+	}
+
+	// Check if the provided var files in a 'plan' command are allowlisted
+	if err := c.checkVarFilesInPlanCommandAllowlisted(cmd); err != nil {
+		errMsg := fmt.Sprintf("```\n%s\n```", err.Error())
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); commentErr != nil {
+			c.Logger.Err("unable to comment on pull request: %s", commentErr)
+		}
 		return
 	}
 

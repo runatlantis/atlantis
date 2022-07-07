@@ -131,11 +131,12 @@ func TestExecute_Defaults(t *testing.T) {
 	Ok(t, err)
 
 	strExceptions := map[string]string{
-		GHUserFlag:        "user",
-		GHTokenFlag:       "token",
-		DataDirFlag:       dataDir,
-		AtlantisURLFlag:   "http://" + hostname + ":4141",
-		RepoAllowlistFlag: "*",
+		GHUserFlag:           "user",
+		GHTokenFlag:          "token",
+		DataDirFlag:          dataDir,
+		AtlantisURLFlag:      "http://" + hostname + ":4141",
+		RepoAllowlistFlag:    "*",
+		VarFileAllowlistFlag: dataDir,
 	}
 	strIgnore := map[string]bool{
 		"config": true,
