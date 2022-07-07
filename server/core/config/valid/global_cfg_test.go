@@ -56,6 +56,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				AllowedWorkflows:     []string{},
 				AllowedOverrides:     []string{},
 				AllowCustomWorkflows: Bool(false),
+				CheckoutStrategy:     "branch",
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -178,6 +179,7 @@ func TestPlatformModeNewGlobalCfg(t *testing.T) {
 				AllowedWorkflows:     []string{},
 				AllowedOverrides:     []string{},
 				AllowCustomWorkflows: Bool(false),
+				CheckoutStrategy:     "branch",
 			},
 		},
 		Workflows: map[string]valid.Workflow{

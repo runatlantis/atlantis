@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -27,7 +28,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
-		CheckoutMerge:               false,
+		GlobalCfg:                   valid.NewGlobalCfg(),
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 
@@ -48,7 +49,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 	logger := logging.NewNoopCtxLogger(t)
 
 	cloneDir, _, err := gwd.Clone(logger, models.Repo{}, models.PullRequest{
-		BaseRepo:   models.Repo{},
+		BaseRepo:   NewBaseRepo(),
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)

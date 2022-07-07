@@ -10,6 +10,8 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
+var validCheckoutStrategies = []interface{}{"merge", "branch"}
+
 // GlobalCfg is the raw schema for server-side repo config.
 type GlobalCfg struct {
 	Repos                []Repo               `yaml:"repos" json:"repos"`
@@ -36,6 +38,7 @@ type Repo struct {
 	AllowedOverrides            []string          `yaml:"allowed_overrides" json:"allowed_overrides"`
 	AllowCustomWorkflows        *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
 	TemplateOverrides           map[string]string `yaml:"template_overrides,omitempty" json:"template_overrides,omitempty"`
+	CheckoutStrategy            string            `yaml:"checkout_strategy,omitempty" json:"checkout_strategy,omitempty"`
 }
 
 func (g GlobalCfg) GetWorkflowNames() []string {
@@ -221,6 +224,7 @@ func (r Repo) Validate() error {
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.ID, validation.Required, validation.By(idValid)),
 		validation.Field(&r.Branch, validation.By(branchValid)),
+		validation.Field(&r.CheckoutStrategy, validation.In(validCheckoutStrategies...)),
 		validation.Field(&r.AllowedOverrides, validation.By(overridesValid)),
 		validation.Field(&r.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
@@ -298,6 +302,13 @@ OUTER:
 		mergedApplyReqs = append(mergedApplyReqs, globalReq)
 	}
 
+	var checkoutStrategy string
+	if r.CheckoutStrategy == "" {
+		checkoutStrategy = "branch"
+	} else {
+		checkoutStrategy = r.CheckoutStrategy
+	}
+
 	return valid.Repo{
 		ID:                          id,
 		IDRegex:                     idRegex,
@@ -313,6 +324,7 @@ OUTER:
 		AllowedOverrides:            r.AllowedOverrides,
 		AllowCustomWorkflows:        r.AllowCustomWorkflows,
 		TemplateOverrides:           r.TemplateOverrides,
+		CheckoutStrategy:            checkoutStrategy,
 	}
 }
 

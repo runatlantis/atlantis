@@ -21,6 +21,7 @@ var globalCfg = valid.GlobalCfg{
 			IDRegex:              regexp.MustCompile(".*"),
 			AllowCustomWorkflows: Bool(true),
 			AllowedOverrides:     []string{"apply_requirements", "workflow"},
+			CheckoutStrategy:     "branch",
 		},
 	},
 }
@@ -1286,6 +1287,7 @@ repos:
   workflow: custom1
   allowed_overrides: [apply_requirements, workflow]
   allow_custom_workflows: true
+  checkout_strategy: merge
 - id: /.*/
   branch: /(master|main)/
   pre_workflow_hooks:
@@ -1325,12 +1327,14 @@ policies:
 						Workflow:             &customWorkflow1,
 						AllowedOverrides:     []string{"apply_requirements", "workflow"},
 						AllowCustomWorkflows: Bool(true),
+						CheckoutStrategy:     "merge",
 					},
 					{
 						IDRegex:           regexp.MustCompile(".*"),
 						BranchRegex:       regexp.MustCompile("(master|main)"),
 						ApplyRequirements: []string{"policies_passed"},
 						PreWorkflowHooks:  preWorkflowHooks,
+						CheckoutStrategy:  "branch",
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1358,7 +1362,8 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						IDRegex: regexp.MustCompile("github.com/"),
+						IDRegex:          regexp.MustCompile("github.com/"),
+						CheckoutStrategy: "branch",
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1376,8 +1381,9 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						ID:       "github.com/owner/repo",
-						Workflow: defaultCfg.Repos[0].Workflow,
+						ID:               "github.com/owner/repo",
+						Workflow:         defaultCfg.Repos[0].Workflow,
+						CheckoutStrategy: "branch",
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1423,6 +1429,7 @@ workflows:
 						AllowedWorkflows:     []string{},
 						AllowedOverrides:     []string{},
 						AllowCustomWorkflows: Bool(false),
+						CheckoutStrategy:     "branch",
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1632,12 +1639,14 @@ policies:
 						ApplyRequirements:    []string{"policies_passed"},
 						AllowedOverrides:     []string{"apply_requirements", "pull_request_workflow", "deployment_workflow", "workflow"},
 						AllowCustomWorkflows: Bool(true),
+						CheckoutStrategy:     "branch",
 					},
 					{
 						IDRegex:           regexp.MustCompile(".*"),
 						BranchRegex:       regexp.MustCompile("(master|main)"),
 						ApplyRequirements: []string{"policies_passed"},
 						PreWorkflowHooks:  preWorkflowHooks,
+						CheckoutStrategy:  "branch",
 					},
 				},
 				Workflows: defaultCfg.Workflows,
@@ -1723,6 +1732,7 @@ deployment_workflows:
 						AllowedWorkflows:     []string{},
 						AllowedOverrides:     []string{},
 						AllowCustomWorkflows: Bool(false),
+						CheckoutStrategy:     "branch",
 					},
 				},
 				Workflows: defaultCfg.Workflows,
@@ -1908,6 +1918,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 						AllowedWorkflows:     []string{"custom"},
 						AllowedOverrides:     []string{"workflow", "apply_requirements"},
 						AllowCustomWorkflows: Bool(true),
+						CheckoutStrategy:     "branch",
 					},
 					{
 						ID:                   "github.com/owner/repo",
@@ -1915,6 +1926,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 						ApplyRequirements:    []string{"policies_passed"},
 						AllowedOverrides:     nil,
 						AllowCustomWorkflows: nil,
+						CheckoutStrategy:     "branch",
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -2103,6 +2115,7 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 						AllowedDeploymentWorkflows:  []string{"custom"},
 						AllowedOverrides:            []string{"pull_request_workflow", "deployment_workflow"},
 						AllowCustomWorkflows:        Bool(true),
+						CheckoutStrategy:            "branch",
 					},
 					{
 						ID:                          "github.com/owner/repo",
@@ -2112,6 +2125,7 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 						AllowedPullRequestWorkflows: nil,
 						AllowedDeploymentWorkflows:  nil,
 						AllowCustomWorkflows:        nil,
+						CheckoutStrategy:            "branch",
 					},
 				},
 				Workflows: map[string]valid.Workflow{

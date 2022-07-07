@@ -430,7 +430,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	When(mockWorkingDir.GetWorkingDir(prjCtx.BaseRepo, prjCtx.Pull, prjCtx.Workspace)).ThenReturn(tmp, nil)
-	When(mockWorkingDir.HasDiverged(matchers.AnyLoggingLogger(), AnyString())).ThenReturn(true)
+	When(mockWorkingDir.HasDiverged(matchers.AnyLoggingLogger(), AnyString(), matchers.AnyModelsRepo())).ThenReturn(true)
 
 	firstRes := runner.Apply(prjCtx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", firstRes.Failure)

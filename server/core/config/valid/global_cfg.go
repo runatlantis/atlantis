@@ -181,6 +181,7 @@ func NewGlobalCfg() GlobalCfg {
 		ApplyRequirements:    []string{},
 		AllowCustomWorkflows: &allowCustomWorkflows,
 		AllowedOverrides:     []string{},
+		CheckoutStrategy:     "branch",
 	}
 
 	globalCfg := GlobalCfg{

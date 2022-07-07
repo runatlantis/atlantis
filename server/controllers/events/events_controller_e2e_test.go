@@ -681,16 +681,18 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		Locker:    lockingClient,
 		VCSClient: vcsClient,
 	}
+
+	globalCfg := valid.NewGlobalCfg()
+
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		TestingOverrideHeadCloneURL: overrideCloneURL,
+		GlobalCfg:                   globalCfg,
 	}
 
 	defaultTFVersion := terraformClient.DefaultVersion()
 	locker := events.NewDefaultWorkingDirLocker()
 	parser := &config.ParserValidator{}
-
-	globalCfg := valid.NewGlobalCfg()
 
 	if userConfig.EnablePlatformMode {
 		globalCfg = globalCfg.EnablePlatformMode()

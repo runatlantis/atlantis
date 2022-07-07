@@ -436,8 +436,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
-		DataDir:       userConfig.DataDir,
-		CheckoutMerge: userConfig.CheckoutStrategy == "merge",
+		DataDir:   userConfig.DataDir,
+		GlobalCfg: globalCfg,
 	}
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir
 	if githubAppEnabled {

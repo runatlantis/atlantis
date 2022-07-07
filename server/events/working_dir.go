@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -45,7 +46,7 @@ type WorkingDir interface {
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
-	HasDiverged(log logging.Logger, cloneDir string) bool
+	HasDiverged(log logging.Logger, cloneDir string, baseRepo models.Repo) bool
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
@@ -55,17 +56,14 @@ type WorkingDir interface {
 // FileWorkspace implements WorkingDir with the file system.
 type FileWorkspace struct {
 	DataDir string
-	// CheckoutMerge is true if we should check out the branch that corresponds
-	// to what the base branch will look like *after* the pull request is merged.
-	// If this is false, then we will check out the head branch from the pull
-	// request.
-	CheckoutMerge bool
 	// TestingOverrideHeadCloneURL can be used during testing to override the
 	// URL of the head repo to be cloned. If it's empty then we clone normally.
 	TestingOverrideHeadCloneURL string
 	// TestingOverrideBaseCloneURL can be used during testing to override the
 	// URL of the base repo to be cloned. If it's empty then we clone normally.
 	TestingOverrideBaseCloneURL string
+
+	GlobalCfg valid.GlobalCfg
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -82,6 +80,9 @@ func (w *FileWorkspace) Clone(
 	projectCloneDir string) (string, bool, error) {
 	cloneDir := w.cloneDir(p.BaseRepo, p, projectCloneDir)
 
+	matchingRepo := w.GlobalCfg.MatchingRepo(p.BaseRepo.ID())
+	checkoutMerge := matchingRepo.CheckoutStrategy == "merge"
+
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
 	if _, err := os.Stat(cloneDir); err == nil {
@@ -91,7 +92,8 @@ func (w *FileWorkspace) Clone(
 		// because we'll already have performed a merge. Instead, we'll check
 		// HEAD^2 since that will be the commit before our merge.
 		pullHead := "HEAD"
-		if w.CheckoutMerge {
+
+		if checkoutMerge {
 			pullHead = "HEAD^2"
 		}
 		revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
@@ -106,20 +108,20 @@ func (w *FileWorkspace) Clone(
 			log.Warn(
 				fmt.Sprintf("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd)),
 				logFields)
-			return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
+			return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p, checkoutMerge)
 		}
 		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
 
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			return cloneDir, w.warnDiverged(log, p, headRepo, cloneDir), nil
+			return cloneDir, w.warnDiverged(log, p, headRepo, cloneDir, checkoutMerge), nil
 		}
 		// We'll fall through to re-clone.
 	}
 
 	// Otherwise we clone the repo.
-	return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
+	return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p, checkoutMerge)
 }
 
 // warnDiverged returns true if we should warn the user that the branch we're
@@ -129,8 +131,8 @@ func (w *FileWorkspace) Clone(
 // Then users won't be getting the merge functionality they expected.
 // If there are any errors we return false since we prefer things to succeed
 // vs. stopping the plan/apply.
-func (w *FileWorkspace) warnDiverged(log logging.Logger, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
-	if !w.CheckoutMerge {
+func (w *FileWorkspace) warnDiverged(log logging.Logger, p models.PullRequest, headRepo models.Repo, cloneDir string, checkoutMerge bool) bool {
+	if !checkoutMerge {
 		// It only makes sense to warn that master has diverged if we're using
 		// the checkout merge strategy. If we're just checking out the branch,
 		// then it doesn't matter what's going on with master because we've
@@ -173,15 +175,19 @@ func (w *FileWorkspace) warnDiverged(log logging.Logger, p models.PullRequest, h
 		}
 	}
 
-	hasDiverged := w.HasDiverged(log, cloneDir)
+	hasDiverged := w.HasDiverged(log, cloneDir, p.BaseRepo)
 	if hasDiverged {
 		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits", logFields)
 	}
 	return hasDiverged
 }
 
-func (w *FileWorkspace) HasDiverged(log logging.Logger, cloneDir string) bool {
-	if !w.CheckoutMerge {
+func (w *FileWorkspace) HasDiverged(log logging.Logger, cloneDir string, baseRepo models.Repo) bool {
+
+	matchingRepo := w.GlobalCfg.MatchingRepo(baseRepo.ID())
+	checkoutMerge := matchingRepo.CheckoutStrategy == "merge"
+
+	if !checkoutMerge {
 		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
 		// we assume false here for 'branch' strategy.
 		return false
@@ -201,7 +207,7 @@ func (w *FileWorkspace) HasDiverged(log logging.Logger, cloneDir string) bool {
 func (w *FileWorkspace) forceClone(log logging.Logger,
 	cloneDir string,
 	headRepo models.Repo,
-	p models.PullRequest) error {
+	p models.PullRequest, checkoutMerge bool) error {
 	logFields := map[string]interface{}{
 		"repository": headRepo.FullName,
 		"pull-num":   p.Num,
@@ -230,7 +236,7 @@ func (w *FileWorkspace) forceClone(log logging.Logger,
 	}
 
 	var cmds [][]string
-	if w.CheckoutMerge {
+	if checkoutMerge {
 		// NOTE: We can't do a shallow clone when we're merging because we'll
 		// get merge conflicts if our clone doesn't have the commits that the
 		// branch we're merging branched off at.

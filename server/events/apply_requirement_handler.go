@@ -33,7 +33,7 @@ func (a *AggregateApplyRequirements) ValidateProject(repoDir string, ctx command
 				return "Pull request must be mergeable before running apply.", nil
 			}
 		case raw.UnDivergedApplyRequirement:
-			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
+			if a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.BaseRepo) {
 				return "Default branch must be rebased onto pull request before running apply.", nil
 			}
 		case raw.UnlockedApplyRequirement:
