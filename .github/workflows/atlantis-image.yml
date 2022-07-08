@@ -16,12 +16,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform:
-          - linux/arm64/v8
-          - linux/amd64
-          - linux/arm/v7
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-go@v3
@@ -50,7 +44,7 @@ jobs:
       uses: docker/build-push-action@v3
       with:
         context: .
-        platforms: ${{ matrix.platform }}
+        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
           ghcr.io/${{ github.repository_owner }}/atlantis:dev
@@ -65,7 +59,7 @@ jobs:
       uses: docker/build-push-action@v3
       with:
         context: .
-        platforms: ${{ matrix.platform }}
+        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
           ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_VERSION }}
@@ -76,7 +70,7 @@ jobs:
       uses: docker/build-push-action@v3
       with:
         context: .
-        platforms: ${{ matrix.platform }}
+        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
           ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_VERSION }}

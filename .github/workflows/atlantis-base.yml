@@ -18,14 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  docker:
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform:
-          - linux/arm64/v8
-          - linux/amd64
-          - linux/arm/v7
     steps:
     - uses: actions/checkout@v3
 
@@ -50,7 +44,7 @@ jobs:
       uses: docker/build-push-action@v3
       with:
         context: docker-base
-        platforms: ${{ matrix.platform }}
+        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: true
         tags: |
           ghcr.io/${{ github.repository_owner }}/atlantis-base:${{env.TODAY}}
