@@ -15,6 +15,12 @@ Bugfixes and new Features
 
 https://github.com/runatlantis/atlantis/releases/tag/v0.19.5
 
+## Backwards Incompatibilities / Notes:
+* `--var-file-allowlist` flag has been added to restrict the access of files on Atlantis install from pull request
+  comments. Set the flag if you want to explicitly grant the access to files outside the default data directory.
+  
+  Previously, any file could be passed to `-var-file`. Now only files under the directories in the allowlist are permitted.
+
 # v0.19.4
 
 Bugfixes and new Features
