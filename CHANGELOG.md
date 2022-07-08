@@ -1,3 +1,20 @@
+# v0.19.6
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.6
+
+
+# v0.19.5
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.5
+
 # v0.19.4
 
 Bugfixes and new Features
