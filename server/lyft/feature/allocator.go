@@ -62,11 +62,9 @@ type PercentageBasedAllocator struct {
 }
 
 func NewGHSourcedAllocator(repoConfig RepoConfig, githubClient vcs.IGithubClient, logger logging.Logger) (Allocator, error) {
-
-	// default to local config if no github client is provided.
+	// fail if no github client is provided
 	if githubClient == nil {
-		logger.Warn("no github client provided, defaulting to local config for feature allocation.")
-		return NoopAllocator{}, nil
+		return nil, errors.New("no github client provided")
 	}
 
 	err := ffclient.Init(
@@ -114,13 +112,4 @@ func (r *PercentageBasedAllocator) ShouldAllocate(featureID Name, fullRepoName s
 	}
 
 	return shouldAllocate, nil
-}
-
-// NoopAllocator is used in exceptional circumstances as a backup where all features
-// are disabled by default for all repos. This is to ensure we don't fail to startup
-// due to missing configuration since features are treated as secondary citizens.
-type NoopAllocator struct{}
-
-func (r NoopAllocator) ShouldAllocate(featureID Name, fullRepoName string) (bool, error) {
-	return false, nil
 }
