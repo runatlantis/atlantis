@@ -51,6 +51,7 @@ func NewStorageBackend(jobs valid.Jobs, logger logging.Logger, featureAllocator 
 		StorageBackend: storageBackend,
 		readFailures:   scope.SubScope("storage_backend").Counter("read_failure"),
 		writeFailures:  scope.SubScope("storage_backend").Counter("write_failure"),
+		writeSuccesses: scope.SubScope("storage_backend").Counter("write_success"),
 	}, nil
 }
 
@@ -153,8 +154,9 @@ func (s *storageBackend) Write(key string, logs []string, _ string) (bool, error
 type InstrumenetedStorageBackend struct {
 	StorageBackend
 
-	readFailures  tally.Counter
-	writeFailures tally.Counter
+	readFailures   tally.Counter
+	writeFailures  tally.Counter
+	writeSuccesses tally.Counter
 }
 
 func (i *InstrumenetedStorageBackend) Read(key string) ([]string, error) {
@@ -169,7 +171,9 @@ func (i *InstrumenetedStorageBackend) Write(key string, logs []string, fullRepoN
 	ok, err := i.StorageBackend.Write(key, logs, fullRepoName)
 	if err != nil {
 		i.writeFailures.Inc(1)
+		return ok, err
 	}
+	i.writeSuccesses.Inc(1)
 	return ok, err
 }
 
