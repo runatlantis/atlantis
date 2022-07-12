@@ -119,6 +119,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 			"pull_requests":    "write",
 			"repository_hooks": "write",
 			"statuses":         "write",
+			"administration":   "read",
 		},
 	}
 
