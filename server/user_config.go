@@ -85,6 +85,7 @@ type UserConfig struct {
 	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
 	TFDownloadURL          string          `mapstructure:"tf-download-url"`
 	TFEHostname            string          `mapstructure:"tfe-hostname"`
+	TFELocalExecutionMode  bool            `mapstructure:"tfe-local-execution-mode"`
 	TFEToken               string          `mapstructure:"tfe-token"`
 	VarFileAllowlist       string          `mapstructure:"var-file-allowlist"`
 	VCSStatusName          string          `mapstructure:"vcs-status-name"`
