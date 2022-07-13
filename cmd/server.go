@@ -52,6 +52,7 @@ const (
 	BitbucketUserFlag                = "bitbucket-user"
 	BitbucketWebhookSecretFlag       = "bitbucket-webhook-secret"
 	ConfigFlag                       = "config"
+	CheckoutDepthFlag                = "checkout-depth"
 	CheckoutStrategyFlag             = "checkout-strategy"
 	DataDirFlag                      = "data-dir"
 	DefaultTFVersionFlag             = "default-tf-version"
@@ -128,6 +129,7 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultCheckoutStrategy             = "branch"
+	DefaultCheckoutDepth                = 50
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
@@ -483,6 +485,12 @@ var boolFlags = map[string]boolFlag{
 	},
 }
 var intFlags = map[string]intFlag{
+	CheckoutDepthFlag: {
+		description: fmt.Sprintf("Used only if --%s=merge.", CheckoutStrategyFlag) +
+			" How many commits to include in each of base and feature branches when cloning repository." +
+			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
+		defaultValue: DefaultCheckoutDepth,
+	},
 	ParallelPoolSize: {
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
 		defaultValue: DefaultParallelPoolSize,
@@ -710,6 +718,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.AutoplanFileList == "" {
 		c.AutoplanFileList = DefaultAutoplanFileList
 	}
+	if c.CheckoutDepth == 0 {
+		c.CheckoutDepth = DefaultCheckoutDepth
+	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
 	}
@@ -770,6 +781,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)
 	if !isValidLogLevel(userConfig.LogLevel) {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
+	}
+
+	if userConfig.CheckoutDepth <= 0 {
+		return errors.New("invalid checkout depth: should be positive")
 	}
 
 	checkoutStrategy := userConfig.CheckoutStrategy

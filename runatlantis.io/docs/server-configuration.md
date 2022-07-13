@@ -211,6 +211,13 @@ Values are chosen in this order:
   This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
   :::
 
+### `--checkout-depth`
+  ```bash
+  atlantis server --checkout-depth=50
+  ```
+  How many commits from branches to fetch. Used only if `--checkout-strategy=merge`.
+  Defaults to `50`. See [Checkout Strategy](checkout-strategy.html) for more details.
+
 ### `--checkout-strategy`
   ```bash
   atlantis server --checkout-strategy="<branch|merge>"
