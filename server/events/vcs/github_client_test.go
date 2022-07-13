@@ -560,7 +560,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 					Hostname: "github.com",
 				},
 			}, models.PullRequest{
-				Num:        1,
+				Num: 1,
 			}, vcsStatusName)
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
