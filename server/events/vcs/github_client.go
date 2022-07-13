@@ -303,7 +303,6 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		return false, errors.Wrap(err, "getting pull request")
 	}
 	state := githubPR.GetMergeableState()
-	g.logger.Debug("PR mergeable state is %v", state)
 	// We map our mergeable check to when the GitHub merge button is clickable.
 	// This corresponds to the following states:
 	// clean: No conflicts, all requirements satisfied.
