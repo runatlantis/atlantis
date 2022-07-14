@@ -477,75 +477,43 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 func TestGithubClient_PullIsMergeable(t *testing.T) {
 	vcsStatusName := "atlantis-test"
 	cases := []struct {
-		state               string
-		requiredCheckName   string
-		requiredCheckStatus string
-		expMergeable        bool
+		state        string
+		expMergeable bool
 	}{
 		{
 			"dirty",
-			"",
-			"",
 			false,
 		},
 		{
 			"unknown",
-			"",
-			"",
+			false,
+		},
+		{
+			"blocked",
 			false,
 		},
 		{
 			"behind",
-			"",
-			"",
 			false,
 		},
 		{
 			"random",
-			"",
-			"",
 			false,
 		},
 		{
 			"unstable",
-			"",
-			"",
 			true,
 		},
 		{
 			"has_hooks",
-			"",
-			"",
 			true,
 		},
 		{
 			"clean",
-			"",
-			"",
 			true,
 		},
 		{
 			"",
-			"",
-			"",
-			false,
-		},
-		{
-			"blocked",
-			fmt.Sprintf("%s/apply", vcsStatusName),
-			"failure",
-			true,
-		},
-		{
-			"blocked",
-			fmt.Sprintf("%s/apply", vcsStatusName),
-			"pending",
-			true,
-		},
-		{
-			"blocked",
-			"required_check",
-			"failure",
 			false,
 		},
 	}
@@ -562,29 +530,12 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 				fmt.Sprintf(`"mergeable_state": "%s"`, c.state),
 				1,
 			)
-			responseStatus, _ := json.Marshal(map[string][]map[string]string{
-				"statuses": {{
-					"context": c.requiredCheckName,
-					"state":   c.requiredCheckStatus,
-				}},
-			})
-			responseRequiredChecks, _ := json.Marshal(map[string][]string{
-				"contexts": {
-					c.requiredCheckName,
-				},
-			})
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					case "/api/v3/repos/owner/repo/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
-						return
-					case "/api/v3/repos/owner/repo/commits/headBranch/status":
-						w.Write(responseStatus) // nolint: errcheck
-						return
-					case "/api/v3/repos/owner/repo/branches/baseBranch/protection/required_status_checks":
-						w.Write(responseRequiredChecks) // nolint: errcheck
 						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -609,9 +560,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 					Hostname: "github.com",
 				},
 			}, models.PullRequest{
-				Num:        1,
-				HeadBranch: "headBranch",
-				BaseBranch: "baseBranch",
+				Num: 1,
 			}, vcsStatusName)
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
