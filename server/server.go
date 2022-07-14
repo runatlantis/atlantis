@@ -385,7 +385,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrapf(err, "initializing storage backend")
 	}
 
-	jobStore := jobs.NewJobStore(storageBackend)
+	jobStore := jobs.NewJobStore(storageBackend, statsScope.SubScope("jobstore"))
 
 	var projectCmdOutputHandler jobs.ProjectCommandOutputHandler
 	// When TFE is enabled log streaming is not necessary.

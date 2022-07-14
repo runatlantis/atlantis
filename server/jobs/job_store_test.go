@@ -2,6 +2,7 @@ package jobs_test
 
 import (
 	"fmt"
+	"github.com/uber-go/tally"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -44,7 +45,7 @@ func TestJobStore_Get(t *testing.T) {
 		When(storageBackend.Read(AnyString())).ThenReturn(expectedLogs, nil)
 
 		// Assert job
-		jobStore := jobs.NewJobStore(storageBackend)
+		jobStore := jobs.NewJobStore(storageBackend, tally.NewTestScope("test", map[string]string{}))
 		gotJob, err := jobStore.Get("1234")
 		assert.NoError(t, err)
 		assert.Equal(t, expectedJob.Output, gotJob.Output)
@@ -58,7 +59,7 @@ func TestJobStore_Get(t *testing.T) {
 		When(storageBackend.Read(AnyString())).ThenReturn([]string{}, errors.New("error"))
 
 		// Assert job
-		jobStore := jobs.NewJobStore(storageBackend)
+		jobStore := jobs.NewJobStore(storageBackend, tally.NewTestScope("test", map[string]string{}))
 		gotJob, err := jobStore.Get("1234")
 		assert.Empty(t, gotJob)
 		assert.EqualError(t, expectedError, err.Error())
@@ -70,7 +71,7 @@ func TestJobStore_AppendOutput(t *testing.T) {
 	t.Run("append output when new job", func(t *testing.T) {
 		// Setup job store
 		storageBackend := mocks.NewMockStorageBackend()
-		jobStore := jobs.NewJobStore(storageBackend)
+		jobStore := jobs.NewJobStore(storageBackend, tally.NewTestScope("test", map[string]string{}))
 		jobID := "1234"
 		output := "Test log message"
 
@@ -86,7 +87,7 @@ func TestJobStore_AppendOutput(t *testing.T) {
 	t.Run("append output when existing job", func(t *testing.T) {
 		// Setup job store
 		storageBackend := mocks.NewMockStorageBackend()
-		jobStore := jobs.NewJobStore(storageBackend)
+		jobStore := jobs.NewJobStore(storageBackend, tally.NewTestScope("test", map[string]string{}))
 		jobID := "1234"
 		output := []string{"Test log message", "Test log message 2"}
 
@@ -199,7 +200,7 @@ func TestJobStore_UpdateJobStatus(t *testing.T) {
 
 	t.Run("error when job does not exist", func(t *testing.T) {
 		storageBackend := mocks.NewMockStorageBackend()
-		jobStore := jobs.NewJobStore(storageBackend)
+		jobStore := jobs.NewJobStore(storageBackend, tally.NewTestScope("test", map[string]string{}))
 		jobID := "1234"
 		expectedErrString := fmt.Sprintf("job: %s does not exist", jobID)
 
