@@ -67,7 +67,7 @@ To install:
     ```yaml
     orgWhitelist: github.com/runatlantis/*
     ```
-1. Configure any other variables (see [https://github.com/helm/charts/tree/master/stable/atlantis#customization](https://github.com/helm/charts/tree/master/stable/atlantis#customization)
+1. Configure any other variables (see [https://github.com/runatlantis/helm-charts#customization](https://github.com/runatlantis/helm-charts#customization)
     for documentation)
 1. Run
     ```sh
