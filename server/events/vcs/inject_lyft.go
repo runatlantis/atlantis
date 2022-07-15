@@ -8,7 +8,7 @@ func NewLyftPullMergeabilityChecker(commitStatusPrefix string) MergeabilityCheck
 	statusFilters := newValidStatusFilters(commitStatusPrefix)
 
 	statusFilters = append(statusFilters, lyft.NewSQFilter())
-	checksFilters := newValidChecksFilters()
+	checksFilters := newValidChecksFilters(commitStatusPrefix)
 
 	supplementalChecker := newSupplementalMergeabilityChecker(statusFilters, checksFilters)
 	supplementalChecker = lyft.NewOwnersStatusChecker(supplementalChecker)
