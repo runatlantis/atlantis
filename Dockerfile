@@ -1,5 +1,5 @@
 # Stage 1: build artifact
-FROM golang:1.17-alpine AS builder
+FROM golang:1.18.4-alpine AS builder
 
 WORKDIR /app
 COPY . /app
