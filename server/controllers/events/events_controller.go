@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -24,7 +25,9 @@ import (
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
@@ -89,7 +92,11 @@ type VCSEventsController struct {
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator
 
-	APISecret []byte
+	APISecret                 []byte
+	ProjectCommandBuilder     events.ProjectCommandBuilder
+	ProjectPlanCommandRunner  events.ProjectPlanCommandRunner
+	ProjectApplyCommandRunner events.ProjectApplyCommandRunner
+	Locker                    locking.Locker
 }
 
 // Post handles POST webhook requests.
@@ -729,7 +736,7 @@ type APIRequest struct {
 	}
 }
 
-func (a *APIRequest) getCommands(ctx *events.CommandContext, cmdBuilder func(*events.CommandContext, *events.CommentCommand) ([]models.ProjectCommandContext, error)) ([]models.ProjectCommandContext, error) {
+func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, error) {
 	cc := make([]*events.CommentCommand, 0)
 
 	for _, project := range a.Projects {
@@ -744,7 +751,7 @@ func (a *APIRequest) getCommands(ctx *events.CommandContext, cmdBuilder func(*ev
 		})
 	}
 
-	cmds := make([]models.ProjectCommandContext, 0)
+	cmds := make([]command.ProjectContext, 0)
 	for _, commentCommand := range cc {
 		projectCmds, err := cmdBuilder(ctx, commentCommand)
 		if err != nil {
@@ -758,14 +765,14 @@ func (a *APIRequest) getCommands(ctx *events.CommandContext, cmdBuilder func(*ev
 	return cmds, nil
 }
 
-func (e *EventsController) apiReportError(w http.ResponseWriter, code int, err error) {
+func (e *VCSEventsController) apiReportError(w http.ResponseWriter, code int, err error) {
 	response, _ := json.Marshal(map[string]string{
 		"error": err.Error(),
 	})
 	e.respond(w, logging.Warn, code, string(response))
 }
 
-func (e *EventsController) APIPlan(w http.ResponseWriter, r *http.Request) {
+func (e *VCSEventsController) APIPlan(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	request, ctx, code, err := e.apiParseAndValidate(w, r)
@@ -775,15 +782,19 @@ func (e *EventsController) APIPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	runner := e.CommandRunner.(*events.DefaultCommandRunner)
-	cmds, err := request.getCommands(ctx, runner.ProjectCommandBuilder.BuildPlanCommands)
+	cmds, err := request.getCommands(ctx, e.ProjectCommandBuilder.BuildPlanCommands)
 	if err != nil {
 		e.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	defer runner.ProjectCommandRunner.(*events.DefaultProjectCommandRunner).Locker.(*events.DefaultProjectLocker).Locker.UnlockByPull(ctx.BaseRepo.FullName, -1)
-	result := runner.RunProjectCmds(cmds, models.PlanCommand)
+	defer e.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0)
+	var projectResults []command.ProjectResult
+	for _, cmd := range cmds {
+		res := e.ProjectPlanCommandRunner.Plan(cmd)
+		projectResults = append(projectResults, res)
+	}
+	result := command.Result{ProjectResults: projectResults}
 
 	code = http.StatusOK
 	if result.HasErrors() {
@@ -795,7 +806,7 @@ func (e *EventsController) APIPlan(w http.ResponseWriter, r *http.Request) {
 	e.respond(w, logging.Debug, code, string(response))
 }
 
-func (e *EventsController) APIApply(w http.ResponseWriter, r *http.Request) {
+func (e *VCSEventsController) APIApply(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	request, ctx, code, err := e.apiParseAndValidate(w, r)
@@ -804,25 +815,34 @@ func (e *EventsController) APIApply(w http.ResponseWriter, r *http.Request) {
 		e.apiReportError(w, code, err)
 		return
 	}
-	runner := e.CommandRunner.(*events.DefaultCommandRunner)
 
 	// We must first make the plan for all projects
-	cmds, err := request.getCommands(ctx, runner.ProjectCommandBuilder.BuildPlanCommands)
+	cmds, err := request.getCommands(ctx, e.ProjectCommandBuilder.BuildPlanCommands)
 	if err != nil {
 		e.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	defer runner.ProjectCommandRunner.(*events.DefaultProjectCommandRunner).Locker.(*events.DefaultProjectLocker).Locker.UnlockByPull(ctx.BaseRepo.FullName, -1)
-	result := runner.RunProjectCmds(cmds, models.PlanCommand)
+	defer e.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0)
+	var projectResults []command.ProjectResult
+	for _, cmd := range cmds {
+		res := e.ProjectPlanCommandRunner.Plan(cmd)
+		projectResults = append(projectResults, res)
+	}
+	result := command.Result{ProjectResults: projectResults}
 
 	// We can now prepare and run the apply step
-	cmds, err = request.getCommands(ctx, runner.ProjectCommandBuilder.BuildApplyCommands)
+	cmds, err = request.getCommands(ctx, e.ProjectCommandBuilder.BuildApplyCommands)
 	if err != nil {
 		e.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	result = runner.RunProjectCmds(cmds, models.ApplyCommand)
+	projectResults = nil
+	for _, cmd := range cmds {
+		res := e.ProjectApplyCommandRunner.Apply(cmd)
+		projectResults = append(projectResults, res)
+	}
+	result = command.Result{ProjectResults: projectResults}
 
 	code = http.StatusOK
 	if result.HasErrors() {
@@ -833,7 +853,7 @@ func (e *EventsController) APIApply(w http.ResponseWriter, r *http.Request) {
 	e.respond(w, logging.Debug, http.StatusOK, string(response))
 }
 
-func (e *EventsController) apiParseAndValidate(w http.ResponseWriter, r *http.Request) (*APIRequest, *events.CommandContext, int, error) {
+func (e *VCSEventsController) apiParseAndValidate(w http.ResponseWriter, r *http.Request) (*APIRequest, *command.Context, int, error) {
 	if len(e.APISecret) == 0 {
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("Ignoring request since API is disabled")
 	}
@@ -873,18 +893,20 @@ func (e *EventsController) apiParseAndValidate(w http.ResponseWriter, r *http.Re
 	}
 
 	// Check if the repo is whitelisted
-	if !e.RepoWhitelistChecker.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
-		return nil, nil, http.StatusForbidden, fmt.Errorf("Repo not whitelisted")
+	if !e.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		return nil, nil, http.StatusForbidden, fmt.Errorf("Repo not allowlisted")
 	}
 
-	return &request, &events.CommandContext{
-		BaseRepo: baseRepo,
+	return &request, &command.Context{
 		HeadRepo: baseRepo,
 		Pull: models.PullRequest{
-			Num:        -1,
+			Num:        0,
 			BaseBranch: request.Ref,
 			HeadBranch: request.Ref,
 			HeadCommit: request.Ref,
+			BaseRepo:   baseRepo,
 		},
+		Scope: e.Scope,
+		Log:   e.Logger,
 	}, 0, nil
 }

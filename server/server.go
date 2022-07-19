@@ -749,6 +749,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
 		APISecret:                       []byte(userConfig.APISecret),
+		ProjectCommandBuilder:           projectCommandBuilder,
+		ProjectPlanCommandRunner:        instrumentedProjectCmdRunner,
+		ProjectApplyCommandRunner:       instrumentedProjectCmdRunner,
+		Locker:                          lockingClient,
 		RepoAllowlistChecker:            repoAllowlist,
 		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
 		SupportedVCSHosts:               supportedVCSHosts,
@@ -813,8 +817,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
-	s.Router.HandleFunc("/plan", s.EventsController.APIPlan).Methods("POST")
-	s.Router.HandleFunc("/apply", s.EventsController.APIApply).Methods("POST")
+	s.Router.HandleFunc("/plan", s.VCSEventsController.APIPlan).Methods("POST")
+	s.Router.HandleFunc("/apply", s.VCSEventsController.APIApply).Methods("POST")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
