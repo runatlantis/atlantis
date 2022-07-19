@@ -846,7 +846,7 @@ func (e *VCSEventsController) APIApply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response, _ := json.Marshal(result)
-	e.respond(w, logging.Debug, http.StatusOK, string(response))
+	e.respond(w, logging.Debug, code, string(response))
 }
 
 func (e *VCSEventsController) apiParseAndValidate(w http.ResponseWriter, r *http.Request) (*APIRequest, *command.Context, int, error) {
