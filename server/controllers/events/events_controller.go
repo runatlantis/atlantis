@@ -757,9 +757,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.
 		if err != nil {
 			return nil, fmt.Errorf("Failed to build command: %v", err)
 		}
-		for _, cmd := range projectCmds {
-			cmds = append(cmds, cmd)
-		}
+		cmds = append(cmds, projectCmds...)
 	}
 
 	return cmds, nil
@@ -788,7 +786,7 @@ func (e *VCSEventsController) APIPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer e.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0)
+	defer e.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0) // nolint: errcheck
 	var projectResults []command.ProjectResult
 	for _, cmd := range cmds {
 		res := e.ProjectPlanCommandRunner.Plan(cmd)
@@ -796,7 +794,6 @@ func (e *VCSEventsController) APIPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	result := command.Result{ProjectResults: projectResults}
 
-	code = http.StatusOK
 	if result.HasErrors() {
 		code = http.StatusInternalServerError
 	}
@@ -823,7 +820,7 @@ func (e *VCSEventsController) APIApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer e.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0)
+	defer e.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0) // nolint: errcheck
 	var projectResults []command.ProjectResult
 	for _, cmd := range cmds {
 		res := e.ProjectPlanCommandRunner.Plan(cmd)
@@ -844,7 +841,6 @@ func (e *VCSEventsController) APIApply(w http.ResponseWriter, r *http.Request) {
 	}
 	result = command.Result{ProjectResults: projectResults}
 
-	code = http.StatusOK
 	if result.HasErrors() {
 		code = http.StatusInternalServerError
 	}
@@ -908,5 +904,5 @@ func (e *VCSEventsController) apiParseAndValidate(w http.ResponseWriter, r *http
 		},
 		Scope: e.Scope,
 		Log:   e.Logger,
-	}, 0, nil
+	}, http.StatusOK, nil
 }

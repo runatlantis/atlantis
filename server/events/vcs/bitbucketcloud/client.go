@@ -267,6 +267,6 @@ func (b *Client) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, 
 	return false, []byte{}, fmt.Errorf("Not Implemented")
 }
 
-func (g *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+func (b *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
 	return "", fmt.Errorf("not yet implemented")
 }
