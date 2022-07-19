@@ -4,11 +4,12 @@
 package mocks
 
 import (
+	"reflect"
+	"time"
+
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
-	"reflect"
-	"time"
 )
 
 type MockAzureDevopsPullGetter struct {
@@ -52,14 +53,14 @@ func (mock *MockAzureDevopsPullGetter) VerifyWasCalledOnce() *VerifierMockAzureD
 	}
 }
 
-func (mock *MockAzureDevopsPullGetter) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockAzureDevopsPullGetter {
+func (mock *MockAzureDevopsPullGetter) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockAzureDevopsPullGetter {
 	return &VerifierMockAzureDevopsPullGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockAzureDevopsPullGetter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockAzureDevopsPullGetter {
+func (mock *MockAzureDevopsPullGetter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockAzureDevopsPullGetter {
 	return &VerifierMockAzureDevopsPullGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -67,7 +68,7 @@ func (mock *MockAzureDevopsPullGetter) VerifyWasCalledInOrder(invocationCountMat
 	}
 }
 
-func (mock *MockAzureDevopsPullGetter) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockAzureDevopsPullGetter {
+func (mock *MockAzureDevopsPullGetter) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockAzureDevopsPullGetter {
 	return &VerifierMockAzureDevopsPullGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -77,7 +78,7 @@ func (mock *MockAzureDevopsPullGetter) VerifyWasCalledEventually(invocationCount
 
 type VerifierMockAzureDevopsPullGetter struct {
 	mock                   *MockAzureDevopsPullGetter
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -101,11 +102,11 @@ func (c *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification) GetCaptur
 func (c *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(params[0]))
+		_param0 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.Repo)
 		}
-		_param1 = make([]int, len(params[1]))
+		_param1 = make([]int, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(int)
 		}

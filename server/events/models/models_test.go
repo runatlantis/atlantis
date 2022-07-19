@@ -14,7 +14,6 @@
 package models_test
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -35,7 +34,7 @@ func TestNewRepo_EmptyCloneURL(t *testing.T) {
 
 func TestNewRepo_InvalidCloneURL(t *testing.T) {
 	_, err := models.NewRepo(models.Github, "owner/repo", ":", "u", "p")
-	ErrEquals(t, "invalid clone url: parse :.git: missing protocol scheme", err)
+	ErrEquals(t, "invalid clone url: parse \":.git\": missing protocol scheme", err)
 }
 
 func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
@@ -64,6 +63,19 @@ func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
 			Type:     models.BitbucketServer,
 		},
 	}, repo)
+}
+
+// If the clone URL contains a space, NewRepo() should encode it
+func TestNewRepo_CloneURLContainsSpace(t *testing.T) {
+	repo, err := models.NewRepo(models.AzureDevops, "owner/project space/repo", "https://dev.azure.com/owner/project space/repo", "u", "p")
+	Ok(t, err)
+	Equals(t, repo.CloneURL, "https://u:p@dev.azure.com/owner/project%20space/repo")
+	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@dev.azure.com/owner/project%20space/repo")
+
+	repo, err = models.NewRepo(models.BitbucketCloud, "owner/repo space", "https://bitbucket.org/owner/repo space", "u", "p")
+	Ok(t, err)
+	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo%20space.git")
+	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@bitbucket.org/owner/repo%20space.git")
 }
 
 func TestNewRepo_FullNameWrongFormat(t *testing.T) {
@@ -342,101 +354,6 @@ func TestAzureDevopsSplitRepoFullName(t *testing.T) {
 		})
 	}
 }
-
-func TestProjectResult_IsSuccessful(t *testing.T) {
-	cases := map[string]struct {
-		pr  models.ProjectResult
-		exp bool
-	}{
-		"plan success": {
-			models.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{},
-			},
-			true,
-		},
-		"apply success": {
-			models.ProjectResult{
-				ApplySuccess: "success",
-			},
-			true,
-		},
-		"failure": {
-			models.ProjectResult{
-				Failure: "failure",
-			},
-			false,
-		},
-		"error": {
-			models.ProjectResult{
-				Error: errors.New("error"),
-			},
-			false,
-		},
-	}
-
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			Equals(t, c.exp, c.pr.IsSuccessful())
-		})
-	}
-}
-
-func TestProjectResult_PlanStatus(t *testing.T) {
-	cases := []struct {
-		p         models.ProjectResult
-		expStatus models.ProjectPlanStatus
-	}{
-		{
-			p: models.ProjectResult{
-				Command: models.PlanCommand,
-				Error:   errors.New("err"),
-			},
-			expStatus: models.ErroredPlanStatus,
-		},
-		{
-			p: models.ProjectResult{
-				Command: models.PlanCommand,
-				Failure: "failure",
-			},
-			expStatus: models.ErroredPlanStatus,
-		},
-		{
-			p: models.ProjectResult{
-				Command:     models.PlanCommand,
-				PlanSuccess: &models.PlanSuccess{},
-			},
-			expStatus: models.PlannedPlanStatus,
-		},
-		{
-			p: models.ProjectResult{
-				Command: models.ApplyCommand,
-				Error:   errors.New("err"),
-			},
-			expStatus: models.ErroredApplyStatus,
-		},
-		{
-			p: models.ProjectResult{
-				Command: models.ApplyCommand,
-				Failure: "failure",
-			},
-			expStatus: models.ErroredApplyStatus,
-		},
-		{
-			p: models.ProjectResult{
-				Command:      models.ApplyCommand,
-				ApplySuccess: "success",
-			},
-			expStatus: models.AppliedPlanStatus,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.expStatus.String(), func(t *testing.T) {
-			Equals(t, c.expStatus, c.p.PlanStatus())
-		})
-	}
-}
-
 func TestPullStatus_StatusCount(t *testing.T) {
 	ps := models.PullStatus{
 		Projects: []models.ProjectStatus{
@@ -452,6 +369,15 @@ func TestPullStatus_StatusCount(t *testing.T) {
 			{
 				Status: models.ErroredApplyStatus,
 			},
+			{
+				Status: models.DiscardedPlanStatus,
+			},
+			{
+				Status: models.ErroredPolicyCheckStatus,
+			},
+			{
+				Status: models.PassedPolicyCheckStatus,
+			},
 		},
 	}
 
@@ -459,4 +385,7 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 1, ps.StatusCount(models.AppliedPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.ErroredApplyStatus))
 	Equals(t, 0, ps.StatusCount(models.ErroredPlanStatus))
+	Equals(t, 1, ps.StatusCount(models.DiscardedPlanStatus))
+	Equals(t, 1, ps.StatusCount(models.ErroredPolicyCheckStatus))
+	Equals(t, 1, ps.StatusCount(models.PassedPolicyCheckStatus))
 }

@@ -1,15 +1,29 @@
 package events_test
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+// disableSSLVerification disables ssl verification for the global http client
+// and returns a function to be called in a defer that will re-enable it.
+func disableSSLVerification() func() {
+	orig := http.DefaultTransport.(*http.Transport).TLSClientConfig
+	// nolint: gosec
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	return func() {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = orig
+	}
+}
 
 // Test that if we don't have any existing files, we check out the repo.
 func TestClone_NoneExisting(t *testing.T) {
@@ -25,9 +39,11 @@ func TestClone_NoneExisting(t *testing.T) {
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
 	}
 
-	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
@@ -74,9 +90,11 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 		CheckoutMerge:               true,
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
 	}
 
-	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -122,9 +140,11 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 		CheckoutMerge:               true,
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
 	}
 
-	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -135,7 +155,8 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -170,9 +191,11 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 		CheckoutMerge:               true,
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
 	}
 
-	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -183,7 +206,8 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -223,9 +247,11 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 		CheckoutMerge:               true,
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
 	}
 
-	_, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, _, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -254,8 +280,10 @@ func TestClone_NoReclone(t *testing.T) {
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
 	}
-	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
@@ -289,8 +317,10 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
 	}
-	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		HeadCommit: expCommit,
 	}, "default")
@@ -323,6 +353,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	runCmd(t, firstPRDir, "git", "fetch", "head", "+refs/heads/first-pr")
 	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
 	runCmd(t, firstPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
 
 	// Simulate second PR.
@@ -340,6 +371,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	runCmd(t, secondPRDir, "git", "fetch", "head", "+refs/heads/second-pr")
 	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")
 	runCmd(t, secondPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
 
 	// Merge first PR
@@ -352,10 +384,12 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 
 	// Run the clone.
 	wd := &events.FileWorkspace{
-		DataDir:       repoDir,
-		CheckoutMerge: true,
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		GpgNoSigningEnabled: true,
 	}
-	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{CloneURL: repoDir}, models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
 		HeadBranch: "second-pr",
 		BaseBranch: "master",
 	}, "default")
@@ -365,7 +399,8 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	// Run it again but without the checkout merge strategy. It should return
 	// false.
 	wd.CheckoutMerge = false
-	_, hasDiverged, err = wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, hasDiverged, err = wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
 		HeadBranch: "second-pr",
 		BaseBranch: "master",
 	}, "default")
@@ -373,13 +408,81 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	Equals(t, hasDiverged, false)
 }
 
+func TestHasDiverged_MasterHasDiverged(t *testing.T) {
+	// Initialize the git repo.
+	repoDir, cleanup := initRepo(t)
+	defer cleanup()
+
+	// Simulate first PR.
+	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
+	runCmd(t, repoDir, "touch", "file1")
+	runCmd(t, repoDir, "git", "add", "file1")
+	runCmd(t, repoDir, "git", "commit", "-m", "file1")
+
+	// Atlantis checkout first PR.
+	firstPRDir := repoDir + "/first-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
+	runCmd(t, firstPRDir, "git", "clone", "--branch", "master", "--single-branch", repoDir, ".")
+	runCmd(t, firstPRDir, "git", "remote", "add", "head", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "head", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, firstPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Simulate second PR.
+	runCmd(t, repoDir, "git", "checkout", "master")
+	runCmd(t, repoDir, "git", "checkout", "-b", "second-pr")
+	runCmd(t, repoDir, "touch", "file2")
+	runCmd(t, repoDir, "git", "add", "file2")
+	runCmd(t, repoDir, "git", "commit", "-m", "file2")
+
+	// Atlantis checkout second PR.
+	secondPRDir := repoDir + "/second-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
+	runCmd(t, secondPRDir, "git", "clone", "--branch", "master", "--single-branch", repoDir, ".")
+	runCmd(t, secondPRDir, "git", "remote", "add", "head", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "head", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, secondPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Merge first PR
+	runCmd(t, repoDir, "git", "checkout", "master")
+	runCmd(t, repoDir, "git", "merge", "first-pr")
+
+	// Copy the second-pr repo to our data dir which has diverged remote master
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", secondPRDir, "repos/0/default")
+
+	// "git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	// Run the clone.
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		GpgNoSigningEnabled: true,
+	}
+	hasDiverged := wd.HasDiverged(logging.NewNoopLogger(t), repoDir+"/repos/0/default")
+	Equals(t, hasDiverged, true)
+
+	// Run it again but without the checkout merge strategy. It should return
+	// false.
+	wd.CheckoutMerge = false
+	hasDiverged = wd.HasDiverged(logging.NewNoopLogger(t), repoDir+"/repos/0/default")
+	Equals(t, hasDiverged, false)
+}
+
 func initRepo(t *testing.T) (string, func()) {
 	repoDir, cleanup := TempDir(t)
-	runCmd(t, repoDir, "git", "init")
+	runCmd(t, repoDir, "git", "init", "--initial-branch=master")
 	runCmd(t, repoDir, "touch", ".gitkeep")
 	runCmd(t, repoDir, "git", "add", ".gitkeep")
 	runCmd(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, repoDir, "git", "config", "--local", "commit.gpgsign", "false")
 	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, repoDir, "git", "branch", "branch")
 	return repoDir, cleanup

@@ -4,11 +4,12 @@
 package mocks
 
 import (
+	"reflect"
+	"time"
+
 	pegomock "github.com/petergtz/pegomock"
 	events "github.com/runatlantis/atlantis/server/events"
 	models "github.com/runatlantis/atlantis/server/events/models"
-	"reflect"
-	"time"
 )
 
 type MockCommentParsing struct {
@@ -48,14 +49,14 @@ func (mock *MockCommentParsing) VerifyWasCalledOnce() *VerifierMockCommentParsin
 	}
 }
 
-func (mock *MockCommentParsing) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockCommentParsing {
+func (mock *MockCommentParsing) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockCommentParsing {
 	return &VerifierMockCommentParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockCommentParsing) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCommentParsing {
+func (mock *MockCommentParsing) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCommentParsing {
 	return &VerifierMockCommentParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -63,7 +64,7 @@ func (mock *MockCommentParsing) VerifyWasCalledInOrder(invocationCountMatcher pe
 	}
 }
 
-func (mock *MockCommentParsing) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockCommentParsing {
+func (mock *MockCommentParsing) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockCommentParsing {
 	return &VerifierMockCommentParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -73,7 +74,7 @@ func (mock *MockCommentParsing) VerifyWasCalledEventually(invocationCountMatcher
 
 type VerifierMockCommentParsing struct {
 	mock                   *MockCommentParsing
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -97,11 +98,11 @@ func (c *MockCommentParsing_Parse_OngoingVerification) GetCapturedArguments() (s
 func (c *MockCommentParsing_Parse_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.VCSHostType) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]models.VCSHostType, len(params[1]))
+		_param1 = make([]models.VCSHostType, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.VCSHostType)
 		}

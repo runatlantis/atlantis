@@ -3,7 +3,9 @@ package matchers
 
 import (
 	"reflect"
+
 	"github.com/petergtz/pegomock"
+
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 )
 
@@ -15,6 +17,18 @@ func AnyPtrToAzuredevopsGitRepository() *azuredevops.GitRepository {
 
 func EqPtrToAzuredevopsGitRepository(value *azuredevops.GitRepository) *azuredevops.GitRepository {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue *azuredevops.GitRepository
+	return nullValue
+}
+
+func NotEqPtrToAzuredevopsGitRepository(value *azuredevops.GitRepository) *azuredevops.GitRepository {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *azuredevops.GitRepository
+	return nullValue
+}
+
+func PtrToAzuredevopsGitRepositoryThat(matcher pegomock.ArgumentMatcher) *azuredevops.GitRepository {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue *azuredevops.GitRepository
 	return nullValue
 }

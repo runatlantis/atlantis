@@ -14,11 +14,17 @@
 package vcs
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/runatlantis/atlantis/server/core/config"
+
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
 	version "github.com/hashicorp/go-version"
@@ -28,6 +34,10 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	gitlab "github.com/xanzy/go-gitlab"
 )
+
+// gitlabMaxCommentLength is the maximum number of chars allowed by Gitlab in a
+// single comment.
+const gitlabMaxCommentLength = 1000000
 
 type GitlabClient struct {
 	Client *gitlab.Client
@@ -44,13 +54,17 @@ var commonMarkSupported = MustConstraint(">=11.1")
 var gitlabClientUnderTest = false
 
 // NewGitlabClient returns a valid GitLab client.
-func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger) (*GitlabClient, error) {
-	client := &GitlabClient{
-		Client: gitlab.NewClient(nil, token),
-	}
+func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging) (*GitlabClient, error) {
+	client := &GitlabClient{}
 
-	// If not using gitlab.com we need to set the URL to the API.
-	if hostname != "gitlab.com" {
+	// Create the client differently depending on the base URL.
+	if hostname == "gitlab.com" {
+		glClient, err := gitlab.NewClient(token)
+		if err != nil {
+			return nil, err
+		}
+		client.Client = glClient
+	} else {
 		// We assume the url will be over HTTPS if the user doesn't specify a scheme.
 		absoluteURL := hostname
 		if !strings.HasPrefix(hostname, "http://") && !strings.HasPrefix(hostname, "https://") {
@@ -74,9 +88,11 @@ func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger
 		// Now we're ready to construct the client.
 		absoluteURL = strings.TrimSuffix(absoluteURL, "/")
 		apiURL := fmt.Sprintf("%s/api/v4/", absoluteURL)
-		if err := client.Client.SetBaseURL(apiURL); err != nil {
-			return nil, errors.Wrapf(err, "setting GitLab API URL: %s", apiURL)
+		glClient, err := gitlab.NewClient(token, gitlab.WithBaseURL(apiURL))
+		if err != nil {
+			return nil, err
 		}
+		client.Client = glClient
 	}
 
 	// Determine which version of GitLab is running.
@@ -134,42 +150,84 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 }
 
 // CreateComment creates a comment on the merge request.
-func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
-	_, _, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.String(comment)})
-	return err
+func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+	sepEnd := "\n```\n</details>" +
+		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
+	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
+		"```diff\n"
+	comments := common.SplitComment(comment, gitlabMaxCommentLength, sepEnd, sepStart)
+	for _, c := range comments {
+		if _, _, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.String(c)}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	return nil
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	approvals, _, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	if approvals.ApprovalsLeft > 0 {
-		return false, nil
+		return approvalStatus, nil
 	}
-	return true, nil
+	return models.ApprovalStatus{
+		IsApproved: true,
+	}, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
 // In GitLab, there isn't a single field that tells us if the pull request is
 // mergeable so for now we check the merge_status and approvals_before_merge
-// fields. We aren't checking if there are unresolved discussions or failing
-// pipelines because those only block merges if the repo is set to require that.
+// fields.
 // In order to check if the repo required these, we'd need to make another API
-// call to get the repo settings. For now I'm going to leave this as is and if
-// some users require checking this as well then we can revisit.
+// call to get the repo settings.
 // It's also possible that GitLab implements their own "mergeable" field in
 // their API in the future.
 // See:
 // - https://gitlab.com/gitlab-org/gitlab-ee/issues/3169
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
-func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
 	if err != nil {
 		return false, err
 	}
-	if mr.MergeStatus == "can_be_merged" && mr.ApprovalsBeforeMerge <= 0 {
+
+	// Get project configuration
+	project, _, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
+	if err != nil {
+		return false, err
+	}
+
+	// Get Commit Statuses
+	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, mr.HeadPipeline.SHA, nil)
+	if err != nil {
+		return false, err
+	}
+
+	for _, status := range statuses {
+		// Ignore any commit statuses with 'atlantis/apply' as prefix
+		if strings.HasPrefix(status.Name, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+			continue
+		}
+		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
+			return false, nil
+		}
+	}
+
+	isPipelineSkipped := mr.HeadPipeline.Status == "skipped"
+	allowSkippedPipeline := project.AllowMergeOnSkippedPipeline && isPipelineSkipped
+	if mr.MergeStatus == "can_be_merged" &&
+		mr.ApprovalsBeforeMerge <= 0 &&
+		mr.BlockingDiscussionsResolved &&
+		!mr.WorkInProgress &&
+		(allowSkippedPipeline || !isPipelineSkipped) {
 		return true, nil
 	}
 	return false, nil
@@ -177,10 +235,10 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 // UpdateStatus updates the build status of a commit.
 func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
-	gitlabState := gitlab.Failed
+	gitlabState := gitlab.Pending
 	switch state {
 	case models.PendingCommitStatus:
-		gitlabState = gitlab.Pending
+		gitlabState = gitlab.Running
 	case models.FailedCommitStatus:
 		gitlabState = gitlab.Failed
 	case models.SuccessCommitStatus:
@@ -200,16 +258,60 @@ func (g *GitlabClient) GetMergeRequest(repoFullName string, pullNum int) (*gitla
 	return mr, err
 }
 
+func (g *GitlabClient) WaitForSuccessPipeline(ctx context.Context, pull models.PullRequest) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	for wait := true; wait; {
+		select {
+		case <-ctx.Done():
+			// validation check time out
+			cancel()
+			return //ctx.Err()
+
+		default:
+			mr, _ := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
+			// check if pipeline has a success state to merge
+			if mr.HeadPipeline.Status == "success" {
+				return
+			}
+			time.Sleep(time.Second)
+		}
+	}
+}
+
 // MergePull merges the merge request.
-func (g *GitlabClient) MergePull(pull models.PullRequest) error {
+func (g *GitlabClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	commitMsg := common.AutomergeCommitMsg
-	_, _, err := g.Client.MergeRequests.AcceptMergeRequest(
+
+	mr, err := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
+	if err != nil {
+		return errors.Wrap(
+			err, "unable to merge merge request, it was not possible to retrieve the merge request")
+	}
+	project, _, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
+	if err != nil {
+		return errors.Wrap(
+			err, "unable to merge merge request, it was not possible to check the project requirements")
+	}
+
+	if project != nil && project.OnlyAllowMergeIfPipelineSucceeds {
+		g.WaitForSuccessPipeline(context.Background(), pull)
+	}
+
+	_, _, err = g.Client.MergeRequests.AcceptMergeRequest(
 		pull.BaseRepo.FullName,
 		pull.Num,
 		&gitlab.AcceptMergeRequestOptions{
-			MergeCommitMessage: &commitMsg,
+			MergeCommitMessage:       &commitMsg,
+			ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
 		})
 	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
+}
+
+// MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
+func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return fmt.Sprintf("!%d", pull.Num), nil
 }
 
 // GetVersion returns the version of the Gitlab server this client is using.
@@ -253,6 +355,33 @@ func MustConstraint(constraint string) version.Constraints {
 		panic(err)
 	}
 	return c
+}
+
+// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
+func (g *GitlabClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	return nil, nil
+}
+
+// DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)
+// The first return value indicate that repo contain atlantis.yaml or not
+// if BaseRepo had one repo config file, its content will placed on the second return value
+func (g *GitlabClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+	opt := gitlab.GetRawFileOptions{Ref: gitlab.String(pull.HeadBranch)}
+
+	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, config.AtlantisYAMLFilename, &opt)
+	if resp.StatusCode == http.StatusNotFound {
+		return false, []byte{}, nil
+	}
+
+	if err != nil {
+		return true, []byte{}, err
+	}
+
+	return true, bytes, nil
+}
+
+func (g *GitlabClient) SupportsSingleFileDownload(repo models.Repo) bool {
+	return true
 }
 
 func (g *GitlabClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {

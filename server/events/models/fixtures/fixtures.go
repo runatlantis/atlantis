@@ -13,7 +13,12 @@
 
 package fixtures
 
-import "github.com/runatlantis/atlantis/server/events/models"
+import (
+	"fmt"
+
+	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/events/models"
+)
 
 var Pull = models.PullRequest{
 	Num:        1,
@@ -50,3 +55,11 @@ var GitlabRepo = models.Repo{
 var User = models.User{
 	Username: "lkysow",
 }
+
+var projectName = "test-project"
+
+var Project = valid.Project{
+	Name: &projectName,
+}
+
+var PullInfo = fmt.Sprintf("%s/%d/%s", GithubRepo.FullName, Pull.Num, *Project.Name)

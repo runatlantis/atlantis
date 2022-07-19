@@ -37,10 +37,11 @@ type WorkingDir interface {
 	// absolute path to the root of the cloned repo. It also returns
 	// a boolean indicating if we should warn users that the branch we're
 	// merging into has been updated since we cloned it.
-	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
+	Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
+	HasDiverged(log logging.SimpleLogging, cloneDir string) bool
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
@@ -61,19 +62,27 @@ type FileWorkspace struct {
 	// TestingOverrideBaseCloneURL can be used during testing to override the
 	// URL of the base repo to be cloned. If it's empty then we clone normally.
 	TestingOverrideBaseCloneURL string
+	// GithubAppEnabled is true if we should fetch the ref "pull/PR_NUMBER/head"
+	// from the "origin" remote. If this is false, we fetch "+refs/heads/$HEAD_BRANCH"
+	// from the "head" remote.
+	GithubAppEnabled bool
+	// use the global setting without overriding
+	GpgNoSigningEnabled bool
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
-// path to the root of the cloned repo. If the repo already exists and is at
+// path to the root of the cloned repo. It also returns
+// a boolean indicating if we should warn users that the branch we're
+// merging into has been updated since we cloned it.
+//If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(
-	log *logging.SimpleLogger,
-	baseRepo models.Repo,
+	log logging.SimpleLogging,
 	headRepo models.Repo,
 	p models.PullRequest,
 	workspace string) (string, bool, error) {
-	cloneDir := w.cloneDir(baseRepo, p, workspace)
+	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
 
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
@@ -102,7 +111,7 @@ func (w *FileWorkspace) Clone(
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
 			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
-			return cloneDir, w.warnDiverged(log, cloneDir), nil
+			return cloneDir, w.warnDiverged(log, p, headRepo, cloneDir), nil
 		}
 
 		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
@@ -120,7 +129,7 @@ func (w *FileWorkspace) Clone(
 // Then users won't be getting the merge functionality they expected.
 // If there are any errors we return false since we prefer things to succeed
 // vs. stopping the plan/apply.
-func (w *FileWorkspace) warnDiverged(log *logging.SimpleLogger, cloneDir string) bool {
+func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that master has diverged if we're using
 		// the checkout merge strategy. If we're just checking out the branch,
@@ -130,14 +139,49 @@ func (w *FileWorkspace) warnDiverged(log *logging.SimpleLogger, cloneDir string)
 	}
 
 	// Bring our remote refs up to date.
-	remoteUpdateCmd := exec.Command("git", "remote", "update")
-	remoteUpdateCmd.Dir = cloneDir
-	outputRemoteUpdate, err := remoteUpdateCmd.CombinedOutput()
-	if err != nil {
-		log.Warn("getting remote update failed: %s", string(outputRemoteUpdate))
-		return false
+	// Reset the URL in case we are using github app credentials since these might have
+	// expired and refreshed and the URL would now be different.
+	// In this case, we should be using a proxy URL which substitutes the credentials in
+	// as a long term fix, but something like that requires more e2e testing/time
+	cmds := [][]string{
+		{
+			"git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
+		},
+		{
+			"git", "remote", "set-url", "head", headRepo.CloneURL,
+		},
+		{
+			"git", "remote", "update",
+		},
 	}
 
+	for _, args := range cmds {
+		cmd := exec.Command(args[0], args[1:]...) // nolint: gosec
+		cmd.Dir = cloneDir
+
+		output, err := cmd.CombinedOutput()
+
+		if err != nil {
+			log.Warn("getting remote update failed: %s", string(output))
+			return false
+		}
+	}
+
+	hasDiverged := w.HasDiverged(log, cloneDir)
+	if hasDiverged {
+		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
+	} else {
+		log.Debug("remote master branch has no new commits")
+	}
+	return hasDiverged
+}
+
+func (w *FileWorkspace) HasDiverged(log logging.SimpleLogging, cloneDir string) bool {
+	if !w.CheckoutMerge {
+		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
+		// we assume false here for 'branch' strategy.
+		return false
+	}
 	// Check if remote master branch has diverged.
 	statusUnoCmd := exec.Command("git", "status", "--untracked-files=no")
 	statusUnoCmd.Dir = cloneDir
@@ -147,15 +191,10 @@ func (w *FileWorkspace) warnDiverged(log *logging.SimpleLogger, cloneDir string)
 		return false
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
-	if hasDiverged {
-		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
-	} else {
-		log.Debug("remote master branch has no new commits")
-	}
 	return hasDiverged
 }
 
-func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
+func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	cloneDir string,
 	headRepo models.Repo,
 	p models.PullRequest) error {
@@ -187,6 +226,12 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		// get merge conflicts if our clone doesn't have the commits that the
 		// branch we're merging branched off at.
 		// See https://groups.google.com/forum/#!topic/git-users/v3MkuuiDJ98.
+		fetchRef := fmt.Sprintf("+refs/heads/%s:", p.HeadBranch)
+		fetchRemote := "head"
+		if w.GithubAppEnabled {
+			fetchRef = fmt.Sprintf("pull/%d/head:", p.Num)
+			fetchRemote = "origin"
+		}
 		cmds = [][]string{
 			{
 				"git", "clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir,
@@ -195,18 +240,23 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 				"git", "remote", "add", "head", headCloneURL,
 			},
 			{
-				"git", "fetch", "head", fmt.Sprintf("+refs/heads/%s:", p.HeadBranch),
-			},
-			// We use --no-ff because we always want there to be a merge commit.
-			// This way, our branch will look the same regardless if the merge
-			// could be fast forwarded. This is useful later when we run
-			// git rev-parse HEAD^2 to get the head commit because it will
-			// always succeed whereas without --no-ff, if the merge was fast
-			// forwarded then git rev-parse HEAD^2 would fail.
-			{
-				"git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD",
+				"git", "fetch", fetchRemote, fetchRef,
 			},
 		}
+		if w.GpgNoSigningEnabled {
+			cmds = append(cmds, []string{
+				"git", "config", "--local", "commit.gpgsign", "false",
+			})
+		}
+		// We use --no-ff because we always want there to be a merge commit.
+		// This way, our branch will look the same regardless if the merge
+		// could be fast forwarded. This is useful later when we run
+		// git rev-parse HEAD^2 to get the head commit because it will
+		// always succeed whereas without --no-ff, if the merge was fast
+		// forwarded then git rev-parse HEAD^2 would fail.
+		cmds = append(cmds, []string{
+			"git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD",
+		})
 	} else {
 		cmds = [][]string{
 			{

@@ -16,19 +16,27 @@ package events
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"text/template"
 
-	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/core/db"
 
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/locking"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/jobs"
 )
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_resource_cleaner.go ResourceCleaner
+
+type ResourceCleaner interface {
+	CleanUp(pullInfo jobs.PullInfo)
+}
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
 
@@ -42,11 +50,13 @@ type PullCleaner interface {
 // PullClosedExecutor executes the tasks required to clean up a closed pull
 // request.
 type PullClosedExecutor struct {
-	Locker     locking.Locker
-	VCSClient  vcs.Client
-	WorkingDir WorkingDir
-	Logger     logging.SimpleLogging
-	DB         *db.BoltDB
+	Locker                   locking.Locker
+	VCSClient                vcs.Client
+	WorkingDir               WorkingDir
+	Logger                   logging.SimpleLogging
+	DB                       *db.BoltDB
+	PullClosedTemplate       PullCleanupTemplate
+	LogStreamResourceCleaner ResourceCleaner
 }
 
 type templatedProject struct {
@@ -59,8 +69,36 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 		"{{ range . }}\n" +
 		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
 
+type PullCleanupTemplate interface {
+	Execute(wr io.Writer, data interface{}) error
+}
+
+type PullClosedEventTemplate struct{}
+
+func (t *PullClosedEventTemplate) Execute(wr io.Writer, data interface{}) error {
+	return pullClosedTemplate.Execute(wr, data)
+}
+
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
+	pullStatus, err := p.DB.GetPullStatus(pull)
+	if err != nil {
+		// Log and continue to clean up other resources.
+		p.Logger.Err("retrieving pull status: %s", err)
+	}
+
+	if pullStatus != nil {
+		for _, project := range pullStatus.Projects {
+			jobContext := jobs.PullInfo{
+				PullNum:     pull.Num,
+				Repo:        pull.BaseRepo.Name,
+				Workspace:   project.Workspace,
+				ProjectName: project.ProjectName,
+			}
+			p.LogStreamResourceCleaner.CleanUp(jobContext)
+		}
+	}
+
 	if err := p.WorkingDir.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
@@ -88,7 +126,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return errors.Wrap(err, "rendering template for comment")
 	}
-	return p.VCSClient.CreateComment(repo, pull.Num, buf.String())
+	return p.VCSClient.CreateComment(repo, pull.Num, buf.String(), "")
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be

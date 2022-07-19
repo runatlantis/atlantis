@@ -1,0 +1,15 @@
+Ran Apply for project: `staging` dir: `.` workspace: `default`
+
+```diff
+null_resource.simple:
+null_resource.simple:
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = "staging"
+workspace = "default"
+
+```
+

@@ -4,9 +4,10 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockLockURLGenerator struct {
@@ -46,14 +47,14 @@ func (mock *MockLockURLGenerator) VerifyWasCalledOnce() *VerifierMockLockURLGene
 	}
 }
 
-func (mock *MockLockURLGenerator) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockLockURLGenerator {
+func (mock *MockLockURLGenerator) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockLockURLGenerator {
 	return &VerifierMockLockURLGenerator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockLockURLGenerator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockLockURLGenerator {
+func (mock *MockLockURLGenerator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockLockURLGenerator {
 	return &VerifierMockLockURLGenerator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -61,7 +62,7 @@ func (mock *MockLockURLGenerator) VerifyWasCalledInOrder(invocationCountMatcher 
 	}
 }
 
-func (mock *MockLockURLGenerator) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockLockURLGenerator {
+func (mock *MockLockURLGenerator) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockLockURLGenerator {
 	return &VerifierMockLockURLGenerator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -71,7 +72,7 @@ func (mock *MockLockURLGenerator) VerifyWasCalledEventually(invocationCountMatch
 
 type VerifierMockLockURLGenerator struct {
 	mock                   *MockLockURLGenerator
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -95,7 +96,7 @@ func (c *MockLockURLGenerator_GenerateLockURL_OngoingVerification) GetCapturedAr
 func (c *MockLockURLGenerator_GenerateLockURL_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}

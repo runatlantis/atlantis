@@ -2,21 +2,23 @@
 Atlantis needs to receive Webhooks from your Git host so that it can respond to pull request events.
 
 :::tip Prerequisites
-* You have created an [access credential](access-credentials.html)
-* You have created a [webhook secret](webhook-secrets.html)
-* You have [deployed](deployment.html) Atlantis and have a url for it
+* You have created an [access credential](access-credentials.md)
+* You have created a [webhook secret](webhook-secrets.md)
+* You have [deployed](deployment.md) Atlantis and have a url for it
 :::
 
 See the instructions for your specific provider below.
 [[toc]]
 
 ## GitHub/GitHub Enterprise
-You can install your webhook at the [organization](https://help.github.com/articles/differences-between-user-and-organization-accounts/) level, or for each individual repository.
+You can install your webhook at the [organization](https://docs.github.com/en/get-started/learning-about-github/types-of-github-accounts) level, or for each individual repository.
 
 ::: tip NOTE
 If only some of the repos in your organization are to be managed by Atlantis, then you
 may want to only install on specific repos for now.
 :::
+
+When authenticating as a Github App, Webhooks are automatically created and need no additional setup, beyond being installed to your organization/user account after creation. Refer to the [Github App setup](access-credentials.md#github-app) section for instructions on how to do so.
 
 If you're installing on the organization, navigate to your organization's page and click **Settings**.
 If installing on a single repository, navigate to the repository home page and click **Settings**.
@@ -39,7 +41,7 @@ If installing on a single repository, navigate to the repository home page and c
 
 ## GitLab
 If you're using GitLab, navigate to your project's home page in GitLab
-- Click **Settings > Integrations** in the sidebar
+- Click **Settings > Webooks** in the sidebar
 - set **URL** to `http://$URL/events` (or `https://$URL/events` if you're using SSL) where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
 - double-check you added `/events` to the end of your URL.
 - set **Secret Token** to the Webhook Secret you generated previously
@@ -80,9 +82,8 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - Double-check you added `/events` to the end of your URL.
 - Set **Secret** to the Webhook Secret you generated previously
   - **NOTE** If you're adding a webhook to multiple repositories, each repository will need to use the **same** secret.
-- Under **Repository** select **Push**
-- Under **Pull Request**, select: Opened, Modified, Merged, Declined, Deleted and Comment added
-- Click **Save**<img src="../guide/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;">
+- Under **Pull Request**, select: Opened, Source branch updated, Merged, Declined, Deleted and Comment added
+- Click **Save**<img src="../guide/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 600px;">
 - See [Next Steps](#next-steps)
 
 ## Azure DevOps
@@ -115,10 +116,8 @@ Repeat the process above until you have webhook subscriptions for the following 
 
 - See [Next Steps](#next-steps)
 
-## GitLab
-If you're using GitLab, navigate to your project's home page in GitLab
 ## Next Steps
 * To verify that Atlantis is receiving your webhooks, create a test pull request
-  to your repo. 
+  to your repo.
 * You should see the request show up in the Atlantis logs at an `INFO` level.
-* You'll now need to configure Atlantis to add your [Provider Credentials](provider-credentials.html)
+* You'll now need to configure Atlantis to add your [Provider Credentials](provider-credentials.md)

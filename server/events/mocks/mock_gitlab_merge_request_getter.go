@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	go_gitlab "github.com/xanzy/go-gitlab"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	go_gitlab "github.com/xanzy/go-gitlab"
 )
 
 type MockGitlabMergeRequestGetter struct {
@@ -51,14 +52,14 @@ func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledOnce() *VerifierMockGit
 	}
 }
 
-func (mock *MockGitlabMergeRequestGetter) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockGitlabMergeRequestGetter {
+func (mock *MockGitlabMergeRequestGetter) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockGitlabMergeRequestGetter {
 	return &VerifierMockGitlabMergeRequestGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGitlabMergeRequestGetter {
+func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGitlabMergeRequestGetter {
 	return &VerifierMockGitlabMergeRequestGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -66,7 +67,7 @@ func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledInOrder(invocationCount
 	}
 }
 
-func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockGitlabMergeRequestGetter {
+func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockGitlabMergeRequestGetter {
 	return &VerifierMockGitlabMergeRequestGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -76,7 +77,7 @@ func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledEventually(invocationCo
 
 type VerifierMockGitlabMergeRequestGetter struct {
 	mock                   *MockGitlabMergeRequestGetter
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -100,11 +101,11 @@ func (c *MockGitlabMergeRequestGetter_GetMergeRequest_OngoingVerification) GetCa
 func (c *MockGitlabMergeRequestGetter_GetMergeRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]int, len(params[1]))
+		_param1 = make([]int, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(int)
 		}

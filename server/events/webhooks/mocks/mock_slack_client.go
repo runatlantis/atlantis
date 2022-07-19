@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	webhooks "github.com/runatlantis/atlantis/server/events/webhooks"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	webhooks "github.com/runatlantis/atlantis/server/events/webhooks"
 )
 
 type MockSlackClient struct {
@@ -96,14 +97,14 @@ func (mock *MockSlackClient) VerifyWasCalledOnce() *VerifierMockSlackClient {
 	}
 }
 
-func (mock *MockSlackClient) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockSlackClient {
+func (mock *MockSlackClient) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockSlackClient {
 	return &VerifierMockSlackClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockSlackClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockSlackClient {
+func (mock *MockSlackClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockSlackClient {
 	return &VerifierMockSlackClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -111,7 +112,7 @@ func (mock *MockSlackClient) VerifyWasCalledInOrder(invocationCountMatcher pegom
 	}
 }
 
-func (mock *MockSlackClient) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockSlackClient {
+func (mock *MockSlackClient) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockSlackClient {
 	return &VerifierMockSlackClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -121,7 +122,7 @@ func (mock *MockSlackClient) VerifyWasCalledEventually(invocationCountMatcher pe
 
 type VerifierMockSlackClient struct {
 	mock                   *MockSlackClient
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -179,7 +180,7 @@ func (c *MockSlackClient_ChannelExists_OngoingVerification) GetCapturedArguments
 func (c *MockSlackClient_ChannelExists_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
@@ -206,11 +207,11 @@ func (c *MockSlackClient_PostMessage_OngoingVerification) GetCapturedArguments()
 func (c *MockSlackClient_PostMessage_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []webhooks.ApplyResult) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]webhooks.ApplyResult, len(params[1]))
+		_param1 = make([]webhooks.ApplyResult, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(webhooks.ApplyResult)
 		}

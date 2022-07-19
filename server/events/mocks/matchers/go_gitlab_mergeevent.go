@@ -2,9 +2,11 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
-	go_gitlab "github.com/xanzy/go-gitlab"
 	"reflect"
+
+	"github.com/petergtz/pegomock"
+
+	go_gitlab "github.com/xanzy/go-gitlab"
 )
 
 func AnyGoGitlabMergeEvent() go_gitlab.MergeEvent {
@@ -15,6 +17,18 @@ func AnyGoGitlabMergeEvent() go_gitlab.MergeEvent {
 
 func EqGoGitlabMergeEvent(value go_gitlab.MergeEvent) go_gitlab.MergeEvent {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue go_gitlab.MergeEvent
+	return nullValue
+}
+
+func NotEqGoGitlabMergeEvent(value go_gitlab.MergeEvent) go_gitlab.MergeEvent {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue go_gitlab.MergeEvent
+	return nullValue
+}
+
+func GoGitlabMergeEventThat(matcher pegomock.ArgumentMatcher) go_gitlab.MergeEvent {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue go_gitlab.MergeEvent
 	return nullValue
 }

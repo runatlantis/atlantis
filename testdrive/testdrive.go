@@ -18,7 +18,6 @@ package testdrive
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -30,7 +29,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v31/github"
 	"github.com/mitchellh/colorstring"
 	"github.com/pkg/errors"
 )
@@ -98,7 +97,7 @@ To continue, we need you to create a GitHub personal access token
 with [green]"repo" [reset]scope so we can fork an example terraform project.
 
 Follow these instructions to create a token (we don't store any tokens):
-[green]https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token[reset]
+[green]https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token[reset]
 - use "atlantis" for the token description
 - add "repo" scope
 - copy the access token
@@ -125,7 +124,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	colorstring.Println("[green]=> fork completed![reset]")
 
 	// Detect terraform and install it if not installed.
-	_, err := exec.LookPath("terraform")
+	terraformPath, err := exec.LookPath("terraform")
 	if err != nil {
 		colorstring.Println("[yellow]=> terraform not found in $PATH.[reset]")
 		colorstring.Println("=> downloading terraform ")
@@ -143,18 +142,25 @@ Follow these instructions to create a token (we don't store any tokens):
 		}
 		colorstring.Println("[green]=> installed terraform successfully at /usr/local/bin[reset]")
 	} else {
-		colorstring.Println("[green]=> terraform found in $PATH![reset]")
+		colorstring.Printf("[green]=> terraform found in $PATH at %s\n[reset]", terraformPath)
 	}
 
-	// Download ngrok.
-	colorstring.Println("=> downloading ngrok  ")
-	s.Start()
-	ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
-	if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
-		return errors.Wrapf(err, "downloading and unzipping ngrok")
+	// Detect ngrok and install it if not installed
+	ngrokPath, ngrokErr := exec.LookPath("ngrok")
+	if ngrokErr != nil {
+		colorstring.Println("[yellow]=> ngrok not found in $PATH.[reset]")
+		colorstring.Println("=> downloading ngrok")
+		s.Start()
+		ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
+		if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
+			return errors.Wrapf(err, "downloading and unzipping ngrok")
+		}
+		s.Stop()
+		colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
+		ngrokPath = "/tmp/ngrok"
+	} else {
+		colorstring.Printf("[green]=> ngrok found in $PATH at %s\n[reset]", ngrokPath)
 	}
-	s.Stop()
-	colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
 
 	// Create ngrok tunnel.
 	colorstring.Println("=> creating secure tunnel")
@@ -173,11 +179,11 @@ tunnels:
     proto: http
 `, ngrokAPIURL, atlantisPort)
 
-	ngrokConfigFile, err := ioutil.TempFile("", "")
+	ngrokConfigFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "creating ngrok config file")
 	}
-	err = ioutil.WriteFile(ngrokConfigFile.Name(), []byte(ngrokConfig), 0600)
+	err = os.WriteFile(ngrokConfigFile.Name(), []byte(ngrokConfig), 0600)
 	if err != nil {
 		return errors.Wrap(err, "writing ngrok config file")
 	}
@@ -189,7 +195,7 @@ tunnels:
 	tunnelReadyLog := regexp.MustCompile("client session established")
 	tunnelTimeout := 20 * time.Second
 	cancelNgrok, ngrokErrors, err := execAndWaitForStderr(&wg, tunnelReadyLog, tunnelTimeout,
-		"/tmp/ngrok", "start", "atlantis", "--config", ngrokConfigFile.Name(), "--log", "stderr", "--log-format", "term")
+		ngrokPath, "start", "atlantis", "--config", ngrokConfigFile.Name(), "--log", "stderr", "--log-format", "term")
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	if err != nil {
 		s.Stop()
@@ -211,7 +217,7 @@ tunnels:
 	// Start atlantis server.
 	colorstring.Println("=> starting atlantis server")
 	s.Start()
-	tmpDir, err := ioutil.TempDir("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "creating a temporary data directory for Atlantis")
 	}
@@ -219,7 +225,7 @@ tunnels:
 	serverReadyLog := regexp.MustCompile("Atlantis started - listening on port 4141")
 	serverReadyTimeout := 5 * time.Second
 	cancelAtlantis, atlantisErrors, err := execAndWaitForStderr(&wg, serverReadyLog, serverReadyTimeout,
-		os.Args[0], "server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", tmpDir, "--atlantis-url", tunnelURL, "--repo-whitelist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo))
+		os.Args[0], "server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", tmpDir, "--atlantis-url", tunnelURL, "--repo-allowlist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo))
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	if err != nil {
 		return errors.Wrap(err, "creating atlantis server")

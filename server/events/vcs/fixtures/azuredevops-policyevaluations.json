@@ -1,0 +1,17 @@
+{
+    "value": [
+        {
+            "configuration": {
+                "isDeleted": false,
+                "isEnabled": true,
+                "isBlocking": true,
+                "settings": {
+                    "statusGenre": "Atlantis Bot/atlantis",
+                    "statusName": "plan"
+                }
+            },
+            "status": "approved"
+        }
+    ],
+    "count": 1
+}

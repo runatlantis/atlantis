@@ -2,20 +2,22 @@ package events_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -117,6 +119,9 @@ projects:
 		},
 	}
 
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -126,27 +131,44 @@ projects:
 			defer cleanup()
 
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
-			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker:  events.NewDefaultWorkingDirLocker(),
-				WorkingDir:        workingDir,
-				ParserValidator:   &yaml.ParserValidator{},
-				VCSClient:         vcsClient,
-				ProjectFinder:     &events.DefaultProjectFinder{},
-				PendingPlanFinder: &events.DefaultPendingPlanFinder{},
-				CommentBuilder:    &events.CommentParser{},
-				GlobalCfg:         valid.NewGlobalCfg(false, false, false),
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  false,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
 			}
 
-			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
-				PullMergeable: true,
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{},
+				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				scope,
+				logger,
+			)
+
+			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
+				PullRequestStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Log:   logger,
+				Scope: scope,
 			})
 			Ok(t, err)
 			Equals(t, len(c.exp), len(ctxs))
@@ -163,22 +185,24 @@ projects:
 // Test building a plan and apply command for one project.
 func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) {
 	cases := []struct {
-		Description    string
-		AtlantisYAML   string
-		Cmd            events.CommentCommand
-		ExpCommentArgs []string
-		ExpWorkspace   string
-		ExpDir         string
-		ExpProjectName string
-		ExpErr         string
-		ExpApplyReqs   []string
+		Description      string
+		AtlantisYAML     string
+		Cmd              events.CommentCommand
+		ExpCommentArgs   []string
+		ExpWorkspace     string
+		ExpDir           string
+		ExpProjectName   string
+		ExpErr           string
+		ExpApplyReqs     []string
+		ExpParallelApply bool
+		ExpParallelPlan  bool
 	}{
 		{
 			Description: "no atlantis.yaml",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      []string{"commentarg"},
-				Name:       models.PlanCommand,
+				Name:       command.Plan,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML:   "",
@@ -191,7 +215,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 			Description: "no atlantis.yaml with project flag",
 			Cmd: events.CommentCommand{
 				RepoRelDir:  ".",
-				Name:        models.PlanCommand,
+				Name:        command.Plan,
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: "",
@@ -201,7 +225,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 			Description: "simple atlantis.yaml",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
-				Name:       models.PlanCommand,
+				Name:       command.Plan,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
@@ -218,7 +242,7 @@ projects:
 			Description: "atlantis.yaml wrong dir",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
-				Name:       models.PlanCommand,
+				Name:       command.Plan,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
@@ -235,7 +259,7 @@ projects:
 			Description: "atlantis.yaml wrong workspace",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
-				Name:       models.PlanCommand,
+				Name:       command.Plan,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
@@ -249,7 +273,7 @@ projects:
 		{
 			Description: "atlantis.yaml with projectname",
 			Cmd: events.CommentCommand{
-				Name:        models.PlanCommand,
+				Name:        command.Plan,
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: `
@@ -267,7 +291,7 @@ projects:
 		{
 			Description: "atlantis.yaml with mergeable apply requirement",
 			Cmd: events.CommentCommand{
-				Name:        models.PlanCommand,
+				Name:        command.Plan,
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: `
@@ -285,7 +309,7 @@ projects:
 		{
 			Description: "atlantis.yaml with mergeable and approved apply requirements",
 			Cmd: events.CommentCommand{
-				Name:        models.PlanCommand,
+				Name:        command.Plan,
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: `
@@ -303,7 +327,7 @@ projects:
 		{
 			Description: "atlantis.yaml with multiple dir/workspaces matching",
 			Cmd: events.CommentCommand{
-				Name:       models.PlanCommand,
+				Name:       command.Plan,
 				RepoRelDir: ".",
 				Workspace:  "myworkspace",
 			},
@@ -323,7 +347,7 @@ projects:
 		{
 			Description: "atlantis.yaml with project flag not matching",
 			Cmd: events.CommentCommand{
-				Name:        models.PlanCommand,
+				Name:        command.Plan,
 				RepoRelDir:  ".",
 				Workspace:   "default",
 				ProjectName: "notconfigured",
@@ -335,11 +359,37 @@ projects:
 `,
 			ExpErr: "no project with name \"notconfigured\" is defined in atlantis.yaml",
 		},
+		{
+			Description: "atlantis.yaml with ParallelPlan Set to true",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				RepoRelDir:  ".",
+				Workspace:   "default",
+				ProjectName: "myproject",
+			},
+			AtlantisYAML: `
+version: 3
+parallel_plan: true
+projects:
+- name: myproject
+  dir: .
+  workspace: myworkspace
+`,
+			ExpParallelPlan:  true,
+			ExpParallelApply: false,
+			ExpDir:           ".",
+			ExpWorkspace:     "myworkspace",
+			ExpProjectName:   "myproject",
+			ExpApplyReqs:     []string{},
+		},
 	}
+
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	for _, c := range cases {
 		// NOTE: we're testing both plan and apply here.
-		for _, cmdName := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
+		for _, cmdName := range []command.Name{command.Plan, command.Apply} {
 			t.Run(c.Description+"_"+cmdName.String(), func(t *testing.T) {
 				RegisterMockTestingT(t)
 				tmpDir, cleanup := DirStructure(t, map[string]interface{}{
@@ -348,31 +398,48 @@ projects:
 				defer cleanup()
 
 				workingDir := mocks.NewMockWorkingDir()
-				When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
+				When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
 				When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
 				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 				if c.AtlantisYAML != "" {
-					err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+					err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 					Ok(t, err)
 				}
 
-				builder := &events.DefaultProjectCommandBuilder{
-					WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-					WorkingDir:       workingDir,
-					ParserValidator:  &yaml.ParserValidator{},
-					VCSClient:        vcsClient,
-					ProjectFinder:    &events.DefaultProjectFinder{},
-					CommentBuilder:   &events.CommentParser{},
-					GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+				globalCfgArgs := valid.GlobalCfgArgs{
+					AllowRepoCfg:  true,
+					MergeableReq:  false,
+					ApprovedReq:   false,
+					UnDivergedReq: false,
 				}
 
-				var actCtxs []models.ProjectCommandContext
+				builder := events.NewProjectCommandBuilder(
+					false,
+					&config.ParserValidator{},
+					&events.DefaultProjectFinder{},
+					vcsClient,
+					workingDir,
+					events.NewDefaultWorkingDirLocker(),
+					valid.NewGlobalCfgFromArgs(globalCfgArgs),
+					&events.DefaultPendingPlanFinder{},
+					&events.CommentParser{},
+					false,
+					true,
+					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+					scope,
+					logger,
+				)
+
+				var actCtxs []command.ProjectContext
 				var err error
-				if cmdName == models.PlanCommand {
-					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &c.Cmd)
+				if cmdName == command.Plan {
+					actCtxs, err = builder.BuildPlanCommands(&command.Context{
+						Log:   logger,
+						Scope: scope,
+					}, &c.Cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{}, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope}, &c.Cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -387,6 +454,8 @@ projects:
 				Equals(t, c.ExpCommentArgs, actCtx.EscapedCommentArgs)
 				Equals(t, c.ExpProjectName, actCtx.ProjectName)
 				Equals(t, c.ExpApplyReqs, actCtx.ApplyRequirements)
+				Equals(t, c.ExpParallelApply, actCtx.ParallelApplyEnabled)
+				Equals(t, c.ExpParallelPlan, actCtx.ParallelPlanEnabled)
 			})
 		}
 	}
@@ -474,6 +543,9 @@ projects:
 			},
 		},
 	}
+
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -481,31 +553,48 @@ projects:
 			defer cleanup()
 
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
 			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
-			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-				WorkingDir:       workingDir,
-				ParserValidator:  &yaml.ParserValidator{},
-				VCSClient:        vcsClient,
-				ProjectFinder:    &events.DefaultProjectFinder{},
-				CommentBuilder:   &events.CommentParser{},
-				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
 			}
 
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{},
+				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				scope,
+				logger,
+			)
+
 			ctxs, err := builder.BuildPlanCommands(
-				&events.CommandContext{},
+				&command.Context{
+					Log:   logger,
+					Scope: scope,
+				},
 				&events.CommentCommand{
 					RepoRelDir:  "",
 					Flags:       nil,
-					Name:        models.PlanCommand,
+					Name:        command.Plan,
 					Verbose:     false,
 					Workspace:   "",
 					ProjectName: "",
@@ -561,23 +650,42 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		matchers.AnyModelsPullRequest())).
 		ThenReturn(tmpDir, nil)
 
-	builder := &events.DefaultProjectCommandBuilder{
-		WorkingDirLocker:  events.NewDefaultWorkingDirLocker(),
-		WorkingDir:        workingDir,
-		ParserValidator:   &yaml.ParserValidator{},
-		VCSClient:         nil,
-		ProjectFinder:     &events.DefaultProjectFinder{},
-		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
-		CommentBuilder:    &events.CommentParser{},
-		GlobalCfg:         valid.NewGlobalCfg(false, false, false),
+	logger := logging.NewNoopLogger(t)
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  false,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
 	}
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		false,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		scope,
+		logger,
+	)
 
 	ctxs, err := builder.BuildApplyCommands(
-		&events.CommandContext{},
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
 			Flags:       nil,
-			Name:        models.ApplyCommand,
+			Name:        command.Apply,
 			Verbose:     false,
 			Workspace:   "",
 			ProjectName: "",
@@ -615,41 +723,56 @@ projects:
 - dir: .
   workspace: staging
 `
-	err := ioutil.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	err := os.WriteFile(filepath.Join(repoDir, config.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
 	Ok(t, err)
 
 	When(workingDir.Clone(
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		matchers.AnyModelsRepo(),
-		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		AnyString())).ThenReturn(repoDir, nil)
+		AnyString())).ThenReturn(repoDir, false, nil)
 	When(workingDir.GetWorkingDir(
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString())).ThenReturn(repoDir, nil)
 
-	builder := &events.DefaultProjectCommandBuilder{
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-		WorkingDir:       workingDir,
-		ParserValidator:  &yaml.ParserValidator{},
-		VCSClient:        nil,
-		ProjectFinder:    &events.DefaultProjectFinder{},
-		CommentBuilder:   &events.CommentParser{},
-		GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  true,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
 	}
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
-	ctx := &events.CommandContext{
-		BaseRepo: models.Repo{},
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		false,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		scope,
+		logger,
+	)
+
+	ctx := &command.Context{
 		HeadRepo: models.Repo{},
 		Pull:     models.PullRequest{},
 		User:     models.User{},
-		Log:      logging.NewNoopLogger(),
+		Log:      logger,
+		Scope:    scope,
 	}
 	_, err = builder.BuildPlanCommands(ctx, &events.CommentCommand{
 		RepoRelDir:  ".",
 		Flags:       nil,
-		Name:        models.PlanCommand,
+		Name:        command.Plan,
 		Verbose:     false,
 		Workspace:   "notconfigured",
 		ProjectName: "",
@@ -677,6 +800,9 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 		},
 	}
 
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
 	for _, c := range cases {
 		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -686,27 +812,44 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			defer cleanup()
 
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
 			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 
-			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-				WorkingDir:       workingDir,
-				ParserValidator:  &yaml.ParserValidator{},
-				VCSClient:        vcsClient,
-				ProjectFinder:    &events.DefaultProjectFinder{},
-				CommentBuilder:   &events.CommentParser{},
-				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
 			}
 
-			var actCtxs []models.ProjectCommandContext
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{},
+				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				scope,
+				logger,
+			)
+
+			var actCtxs []command.ProjectContext
 			var err error
-			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &events.CommentCommand{
+			actCtxs, err = builder.BuildPlanCommands(&command.Context{
+				Log:   logger,
+				Scope: scope,
+			}, &events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
-				Name:       models.PlanCommand,
+				Name:       command.Plan,
 				Verbose:    false,
 				Workspace:  "default",
 			})
@@ -783,7 +926,7 @@ projects:
 			"project1": map[string]interface{}{
 				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
 			},
-			yaml.AtlantisYAMLFilename: atlantisYamlContent,
+			config.AtlantisYAMLFilename: atlantisYamlContent,
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
 		Exp: map[string][]int{
@@ -796,7 +939,7 @@ projects:
 			"project1": map[string]interface{}{
 				"main.tf": nil,
 			},
-			yaml.AtlantisYAMLFilename: atlantisYamlContent,
+			config.AtlantisYAMLFilename: atlantisYamlContent,
 		},
 		ModifiedFiles: []string{"project1/main.tf"},
 		Exp: map[string][]int{
@@ -832,6 +975,9 @@ projects:
 		},
 	}
 
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -846,31 +992,47 @@ projects:
 			When(workingDir.Clone(
 				matchers.AnyPtrToLoggingSimpleLogger(),
 				matchers.AnyModelsRepo(),
-				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
-				AnyString())).ThenReturn(tmpDir, nil)
+				AnyString())).ThenReturn(tmpDir, false, nil)
 
 			When(workingDir.GetWorkingDir(
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
 				AnyString())).ThenReturn(tmpDir, nil)
 
-			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-				WorkingDir:       workingDir,
-				VCSClient:        vcsClient,
-				ParserValidator:  &yaml.ParserValidator{},
-				ProjectFinder:    &events.DefaultProjectFinder{},
-				CommentBuilder:   &events.CommentParser{},
-				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
 			}
 
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{},
+				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				scope,
+				logger,
+			)
+
 			actCtxs, err := builder.BuildPlanCommands(
-				&events.CommandContext{},
+				&command.Context{
+					Log:   logger,
+					Scope: scope,
+				},
 				&events.CommentCommand{
 					RepoRelDir: "",
 					Flags:      nil,
-					Name:       models.PlanCommand,
+					Name:       command.Plan,
 					Verbose:    false,
 				})
 
@@ -886,4 +1048,210 @@ projects:
 			}
 		})
 	}
+}
+
+// Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
+func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
+	atlantisYAML := `
+version: 3
+projects:
+- dir: dir1`
+
+	RegisterMockTestingT(t)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+	When(vcsClient.SupportsSingleFileDownload(matchers.AnyModelsRepo())).ThenReturn(true)
+	When(vcsClient.DownloadRepoConfigFile(matchers.AnyModelsPullRequest())).ThenReturn(true, []byte(atlantisYAML), nil)
+	workingDir := mocks.NewMockWorkingDir()
+
+	logger := logging.NewNoopLogger(t)
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  true,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		true,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		scope,
+		logger,
+	)
+
+	var actCtxs []command.ProjectContext
+	var err error
+	actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
+		HeadRepo: models.Repo{},
+		Pull:     models.PullRequest{},
+		User:     models.User{},
+		Log:      logger,
+		Scope:    scope,
+		PullRequestStatus: models.PullReqStatus{
+			Mergeable: true,
+		},
+	})
+	Ok(t, err)
+	Equals(t, 0, len(actCtxs))
+	workingDir.VerifyWasCalled(Never()).Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())
+}
+
+func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanCommand(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"main.tf": nil,
+	})
+	defer cleanup()
+
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  false,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+
+	builder := events.NewProjectCommandBuilder(
+		true,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		false,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		scope,
+		logger,
+	)
+
+	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
+		PullRequestStatus: models.PullReqStatus{
+			Mergeable: true,
+		},
+		Log:   logger,
+		Scope: scope,
+	})
+
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	planCtx := ctxs[0]
+	policyCheckCtx := ctxs[1]
+	Equals(t, command.Plan, planCtx.CommandName)
+	Equals(t, globalCfg.Workflows["default"].Plan.Steps, planCtx.Steps)
+	Equals(t, command.PolicyCheck, policyCheckCtx.CommandName)
+	Equals(t, globalCfg.Workflows["default"].PolicyCheck.Steps, policyCheckCtx.Steps)
+}
+
+// Test building version command for multiple projects
+func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"workspace1": map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+		},
+		"workspace2": map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+		},
+	})
+	defer cleanup()
+	// Initialize git repos in each workspace so that the .tfplan files get
+	// picked up.
+	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest())).
+		ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  false,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		false,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		scope,
+		logger,
+	)
+
+	ctxs, err := builder.BuildVersionCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Version,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 4, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "workspace1", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "workspace1", ctxs[1].Workspace)
+	Equals(t, "project1", ctxs[2].RepoRelDir)
+	Equals(t, "workspace2", ctxs[2].Workspace)
+	Equals(t, "project2", ctxs[3].RepoRelDir)
+	Equals(t, "workspace2", ctxs[3].Workspace)
 }

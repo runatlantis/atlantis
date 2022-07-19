@@ -2,9 +2,11 @@
 package matchers
 
 import (
-	github "github.com/google/go-github/v28/github"
-	"github.com/petergtz/pegomock"
 	"reflect"
+
+	"github.com/petergtz/pegomock"
+
+	github "github.com/google/go-github/v31/github"
 )
 
 func AnyPtrToGithubRepository() *github.Repository {
@@ -15,6 +17,18 @@ func AnyPtrToGithubRepository() *github.Repository {
 
 func EqPtrToGithubRepository(value *github.Repository) *github.Repository {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue *github.Repository
+	return nullValue
+}
+
+func NotEqPtrToGithubRepository(value *github.Repository) *github.Repository {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *github.Repository
+	return nullValue
+}
+
+func PtrToGithubRepositoryThat(matcher pegomock.ArgumentMatcher) *github.Repository {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue *github.Repository
 	return nullValue
 }

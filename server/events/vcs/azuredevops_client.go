@@ -17,12 +17,13 @@ import (
 
 // AzureDevopsClient represents an Azure DevOps VCS client
 type AzureDevopsClient struct {
-	Client *azuredevops.Client
-	ctx    context.Context
+	Client   *azuredevops.Client
+	ctx      context.Context
+	UserName string
 }
 
 // NewAzureDevopsClient returns a valid Azure DevOps client.
-func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, error) {
+func NewAzureDevopsClient(hostname string, userName string, token string) (*AzureDevopsClient, error) {
 	tp := azuredevops.BasicAuthTransport{
 		Username: "",
 		Password: strings.TrimSpace(token),
@@ -44,8 +45,9 @@ func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, er
 	}
 
 	client := &AzureDevopsClient{
-		Client: adClient,
-		ctx:    context.Background(),
+		Client:   adClient,
+		UserName: userName,
+		ctx:      context.Background(),
 	}
 
 	return client, nil
@@ -56,15 +58,19 @@ func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, er
 func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
-	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
-	commitIDResponse, _, _ := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
+	pullRequest, _, _ := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 
-	commitID := commitIDResponse.GetLastMergeSourceCommit().GetCommitID()
+	targetRefName := strings.Replace(pullRequest.GetTargetRefName(), "refs/heads/", "", 1)
+	sourceRefName := strings.Replace(pullRequest.GetSourceRefName(), "refs/heads/", "", 1)
 
-	r, _, _ := g.Client.Git.GetChanges(g.ctx, owner, project, repoName, commitID)
+	r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName)
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
+	}
 
 	for _, change := range r.Changes {
 		item := change.GetItem()
@@ -89,7 +95,7 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 //
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
@@ -98,18 +104,18 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	// maxCommentLength is the maximum number of chars allowed in a single comment
 	// This length was copied from the Github client - haven't found documentation
 	// or tested limit in Azure DevOps.
-	const maxCommentLength = 65536
+	const maxCommentLength = 150000
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
-	for _, c := range comments {
+	for i := range comments {
 		commentType := "text"
 		parentCommentID := 0
 
 		prComment := azuredevops.Comment{
 			CommentType:     &commentType,
-			Content:         &c,
+			Content:         &comments[i],
 			ParentCommentID: &parentCommentID,
 		}
 		prComments := []*azuredevops.Comment{&prComment}
@@ -124,43 +130,91 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	return nil
 }
 
-// PullIsApproved returns true if the merge request was approved.
+func (g *AzureDevopsClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	return nil
+}
+
+// PullIsApproved returns true if the merge request was approved by another reviewer.
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
-func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
-	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
-		return false, errors.Wrap(err, "getting pull request")
+		return approvalStatus, errors.Wrap(err, "getting pull request")
 	}
+
 	for _, review := range adPull.Reviewers {
 		if review == nil {
 			continue
 		}
-		if review.GetVote() == azuredevops.VoteApproved {
-			return true, nil
+
+		if review.IdentityRef.GetUniqueName() == adPull.GetCreatedBy().GetUniqueName() {
+			continue
+		}
+
+		if review.GetVote() == azuredevops.VoteApproved || review.GetVote() == azuredevops.VoteApprovedWithSuggestions {
+			return models.ApprovalStatus{
+				IsApproved: true,
+			}, nil
 		}
 	}
-	return false, nil
+
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
-	opts := azuredevops.PullRequestGetOptions{
-		IncludeWorkItemRefs: true,
-	}
+func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+
+	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
 	}
-	if *adPull.MergeStatus != azuredevops.MergeConflicts.String() &&
-		*adPull.MergeStatus != azuredevops.MergeRejectedByPolicy.String() {
-		return true, nil
+
+	if *adPull.MergeStatus != azuredevops.MergeSucceeded.String() {
+		return false, nil
 	}
-	return false, nil
+
+	if *adPull.IsDraft {
+		return false, nil
+	}
+
+	if *adPull.Status != azuredevops.PullActive.String() {
+		return false, nil
+	}
+
+	projectID := *adPull.Repository.Project.ID
+	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, pull.Num)
+	policyEvaluations, _, err := g.Client.PolicyEvaluations.List(g.ctx, owner, project, artifactID, &azuredevops.PolicyEvaluationsListOptions{})
+	if err != nil {
+		return false, errors.Wrap(err, "getting policy evaluations")
+	}
+
+	for _, policyEvaluation := range policyEvaluations {
+		if !*policyEvaluation.Configuration.IsEnabled || *policyEvaluation.Configuration.IsDeleted {
+			continue
+		}
+
+		// Ignore the Atlantis status, even if its set as a blocker.
+		// This status should not be considered when evaluating if the pull request can be applied.
+		settings := (policyEvaluation.Configuration.Settings).(map[string]interface{})
+		if genre, ok := settings["statusGenre"]; ok && genre == "Atlantis Bot/atlantis" {
+			if name, ok := settings["statusName"]; ok && name == "apply" {
+				continue
+			}
+		}
+
+		if *policyEvaluation.Configuration.IsBlocking && *policyEvaluation.Status != azuredevops.PolicyEvaluationApproved {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // GetPullRequest returns the pull request.
@@ -185,12 +239,8 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 		adState = azuredevops.GitFailed.String()
 	}
 
-	genreStr := "Atlantis Bot"
 	status := azuredevops.GitPullRequestStatus{}
-	status.Context = &azuredevops.GitStatusContext{
-		Name:  &src,
-		Genre: &genreStr,
-	}
+	status.Context = GitStatusContextFromSrc(src)
 	status.Description = &description
 	status.State = &adState
 	if url != "" {
@@ -244,13 +294,22 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 // If the user has set a branch policy that disallows no fast-forward, the merge will fail
 // until we handle branch policies
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
-func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
+func (g *AzureDevopsClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 	descriptor := "Atlantis Terraform Pull Request Automation"
-	i := "atlantis"
+
+	userID, err := g.Client.UserEntitlements.GetUserID(g.ctx, g.UserName, owner)
+	if err != nil {
+		return errors.Wrapf(err, "Getting user id failed. User name: %s Organization %s ", g.UserName, owner)
+	}
+	if userID == nil {
+		return fmt.Errorf("the user %s is not found in the organization %s", g.UserName, owner)
+	}
+
 	imageURL := "https://github.com/runatlantis/atlantis/raw/master/runatlantis.io/.vuepress/public/hero.png"
 	id := azuredevops.IdentityRef{
 		Descriptor: &descriptor,
-		ID:         &i,
+		ID:         userID,
 		ImageURL:   &imageURL,
 	}
 	// Set default pull request completion options
@@ -260,7 +319,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	completionOpts := azuredevops.GitPullRequestCompletionOptions{
 		BypassPolicy:            new(bool),
 		BypassReason:            azuredevops.String(""),
-		DeleteSourceBranch:      new(bool),
+		DeleteSourceBranch:      &pullOptions.DeleteSourceBranchOnMerge,
 		MergeCommitMessage:      azuredevops.String(common.AutomergeCommitMsg),
 		MergeStrategy:           &mcm,
 		SquashMerge:             new(bool),
@@ -273,7 +332,6 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	mergePull.AutoCompleteSetBy = &id
 	mergePull.CompletionOptions = &completionOpts
 
-	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 	mergeResult, _, err := g.Client.PullRequests.Merge(
 		g.ctx,
 		owner,
@@ -291,6 +349,11 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMergeFailureMessage())
 	}
 	return nil
+}
+
+// MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
+func (g *AzureDevopsClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return fmt.Sprintf("!%d", pull.Num), nil
 }
 
 // SplitAzureDevopsRepoFullName splits a repo full name up into its owner,
@@ -314,6 +377,38 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 			repoFullName[lastSlashIdx+1:]
 	}
 	return repoFullName[:lastSlashIdx], "", repoFullName[lastSlashIdx+1:]
+}
+
+// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
+func (g *AzureDevopsClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	return nil, nil
+}
+
+func (g *AzureDevopsClient) SupportsSingleFileDownload(repo models.Repo) bool {
+	return false
+}
+
+func (g *AzureDevopsClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+	return false, []byte{}, fmt.Errorf("Not Implemented")
+}
+
+// GitStatusContextFromSrc parses an Atlantis formatted src string into a context suitable
+// for the status update API. In the AzureDevops branch policy UI there is a single string
+// field used to drive these contexts where all text preceding the final '/' character is
+// treated as the 'genre'.
+func GitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
+	lastSlashIdx := strings.LastIndex(src, "/")
+	genre := "Atlantis Bot"
+	name := src
+	if lastSlashIdx != -1 {
+		genre = fmt.Sprintf("%s/%s", genre, src[:lastSlashIdx])
+		name = src[lastSlashIdx+1:]
+	}
+
+	return &azuredevops.GitStatusContext{
+		Name:  &name,
+		Genre: &genre,
+	}
 }
 
 func (g *AzureDevopsClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {

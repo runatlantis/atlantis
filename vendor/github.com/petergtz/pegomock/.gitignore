@@ -1,9 +1,0 @@
-mock_display_test.go
-matchers
-debug.test
-.vscode
-*.coverprofile
-.idea
-*.iml
-dist
-pegomock/pegomock

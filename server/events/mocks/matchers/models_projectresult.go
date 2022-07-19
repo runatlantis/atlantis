@@ -3,18 +3,31 @@ package matchers
 
 import (
 	"reflect"
+
 	"github.com/petergtz/pegomock"
-	models "github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
-func AnyModelsProjectResult() models.ProjectResult {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(models.ProjectResult))(nil)).Elem()))
-	var nullValue models.ProjectResult
+func AnyModelsProjectResult() command.ProjectResult {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(command.ProjectResult))(nil)).Elem()))
+	var nullValue command.ProjectResult
 	return nullValue
 }
 
-func EqModelsProjectResult(value models.ProjectResult) models.ProjectResult {
+func EqModelsProjectResult(value command.ProjectResult) command.ProjectResult {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue models.ProjectResult
+	var nullValue command.ProjectResult
+	return nullValue
+}
+
+func NotEqModelsProjectResult(value command.ProjectResult) command.ProjectResult {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue command.ProjectResult
+	return nullValue
+}
+
+func ModelsProjectResultThat(matcher pegomock.ArgumentMatcher) command.ProjectResult {
+	pegomock.RegisterMatcher(matcher)
+	var nullValue command.ProjectResult
 	return nullValue
 }

@@ -16,8 +16,9 @@ package events
 import (
 	"fmt"
 
-	"github.com/runatlantis/atlantis/server/events/locking"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -32,12 +33,13 @@ type ProjectLocker interface {
 	// The third return value is a function that can be called to unlock the
 	// lock. It will only be set if the lock was acquired. Any errors will set
 	// error.
-	TryLock(log *logging.SimpleLogger, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error)
+	TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error)
 }
 
 // DefaultProjectLocker implements ProjectLocker.
 type DefaultProjectLocker struct {
-	Locker locking.Locker
+	Locker    locking.Locker
+	VCSClient vcs.Client
 }
 
 // TryLockResponse is the result of trying to lock a project.
@@ -56,16 +58,20 @@ type TryLockResponse struct {
 }
 
 // TryLock implements ProjectLocker.TryLock.
-func (p *DefaultProjectLocker) TryLock(log *logging.SimpleLogger, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error) {
+func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error) {
 	lockAttempt, err := p.Locker.TryLock(project, workspace, pull, user)
 	if err != nil {
 		return nil, err
 	}
 	if !lockAttempt.LockAcquired && lockAttempt.CurrLock.Pull.Num != pull.Num {
+		link, err := p.VCSClient.MarkdownPullLink(lockAttempt.CurrLock.Pull)
+		if err != nil {
+			return nil, err
+		}
 		failureMsg := fmt.Sprintf(
-			"This project is currently locked by an unapplied plan from pull #%d. To continue, delete the lock from #%d or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
-			lockAttempt.CurrLock.Pull.Num,
-			lockAttempt.CurrLock.Pull.Num)
+			"This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+			link,
+			link)
 		return &TryLockResponse{
 			LockAcquired:      false,
 			LockFailureReason: failureMsg,

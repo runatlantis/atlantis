@@ -1,0 +1,11 @@
+Ran Apply for dir: `dir1` workspace: `default`
+
+```diff
+null_resource.automerge[0]: Creating...
+null_resource.automerge[0]: Creation complete after *s [id=*******************]
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+
+```
+

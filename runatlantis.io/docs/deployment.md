@@ -12,7 +12,7 @@ This page covers getting Atlantis up and running in your infrastructure.
 ### Runtime
 Atlantis is a simple [Go](https://golang.org/) app. It receives webhooks from
 your Git host and executes Terraform commands locally. There is an official
-Atlantis [Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
+Atlantis [Docker image](https://ghcr.io/runatlantis/atlantis).
 
 ### Routing
 Atlantis and your Git host need to be able to route and communicate with one another. Your Git host needs to be able to send webhooks to Atlantis and Atlantis needs to be able to make API calls to your Git host.
@@ -43,13 +43,17 @@ Pick your deployment type:
 
 
 ### Kubernetes Helm Chart
-Atlantis has an [official Helm chart](https://hub.kubeapps.com/charts/stable/atlantis).
+Atlantis has an [official Helm chart](https://github.com/runatlantis/helm-charts/tree/main/charts/atlantis)
 
 To install:
+1. Add the runatlantis helm chart repository to helm
+    ```bash
+    helm repo add runatlantis https://runatlantis.github.io/helm-charts
+    ```
 1. `cd` into a directory where you're going to configure your Atlantis Helm chart
 1. Create a `values.yaml` file by running
     ```bash
-    helm inspect values stable/atlantis > values.yaml
+    helm inspect values runatlantis/atlantis > values.yaml
     ```
 1. Edit `values.yaml` and add your access credentials and webhook secret
     ```yaml
@@ -63,16 +67,16 @@ To install:
     ```yaml
     orgWhitelist: github.com/runatlantis/*
     ```
-1. Configure any other variables (see [https://github.com/helm/charts/tree/master/stable/atlantis#customization](https://github.com/helm/charts/tree/master/stable/atlantis#customization)
+1. Configure any other variables (see [https://github.com/runatlantis/helm-charts#customization](https://github.com/runatlantis/helm-charts#customization)
     for documentation)
 1. Run
     ```sh
-    helm install atlantis stable/atlantis -f values.yaml
+    helm install atlantis runatlantis/atlantis -f values.yaml
     ```
-    
+
     If you are using helm v2, run:
     ```sh
-    helm install -f values.yaml stable/atlantis
+    helm install -f values.yaml runatlantis/atlantis
     ```
 
 
@@ -102,8 +106,8 @@ Next, edit the manifests below as follows:
 1. Replace `<VERSION>` in `image: runatlantis/atlantis:<VERSION>` with the most recent version from [https://github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest).
     * NOTE: You never want to run with `:latest` because if your Pod moves to a new node, Kubernetes will pull the latest image and you might end
 up upgrading Atlantis by accident!
-2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_WHITELIST` with the whitelist pattern
-for your Terraform repos. See [Repo Whitelist](server-configuration.html#repo-whitelist) for more details.
+2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_ALLOWLIST` with the allowlist pattern
+for your Terraform repos. See [Repo Allowlist](server-configuration.html#repo-allowlist) for more details.
 3. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
     2. Delete all the `ATLANTIS_GITLAB_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
@@ -147,8 +151,8 @@ spec:
       - name: atlantis
         image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
-        - name: ATLANTIS_REPO_WHITELIST
-          value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
+        - name: ATLANTIS_REPO_ALLOWLIST
+          value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
 
         ### GitHub Config ###
         - name: ATLANTIS_GH_USER
@@ -295,8 +299,8 @@ spec:
       - name: atlantis
         image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
-        - name: ATLANTIS_REPO_WHITELIST
-          value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
+        - name: ATLANTIS_REPO_ALLOWLIST
+          value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
 
         ### GitHub Config ###
         - name: ATLANTIS_GH_USER
@@ -451,8 +455,8 @@ patchesStrategicMerge:
  containers:
   - name: atlantis
     env:
-      - name: ATLANTIS_REPO_WHITELIST
-        value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
+      - name: ATLANTIS_REPO_ALLOWLIST
+        value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
 ```
 
 #### GitLab
@@ -520,7 +524,7 @@ OpenShift runs Docker images with random user id's that use `/` as their home di
 
 ### AWS Fargate
 If you'd like to run Atlantis on [AWS Fargate](https://aws.amazon.com/fargate/)
- check out the Atlantis module on the Terraform Module Registry: [https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws](https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws)
+ check out the Atlantis module on the [Terraform Module Registry](https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws/latest)
  and then check out the [Next Steps](#next-steps).
 
 ### Google Kubernetes Engine (GKE)
@@ -532,14 +536,14 @@ Cloud Storage Backend and TLS certs: [https://github.com/sethvargo/atlantis-on-g
 Once you're done, see [Next Steps](#next-steps).
 
 ### Docker
-Atlantis has an [official](https://hub.docker.com/r/runatlantis/atlantis/) Docker image: `runatlantis/atlantis`.
+Atlantis has an [official](https://ghcr.io/runatlantis/atlantis) Docker image: `ghcr.io/runatlantis/atlantis`.
 
 #### Customization
 If you need to modify the Docker image that we provide, for instance to add the terragrunt binary, you can do something like this:
 
 1. Create a custom docker file
     ```dockerfile
-    FROM runatlantis/atlantis:{latest version}
+    FROM ghcr.io/runatlantis/atlantis:{latest version}
 
     # copy a terraform binary of the version you need
     COPY terragrunt /usr/local/bin/terragrunt
@@ -563,7 +567,7 @@ Another option is [Azure Container Instances](https://docs.microsoft.com/en-us/a
 ### Roll Your Own
 If you want to roll your own Atlantis installation, you can get the `atlantis`
 binary from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
-or use the [official Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
+or use the [official Docker image](https://ghcr.io/runatlantis/atlantis).
 
 #### Startup Command
 The exact flags to `atlantis server` depends on your Git host:
@@ -575,7 +579,7 @@ atlantis server \
 --gh-user="$USERNAME" \
 --gh-token="$TOKEN" \
 --gh-webhook-secret="$SECRET" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### GitHub Enterprise
@@ -587,7 +591,7 @@ atlantis server \
 --gh-token="$TOKEN" \
 --gh-webhook-secret="$SECRET" \
 --gh-hostname="$HOSTNAME" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### GitLab
@@ -597,7 +601,7 @@ atlantis server \
 --gitlab-user="$USERNAME" \
 --gitlab-token="$TOKEN" \
 --gitlab-webhook-secret="$SECRET" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### GitLab Enterprise
@@ -609,7 +613,7 @@ atlantis server \
 --gitlab-token="$TOKEN" \
 --gitlab-webhook-secret="$SECRET" \
 --gitlab-hostname="$HOSTNAME" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### Bitbucket Cloud (bitbucket.org)
@@ -618,7 +622,7 @@ atlantis server \
 --atlantis-url="$URL" \
 --bitbucket-user="$USERNAME" \
 --bitbucket-token="$TOKEN" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### Bitbucket Server (aka Stash)
@@ -630,7 +634,7 @@ atlantis server \
 --bitbucket-token="$TOKEN" \
 --bitbucket-webhook-secret="$SECRET" \
 --bitbucket-base-url="$BASE_URL" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### Azure DevOps
@@ -644,7 +648,7 @@ atlantis server \
 --azuredevops-token="$TOKEN" \
 --azuredevops-webhook-user="$ATLANTIS_AZUREDEVOPS_WEBHOOK_USER" \
 --azuredevops-webhook-password="$ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 --ssl-cert-file=file.crt
 --ssl-key-file=file.key
 ```
@@ -662,9 +666,9 @@ Where
     you can specify it in a config file
      (see [Configuration](/docs/server-configuration.html#environment-variables))
       or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
-- `$REPO_WHITELIST` is which repos Atlantis can run on, ex.
+- `$REPO_ALLOWLIST` is which repos Atlantis can run on, ex.
  `github.com/runatlantis/*` or `github.enterprise.corp.com/*`.
-  See [Repo Whitelist](server-configuration.html#repo-whitelist) for more details.
+  See [Repo Allowlist](server-configuration.html#repo-allowlist) for more details.
 
 Atlantis is now running!
 ::: tip

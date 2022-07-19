@@ -24,9 +24,10 @@ type Client interface {
 	// GetModifiedFiles returns the names of files that were modified in the merge request
 	// relative to the repo root, e.g. parent/child/file.txt.
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
-	CreateComment(repo models.Repo, pullNum int, comment string) error
-	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
-	PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error)
+	CreateComment(repo models.Repo, pullNum int, comment string, command string) error
+	HidePrevCommandComments(repo models.Repo, pullNum int, command string) error
+	PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error)
+	PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error)
 	// UpdateStatus updates the commit status to state for pull. src is the
 	// source of this status. This should be relatively static across runs,
 	// ex. atlantis/plan or atlantis/apply.
@@ -35,6 +36,14 @@ type Client interface {
 	// url is an optional link that users should click on for more information
 	// about this status.
 	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error
-	MergePull(pull models.PullRequest) error
+	MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error
+	MarkdownPullLink(pull models.PullRequest) (string, error)
+	GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error)
+
+	// DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)
+	// The first return value indicate that repo contain atlantis.yaml or not
+	// if BaseRepo had one repo config file, its content will placed on the second return value
+	DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error)
+	SupportsSingleFileDownload(repo models.Repo) bool
 	GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error)
 }

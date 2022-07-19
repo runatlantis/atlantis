@@ -6,7 +6,7 @@ and Private Terraform Enterprise was renamed Terraform Enterprise.
 :::
 
 Atlantis integrates seamlessly with Terraform Cloud and Terraform Enterprise, whether you're using:
-* [Free Remote State Management](https://app.terraform.io/signup)
+* [Free Remote State Management](https://app.terraform.io)
 * Terraform Cloud Paid Tiers
 * A Private Installation of Terraform Enterprise
 
@@ -52,11 +52,14 @@ Using a **Team Token is recommended**, however you can also use a User Token.
 
 ### Team Token
 To generate a team token, click on **Settings** in the top bar, then **Teams** in
-the sidebar, then scroll down to **Team API Token**.
+the sidebar.
+Choose an existing team or create a new one.
+Enable the **Manage Workspaces** permission, then scroll down to **Team API Token**.
 
 ### User Token
 To generate a user token, click on your avatar, then **User Settings**, then
 **Tokens** in the sidebar.
+Ensure the **Manage Workspaces** permission is enabled for this user's team.
 
 ## Passing The Token To Atlantis
 The token can be passed to Atlantis via the `ATLANTIS_TFE_TOKEN` environment variable.
@@ -69,6 +72,10 @@ flag to its hostname.
 
 That's it! Atlantis should be able to perform Terraform operations using Terraform Cloud/Enterprise's
 remote state backend now.
+
+:::warning
+If you're using local execution mode for your workspaces, remember to set the
+`--tfe-local-execution-mode`. Otherwise you won't see the logs in Atlantis.
 
 :::warning
 The Terraform Cloud/Enterprise integration only works with the built-in

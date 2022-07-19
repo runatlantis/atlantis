@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
 type MockPullCleaner struct {
@@ -47,14 +48,14 @@ func (mock *MockPullCleaner) VerifyWasCalledOnce() *VerifierMockPullCleaner {
 	}
 }
 
-func (mock *MockPullCleaner) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockPullCleaner {
+func (mock *MockPullCleaner) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockPullCleaner {
 	return &VerifierMockPullCleaner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockPullCleaner) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockPullCleaner {
+func (mock *MockPullCleaner) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockPullCleaner {
 	return &VerifierMockPullCleaner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -62,7 +63,7 @@ func (mock *MockPullCleaner) VerifyWasCalledInOrder(invocationCountMatcher pegom
 	}
 }
 
-func (mock *MockPullCleaner) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockPullCleaner {
+func (mock *MockPullCleaner) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockPullCleaner {
 	return &VerifierMockPullCleaner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -72,7 +73,7 @@ func (mock *MockPullCleaner) VerifyWasCalledEventually(invocationCountMatcher pe
 
 type VerifierMockPullCleaner struct {
 	mock                   *MockPullCleaner
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -96,11 +97,11 @@ func (c *MockPullCleaner_CleanUpPull_OngoingVerification) GetCapturedArguments()
 func (c *MockPullCleaner_CleanUpPull_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(params[0]))
+		_param0 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.Repo)
 		}
-		_param1 = make([]models.PullRequest, len(params[1]))
+		_param1 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
 		}

@@ -3,10 +3,11 @@ package vcs_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -64,6 +65,21 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 		PullRequestID: azuredevops.Int(22),
 	}
 
+	userIDResponse := `{
+		"members": [
+			{
+				"id": "6416203b-98bb-4910-8f8a-b12aa19a399f"
+			}
+		],
+		"continuationToken": null,
+		"totalCount": 0,
+		"items": [
+			{
+				"id": "6416203b-98bb-4910-8f8a-b12aa19a399f"
+			}
+		]
+	}`
+
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			testServer := httptest.NewTLSServer(
@@ -73,6 +89,9 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 					case "/owner/project/_apis/git/repositories/repo/pullrequests/22?api-version=5.1-preview.1":
 						w.WriteHeader(c.code)
 						w.Write([]byte(c.response)) // nolint: errcheck
+					case "/owner/_apis/userentitlements?$filter=name+eq+'user'&$api-version=6.0-preview.3":
+						w.WriteHeader(c.code)
+						w.Write([]byte(userIDResponse)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
@@ -81,7 +100,8 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client.Client.VsaexBaseURL = *testServerURL
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -108,6 +128,8 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 					Owner:    "owner",
 					Name:     "repo",
 				},
+			}, models.PullRequestOptions{
+				DeleteSourceBranchOnMerge: false,
 			})
 			if c.expErr == "" {
 				Ok(t, err)
@@ -170,7 +192,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 					case "/owner/project/_apis/git/repositories/repo/pullrequests/22/statuses?api-version=5.1-preview.1":
 						gotRequest = true
 						defer r.Body.Close() // nolint: errcheck
-						body, err := ioutil.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
 						exp := fmt.Sprintf(partResponse, c.expState)
 						if c.supportsIterations == true {
@@ -192,7 +214,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -242,7 +264,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 			case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
 				w.Write([]byte(fixtures.ADPullJSON)) // nolint: errcheck
 			// The second should hit this URL.
-			case "/owner/project/_apis/git/repositories/repo/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3/changes?api-version=5.1-preview.1":
+			case "/owner/project/_apis/git/repositories/repo/diffs/commits?api-version=5.1&baseVersion=new_feature&targetVersion=npaulk/my_work":
 				// We write a header that means there's an additional page.
 				w.Write([]byte(resp)) // nolint: errcheck
 				return
@@ -255,7 +277,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -277,54 +299,93 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 }
 
 func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
+	type Policy struct {
+		genre  string
+		name   string
+		status string
+	}
 	cases := []struct {
-		state        string
+		testName     string
+		mergeStatus  string
+		policy       Policy
 		expMergeable bool
 	}{
 		{
+			"merge conflicts",
 			azuredevops.MergeConflicts.String(),
+			Policy{
+				"Not Atlantis",
+				"foo",
+				"approved",
+			},
 			false,
 		},
 		{
-			azuredevops.MergeRejectedByPolicy.String(),
-			false,
-		},
-		{
-			azuredevops.MergeFailure.String(),
-			true,
-		},
-		{
-			azuredevops.MergeNotSet.String(),
-			true,
-		},
-		{
-			azuredevops.MergeQueued.String(),
-			true,
-		},
-		{
+			"rejected policy status",
 			azuredevops.MergeSucceeded.String(),
+			Policy{
+				"Not Atlantis",
+				"foo",
+				"rejected",
+			},
+			false,
+		},
+		{
+			"merge succeeded",
+			azuredevops.MergeSucceeded.String(),
+			Policy{
+				"Not Atlantis",
+				"foo",
+				"approved",
+			},
+			true,
+		},
+		{
+			"pending policy status",
+			azuredevops.MergeSucceeded.String(),
+			Policy{
+				"Not Atlantis",
+				"foo",
+				"pending",
+			},
+			false,
+		},
+		{
+			"atlantis apply status rejected",
+			azuredevops.MergeSucceeded.String(),
+			Policy{
+				"Atlantis Bot/atlantis",
+				"apply",
+				"rejected",
+			},
 			true,
 		},
 	}
 
-	// Use a real Azure DevOps json response and edit the mergeable_state field.
-	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
+	jsonPullRequestBytes, err := os.ReadFile("fixtures/azuredevops-pr.json")
 	Ok(t, err)
-	json := string(jsBytes)
+
+	jsonPolicyEvaluationBytes, err := os.ReadFile("fixtures/azuredevops-policyevaluations.json")
+	Ok(t, err)
+
+	pullRequestBody := string(jsonPullRequestBytes)
+	policyEvaluationsBody := string(jsonPolicyEvaluationBytes)
 
 	for _, c := range cases {
-		t.Run(c.state, func(t *testing.T) {
-			response := strings.Replace(json,
-				`"mergeStatus": "NotSet"`,
-				fmt.Sprintf(`"mergeStatus": "%s"`, c.state),
-				1,
-			)
+		t.Run(c.testName, func(t *testing.T) {
+			pullRequestResponse := strings.Replace(pullRequestBody, `"mergeStatus": "notSet"`, fmt.Sprintf(`"mergeStatus": "%s"`, c.mergeStatus), 1)
+			policyEvaluationsResponse := strings.Replace(policyEvaluationsBody, `"status": "approved"`, fmt.Sprintf(`"status": "%s"`, c.policy.status), 1)
+			policyEvaluationsResponse = strings.Replace(policyEvaluationsResponse, `"statusGenre": "Atlantis Bot/atlantis"`, fmt.Sprintf(`"statusGenre": "%s"`, c.policy.genre), 1)
+			policyEvaluationsResponse = strings.Replace(policyEvaluationsResponse, `"statusName": "plan"`, fmt.Sprintf(`"statusName": "%s"`, c.policy.name), 1)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
-						w.Write([]byte(response)) // nolint: errcheck
+						w.Write([]byte(pullRequestResponse)) // nolint: errcheck
+						return
+					case "/owner/project/_apis/policy/evaluations?api-version=5.1-preview&artifactId=vstfs%3A%2F%2F%2FCodeReview%2FCodeReviewId%2F33333333-3333-3333-333333333333%2F1":
+						w.Write([]byte(policyEvaluationsResponse)) // nolint: errcheck
 						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -332,10 +393,13 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 						return
 					}
 				}))
+
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 			Ok(t, err)
+
 			defer disableSSLVerification()()
 
 			actMergeable, err := client.PullIsMergeable(models.Repo{
@@ -350,7 +414,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				},
 			}, models.PullRequest{
 				Num: 1,
-			})
+			}, "atlantis-test")
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})
@@ -359,49 +423,57 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 
 func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 	cases := []struct {
-		testName    string
-		vote        int
-		expApproved bool
+		testName           string
+		reviewerUniqueName string
+		reviewerVote       int
+		expApproved        bool
 	}{
 		{
 			"approved",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteApproved,
 			true,
 		},
 		{
 			"approved with suggestions",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteApprovedWithSuggestions,
-			false,
+			true,
 		},
 		{
 			"no vote",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteNone,
 			false,
 		},
 		{
 			"vote waiting for author",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteWaitingForAuthor,
 			false,
 		},
 		{
 			"vote rejected",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteRejected,
+			false,
+		},
+		{
+			"approved only by author",
+			"atlantis.author@example.com",
+			azuredevops.VoteApproved,
 			false,
 		},
 	}
 
-	// Use a real Azure DevOps json response and edit the mergeable_state field.
-	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
+	jsBytes, err := os.ReadFile("fixtures/azuredevops-pr.json")
 	Ok(t, err)
-	json := string(jsBytes)
 
+	json := string(jsBytes)
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			response := strings.Replace(json,
-				`"vote": 0,`,
-				fmt.Sprintf(`"vote": %d,`, c.vote),
-				1,
-			)
+			response := strings.Replace(json, `"vote": 0,`, fmt.Sprintf(`"vote": %d,`, c.reviewerVote), 1)
+			response = strings.Replace(response, "atlantis.reviewer@example.com", c.reviewerUniqueName, 1)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -415,13 +487,16 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 						return
 					}
 				}))
+
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 			Ok(t, err)
+
 			defer disableSSLVerification()()
 
-			actApproved, err := client.PullIsApproved(models.Repo{
+			approvalStatus, err := client.PullIsApproved(models.Repo{
 				FullName:          "owner/project/repo",
 				Owner:             "owner",
 				Name:              "repo",
@@ -435,14 +510,14 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 				Num: 1,
 			})
 			Ok(t, err)
-			Equals(t, c.expApproved, actApproved)
+			Equals(t, c.expApproved, approvalStatus.IsApproved)
 		})
 	}
 }
 
 func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 	// Use a real Azure DevOps json response and edit the mergeable_state field.
-	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
+	jsBytes, err := os.ReadFile("fixtures/azuredevops-pr.json")
 	Ok(t, err)
 	response := string(jsBytes)
 
@@ -461,7 +536,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 		Ok(t, err)
 		defer disableSSLVerification()()
 
@@ -478,6 +553,15 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 		}, 1)
 		Ok(t, err)
 	})
+}
+
+func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
+	client, err := vcs.NewAzureDevopsClient("hostname", "user", "token")
+	Ok(t, err)
+	pull := models.PullRequest{Num: 1}
+	s, _ := client.MarkdownPullLink(pull)
+	exp := "!1"
+	Equals(t, exp, s)
 }
 
 var adMergeSuccess = `{
@@ -501,4 +585,40 @@ var adMergeSuccess = `{
 					"transitionWorkItems":true,
 					"triggeredByAutoComplete":false
 	}
-}`
+}
+`
+
+func TestAzureDevopsClient_GitStatusContextFromSrc(t *testing.T) {
+	cases := []struct {
+		src      string
+		expGenre string
+		expName  string
+	}{
+		{
+			"atlantis/plan",
+			"Atlantis Bot/atlantis",
+			"plan",
+		},
+		{
+			"atlantis/foo/bar/biz/baz",
+			"Atlantis Bot/atlantis/foo/bar/biz",
+			"baz",
+		},
+		{
+			"foo",
+			"Atlantis Bot",
+			"foo",
+		},
+		{
+			"",
+			"Atlantis Bot",
+			"",
+		},
+	}
+
+	for _, c := range cases {
+		result := vcs.GitStatusContextFromSrc(c.src)
+		Equals(t, &c.expName, result.Name)
+		Equals(t, &c.expGenre, result.Genre)
+	}
+}

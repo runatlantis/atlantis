@@ -44,7 +44,7 @@ GitHub and GitLab use webhook secrets so clients can verify that the webhooks ca
 from them.
 ::: warning
 Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using Bitbucket Cloud you can skip this step.
-When you're ready to do a production deploy of Atlantis you should whitelist [Bitbucket IPs](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
+When you're ready to do a production deploy of Atlantis you should allowlist [Bitbucket IPs](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
 to ensure the webhooks are coming from them.
 :::
 Create a random string of any length (you can use [https://www.random.org/strings/](https://www.random.org/strings/))
@@ -86,7 +86,7 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
     <summary>Expand</summary>
     <ul>
         <li>Go to your repo's home page</li>
-        <li>Click <strong>Settings &gt; Integrations</strong> in the sidebar</li>
+        <li>Click <strong>Settings &gt; Webhooks</strong> in the sidebar</li>
         <li>set <strong>URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
         <li>double-check you added <code>/events</code> to the end of your URL.</li>
         <li>set <strong>Secret Token</strong> to your random string</li>
@@ -135,9 +135,8 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
         <li>Set <strong>URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
         <li>Double-check you added <code>/events</code> to the end of your URL.</li>
         <li>Set <strong>Secret</strong> to your random string</li>
-        <li>Under <strong>Repository</strong> select <strong>Push</strong></li>
-        <li>Under <strong>Pull Request</strong>, select: Opened, Modified, Merged, Declined, Deleted and Comment added</li>
-        <li>Click <strong>Save</strong><img src="./images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;"></li>
+        <li>Under <strong>Pull Request</strong>, select: Opened, Source branch updated, Merged, Declined, Deleted and Comment added</li>
+        <li>Click <strong>Save</strong><img src="./images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 600px;"></li>
     </ul>
 </details>
 
@@ -148,7 +147,7 @@ you can use your own user. Here we'll create the access token that Atlantis uses
 set commit statuses.
 
 ### GitHub or GitHub Enterprise Access Token
-- follow [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)
+- follow [https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token)
 - create a token with **repo** scope
 - set the token as an environment variable
 ```
@@ -156,7 +155,7 @@ TOKEN="{YOUR_TOKEN}"
 ```
 
 ### GitLab or GitLab Enterprise Access Token
-- follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
+- follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
 - create a token with **api** scope
 - set the token as an environment variable
 ```
@@ -164,7 +163,7 @@ TOKEN="{YOUR_TOKEN}"
 ```
 
 ### Bitbucket Cloud (bitbucket.org) Access Token
-- follow [https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword](https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword)
+- follow [https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 - Label the password "atlantis"
 - Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - set the token as an environment variable
@@ -189,8 +188,8 @@ You're almost ready to start Atlantis, just set two more variables:
 
 ```bash
 USERNAME="{the username of your GitHub, GitLab or Bitbucket user}"
-REPO_WHITELIST="$YOUR_GIT_HOST/$YOUR_USERNAME/$YOUR_REPO"
-# ex. REPO_WHITELIST="github.com/runatlantis/atlantis"
+REPO_ALLOWLIST="$YOUR_GIT_HOST/$YOUR_USERNAME/$YOUR_REPO"
+# ex. REPO_ALLOWLIST="github.com/runatlantis/atlantis"
 # If you're using Bitbucket Server, $YOUR_GIT_HOST will be the domain name of your
 # server without scheme or port and $YOUR_USERNAME will be the name of the **project** the repo
 # is under, **not the key** of the project.
@@ -204,7 +203,7 @@ atlantis server \
 --gh-user="$USERNAME" \
 --gh-token="$TOKEN" \
 --gh-webhook-secret="$SECRET" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ### GitHub Enterprise Command
@@ -216,7 +215,7 @@ atlantis server \
 --gh-token="$TOKEN" \
 --gh-webhook-secret="$SECRET" \
 --gh-hostname="$HOSTNAME" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ### GitLab Command
@@ -226,7 +225,7 @@ atlantis server \
 --gitlab-user="$USERNAME" \
 --gitlab-token="$TOKEN" \
 --gitlab-webhook-secret="$SECRET" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ### GitLab Enterprise Command
@@ -238,7 +237,7 @@ atlantis server \
 --gitlab-token="$TOKEN" \
 --gitlab-webhook-secret="$SECRET" \
 --gitlab-hostname="$HOSTNAME" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ### Bitbucket Cloud (bitbucket.org) Command
@@ -247,7 +246,7 @@ atlantis server \
 --atlantis-url="$URL" \
 --bitbucket-user="$USERNAME" \
 --bitbucket-token="$TOKEN" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ### Bitbucket Server (aka Stash) Command
@@ -259,10 +258,10 @@ atlantis server \
 --bitbucket-token="$TOKEN" \
 --bitbucket-webhook-secret="$SECRET" \
 --bitbucket-base-url="$BASE_URL" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
-##### Azure DevOps
+### Azure DevOps
 
 A certificate and private key are required if using Basic authentication for webhooks.
 
@@ -273,7 +272,7 @@ atlantis server \
 --azuredevops-token="$TOKEN" \
 --azuredevops-webhook-user="$ATLANTIS_AZUREDEVOPS_WEBHOOK_USER" \
 --azuredevops-webhook-password="$ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 --ssl-cert-file=file.crt
 --ssl-key-file=file.key
 ```
@@ -310,6 +309,10 @@ atlantis plan -- -target=resource -var 'foo=bar'
 ### Apply
 If you'd like to `apply`, type a comment: `atlantis apply`. You can use the `-d` or `-w` flags to point
 Atlantis at a specific plan. Otherwise it tries to apply the plan for the root directory.
+
+## Real-time logs
+The [real-time terraform output](/docs/streaming-logs.md) for your command can be found by clicking into the status check for a given project in a PR which
+links to the log-streaming UI. This is a terminal UI where you can view your commands executing in real-time.
 
 ## Next Steps
 * If things are working as expected you can `Ctrl-C` the `atlantis server` command and the `ngrok` command.
