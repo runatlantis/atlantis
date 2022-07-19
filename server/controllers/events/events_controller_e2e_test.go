@@ -1007,6 +1007,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		projectCommandRunner,
 		parallelPoolSize,
 		false,
+		false,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
