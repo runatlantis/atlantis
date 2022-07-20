@@ -81,26 +81,17 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	request, ctx, code, err := a.apiParseAndValidate(r)
-
 	if err != nil {
 		a.apiReportError(w, code, err)
 		return
 	}
 
-	cmds, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildPlanCommands)
+	result, err := a.apiPlan(request, ctx)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0) // nolint: errcheck
-	var projectResults []command.ProjectResult
-	for _, cmd := range cmds {
-		res := a.ProjectPlanCommandRunner.Plan(cmd)
-		projectResults = append(projectResults, res)
-	}
-	result := command.Result{ProjectResults: projectResults}
-
 	if result.HasErrors() {
 		code = http.StatusInternalServerError
 	}
@@ -118,40 +109,25 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	request, ctx, code, err := a.apiParseAndValidate(r)
-
 	if err != nil {
 		a.apiReportError(w, code, err)
 		return
 	}
 
 	// We must first make the plan for all projects
-	cmds, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildPlanCommands)
+	_, err = a.apiPlan(request, ctx)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0) // nolint: errcheck
-	var projectResults []command.ProjectResult
-	for _, cmd := range cmds {
-		res := a.ProjectPlanCommandRunner.Plan(cmd)
-		projectResults = append(projectResults, res)
-	}
-	result := command.Result{ProjectResults: projectResults}
 
 	// We can now prepare and run the apply step
-	cmds, err = request.getCommands(ctx, a.ProjectCommandBuilder.BuildApplyCommands)
+	result, err := a.apiApply(request, ctx)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	projectResults = nil
-	for _, cmd := range cmds {
-		res := a.ProjectApplyCommandRunner.Apply(cmd)
-		projectResults = append(projectResults, res)
-	}
-	result = command.Result{ProjectResults: projectResults}
-
 	if result.HasErrors() {
 		code = http.StatusInternalServerError
 	}
@@ -162,6 +138,34 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.respond(w, logging.Debug, code, string(response))
+}
+
+func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
+	cmds, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildPlanCommands)
+	if err != nil {
+		return nil, err
+	}
+
+	var projectResults []command.ProjectResult
+	for _, cmd := range cmds {
+		res := a.ProjectPlanCommandRunner.Plan(cmd)
+		projectResults = append(projectResults, res)
+	}
+	return &command.Result{ProjectResults: projectResults}, nil
+}
+
+func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
+	cmds, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildApplyCommands)
+	if err != nil {
+		return nil, err
+	}
+
+	var projectResults []command.ProjectResult
+	for _, cmd := range cmds {
+		res := a.ProjectApplyCommandRunner.Apply(cmd)
+		projectResults = append(projectResults, res)
+	}
+	return &command.Result{ProjectResults: projectResults}, nil
 }
 
 func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *command.Context, int, error) {
