@@ -201,7 +201,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusInternalServerError, err
 	}
 
-	baseRepo, err := a.Parser.ParseAPIPlanRequest(request.Repository, cloneURL)
+	baseRepo, err := a.Parser.ParseAPIPlanRequest(VCSHostType, request.Repository, cloneURL)
 	if err != nil {
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("failed to parse request: %v", err)
 	}

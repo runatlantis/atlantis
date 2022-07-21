@@ -503,5 +503,10 @@ func (g *GithubClient) SupportsSingleFileDownload(repo models.Repo) bool {
 }
 
 func (g *GithubClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
-	return "", fmt.Errorf("not yet implemented")
+	parts := strings.Split(repo, "/")
+	repository, _, err := g.client.Repositories.Get(g.ctx, parts[0], parts[1])
+	if err != nil {
+		return "", err
+	}
+	return repository.GetCloneURL(), nil
 }
