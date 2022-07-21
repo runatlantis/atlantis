@@ -351,9 +351,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	var projectCmdOutputHandler jobs.ProjectCommandOutputHandler
-	// When TFE is enabled log streaming is not necessary.
 
-	if userConfig.TFEToken != "" {
+	if userConfig.TFEToken != "" && !userConfig.TFELocalExecutionMode {
+		// When TFE is enabled and using remote execution mode log streaming is not necessary.
 		projectCmdOutputHandler = &jobs.NoopProjectOutputHandler{}
 	} else {
 		projectCmdOutput := make(chan *jobs.ProjectCmdOutputLine)

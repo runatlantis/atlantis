@@ -626,6 +626,12 @@ Values are chosen in this order:
   If using Terraform Cloud (i.e. you don't have your own Terraform Enterprise installation)
   no need to set since it defaults to `app.terraform.io`.
 
+* ### `--tfe-local-execution-mode`
+  ```bash
+  atlantis server --tfe-local-execution-mode
+  ```
+  Enable if you're using local execution mode (instead of TFE/C's remote execution mode). See [Terraform Cloud](terraform-cloud.html) for more details.
+
 * ### `--tfe-token`
   ```bash
   atlantis server --tfe-token="xxx.atlasv1.yyy"

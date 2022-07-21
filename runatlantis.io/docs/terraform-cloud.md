@@ -74,6 +74,10 @@ That's it! Atlantis should be able to perform Terraform operations using Terrafo
 remote state backend now.
 
 :::warning
+If you're using local execution mode for your workspaces, remember to set the
+`--tfe-local-execution-mode`. Otherwise you won't see the logs in Atlantis.
+
+:::warning
 The Terraform Cloud/Enterprise integration only works with the built-in
 `plan` and `apply` steps. It does not work with custom `run` steps that replace
 plan or apply.

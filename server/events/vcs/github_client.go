@@ -25,7 +25,6 @@ import (
 	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config"
-	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -304,7 +303,6 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		return false, errors.Wrap(err, "getting pull request")
 	}
 	state := githubPR.GetMergeableState()
-	g.logger.Debug("PR mergeable state is %v", state)
 	// We map our mergeable check to when the GitHub merge button is clickable.
 	// This corresponds to the following states:
 	// clean: No conflicts, all requirements satisfied.
@@ -313,48 +311,7 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	//           status checks. Merging is allowed (yellow box).
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
-	// blocked: Blocked by a failing/missing required status check.
 	// See: https://github.com/octokit/octokit.net/issues/1763
-	if state == "blocked" {
-		var allStatuses []*github.RepoStatus
-		nextPage := 0
-		for {
-			g.logger.Debug("GET /repos/%v/%v/commits/%d/status", repo.Owner, repo.Name, pull.HeadBranch)
-			combinedStatus, resp, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, pull.HeadBranch, &github.ListOptions{
-				Page: nextPage,
-			})
-			if err != nil {
-				return false, errors.Wrap(err, "fetching PR statuses")
-			}
-			allStatuses = append(allStatuses, combinedStatus.Statuses...)
-			if resp.NextPage == 0 {
-				break
-			}
-			nextPage = resp.NextPage
-		}
-		g.logger.Debug("GET /repos/%v/%v/branches/%d/protection/required_status_checks", repo.Owner, repo.Name, pull.BaseBranch)
-		requiredChecks, _, err := g.client.Repositories.GetRequiredStatusChecks(g.ctx, repo.Owner, repo.Name, pull.BaseBranch)
-		if err != nil {
-			return false, errors.Wrap(err, "fetching PR required checks")
-		}
-		for _, status := range allStatuses {
-			for _, requiredCheck := range requiredChecks.Contexts {
-				// Ignore any commit statuses with 'atlantis/apply' as prefix
-				if strings.HasPrefix(status.GetContext(), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
-					continue
-				}
-				if status.GetContext() == requiredCheck {
-					if status.GetState() == "failure" || status.GetState() == "pending" {
-						g.logger.Debug("Failed check %v", requiredCheck)
-						return false, nil
-					}
-				}
-			}
-		}
-		g.logger.Debug("Blocked only by atlantis/apply")
-		return true, nil
-
-	}
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
 		return false, nil
 	}

@@ -7,7 +7,7 @@ replace google.golang.org/grpc => google.golang.org/grpc v1.29.1
 require (
 	github.com/Laisky/graphql v1.0.5
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/bradleyfalzon/ghinstallation/v2 v2.0.4
+	github.com/bradleyfalzon/ghinstallation/v2 v2.1.0
 	github.com/briandowns/spinner v0.0.0-20170614154858-48dbb65d7bd5
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/elazarl/go-bindata-assetfs v1.0.1
@@ -20,7 +20,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-getter v1.6.2
-	github.com/hashicorp/go-version v1.5.0
+	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20200806211835-c481b8bfa41e
 	github.com/mcdafydd/go-azuredevops v0.12.1
 	github.com/microcosm-cc/bluemonday v1.0.19
@@ -39,7 +39,7 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli v1.22.9
 	github.com/urfave/negroni v1.0.0
-	github.com/xanzy/go-gitlab v0.68.2
+	github.com/xanzy/go-gitlab v0.69.0
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.21.0
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5
@@ -68,7 +68,6 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
-	github.com/google/go-github/v41 v41.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.4.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
@@ -136,6 +135,7 @@ require (
 	cloud.google.com/go/compute v1.6.1 // indirect
 	cloud.google.com/go/iam v0.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/google/go-github/v45 v45.2.0 // indirect
 	github.com/m3db/prometheus_client_golang v0.8.1 // indirect
 	github.com/m3db/prometheus_client_model v0.1.0 // indirect
 	github.com/m3db/prometheus_common v0.1.0 // indirect

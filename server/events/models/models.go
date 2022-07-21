@@ -363,10 +363,12 @@ func (p *PlanSuccess) Summary() string {
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
-	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~])`)
+	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s->\s|<<|\{|\(known after apply\)|\[)(.*)`)
+	diffListRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
 	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
 
-	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1")
+	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5")
+	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
 
 	return formattedTerraformOutput
