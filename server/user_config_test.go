@@ -59,10 +59,6 @@ func TestUserConfig_ToLyftMode(t *testing.T) {
 			server.Gateway,
 		},
 		{
-			"hybrid",
-			server.Hybrid,
-		},
-		{
 			"worker",
 			server.Worker,
 		},

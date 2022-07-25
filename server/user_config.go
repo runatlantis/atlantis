@@ -9,7 +9,6 @@ type Mode int
 const (
 	Default Mode = iota
 	Gateway
-	Hybrid
 	Worker
 )
 
@@ -110,8 +109,6 @@ func (u UserConfig) ToLyftMode() Mode {
 		return Default
 	case "gateway":
 		return Gateway
-	case "hybrid":
-		return Hybrid
 	case "worker":
 		return Worker
 	}
