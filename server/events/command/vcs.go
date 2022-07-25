@@ -22,13 +22,14 @@ func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo,
 	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
 
 	request := types.UpdateStatusRequest{
-		Repo:        repo,
-		PullNum:     pull.Num,
-		Ref:         pull.HeadCommit,
-		StatusName:  src,
-		State:       status,
-		Description: descrip,
-		DetailsURL:  "",
+		Repo:             repo,
+		PullNum:          pull.Num,
+		Ref:              pull.HeadCommit,
+		StatusName:       src,
+		State:            status,
+		Description:      descrip,
+		DetailsURL:       "",
+		PullCreationTime: pull.CreatedAt,
 	}
 	return d.Client.UpdateStatus(ctx, request)
 }
@@ -47,13 +48,14 @@ func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.
 	}
 
 	request := types.UpdateStatusRequest{
-		Repo:        repo,
-		PullNum:     pull.Num,
-		Ref:         pull.HeadCommit,
-		StatusName:  src,
-		State:       status,
-		Description: fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb),
-		DetailsURL:  "",
+		Repo:             repo,
+		PullNum:          pull.Num,
+		Ref:              pull.HeadCommit,
+		StatusName:       src,
+		State:            status,
+		Description:      fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb),
+		DetailsURL:       "",
+		PullCreationTime: pull.CreatedAt,
 	}
 
 	return d.Client.UpdateStatus(ctx, request)
@@ -70,13 +72,14 @@ func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx Project
 
 	description := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
 	request := types.UpdateStatusRequest{
-		Repo:        projectCtx.BaseRepo,
-		PullNum:     projectCtx.Pull.Num,
-		Ref:         projectCtx.Pull.HeadCommit,
-		StatusName:  statusName,
-		State:       status,
-		Description: description,
-		DetailsURL:  url,
+		Repo:             projectCtx.BaseRepo,
+		PullNum:          projectCtx.Pull.Num,
+		Ref:              projectCtx.Pull.HeadCommit,
+		StatusName:       statusName,
+		State:            status,
+		Description:      description,
+		DetailsURL:       url,
+		PullCreationTime: projectCtx.Pull.CreatedAt,
 	}
 
 	return d.Client.UpdateStatus(ctx, request)

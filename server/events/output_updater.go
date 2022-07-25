@@ -28,7 +28,10 @@ type FeatureAwareChecksOutputUpdater struct {
 }
 
 func (c *FeatureAwareChecksOutputUpdater) UpdateOutput(ctx *command.Context, cmd PullCommand, res command.Result) {
-	shouldAllocate, err := c.FeatureAllocator.ShouldAllocate(feature.GithubChecks, ctx.HeadRepo.FullName)
+	shouldAllocate, err := c.FeatureAllocator.ShouldAllocate(feature.GithubChecks, feature.FeatureContext{
+		RepoName:         ctx.HeadRepo.FullName,
+		PullCreationTime: ctx.Pull.CreatedAt,
+	})
 	if err != nil {
 		c.Logger.Error(fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.GithubChecks, err))
 	}

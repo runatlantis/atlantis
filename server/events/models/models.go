@@ -181,6 +181,8 @@ type PullRequest struct {
 	UpdatedAt time.Time
 	// ClosedAt is the time the PR was closed. This is nil if the PR is open
 	ClosedAt time.Time
+	// CreatedAt is the time the PR was created.
+	CreatedAt time.Time
 }
 
 type PullRequestState int

@@ -69,7 +69,7 @@ func TestFeatureAllocatorRunner(t *testing.T) {
 
 			When(featureAllocator.ShouldAllocate(
 				featureMatchers.AnyFeatureName(),
-				AnyString(),
+				featureMatchers.AnyFeatureFeatureContext(),
 			)).ThenReturn(c.allocated, c.err)
 
 			ctx := &command.Context{

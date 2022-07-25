@@ -52,6 +52,7 @@ func (p *PullConverter) Convert(pull *github.PullRequest) (models.PullRequest, e
 	pullState := models.ClosedPullState
 	closedAt := pull.GetClosedAt()
 	updatedAt := pull.GetUpdatedAt()
+	createdAt := pull.GetCreatedAt()
 	if pull.GetState() == "open" {
 		pullState = models.OpenPullState
 	}
@@ -68,5 +69,6 @@ func (p *PullConverter) Convert(pull *github.PullRequest) (models.PullRequest, e
 		BaseBranch: baseBranch,
 		ClosedAt:   closedAt,
 		UpdatedAt:  updatedAt,
+		CreatedAt:  createdAt,
 	}, nil
 }

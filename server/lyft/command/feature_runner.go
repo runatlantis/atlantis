@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
@@ -44,7 +45,8 @@ func (r *PlatformModeFeatureRunner) Run(ctx *command.Context, cmd *command.Comme
 		return
 	}
 
-	shouldAllocate, err := r.featureAllocator.ShouldAllocate(feature.PlatformMode, ctx.HeadRepo.FullName)
+	// prCreationTime defaults to time.Unix(0, 0) to ensure features are turned on by default
+	shouldAllocate, err := r.featureAllocator.ShouldAllocate(feature.PlatformMode, feature.FeatureContext{RepoName: ctx.HeadRepo.FullName})
 	if err != nil {
 		r.logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.PlatformMode, err))
 	}
