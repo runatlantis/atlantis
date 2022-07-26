@@ -46,7 +46,8 @@ func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 	if !l.WebAuthentication ||
 		r.URL.Path == "/events" ||
 		r.URL.Path == "/healthz" ||
-		r.URL.Path == "/status" {
+		r.URL.Path == "/status" ||
+		r.URL.Path == "/metrics" {
 		allowed = true
 	} else {
 		user, pass, ok := r.BasicAuth()
