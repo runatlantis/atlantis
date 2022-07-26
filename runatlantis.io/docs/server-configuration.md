@@ -434,6 +434,12 @@ Values are chosen in this order:
   ```
   Port to bind to. Defaults to `4141`.
 
+* ### `--quiet-policy-checks`
+  ```bash
+  atlantis server --quiet-policy-checks
+  ```
+  Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
+
 * ### `--repo-config`
   ```bash
   atlantis server --repo-config="path/to/repos.yaml"
