@@ -705,13 +705,15 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 
 func TestCommentParser_HelpComment(t *testing.T) {
 	cases := []struct {
-		applyDisabled bool
-		expectResult  string
+		applyDisabled   bool
+		atlantisVersion string
+		expectResult    string
 	}{
 		{
 			applyDisabled: false,
+			atlantisVersion: "1.0.0",
 			expectResult: "```cmake\n" +
-				`atlantis
+				`atlantis v1.0.0
 Terraform Pull Request Automation
 
 Usage:
@@ -747,8 +749,9 @@ Use "atlantis [command] --help" for more information about a command.` +
 		},
 		{
 			applyDisabled: true,
+			atlantisVersion: "1.0.0",
 			expectResult: "```cmake\n" +
-				`atlantis
+				`atlantis v1.0.0
 Terraform Pull Request Automation
 
 Usage:

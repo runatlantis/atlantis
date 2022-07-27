@@ -373,8 +373,8 @@ func (e *CommentParser) HelpComment(applyDisabled bool) string {
 	buf := &bytes.Buffer{}
 	var tmpl = template.Must(template.New("").Parse(helpCommentTemplate))
 	if err := tmpl.Execute(buf, struct {
-		ApplyDisabled   bool,
-		AtlantisVersion string,
+		ApplyDisabled   bool
+		AtlantisVersion string
 	}{
 		ApplyDisabled:   applyDisabled,
 		AtlantisVersion: e.AtlantisVersion,
