@@ -63,7 +63,7 @@ To install:
       token: bar
       secret: baz
     ```
-1. Edit `values.yaml` and set your `orgAllowlist` (see [Repo Allowlist](server-configuration.md#repo-allowlist) for more information)
+1. Edit `values.yaml` and set your `orgAllowlist` (see [Repo Allowlist](server-configuration.md#--repo-allowlist) for more information)
     ```yaml
     orgAllowlist: github.com/runatlantis/*
     ```
