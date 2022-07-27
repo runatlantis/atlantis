@@ -95,3 +95,7 @@ func (d *ClientProxy) DownloadRepoConfigFile(pull models.PullRequest) (bool, []b
 func (d *ClientProxy) SupportsSingleFileDownload(repo models.Repo) bool {
 	return d.clients[repo.VCSHost.Type].SupportsSingleFileDownload(repo)
 }
+
+func (d *ClientProxy) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return d.clients[VCSHostType].GetCloneURL(VCSHostType, repo)
+}

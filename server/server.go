@@ -104,6 +104,7 @@ type Server struct {
 	LocksController                *controllers.LocksController
 	StatusController               *controllers.StatusController
 	JobsController                 *controllers.JobsController
+	APIController                  *controllers.APIController
 	IndexTemplate                  templates.TemplateWriter
 	LockDetailTemplate             templates.TemplateWriter
 	ProjectJobsTemplate            templates.TemplateWriter
@@ -735,6 +736,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
 	}
+	apiController := &controllers.APIController{
+		APISecret:                 []byte(userConfig.APISecret),
+		Locker:                    lockingClient,
+		Logger:                    logger,
+		Parser:                    eventParser,
+		ProjectCommandBuilder:     projectCommandBuilder,
+		ProjectPlanCommandRunner:  instrumentedProjectCmdRunner,
+		ProjectApplyCommandRunner: instrumentedProjectCmdRunner,
+		RepoAllowlistChecker:      repoAllowlist,
+		Scope:                     statsScope.SubScope("api"),
+		VCSClient:                 vcsClient,
+	}
 
 	eventsController := &events_controllers.VCSEventsController{
 		CommandRunner:                   commandRunner,
@@ -788,6 +801,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LocksController:                locksController,
 		JobsController:                 jobsController,
 		StatusController:               statusController,
+		APIController:                  apiController,
 		IndexTemplate:                  templates.IndexTemplate,
 		LockDetailTemplate:             templates.LockTemplate,
 		ProjectJobsTemplate:            templates.ProjectJobsTemplate,
@@ -812,6 +826,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
+	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
+	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()

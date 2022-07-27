@@ -46,6 +46,7 @@ type UserConfig struct {
 	GitlabToken                string `mapstructure:"gitlab-token"`
 	GitlabUser                 string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret        string `mapstructure:"gitlab-webhook-secret"`
+	APISecret                  string `mapstructure:"api-secret"`
 	HidePrevPlanComments       bool   `mapstructure:"hide-prev-plan-comments"`
 	LogLevel                   string `mapstructure:"log-level"`
 	ParallelPoolSize           int    `mapstructure:"parallel-pool-size"`
