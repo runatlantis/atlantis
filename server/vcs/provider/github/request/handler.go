@@ -146,11 +146,11 @@ func (h *Handler) handleGithubCommentEvent(ctx context.Context, event *github.Is
 	if err != nil {
 		return &errors.EventParsingError{Err: err}
 	}
-	ctxWithRepo := context.WithValue(ctx, logging.RepositoryKey, commentEvent.BaseRepo.FullName)
-	ctxWithPull := context.WithValue(ctxWithRepo, logging.PullNumKey, commentEvent.PullNum)
-	ctxWithSha := context.WithValue(ctxWithPull, logging.SHAKey, commentEvent.Pull.HeadCommit)
+	ctx = context.WithValue(ctx, logging.RepositoryKey, commentEvent.BaseRepo.FullName)
+	ctx = context.WithValue(ctx, logging.PullNumKey, commentEvent.PullNum)
+	ctx = context.WithValue(ctx, logging.SHAKey, commentEvent.Pull.HeadCommit)
 
-	return h.commentHandler.Handle(ctxWithSha, request, commentEvent)
+	return h.commentHandler.Handle(ctx, request, commentEvent)
 }
 
 func (h *Handler) handleGithubPullRequestEvent(ctx context.Context, event *github.PullRequestEvent, request *http.BufferedRequest) error {
@@ -159,9 +159,9 @@ func (h *Handler) handleGithubPullRequestEvent(ctx context.Context, event *githu
 	if err != nil {
 		return &errors.EventParsingError{Err: err}
 	}
-	ctxWithRepo := context.WithValue(ctx, logging.RepositoryKey, pullEvent.Pull.BaseRepo.FullName)
-	ctxWithPull := context.WithValue(ctxWithRepo, logging.PullNumKey, pullEvent.Pull.Num)
-	ctxWithSha := context.WithValue(ctxWithPull, logging.SHAKey, pullEvent.Pull.HeadCommit)
+	ctx = context.WithValue(ctx, logging.RepositoryKey, pullEvent.Pull.BaseRepo.FullName)
+	ctx = context.WithValue(ctx, logging.PullNumKey, pullEvent.Pull.Num)
+	ctx = context.WithValue(ctx, logging.SHAKey, pullEvent.Pull.HeadCommit)
 
-	return h.prHandler.Handle(ctxWithSha, request, pullEvent)
+	return h.prHandler.Handle(ctx, request, pullEvent)
 }
