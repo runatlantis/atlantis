@@ -22,7 +22,7 @@ func (r *MultiEnvStepRunner) Run(ctx command.ProjectContext, command string, pat
 			var sb strings.Builder
 			sb.WriteString("Dynamic environment variables added:\n")
 			for _, item := range envVars {
-				nameValue := strings.Split(item, "=")
+				nameValue := strings.SplitN(item, "=", 2)
 				if len(nameValue) == 2 {
 					envs[nameValue[0]] = nameValue[1]
 					sb.WriteString(nameValue[0])
