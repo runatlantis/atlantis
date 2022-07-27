@@ -465,6 +465,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		BitbucketUser:   userConfig.BitbucketUser,
 		AzureDevopsUser: userConfig.AzureDevopsUser,
 		ApplyDisabled:   userConfig.DisableApply,
+		AtlantisVersion: config.AtlantisVersion,
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}

@@ -79,6 +79,7 @@ type CommentParser struct {
 	BitbucketUser   string
 	AzureDevopsUser string
 	ApplyDisabled   bool
+	AtlantisVersion string
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -372,9 +373,11 @@ func (e *CommentParser) HelpComment(applyDisabled bool) string {
 	buf := &bytes.Buffer{}
 	var tmpl = template.Must(template.New("").Parse(helpCommentTemplate))
 	if err := tmpl.Execute(buf, struct {
-		ApplyDisabled bool
+		ApplyDisabled   bool,
+		AtlantisVersion string,
 	}{
-		ApplyDisabled: applyDisabled,
+		ApplyDisabled:   applyDisabled,
+		AtlantisVersion: e.AtlantisVersion,
 	}); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
 	}
@@ -383,7 +386,7 @@ func (e *CommentParser) HelpComment(applyDisabled bool) string {
 }
 
 var helpCommentTemplate = "```cmake\n" +
-	`atlantis
+	`atlantis v{{ .AtlantisVersion }}
 Terraform Pull Request Automation
 
 Usage:
