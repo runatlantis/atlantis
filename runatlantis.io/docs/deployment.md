@@ -63,10 +63,11 @@ To install:
       token: bar
       secret: baz
     ```
-1. Edit `values.yaml` and set your `orgWhitelist` (see [Repo Whitelist](server-configuration.html#repo-whitelist) for more information)
+1. Edit `values.yaml` and set your `orgAllowlist` (see [Repo Allowlist](server-configuration.md#repo-allowlist) for more information)
     ```yaml
-    orgWhitelist: github.com/runatlantis/*
+    orgAllowlist: github.com/runatlantis/*
     ```
+    **Note**: For helm chart version < `4.0.2`, `orgWhitelist` must be used instead. 
 1. Configure any other variables (see [https://github.com/runatlantis/helm-charts#customization](https://github.com/runatlantis/helm-charts#customization)
     for documentation)
 1. Run
