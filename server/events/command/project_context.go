@@ -22,6 +22,7 @@ type ContextFlags struct {
 	ParallelApply,
 	ParallelPlan,
 	ForceApply bool
+	LogLevel string
 }
 
 func NewProjectContext(

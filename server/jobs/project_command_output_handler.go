@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"sync"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -67,12 +68,14 @@ type AsyncProjectCommandOutputHandler struct {
 	// Map to track jobs in a pull request
 	pullToJobMapping sync.Map
 	logger           logging.Logger
+	logFilter        filter.LogFilter
 }
 
 func NewAsyncProjectCommandOutputHandler(
 	projectCmdOutput chan *ProjectCmdOutputLine,
 	logger logging.Logger,
 	jobStore JobStore,
+	logFilter filter.LogFilter,
 ) ProjectCommandOutputHandler {
 	return &AsyncProjectCommandOutputHandler{
 		projectCmdOutput: projectCmdOutput,
@@ -80,6 +83,7 @@ func NewAsyncProjectCommandOutputHandler(
 		pullToJobMapping: sync.Map{},
 		JobStore:         jobStore,
 		receiverRegistry: NewReceiverRegistry(),
+		logFilter:        logFilter,
 	}
 }
 
@@ -101,6 +105,11 @@ func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg 
 
 func (p *AsyncProjectCommandOutputHandler) Handle() {
 	for msg := range p.projectCmdOutput {
+
+		// Filter out log lines from job output
+		if p.logFilter.ShouldFilterLine(msg.Line) {
+			continue
+		}
 
 		// Add job to pullToJob mapping
 		if _, ok := p.pullToJobMapping.Load(msg.JobInfo.PullInfo); !ok {

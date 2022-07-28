@@ -423,13 +423,14 @@ func TestCommentCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_String(t *testing.T) {
-	exp := `command="plan" dir="mydir" workspace="myworkspace" project="myproject" flags="flag1,flag2"`
+	exp := `command="plan" dir="mydir" workspace="myworkspace" project="myproject" loglevel="trace" flags="flag1,flag2"`
 	Equals(t, exp, (command.Comment{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},
 		Name:        command.Plan,
 		Workspace:   "myworkspace",
 		ProjectName: "myproject",
+		LogLevel:    "trace",
 	}).String())
 }
 

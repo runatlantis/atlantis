@@ -94,25 +94,12 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx context.Context, prjCtx comma
 		wg.Add(2)
 		// Asynchronously copy from stdout/err to outCh.
 		go func() {
-			s := bufio.NewScanner(stdout)
-			buf := []byte{}
-			s.Buffer(buf, BufioScannerBufferSize)
-
-			for s.Scan() {
-				message := s.Text()
-				outCh <- helpers.Line{Line: message}
-				c.projectCmdOutputHandler.Send(prjCtx, message)
-			}
-			wg.Done()
+			defer wg.Done()
+			c.WriteOutput(stdout, outCh, prjCtx)
 		}()
 		go func() {
-			s := bufio.NewScanner(stderr)
-			for s.Scan() {
-				message := s.Text()
-				outCh <- helpers.Line{Line: message}
-				c.projectCmdOutputHandler.Send(prjCtx, message)
-			}
-			wg.Done()
+			defer wg.Done()
+			c.WriteOutput(stderr, outCh, prjCtx)
 		}()
 
 		// Wait for our copying to complete. This *must* be done before
@@ -133,4 +120,16 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx context.Context, prjCtx comma
 	}()
 
 	return outCh
+}
+
+func (c *AsyncClient) WriteOutput(stdReader io.ReadCloser, outCh chan helpers.Line, prjCtx command.ProjectContext) {
+	s := bufio.NewScanner(stdReader)
+	buf := []byte{}
+	s.Buffer(buf, BufioScannerBufferSize)
+
+	for s.Scan() {
+		message := s.Text()
+		outCh <- helpers.Line{Line: message}
+		c.projectCmdOutputHandler.Send(prjCtx, message)
+	}
 }

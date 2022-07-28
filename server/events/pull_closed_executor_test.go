@@ -14,6 +14,7 @@
 package events_test
 
 import (
+	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"github.com/uber-go/tally"
 	"io/ioutil"
 	"testing"
@@ -202,7 +203,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		// Create Log streaming resources
 		prjCmdOutput := make(chan *jobs.ProjectCmdOutputLine)
 		storageBackend := jobmocks.NewMockStorageBackend()
-		prjCmdOutHandler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutput, logger, jobs.NewJobStore(storageBackend, tally.NewTestScope("test", map[string]string{})))
+		prjCmdOutHandler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutput, logger, jobs.NewJobStore(storageBackend, tally.NewTestScope("test", map[string]string{})), filter.LogFilter{})
 		ctx := command.ProjectContext{
 			BaseRepo:    fixtures.GithubRepo,
 			Pull:        fixtures.Pull,

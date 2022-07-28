@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"io"
 	"io/ioutil"
 	"log"
@@ -200,6 +201,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	statsScope, closer, err := metrics.NewScope(globalCfg.Metrics, ctxLogger, userConfig.StatsNamespace)
+
+	logFilter := filter.LogFilter{
+		Regexes: globalCfg.TerraformLogFilter.Regexes,
+	}
 
 	if err != nil {
 		return nil, errors.Wrapf(err, "instantiating metrics scope")
@@ -395,6 +400,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCmdOutput,
 		ctxLogger,
 		jobStore,
+		logFilter,
 	)
 
 	terraformClient, err := terraform.NewClient(
@@ -416,6 +422,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
 		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
 		GlobalCfg:                globalCfg,
+		LogFilter:                logFilter,
 	}
 	markdownRenderer := &markdown.Renderer{
 		DisableApplyAll:          userConfig.DisableApplyAll,

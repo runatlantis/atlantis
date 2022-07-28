@@ -47,6 +47,7 @@ type GlobalCfg struct {
 	PolicySets           PolicySets
 	Metrics              Metrics
 	Jobs                 Jobs
+	TerraformLogFilter   TerraformLogFilters
 }
 
 // Interface to configure the storage backends
@@ -93,6 +94,10 @@ type Metrics struct {
 type Statsd struct {
 	Port string
 	Host string
+}
+
+type TerraformLogFilters struct {
+	Regexes []*regexp.Regexp
 }
 
 type MergedProjectCfg struct {

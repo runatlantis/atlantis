@@ -131,7 +131,7 @@ func (p *PlanStepRunner) switchWorkspace(ctx context.Context, prjCtx command.Pro
 			return err
 		}
 		// If `show` says we're already on this workspace then we're done.
-		if strings.TrimSpace(workspaceShowOutput) == prjCtx.Workspace {
+		if strings.Contains(workspaceShowOutput, prjCtx.Workspace) {
 			return nil
 		}
 	}

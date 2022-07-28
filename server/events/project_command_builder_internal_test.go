@@ -608,7 +608,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							Mergeable: true,
 						},
-					}, cmd, "", []string{"flag"}, tmp, "project1", "myworkspace", false)
+					}, cmd, "", []string{"flag"}, tmp, "project1", "myworkspace", false, "")
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -631,6 +631,183 @@ projects:
 						expSteps = append(expSteps, valid.Step{
 							StepName: stepName,
 						})
+					}
+
+					c.expCtx.CommandName = cmd
+					// Init fields we couldn't in our cases map.
+					c.expCtx.Steps = expSteps
+					ctx.PolicySets = emptyPolicySets
+
+					// Job ID cannot be compared since its generated at random
+					ctx.JobID = ""
+
+					Equals(t, c.expCtx, ctx)
+					// Equals() doesn't compare TF version properly so have to
+					// use .String().
+					if c.expCtx.TerraformVersion != nil {
+						Equals(t, c.expCtx.TerraformVersion.String(), ctx.TerraformVersion.String())
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestBuildProjectCmdCtx_LogLevel(t *testing.T) {
+	logger := logging.NewNoopCtxLogger(t)
+	emptyPolicySets := valid.PolicySets{
+		Version:    nil,
+		PolicySets: []valid.PolicySet{},
+	}
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+		},
+	}
+	pull := models.PullRequest{
+		BaseRepo: baseRepo,
+	}
+	cases := map[string]struct {
+		globalCfg     string
+		repoCfg       string
+		expErr        string
+		expCtx        command.ProjectContext
+		expPlanSteps  []string
+		expApplySteps []string
+		logLevel      string
+	}{
+		// Test that if we've set global defaults and no project config
+		// that the global defaults are used.
+		"global defaults": {
+			globalCfg: `
+repos:
+- id: /.*/
+  workflow: default
+workflows:
+  default:
+    plan:
+      steps:
+      - init
+      - plan
+    apply:
+      steps:
+      - apply`,
+			repoCfg: "",
+			expCtx: command.ProjectContext{
+				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				BaseRepo:           baseRepo,
+				EscapedCommentArgs: []string{`\f\l\a\g`},
+				AutoplanEnabled:    true,
+				HeadRepo:           models.Repo{},
+				Log:                logger,
+				PullReqStatus: models.PullReqStatus{
+					Mergeable: true,
+				},
+				Pull:              pull,
+				ProjectName:       "",
+				ApplyRequirements: []string{},
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				User:              models.User{},
+				Workspace:         "myworkspace",
+				PolicySets:        emptyPolicySets,
+				RequestCtx:        context.TODO(),
+			},
+			expPlanSteps:  []string{"env", "init", "plan"},
+			expApplySteps: []string{"env", "apply"},
+			logLevel:      "trace",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmp, cleanup := DirStructure(t, map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"modules": map[string]interface{}{
+					"module": map[string]interface{}{
+						"main.tf": nil,
+					},
+				},
+			})
+			defer cleanup()
+
+			workingDir := NewMockWorkingDir()
+			When(workingDir.Clone(matchers.AnyLoggingLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+
+			// Write and parse the global config file.
+			globalCfgPath := filepath.Join(tmp, "global.yaml")
+			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
+			parser := &config.ParserValidator{}
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg())
+			Ok(t, err)
+
+			if c.repoCfg != "" {
+				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+			}
+
+			builder := &DefaultProjectCommandBuilder{
+				ParserValidator:   &config.ParserValidator{},
+				ProjectFinder:     &DefaultProjectFinder{},
+				VCSClient:         vcsClient,
+				WorkingDir:        workingDir,
+				WorkingDirLocker:  NewDefaultWorkingDirLocker(),
+				GlobalCfg:         globalCfg,
+				PendingPlanFinder: &DefaultPendingPlanFinder{},
+				ProjectCommandContextBuilder: &projectCommandContextBuilder{
+					CommentBuilder: &CommentParser{},
+				},
+				AutoplanFileList: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				EnableRegExpCmd:  false,
+			}
+
+			// We run a test for each type of command.
+			for _, cmd := range []command.Name{command.Plan, command.Apply} {
+				t.Run(cmd.String(), func(t *testing.T) {
+					ctxs, err := builder.buildProjectCommandCtx(&command.Context{
+						RequestCtx: context.TODO(),
+						Log:        logger,
+						Pull: models.PullRequest{
+							BaseRepo: baseRepo,
+						},
+						PullRequestStatus: models.PullReqStatus{
+							Mergeable: true,
+						},
+					}, cmd, "", []string{"flag"}, tmp, "project1", "myworkspace", false, c.logLevel)
+
+					if c.expErr != "" {
+						ErrEquals(t, c.expErr, err)
+						return
+					}
+					ctx := ctxs[0]
+
+					Ok(t, err)
+
+					// Construct expected steps.
+					var stepNames []string
+					switch cmd {
+					case command.Plan:
+						stepNames = c.expPlanSteps
+					case command.Apply:
+						stepNames = c.expApplySteps
+					}
+					var expSteps []valid.Step
+					for _, stepName := range stepNames {
+						if stepName == "env" {
+							expSteps = append(expSteps, valid.Step{
+								StepName:    stepName,
+								EnvVarName:  valid.TF_LOG_ENV_VAR,
+								EnvVarValue: c.logLevel,
+							})
+						} else {
+							expSteps = append(expSteps, valid.Step{
+								StepName: stepName,
+							})
+						}
 					}
 
 					c.expCtx.CommandName = cmd
@@ -801,7 +978,7 @@ projects:
 							Mergeable: true,
 						},
 						RequestCtx: context.TODO(),
-					}, cmd, "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", false)
+					}, cmd, "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", false, "")
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -1015,7 +1192,7 @@ workflows:
 					PullRequestStatus: models.PullReqStatus{
 						Mergeable: true,
 					},
-				}, command.Plan, "", []string{"flag"}, tmp, "project1", "myworkspace", false)
+				}, command.Plan, "", []string{"flag"}, tmp, "project1", "myworkspace", false, "")
 
 				if c.expErr != "" {
 					ErrEquals(t, c.expErr, err)

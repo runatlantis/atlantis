@@ -21,6 +21,7 @@ type GlobalCfg struct {
 	PolicySets           PolicySets           `yaml:"policies" json:"policies"`
 	Metrics              Metrics              `yaml:"metrics" json:"metrics"`
 	Jobs                 Jobs                 `yaml:"jobs" json:"jobs"`
+	TerraformLogFilters  TerraformLogFilters  `yaml:"terraform_log_filters" json:"terraform_log_filters"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
@@ -73,6 +74,7 @@ func (g GlobalCfg) Validate() error {
 		validation.Field(&g.DeploymentWorkflows),
 		validation.Field(&g.Metrics),
 		validation.Field(&g.Jobs),
+		validation.Field(&g.TerraformLogFilters),
 	)
 	if err != nil {
 		return err
@@ -160,6 +162,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 		PolicySets:           policySets,
 		Metrics:              g.Metrics.ToValid(),
 		Jobs:                 g.Jobs.ToValid(),
+		TerraformLogFilter:   g.TerraformLogFilters.ToValid(),
 	}
 }
 

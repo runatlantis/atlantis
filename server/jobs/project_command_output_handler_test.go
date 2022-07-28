@@ -1,6 +1,8 @@
 package jobs_test
 
 import (
+	"github.com/runatlantis/atlantis/server/events/terraform/filter"
+	"regexp"
 	"sync"
 	"testing"
 
@@ -53,6 +55,9 @@ func createProjectCommandOutputHandler(t *testing.T) (jobs.ProjectCommandOutputH
 		prjCmdOutputChan,
 		logger,
 		jobStore,
+		filter.LogFilter{
+			Regexes: []*regexp.Regexp{regexp.MustCompile("InvalidMessage")},
+		},
 	)
 
 	go func() {
@@ -89,6 +94,39 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		projectOutputHandler.Register(ctx.JobID, ch)
 
 		wg.Add(1)
+		projectOutputHandler.Send(ctx, Msg)
+		wg.Wait()
+		close(ch)
+
+		Equals(t, expectedMsg, Msg)
+	})
+
+	t.Run("strip message from main channel", func(t *testing.T) {
+		var wg sync.WaitGroup
+		var expectedMsg string
+		projectOutputHandler, jobStore := createProjectCommandOutputHandler(t)
+		strippedMessage := "InvalidMessage test"
+
+		When(jobStore.Get(AnyString())).ThenReturn(&jobs.Job{}, nil)
+		ch := make(chan string)
+
+		// read from channel
+		go func() {
+			for msg := range ch {
+				expectedMsg = msg
+				wg.Done()
+			}
+		}()
+
+		// register channel and backfill from buffer
+		// Note: We call this synchronously because otherwise
+		// there could be a race where we are unable to register the channel
+		// before sending messages due to the way we lock our buffer memory cache
+		projectOutputHandler.Register(ctx.JobID, ch)
+
+		wg.Add(1)
+		// even if stripped message is sent first, registered channel will never receive it, making expectedMsg == Msg
+		projectOutputHandler.Send(ctx, strippedMessage)
 		projectOutputHandler.Send(ctx, Msg)
 		wg.Wait()
 		close(ch)

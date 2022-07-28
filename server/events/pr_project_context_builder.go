@@ -29,7 +29,7 @@ func (p *prProjectContextBuilder) BuildProjectContext(
 	return buildContext(
 		ctx,
 		cmdName,
-		getSteps(cmdName, prjCfg.Workflow),
+		getSteps(cmdName, prjCfg.Workflow, contextFlags.LogLevel),
 		p.CommentBuilder,
 		prjCfg,
 		commentArgs,

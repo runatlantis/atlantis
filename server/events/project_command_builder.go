@@ -125,7 +125,7 @@ type DefaultProjectCommandBuilder struct {
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
-	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false)
+	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false, "")
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 // See ProjectCommandBuilder.BuildPlanCommands.
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *command.Comment) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
-		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.ForceApply)
+		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.ForceApply, cmd.LogLevel)
 	}
 	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
 	return pcc, err
@@ -171,7 +171,7 @@ func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
 // modified in this ctx.
-func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context, commentFlags []string, forceApply bool) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context, commentFlags []string, forceApply bool, logLevel string) ([]command.ProjectContext, error) {
 	// We'll need the list of modified files.
 	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
@@ -220,6 +220,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 				ForceApply:    forceApply,
 				ParallelApply: repoCfg.ParallelApply,
 				ParallelPlan:  repoCfg.ParallelPlan,
+				LogLevel:      logLevel,
 			}
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
@@ -247,6 +248,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 				ForceApply:    forceApply,
 				ParallelApply: DefaultParallelApplyEnabled,
 				ParallelPlan:  DefaultParallelPlanEnabled,
+				LogLevel:      logLevel,
 			}
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
@@ -304,6 +306,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		repoRelDir,
 		workspace,
 		cmd.ForceApply,
+		cmd.LogLevel,
 	)
 }
 
@@ -389,7 +392,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *command.Cont
 
 	var cmds []command.ProjectContext
 	for _, plan := range plans {
-		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.ForceApply)
+		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.ForceApply, commentCmd.LogLevel)
 		if err != nil {
 			return nil, errors.Wrapf(err, "building command for dir %q", plan.RepoRelDir)
 		}
@@ -436,6 +439,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *command.Con
 		repoRelDir,
 		workspace,
 		cmd.ForceApply,
+		cmd.LogLevel,
 	)
 }
 
@@ -477,6 +481,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *command.C
 		repoRelDir,
 		workspace,
 		cmd.ForceApply,
+		cmd.LogLevel,
 	)
 }
 
@@ -489,7 +494,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	repoDir string,
 	repoRelDir string,
 	workspace string,
-	forceApply bool) ([]command.ProjectContext, error) {
+	forceApply bool,
+	logLevel string) ([]command.ProjectContext, error) {
 
 	matchingProjects, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
 	if err != nil {
@@ -508,6 +514,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		ForceApply:    forceApply,
 		ParallelApply: parallelApply,
 		ParallelPlan:  parallelPlan,
+		LogLevel:      logLevel,
 	}
 
 	if len(matchingProjects) > 0 {

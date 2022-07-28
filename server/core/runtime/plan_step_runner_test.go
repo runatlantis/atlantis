@@ -295,7 +295,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			// output of `workspace show` to be a different name.
 			When(terraform.RunCommandWithVersion(
 				ctx,
-				prjCtx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("diffworkspace\n", nil)
+				prjCtx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("diffworkzpace\n", nil)
 
 			expWorkspaceArgs := []string{c.expWorkspaceCommand, "select", "workspace"}
 			When(terraform.RunCommandWithVersion(

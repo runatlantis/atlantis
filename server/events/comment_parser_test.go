@@ -190,6 +190,25 @@ func TestParse_InvalidCommand(t *testing.T) {
 	}
 }
 
+func TestParse_InvalidLogLevel(t *testing.T) {
+
+	comments := []string{
+		"atlantis plan -l warnz",
+		"atlantis plan --log-level strace",
+	}
+	for _, c := range comments {
+		r := commentParser.Parse(c, models.Github)
+		exp := fmt.Sprintf("```\nError: invalid log level: %q.\n", strings.Fields(c)[3]) + PlanUsage + "```"
+		for i, c := range exp {
+			if string(c) != string(r.CommentResponse[i]) {
+				fmt.Println(i, string(c))
+			}
+		}
+		Assert(t, r.CommentResponse == exp,
+			"For comment %q expected CommentResponse==%q but got %q", c, exp, r.CommentResponse)
+	}
+}
+
 func TestParse_SubcommandUsage(t *testing.T) {
 	t.Log("given a comment asking for the usage of a subcommand should " +
 		"return help")
@@ -332,9 +351,11 @@ func TestParse_Parsing(t *testing.T) {
 		expDir       string
 		expExtraArgs string
 		expProject   string
+		expLogLevel  string
 	}{
 		// Test defaults.
 		{
+			"",
 			"",
 			"",
 			"",
@@ -348,11 +369,13 @@ func TestParse_Parsing(t *testing.T) {
 			"",
 			"",
 			"",
+			"",
 		},
 		{
 			"-d dir",
 			"",
 			"dir",
+			"",
 			"",
 			"",
 		},
@@ -362,11 +385,21 @@ func TestParse_Parsing(t *testing.T) {
 			"",
 			"",
 			"project",
+			"",
+		},
+		{
+			"-l trace",
+			"",
+			"",
+			"",
+			"",
+			"trace",
 		},
 		// Test each long flag individually.
 		{
 			"--workspace workspace",
 			"workspace",
+			"",
 			"",
 			"",
 			"",
@@ -377,6 +410,7 @@ func TestParse_Parsing(t *testing.T) {
 			"dir",
 			"",
 			"",
+			"",
 		},
 		{
 			"--project project",
@@ -384,6 +418,15 @@ func TestParse_Parsing(t *testing.T) {
 			"",
 			"",
 			"project",
+			"",
+		},
+		{
+			"--log-level TRACE",
+			"",
+			"",
+			"",
+			"",
+			"trace",
 		},
 		// Test all of them with different permutations.
 		{
@@ -392,6 +435,15 @@ func TestParse_Parsing(t *testing.T) {
 			"dir",
 			"",
 			"",
+			"",
+		},
+		{
+			"-w workspace -d dir -l warn",
+			"workspace",
+			"dir",
+			"",
+			"",
+			"warn",
 		},
 		{
 			"-w workspace -- -d dir",
@@ -399,10 +451,12 @@ func TestParse_Parsing(t *testing.T) {
 			"",
 			"-d dir",
 			"",
+			"",
 		},
 		// Test the extra args parsing.
 		{
 			"--",
+			"",
 			"",
 			"",
 			"",
@@ -414,6 +468,7 @@ func TestParse_Parsing(t *testing.T) {
 			"dir",
 			"arg one -two --three &&",
 			"",
+			"",
 		},
 		// Test whitespace.
 		{
@@ -422,12 +477,14 @@ func TestParse_Parsing(t *testing.T) {
 			"dir",
 			"arg one -two --three &&",
 			"",
+			"",
 		},
 		{
 			"   -w   workspace   -d   dir   --   arg   one   -two   --three   &&",
 			"workspace",
 			"dir",
 			"arg one -two --three &&",
+			"",
 			"",
 		},
 		// Test that the dir string is normalized.
@@ -437,11 +494,13 @@ func TestParse_Parsing(t *testing.T) {
 			".",
 			"",
 			"",
+			"",
 		},
 		{
 			"-d /adir",
 			"",
 			"adir",
+			"",
 			"",
 			"",
 		},
@@ -451,11 +510,13 @@ func TestParse_Parsing(t *testing.T) {
 			".",
 			"",
 			"",
+			"",
 		},
 		{
 			"-d ./",
 			"",
 			".",
+			"",
 			"",
 			"",
 		},
@@ -465,11 +526,13 @@ func TestParse_Parsing(t *testing.T) {
 			"adir",
 			"",
 			"",
+			"",
 		},
 		{
 			"-d \"dir with space\"",
 			"",
 			"dir with space",
+			"",
 			"",
 			"",
 		},
@@ -483,6 +546,7 @@ func TestParse_Parsing(t *testing.T) {
 				Assert(t, r.CommentResponse == "", "CommentResponse should have been empty but was %q for comment %q", r.CommentResponse, comment)
 				Assert(t, test.expDir == r.Command.RepoRelDir, "exp dir to equal %q but was %q for comment %q", test.expDir, r.Command.RepoRelDir, comment)
 				Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
+				Assert(t, test.expLogLevel == r.Command.LogLevel, "exp log level to equal %q but was %q for comment %q", test.expLogLevel, r.Command.LogLevel, comment)
 				actExtraArgs := strings.Join(r.Command.Flags, " ")
 				Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 				if cmdName == "plan" {
@@ -730,6 +794,8 @@ func TestParse_VCSUsername(t *testing.T) {
 var PlanUsage = `Usage of plan:
   -d, --dir string         Which directory to run plan in relative to root of repo,
                            ex. 'child/dir'.
+  -l, --log-level string   Which log level to use when emitting terraform results,
+                           ex. 'trace'.
   -p, --project string     Which project to run plan for. Refers to the name of the
                            project configured in atlantis.yaml. Cannot be used at
                            same time as workspace or dir flags.
@@ -740,6 +806,8 @@ var ApplyUsage = `Usage of apply:
   -d, --dir string         Apply the plan for this directory, relative to root of
                            repo, ex. 'child/dir'.
   -f, --force              Force Atlantis to ignore apply requirements.
+  -l, --log-level string   Which log level to use when emitting terraform results,
+                           ex. 'trace'.
   -p, --project string     Apply the plan for this project. Refers to the name of
                            the project configured in atlantis.yaml. Cannot be used
                            at same time as workspace or dir flags.

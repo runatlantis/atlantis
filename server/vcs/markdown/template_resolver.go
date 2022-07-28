@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"io/ioutil"
 	"strings"
 	"text/template"
@@ -73,6 +74,7 @@ type TemplateResolver struct {
 	GitlabSupportsCommonMark bool
 	DisableMarkdownFolding   bool
 	GlobalCfg                valid.GlobalCfg
+	LogFilter                filter.LogFilter
 }
 
 // Resolves templates for commands
@@ -114,13 +116,14 @@ func (t *TemplateResolver) ResolveProject(result command.ProjectResult, baseRepo
 
 	switch {
 	case result.Error != nil:
-		tmpl = t.buildTemplate(Error, baseRepo.VCSHost.Type, wrappedErrTmpl, unwrappedErrTmpl, result.Error.Error(), templateOverrides)
+		filteredOutput := t.filterOutput(result.Error.Error())
+		tmpl = t.buildTemplate(Error, baseRepo.VCSHost.Type, wrappedErrTmpl, unwrappedErrTmpl, filteredOutput, templateOverrides)
 		templateData = struct {
 			Command string
 			Error   string
 		}{
 			Command: common.Command,
-			Error:   result.Error.Error(),
+			Error:   filteredOutput,
 		}
 	case result.Failure != "":
 		// use template override if specified
@@ -138,7 +141,9 @@ func (t *TemplateResolver) ResolveProject(result command.ProjectResult, baseRepo
 			Failure: result.Failure,
 		}
 	case result.PlanSuccess != nil:
-		tmpl = t.buildTemplate(PlanSuccess, baseRepo.VCSHost.Type, planSuccessWrappedTmpl, planSuccessUnwrappedTmpl, result.PlanSuccess.TerraformOutput, templateOverrides)
+		filteredOutput := t.filterOutput(result.PlanSuccess.TerraformOutput)
+		tmpl = t.buildTemplate(PlanSuccess, baseRepo.VCSHost.Type, planSuccessWrappedTmpl, planSuccessUnwrappedTmpl, filteredOutput, templateOverrides)
+		result.PlanSuccess.TerraformOutput = filteredOutput
 		templateData = planSuccessData{
 			PlanSuccess:              *result.PlanSuccess,
 			PlanSummary:              result.PlanSuccess.Summary(),
@@ -151,11 +156,12 @@ func (t *TemplateResolver) ResolveProject(result command.ProjectResult, baseRepo
 			PolicyCheckSuccess: *result.PolicyCheckSuccess,
 		}
 	case result.ApplySuccess != "":
-		tmpl = t.buildTemplate(ApplySuccess, baseRepo.VCSHost.Type, applyWrappedSuccessTmpl, applyUnwrappedSuccessTmpl, result.ApplySuccess, templateOverrides)
+		filteredOutput := t.filterOutput(result.ApplySuccess)
+		tmpl = t.buildTemplate(ApplySuccess, baseRepo.VCSHost.Type, applyWrappedSuccessTmpl, applyUnwrappedSuccessTmpl, filteredOutput, templateOverrides)
 		templateData = struct {
 			Output string
 		}{
-			Output: result.ApplySuccess,
+			Output: filteredOutput,
 		}
 	case result.VersionSuccess != "":
 		tmpl = t.buildTemplate(VersionSuccess, baseRepo.VCSHost.Type, versionWrappedSuccessTmpl, versionUnwrappedSuccessTmpl, result.VersionSuccess, templateOverrides)
@@ -167,6 +173,18 @@ func (t *TemplateResolver) ResolveProject(result command.ProjectResult, baseRepo
 	}
 	return tmpl, templateData
 
+}
+
+func (t *TemplateResolver) filterOutput(s string) string {
+	var filteredLines []string
+	logLines := strings.Split(s, "\n")
+	for _, line := range logLines {
+		if t.LogFilter.ShouldFilterLine(line) {
+			continue
+		}
+		filteredLines = append(filteredLines, line)
+	}
+	return strings.Join(filteredLines, "\n")
 }
 
 func (t *TemplateResolver) buildTemplate(projectOutputType ProjectOutputType, vcsHost models.VCSHostType, wrappedTmpl string, unwrappedTmpl string, output string, templateOverrides map[string]string) *template.Template {

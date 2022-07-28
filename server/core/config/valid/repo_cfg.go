@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const TF_LOG_ENV_VAR = "TF_LOG"
+
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
 type RepoCfg struct {
 	// Version is the version of the atlantis YAML file.
@@ -214,4 +216,14 @@ type Workflow struct {
 	Apply       Stage
 	Plan        Stage
 	PolicyCheck Stage
+}
+
+// If logLevel is passed in a comment, we will prepend an env step to export it
+func PrependLogEnvStep(steps []Step, logLevel string) []Step {
+	envStep := Step{
+		StepName:    "env",
+		EnvVarName:  TF_LOG_ENV_VAR,
+		EnvVarValue: logLevel,
+	}
+	return append([]Step{envStep}, steps...)
 }
