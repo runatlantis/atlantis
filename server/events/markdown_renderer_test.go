@@ -2188,7 +2188,7 @@ Terraform will perform the following actions:
       + name    = "redacted.redacted.redacted.io"
       + records = [
             "foo",
-      ]
+        ]
       + ttl     = 300
       + type    = "A"
       + zone_id = "redacted"
