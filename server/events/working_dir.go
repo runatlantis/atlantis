@@ -105,12 +105,12 @@ func (w *FileWorkspace) Clone(
 		}
 	}
 
-	return cloneDir, w.warnDiverged(log, cloneDir), nil
+	return cloneDir, w.warnDiverged(log, p, headRepo, cloneDir), nil
 }
 
 // alreadyClonedHEAD determines whether the HEAD commit is already present in the cloneDir
 // repository. This can be used to determine whether we should force clone again.
-func (w *FileWorkspace) alreadyClonedHEAD(log *logging.SimpleLogging, cloneDir string, p models.PullRequest) bool {
+func (w *FileWorkspace) alreadyClonedHEAD(log logging.SimpleLogging, cloneDir string, p models.PullRequest) bool {
 	// If the directory isn't there or isn't readable, we cannot already be cloned
 	if _, err := os.Stat(cloneDir); err != nil {
 		return false
@@ -149,7 +149,7 @@ func (w *FileWorkspace) alreadyClonedHEAD(log *logging.SimpleLogging, cloneDir s
 // fetchBranch causes the repository to fetch the most recent version of the given branch
 // in a shallow fashion. This ensures we can access files from this branch, enabling later
 // reading of files from this revision.
-func (w *FileWorkspace) fetchBranch(log *logging.SimpleLogging, cloneDir, branch string) (string, error) {
+func (w *FileWorkspace) fetchBranch(log logging.SimpleLogging, cloneDir, branch string) (string, error) {
 	log.Debug("fetching branch %s into repository %s", branch, cloneDir)
 
 	fetchCmd := exec.Command("git", "fetch", "--depth=1", "origin", fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", branch, branch))
