@@ -1,8 +1,8 @@
 # Stage 1: build artifact
 FROM golang:1.19.0-alpine AS builder
 
-WORKDIR /app
-COPY . /app
+WORKDIR /go/src/github.com/runatlantis/atlantis
+COPY . /go/src/github.com/runatlantis/atlantis
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
 
 # Stage 2
@@ -58,7 +58,9 @@ RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
 RUN ln -s /usr/local/bin/cft/versions/${DEFAULT_CONFTEST_VERSION}/conftest /usr/local/bin/conftest
 
 # copy binary
-COPY --from=builder /app/atlantis /usr/local/bin/atlantis
+#COPY --from=builder /app/atlantis /usr/local/bin/atlantis
+# Override this binary with what we built in the builder image
+COPY --from=builder /go/src/github.com/runatlantis/atlantis/atlantis /usr/local/bin/atlantis
 
 # copy docker entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
