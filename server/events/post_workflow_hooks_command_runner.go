@@ -54,7 +54,15 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 	log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := w.WorkingDir.Clone(log, headRepo, pull, DefaultWorkspace)
+	_, _, _, _, _, configSourceBranch := w.GlobalCfg.GetMatchingCfg(ctx.Log, ctx.Pull.BaseRepo.ID())
+
+	// If we need to access another branch, ensure we fetch it during our initial clone
+	additionalBranches := []string{}
+	if configSourceBranch != nil {
+		additionalBranches = append(additionalBranches, *configSourceBranch)
+	}
+
+	repoDir, _, err := w.WorkingDir.Clone(log, headRepo, pull, DefaultWorkspace, additionalBranches)
 	if err != nil {
 		return err
 	}
