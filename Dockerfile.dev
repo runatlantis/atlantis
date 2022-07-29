@@ -1,5 +1,12 @@
-FROM ghcr.io/runatlantis/atlantis:latest
-COPY atlantis /usr/local/bin/atlantis
+# Stage 1: build artifact
+FROM golang:1.17-alpine AS builder
+
+WORKDIR /go/src/github.com/runatlantis/atlantis
+COPY . /go/src/github.com/runatlantis/atlantis
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
+
+FROM ghcr.io/runatlantis/atlantis-base:2022.05.13 AS base
+COPY --from=builder /go/src/github.com/runatlantis/atlantis/atlantis /usr/local/bin/atlantis
 # TODO: remove this once we get this in the base image
 ENV DEFAULT_CONFTEST_VERSION=0.33.0
 
