@@ -420,12 +420,12 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
         document.location.pathname +
         "/ws");
 
-      socket.addEventListener('open', (event) => {
-        updateTerminalStatus("Running...")
-      });
-      socket.addEventListener('close', (event) => {
-        updateTerminalStatus("Done")
-      });
+      socket.onopen = function(event) {
+        updateTerminalStatus("Running...");
+      };
+      socket.onclose = function(event) {
+        updateTerminalStatus("Done");
+      };
 
       window.addEventListener("unload", function(event) {
         websocket.close();
