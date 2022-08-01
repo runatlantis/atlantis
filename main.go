@@ -27,17 +27,17 @@ func main() {
 
 	// We're creating commands manually here rather than using init() functions
 	// (as recommended by cobra) because it makes testing easier.
-	server := &cmd.ServerCmd{
-		ServerCreator:   &cmd.DefaultServerCreator{},
-		Viper:           v,
-		AtlantisVersion: atlantisVersion,
-	}
+	server := cmd.NewServerCmd(v, atlantisVersion)
 	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
 	testdrive := &cmd.TestdriveCmd{}
-	cmd.RootCmd.AddCommand(temporalCmd.NewWorkerCmd(temporalCmd.WorkerConfig{}))
-	cmd.RootCmd.AddCommand(temporalCmd.NewServerCmd())
+
 	cmd.RootCmd.AddCommand(server.Init())
 	cmd.RootCmd.AddCommand(version.Init())
 	cmd.RootCmd.AddCommand(testdrive.Init())
+
+	// TODO: remove once we've added support for temporal, this exists only for demo purposes rn
+	cmd.RootCmd.AddCommand(temporalCmd.NewWorkerCmd(temporalCmd.WorkerConfig{}))
+	cmd.RootCmd.AddCommand(temporalCmd.NewServerCmd())
+
 	cmd.Execute()
 }

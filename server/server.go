@@ -48,7 +48,6 @@ import (
 	lyftCommands "github.com/runatlantis/atlantis/server/lyft/command"
 	lyftRuntime "github.com/runatlantis/atlantis/server/lyft/core/runtime"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
-	"github.com/runatlantis/atlantis/server/lyft/gateway"
 	"github.com/runatlantis/atlantis/server/lyft/scheduled"
 	"github.com/runatlantis/atlantis/server/metrics"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
@@ -937,19 +936,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	gatewaySnsWriter := sns.NewWriterWithStats(session, userConfig.LyftGatewaySnsTopicArn, statsScope.SubScope("aws.sns.gateway"))
-	autoplanValidator := &gateway.AutoplanValidator{
-		Scope:                         statsScope.SubScope("validator"),
-		VCSClient:                     vcsClient,
-		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
-		Drainer:                       drainer,
-		GlobalCfg:                     globalCfg,
-		CommitStatusUpdater:           commitStatusUpdater,
-		PrjCmdBuilder:                 projectCommandBuilder,
-		OutputUpdater:                 outputUpdater,
-		WorkingDir:                    workingDir,
-		WorkingDirLocker:              workingDirLocker,
-	}
 
 	repoConverter := github_converter.RepoConverter{
 		GithubUser:  userConfig.GithubUser,
@@ -959,22 +945,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	pullConverter := github_converter.PullConverter{
 		RepoConverter: repoConverter,
 	}
-
-	gatewayEventsController := gateway.NewVCSEventsController(
-		statsScope,
-		[]byte(userConfig.GithubWebhookSecret),
-		userConfig.PlanDrafts,
-		autoplanValidator,
-		gatewaySnsWriter,
-		commentParser,
-		repoAllowlist,
-		vcsClient,
-		ctxLogger,
-		supportedVCSHosts,
-		repoConverter,
-		pullConverter,
-		githubClient,
-	)
 
 	defaultEventsController := events_controllers.NewVCSEventsController(
 		statsScope,
@@ -1006,11 +976,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	case Default: // default eventsController handles POST
 		vcsPostHandler = defaultEventsController
 		ctxLogger.Info("running Atlantis in default mode")
-	case Gateway: // gateway eventsController handles POST
-		vcsPostHandler = gatewayEventsController
-		ctxLogger.Info("running Atlantis in gateway mode", map[string]interface{}{
-			"sns": userConfig.LyftGatewaySnsTopicArn,
-		})
 	case Worker: // an SQS worker is set up to handle messages via default eventsController
 		worker, err := sqs.NewGatewaySQSWorker(ctx, statsScope, ctxLogger, userConfig.LyftWorkerQueueURL, defaultEventsController)
 		if err != nil {
@@ -1064,19 +1029,17 @@ func (s *Server) Start() error {
 	if s.LyftMode != Worker {
 		s.Router.HandleFunc("/events", s.VCSPostHandler.Post).Methods("POST")
 	}
-	if s.LyftMode != Gateway {
-		s.Router.HandleFunc("/", s.Index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
-			return r.URL.Path == "/" || r.URL.Path == "/index.html"
-		})
-		s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
-		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
-		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
-		s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
-		s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
-			Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-		s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
-		s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
-	}
+	s.Router.HandleFunc("/", s.Index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
+		return r.URL.Path == "/" || r.URL.Path == "/index.html"
+	})
+	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
+	s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
+	s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
+	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
+	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
+		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
+	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
+	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 
