@@ -44,6 +44,7 @@ jobs:
           muffet \
             -e 'https://github\.com/runatlantis/atlantis/edit/master/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
+            -e 'https://github.com/runatlantis/helm-charts/blob/main/README.md#customization' \
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
             http://localhost:8080/
