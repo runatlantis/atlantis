@@ -8,7 +8,7 @@ import (
 	awsSns "github.com/aws/aws-sdk-go/service/sns"
 	snsApi "github.com/aws/aws-sdk-go/service/sns/snsiface"
 	"github.com/runatlantis/atlantis/server/events/metrics"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_writer.go Writer

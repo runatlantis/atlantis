@@ -11,7 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 type JobIDKeyGenerator struct{}

@@ -13,7 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/recovery"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 // AutoplanValidator handles setting up repo cloning and checking to verify of any terraform files have changed

@@ -3,7 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 // InstrumentedProjectCommandContextBuilder ensures that project command context contains a scoped stats

@@ -131,7 +131,6 @@ require (
 	github.com/cactus/go-statsd-client/statsd v0.0.0-20200623234511-94959e3146b2
 	github.com/nikunjy/rules v0.0.0-20200120082459-0b7c4dc9dc86 // indirect
 	github.com/twmb/murmur3 v1.1.6 // indirect
-	github.com/uber-go/tally v3.4.3+incompatible
 )
 
 require go.temporal.io/sdk v1.13.0
@@ -141,6 +140,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.13.1
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.16.0
 	github.com/graymeta/stow v0.2.7
+	github.com/uber-go/tally/v4 v4.1.2
 	logur.dev/adapter/zap v0.5.0
 	logur.dev/logur v0.17.0
 )

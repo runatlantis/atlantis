@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 // Queue mirrors a strict set of AWS SQS Interface

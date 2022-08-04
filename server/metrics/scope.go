@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
-	tallystatsd "github.com/uber-go/tally/statsd"
+	"github.com/uber-go/tally/v4"
+	tallystatsd "github.com/uber-go/tally/v4/statsd"
 )
 
 func NewLoggingScope(logger logging.Logger, statsNamespace string) (tally.Scope, io.Closer, error) {

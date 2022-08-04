@@ -13,7 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/lyft/aws/sqs"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/assert"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 
 	"testing"
 )

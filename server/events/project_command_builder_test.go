@@ -21,7 +21,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/wrappers"
 	. "github.com/runatlantis/atlantis/testing"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {

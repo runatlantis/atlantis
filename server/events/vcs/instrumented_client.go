@@ -11,7 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/logging/fields"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 // NewInstrumentedGithubClient creates a client proxy responsible for gathering stats and logging

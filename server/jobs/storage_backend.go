@@ -10,7 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 const PageSize = 100

@@ -52,7 +52,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/wrappers"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"

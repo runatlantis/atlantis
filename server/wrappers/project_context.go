@@ -2,7 +2,7 @@ package wrappers
 
 import (
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 type projectContext struct {

@@ -10,7 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/lyft/aws/sqs/mocks"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sqs/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 
 	"context"
 	"errors"

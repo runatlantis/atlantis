@@ -13,7 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	converters "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/request"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 const githubHeader = "X-Github-Event"

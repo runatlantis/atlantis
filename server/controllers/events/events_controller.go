@@ -37,7 +37,7 @@ import (
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	github_request "github.com/runatlantis/atlantis/server/vcs/provider/github/request"
 	event_types "github.com/runatlantis/atlantis/server/vcs/types/event"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 

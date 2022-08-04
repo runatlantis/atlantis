@@ -14,7 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 )
 
 const (
