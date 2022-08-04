@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-github/v31/github"
+	"github.com/google/go-github/v45/github"
 	"github.com/runatlantis/atlantis/server/controllers/events/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	httputils "github.com/runatlantis/atlantis/server/http"

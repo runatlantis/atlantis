@@ -1,7 +1,7 @@
 package vcs
 
 import (
-	"github.com/google/go-github/v31/github"
+	"github.com/google/go-github/v45/github"
 )
 
 // ValidStatusFilter implementations filter any valid statuses,

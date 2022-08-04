@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/google/go-github/v31/github"
+	"github.com/google/go-github/v45/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 )

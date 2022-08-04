@@ -5,7 +5,7 @@ import (
 	"github.com/petergtz/pegomock"
 	"reflect"
 
-	github "github.com/google/go-github/v31/github"
+	github "github.com/google/go-github/v45/github"
 )
 
 func AnySliceOfPtrToGithubRepoStatus() []*github.RepoStatus {

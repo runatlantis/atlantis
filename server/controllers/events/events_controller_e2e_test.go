@@ -15,7 +15,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/go-github/v31/github"
+	"github.com/google/go-github/v45/github"
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server"

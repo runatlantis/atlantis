@@ -5,7 +5,7 @@ package mocks
 
 import (
 	context "context"
-	github "github.com/google/go-github/v31/github"
+	github "github.com/google/go-github/v45/github"
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	types "github.com/runatlantis/atlantis/server/events/vcs/types"

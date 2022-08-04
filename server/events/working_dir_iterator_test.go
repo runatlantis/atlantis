@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/google/go-github/v31/github"
+	"github.com/google/go-github/v45/github"
 	"github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"

@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/Laisky/graphql"
-	"github.com/google/go-github/v31/github"
+	"github.com/google/go-github/v45/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -518,10 +518,9 @@ func (g *GithubClient) updateChecksStatus(ctx context.Context, request types.Upd
 	}
 
 	updateCheckRunOpts := github.UpdateCheckRunOptions{
-		Name:    request.StatusName,
-		HeadSHA: &request.Ref,
-		Status:  &status,
-		Output:  &checkRunOutput,
+		Name:   request.StatusName,
+		Status: &status,
+		Output: &checkRunOutput,
 	}
 
 	// URL in update request takes precedence.
