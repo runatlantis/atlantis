@@ -22,6 +22,7 @@ type GlobalCfg struct {
 	Metrics              Metrics              `yaml:"metrics" json:"metrics"`
 	Jobs                 Jobs                 `yaml:"jobs" json:"jobs"`
 	TerraformLogFilters  TerraformLogFilters  `yaml:"terraform_log_filters" json:"terraform_log_filters"`
+	Temporal             Temporal             `yaml:"temporal" json:"temporal"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
@@ -163,6 +164,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 		Metrics:              g.Metrics.ToValid(),
 		Jobs:                 g.Jobs.ToValid(),
 		TerraformLogFilter:   g.TerraformLogFilters.ToValid(),
+		Temporal:             g.Temporal.ToValid(),
 	}
 }
 

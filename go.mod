@@ -2,7 +2,7 @@ module github.com/runatlantis/atlantis
 
 go 1.17
 
-replace google.golang.org/grpc => google.golang.org/grpc v1.29.1
+replace google.golang.org/grpc => google.golang.org/grpc v1.45.0
 
 require (
 	cloud.google.com/go v0.81.0 // indirect
@@ -89,7 +89,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.8.1
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/thomaspoignant/go-feature-flag v0.18.4
 	github.com/ulikunitz/xz v0.5.8 // indirect
@@ -102,26 +102,26 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.0
-	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
-	golang.org/x/mod v0.4.2 // indirect
-	golang.org/x/net v0.0.0-20211109214657-ef0fda0de508
+	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
+	golang.org/x/net v0.0.0-20220531201128-c960675eff93
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602 // indirect
-	golang.org/x/sys v0.0.0-20211110154304-99a53858aa08 // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
-	golang.org/x/tools v0.1.2 // indirect
+	golang.org/x/tools v0.1.10 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/api v0.44.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20211104193956-4c6863e31247 // indirect
-	google.golang.org/grpc v1.42.0 // indirect
-	google.golang.org/protobuf v1.27.1 // indirect
+	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8 // indirect
+	google.golang.org/grpc v1.47.0 // indirect
+	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools v2.2.0+incompatible // indirect
 )
 
@@ -133,7 +133,7 @@ require (
 	github.com/twmb/murmur3 v1.1.6 // indirect
 )
 
-require go.temporal.io/sdk v1.13.0
+require go.temporal.io/sdk v1.15.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.13.0
@@ -141,6 +141,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.16.0
 	github.com/graymeta/stow v0.2.7
 	github.com/uber-go/tally/v4 v4.1.2
+	go.temporal.io/sdk/contrib/tally v0.1.0
 	logur.dev/adapter/zap v0.5.0
 	logur.dev/logur v0.17.0
 )
@@ -166,6 +167,6 @@ require (
 	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/stretchr/objx v0.3.0 // indirect
-	go.temporal.io/api v1.6.1-0.20211110205628-60c98e9cbfe2 // indirect
-	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 // indirect
+	go.temporal.io/api v1.8.0 // indirect
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 )

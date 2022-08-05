@@ -10,6 +10,7 @@ const (
 	Default Mode = iota
 	Gateway
 	Worker
+	TemporalWorker
 )
 
 // UserConfig holds config values passed in by the user.
@@ -111,6 +112,8 @@ func (u UserConfig) ToLyftMode() Mode {
 		return Gateway
 	case "worker":
 		return Worker
+	case "temporalworker":
+		return TemporalWorker
 	}
 	return Default
 }

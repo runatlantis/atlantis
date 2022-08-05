@@ -48,6 +48,7 @@ type GlobalCfg struct {
 	Metrics              Metrics
 	Jobs                 Jobs
 	TerraformLogFilter   TerraformLogFilters
+	Temporal             Temporal
 }
 
 // Interface to configure the storage backends
@@ -92,6 +93,11 @@ type Metrics struct {
 }
 
 type Statsd struct {
+	Port string
+	Host string
+}
+
+type Temporal struct {
 	Port string
 	Host string
 }
