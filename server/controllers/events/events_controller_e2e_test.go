@@ -27,6 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/jobs"
+	event_types "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/request"
 
@@ -51,6 +52,12 @@ import (
 
 const ConftestVersion = "0.25.0"
 const githubHeader = "X-Github-Event"
+
+type noopPushEventHandler struct{}
+
+func (h noopPushEventHandler) Handle(ctx context.Context, event event_types.Push) error {
+	return nil
+}
 
 type NoopTFDownloader struct{}
 
@@ -982,6 +989,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 				nil,
 				commentHandler,
 				prHandler,
+				noopPushEventHandler{},
 				false,
 				repoConverter,
 				pullConverter,

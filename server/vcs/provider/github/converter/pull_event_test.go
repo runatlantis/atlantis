@@ -1,4 +1,4 @@
-package converter
+package converter_test
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 	"github.com/google/go-github/v45/github"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -19,12 +20,12 @@ var PullEvent = github.PullRequestEvent{
 }
 
 func TestConvert_PullRequestEvent(t *testing.T) {
-	repoConverter := RepoConverter{
+	repoConverter := converter.RepoConverter{
 		GithubUser:  "github-user",
 		GithubToken: "github-token",
 	}
-	subject := PullEventConverter{
-		PullConverter: PullConverter{RepoConverter: repoConverter},
+	subject := converter.PullEventConverter{
+		PullConverter: converter.PullConverter{RepoConverter: repoConverter},
 	}
 	_, err := subject.Convert(&github.PullRequestEvent{})
 	ErrEquals(t, "pull_request is null", err)
@@ -74,12 +75,12 @@ func TestConvert_PullRequestEvent(t *testing.T) {
 }
 
 func TestConvert_PullRequestEvent_Draft(t *testing.T) {
-	repoConverter := RepoConverter{
+	repoConverter := converter.RepoConverter{
 		GithubUser:  "github-user",
 		GithubToken: "github-token",
 	}
-	subject := PullEventConverter{
-		PullConverter: PullConverter{RepoConverter: repoConverter},
+	subject := converter.PullEventConverter{
+		PullConverter: converter.PullConverter{RepoConverter: repoConverter},
 	}
 
 	// verify that draft PRs are treated as 'other' events by default
@@ -98,12 +99,12 @@ func TestConvert_PullRequestEvent_Draft(t *testing.T) {
 }
 
 func TestConvert_PullRequestEvent_EventType(t *testing.T) {
-	repoConverter := RepoConverter{
+	repoConverter := converter.RepoConverter{
 		GithubUser:  "github-user",
 		GithubToken: "github-token",
 	}
-	subject := PullEventConverter{
-		PullConverter: PullConverter{RepoConverter: repoConverter},
+	subject := converter.PullEventConverter{
+		PullConverter: converter.PullConverter{RepoConverter: repoConverter},
 	}
 	cases := []struct {
 		action   string
@@ -182,8 +183,8 @@ func TestConvert_PullRequestEvent_EventType(t *testing.T) {
 			Ok(t, err)
 			Equals(t, c.draftExp, pull.EventType)
 
-			subjectDraft := PullEventConverter{
-				PullConverter: PullConverter{RepoConverter: repoConverter},
+			subjectDraft := converter.PullEventConverter{
+				PullConverter: converter.PullConverter{RepoConverter: repoConverter},
 			}
 			// Test draft parsing when draft PRs are enabled.
 			subjectDraft.AllowDraftPRs = true

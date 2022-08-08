@@ -1,15 +1,29 @@
-package handlers
+package event
 
 import (
 	"bytes"
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/http"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/vcs/types/event"
 )
+
+// Comment is our internal representation of a vcs based comment event.
+type Comment struct {
+	Pull      models.PullRequest
+	BaseRepo  models.Repo
+	HeadRepo  models.Repo
+	User      models.User
+	PullNum   int
+	Comment   string
+	VCSHost   models.VCSHostType
+	Timestamp time.Time
+}
+
 
 func NewCommentEventWorkerProxy(
 	logger logging.Logger,
@@ -23,7 +37,7 @@ type CommentEventWorkerProxy struct {
 	snsWriter Writer
 }
 
-func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, _ event.Comment, _ *command.Comment) error {
+func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, _ Comment, _ *command.Comment) error {
 	buffer := bytes.NewBuffer([]byte{})
 
 	if err := request.GetRequestWithContext(ctx).Write(buffer); err != nil {

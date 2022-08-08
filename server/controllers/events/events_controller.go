@@ -36,7 +36,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	github_request "github.com/runatlantis/atlantis/server/vcs/provider/github/request"
-	event_types "github.com/runatlantis/atlantis/server/vcs/types/event"
+	event_types "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	"github.com/uber-go/tally/v4"
 	gitlab "github.com/xanzy/go-gitlab"
 )
@@ -73,6 +73,12 @@ type commentEventHandler interface {
 
 type prEventHandler interface {
 	Handle(ctx context.Context, request *httputils.BufferedRequest, event event_types.PullRequest) error
+}
+
+type unsupportedPushEventHandler struct {}
+
+func (h unsupportedPushEventHandler) Handle(ctx context.Context, event event_types.Push) error {
+	return fmt.Errorf("push events are not supported in this context")
 }
 
 func NewRequestResolvers(
@@ -130,6 +136,10 @@ func NewVCSEventsController(
 		logger,
 	)
 
+	// we don't support push events in the atlantis worker and these should never make it in the queue
+	// in the first place, so if it happens, let's return an error and fail fast.
+	pushHandler := unsupportedPushEventHandler{}
+
 	// lazy map of resolver providers to their resolver
 	// laziness ensures we only instantiate the providers we support.
 	providerResolverInitializer := map[models.VCSHostType]func() RequestResolver{
@@ -140,6 +150,7 @@ func NewVCSEventsController(
 				githubWebhookSecret,
 				commentHandler,
 				prHandler,
+				pushHandler,
 				allowDraftPRs,
 				repoConverter,
 				pullConverter,

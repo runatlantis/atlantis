@@ -13,9 +13,20 @@ import (
 	httputils "github.com/runatlantis/atlantis/server/http"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
-	"github.com/runatlantis/atlantis/server/vcs/types/event"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	"github.com/stretchr/testify/assert"
 )
+
+type assertingPushHandler struct {
+	t             *testing.T
+	expectedInput event.Push
+}
+
+func (h assertingPushHandler) Handle(ctx context.Context, input event.Push) error {
+	assert.Equal(h.t, h.expectedInput, input)
+
+	return nil
+}
 
 // mocks/test implementations
 type assertingPRHandler struct {
@@ -50,6 +61,15 @@ type testValidator struct {
 
 func (d testValidator) Validate(r *httputils.BufferedRequest, secret []byte) ([]byte, error) {
 	return d.returnedPayload, d.returnedError
+}
+
+type testPushEventConverter struct {
+	returnedPushEvent           event.Push
+	returnedParsePushEventError error
+}
+
+func (c testPushEventConverter) Convert(_ *github.PushEvent) (event.Push, error) {
+	return c.returnedPushEvent, c.returnedParsePushEventError
 }
 
 type testPullEventConverter struct {
@@ -199,7 +219,6 @@ func TestHandle_CommentEvent(t *testing.T) {
 		})
 
 	}
-
 }
 
 func TestHandle_PREvent(t *testing.T) {
@@ -320,4 +339,113 @@ func TestHandle_PREvent(t *testing.T) {
 
 	}
 
+}
+
+func TestHandlePushEvent(t *testing.T) {
+	payload := []byte("payload")
+	secret := "secret"
+
+	log := logging.NewNoopCtxLogger(t)
+	scope, _, err := metrics.NewLoggingScope(logging.NewNoopCtxLogger(t), "atlantis")
+	assert.NoError(t, err)
+
+	rawRequest, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost, "",
+		bytes.NewBuffer([]byte("body")),
+	)
+	assert.NoError(t, err)
+
+	request, err := httputils.NewBufferedRequest(rawRequest)
+	assert.NoError(t, err)
+
+	internalEvent := event.Push{
+		Sha: "1234",
+	}
+
+	event := &github.PushEvent{
+		Repo: &github.PushEventRepository{
+			Name: github.String("repo"),
+		},
+	}
+
+	t.Run("success", func(t *testing.T) {
+		subject := Handler{
+			logger:        log,
+			scope:         scope,
+			webhookSecret: []byte(secret),
+			pushHandler: assertingPushHandler{
+				expectedInput: internalEvent,
+				t:             t,
+			},
+			validator: testValidator{
+				returnedPayload: payload,
+			},
+			pushEventConverter: testPushEventConverter{
+				returnedPushEvent: internalEvent,
+			},
+			parser: &testParser{
+				returnedEvent: event,
+			},
+			Matcher: Matcher{},
+		}
+
+		err = subject.Handle(request)
+		assert.NoError(t, err)
+	})
+
+	cases := []struct {
+		returnedParseWebhookError   error
+		returnedValidatorError      error
+		returnedParsePushEventError error
+		expectedErr                 error
+		description                 string
+	}{
+		{
+			description:               "webhook parsing error",
+			returnedParseWebhookError: assert.AnError,
+			expectedErr:               &errors.WebhookParsingError{},
+		},
+		{
+			description:            "validator error",
+			returnedValidatorError: assert.AnError,
+			expectedErr:            &errors.RequestValidationError{},
+		},
+		{
+			description:                 "event parsing error",
+			returnedParsePushEventError: assert.AnError,
+			expectedErr:                 &errors.EventParsingError{},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			subject := Handler{
+				logger:        log,
+				scope:         scope,
+				webhookSecret: []byte(secret),
+				pushHandler: assertingPushHandler{
+					expectedInput: internalEvent,
+					t:             t,
+				},
+				validator: testValidator{
+					returnedPayload: payload,
+					returnedError:   c.returnedValidatorError,
+				},
+				pushEventConverter: testPushEventConverter{
+					returnedPushEvent:           internalEvent,
+					returnedParsePushEventError: c.returnedParsePushEventError,
+				},
+				parser: &testParser{
+					returnedEvent:             event,
+					returnedParseWebhookError: c.returnedParseWebhookError,
+				},
+				Matcher: Matcher{},
+			}
+
+			err = subject.Handle(request)
+			assert.IsType(t, c.expectedErr, err)
+		})
+
+	}
 }

@@ -1,4 +1,4 @@
-package converter
+package converter_test
 
 import (
 	"testing"
@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-github/v45/github"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,11 +34,11 @@ var Pull = github.PullRequest{
 }
 
 func TestParseGithubPull(t *testing.T) {
-	repoConverter := RepoConverter{
+	repoConverter := converter.RepoConverter{
 		GithubUser:  "github-user",
 		GithubToken: "github-token",
 	}
-	pullConverter := PullConverter{RepoConverter: repoConverter}
+	pullConverter := converter.PullConverter{RepoConverter: repoConverter}
 	testPull := deepcopy.Copy(Pull).(github.PullRequest)
 	testPull.Head.SHA = nil
 	_, err := pullConverter.Convert(&testPull)

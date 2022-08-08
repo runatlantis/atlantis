@@ -1,10 +1,11 @@
-package converter
+package converter_test
 
 import (
 	"testing"
 
 	"github.com/google/go-github/v45/github"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +17,7 @@ var Repo = github.Repository{
 }
 
 func TestParseGithubRepo(t *testing.T) {
-	repoConverter := RepoConverter{
+	repoConverter := converter.RepoConverter{
 		GithubUser:  "github-user",
 		GithubToken: "github-token",
 	}

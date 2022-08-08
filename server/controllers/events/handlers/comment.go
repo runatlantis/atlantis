@@ -9,7 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/http"
 	"github.com/runatlantis/atlantis/server/logging"
-	event_types "github.com/runatlantis/atlantis/server/vcs/types/event"
+	event_types "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 )
 
 // commentCreator creates a comment on a pull request for a given repo

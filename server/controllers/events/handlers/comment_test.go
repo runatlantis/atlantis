@@ -12,7 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	httputils "github.com/runatlantis/atlantis/server/http"
 	"github.com/runatlantis/atlantis/server/logging"
-	event_types "github.com/runatlantis/atlantis/server/vcs/types/event"
+	event_types "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/go-github/v45/github"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/vcs/types/event"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 )
 
 type PullEventConverter struct {

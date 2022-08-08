@@ -9,7 +9,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
-	gateway_handlers "github.com/runatlantis/atlantis/server/lyft/gateway/events/handlers"
+	"github.com/runatlantis/atlantis/server/lyft/feature"
+	gateway_handlers "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	converters "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/request"
@@ -32,6 +33,7 @@ func NewVCSEventsController(
 	repoConverter converters.RepoConverter,
 	pullConverter converters.PullConverter,
 	githubClient converter.PullGetter,
+	featureAllocator feature.Allocator,
 ) *VCSEventsController {
 	pullEventWorkerProxy := gateway_handlers.NewPullEventWorkerProxy(
 		snsWriter, logger,
@@ -56,6 +58,10 @@ func NewVCSEventsController(
 		logger,
 	)
 
+	pushHandler := &gateway_handlers.PushHandler{
+		Allocator: featureAllocator,
+	}
+
 	// lazy map of resolver providers to their resolver
 	// laziness ensures we only instantiate the providers we support.
 	providerResolverInitializer := map[models.VCSHostType]func() events_controllers.RequestResolver{
@@ -66,6 +72,7 @@ func NewVCSEventsController(
 				webhookSecret,
 				commentHandler,
 				prHandler,
+				pushHandler,
 				allowDraftPRs,
 				repoConverter,
 				pullConverter,

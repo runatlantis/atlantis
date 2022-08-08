@@ -1,7 +1,6 @@
 package converter
 
 import (
-	"github.com/google/go-github/v45/github"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -11,8 +10,13 @@ type RepoConverter struct {
 	GithubToken string
 }
 
+type externalRepo interface {
+	GetFullName() string
+	GetCloneURL() string
+}
+
 // ParseGithubRepo parses the response from the GitHub API endpoint that
 // returns a repo into the Atlantis model.
-func (c *RepoConverter) Convert(ghRepo *github.Repository) (models.Repo, error) {
+func (c *RepoConverter) Convert(ghRepo externalRepo) (models.Repo, error) {
 	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), c.GithubUser, c.GithubToken)
 }

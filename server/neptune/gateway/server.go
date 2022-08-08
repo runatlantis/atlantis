@@ -265,6 +265,7 @@ func NewServer(config Config) (*Server, error) {
 		repoConverter,
 		pullConverter,
 		vcsClient,
+		featureAllocator,
 	)
 
 	router := mux.NewRouter()

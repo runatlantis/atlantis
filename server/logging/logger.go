@@ -33,12 +33,13 @@ func (c ContextKey) String() string {
 }
 
 const (
-	RequestIDKey  = ContextKey("gh-request-id")
-	RepositoryKey = ContextKey("repository")
-	SHAKey        = ContextKey("sha")
-	PullNumKey    = ContextKey("pull-num")
-	ProjectKey    = ContextKey("project")
-	Err           = ContextKey("err")
+	InstallationIDKey = ContextKey("gh-installation-id")
+	RequestIDKey   = ContextKey("gh-request-id")
+	RepositoryKey  = ContextKey("repository")
+	SHAKey         = ContextKey("sha")
+	PullNumKey     = ContextKey("pull-num")
+	ProjectKey     = ContextKey("project")
+	Err            = ContextKey("err")
 )
 
 // Logger is the logging interface used throughout the code.
@@ -82,7 +83,7 @@ func NewLoggerFromLevel(lvl LogLevel) (*logger, error) {
 func extractFields(ctx context.Context) map[string]interface{} {
 	args := make(map[string]interface{})
 
-	for _, k := range []ContextKey{RequestIDKey, RepositoryKey, PullNumKey, ProjectKey, SHAKey} {
+	for _, k := range []ContextKey{RequestIDKey, RepositoryKey, PullNumKey, ProjectKey, SHAKey, InstallationIDKey} {
 		if v, ok := ctx.Value(k).(string); ok {
 			args[k.String()] = v
 		}

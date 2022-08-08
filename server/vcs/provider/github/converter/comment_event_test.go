@@ -1,4 +1,4 @@
-package converter
+package converter_test
 
 import (
 	"testing"
@@ -7,6 +7,7 @@ import (
 	"github.com/mohae/deepcopy"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,9 +25,9 @@ func (p MockPullGetter) GetPullRequest(_ models.Repo, _ int) (*github.PullReques
 	return p.pull, p.err
 }
 
-func setup(t *testing.T) (github.IssueCommentEvent, models.Repo, models.PullRequest, PullConverter) {
-	pullConverter := PullConverter{
-		RepoConverter: RepoConverter{
+func setup(t *testing.T) (github.IssueCommentEvent, models.Repo, models.PullRequest, converter.PullConverter) {
+	pullConverter := converter.PullConverter{
+		RepoConverter: converter.RepoConverter{
 			GithubUser:  GithubUser,
 			GithubToken: GithubToken,
 		},
@@ -82,7 +83,7 @@ func TestCommentEvent_Convert_Success(t *testing.T) {
 	}
 
 	// act
-	subject := CommentEventConverter{
+	subject := converter.CommentEventConverter{
 		PullConverter: pullConverter,
 		PullGetter:    githubPullGetter,
 	}
@@ -101,7 +102,7 @@ func TestCommentEvent_Convert_Success(t *testing.T) {
 func TestCommentEvent_Convert_Fail(t *testing.T) {
 	// setup
 	comment, _, _, pullConverter := setup(t)
-	subject := CommentEventConverter{
+	subject := converter.CommentEventConverter{
 		PullConverter: pullConverter,
 	}
 
@@ -136,7 +137,7 @@ func TestRunCommentCommand_GithubPullError(t *testing.T) {
 	}
 
 	// act
-	subject := CommentEventConverter{
+	subject := converter.CommentEventConverter{
 		PullConverter: pullConverter,
 		PullGetter:    githubPullGetter,
 	}
@@ -155,7 +156,7 @@ func TestRunCommentCommand_GithubPullParseError(t *testing.T) {
 	}
 
 	// act
-	subject := CommentEventConverter{
+	subject := converter.CommentEventConverter{
 		PullConverter: pullConverter,
 		PullGetter:    githubPullGetter,
 	}

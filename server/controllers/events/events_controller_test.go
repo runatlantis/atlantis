@@ -37,7 +37,7 @@ import (
 	httputils "github.com/runatlantis/atlantis/server/http"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
-	event_types "github.com/runatlantis/atlantis/server/vcs/types/event"
+	event_types "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
 )
