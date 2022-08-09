@@ -523,6 +523,11 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	Ok(t, err)
 	prJSON := string(jsBytes)
 
+	// Status Check Response
+	jsBytes, err = os.ReadFile("fixtures/github-commit-status-full.json")
+	Ok(t, err)
+	commitJSON := string(jsBytes)
+
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
 			response := strings.Replace(prJSON,
@@ -537,6 +542,11 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 					case "/api/v3/repos/owner/repo/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
 						return
+					case "/api/v3/repos/owner/repo/pulls/1/reviews?per_page=300":
+						w.Write([]byte("[]")) // nolint: errcheck
+						return
+					case "/api/v3/repos/owner/repo/commits/new-topic/status":
+						w.Write([]byte(commitJSON))
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)

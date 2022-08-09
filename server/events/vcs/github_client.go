@@ -18,6 +18,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -296,12 +297,45 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 	return approvalStatus, nil
 }
 
+// Checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
+func (g *GithubClient) GetStatus(repo models.Repo, pull *github.PullRequest) (bool, error) {
+	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, *pull.Head.Ref, nil)
+	if err != nil {
+		return false, errors.Wrap(err, "getting combined status")
+	}
+
+	//compile for performance reasons
+	matcher, _ := regexp.Compile("atlantis/apply")
+
+	for _, r := range status.Statuses {
+		if !matcher.MatchString(*r.Context) {
+			if *r.State == "failure" {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
+}
+
 // PullIsMergeable returns true if the pull request is mergeable.
 func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	githubPR, err := g.GetPullRequest(repo, pull.Num)
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
 	}
+
+	approved, err := g.PullIsApproved(repo, pull)
+	if err != nil {
+		return false, errors.Wrap(err, "getting pull request approval")
+	}
+	fmt.Printf("Approval: %v\n", approved.IsApproved)
+
+	status, err := g.GetStatus(repo, githubPR)
+	if err != nil {
+		return false, errors.Wrap(err, "getting pull request status")
+	}
+
 	state := githubPR.GetMergeableState()
 	// We map our mergeable check to when the GitHub merge button is clickable.
 	// This corresponds to the following states:
@@ -313,6 +347,10 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
+		if state == "blocked" && status && approved.IsApproved {
+			return true, nil
+		}
+
 		return false, nil
 	}
 	return true, nil
