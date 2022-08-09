@@ -31,11 +31,14 @@ import (
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	lyft_gateway "github.com/runatlantis/atlantis/server/lyft/gateway"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/sync"
+	httpInternal "github.com/runatlantis/atlantis/server/neptune/http"
 	"github.com/runatlantis/atlantis/server/vcs/markdown"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/wrappers"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
+	"golang.org/x/sync/errgroup"
 )
 
 // TODO: let's make this struct nicer using actual OOP instead of just a god type struct
@@ -65,15 +68,13 @@ type Config struct {
 }
 
 type Server struct {
-	StatsCloser      io.Closer
-	Router           *mux.Router
-	EventController  *lyft_gateway.VCSEventsController
-	StatusController *controllers.StatusController
-	Logger           logging.Logger
-	Port             int
-	Drainer          *events.Drainer
-	SSLKeyFile       string
-	SSLCertFile      string
+	StatsCloser io.Closer
+	Handler     http.Handler
+	Logger      logging.Logger
+	Port        int
+	Drainer     *events.Drainer
+	Scheduler   *sync.AsyncScheduler
+	Server      httpInternal.ServerProxy
 }
 
 // NewServer injects all dependencies nothing should "start" here
@@ -231,6 +232,8 @@ func NewServer(config Config) (*Server, error) {
 		config.MaxProjectsPerPR,
 	)
 
+	asyncScheduler := sync.NewAsyncScheduler(ctxLogger)
+
 	gatewaySnsWriter := sns.NewWriterWithStats(session, config.SNSTopicArn, statsScope.SubScope("aws.sns.gateway"))
 	autoplanValidator := &lyft_gateway.AutoplanValidator{
 		Scope:                         statsScope.SubScope("validator"),
@@ -266,34 +269,13 @@ func NewServer(config Config) (*Server, error) {
 		pullConverter,
 		vcsClient,
 		featureAllocator,
+		asyncScheduler,
 	)
 
 	router := mux.NewRouter()
-
-	return &Server{
-		StatsCloser:      closer,
-		Router:           router,
-		EventController:  gatewayEventsController,
-		StatusController: statusController,
-		Logger:           ctxLogger,
-		Port:             config.Port,
-		Drainer:          drainer,
-	}, nil
-
-}
-
-// Start is blocking and listens for incoming requests until a configured shutdown
-// signal is received.
-func (s *Server) Start() error {
-
-	// TODO: remove router initialization from here
-	// I assume this is currently happening to ensure that healthz is returning ready
-	// only when we are actually ready to receive requests, however, a better to do this is
-	// by using some atomic value to determine when our server is ready to start taking traffic.
-	// This way we'd have clean separation between setup and execution
-	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
-	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
-	s.Router.HandleFunc("/events", s.EventController.Post).Methods("POST")
+	router.HandleFunc("/healthz", Healthz).Methods("GET")
+	router.HandleFunc("/status", statusController.Get).Methods("GET")
+	router.HandleFunc("/events", gatewayEventsController.Post).Methods("POST")
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
@@ -301,47 +283,89 @@ func (s *Server) Start() error {
 		StackAll:   false,
 		StackSize:  1024 * 8,
 	})
-	n.UseHandler(s.Router)
+	n.UseHandler(router)
 
+	s := httpInternal.ServerProxy{
+		Server: &http.Server{
+			Addr:    fmt.Sprintf(":%d", config.Port),
+			Handler: n,
+		},
+		SSLCertFile: config.SSLCertFile,
+		SSLKeyFile:  config.SSLKeyFile,
+	}
+
+	return &Server{
+		StatsCloser: closer,
+		Handler:     n,
+		Scheduler:   asyncScheduler,
+		Logger:      ctxLogger,
+		Port:        config.Port,
+		Drainer:     drainer,
+		Server:      s,
+	}, nil
+
+}
+
+// Start is blocking and listens for incoming requests until a configured shutdown
+// signal is received.
+func (s *Server) Start() error {
 	defer s.Logger.Close()
 
-	// Ensure server gracefully drains connections when stopped.
-	stop := make(chan os.Signal, 1)
-	// Stop on SIGINTs and SIGTERMs.
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	// we create a base context that is marked done when we get a sigterm.
+	// we should use this context for other async work to ensure we
+	// are gracefully handling shutdown and not dropping data.
+	mainCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
-	go func() {
+	// error group here makes it easier to add other processes and share a ctx between them
+	group, gCtx := errgroup.WithContext(mainCtx)
+	group.Go(func() error {
 		s.Logger.Info(fmt.Sprintf("Atlantis started - listening on port %v", s.Port))
-
-		var err error
-		if s.SSLCertFile != "" && s.SSLKeyFile != "" {
-			err = server.ListenAndServeTLS(s.SSLCertFile, s.SSLKeyFile)
-		} else {
-			err = server.ListenAndServe()
-		}
-
+		err := s.Server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			s.Logger.Error(err.Error())
 		}
-	}()
-	<-stop
 
+		return err
+	})
+
+	<-gCtx.Done()
 	s.Logger.Warn("Received interrupt. Waiting for in-progress operations to complete")
+
+	if err := s.Shutdown(); err != nil {
+		return err
+	}
+
+	if err := group.Wait(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Server) Shutdown() error {
+
+	// legacy way of draining ops, we should remove
+	// in favor of context based approach.
 	s.waitForDrain()
+
+	// block on async work for 30 seconds max
+	s.Scheduler.Shutdown(30 * time.Second)
 
 	// flush stats before shutdown
 	if err := s.StatsCloser.Close(); err != nil {
 		s.Logger.Error(err.Error())
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
-	if err := server.Shutdown(ctx); err != nil {
+	// wait for 5 seconds to shutdown http server and drain existing requests if any.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := s.Server.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
 	}
 
 	return nil
-
 }
 
 // waitForDrain blocks until draining is complete.
@@ -364,7 +388,7 @@ func (s *Server) waitForDrain() {
 }
 
 // Healthz returns the health check response. It always returns a 200 currently.
-func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
+func Healthz(w http.ResponseWriter, _ *http.Request) {
 	data, err := json.MarshalIndent(&struct {
 		Status string `json:"status"`
 	}{

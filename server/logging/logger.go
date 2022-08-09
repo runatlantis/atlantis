@@ -15,7 +15,6 @@
 package logging
 
 import (
-	"context"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -24,22 +23,7 @@ import (
 	"go.uber.org/zap/zaptest"
 	logurzap "logur.dev/adapter/zap"
 	"logur.dev/logur"
-)
-
-type ContextKey string
-
-func (c ContextKey) String() string {
-	return string(c)
-}
-
-const (
-	InstallationIDKey = ContextKey("gh-installation-id")
-	RequestIDKey   = ContextKey("gh-request-id")
-	RepositoryKey  = ContextKey("repository")
-	SHAKey         = ContextKey("sha")
-	PullNumKey     = ContextKey("pull-num")
-	ProjectKey     = ContextKey("project")
-	Err            = ContextKey("err")
+	context "github.com/runatlantis/atlantis/server/neptune/gateway/context"
 )
 
 // Logger is the logging interface used throughout the code.
@@ -70,26 +54,13 @@ func NewLoggerFromLevel(lvl LogLevel) (*logger, error) {
 
 	ctxLogger := logur.WithContextExtractor(
 		structuredLogger,
-		extractFields,
+		context.ExtractFields,
 	)
 
 	return &logger{
 		LoggerFacade: ctxLogger,
 	}, nil
 
-}
-
-// Extracts relevant fields from context for structured logging.
-func extractFields(ctx context.Context) map[string]interface{} {
-	args := make(map[string]interface{})
-
-	for _, k := range []ContextKey{RequestIDKey, RepositoryKey, PullNumKey, ProjectKey, SHAKey, InstallationIDKey} {
-		if v, ok := ctx.Value(k).(string); ok {
-			args[k.String()] = v
-		}
-	}
-
-	return args
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_simple_logging.go SimpleLogging
@@ -222,7 +193,7 @@ func NewNoopCtxLogger(t *testing.T) Logger {
 	return &logger{
 		LoggerFacade: logur.WithContextExtractor(
 			sLogger,
-			extractFields,
+			context.ExtractFields,
 		),
 	}
 }

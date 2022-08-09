@@ -8,25 +8,25 @@ import (
 	"strconv"
 
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/context"
 )
 
 func Repo(repo models.Repo) map[string]interface{} {
 	return map[string]interface{}{
-		logging.RepositoryKey.String(): repo.FullName,
+		context.RepositoryKey.String(): repo.FullName,
 	}
 }
 
 func PullRequest(pull models.PullRequest) map[string]interface{} {
 	return map[string]interface{}{
-		logging.RepositoryKey.String(): pull.BaseRepo.FullName,
-		logging.PullNumKey.String():    strconv.Itoa(pull.Num),
-		logging.SHAKey.String():        pull.HeadCommit,
+		context.RepositoryKey.String(): pull.BaseRepo.FullName,
+		context.PullNumKey.String():    strconv.Itoa(pull.Num),
+		context.SHAKey.String():        pull.HeadCommit,
 	}
 }
 
 func PullRequestWithErr(pull models.PullRequest, err error) map[string]interface{} {
 	kv := PullRequest(pull)
-	kv[logging.Err.String()] = err
+	kv[context.Err.String()] = err
 	return kv
 }

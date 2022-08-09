@@ -11,6 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/logging/fields"
+	keys "github.com/runatlantis/atlantis/server/neptune/gateway/context"
 	"github.com/uber-go/tally/v4"
 )
 
@@ -81,7 +82,7 @@ func (c *InstrumentedGithubClient) GetContents(owner, repo, branch, path string)
 
 	//TODO: thread context and use related logging methods.
 	c.Logger.Info("fetched contents", map[string]interface{}{
-		logging.RepositoryKey.String(): repo,
+		keys.RepositoryKey.String(): repo,
 	})
 
 	return contents, err
@@ -111,8 +112,8 @@ func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoO
 
 	//TODO: thread context and use related logging methods.
 	c.Logger.Info("fetched pull request", map[string]interface{}{
-		logging.RepositoryKey.String(): fmt.Sprintf("%s/%s", repoOwner, repoName),
-		logging.PullNumKey.String():    strconv.Itoa(pullNum),
+		keys.RepositoryKey.String(): fmt.Sprintf("%s/%s", repoOwner, repoName),
+		keys.PullNumKey.String():    strconv.Itoa(pullNum),
 	})
 
 	return pull, err
@@ -214,8 +215,8 @@ func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, commen
 
 	//TODO: thread context and use related logging methods.
 	c.Logger.Info("created pull request comment", map[string]interface{}{
-		logging.RepositoryKey.String(): repo.FullName,
-		logging.PullNumKey.String():    strconv.Itoa(pullNum),
+		keys.RepositoryKey.String(): repo.FullName,
+		keys.PullNumKey.String():    strconv.Itoa(pullNum),
 	})
 	return nil
 }
@@ -237,8 +238,8 @@ func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum i
 
 	//TODO: thread context and use related logging methods.
 	c.Logger.Info("hid previous comments", map[string]interface{}{
-		logging.RepositoryKey.String(): repo.FullName,
-		logging.PullNumKey.String():    strconv.Itoa(pullNum),
+		keys.RepositoryKey.String(): repo.FullName,
+		keys.PullNumKey.String():    strconv.Itoa(pullNum),
 	})
 	return nil
 
@@ -308,11 +309,11 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 	// for now keeping this at info to debug weirdness we've been
 	// seeing with status api calls.
 	c.Logger.Info("updated vcs status", map[string]interface{}{
-		logging.RepositoryKey.String(): request.Repo.FullName,
-		logging.PullNumKey.String():    strconv.Itoa(request.PullNum),
-		logging.SHAKey.String():        request.Ref,
-		"status-name":                  request.StatusName,
-		"state":                        request.State.String(),
+		keys.RepositoryKey.String(): request.Repo.FullName,
+		keys.PullNumKey.String():    strconv.Itoa(request.PullNum),
+		keys.SHAKey.String():        request.Ref,
+		"status-name":               request.StatusName,
+		"state":                     request.State.String(),
 	})
 
 	executionSuccess.Inc(1)

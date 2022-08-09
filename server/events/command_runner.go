@@ -26,6 +26,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/logging/fields"
+	contextInternal "github.com/runatlantis/atlantis/server/neptune/gateway/context"
 	"github.com/runatlantis/atlantis/server/recovery"
 	"github.com/uber-go/tally/v4"
 )
@@ -215,8 +216,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(ctx context.Context, baseRepo m
 }
 
 func newCtx(ctx context.Context, repoFullName string, pullNum int) context.Context {
-	ctx = context.WithValue(ctx, logging.RepositoryKey, repoFullName)
-	return context.WithValue(ctx, logging.PullNumKey, strconv.Itoa(pullNum))
+	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, repoFullName)
+	return context.WithValue(ctx, contextInternal.PullNumKey, strconv.Itoa(pullNum))
 }
 
 func (c *DefaultCommandRunner) validateCtxAndComment(cmdCtx *command.Context) bool {

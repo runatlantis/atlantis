@@ -12,10 +12,9 @@ import (
 )
 
 func TestHealthz(t *testing.T) {
-	s := gateway.Server{}
 	req, _ := http.NewRequest("GET", "/healthz", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.Healthz(w, req)
+	gateway.Healthz(w, req)
 	assert.Equal(t, http.StatusOK, w.Result().StatusCode)
 	body, _ := ioutil.ReadAll(w.Result().Body)
 	assert.Equal(t, "application/json", w.Result().Header["Content-Type"][0])

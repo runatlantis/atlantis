@@ -9,6 +9,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/controllers/events/handlers"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
+	contextInternal "github.com/runatlantis/atlantis/server/neptune/gateway/context"
 
 	"github.com/google/go-github/v45/github"
 	"github.com/runatlantis/atlantis/server/controllers/events/errors"
@@ -123,7 +124,7 @@ func (h *Handler) Handle(r *http.BufferedRequest) error {
 
 	ctx := context.WithValue(
 		r.GetRequest().Context(),
-		logging.RequestIDKey,
+		contextInternal.RequestIDKey,
 		r.GetHeader(requestIDHeader),
 	)
 
@@ -144,7 +145,7 @@ func (h *Handler) Handle(r *http.BufferedRequest) error {
 	installationID := githubapp.GetInstallationIDFromEvent(installationSource)
 
 	// this will be used to create the relevant installation client
-	ctx = context.WithValue(ctx, logging.InstallationIDKey, installationID)
+	ctx = context.WithValue(ctx, contextInternal.InstallationIDKey, installationID)
 
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
@@ -179,9 +180,9 @@ func (h *Handler) handleCommentEvent(ctx context.Context, e *github.IssueComment
 	if err != nil {
 		return &errors.EventParsingError{Err: err}
 	}
-	ctx = context.WithValue(ctx, logging.RepositoryKey, commentEvent.BaseRepo.FullName)
-	ctx = context.WithValue(ctx, logging.PullNumKey, commentEvent.PullNum)
-	ctx = context.WithValue(ctx, logging.SHAKey, commentEvent.Pull.HeadCommit)
+	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, commentEvent.BaseRepo.FullName)
+	ctx = context.WithValue(ctx, contextInternal.PullNumKey, commentEvent.PullNum)
+	ctx = context.WithValue(ctx, contextInternal.SHAKey, commentEvent.Pull.HeadCommit)
 
 	return h.commentHandler.Handle(ctx, request, commentEvent)
 }
@@ -192,9 +193,9 @@ func (h *Handler) handlePullRequestEvent(ctx context.Context, e *github.PullRequ
 	if err != nil {
 		return &errors.EventParsingError{Err: err}
 	}
-	ctx = context.WithValue(ctx, logging.RepositoryKey, pullEvent.Pull.BaseRepo.FullName)
-	ctx = context.WithValue(ctx, logging.PullNumKey, pullEvent.Pull.Num)
-	ctx = context.WithValue(ctx, logging.SHAKey, pullEvent.Pull.HeadCommit)
+	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, pullEvent.Pull.BaseRepo.FullName)
+	ctx = context.WithValue(ctx, contextInternal.PullNumKey, pullEvent.Pull.Num)
+	ctx = context.WithValue(ctx, contextInternal.SHAKey, pullEvent.Pull.HeadCommit)
 
 	return h.prHandler.Handle(ctx, request, pullEvent)
 }
@@ -205,8 +206,8 @@ func (h *Handler) handlePushEvent(ctx context.Context, e *github.PushEvent) erro
 	if err != nil {
 		return &errors.EventParsingError{Err: err}
 	}
-	ctx = context.WithValue(ctx, logging.RepositoryKey, pushEvent.Repo.FullName)
-	ctx = context.WithValue(ctx, logging.SHAKey, pushEvent.Sha)
+	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, pushEvent.Repo.FullName)
+	ctx = context.WithValue(ctx, contextInternal.SHAKey, pushEvent.Sha)
 
 	return h.pushHandler.Handle(ctx, pushEvent)
 }

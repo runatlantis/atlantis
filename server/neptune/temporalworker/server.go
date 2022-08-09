@@ -124,7 +124,14 @@ func (s Server) Start() error {
 
 	s.Logger.Info(fmt.Sprintf("Atlantis started - listening on port %v", s.Port))
 
-	go s.HttpServerProxy.ListenAndServe()
+	go func() {
+		err = s.HttpServerProxy.ListenAndServe()
+
+		if err != nil && err != http.ErrServerClosed {
+			s.Logger.Error(err.Error())
+		}
+	}()
+
 	<-stop
 
 	// flush stats before shutdown

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
@@ -11,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	gateway_handlers "github.com/runatlantis/atlantis/server/neptune/gateway/event"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/sync"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	converters "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/request"
@@ -18,6 +20,10 @@ import (
 )
 
 const githubHeader = "X-Github-Event"
+
+type scheduler interface {
+	Schedule(ctx context.Context, f sync.Executor)
+}
 
 func NewVCSEventsController(
 	scope tally.Scope,
@@ -34,6 +40,7 @@ func NewVCSEventsController(
 	pullConverter converters.PullConverter,
 	githubClient converter.PullGetter,
 	featureAllocator feature.Allocator,
+	scheduler scheduler,
 ) *VCSEventsController {
 	pullEventWorkerProxy := gateway_handlers.NewPullEventWorkerProxy(
 		snsWriter, logger,
@@ -60,6 +67,7 @@ func NewVCSEventsController(
 
 	pushHandler := &gateway_handlers.PushHandler{
 		Allocator: featureAllocator,
+		Scheduler: scheduler,
 	}
 
 	// lazy map of resolver providers to their resolver

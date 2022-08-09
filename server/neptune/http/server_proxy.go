@@ -12,14 +12,10 @@ type ServerProxy struct {
 	Logger      logging.Logger
 }
 
-func (p *ServerProxy) ListenAndServe() {
-	var err error
+func (p *ServerProxy) ListenAndServe() error {
 	if p.SSLCertFile != "" && p.SSLKeyFile != "" {
-		err = p.Server.ListenAndServeTLS(p.SSLCertFile, p.SSLKeyFile)
+		return p.Server.ListenAndServeTLS(p.SSLCertFile, p.SSLKeyFile)
 	} else {
-		err = p.Server.ListenAndServe()
-	}
-	if err != nil && err != http.ErrServerClosed {
-		p.Logger.Error(err.Error())
+		return p.Server.ListenAndServe()
 	}
 }
