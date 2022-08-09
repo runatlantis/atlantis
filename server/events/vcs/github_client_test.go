@@ -546,7 +546,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 						w.Write([]byte("[]")) // nolint: errcheck
 						return
 					case "/api/v3/repos/owner/repo/commits/new-topic/status":
-						w.Write([]byte(commitJSON))
+						w.Write([]byte(commitJSON)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
