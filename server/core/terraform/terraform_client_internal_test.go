@@ -64,7 +64,7 @@ func TestVersionLoader_buildsURL(t *testing.T) {
 	v, _ := version.NewVersion("0.15.0")
 
 	destPath := "some/path"
-	fullURL := fmt.Sprintf("https://releases.hashicorp.com/terraform/0.15.0/terraform_0.15.0_%s_%s.zip?checksum=file:https://releases.hashicorp.com/terraform/0.15.0/terraform_0.15.0_SHA256SUMS", runtime.GOOS, runtime.GOARCH)
+	fullURL := fmt.Sprintf("https://releases.hashicorp.com/terraform/0.15.0/terraform_0.15.0_%s_amd64.zip?checksum=file:https://releases.hashicorp.com/terraform/0.15.0/terraform_0.15.0_SHA256SUMS", runtime.GOOS)
 
 	RegisterMockTestingT(t)
 

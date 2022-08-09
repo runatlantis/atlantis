@@ -394,17 +394,6 @@ type VersionSuccess struct {
 	VersionOutput string
 }
 
-// CheckRunStatus is the current status of a checkrun that is in progress
-// It keeps track of the jobURL and checkRunOutput
-type CheckRunStatus struct {
-	ID      string
-	JobsURL string
-
-	// Only need to persist for PolicyCheck commands since github does not persist the state of checkrun
-	// output
-	Output string
-}
-
 // PullStatus is the current status of a pull request that is in progress.
 type PullStatus struct {
 	// Projects are the projects that have been modified in this pull request.

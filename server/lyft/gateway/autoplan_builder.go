@@ -56,11 +56,6 @@ func (r *AutoplanValidator) isValid(ctx context.Context, logger logging.Logger, 
 		cmdCtx.Log.ErrorContext(cmdCtx.RequestCtx, fmt.Sprintf("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan))
 	}
 
-	// Set to pending to create checkrun
-	if statusErr := r.CommitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.PendingCommitStatus, command.Plan); statusErr != nil {
-		cmdCtx.Log.WarnContext(cmdCtx.RequestCtx, fmt.Sprintf("unable to update commit status: %v", statusErr))
-	}
-
 	projectCmds, err := r.PrjCmdBuilder.BuildAutoplanCommands(cmdCtx)
 	if err != nil {
 		if statusErr := r.CommitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {

@@ -33,12 +33,6 @@ type PolicyCheckCommandRunner struct {
 }
 
 func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.ProjectContext) {
-
-	// Set policy_check commit status to pending
-	if err := p.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
-		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
-	}
-
 	if len(cmds) == 0 {
 		ctx.Log.InfoContext(ctx.RequestCtx, "no projects to run policy_check in")
 		// If there were no projects modified, we set successful commit statuses
@@ -50,6 +44,11 @@ func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.Proj
 		return
 	}
 
+	// So set policy_check commit status to pending
+	if err := p.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
+		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
+	}
+
 	var result command.Result
 	if p.isParallelEnabled(cmds) {
 		ctx.Log.InfoContext(ctx.RequestCtx, "Running policy_checks in parallel")
@@ -57,9 +56,6 @@ func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.Proj
 	} else {
 		result = runProjectCmds(cmds, p.prjCmdRunner.PolicyCheck)
 	}
-
-	// Set project level statuses to pending to simplify handling status updates in checks/github_client
-	p.setProjectLevelStatusesToPending(*ctx, result)
 
 	p.outputUpdater.UpdateOutput(ctx, PolicyCheckCommand{}, result)
 
@@ -90,23 +86,4 @@ func (p *PolicyCheckCommandRunner) updateCommitStatus(ctx *command.Context, pull
 
 func (p *PolicyCheckCommandRunner) isParallelEnabled(cmds []command.ProjectContext) bool {
 	return len(cmds) > 0 && cmds[0].ParallelPolicyCheckEnabled
-}
-
-func (p *PolicyCheckCommandRunner) setProjectLevelStatusesToPending(ctx command.Context, result command.Result) {
-
-	for _, prjResult := range result.ProjectResults {
-
-		// Rebuild the project ctx after result
-		prjCtx := command.ProjectContext{
-			ProjectName: prjResult.ProjectName,
-			RepoRelDir:  prjResult.RepoRelDir,
-			Workspace:   prjResult.Workspace,
-			BaseRepo:    ctx.Pull.BaseRepo,
-			Pull:        ctx.Pull,
-		}
-
-		if err := p.commitStatusUpdater.UpdateProject(ctx.RequestCtx, prjCtx, prjResult.Command, models.PendingCommitStatus, ""); err != nil {
-			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
-		}
-	}
 }
