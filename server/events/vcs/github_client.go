@@ -484,143 +484,15 @@ func (g *GithubClient) UpdateStatus(ctx context.Context, request types.UpdateSta
 }
 
 // [WENGINES-4643] TODO: Move the checks implementation to UpdateStatus once github checks is stable
-func (g *GithubClient) UpdateChecksStatus(ctx context.Context, request types.UpdateStatusRequest) error {
-	checkRuns, err := g.GetRepoChecks(request.Repo, request.Ref)
-	if err != nil {
-		return err
-	}
-
-	// Update checkrun if it exists and if it's not a rerun
-	// request.state is pending only when an operation starts. So, if the checkrun exists and the state is pending, it is a rerun.
-	if checkRun := g.findCheckRun(request.StatusName, checkRuns); checkRun != nil && request.State != models.PendingCommitStatus {
-		return g.updateChecksStatus(ctx, request, checkRun)
-	}
-
-	return g.createChecksStatus(ctx, request)
+func (g *GithubClient) UpdateCheckStatus(ctx context.Context, repo models.Repo, checkRunId int64, updateCheckRunOpts github.UpdateCheckRunOptions) (github.CheckRun, error) {
+	checkRun, _, err := g.client.Checks.UpdateCheckRun(ctx, repo.Owner, repo.Name, checkRunId, updateCheckRunOpts)
+	return *checkRun, err
 }
 
-// Update existing checkrun
-func (g *GithubClient) updateChecksStatus(ctx context.Context, request types.UpdateStatusRequest, checkRun *github.CheckRun) error {
-
-	var fallBackURL string
-	if checkRun.DetailsURL != nil {
-		fallBackURL = *checkRun.DetailsURL
-	}
-
-	ouptut := g.capCheckRunOutput(request.Output)
-	status, conclusion := g.resolveChecksStatus(request.State)
-	summary := g.summaryWithJobURL(request, fallBackURL)
-
-	checkRunOutput := github.CheckRunOutput{
-		Title:   &request.StatusName,
-		Text:    &ouptut,
-		Summary: &summary,
-	}
-
-	updateCheckRunOpts := github.UpdateCheckRunOptions{
-		Name:   request.StatusName,
-		Status: &status,
-		Output: &checkRunOutput,
-	}
-
-	// URL in update request takes precedence.
-	// fall back to checkRun details URL
-	if request.DetailsURL != "" {
-		updateCheckRunOpts.DetailsURL = &request.DetailsURL
-	} else if checkRun.DetailsURL != nil {
-		updateCheckRunOpts.DetailsURL = checkRun.DetailsURL
-	}
-
-	// Conclusion is required if status is Completed
-	if status == Completed.String() {
-		updateCheckRunOpts.Conclusion = &conclusion
-	}
-	_, _, err := g.client.Checks.UpdateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, *checkRun.ID, updateCheckRunOpts)
-	return err
-}
-
-// create a new checkrun
-func (g *GithubClient) createChecksStatus(ctx context.Context, request types.UpdateStatusRequest) error {
-	ouptut := g.capCheckRunOutput(request.Output)
-	status, conclusion := g.resolveChecksStatus(request.State)
-	summary := g.summaryWithJobURL(request, "")
-
-	checkRunOutput := github.CheckRunOutput{
-		Title:   &request.StatusName,
-		Text:    &ouptut,
-		Summary: &summary,
-	}
-
-	createCheckRunOpts := github.CreateCheckRunOptions{
-		Name:    request.StatusName,
-		HeadSHA: request.Ref,
-		Status:  &status,
-		Output:  &checkRunOutput,
-	}
-
-	// Conclusion is required if status is Completed
-	if status == Completed.String() {
-		createCheckRunOpts.Conclusion = &conclusion
-	}
-
-	_, _, err := g.client.Checks.CreateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, createCheckRunOpts)
-	return err
-}
-
-// Cap the output string if it exceeds the max checks output length
-func (g *GithubClient) capCheckRunOutput(output string) string {
-	if len(output) > maxChecksOutputLength {
-		return output[:maxChecksOutputLength]
-	}
-	return output
-}
-
-// Append job URL to summary if it's a project plan or apply operation bc we currently only stream logs for these two operations
-func (g *GithubClient) summaryWithJobURL(request types.UpdateStatusRequest, fallBackURL string) string {
-	if strings.Contains(request.StatusName, ":") &&
-		(strings.Contains(request.StatusName, "plan") || strings.Contains(request.StatusName, "apply")) {
-
-		// URL in update request takes precedence
-		// fallbackURL i.e checkrun URL could be stale from previous operation
-		if request.DetailsURL != "" {
-			return fmt.Sprintf("%s\n[Logs](%s)", request.Description, request.DetailsURL)
-		} else if fallBackURL != "" {
-			return fmt.Sprintf("%s\n[Logs](%s)", request.Description, fallBackURL)
-		}
-	}
-	return request.Description
-}
-
-// Github Checks uses Status and Conclusion to report status of the check run. Need to map models.CommitStatus to Status and Conclusion
-// Status -> queued, in_progress, completed
-// Conclusion -> failure, neutral, cancelled, timed_out, or action_required. (Optional. Required if you provide a status of "completed".)
-func (g *GithubClient) resolveChecksStatus(state models.CommitStatus) (string, string) {
-	status := Queued
-	conclusion := Neutral
-
-	switch state {
-	case models.SuccessCommitStatus:
-		status = Completed
-		conclusion = Success
-
-	case models.PendingCommitStatus:
-		status = InProgress
-
-	case models.FailedCommitStatus:
-		status = Completed
-		conclusion = Failure
-	}
-
-	return status.String(), conclusion.String()
-}
-
-func (g *GithubClient) findCheckRun(statusName string, checkRuns []*github.CheckRun) *github.CheckRun {
-	for _, checkRun := range checkRuns {
-		if *checkRun.Name == statusName {
-			return checkRun
-		}
-	}
-	return nil
+// [WENGINES-4643] TODO: Move the checks implementation to UpdateStatus once github checks is stable
+func (g *GithubClient) CreateCheckStatus(ctx context.Context, repo models.Repo, createCheckRunOpts github.CreateCheckRunOptions) (github.CheckRun, error) {
+	checkRun, _, err := g.client.Checks.CreateCheckRun(ctx, repo.Owner, repo.Name, createCheckRunOpts)
+	return *checkRun, err
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.

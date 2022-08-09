@@ -381,7 +381,7 @@ func TestRunAutoplanCommand_PreWorkflowHookError(t *testing.T) {
 	ch.PreWorkflowHooksCommandRunner = preWorkflowHooksCommandRunner
 
 	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now())
-	_, _, _, status, cmdName := commitUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName()).GetCapturedArguments()
+	_, _, _, status, cmdName := commitUpdater.VerifyWasCalled(&EqMatcher{Value: 2}).UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName()).GetCapturedArguments()
 	Equals(t, models.FailedCommitStatus, status)
 	Equals(t, command.Plan, cmdName)
 }

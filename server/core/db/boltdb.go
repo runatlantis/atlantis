@@ -22,13 +22,16 @@ type BoltDB struct {
 	locksBucketName       []byte
 	pullsBucketName       []byte
 	globalLocksBucketName []byte
+	checkRunsBucketName   []byte
 }
 
 const (
 	locksBucketName       = "runLocks"
 	pullsBucketName       = "pulls"
 	globalLocksBucketName = "globalLocks"
+	checkrunsBucketName   = "checkRuns"
 	pullKeySeparator      = "::"
+	checkRunKeySeparator  = "||"
 )
 
 // New returns a valid locker. We need to be able to write to dataDir
@@ -56,6 +59,9 @@ func New(dataDir string) (*BoltDB, error) {
 		if _, err = tx.CreateBucketIfNotExists([]byte(globalLocksBucketName)); err != nil {
 			return errors.Wrapf(err, "creating bucket %q", globalLocksBucketName)
 		}
+		if _, err = tx.CreateBucketIfNotExists([]byte(checkrunsBucketName)); err != nil {
+			return errors.Wrapf(err, "creating bucket %q", checkrunsBucketName)
+		}
 		return nil
 	})
 	if err != nil {
@@ -67,6 +73,7 @@ func New(dataDir string) (*BoltDB, error) {
 		locksBucketName:       []byte(locksBucketName),
 		pullsBucketName:       []byte(pullsBucketName),
 		globalLocksBucketName: []byte(globalLocksBucketName),
+		checkRunsBucketName:   []byte(checkrunsBucketName),
 	}, nil
 }
 
@@ -311,6 +318,30 @@ func (b *BoltDB) GetLock(p models.Project, workspace string) (*models.ProjectLoc
 	return &lock, nil
 }
 
+// Sets the checkRunID for a command
+func (b *BoltDB) UpdateCheckRunForStatus(statusName string, repo models.Repo, ref string, checkRunStatus models.CheckRunStatus) error {
+	key := b.checkRunKey(statusName, repo, ref)
+	return b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.checkRunsBucketName)
+		return b.writeCheckRunToBucket(bucket, []byte(key), checkRunStatus)
+	})
+}
+
+// Returns nil if the checkrun dne in the db
+func (b *BoltDB) GetCheckRunForStatus(statusName string, repo models.Repo, ref string) (*models.CheckRunStatus, error) {
+	key := b.checkRunKey(statusName, repo, ref)
+
+	var checkRun *models.CheckRunStatus
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.checkRunsBucketName)
+		var txErr error
+		checkRun, txErr = b.getCheckRunFromBucket(bucket, []byte(key))
+		return txErr
+	})
+
+	return checkRun, err
+}
+
 // UpdatePullWithResults updates pull's status with the latest project results.
 // It returns the new PullStatus object.
 func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
@@ -462,6 +493,10 @@ func (b *BoltDB) lockKey(p models.Project, workspace string) string {
 	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, workspace)
 }
 
+func (b *BoltDB) checkRunKey(statusName string, repo models.Repo, ref string) string {
+	return fmt.Sprintf("%s||%s||%s", repo.FullName, ref, statusName)
+}
+
 func (b *BoltDB) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.PullStatus, error) {
 	serialized := bucket.Get(key)
 	if serialized == nil {
@@ -475,11 +510,33 @@ func (b *BoltDB) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.Pul
 	return &p, nil
 }
 
+func (b *BoltDB) getCheckRunFromBucket(bucket *bolt.Bucket, key []byte) (*models.CheckRunStatus, error) {
+	serialized := bucket.Get(key)
+	if serialized == nil {
+		return nil, nil
+	}
+
+	var p models.CheckRunStatus
+	if err := json.Unmarshal(serialized, &p); err != nil {
+		return nil, errors.Wrapf(err, "deserializing checkrun at %q with contents %q", key, serialized)
+	}
+	return &p, nil
+}
+
 func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.PullStatus) error {
 	serialized, err := json.Marshal(pull)
 	if err != nil {
 		return errors.Wrap(err, "serializing")
 	}
+	return bucket.Put(key, serialized)
+}
+
+func (b *BoltDB) writeCheckRunToBucket(bucket *bolt.Bucket, key []byte, checkRun models.CheckRunStatus) error {
+	serialized, err := json.Marshal(checkRun)
+	if err != nil {
+		return errors.Wrap(err, "serializing")
+	}
+
 	return bucket.Put(key, serialized)
 }
 

@@ -80,6 +80,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 		return
 	}
 
+	// Pending status creates a new checkrun
 	if err = a.commitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
 		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
