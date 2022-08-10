@@ -17,12 +17,13 @@ import (
 	converters "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/request"
 	"github.com/uber-go/tally/v4"
+	"go.temporal.io/sdk/client"
 )
 
 const githubHeader = "X-Github-Event"
 
 type scheduler interface {
-	Schedule(ctx context.Context, f sync.Executor)
+	Schedule(ctx context.Context, f sync.Executor) error
 }
 
 func NewVCSEventsController(
@@ -41,6 +42,7 @@ func NewVCSEventsController(
 	githubClient converter.PullGetter,
 	featureAllocator feature.Allocator,
 	scheduler scheduler,
+	temporalClient client.Client,
 ) *VCSEventsController {
 	pullEventWorkerProxy := gateway_handlers.NewPullEventWorkerProxy(
 		snsWriter, logger,
@@ -66,8 +68,10 @@ func NewVCSEventsController(
 	)
 
 	pushHandler := &gateway_handlers.PushHandler{
-		Allocator: featureAllocator,
-		Scheduler: scheduler,
+		Allocator:      featureAllocator,
+		Scheduler:      scheduler,
+		Logger:         logger,
+		TemporalClient: temporalClient,
 	}
 
 	// lazy map of resolver providers to their resolver

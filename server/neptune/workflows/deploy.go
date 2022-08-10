@@ -8,7 +8,11 @@ import (
 
 // Export anything that callers need such as requests, signals, etc.
 type DeployRequest = deploy.Request
+type Repo = deploy.Repo
+
 type DeployNewRevisionSignalRequest = revision.NewRevisionRequest
+
+var DeployTaskQueue = deploy.TaskQueue
 
 var DeployNewRevisionSignalID = deploy.NewRevisionSignalID
 

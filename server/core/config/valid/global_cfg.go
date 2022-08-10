@@ -98,8 +98,9 @@ type Statsd struct {
 }
 
 type Temporal struct {
-	Port string
-	Host string
+	Port            string
+	Host            string
+	UseSystemCACert bool
 }
 
 type TerraformLogFilters struct {

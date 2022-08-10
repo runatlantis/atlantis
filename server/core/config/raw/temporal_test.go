@@ -85,13 +85,6 @@ func TestTemporal_Validate_Error(t *testing.T) {
 				Port: "string",
 			},
 		},
-		{
-			description: "invalid host",
-			subject: raw.Temporal{
-				Host: "127.0.1",
-				Port: "1234",
-			},
-		},
 	}
 
 	for _, c := range cases {

@@ -2,21 +2,9 @@ package temporalworker
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/runatlantis/atlantis/server/controllers"
-	"github.com/runatlantis/atlantis/server/controllers/templates"
-	"github.com/runatlantis/atlantis/server/logging"
-	neptune_http "github.com/runatlantis/atlantis/server/neptune/http"
-	"github.com/uber-go/tally/v4"
-	"github.com/urfave/cli"
-	"github.com/urfave/negroni"
 	"go.temporal.io/sdk/client"
-	temporal_tally "go.temporal.io/sdk/contrib/tally"
-	"go.temporal.io/sdk/worker"
 	"io"
 	"log"
 	"net/http"
@@ -26,6 +14,20 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/controllers"
+	"github.com/runatlantis/atlantis/server/controllers/templates"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/logging"
+	neptune_http "github.com/runatlantis/atlantis/server/neptune/http"
+	"github.com/runatlantis/atlantis/server/neptune/temporal"
+	"github.com/runatlantis/atlantis/server/neptune/workflows"
+	"github.com/uber-go/tally/v4"
+	"github.com/urfave/cli"
+	"github.com/urfave/negroni"
+	"go.temporal.io/sdk/worker"
 )
 
 const (
@@ -36,24 +38,24 @@ const (
 
 // Config is TemporalWorker specific user config
 type Config struct {
-	AtlantisURL      *url.URL
-	AtlantisVersion  string
-	CtxLogger        logging.Logger
-	SslCertFile      string
-	SslKeyFile       string
-	TemporalHostPort string
-	Scope            tally.Scope
-	Closer           io.Closer
-	Port             int
+	AtlantisURL     *url.URL
+	AtlantisVersion string
+	CtxLogger       logging.Logger
+	SslCertFile     string
+	SslKeyFile      string
+	Scope           tally.Scope
+	Closer          io.Closer
+	TemporalCfg     valid.Temporal
+	Port            int
 }
 
 type Server struct {
-	Logger           logging.Logger
-	HttpServerProxy  *neptune_http.ServerProxy
-	Port             int
-	StatsScope       tally.Scope
-	StatsCloser      io.Closer
-	TemporalHostPort string
+	Logger          logging.Logger
+	HttpServerProxy *neptune_http.ServerProxy
+	Port            int
+	StatsScope      tally.Scope
+	StatsCloser     io.Closer
+	TemporalClient  client.Client
 }
 
 // TODO: as more behavior is added into the TemporalWorker package, inject corresponding dependencies
@@ -65,6 +67,12 @@ func NewServer(config *Config) (*Server, error) {
 		StatsScope:          config.Scope,
 		Logger:              config.CtxLogger,
 		ProjectJobsTemplate: templates.ProjectJobsTemplate,
+	}
+
+	// temporal client + worker initialization
+	temporalClient, err := temporal.NewClient(config.Scope, config.CtxLogger, config.TemporalCfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing temporal client")
 	}
 	// router initialization
 	router := mux.NewRouter()
@@ -85,12 +93,12 @@ func NewServer(config *Config) (*Server, error) {
 		Logger:      config.CtxLogger,
 	}
 	server := Server{
-		Logger:           config.CtxLogger,
-		HttpServerProxy:  httpServerProxy,
-		Port:             config.Port,
-		StatsScope:       config.Scope,
-		StatsCloser:      config.Closer,
-		TemporalHostPort: config.TemporalHostPort,
+		Logger:          config.CtxLogger,
+		HttpServerProxy: httpServerProxy,
+		Port:            config.Port,
+		StatsScope:      config.Scope,
+		StatsCloser:     config.Closer,
+		TemporalClient:  temporalClient,
 	}
 	return &server, nil
 }
@@ -99,16 +107,11 @@ func (s Server) Start() error {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	defer s.Logger.Close()
+	defer s.TemporalClient.Close()
 
-	// temporal client + worker initialization
-	temporalClient, err := s.buildTemporalClient()
-	if err != nil {
-		return err
-	}
-	defer temporalClient.Close()
 	go func() {
 		defer wg.Done()
-		w := worker.New(temporalClient, DeployTaskqueue, worker.Options{
+		w := worker.New(s.TemporalClient, workflows.DeployTaskQueue, worker.Options{
 			// ensures that sessions are preserved on the same worker
 			EnableSessionWorker: true,
 		})
@@ -125,7 +128,7 @@ func (s Server) Start() error {
 	s.Logger.Info(fmt.Sprintf("Atlantis started - listening on port %v", s.Port))
 
 	go func() {
-		err = s.HttpServerProxy.ListenAndServe()
+		err := s.HttpServerProxy.ListenAndServe()
 
 		if err != nil && err != http.ErrServerClosed {
 			s.Logger.Error(err.Error())
@@ -146,28 +149,6 @@ func (s Server) Start() error {
 	}
 	wg.Wait()
 	return nil
-}
-
-func (s *Server) buildTemporalClient() (client.Client, error) {
-	certs, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, err
-	}
-	connectionOptions := client.ConnectionOptions{
-		TLS: &tls.Config{
-			RootCAs:    certs,
-			MinVersion: tls.VersionTLS12,
-		},
-	}
-	clientOptions := client.Options{
-		Namespace:         AtlantisNamespace,
-		ConnectionOptions: connectionOptions,
-		MetricsHandler:    temporal_tally.NewMetricsHandler(s.StatsScope),
-	}
-	if s.TemporalHostPort != "" {
-		clientOptions.HostPort = s.TemporalHostPort
-	}
-	return client.Dial(clientOptions)
 }
 
 // Healthz returns the health check response. It always returns a 200 currently.

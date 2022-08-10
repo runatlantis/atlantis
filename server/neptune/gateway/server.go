@@ -33,11 +33,13 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/sync"
 	httpInternal "github.com/runatlantis/atlantis/server/neptune/http"
+	"github.com/runatlantis/atlantis/server/neptune/temporal"
 	"github.com/runatlantis/atlantis/server/vcs/markdown"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/wrappers"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
+	"go.temporal.io/sdk/client"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -68,13 +70,14 @@ type Config struct {
 }
 
 type Server struct {
-	StatsCloser io.Closer
-	Handler     http.Handler
-	Logger      logging.Logger
-	Port        int
-	Drainer     *events.Drainer
-	Scheduler   *sync.AsyncScheduler
-	Server      httpInternal.ServerProxy
+	StatsCloser    io.Closer
+	Handler        http.Handler
+	Logger         logging.Logger
+	Port           int
+	Drainer        *events.Drainer
+	Scheduler      *sync.AsyncScheduler
+	Server         httpInternal.ServerProxy
+	TemporalClient client.Client
 }
 
 // NewServer injects all dependencies nothing should "start" here
@@ -254,6 +257,12 @@ func NewServer(config Config) (*Server, error) {
 		RepoConverter: repoConverter,
 	}
 
+	temporalClient, err := temporal.NewClient(statsScope, ctxLogger, globalCfg.Temporal)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing temporal client")
+	}
+
 	gatewayEventsController := lyft_gateway.NewVCSEventsController(
 		statsScope,
 		[]byte(config.GithubWebhookSecret),
@@ -270,6 +279,7 @@ func NewServer(config Config) (*Server, error) {
 		vcsClient,
 		featureAllocator,
 		asyncScheduler,
+		temporalClient,
 	)
 
 	router := mux.NewRouter()
@@ -295,13 +305,14 @@ func NewServer(config Config) (*Server, error) {
 	}
 
 	return &Server{
-		StatsCloser: closer,
-		Handler:     n,
-		Scheduler:   asyncScheduler,
-		Logger:      ctxLogger,
-		Port:        config.Port,
-		Drainer:     drainer,
-		Server:      s,
+		StatsCloser:    closer,
+		Handler:        n,
+		Scheduler:      asyncScheduler,
+		Logger:         ctxLogger,
+		Port:           config.Port,
+		Drainer:        drainer,
+		TemporalClient: temporalClient,
+		Server:         s,
 	}, nil
 
 }
@@ -310,6 +321,7 @@ func NewServer(config Config) (*Server, error) {
 // signal is received.
 func (s *Server) Start() error {
 	defer s.Logger.Close()
+	defer s.TemporalClient.Close()
 
 	// we create a base context that is marked done when we get a sigterm.
 	// we should use this context for other async work to ensure we
