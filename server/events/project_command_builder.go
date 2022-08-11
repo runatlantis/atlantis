@@ -3,6 +3,7 @@ package events
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -45,6 +46,7 @@ func NewInstrumentedProjectCommandBuilder(
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	AutoplanFileList string,
+	StrictPlanFileList bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 ) *InstrumentedProjectCommandBuilder {
@@ -62,6 +64,7 @@ func NewInstrumentedProjectCommandBuilder(
 			skipCloneNoChanges,
 			EnableRegExpCmd,
 			AutoplanFileList,
+			StrictPlanFileList,
 			scope,
 			logger,
 		),
@@ -82,6 +85,7 @@ func NewProjectCommandBuilder(
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	AutoplanFileList string,
+	StrictPlanFileList bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 ) *DefaultProjectCommandBuilder {
@@ -96,6 +100,7 @@ func NewProjectCommandBuilder(
 		SkipCloneNoChanges: skipCloneNoChanges,
 		EnableRegExpCmd:    EnableRegExpCmd,
 		AutoplanFileList:   AutoplanFileList,
+		StrictPlanFileList: StrictPlanFileList,
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
@@ -159,6 +164,7 @@ type DefaultProjectCommandBuilder struct {
 	EnableRegExpCmd              bool
 	AutoplanFileList             string
 	EnableDiffMarkdownFormat     bool
+	StrictPlanFileList           bool
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -343,6 +349,27 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
+	}
+
+	if p.StrictPlanFileList {
+		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
+		if err != nil {
+			return nil, err
+		}
+
+		if cmd.RepoRelDir != "" {
+			foundDir := false
+
+			for _, f := range modifiedFiles {
+				if filepath.Dir(f) == cmd.RepoRelDir {
+					foundDir = true
+				}
+			}
+
+			if !foundDir {
+				return nil, fmt.Errorf("the dir \"%s\" is not in the plan list of this pull request", cmd.RepoRelDir)
+			}
+		}
 	}
 
 	var pcc []command.ProjectContext

@@ -507,6 +507,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
 		userConfig.AutoplanFileList,
+		userConfig.StrictPlanFileList,
 		statsScope,
 		logger,
 	)

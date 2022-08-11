@@ -603,6 +603,12 @@ Values are chosen in this order:
   ```
   File containing x509 private key matching `--ssl-cert-file`.
 
+* ### `--strict-plan-file-list`
+  ```bash
+  atlantis server --strict-plan-file-list
+  ```
+  `--strict-plan-file-list` will block plan requests from projects outside the files modified in the pull request.
+
 * ### `--stats-namespace`
   ```bash
   atlantis server --stats-namespace="myatlantis"

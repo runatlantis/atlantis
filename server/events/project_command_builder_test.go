@@ -159,6 +159,7 @@ projects:
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				scope,
 				logger,
 			)
@@ -427,6 +428,7 @@ projects:
 					false,
 					true,
 					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+					false,
 					scope,
 					logger,
 				)
@@ -582,6 +584,7 @@ projects:
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				scope,
 				logger,
 			)
@@ -673,6 +676,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		false,
 		scope,
 		logger,
 	)
@@ -758,6 +762,7 @@ projects:
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		false,
 		scope,
 		logger,
 	)
@@ -837,6 +842,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				scope,
 				logger,
 			)
@@ -1020,6 +1026,7 @@ projects:
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				scope,
 				logger,
 			)
@@ -1087,6 +1094,7 @@ projects:
 		true,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		false,
 		scope,
 		logger,
 	)
@@ -1145,6 +1153,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		false,
 		scope,
 		logger,
 	)
@@ -1227,6 +1236,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		false,
 		scope,
 		logger,
 	)
