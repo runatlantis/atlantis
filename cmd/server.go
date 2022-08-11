@@ -414,8 +414,9 @@ type ServerCmd struct {
 func NewServerCmd(v *viper.Viper, version string) *ServerCmd {
 	return &ServerCmd{
 		ServerCreator: &ServerCreatorProxy{
-			GatewayCreator: &GatewayCreator{},
-			WorkerCreator:  &WorkerCreator{},
+			GatewayCreator:        &GatewayCreator{},
+			WorkerCreator:         &WorkerCreator{},
+			TemporalWorkerCreator: &TemporalWorker{},
 		},
 		Viper:           v,
 		AtlantisVersion: version,
