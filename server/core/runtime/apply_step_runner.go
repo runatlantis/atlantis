@@ -127,8 +127,8 @@ func (a *ApplyStepRunner) runRemoteApply(
 	}
 
 	// updateStatusF will update the commit status and log any error.
-	updateStatusF := func(status models.CommitStatus, url string) {
-		if err := a.CommitStatusUpdater.UpdateProject(ctx, prjCtx, command.Apply, status, url); err != nil {
+	updateStatusF := func(status models.CommitStatus, url string, statusId string) {
+		if _, err := a.CommitStatusUpdater.UpdateProject(ctx, prjCtx, command.Apply, status, url, statusId); err != nil {
 			prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("unable to update status: %s", err))
 		}
 	}
@@ -155,7 +155,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
-			updateStatusF(models.PendingCommitStatus, runURL)
+			updateStatusF(models.PendingCommitStatus, runURL, prjCtx.StatusId)
 			nextLineIsRunURL = false
 		}
 
@@ -179,16 +179,16 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	output := strings.Join(lines, "\n")
 	if planChangedErr != nil {
-		updateStatusF(models.FailedCommitStatus, runURL)
+		updateStatusF(models.FailedCommitStatus, runURL, prjCtx.StatusId)
 		// The output isn't important if the plans don't match so we just
 		// discard it.
 		return "", planChangedErr
 	}
 
 	if err != nil {
-		updateStatusF(models.FailedCommitStatus, runURL)
+		updateStatusF(models.FailedCommitStatus, runURL, prjCtx.StatusId)
 	} else {
-		updateStatusF(models.SuccessCommitStatus, runURL)
+		updateStatusF(models.SuccessCommitStatus, runURL, prjCtx.StatusId)
 	}
 	return output, err
 }

@@ -149,7 +149,8 @@ func TestIsValid_TerraformChanges(t *testing.T) {
 		matchers.AnyModelsCommitStatus(),
 		matchers.AnyModelsCommandName(),
 		AnyInt(),
-		AnyInt())
+		AnyInt(),
+		AnyString())
 	workingDir.VerifyWasCalledOnce().Delete(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())
 	workingDirLocker.VerifyWasCalledOnce().TryLock(AnyString(), AnyInt(), AnyString())
 }
@@ -170,7 +171,8 @@ func TestPullRequestHasTerraformChanges_NoTerraformChanges(t *testing.T) {
 		matchers.AnyModelsCommitStatus(),
 		matchers.AnyModelsCommandName(),
 		AnyInt(),
-		AnyInt())
+		AnyInt(),
+		AnyString())
 	workingDir.VerifyWasCalledOnce().Delete(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())
 	workingDirLocker.VerifyWasCalledOnce().TryLock(AnyString(), AnyInt(), AnyString())
 }

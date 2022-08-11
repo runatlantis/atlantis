@@ -153,6 +153,8 @@ type ProjectContext struct {
 	JobID string
 	// RequestCtx is the context generated when request is first received from VCS
 	RequestCtx context.Context
+	// StatusId is used for consecutive status updates in the step runners
+	StatusId string
 }
 
 // ProjectCloneDir creates relative path to clone the repo to. If we are running

@@ -46,13 +46,13 @@ type strictTestChecksClient struct {
 	count int
 }
 
-func (c *strictTestChecksClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
+func (c *strictTestChecksClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
 	if c.count > (len(c.clients) - 1) {
-		return errors.New("more calls than expected")
+		return "", errors.New("more calls than expected")
 	}
-	err := c.clients[c.count].UpdateStatus(ctx, request)
+	_, err := c.clients[c.count].UpdateStatus(ctx, request)
 	c.count += 1
-	return err
+	return "", err
 }
 
 type testChecksClient struct {
@@ -63,105 +63,11 @@ type testChecksClient struct {
 	called bool
 }
 
-func (c *testChecksClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
+func (c *testChecksClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
 	c.called = true
 	assert.Equal(c.t, c.expectedRequest, request)
 
-	return c.expectedError
-}
-
-func TestChecksOutputUpdater_ResultErrorFailure(t *testing.T) {
-	repo := models.Repo{
-		FullName: "nish/repo",
-	}
-
-	createdAt := time.Now()
-	sha := "12345"
-
-	pull := models.PullRequest{
-		HeadCommit: sha,
-		Num:        1,
-		CreatedAt:  createdAt,
-		BaseRepo:   repo,
-	}
-
-	cmdCtx := &command.Context{
-		Pull:       pull,
-		RequestCtx: context.Background(),
-		HeadRepo:   repo,
-	}
-
-	output := "some output"
-
-	t.Run("result error ", func(t *testing.T) {
-		commandResult := command.Result{
-			Error: assert.AnError,
-		}
-
-		client := &testChecksClient{
-			t: t,
-			expectedRequest: types.UpdateStatusRequest{
-				Repo:             repo,
-				Ref:              sha,
-				StatusName:       "nish/plan",
-				Description:      "Plan failed",
-				State:            models.FailedCommitStatus,
-				PullCreationTime: createdAt,
-				Output:           output,
-				PullNum:          1,
-			},
-		}
-		subject := events.ChecksOutputUpdater{
-			VCSClient: client,
-			MarkdownRenderer: &testRenderer{
-				t:               t,
-				expectedCmdName: command.Plan,
-				expectedResult:  commandResult,
-				expectedRepo:    repo,
-				expectedOutput:  output,
-			},
-			TitleBuilder: vcs.StatusTitleBuilder{"nish"},
-		}
-
-		subject.UpdateOutput(cmdCtx, events.AutoplanCommand{}, commandResult)
-
-		assert.True(t, client.called)
-	})
-
-	t.Run("result failure ", func(t *testing.T) {
-		commandResult := command.Result{
-			Failure: "some_failure",
-		}
-
-		client := &testChecksClient{
-			t: t,
-			expectedRequest: types.UpdateStatusRequest{
-				Repo:             repo,
-				Ref:              sha,
-				StatusName:       "nish/plan",
-				Description:      "Plan failed",
-				State:            models.FailedCommitStatus,
-				PullCreationTime: createdAt,
-				Output:           output,
-				PullNum:          1,
-			},
-		}
-		subject := events.ChecksOutputUpdater{
-			VCSClient: client,
-			MarkdownRenderer: &testRenderer{
-				t:               t,
-				expectedCmdName: command.Plan,
-				expectedResult:  commandResult,
-				expectedRepo:    repo,
-				expectedOutput:  output,
-			},
-			TitleBuilder: vcs.StatusTitleBuilder{"nish"},
-		}
-
-		subject.UpdateOutput(cmdCtx, events.AutoplanCommand{}, commandResult)
-
-		assert.True(t, client.called)
-	})
+	return "", c.expectedError
 }
 
 func TestChecksOutputUpdater_ProjectResults(t *testing.T) {
@@ -346,9 +252,10 @@ func TestChecksOutputUpdater_ProjectResults_ApprovePolicies(t *testing.T) {
 
 	t.Run("project result success", func(t *testing.T) {
 		projectResult := command.ProjectResult{
-			ProjectName: "project1",
-			RepoRelDir:  "somedir",
-			Workspace:   "default",
+			ProjectName:        "project1",
+			RepoRelDir:         "somedir",
+			Workspace:          "default",
+			PolicyCheckSuccess: &models.PolicyCheckSuccess{},
 		}
 		commandResult := command.Result{
 			ProjectResults: []command.ProjectResult{
@@ -363,20 +270,8 @@ func TestChecksOutputUpdater_ProjectResults_ApprovePolicies(t *testing.T) {
 					expectedRequest: types.UpdateStatusRequest{
 						Repo:             repo,
 						Ref:              sha,
-						StatusName:       "nish/approve_policies",
-						Description:      "Approve_policies succeeded",
-						State:            models.SuccessCommitStatus,
-						PullCreationTime: createdAt,
-						Output:           output,
-						PullNum:          1,
-					},
-				},
-				{
-					t: t,
-					expectedRequest: types.UpdateStatusRequest{
-						Repo:             repo,
-						Ref:              sha,
 						StatusName:       "nish/policy_check: project1",
+						Output:           "some output",
 						State:            models.SuccessCommitStatus,
 						PullCreationTime: createdAt,
 						PullNum:          1,
@@ -388,7 +283,7 @@ func TestChecksOutputUpdater_ProjectResults_ApprovePolicies(t *testing.T) {
 			VCSClient: client,
 			MarkdownRenderer: &testRenderer{
 				t:                     t,
-				expectedCmdName:       command.ApprovePolicies,
+				expectedCmdName:       command.PolicyCheck,
 				expectedResult:        commandResult,
 				expectedRepo:          repo,
 				expectedOutput:        output,

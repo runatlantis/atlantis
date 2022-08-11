@@ -229,7 +229,7 @@ func (g *AzureDevopsClient) GetPullRequest(repo models.Repo, num int) (*azuredev
 }
 
 // UpdateStatus updates the build status of a commit.
-func (g *AzureDevopsClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
+func (g *AzureDevopsClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
 	adState := azuredevops.GitError.String()
 	switch request.State {
 	case models.PendingCommitStatus:
@@ -257,19 +257,19 @@ func (g *AzureDevopsClient) UpdateStatus(ctx context.Context, request types.Upda
 	opts := azuredevops.PullRequestListOptions{}
 	source, resp, err := g.Client.PullRequests.Get(g.ctx, owner, project, request.PullNum, &opts)
 	if err != nil {
-		return errors.Wrap(err, "getting pull request")
+		return "", errors.Wrap(err, "getting pull request")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.Wrapf(err, "http response code %d getting pull request", resp.StatusCode)
+		return "", errors.Wrapf(err, "http response code %d getting pull request", resp.StatusCode)
 	}
 	if source.GetSupportsIterations() {
 		opts := azuredevops.PullRequestIterationsListOptions{}
 		iterations, resp, err := g.Client.PullRequests.ListIterations(g.ctx, owner, project, repoName, request.PullNum, &opts)
 		if err != nil {
-			return errors.Wrap(err, "listing pull request iterations")
+			return "", errors.Wrap(err, "listing pull request iterations")
 		}
 		if resp.StatusCode != http.StatusOK {
-			return errors.Wrapf(err, "http response code %d listing pull request iterations", resp.StatusCode)
+			return "", errors.Wrapf(err, "http response code %d listing pull request iterations", resp.StatusCode)
 		}
 		for _, iteration := range iterations {
 			if sourceRef := iteration.GetSourceRefCommit(); sourceRef != nil {
@@ -281,18 +281,18 @@ func (g *AzureDevopsClient) UpdateStatus(ctx context.Context, request types.Upda
 		}
 		if iterationID := status.IterationID; iterationID != nil {
 			if !(*iterationID >= 1) {
-				return errors.New("supportsIterations was true but got invalid iteration ID or no matching iteration commit SHA was found")
+				return "", errors.New("supportsIterations was true but got invalid iteration ID or no matching iteration commit SHA was found")
 			}
 		}
 	}
 	_, resp, err = g.Client.PullRequests.CreateStatus(g.ctx, owner, project, repoName, request.PullNum, &status)
 	if err != nil {
-		return errors.Wrap(err, "creating pull request status")
+		return "", errors.Wrap(err, "creating pull request status")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.Wrapf(err, "http response code %d creating pull request status", resp.StatusCode)
+		return "", errors.Wrapf(err, "http response code %d creating pull request status", resp.StatusCode)
 	}
-	return err
+	return "", err
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.

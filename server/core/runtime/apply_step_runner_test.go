@@ -293,8 +293,8 @@ Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
 
 	// Check that the status was updated with the run url.
 	runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test-dir2/runs/run-PiDsRYKGcerTttV2"
-	updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Apply, models.PendingCommitStatus, runURL)
-	updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Apply, models.SuccessCommitStatus, runURL)
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Apply, models.PendingCommitStatus, runURL, "")
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Apply, models.SuccessCommitStatus, runURL, "")
 }
 
 // Test that if the plan is different, we error out.

@@ -247,8 +247,8 @@ func (p *PlanStepRunner) runRemotePlan(
 	envs map[string]string) (string, error) {
 
 	// updateStatusF will update the commit status and log any error.
-	updateStatusF := func(status models.CommitStatus, url string) {
-		if err := p.CommitStatusUpdater.UpdateProject(ctx, prjCtx, command.Plan, status, url); err != nil {
+	updateStatusF := func(status models.CommitStatus, url string, statusId string) {
+		if _, err := p.CommitStatusUpdater.UpdateProject(ctx, prjCtx, command.Plan, status, url, statusId); err != nil {
 			prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("unable to update status: %s", err))
 		}
 	}
@@ -273,16 +273,16 @@ func (p *PlanStepRunner) runRemotePlan(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
-			updateStatusF(models.PendingCommitStatus, runURL)
+			updateStatusF(models.PendingCommitStatus, runURL, prjCtx.StatusId)
 			nextLineIsRunURL = false
 		}
 	}
 
 	output := strings.Join(lines, "\n")
 	if err != nil {
-		updateStatusF(models.FailedCommitStatus, runURL)
+		updateStatusF(models.FailedCommitStatus, runURL, prjCtx.StatusId)
 	} else {
-		updateStatusF(models.SuccessCommitStatus, runURL)
+		updateStatusF(models.SuccessCommitStatus, runURL, prjCtx.StatusId)
 	}
 	return output, err
 }

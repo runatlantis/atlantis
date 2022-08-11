@@ -291,7 +291,7 @@ func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullR
 	return mergeable, err
 }
 
-func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
+func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
 	scope := c.StatsScope.SubScope("update_status")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
@@ -300,9 +300,10 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	if err := c.Client.UpdateStatus(ctx, request); err != nil {
+	statusId, err := c.Client.UpdateStatus(ctx, request)
+	if err != nil {
 		executionError.Inc(1)
-		return err
+		return "", err
 	}
 
 	//TODO: thread context and use related logging methods.
@@ -317,6 +318,6 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 	})
 
 	executionSuccess.Inc(1)
-	return nil
+	return statusId, nil
 
 }

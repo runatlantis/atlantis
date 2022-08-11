@@ -17,7 +17,7 @@ type ChecksClientWrapper struct {
 	Logger           logging.Logger
 }
 
-func (c *ChecksClientWrapper) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error {
+func (c *ChecksClientWrapper) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
 	shouldAllocate, err := c.FeatureAllocator.ShouldAllocate(feature.GithubChecks, feature.FeatureContext{
 		RepoName:         request.Repo.FullName,
 		PullCreationTime: request.PullCreationTime,

@@ -100,7 +100,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 				Owner:    "owner",
 				Name:     "repo",
 			}
-			err = client.UpdateStatus(context.TODO(), types.UpdateStatusRequest{
+			_, err = client.UpdateStatus(context.TODO(), types.UpdateStatusRequest{
 				Repo:        repo,
 				PullNum:     22,
 				Ref:         "sha",

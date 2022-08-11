@@ -77,7 +77,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			cr := &ApplyCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&command.Context{}, c.pullStatus)
+			cr.updateCommitStatus(&command.Context{}, c.pullStatus, "")
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
@@ -139,7 +139,7 @@ func TestPlanUpdateCommitStatus(t *testing.T) {
 			cr := &PlanCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&command.Context{}, c.pullStatus)
+			cr.updateCommitStatus(&command.Context{}, c.pullStatus, "")
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
@@ -157,20 +157,22 @@ type MockCSU struct {
 	CalledCommand    string
 	CalledNumSuccess int
 	CalledNumTotal   int
+	CalledStatusId   string
 }
 
-func (m *MockCSU) UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command fmt.Stringer, numSuccess int, numTotal int) error {
+func (m *MockCSU) UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command fmt.Stringer, numSuccess int, numTotal int, statusId string) (string, error) {
 	m.CalledRepo = repo
 	m.CalledPull = pull
 	m.CalledStatus = status
 	m.CalledCommand = command.String()
 	m.CalledNumSuccess = numSuccess
 	m.CalledNumTotal = numTotal
-	return nil
+	m.CalledStatusId = statusId
+	return "", nil
 }
-func (m *MockCSU) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command fmt.Stringer) error {
-	return nil
+func (m *MockCSU) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command fmt.Stringer, statusId string) (string, error) {
+	return "", nil
 }
-func (m *MockCSU) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string) error {
-	return nil
+func (m *MockCSU) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error) {
+	return "", nil
 }

@@ -3,7 +3,6 @@ package events
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -24,7 +23,7 @@ type renderer interface {
 }
 
 type checksClient interface {
-	UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) error
+	UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error)
 }
 
 // [WENGINES-4643] TODO: Remove PullOutputUpdater and default to checks once github checks is stable
@@ -62,28 +61,6 @@ type ChecksOutputUpdater struct {
 }
 
 func (c *ChecksOutputUpdater) UpdateOutput(ctx *command.Context, cmd PullCommand, res command.Result) {
-
-	if res.Error != nil || res.Failure != "" {
-		output := c.MarkdownRenderer.Render(res, cmd.CommandName(), ctx.Pull.BaseRepo)
-		updateStatusReq := types.UpdateStatusRequest{
-			Repo:             ctx.HeadRepo,
-			Ref:              ctx.Pull.HeadCommit,
-			StatusName:       c.TitleBuilder.Build(cmd.CommandName().String()),
-			PullNum:          ctx.Pull.Num,
-			Description:      fmt.Sprintf("%s failed", strings.Title(cmd.CommandName().String())),
-			Output:           output,
-			State:            models.FailedCommitStatus,
-			PullCreationTime: ctx.Pull.CreatedAt,
-		}
-
-		if err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
-			ctx.Log.ErrorContext(ctx.RequestCtx, "updable to update check run", map[string]interface{}{
-				"error": err.Error(),
-			})
-		}
-		return
-	}
-
 	// Handle ApprovePolicies command separately
 	if cmd.CommandName() == command.ApprovePolicies {
 		c.handleApprovePolicies(ctx, cmd, res)
@@ -115,10 +92,11 @@ func (c *ChecksOutputUpdater) UpdateOutput(ctx *command.Context, cmd PullCommand
 			Description:      description,
 			Output:           output,
 			State:            state,
+			StatusId:         projectResult.StatusId,
 			PullCreationTime: ctx.Pull.CreatedAt,
 		}
 
-		if err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
+		if _, err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
 			ctx.Log.ErrorContext(ctx.RequestCtx, "unable to update check run", map[string]interface{}{
 				"error": err.Error(),
 			})
@@ -128,47 +106,30 @@ func (c *ChecksOutputUpdater) UpdateOutput(ctx *command.Context, cmd PullCommand
 }
 
 func (c *ChecksOutputUpdater) handleApprovePolicies(ctx *command.Context, cmd PullCommand, res command.Result) {
-	output := c.MarkdownRenderer.Render(res, cmd.CommandName(), ctx.Pull.BaseRepo)
-	updateStatusReq := types.UpdateStatusRequest{
-		Repo:             ctx.HeadRepo,
-		Ref:              ctx.Pull.HeadCommit,
-		StatusName:       c.TitleBuilder.Build(cmd.CommandName().String()),
-		PullNum:          ctx.Pull.Num,
-		Description:      fmt.Sprintf("%s succeeded", strings.Title(cmd.CommandName().String())),
-		Output:           output,
-		State:            models.SuccessCommitStatus,
-		PullCreationTime: ctx.Pull.CreatedAt,
-	}
-
-	if err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
-		ctx.Log.Error("unable to update check run", map[string]interface{}{
-			"error": err.Error(),
-		})
-	}
-
 	// In addition, update project level atlantis/policy_check checkruns
 	for _, projectResult := range res.ProjectResults {
 		statusName := c.TitleBuilder.Build(command.PolicyCheck.String(), vcs.StatusTitleOptions{
 			ProjectName: projectResult.ProjectName,
 		})
 
-		var state models.CommitStatus
-		if projectResult.Error != nil || projectResult.Failure != "" {
+		state := models.SuccessCommitStatus
+		if projectResult.PolicyCheckSuccess == nil {
 			state = models.FailedCommitStatus
-		} else {
-			state = models.SuccessCommitStatus
 		}
 
+		output := c.MarkdownRenderer.RenderProject(projectResult, command.PolicyCheck, ctx.Pull.BaseRepo)
 		updateStatusReq := types.UpdateStatusRequest{
 			Repo:             ctx.HeadRepo,
 			Ref:              ctx.Pull.HeadCommit,
 			StatusName:       statusName,
 			PullNum:          ctx.Pull.Num,
 			State:            state,
+			StatusId:         projectResult.StatusId,
+			Output:           output,
 			PullCreationTime: ctx.Pull.CreatedAt,
 		}
 
-		if err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
+		if _, err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
 			ctx.Log.ErrorContext(ctx.RequestCtx, "updable to update check run", map[string]interface{}{
 				"error": err.Error(),
 			})

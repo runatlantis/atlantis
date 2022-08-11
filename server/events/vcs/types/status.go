@@ -17,4 +17,5 @@ type UpdateStatusRequest struct {
 	// if not present, should be -1
 	PullNum          int
 	PullCreationTime time.Time
+	StatusId         string
 }
