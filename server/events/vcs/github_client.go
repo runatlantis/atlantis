@@ -297,8 +297,8 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 	return approvalStatus, nil
 }
 
-// Checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
-func (g *GithubClient) GetStatus(repo models.Repo, pull *github.PullRequest) (bool, error) {
+// GetCombinedStatusMinusApply checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
+func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest) (bool, error) {
 	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, *pull.Head.Ref, nil)
 	if err != nil {
 		return false, errors.Wrap(err, "getting combined status")
@@ -318,22 +318,39 @@ func (g *GithubClient) GetStatus(repo models.Repo, pull *github.PullRequest) (bo
 	return true, nil
 }
 
+// GetPullReviewDecision gets the pull review decision, which takes into account CODEOWNERS
+func (g *GithubClient) GetPullReviewDecision(repo models.Repo, pull models.PullRequest) (approvalStatus bool, err error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				ReviewDecision string
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":  githubv4.String(repo.Owner),
+		"name":   githubv4.String(repo.Name),
+		"number": githubv4.Int(pull.Num),
+	}
+
+	err = g.v4QueryClient.Query(g.ctx, &query, variables)
+	if err != nil {
+		return approvalStatus, errors.Wrap(err, "getting reviewDecision")
+	}
+
+	if query.Repository.PullRequest.ReviewDecision == "APPROVED" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 // PullIsMergeable returns true if the pull request is mergeable.
 func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	githubPR, err := g.GetPullRequest(repo, pull.Num)
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
-	}
-
-	approved, err := g.PullIsApproved(repo, pull)
-	if err != nil {
-		return false, errors.Wrap(err, "getting pull request approval")
-	}
-	fmt.Printf("Approval: %v\n", approved.IsApproved)
-
-	status, err := g.GetStatus(repo, githubPR)
-	if err != nil {
-		return false, errors.Wrap(err, "getting pull request status")
 	}
 
 	state := githubPR.GetMergeableState()
@@ -347,8 +364,23 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
-		if state == "blocked" && status && approved.IsApproved {
-			return true, nil
+		if state == "blocked" {
+			//check status excluding atlantis apply
+			status, err := g.GetCombinedStatusMinusApply(repo, githubPR)
+			if err != nil {
+				return false, errors.Wrap(err, "getting pull request status")
+			}
+
+			//check to see if pr is approved using reviewDecision
+			approved, err := g.GetPullReviewDecision(repo, pull)
+			if err != nil {
+				return false, errors.Wrap(err, "getting pull request reviewDecision")
+			}
+
+			//if all other status checks EXCEPT atlantis/apply are successful, and the PR is approved based on reviewDecision, let it proceed
+			if status && approved {
+				return true, nil
+			}
 		}
 
 		return false, nil
