@@ -72,8 +72,8 @@ const (
 	GHAppKeyFileFlag            = "gh-app-key-file"
 	GHAppSlugFlag               = "gh-app-slug"
 	GHOrganizationFlag          = "gh-org"
-	GHWebhookSecretFlag         = "gh-webhook-secret" // nolint: gosec
-	GHAllowMergeableBypassApply = "gh-allow-mergeable-bypass-apply"
+	GHWebhookSecretFlag         = "gh-webhook-secret"               // nolint: gosec
+	GHAllowMergeableBypassApply = "gh-allow-mergeable-bypass-apply" // nolint: gosec
 	GitlabHostnameFlag          = "gitlab-hostname"
 	GitlabTokenFlag             = "gitlab-token"
 	GitlabUserFlag              = "gitlab-user"
