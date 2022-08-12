@@ -45,6 +45,7 @@ type GithubClient struct {
 	v4QueryClient  *githubv4.Client
 	ctx            context.Context
 	logger         logging.SimpleLogging
+	config         GithubConfig
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -62,7 +63,7 @@ type GithubAppTemporarySecrets struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, logger logging.SimpleLogging) (*GithubClient, error) {
 	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
@@ -118,6 +119,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 		v4QueryClient:  v4QueryClient,
 		ctx:            context.Background(),
 		logger:         logger,
+		config:         config,
 	}, nil
 }
 
@@ -381,22 +383,26 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
-		if state == "blocked" {
-			//check status excluding atlantis apply
-			status, err := g.GetCombinedStatusMinusApply(repo, githubPR, vcsstatusname)
-			if err != nil {
-				return false, errors.Wrap(err, "getting pull request status")
-			}
+		//mergeable bypass apply code hidden by feature flag
+		if g.config.AllowMergeableBypassApply {
+			g.logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
+			if state == "blocked" {
+				//check status excluding atlantis apply
+				status, err := g.GetCombinedStatusMinusApply(repo, githubPR, vcsstatusname)
+				if err != nil {
+					return false, errors.Wrap(err, "getting pull request status")
+				}
 
-			//check to see if pr is approved using reviewDecision
-			approved, err := g.GetPullReviewDecision(repo, pull)
-			if err != nil {
-				return false, errors.Wrap(err, "getting pull request reviewDecision")
-			}
+				//check to see if pr is approved using reviewDecision
+				approved, err := g.GetPullReviewDecision(repo, pull)
+				if err != nil {
+					return false, errors.Wrap(err, "getting pull request reviewDecision")
+				}
 
-			//if all other status checks EXCEPT atlantis/apply are successful, and the PR is approved based on reviewDecision, let it proceed
-			if status && approved {
-				return true, nil
+				//if all other status checks EXCEPT atlantis/apply are successful, and the PR is approved based on reviewDecision, let it proceed
+				if status && approved {
+					return true, nil
+				}
 			}
 		}
 

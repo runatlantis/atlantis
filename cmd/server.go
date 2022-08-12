@@ -37,55 +37,56 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
-	ADWebhookPasswordFlag      = "azuredevops-webhook-password" // nolint: gosec
-	ADWebhookUserFlag          = "azuredevops-webhook-user"
-	ADTokenFlag                = "azuredevops-token" // nolint: gosec
-	ADUserFlag                 = "azuredevops-user"
-	ADHostnameFlag             = "azuredevops-hostname"
-	AllowForkPRsFlag           = "allow-fork-prs"
-	AllowRepoConfigFlag        = "allow-repo-config"
-	AtlantisURLFlag            = "atlantis-url"
-	AutomergeFlag              = "automerge"
-	AutoplanFileListFlag       = "autoplan-file-list"
-	BitbucketBaseURLFlag       = "bitbucket-base-url"
-	BitbucketTokenFlag         = "bitbucket-token"
-	BitbucketUserFlag          = "bitbucket-user"
-	BitbucketWebhookSecretFlag = "bitbucket-webhook-secret"
-	ConfigFlag                 = "config"
-	CheckoutStrategyFlag       = "checkout-strategy"
-	DataDirFlag                = "data-dir"
-	DefaultTFVersionFlag       = "default-tf-version"
-	DisableApplyAllFlag        = "disable-apply-all"
-	DisableApplyFlag           = "disable-apply"
-	DisableAutoplanFlag        = "disable-autoplan"
-	DisableMarkdownFoldingFlag = "disable-markdown-folding"
-	DisableRepoLockingFlag     = "disable-repo-locking"
-	EnablePolicyChecksFlag     = "enable-policy-checks"
-	EnableRegExpCmdFlag        = "enable-regexp-cmd"
-	EnableDiffMarkdownFormat   = "enable-diff-markdown-format"
-	GHHostnameFlag             = "gh-hostname"
-	GHTeamAllowlistFlag        = "gh-team-allowlist"
-	GHTokenFlag                = "gh-token"
-	GHUserFlag                 = "gh-user"
-	GHAppIDFlag                = "gh-app-id"
-	GHAppKeyFlag               = "gh-app-key"
-	GHAppKeyFileFlag           = "gh-app-key-file"
-	GHAppSlugFlag              = "gh-app-slug"
-	GHOrganizationFlag         = "gh-org"
-	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
-	GitlabHostnameFlag         = "gitlab-hostname"
-	GitlabTokenFlag            = "gitlab-token"
-	GitlabUserFlag             = "gitlab-user"
-	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
-	APISecretFlag              = "api-secret"
-	HidePrevPlanComments       = "hide-prev-plan-comments"
-	LogLevelFlag               = "log-level"
-	ParallelPoolSize           = "parallel-pool-size"
-	StatsNamespace             = "stats-namespace"
-	AllowDraftPRs              = "allow-draft-prs"
-	PortFlag                   = "port"
-	RepoConfigFlag             = "repo-config"
-	RepoConfigJSONFlag         = "repo-config-json"
+	ADWebhookPasswordFlag       = "azuredevops-webhook-password" // nolint: gosec
+	ADWebhookUserFlag           = "azuredevops-webhook-user"
+	ADTokenFlag                 = "azuredevops-token" // nolint: gosec
+	ADUserFlag                  = "azuredevops-user"
+	ADHostnameFlag              = "azuredevops-hostname"
+	AllowForkPRsFlag            = "allow-fork-prs"
+	AllowRepoConfigFlag         = "allow-repo-config"
+	AtlantisURLFlag             = "atlantis-url"
+	AutomergeFlag               = "automerge"
+	AutoplanFileListFlag        = "autoplan-file-list"
+	BitbucketBaseURLFlag        = "bitbucket-base-url"
+	BitbucketTokenFlag          = "bitbucket-token"
+	BitbucketUserFlag           = "bitbucket-user"
+	BitbucketWebhookSecretFlag  = "bitbucket-webhook-secret"
+	ConfigFlag                  = "config"
+	CheckoutStrategyFlag        = "checkout-strategy"
+	DataDirFlag                 = "data-dir"
+	DefaultTFVersionFlag        = "default-tf-version"
+	DisableApplyAllFlag         = "disable-apply-all"
+	DisableApplyFlag            = "disable-apply"
+	DisableAutoplanFlag         = "disable-autoplan"
+	DisableMarkdownFoldingFlag  = "disable-markdown-folding"
+	DisableRepoLockingFlag      = "disable-repo-locking"
+	EnablePolicyChecksFlag      = "enable-policy-checks"
+	EnableRegExpCmdFlag         = "enable-regexp-cmd"
+	EnableDiffMarkdownFormat    = "enable-diff-markdown-format"
+	GHHostnameFlag              = "gh-hostname"
+	GHTeamAllowlistFlag         = "gh-team-allowlist"
+	GHTokenFlag                 = "gh-token"
+	GHUserFlag                  = "gh-user"
+	GHAppIDFlag                 = "gh-app-id"
+	GHAppKeyFlag                = "gh-app-key"
+	GHAppKeyFileFlag            = "gh-app-key-file"
+	GHAppSlugFlag               = "gh-app-slug"
+	GHOrganizationFlag          = "gh-org"
+	GHWebhookSecretFlag         = "gh-webhook-secret" // nolint: gosec
+	GHAllowMergeableBypassApply = "gh-allow-mergeable-bypass-apply"
+	GitlabHostnameFlag          = "gitlab-hostname"
+	GitlabTokenFlag             = "gitlab-token"
+	GitlabUserFlag              = "gitlab-user"
+	GitlabWebhookSecretFlag     = "gitlab-webhook-secret" // nolint: gosec
+	APISecretFlag               = "api-secret"
+	HidePrevPlanComments        = "hide-prev-plan-comments"
+	LogLevelFlag                = "log-level"
+	ParallelPoolSize            = "parallel-pool-size"
+	StatsNamespace              = "stats-namespace"
+	AllowDraftPRs               = "allow-draft-prs"
+	PortFlag                    = "port"
+	RepoConfigFlag              = "repo-config"
+	RepoConfigJSONFlag          = "repo-config-json"
 	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
 	RepoWhitelistFlag          = "repo-whitelist"
 	RepoAllowlistFlag          = "repo-allowlist"
@@ -372,6 +373,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnableDiffMarkdownFormat: {
 		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
+		defaultValue: false,
+	},
+	GHAllowMergeableBypassApply: {
+		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {
