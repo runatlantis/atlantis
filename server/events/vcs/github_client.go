@@ -18,7 +18,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -298,18 +298,35 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 }
 
 // GetCombinedStatusMinusApply checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
-func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest) (bool, error) {
+func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest, vcstatusname string) (bool, error) {
+	//check combined status api
 	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, *pull.Head.Ref, nil)
 	if err != nil {
 		return false, errors.Wrap(err, "getting combined status")
 	}
 
-	//compile for performance reasons
-	matcher, _ := regexp.Compile("atlantis/apply")
-
+	//iterate over statuses - return false if we find one that isnt "apply" and doesnt have state = "success"
 	for _, r := range status.Statuses {
-		if !matcher.MatchString(*r.Context) {
-			if *r.State == "failure" {
+		if strings.HasPrefix(*r.Context, fmt.Sprintf("%s/%s", vcstatusname, command.Apply.String())) {
+			continue
+		}
+		if *r.State != "success" {
+			return false, nil
+		}
+	}
+
+	//check check suite/check run api
+	checksuites, _, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), repo.Owner, repo.Name, *pull.Head.Ref, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	//iterate over check completed check suites - return false if we find one that doesnt have conclusion = "success"
+	for _, c := range checksuites.CheckSuites {
+		if *c.Status == "completed" {
+			if *c.Conclusion == "success" {
+				continue
+			} else {
 				return false, nil
 			}
 		}
@@ -366,7 +383,7 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
 		if state == "blocked" {
 			//check status excluding atlantis apply
-			status, err := g.GetCombinedStatusMinusApply(repo, githubPR)
+			status, err := g.GetCombinedStatusMinusApply(repo, githubPR, vcsstatusname)
 			if err != nil {
 				return false, errors.Wrap(err, "getting pull request status")
 			}
