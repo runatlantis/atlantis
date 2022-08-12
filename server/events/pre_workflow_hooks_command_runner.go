@@ -1,6 +1,8 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -21,6 +23,7 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 	WorkingDir            WorkingDir
 	GlobalCfg             valid.GlobalCfg
 	PreWorkflowHookRunner runtime.PreWorkflowHookRunner
+	CommitStatusUpdater   CommitStatusUpdater
 }
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
@@ -83,11 +86,27 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 	repoDir string,
 ) error {
 
-	for _, hook := range preWorkflowHooks {
+	for i, hook := range preWorkflowHooks {
+		hookDescription := hook.StepDescription
+		if hookDescription == "" {
+			hookDescription = fmt.Sprintf("Pre workflow hook #%d", i)
+		}
+
+		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, hookDescription); err != nil {
+			ctx.Log.Warn("unable to pre workflow hook status: %s", err)
+		}
+
 		_, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, repoDir)
 
 		if err != nil {
+			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, hookDescription); err != nil {
+				ctx.Log.Warn("unable to pre workflow hook status: %s", err)
+			}
 			return err
+		}
+
+		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, hookDescription); err != nil {
+			ctx.Log.Warn("unable to pre workflow hook status: %s", err)
 		}
 	}
 

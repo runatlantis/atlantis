@@ -1,6 +1,8 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -21,6 +23,7 @@ type DefaultPostWorkflowHooksCommandRunner struct {
 	WorkingDir             WorkingDir
 	GlobalCfg              valid.GlobalCfg
 	PostWorkflowHookRunner runtime.PostWorkflowHookRunner
+	CommitStatusUpdater    CommitStatusUpdater
 }
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
@@ -83,13 +86,28 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 	repoDir string,
 ) error {
 
-	for _, hook := range postWorkflowHooks {
+	for i, hook := range postWorkflowHooks {
+		hookDescription := hook.StepDescription
+		if hookDescription == "" {
+			hookDescription = fmt.Sprintf("Post workflow hook #%d", i)
+		}
+
+		if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, hookDescription); err != nil {
+			ctx.Log.Warn("unable to post workflow hook status: %s", err)
+		}
+
 		_, err := w.PostWorkflowHookRunner.Run(ctx, hook.RunCommand, repoDir)
 
 		if err != nil {
+			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, hookDescription); err != nil {
+				ctx.Log.Warn("unable to post workflow hook status: %s", err)
+			}
 			return err
 		}
-	}
 
+		if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, hookDescription); err != nil {
+			ctx.Log.Warn("unable to post workflow hook status: %s", err)
+		}
+	}
 	return nil
 }

@@ -486,6 +486,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:      workingDirLocker,
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{},
+		CommitStatusUpdater:   commitStatusUpdater,
 	}
 	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
 		VCSClient:              vcsClient,
@@ -493,6 +494,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:       workingDirLocker,
 		WorkingDir:             workingDir,
 		PostWorkflowHookRunner: runtime.DefaultPostWorkflowHookRunner{},
+		CommitStatusUpdater:    commitStatusUpdater,
 	}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		policyChecksEnabled,
