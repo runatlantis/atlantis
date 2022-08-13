@@ -144,9 +144,7 @@ workflows:
 ```
 
 ### cdktf
-In order to enable [cdktf](https://www.terraform.io/cdktf)
-
-#### requirements
+Here are the requirements to enable [cdktf](https://www.terraform.io/cdktf)
 
 - A custom image with `cdktf` installed
 - The autoplan file updated to trigger off of `**/cdk.tf.json`
@@ -162,7 +160,7 @@ FROM ghcr.io/runatlantis/atlantis:v0.19.7
 RUN apk add npm && npm i -g cdktf-cli
 ```
 
-#### 
+#### server config
 
 ```bash
 # env variables
@@ -177,7 +175,7 @@ OR
 autoplan-file-list: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/cdk.tf.json"
 ```
 
-#### hooks
+#### server repo config
 
 Then perhaps the `cdktf synth` (as a double check in case the hcl files were not generated locally and committed to the PR branch) can run as a `post-checkout` hook as described in this [comment](https://github.com/runatlantis/atlantis/issues/500#issuecomment-571160488).
 
@@ -192,16 +190,14 @@ repos:
       - run: npm i && cdktf get && cdktf synth
 ```
 
-#### full workflow
+#### workflow
 
 1. k8s/fargate/whatever uses a custom docker image of atlantis with `cdktf` installed with the `--autoplan-file-list` to trigger on json files
-2. PR branch is pushed up containing cdktf (w/e language) changes and generated hcl json
-3. Atlantis checks out the branch in the repo
-4. Atlantis runs the `cdktf get && cdktf synth` command in the repo root as a `post-checkout` hook (as a double check described above)
-    - Use native [`pre_workflow_hooks`](https://www.runatlantis.io/docs/pre-workflow-hooks.html)
-    - This [blog post](https://build.thebeat.co/ci-cd-for-terragrunt-iac-through-atlantis-9e7ba98ac487) helps describe the hook in detail. This must have been setup prior to native `pre_workflow_hooks` support.
-6. Atlantis detects the change to the generated hcl json files in a number of `dir`s
-7. Atlantis then runs `terraform` workflows in the respective `dir`s
+1. PR branch is pushed up containing `cdktf` changes and generated hcl json
+1. Atlantis checks out the branch in the repo
+1. Atlantis runs the `npm i && cdktf get && cdktf synth` command in the repo root as a step in `pre_workflow_hooks` (as a double check described above)
+1. Atlantis detects the change to the generated hcl json files in a number of `dir`s
+1. Atlantis then runs `terraform` workflows in the respective `dir`s as usual
 
 ### Terragrunt
 Atlantis supports running custom commands in place of the default Atlantis
