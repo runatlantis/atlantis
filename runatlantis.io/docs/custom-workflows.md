@@ -178,9 +178,7 @@ autoplan-file-list: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/cdk.tf.json"
 
 #### server repo config
 
-Then perhaps the `cdktf synth` (as a double check in case the hcl files were not generated locally and committed to the PR branch) can run as a `post-checkout` hook as described in this [comment](https://github.com/runatlantis/atlantis/issues/500#issuecomment-571160488).
-
-OR use `pre_workflow_hooks`
+Use `pre_workflow_hooks`
 
 `atlantis server --repo-config="repos.yaml"`
 ```yaml
