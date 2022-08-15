@@ -299,6 +299,18 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 	return approvalStatus, nil
 }
 
+// isRequiredCheck is a helper function to determine if a check is required or not
+func isRequiredCheck(check string, required []string) bool {
+	//in go1.18 can prob replace this with slices.Contains
+	for _, r := range required {
+		if r == check {
+			return true
+		}
+	}
+
+	return false
+}
+
 // GetCombinedStatusMinusApply checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
 func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest, vcstatusname string) (bool, error) {
 	//check combined status api
@@ -317,19 +329,46 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 		}
 	}
 
+	//get required status checks
+	required, _, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner, repo.Name, *pull.Base.Ref)
+	if err != nil {
+		return false, errors.Wrap(err, "getting required status checks")
+	}
+
 	//check check suite/check run api
 	checksuites, _, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), repo.Owner, repo.Name, *pull.Head.Ref, nil)
 	if err != nil {
-		panic(err)
+		return false, errors.Wrap(err, "getting check suites for ref")
 	}
 
 	//iterate over check completed check suites - return false if we find one that doesnt have conclusion = "success"
 	for _, c := range checksuites.CheckSuites {
 		if *c.Status == "completed" {
-			if *c.Conclusion == "success" {
-				continue
-			} else {
-				return false, nil
+			fmt.Printf("Looking at suite %v\n", *c.ID)
+			//iterate over the runs inside the suite
+			suite, _, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), repo.Owner, repo.Name, *c.ID, nil)
+			if err != nil {
+				return false, errors.Wrap(err, "getting check runs for check suite")
+			}
+
+			for _, r := range suite.CheckRuns {
+				fmt.Printf("Looking at check run %s\n", *r.Name)
+				//check to see if the check is required
+				if isRequiredCheck(*r.Name, required.RequiredStatusChecks.Contexts) {
+					fmt.Println("Check is required")
+					if *c.Conclusion == "success" {
+						fmt.Println("Check is successful")
+						continue
+					} else {
+						fmt.Println("Check is failed")
+						return false, nil
+					}
+				} else {
+					//ignore checks that arent required
+					fmt.Println("Check is not required")
+					continue
+				}
+
 			}
 		}
 	}
@@ -392,6 +431,8 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 				if err != nil {
 					return false, errors.Wrap(err, "getting pull request status")
 				}
+
+				fmt.Printf("Status was %v\n", status)
 
 				//check to see if pr is approved using reviewDecision
 				approved, err := g.GetPullReviewDecision(repo, pull)

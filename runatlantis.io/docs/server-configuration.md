@@ -362,12 +362,18 @@ Values are chosen in this order:
   ::: warning SECURITY WARNING
   The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gh-app-key-file` to mitigate that risk.
   :::
--
+
 - ### `--gh-team-allowlist`
   ```bash
   atlantis server --gh-team-allowlist="myteam:plan, secteam:apply"
   ```
   Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
+
+- ### `--gh-allow-mergeable-bypass-apply`
+  ```bash
+  atlantis server --gh-allow-mergeable-bypass-apply
+  ```
+  Feature flag to enable ability to use `mergeable` mode with required apply status check.
 
 * ### `--gitlab-hostname`
   ```bash
