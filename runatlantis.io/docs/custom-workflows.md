@@ -190,6 +190,21 @@ repos:
       - run: npm i && cdktf get && cdktf synth
 ```
 
+#### repo structure
+
+This is the git repo structure after running `cdktf synth`. The `cdk.tf.json` files contain the HCL that atlantis can run.
+
+```bash
+$ tree --gitignore
+.
+├── cdktf.json
+├── cdktf.out
+│   ├── manifest.json
+│   └── stacks
+│       └── eks
+│           └── cdk.tf.json
+```
+
 #### workflow
 
 1. k8s/fargate/whatever uses a custom docker image of atlantis with `cdktf` installed with the `--autoplan-file-list` to trigger on json files
