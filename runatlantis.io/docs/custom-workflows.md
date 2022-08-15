@@ -150,6 +150,7 @@ Here are the requirements to enable [cdktf](https://www.terraform.io/cdktf)
 - The autoplan file updated to trigger off of `**/cdk.tf.json`
 - The output of `cdktf synth` has to be committed to the pull request
 - Optional: Use `pre_workflow_hooks` to run `cdktf synth` as a double check
+- Optional: There isn't a requirement to use a repo `atlantis.yaml` but one can be leveraged if needed.
 
 #### custom image
 
@@ -207,7 +208,7 @@ $ tree --gitignore
 
 #### workflow
 
-1. k8s/fargate/whatever uses a custom docker image of atlantis with `cdktf` installed with the `--autoplan-file-list` to trigger on json files
+1. Container orchestrator (k8s/fargate/ecs/etc) uses the custom docker image of atlantis with `cdktf` installed with the `--autoplan-file-list` to trigger on json files
 1. PR branch is pushed up containing `cdktf` changes and generated hcl json
 1. Atlantis checks out the branch in the repo
 1. Atlantis runs the `npm i && cdktf get && cdktf synth` command in the repo root as a step in `pre_workflow_hooks` (as a double check described above)
