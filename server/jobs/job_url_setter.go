@@ -12,7 +12,7 @@ import (
 
 // ProjectJobURLGenerator generates urls to view project's progress.
 type ProjectJobURLGenerator interface {
-	GenerateProjectJobURL(p command.ProjectContext) (string, error)
+	GenerateProjectJobURL(jobId string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_status_updater.go ProjectStatusUpdater
@@ -36,7 +36,7 @@ func NewJobURLSetter(projectJobURLGenerator ProjectJobURLGenerator, projectStatu
 }
 
 func (j *JobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus) error {
-	url, err := j.projectJobURLGenerator.GenerateProjectJobURL(ctx)
+	url, err := j.projectJobURLGenerator.GenerateProjectJobURL(ctx.JobID)
 
 	if err != nil {
 		return err

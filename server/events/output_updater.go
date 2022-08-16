@@ -17,6 +17,11 @@ type OutputUpdater interface {
 	UpdateOutput(ctx *command.Context, cmd PullCommand, res command.Result)
 }
 
+// JobURLGenerator generates urls to view project's progress.
+type jobURLGenerator interface {
+	GenerateProjectJobURL(jobId string) (string, error)
+}
+
 type renderer interface {
 	Render(res command.Result, cmdName command.Name, baseRepo models.Repo) string
 	RenderProject(prjRes command.ProjectResult, cmdName command.Name, baseRepo models.Repo) string
@@ -58,42 +63,35 @@ type ChecksOutputUpdater struct {
 	VCSClient        checksClient
 	MarkdownRenderer renderer
 	TitleBuilder     vcs.StatusTitleBuilder
+	JobURLGenerator  jobURLGenerator
 }
 
 func (c *ChecksOutputUpdater) UpdateOutput(ctx *command.Context, cmd PullCommand, res command.Result) {
-	// Handle ApprovePolicies command separately
-	if cmd.CommandName() == command.ApprovePolicies {
-		c.handleApprovePolicies(ctx, cmd, res)
+	if res.Error != nil || res.Failure != "" {
+		c.handleCommandFailure(ctx, cmd, res)
 		return
 	}
 
 	// iterate through all project results and the update the github check
 	for _, projectResult := range res.ProjectResults {
-		statusName := c.TitleBuilder.Build(cmd.CommandName().String(), vcs.StatusTitleOptions{
-			ProjectName: projectResult.ProjectName,
-		})
-
-		// Description is a required field
-		description := fmt.Sprintf("**Project**: `%s`\n**Dir**: `%s`\n**Workspace**: `%s`", projectResult.ProjectName, projectResult.RepoRelDir, projectResult.Workspace)
-
-		var state models.CommitStatus
-		if projectResult.Error != nil || projectResult.Failure != "" {
-			state = models.FailedCommitStatus
-		} else {
-			state = models.SuccessCommitStatus
-		}
-
-		output := c.MarkdownRenderer.RenderProject(projectResult, cmd.CommandName(), ctx.Pull.BaseRepo)
 		updateStatusReq := types.UpdateStatusRequest{
 			Repo:             ctx.HeadRepo,
 			Ref:              ctx.Pull.HeadCommit,
-			StatusName:       statusName,
 			PullNum:          ctx.Pull.Num,
-			Description:      description,
-			Output:           output,
-			State:            state,
-			StatusId:         projectResult.StatusId,
 			PullCreationTime: ctx.Pull.CreatedAt,
+			StatusId:         projectResult.StatusId,
+			DetailsURL:       c.buildJobURL(ctx, projectResult.Command, projectResult.JobId),
+			Output:           c.MarkdownRenderer.RenderProject(projectResult, projectResult.Command, ctx.HeadRepo),
+			State:            c.resolveState(projectResult),
+
+			// Also replaces ApprovePolicies with PolicyCheck
+			StatusName: c.buildStatusName(cmd, vcs.StatusTitleOptions{ProjectName: projectResult.ProjectName}),
+
+			// Additional fields to support templating for project level checkruns
+			CommandName: projectResult.Command.TitleString(),
+			Project:     projectResult.ProjectName,
+			Workspace:   projectResult.Workspace,
+			Directory:   projectResult.RepoRelDir,
 		}
 
 		if _, err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
@@ -102,45 +100,65 @@ func (c *ChecksOutputUpdater) UpdateOutput(ctx *command.Context, cmd PullCommand
 			})
 		}
 	}
-
 }
 
-func (c *ChecksOutputUpdater) handleApprovePolicies(ctx *command.Context, cmd PullCommand, res command.Result) {
-	// In addition, update project level atlantis/policy_check checkruns
-	for _, projectResult := range res.ProjectResults {
-		statusName := c.TitleBuilder.Build(command.PolicyCheck.String(), vcs.StatusTitleOptions{
-			ProjectName: projectResult.ProjectName,
-		})
-
-		// Description is a required field
-		description := fmt.Sprintf("**Project**: `%s`\n**Dir**: `%s`\n**Workspace**: `%s`", projectResult.ProjectName, projectResult.RepoRelDir, projectResult.Workspace)
-
-		state := models.SuccessCommitStatus
-		if projectResult.PolicyCheckSuccess == nil {
-			state = models.FailedCommitStatus
-		}
-
-		output := c.MarkdownRenderer.RenderProject(projectResult, command.PolicyCheck, ctx.Pull.BaseRepo)
-		updateStatusReq := types.UpdateStatusRequest{
-			Repo:             ctx.HeadRepo,
-			Ref:              ctx.Pull.HeadCommit,
-			StatusName:       statusName,
-			PullNum:          ctx.Pull.Num,
-			State:            state,
-			Description:      description,
-			StatusId:         projectResult.StatusId,
-			Output:           output,
-			PullCreationTime: ctx.Pull.CreatedAt,
-		}
-
-		if _, err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
-			ctx.Log.ErrorContext(ctx.RequestCtx, "updable to update check run", map[string]interface{}{
-				"error": err.Error(),
-			})
-		}
+func (c *ChecksOutputUpdater) handleCommandFailure(ctx *command.Context, cmd PullCommand, res command.Result) {
+	updateStatusReq := types.UpdateStatusRequest{
+		Repo:             ctx.HeadRepo,
+		Ref:              ctx.Pull.HeadCommit,
+		PullNum:          ctx.Pull.Num,
+		PullCreationTime: ctx.Pull.CreatedAt,
+		State:            models.FailedCommitStatus,
+		StatusName:       c.buildStatusName(cmd, vcs.StatusTitleOptions{}),
+		CommandName:      cmd.CommandName().TitleString(),
+		Output:           c.buildOutput(res),
 	}
 
-	return
+	if _, err := c.VCSClient.UpdateStatus(ctx.RequestCtx, updateStatusReq); err != nil {
+		ctx.Log.ErrorContext(ctx.RequestCtx, "unable to update check run", map[string]interface{}{
+			"error": err.Error(),
+		})
+	}
+}
+
+func (c *ChecksOutputUpdater) buildJobURL(ctx *command.Context, cmd command.Name, jobID string) string {
+
+	// Only support streaming logs for plan and apply operation for now
+	if cmd == command.Plan || cmd == command.Apply {
+		jobURL, err := c.JobURLGenerator.GenerateProjectJobURL(jobID)
+		if err != nil {
+			ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("generating job URL %v", err))
+		}
+
+		return jobURL
+	}
+	return ""
+}
+
+func (c *ChecksOutputUpdater) buildOutput(res command.Result) string {
+	if res.Error != nil {
+		return res.Error.Error()
+	} else if res.Failure != "" {
+		return res.Failure
+	}
+	return ""
+}
+
+func (c *ChecksOutputUpdater) buildStatusName(cmd PullCommand, options vcs.StatusTitleOptions) string {
+	commandName := cmd.CommandName()
+	if commandName == command.ApprovePolicies {
+		commandName = command.PolicyCheck
+	}
+
+	return c.TitleBuilder.Build(commandName.String(), options)
+}
+
+func (c *ChecksOutputUpdater) resolveState(result command.ProjectResult) models.CommitStatus {
+	if result.Error != nil || result.Failure != "" {
+		return models.FailedCommitStatus
+	} else {
+		return models.SuccessCommitStatus
+	}
 }
 
 // Default prj output updater which writes to the pull req comment

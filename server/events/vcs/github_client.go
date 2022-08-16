@@ -33,64 +33,10 @@ import (
 	"github.com/shurcooL/githubv4"
 )
 
-// github checks conclusion
-type ChecksConclusion int
-
-const (
-	Neutral ChecksConclusion = iota
-	TimedOut
-	ActionRequired
-	Cancelled
-	Failure
-	Success
-)
-
-func (e ChecksConclusion) String() string {
-	switch e {
-	case Neutral:
-		return "neutral"
-	case TimedOut:
-		return "timed_out"
-	case ActionRequired:
-		return "action_required"
-	case Cancelled:
-		return "cancelled"
-	case Failure:
-		return "failure"
-	case Success:
-		return "success"
-	}
-	return ""
-}
-
-// github checks status
-type CheckStatus int
-
-const (
-	Queued CheckStatus = iota
-	InProgress
-	Completed
-)
-
-func (e CheckStatus) String() string {
-	switch e {
-	case Queued:
-		return "queued"
-	case InProgress:
-		return "in_progress"
-	case Completed:
-		return "completed"
-	}
-	return ""
-}
-
 // maxCommentLength is the maximum number of chars allowed in a single comment
 // by GitHub.
 const (
 	maxCommentLength = 65536
-
-	// Reference: https://github.com/github/docs/issues/3765
-	maxChecksOutputLength = 65535
 )
 
 // allows for custom handling of github 404s
@@ -485,136 +431,18 @@ func (g *GithubClient) UpdateStatus(ctx context.Context, request types.UpdateSta
 }
 
 // [WENGINES-4643] TODO: Move the checks implementation to UpdateStatus once github checks is stable
-func (g *GithubClient) UpdateChecksStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
-
-	if request.StatusId == "" {
-		return g.createChecksStatus(ctx, request)
-	}
-
-	return request.StatusId, g.updateChecksStatus(ctx, request, request.StatusId)
-}
-
-// Update existing checkrun
-func (g *GithubClient) updateChecksStatus(ctx context.Context, request types.UpdateStatusRequest, checkRunId string) error {
-
-	output := g.capCheckRunOutput(request.Output)
-	status, conclusion := g.resolveChecksStatus(request.State)
-	checkRunOutput := github.CheckRunOutput{
-		Title:   &request.StatusName,
-		Summary: &request.Description,
-	}
-
-	if output != "" {
-		checkRunOutput.Text = &output
-	}
-
-	updateCheckRunOpts := github.UpdateCheckRunOptions{
-		Name:   request.StatusName,
-		Status: &status,
-		Output: &checkRunOutput,
-	}
-
-	// URL in update request takes precedence.
-	// fall back to checkRun details URL
-	if request.DetailsURL != "" {
-		updateCheckRunOpts.DetailsURL = &request.DetailsURL
-	}
-
-	// Conclusion is required if status is Completed
-	if status == Completed.String() {
-		updateCheckRunOpts.Conclusion = &conclusion
-	}
-
-	checkRunIdInt, _ := strconv.ParseInt(checkRunId, 10, 64)
-	_, _, err := g.client.Checks.UpdateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, checkRunIdInt, updateCheckRunOpts)
+func (g *GithubClient) UpdateCheckRun(ctx context.Context, owner string, repo string, checkRunId int64, request github.UpdateCheckRunOptions) error {
+	_, _, err := g.client.Checks.UpdateCheckRun(ctx, owner, repo, checkRunId, request)
 	return err
 }
 
-// create a new checkrun
-func (g *GithubClient) createChecksStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
-	output := g.capCheckRunOutput(request.Output)
-	status, conclusion := g.resolveChecksStatus(request.State)
-	summary := g.summaryWithJobURL(request, "")
-
-	checkRunOutput := github.CheckRunOutput{
-		Title:   &request.StatusName,
-		Summary: &summary,
+func (g *GithubClient) CreateCheckRun(ctx context.Context, owner string, repo string, request github.CreateCheckRunOptions) (string, error) {
+	checkRun, _, err := g.client.Checks.CreateCheckRun(ctx, owner, repo, request)
+	if err != nil {
+		return "", err
 	}
 
-	if output != "" {
-		checkRunOutput.Text = &output
-	}
-
-	createCheckRunOpts := github.CreateCheckRunOptions{
-		Name:    request.StatusName,
-		HeadSHA: request.Ref,
-		Status:  &status,
-		Output:  &checkRunOutput,
-	}
-
-	// Conclusion is required if status is Completed
-	if status == Completed.String() {
-		createCheckRunOpts.Conclusion = &conclusion
-	}
-
-	checkRun, _, err := g.client.Checks.CreateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, createCheckRunOpts)
-	return strconv.FormatInt(*checkRun.ID, 10), err
-}
-
-// Cap the output string if it exceeds the max checks output length
-func (g *GithubClient) capCheckRunOutput(output string) string {
-	if len(output) > maxChecksOutputLength {
-		return output[:maxChecksOutputLength]
-	}
-	return output
-}
-
-// Append job URL to summary if it's a project plan or apply operation bc we currently only stream logs for these two operations
-func (g *GithubClient) summaryWithJobURL(request types.UpdateStatusRequest, fallBackURL string) string {
-	if strings.Contains(request.StatusName, ":") &&
-		(strings.Contains(request.StatusName, "plan") || strings.Contains(request.StatusName, "apply")) {
-
-		// URL in update request takes precedence
-		// fallbackURL i.e checkrun URL could be stale from previous operation
-		if request.DetailsURL != "" {
-			return fmt.Sprintf("%s\n[Logs](%s)", request.Description, request.DetailsURL)
-		} else if fallBackURL != "" {
-			return fmt.Sprintf("%s\n[Logs](%s)", request.Description, fallBackURL)
-		}
-	}
-	return request.Description
-}
-
-// Github Checks uses Status and Conclusion to report status of the check run. Need to map models.CommitStatus to Status and Conclusion
-// Status -> queued, in_progress, completed
-// Conclusion -> failure, neutral, cancelled, timed_out, or action_required. (Optional. Required if you provide a status of "completed".)
-func (g *GithubClient) resolveChecksStatus(state models.CommitStatus) (string, string) {
-	status := Queued
-	conclusion := Neutral
-
-	switch state {
-	case models.SuccessCommitStatus:
-		status = Completed
-		conclusion = Success
-
-	case models.PendingCommitStatus:
-		status = InProgress
-
-	case models.FailedCommitStatus:
-		status = Completed
-		conclusion = Failure
-	}
-
-	return status.String(), conclusion.String()
-}
-
-func (g *GithubClient) findCheckRun(statusName string, checkRuns []*github.CheckRun) *github.CheckRun {
-	for _, checkRun := range checkRuns {
-		if *checkRun.Name == statusName {
-			return checkRun
-		}
-	}
-	return nil
+	return strconv.FormatInt(*checkRun.ID, 10), nil
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.

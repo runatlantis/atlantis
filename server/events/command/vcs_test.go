@@ -16,6 +16,7 @@ package command_test
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
@@ -84,6 +85,7 @@ func TestUpdateCombined(t *testing.T) {
 				State:       c.status,
 				StatusName:  expSrc,
 				Description: c.expDescrip,
+				CommandName: c.command.TitleString(),
 			})
 		})
 	}
@@ -158,6 +160,9 @@ func TestUpdateCombinedCount(t *testing.T) {
 				State:       c.status,
 				StatusName:  expSrc,
 				Description: c.expDescrip,
+				CommandName: c.command.TitleString(),
+				NumSuccess:  strconv.FormatInt(int64(c.numSuccess), 10),
+				NumTotal:    strconv.FormatInt(int64(c.numTotal), 10),
 			})
 		})
 	}
@@ -209,6 +214,11 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 				StatusName:  c.expSrc,
 				Description: "Plan in progress...",
 				DetailsURL:  "url",
+
+				CommandName: "Plan",
+				Workspace:   c.workspace,
+				Directory:   c.repoRelDir,
+				Project:     c.projectName,
 			})
 		})
 	}
@@ -275,6 +285,9 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 				StatusName:  fmt.Sprintf("atlantis/%s: ./default", c.cmd.String()),
 				Description: c.expDescrip,
 				DetailsURL:  "url",
+				CommandName: c.cmd.TitleString(),
+				Workspace:   "default",
+				Directory:   ".",
 			})
 		})
 	}
@@ -302,5 +315,8 @@ func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) 
 		StatusName:  "custom/apply: ./default",
 		Description: "Apply succeeded.",
 		DetailsURL:  "url",
+		Workspace:   "default",
+		CommandName: "Apply",
+		Directory:   ".",
 	})
 }

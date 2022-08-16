@@ -646,6 +646,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:        vcsClient,
 		MarkdownRenderer: markdownRenderer,
 		TitleBuilder:     vcs.StatusTitleBuilder{TitlePrefix: userConfig.VCSStatusName},
+		JobURLGenerator:  router,
 	}
 
 	// [WENGINES-4643] TODO: Remove pullOutputUpdater once github checks is stable
@@ -764,7 +765,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PrjCommandBuilder: projectCommandBuilder,
 		FeatureAllocator:  featureAllocator,
 	}
-
+  
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		projectCommandBuilder,

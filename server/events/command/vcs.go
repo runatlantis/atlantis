@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -17,7 +18,7 @@ type VCSStatusUpdater struct {
 	TitleBuilder vcs.StatusTitleBuilder
 }
 
-func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, checkRunId string) (string, error) {
+func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, statusId string) (string, error) {
 	src := d.TitleBuilder.Build(cmdName.String())
 	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
 
@@ -30,12 +31,13 @@ func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo,
 		Description:      descrip,
 		DetailsURL:       "",
 		PullCreationTime: pull.CreatedAt,
-		StatusId:         checkRunId,
+		StatusId:         statusId,
+		CommandName:      titleString(cmdName),
 	}
 	return d.Client.UpdateStatus(ctx, request)
 }
 
-func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int, checkRunId string) (string, error) {
+func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int, statusId string) (string, error) {
 	src := d.TitleBuilder.Build(cmdName.String())
 	cmdVerb := "unknown"
 
@@ -57,13 +59,18 @@ func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.
 		Description:      fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb),
 		DetailsURL:       "",
 		PullCreationTime: pull.CreatedAt,
-		StatusId:         checkRunId,
+		StatusId:         statusId,
+		CommandName:      titleString(cmdName),
+
+		// Additional fields for github checks rendering
+		NumSuccess: strconv.FormatInt(int64(numSuccess), 10),
+		NumTotal:   strconv.FormatInt(int64(numTotal), 10),
 	}
 
 	return d.Client.UpdateStatus(ctx, request)
 }
 
-func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, checkRunId string) (string, error) {
+func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error) {
 	projectID := projectCtx.ProjectName
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", projectCtx.RepoRelDir, projectCtx.Workspace)
@@ -82,7 +89,12 @@ func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx Project
 		Description:      description,
 		DetailsURL:       url,
 		PullCreationTime: projectCtx.Pull.CreatedAt,
-		StatusId:         checkRunId,
+		StatusId:         statusId,
+
+		CommandName: titleString(cmdName),
+		Project:     projectCtx.ProjectName,
+		Workspace:   projectCtx.Workspace,
+		Directory:   projectCtx.RepoRelDir,
 	}
 
 	return d.Client.UpdateStatus(ctx, request)
@@ -100,4 +112,8 @@ func (d *VCSStatusUpdater) statusDescription(status models.CommitStatus) string 
 	}
 
 	return description
+}
+
+func titleString(cmdName fmt.Stringer) string {
+	return strings.Title(strings.ReplaceAll(strings.ToLower(cmdName.String()), "_", " "))
 }

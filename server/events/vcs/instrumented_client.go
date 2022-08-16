@@ -314,6 +314,7 @@ func (c *InstrumentedClient) UpdateStatus(ctx context.Context, request types.Upd
 		keys.PullNumKey.String():    strconv.Itoa(request.PullNum),
 		keys.SHAKey.String():        request.Ref,
 		"status-name":               request.StatusName,
+		"status-id":                 request.StatusId,
 		"state":                     request.State.String(),
 	})
 
