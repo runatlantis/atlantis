@@ -8,4 +8,4 @@ Only statsd is supported currently, but it should be relatively straightforward 
 
 ## Configuration
 
-Metrics are configured through the (server-side-repo-config.html#Metrics). 
+Metrics are configured through the [Server Side Config](server-side-repo-config.html#metrics).
