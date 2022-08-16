@@ -11,52 +11,55 @@ import (
 // The status contains a url that outputs current progress of the terraform plan/apply command.
 type ProjectOutputWrapper struct {
 	ProjectCommandRunner
-	JobURLSetter JobURLSetter
-	JobCloser    JobCloser
+
+	ProjectStatusUpdater command.StatusUpdater
 }
 
 func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectResult {
-	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
-
-	// A job needs to be closed if a log streaming job has been registered in our log handler which happens in the
-	// step runner when the first tf output for the operation is streamed. However, there's no way to tell is the operation reached
-	// the step runner and a job has been registered. So, we just assume that a job exists for now and close it.
-	// If the job does not exist, we log an error.
-	p.JobCloser.CloseJob(ctx.JobID, ctx.BaseRepo)
-	return result
-}
-
-func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
-	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
-
-	// A job needs to be closed if a log streaming job has been registered in our log handler which happens in the
-	// step runner when the first tf output for the operation is streamed. However, there's no way to tell is the operation reached
-	// the step runner and a job has been registered. So, we just assume that a job exists for now and close it.
-	// If the job does not exist, we log an error.
-	p.JobCloser.CloseJob(ctx.JobID, ctx.BaseRepo)
-	return result
-}
-
-func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult) command.ProjectResult {
-	// Create a PR status to track project's plan status. The status will
-	// include a link to view the progress of atlantis plan command in real
-	// time
-	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus); err != nil {
+	statusId, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.PendingCommitStatus)
+	if err != nil {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
 
-	// ensures we are differentiating between project level command and overall command
-	result := execute(ctx)
+	// Write the statusId to project context which is used by the command runners when making consecutive status updates
+	// Noop when checks is not enabled
+	ctx.StatusId = statusId
 
+	result := p.ProjectCommandRunner.Plan(ctx)
 	if result.Error != nil || result.Failure != "" {
-		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus); err != nil {
+		if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.FailedCommitStatus); err != nil {
 			ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 		}
 
 		return result
 	}
 
-	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus); err != nil {
+	if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.SuccessCommitStatus); err != nil {
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
+	}
+	return result
+}
+
+func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
+	statusId, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.PendingCommitStatus)
+	if err != nil {
+		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
+	}
+
+	// Write the statusId to project context which is used by the command runners when making consecutive status updates
+	// Noop when checks is not enabled
+	ctx.StatusId = statusId
+
+	result := p.ProjectCommandRunner.Apply(ctx)
+	if result.Error != nil || result.Failure != "" {
+		if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.FailedCommitStatus); err != nil {
+			ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
+		}
+
+		return result
+	}
+
+	if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.SuccessCommitStatus); err != nil {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
 

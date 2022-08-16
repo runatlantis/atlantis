@@ -685,6 +685,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		applyRequirementHandler,
 	)
 
+	statusUpdater := command.ProjectStatusUpdater{
+		ProjectJobURLGenerator:     router,
+		JobCloser:                  projectCmdOutputHandler,
+		FeatureAllocator:           featureAllocator,
+		ProjectCommitStatusUpdater: commitStatusUpdater,
+	}
+
 	prjCmdRunner := wrappers.
 		WrapProjectRunner(unwrappedPrjCmdRunner).
 		WithSync(
@@ -694,8 +701,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WithAuditing(snsWriter).
 		WithInstrumentation().
 		WithJobs(
-			jobs.NewJobURLSetter(router, commitStatusUpdater),
-			projectCmdOutputHandler,
+			statusUpdater,
 		)
 
 	unwrappedPRPrjCmdRunner := events.NewProjectCommandRunner(
@@ -711,8 +717,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WithAuditing(snsWriter).
 		WithInstrumentation().
 		WithJobs(
-			jobs.NewJobURLSetter(router, commitStatusUpdater),
-			projectCmdOutputHandler,
+			statusUpdater,
 		)
 
 	pullReqStatusFetcher := lyft_vcs.NewSQBasedPullStatusFetcher(
@@ -800,7 +805,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PrjCommandBuilder: prProjectCommandBuilder,
 		FeatureAllocator:  featureAllocator,
 	}
-
+  
 	prApprovePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		prProjectCommandBuilder,

@@ -87,7 +87,7 @@ func TestGenerateProjectJobURL_ShouldGenerateURLWhenJobIDSpecified(t *testing.T)
 		JobID: jobID,
 	}
 	expectedURL := fmt.Sprintf("http://localhost:4141/jobs/%s", jobID)
-	gotURL, err := router.GenerateProjectJobURL(ctx)
+	gotURL, err := router.GenerateProjectJobURL(ctx.JobID)
 	Ok(t, err)
 
 	Equals(t, expectedURL, gotURL)
@@ -106,7 +106,7 @@ func TestGenerateProjectJobURL_ShouldReturnErrorWhenJobIDNotSpecified(t *testing
 		RepoRelDir: "ops/terraform/",
 	}
 	expectedErrString := "no job id in ctx"
-	gotURL, err := router.GenerateProjectJobURL(ctx)
+	gotURL, err := router.GenerateProjectJobURL(ctx.JobID)
 	assert.EqualError(t, err, expectedErrString)
 	Equals(t, "", gotURL)
 }

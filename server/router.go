@@ -6,7 +6,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 // Router can be used to retrieve Atlantis URLs. It acts as an intermediary
@@ -39,15 +38,15 @@ func (r *Router) GenerateLockURL(lockID string) string {
 	return r.AtlantisURL.String() + lockURL.String()
 }
 
-func (r *Router) GenerateProjectJobURL(ctx command.ProjectContext) (string, error) {
-	if ctx.JobID == "" {
+func (r *Router) GenerateProjectJobURL(jobId string) (string, error) {
+	if jobId == "" {
 		return "", fmt.Errorf("no job id in ctx")
 	}
 	jobURL, err := r.Underlying.Get((r.ProjectJobsViewRouteName)).URL(
-		"job-id", ctx.JobID,
+		"job-id", jobId,
 	)
 	if err != nil {
-		return "", errors.Wrapf(err, "creating job url for %s", ctx.JobID)
+		return "", errors.Wrapf(err, "creating job url for %s", jobId)
 	}
 
 	return r.AtlantisURL.String() + jobURL.String(), nil

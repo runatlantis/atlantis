@@ -27,13 +27,16 @@ import (
 	smocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
+	commandMocks "github.com/runatlantis/atlantis/server/events/command/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/wrappers"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 // Test that it runs the expected plan steps.
@@ -205,6 +208,82 @@ func TestDefaultProjectCommandRunner_PlanWithSync(t *testing.T) {
 	}
 }
 
+type strictTestCommitStatusUpdater struct {
+	statusUpdaters []*testCommitStatusUpdater
+	count          int
+}
+
+// UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error)
+func (t *strictTestCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error) {
+	if t.count > (len(t.statusUpdaters) - 1) {
+		return "", errors.New("more calls than expected")
+	}
+
+	statusId, err := t.statusUpdaters[t.count].UpdateProject(ctx, projectCtx, cmdName, status, url, statusId)
+	t.count += 1
+	return statusId, err
+}
+
+type testCommitStatusUpdater struct {
+	t           *testing.T
+	expCtx      context.Context
+	expPrjCtx   command.ProjectContext
+	expCmdName  fmt.Stringer
+	expStatus   models.CommitStatus
+	expUrl      string
+	expStatusId string
+
+	statusId string
+	err      error
+}
+
+func (t *testCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error) {
+	assert.Equal(t.t, t.expCtx, ctx)
+	assert.Equal(t.t, t.expPrjCtx, projectCtx)
+	assert.Equal(t.t, t.expCmdName, cmdName)
+	assert.Equal(t.t, t.expStatus, status)
+	assert.Equal(t.t, t.expUrl, url)
+	assert.Equal(t.t, t.expStatusId, statusId)
+
+	return t.statusId, t.err
+}
+
+type testProjectCommandRunner struct {
+	t         *testing.T
+	expPrjCtx command.ProjectContext
+	result    command.ProjectResult
+}
+
+func (t *testProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
+	assert.Equal(t.t, t.expPrjCtx, ctx)
+
+	return t.result
+}
+
+func (t *testProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
+	assert.Equal(t.t, t.expPrjCtx, ctx)
+
+	return t.result
+}
+
+func (t *testProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
+	assert.Equal(t.t, t.expPrjCtx, ctx)
+
+	return t.result
+}
+
+func (t *testProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
+	assert.Equal(t.t, t.expPrjCtx, ctx)
+
+	return t.result
+}
+
+func (t *testProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectResult {
+	assert.Equal(t.t, t.expPrjCtx, ctx)
+
+	return t.result
+}
+
 func TestProjectOutputWrapper(t *testing.T) {
 	RegisterMockTestingT(t)
 	prjCtx := command.ProjectContext{
@@ -216,6 +295,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 		},
 		Workspace:  "default",
 		RepoRelDir: ".",
+		RequestCtx: context.TODO(),
 	}
 
 	cases := []struct {
@@ -262,15 +342,8 @@ func TestProjectOutputWrapper(t *testing.T) {
 			var prjResult command.ProjectResult
 			var expCommitStatus models.CommitStatus
 
-			mockJobURLSetter := mocks.NewMockJobURLSetter()
+			mockJobUrlGenerator := commandMocks.NewMockJobURLGenerator()
 			mockJobCloser := mocks.NewMockJobCloser()
-			mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
-
-			runner := &events.ProjectOutputWrapper{
-				JobURLSetter:         mockJobURLSetter,
-				JobCloser:            mockJobCloser,
-				ProjectCommandRunner: mockProjectCommandRunner,
-			}
 
 			if c.Success {
 				prjResult = command.ProjectResult{
@@ -290,24 +363,60 @@ func TestProjectOutputWrapper(t *testing.T) {
 				expCommitStatus = models.FailedCommitStatus
 			}
 
-			When(mockProjectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(prjResult)
-			When(mockProjectCommandRunner.Apply(matchers.AnyModelsProjectCommandContext())).ThenReturn(prjResult)
+			prjCtx.CommandName = c.CommandName
+
+			mockProjectCommandRunner := testProjectCommandRunner{
+				t:         t,
+				expPrjCtx: prjCtx,
+				result:    prjResult,
+			}
+
+			mockCommitStatusUpdater := strictTestCommitStatusUpdater{
+				statusUpdaters: []*testCommitStatusUpdater{
+					&testCommitStatusUpdater{
+						t:           t,
+						expCtx:      context.TODO(),
+						expPrjCtx:   prjCtx,
+						expCmdName:  c.CommandName,
+						expStatus:   models.PendingCommitStatus,
+						expStatusId: "",
+						expUrl:      "",
+						statusId:    "",
+						err:         nil,
+					},
+					&testCommitStatusUpdater{
+						t:           t,
+						expCtx:      context.TODO(),
+						expPrjCtx:   prjCtx,
+						expCmdName:  c.CommandName,
+						expStatus:   expCommitStatus,
+						expStatusId: "",
+						expUrl:      "",
+						statusId:    "",
+						err:         nil,
+					},
+				},
+			}
+
+			featureAllocator := mockFeatureAllocator{}
+
+			projectUpdater := command.ProjectStatusUpdater{
+				JobCloser:                  mockJobCloser,
+				ProjectJobURLGenerator:     mockJobUrlGenerator,
+				ProjectCommitStatusUpdater: &mockCommitStatusUpdater,
+				FeatureAllocator:           &featureAllocator,
+			}
+
+			runner := &events.ProjectOutputWrapper{
+				ProjectStatusUpdater: projectUpdater,
+				ProjectCommandRunner: &mockProjectCommandRunner,
+			}
 
 			switch c.CommandName {
 			case command.Plan:
 				runner.Plan(prjCtx)
 			case command.Apply:
 				runner.Apply(prjCtx)
-			}
-
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(prjCtx, c.CommandName, models.PendingCommitStatus)
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(prjCtx, c.CommandName, expCommitStatus)
-
-			switch c.CommandName {
-			case command.Plan:
-				mockProjectCommandRunner.VerifyWasCalledOnce().Plan(prjCtx)
-			case command.Apply:
-				mockProjectCommandRunner.VerifyWasCalledOnce().Apply(prjCtx)
 			}
 		})
 	}
@@ -618,4 +727,12 @@ type mockURLGenerator struct{}
 
 func (m mockURLGenerator) GenerateLockURL(lockID string) string {
 	return "https://" + lockID
+}
+
+type mockFeatureAllocator struct {
+	shouldAllocate bool
+}
+
+func (m *mockFeatureAllocator) ShouldAllocate(featureID feature.Name, featureCtx feature.FeatureContext) (bool, error) {
+	return m.shouldAllocate, nil
 }
