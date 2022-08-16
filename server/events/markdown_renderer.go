@@ -89,6 +89,7 @@ type planSuccessData struct {
 
 type policyCheckSuccessData struct {
 	models.PolicyCheckSuccess
+	PolicyCheckSummary string
 }
 
 type projectResultTmplData struct {
@@ -162,7 +163,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckSuccess.PolicyCheckOutput) {
-				resultData.Rendered = m.renderTemplate(policyCheckSuccessWrappedTmpl, policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
+				resultData.Rendered = m.renderTemplate(policyCheckSuccessWrappedTmpl, policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
 			} else {
 				resultData.Rendered = m.renderTemplate(policyCheckSuccessUnwrappedTmpl, policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
 			}
@@ -331,7 +332,8 @@ var policyCheckSuccessWrappedTmpl = template.Must(template.New("").Parse(
 		"{{.PolicyCheckOutput}}\n" +
 		"```\n\n" +
 		policyCheckNextSteps + "\n" +
-		"</details>" +
+		"</details>" + "\n" +
+		"{{.PolicyCheckSummary}}" +
 		"{{ if .HasDiverged }}\n\n:warning: The branch we're merging into is ahead, it is recommended to pull new commits first.{{end}}"))
 
 // policyCheckNextSteps are instructions appended after successful plans as to what
