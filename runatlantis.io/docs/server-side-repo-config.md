@@ -459,9 +459,9 @@ If you set a workflow with the key `default`, it will override this.
 
 ### Metrics
 
-| Key                    | Type            | Default | Required  | Description                              |
-|------------------------|-----------------|---------|-----------|------------------------------------------|
-| statsd                 | Statsd(#Statsd) | none    | no        | Statsd metrics provider                  |
+| Key                    | Type              | Default | Required  | Description                              |
+|------------------------|-------------------|---------|-----------|------------------------------------------|
+| statsd                 | [Statsd](#statsd) | none    | no        | Statsd metrics provider                  |
 
 ### Statsd
 
