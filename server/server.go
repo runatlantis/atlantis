@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"io"
 	"io/ioutil"
 	"log"
@@ -32,6 +31,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/runatlantis/atlantis/server/instrumentation"
@@ -67,6 +68,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/command/apply"
+	"github.com/runatlantis/atlantis/server/events/command/policies"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
@@ -752,13 +754,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullReqStatusFetcher,
 	)
 
-	// Using pull updater for approving policies until we move off of PR comments entirely
+	policyCheckOutputGenerator := policies.CommandOutputGenerator{
+		PrjCommandRunner:  prjCmdRunner,
+		PrjCommandBuilder: projectCommandBuilder,
+		FeatureAllocator:  featureAllocator,
+	}
+
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
 		outputUpdater,
 		dbUpdater,
+		&policyCheckOutputGenerator,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
@@ -768,7 +776,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	// Using pull updater for version commands until we move off of PR comments entirely
 	versionCommandRunner := events.NewVersionCommandRunner(
-		outputUpdater,
+		&pullOutputUpdater,
 		projectCommandBuilder,
 		prjCmdRunner,
 		userConfig.ParallelPoolSize,
@@ -787,13 +795,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 	)
 
-	// Using pull updater for approving policies until we move off of PR comments entirely
+	prPolicyCheckOutputGenerator := &policies.CommandOutputGenerator{
+		PrjCommandRunner:  prPrjCmdRunner,
+		PrjCommandBuilder: prProjectCommandBuilder,
+		FeatureAllocator:  featureAllocator,
+	}
+
 	prApprovePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		prProjectCommandBuilder,
 		prPrjCmdRunner,
 		outputUpdater,
 		dbUpdater,
+		prPolicyCheckOutputGenerator,
 	)
 
 	featuredPlanRunner := lyftCommands.NewPlatformModeFeatureRunner(

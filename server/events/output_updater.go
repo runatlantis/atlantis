@@ -112,6 +112,9 @@ func (c *ChecksOutputUpdater) handleApprovePolicies(ctx *command.Context, cmd Pu
 			ProjectName: projectResult.ProjectName,
 		})
 
+		// Description is a required field
+		description := fmt.Sprintf("**Project**: `%s`\n**Dir**: `%s`\n**Workspace**: `%s`", projectResult.ProjectName, projectResult.RepoRelDir, projectResult.Workspace)
+
 		state := models.SuccessCommitStatus
 		if projectResult.PolicyCheckSuccess == nil {
 			state = models.FailedCommitStatus
@@ -124,6 +127,7 @@ func (c *ChecksOutputUpdater) handleApprovePolicies(ctx *command.Context, cmd Pu
 			StatusName:       statusName,
 			PullNum:          ctx.Pull.Num,
 			State:            state,
+			Description:      description,
 			StatusId:         projectResult.StatusId,
 			Output:           output,
 			PullCreationTime: ctx.Pull.CreatedAt,

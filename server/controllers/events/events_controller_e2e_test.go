@@ -36,6 +36,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/command/apply"
+	"github.com/runatlantis/atlantis/server/events/command/policies"
 	"github.com/runatlantis/atlantis/server/vcs/markdown"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -879,6 +880,11 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		prjCmdRunner,
 		pullUpdater,
 		dbUpdater,
+		&policies.CommandOutputGenerator{
+			PrjCommandRunner:  prjCmdRunner,
+			PrjCommandBuilder: projectCommandBuilder,
+			FeatureAllocator:  featureAllocator,
+		},
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
