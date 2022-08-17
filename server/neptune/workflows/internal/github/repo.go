@@ -8,8 +8,14 @@ type Repo struct {
 	Name string
 	// URL is the ssh clone URL (ie. git@github.com:owner/repo.git)
 	URL string
+
+	Credentials AppCredentials
 }
 
 func (r Repo) GetFullName() string {
 	return r.Owner + "/" + r.Name
+}
+
+type AppCredentials struct {
+	InstallationToken int64
 }

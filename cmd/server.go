@@ -15,13 +15,16 @@ package cmd
 
 import (
 	"fmt"
-	cfgParser "github.com/runatlantis/atlantis/server/core/config"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/palantir/go-githubapp/githubapp"
+	cfgParser "github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/metrics"
 
 	"github.com/docker/docker/pkg/fileutils"
 	homedir "github.com/mitchellh/go-homedir"
@@ -499,6 +502,25 @@ func (t *TemporalWorker) NewServer(userConfig server.UserConfig, config server.C
 		return nil, errors.Wrapf(err,
 			"parsing atlantis url %q", userConfig.AtlantisURL)
 	}
+
+	// TODO: we should just supply a yaml file with this info and load it directly into the
+	// app config struct
+	privateKey, err := ioutil.ReadFile(userConfig.GithubAppKeyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	appConfig := githubapp.Config{
+		App: struct {
+			IntegrationID int64  "yaml:\"integration_id\" json:\"integrationId\""
+			WebhookSecret string "yaml:\"webhook_secret\" json:\"webhookSecret\""
+			PrivateKey    string "yaml:\"private_key\" json:\"privateKey\""
+		}{
+			IntegrationID: userConfig.GithubAppID,
+			WebhookSecret: userConfig.GithubWebhookSecret,
+			PrivateKey:    string(privateKey),
+		},
+	}
 	cfg := &temporalworker.Config{
 		AtlantisURL:     parsedURL,
 		AtlantisVersion: config.AtlantisVersion,
@@ -509,6 +531,7 @@ func (t *TemporalWorker) NewServer(userConfig server.UserConfig, config server.C
 		SslCertFile:     userConfig.SSLCertFile,
 		SslKeyFile:      userConfig.SSLKeyFile,
 		TemporalCfg:     globalCfg.Temporal,
+		App:             appConfig,
 	}
 	return temporalworker.NewServer(cfg)
 }

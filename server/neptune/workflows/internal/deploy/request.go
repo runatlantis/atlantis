@@ -18,6 +18,12 @@ type Repo struct {
 	Name string
 	// URL is the ssh clone URL (ie. git@github.com:owner/repo.git)
 	URL string
+
+	Credentials AppCredentials
+}
+
+type AppCredentials struct {
+	InstallationToken int64
 }
 
 type Root struct {

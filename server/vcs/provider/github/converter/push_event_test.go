@@ -26,6 +26,7 @@ func TestConvert_PushEvent(t *testing.T) {
 	ref := "refs/heads/main"
 	sha := "1234"
 	user := "nish"
+	installationToken := 1234
 
 	pushEventRepo := &github.PushEventRepository{
 		FullName: github.String(repoFullName),
@@ -54,6 +55,7 @@ func TestConvert_PushEvent(t *testing.T) {
 		Sender: vcs.User{
 			Login: "nish",
 		},
+		InstallationToken: int64(installationToken),
 	}
 
 	result, err := subject.Convert(&github.PushEvent{
@@ -64,6 +66,9 @@ func TestConvert_PushEvent(t *testing.T) {
 		},
 		Sender: &github.User{
 			Login: github.String(user),
+		},
+		Installation: &github.Installation{
+			ID: github.Int64(int64(installationToken)),
 		},
 	})
 

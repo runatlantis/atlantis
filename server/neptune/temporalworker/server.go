@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.temporal.io/sdk/client"
 	"io"
 	"log"
 	"net/http"
@@ -15,7 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	"go.temporal.io/sdk/client"
+
 	"github.com/gorilla/mux"
+	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
@@ -47,6 +49,7 @@ type Config struct {
 	Closer          io.Closer
 	TemporalCfg     valid.Temporal
 	Port            int
+	App             githubapp.Config
 }
 
 type Server struct {
@@ -56,9 +59,9 @@ type Server struct {
 	StatsScope      tally.Scope
 	StatsCloser     io.Closer
 	TemporalClient  client.Client
+	Activities      *workflows.Activities
 }
 
-// TODO: as more behavior is added into the TemporalWorker package, inject corresponding dependencies
 func NewServer(config *Config) (*Server, error) {
 	jobsController := &controllers.JobsController{
 		AtlantisVersion:     config.AtlantisVersion,
@@ -92,6 +95,12 @@ func NewServer(config *Config) (*Server, error) {
 		Server:      &http.Server{Addr: fmt.Sprintf(":%d", config.Port), Handler: n},
 		Logger:      config.CtxLogger,
 	}
+
+	activities, err := workflows.NewActivities(config.App, config.Scope.SubScope("app"))
+
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing activities")
+	}
 	server := Server{
 		Logger:          config.CtxLogger,
 		HttpServerProxy: httpServerProxy,
@@ -99,6 +108,7 @@ func NewServer(config *Config) (*Server, error) {
 		StatsScope:      config.Scope,
 		StatsCloser:     config.Closer,
 		TemporalClient:  temporalClient,
+		Activities:      activities,
 	}
 	return &server, nil
 }
@@ -115,6 +125,10 @@ func (s Server) Start() error {
 			// ensures that sessions are preserved on the same worker
 			EnableSessionWorker: true,
 		})
+
+		w.RegisterActivity(s.Activities)
+		w.RegisterWorkflow(workflows.Deploy)
+
 		if err := w.Run(worker.InterruptCh()); err != nil {
 			log.Fatalln("unable to start worker", err)
 		}

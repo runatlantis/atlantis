@@ -16,6 +16,7 @@ import (
 
 type workerActivities interface {
 	FetchLatestDeployment(ctx context.Context, request activities.FetchLatestDeploymentRequest) (activities.FetchLatestDeploymentResponse, error)
+	UpdateCheckRun(ctx context.Context, request activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error)
 }
 
 type WorkerState string
@@ -68,9 +69,12 @@ func (w *Worker) Work(ctx workflow.Context) {
 		msg := w.Queue.Pop()
 
 		revision := msg.Revision
+		checkRunID := msg.CheckRunID
 		ctx := workflow.WithValue(ctx, config.RevisionLogKey, revision)
 
+		w.updateInProgress(ctx, checkRunID)
 		err = w.work(ctx, revision)
+		w.updateComplete(ctx, checkRunID)
 
 		if err != nil {
 			logger.Error(ctx, "failed to deploy revision, moving to next one")
@@ -80,6 +84,49 @@ func (w *Worker) Work(ctx workflow.Context) {
 
 func (w *Worker) GetState() WorkerState {
 	return w.state
+}
+
+func (w *Worker) updateComplete(ctx workflow.Context, checkRunID int64) {
+	// TODO: if we never created a check run, there was likely some issue, we should attempt to create it again.
+	if checkRunID == 0 {
+		logger.Info(ctx, "check run id is 0, skipping updating state to complete")
+	}
+
+	var resp activities.UpdateCheckRunResponse
+
+	// intentionally infinitely retry since it's important we at least apply a completion status.
+	// we might want to not block on this and track this in the background so as to not block future deploys
+	_ = workflow.ExecuteActivity(ctx, w.Activities.UpdateCheckRun, activities.UpdateCheckRunRequest{
+		Title: "atlantis/deploy",
+		State: github.CheckRunComplete,
+		// TODO: Add conclusion
+		Repo:  w.Repo,
+		ID:    checkRunID,
+	}).Get(ctx, &resp)
+}
+
+func (w *Worker) updateInProgress(ctx workflow.Context, checkRunID int64) {
+	// TODO: if we never created a check run, there was likely some issue, we should attempt to create it again.
+	if checkRunID == 0 {
+		logger.Info(ctx, "check run id is 0, skipping updating state to in_progress")
+		return
+	}
+	ctx = workflow.WithRetryPolicy(ctx, temporal.RetryPolicy{
+		MaximumAttempts: 5,
+	})
+
+	var resp activities.UpdateCheckRunResponse
+
+	err := workflow.ExecuteActivity(ctx, w.Activities.UpdateCheckRun, activities.UpdateCheckRunRequest{
+		Title: "atlantis/deploy",
+		State: github.CheckRunPending,
+		Repo:  w.Repo,
+		ID:    checkRunID,
+	}).Get(ctx, &resp)
+
+	if err != nil {
+		logger.Error(ctx, err.Error())
+	}
 }
 
 func (w *Worker) work(ctx workflow.Context, revision string) error {

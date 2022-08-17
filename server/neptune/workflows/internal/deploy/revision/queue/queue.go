@@ -5,7 +5,8 @@ import (
 )
 
 type Message struct {
-	Revision string
+	Revision   string
+	CheckRunID int64
 }
 
 // Queue is a standard queue implementation

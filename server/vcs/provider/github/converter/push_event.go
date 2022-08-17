@@ -5,6 +5,7 @@ import (
 	"regexp"
 
 	"github.com/google/go-github/v45/github"
+	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	"github.com/runatlantis/atlantis/server/vcs"
@@ -39,6 +40,8 @@ func (p PushEvent) Convert(e *github.PushEvent) (event.Push, error) {
 		return event.Push{}, errors.Wrap(err, "getting ref type")
 	}
 
+	installationToken := githubapp.GetInstallationIDFromEvent(e)
+
 	return event.Push{
 		Repo: repo,
 		Sha:  e.GetHeadCommit().GetSHA(),
@@ -49,5 +52,6 @@ func (p PushEvent) Convert(e *github.PushEvent) (event.Push, error) {
 			Type: refType,
 			Name: name,
 		},
+		InstallationToken: installationToken,
 	}, nil
 }

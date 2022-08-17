@@ -67,9 +67,12 @@ type Runner struct {
 func newRunner(ctx workflow.Context, request Request) *Runner {
 	// convert to internal types, we should probably move these into another struct
 	repo := github.Repo{
-		Name:     request.Repository.Name,
-		Owner:    request.Repository.Owner,
-		URL:      request.Repository.URL,
+		Name:  request.Repository.Name,
+		Owner: request.Repository.Owner,
+		URL:   request.Repository.URL,
+		Credentials: github.AppCredentials{
+			InstallationToken: request.Repository.Credentials.InstallationToken,
+		},
 	}
 
 	// inject dependencies
@@ -79,7 +82,7 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 	var a *activities.Deploy
 
 	revisionQueue := queue.NewQueue()
-	revisionReceiver := revision.NewReceiver(ctx, revisionQueue)
+	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, repo, a)
 
 	worker := &queue.Worker{
 		Queue:      revisionQueue,

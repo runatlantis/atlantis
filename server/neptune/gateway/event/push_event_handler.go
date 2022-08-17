@@ -14,10 +14,11 @@ import (
 )
 
 type Push struct {
-	Repo   models.Repo
-	Ref    vcs.Ref
-	Sha    string
-	Sender vcs.User
+	Repo              models.Repo
+	Ref               vcs.Ref
+	Sha               string
+	Sender            vcs.User
+	InstallationToken int64
 }
 
 type signaler interface {
@@ -79,6 +80,9 @@ func (p *PushHandler) handle(ctx context.Context, event Push) error {
 				FullName: event.Repo.FullName,
 				Name:     event.Repo.Name,
 				Owner:    event.Repo.Owner,
+				Credentials: workflows.AppCredentials{
+					InstallationToken: event.InstallationToken,
+				},
 			},
 		},
 	)
