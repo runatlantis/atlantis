@@ -228,6 +228,25 @@ func (mock *MockEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest
 	return ret0
 }
 
+func (mock *MockEventParsing) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFullName string, cloneURL string) (models.Repo, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockEventParsing().")
+	}
+	params := []pegomock.Param{vcsHostType, repoFullName, cloneURL}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseAPIPlanRequest", params, []reflect.Type{reflect.TypeOf((*models.VCSHostType)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem()})
+	var ret0 models.Repo
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.Repo)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockEventParsing) ParseBitbucketCloudPullEvent(body []byte) (models.PullRequest, models.Repo, models.Repo, models.User, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockEventParsing().")

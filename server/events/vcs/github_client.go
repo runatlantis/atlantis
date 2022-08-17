@@ -501,3 +501,12 @@ func (g *GithubClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []
 func (g *GithubClient) SupportsSingleFileDownload(repo models.Repo) bool {
 	return true
 }
+
+func (g *GithubClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	parts := strings.Split(repo, "/")
+	repository, _, err := g.client.Repositories.Get(g.ctx, parts[0], parts[1])
+	if err != nil {
+		return "", err
+	}
+	return repository.GetCloneURL(), nil
+}

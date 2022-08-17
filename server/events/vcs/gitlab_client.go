@@ -383,3 +383,11 @@ func (g *GitlabClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []
 func (g *GitlabClient) SupportsSingleFileDownload(repo models.Repo) bool {
 	return true
 }
+
+func (g *GitlabClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	project, _, err := g.Client.Projects.GetProject(repo, nil)
+	if err != nil {
+		return "", err
+	}
+	return project.HTTPURLToRepo, nil
+}

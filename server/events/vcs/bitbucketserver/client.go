@@ -348,3 +348,7 @@ func (b *Client) SupportsSingleFileDownload(repo models.Repo) bool {
 func (b *Client) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("not implemented")
 }
+
+func (b *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
+}

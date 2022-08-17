@@ -14,19 +14,24 @@
 package events
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"golang.org/x/sync/semaphore"
 )
 
 const workingDirPrefix = "repos"
+
+var cloneLocks sync.Map
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_working_dir.go WorkingDir
 //go:generate pegomock generate -m --use-experimental-model-gen --package events WorkingDir
@@ -198,6 +203,18 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	cloneDir string,
 	headRepo models.Repo,
 	p models.PullRequest) error {
+
+	value, _ := cloneLocks.LoadOrStore(cloneDir, semaphore.NewWeighted(1))
+	sem := value.(*semaphore.Weighted)
+
+	defer sem.Release(1)
+	if acquired := sem.TryAcquire(1); !acquired {
+		err := sem.Acquire(context.TODO(), 1)
+		if err != nil {
+			return errors.Wrap(err, "waiting for repository to be cloned")
+		}
+		return nil
+	}
 
 	err := os.RemoveAll(cloneDir)
 	if err != nil {

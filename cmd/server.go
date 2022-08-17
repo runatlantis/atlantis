@@ -77,6 +77,7 @@ const (
 	GitlabTokenFlag            = "gitlab-token"
 	GitlabUserFlag             = "gitlab-user"
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
+	APISecretFlag              = "api-secret"
 	HidePrevPlanComments       = "hide-prev-plan-comments"
 	LogLevelFlag               = "log-level"
 	ParallelPoolSize           = "parallel-pool-size"
@@ -258,6 +259,9 @@ var stringFlags = map[string]stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
+	},
+	APISecretFlag: {
+		description: "Secret to validate requests made to the API",
 	},
 	LogLevelFlag: {
 		description:  "Log level. Either debug, info, warn, or error.",
