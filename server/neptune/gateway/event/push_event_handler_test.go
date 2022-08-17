@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
@@ -161,6 +162,15 @@ func TestHandlePushEvent(t *testing.T) {
 					Owner:    repoOwner,
 					URL:      repoURL,
 				},
+				Root: workflows.Root{
+					Name: "TODO",
+					Plan: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
+					},
+					Apply: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
+					},
+				},
 			},
 		}
 		allocator := &testAllocator{
@@ -177,6 +187,7 @@ func TestHandlePushEvent(t *testing.T) {
 			TemporalClient: testSignaler,
 			Allocator:      allocator,
 			Logger:         logger,
+			GlobalCfg:      valid.NewGlobalCfg(),
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -204,6 +215,15 @@ func TestHandlePushEvent(t *testing.T) {
 					Owner:    repoOwner,
 					URL:      repoURL,
 				},
+				Root: workflows.Root{
+					Name: "TODO",
+					Plan: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
+					},
+					Apply: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
+					},
+				},
 			},
 			expectedErr: assert.AnError,
 		}
@@ -221,6 +241,7 @@ func TestHandlePushEvent(t *testing.T) {
 			TemporalClient: testSignaler,
 			Allocator:      allocator,
 			Logger:         logger,
+			GlobalCfg:      valid.NewGlobalCfg(),
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -228,4 +249,18 @@ func TestHandlePushEvent(t *testing.T) {
 
 		assert.True(t, testSignaler.called)
 	})
+}
+
+func convertTestSteps(steps []valid.Step) []workflows.Step {
+	var convertedSteps []workflows.Step
+	for _, step := range steps {
+		convertedSteps = append(convertedSteps, workflows.Step{
+			StepName:    step.StepName,
+			ExtraArgs:   step.ExtraArgs,
+			RunCommand:  step.RunCommand,
+			EnvVarName:  step.EnvVarName,
+			EnvVarValue: step.EnvVarValue,
+		})
+	}
+	return convertedSteps
 }

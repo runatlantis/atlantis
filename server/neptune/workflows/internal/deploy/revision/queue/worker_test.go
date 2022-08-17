@@ -2,6 +2,7 @@ package queue_test
 
 import (
 	"context"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"testing"
 	"time"
 
@@ -38,6 +39,10 @@ type queueAndState struct {
 	State        queue.WorkerState
 }
 
+func emptyTerraformWorkflow(ctx workflow.Context, r terraform.Request) error {
+	return nil
+}
+
 func testWorkflow(ctx workflow.Context, r request) (response, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		ScheduleToCloseTimeout: 5 * time.Second,
@@ -58,6 +63,7 @@ func testWorkflow(ctx workflow.Context, r request) (response, error) {
 			Owner: "nish",
 			URL:   "git@github.com/nish/hello.git",
 		},
+		TerraformWorkflow: emptyTerraformWorkflow,
 	}
 
 	err := workflow.SetQueryHandler(ctx, "queue", func() (queueAndState, error) {
@@ -85,6 +91,7 @@ func TestWorker(t *testing.T) {
 
 	testActivities := &testActivities{}
 	env.RegisterActivity(testActivities)
+	env.RegisterWorkflow(emptyTerraformWorkflow)
 
 	// we set this callback so we can query the state of the queue
 	// after all processing has complete to determine whether we should
@@ -135,6 +142,7 @@ func TestWorker_updatesChecks(t *testing.T) {
 
 	testActivities := &testActivities{}
 	env.RegisterActivity(testActivities)
+	env.RegisterWorkflow(emptyTerraformWorkflow)
 
 	env.OnActivity(testActivities.UpdateCheckRun, mock.Anything, activities.UpdateCheckRunRequest{
 		Title: "atlantis/deploy",

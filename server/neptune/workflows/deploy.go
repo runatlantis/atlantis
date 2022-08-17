@@ -13,6 +13,9 @@ import (
 // Export anything that callers need such as requests, signals, etc.
 type DeployRequest = deploy.Request
 type Repo = deploy.Repo
+type Root = deploy.Root
+type Job = deploy.Job
+type Step = deploy.Step
 type AppCredentials = deploy.AppCredentials
 
 type DeployNewRevisionSignalRequest = revision.NewRevisionRequest
@@ -38,5 +41,5 @@ func NewActivities(appConfig githubapp.Config, scope tally.Scope) (*Activities, 
 }
 
 func Deploy(ctx workflow.Context, request DeployRequest) error {
-	return deploy.Workflow(ctx, request)
+	return deploy.Workflow(ctx, request, Terraform)
 }

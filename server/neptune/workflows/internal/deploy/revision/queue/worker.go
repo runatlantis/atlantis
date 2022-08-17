@@ -10,6 +10,8 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/steps"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -28,10 +30,11 @@ const (
 )
 
 type Worker struct {
-	Activities workerActivities
-	Queue      *Queue
-	Repo       github.Repo
-	RootName   string
+	Activities        workerActivities
+	Queue             *Queue
+	Repo              github.Repo
+	Root              steps.Root
+	TerraformWorkflow func(ctx workflow.Context, request terraform.Request) error
 
 	// mutable
 	state WorkerState
@@ -100,8 +103,8 @@ func (w *Worker) updateComplete(ctx workflow.Context, checkRunID int64) {
 		Title: "atlantis/deploy",
 		State: github.CheckRunComplete,
 		// TODO: Add conclusion
-		Repo:  w.Repo,
-		ID:    checkRunID,
+		Repo: w.Repo,
+		ID:   checkRunID,
 	}).Get(ctx, &resp)
 }
 
@@ -149,14 +152,26 @@ func (w *Worker) work(ctx workflow.Context, revision string) error {
 	logger.Info(ctx, fmt.Sprintf("latest deployed revision %s", deployedRevision))
 
 	// TODO: fill in the rest
-
+	// Spin up a child workflow to handle Terraform operations
+	//childWorkflowOptions := workflow.ChildWorkflowOptions{
+	//	WorkflowID: id.String(),
+	//}
+	//ctx = workflow.WithChildOptions(ctx, childWorkflowOptions)
+	//terraformWorkflowRequest := terraform.Request{
+	//	Repo: w.Repo,
+	//	Root: w.Root,
+	//}
+	//err = workflow.ExecuteChildWorkflow(ctx, w.TerraformWorkflow, terraformWorkflowRequest).Get(ctx, nil)
+	//if err != nil {
+	//	return errors.Wrap(err, "executing child terraform workflow")
+	//}
 	return nil
 }
 
 func (w *Worker) fetchLatestDeployment(ctx workflow.Context) (string, error) {
 	request := activities.FetchLatestDeploymentRequest{
 		RepositoryURL: w.Repo.URL,
-		RootName:      w.RootName,
+		RootName:      w.Root.Name,
 	}
 
 	var resp activities.FetchLatestDeploymentResponse

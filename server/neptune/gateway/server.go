@@ -280,6 +280,7 @@ func NewServer(config Config) (*Server, error) {
 		featureAllocator,
 		asyncScheduler,
 		temporalClient,
+		globalCfg,
 	)
 
 	router := mux.NewRouter()

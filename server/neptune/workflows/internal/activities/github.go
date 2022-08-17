@@ -113,3 +113,13 @@ func (a *githubActivities) CreateCheckRun(ctx context.Context, request CreateChe
 		ID: run.GetID(),
 	}, nil
 }
+
+type GithubRepoCloneRequest struct {
+	Repo           internal.Repo
+	Revision       string
+	DestinationDir string
+}
+
+func (a *githubActivities) GithubRepoClone(ctx context.Context, request GithubRepoCloneRequest) error {
+	return nil
+}

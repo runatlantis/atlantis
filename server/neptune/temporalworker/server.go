@@ -114,23 +114,21 @@ func NewServer(config *Config) (*Server, error) {
 }
 
 func (s Server) Start() error {
-	var wg sync.WaitGroup
-	wg.Add(1)
 	defer s.Logger.Close()
 	defer s.TemporalClient.Close()
+	var wg sync.WaitGroup
+	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
 		w := worker.New(s.TemporalClient, workflows.DeployTaskQueue, worker.Options{
-			// ensures that sessions are preserved on the same worker
 			EnableSessionWorker: true,
 		})
-
 		w.RegisterActivity(s.Activities)
 		w.RegisterWorkflow(workflows.Deploy)
-
+		w.RegisterWorkflow(workflows.Terraform)
 		if err := w.Run(worker.InterruptCh()); err != nil {
-			log.Fatalln("unable to start worker", err)
+			log.Fatalln("unable to start deploy worker", err)
 		}
 	}()
 
@@ -150,6 +148,7 @@ func (s Server) Start() error {
 	}()
 
 	<-stop
+	wg.Wait()
 
 	// flush stats before shutdown
 	if err := s.StatsCloser.Close(); err != nil {
@@ -161,7 +160,6 @@ func (s Server) Start() error {
 	if err := s.HttpServerProxy.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
 	}
-	wg.Wait()
 	return nil
 }
 

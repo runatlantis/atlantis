@@ -6,6 +6,7 @@ import (
 
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/handlers"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -13,7 +14,6 @@ import (
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	gateway_handlers "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/sync"
-	"github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	converters "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/request"
 	"github.com/uber-go/tally/v4"
@@ -39,11 +39,11 @@ func NewVCSEventsController(
 	supportedVCSProviders []models.VCSHostType,
 	repoConverter converters.RepoConverter,
 	pullConverter converters.PullConverter,
-	githubClient converter.PullGetter,
+	githubClient converters.PullGetter,
 	featureAllocator feature.Allocator,
 	scheduler scheduler,
 	temporalClient client.Client,
-) *VCSEventsController {
+	globalCfg valid.GlobalCfg) *VCSEventsController {
 	pullEventWorkerProxy := gateway_handlers.NewPullEventWorkerProxy(
 		snsWriter, logger,
 	)
@@ -72,6 +72,7 @@ func NewVCSEventsController(
 		Scheduler:      scheduler,
 		Logger:         logger,
 		TemporalClient: temporalClient,
+		GlobalCfg:      globalCfg,
 	}
 
 	// lazy map of resolver providers to their resolver

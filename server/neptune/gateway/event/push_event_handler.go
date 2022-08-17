@@ -2,8 +2,8 @@ package event
 
 import (
 	"context"
-
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
@@ -30,11 +30,14 @@ type scheduler interface {
 	Schedule(ctx context.Context, f sync.Executor) error
 }
 
+const defaultWorkspace = "default"
+
 type PushHandler struct {
 	Allocator      feature.Allocator
 	Scheduler      scheduler
 	TemporalClient signaler
 	Logger         logging.Logger
+	GlobalCfg      valid.GlobalCfg
 }
 
 func (p *PushHandler) Handle(ctx context.Context, event Push) error {
@@ -84,6 +87,15 @@ func (p *PushHandler) handle(ctx context.Context, event Push) error {
 					InstallationToken: event.InstallationToken,
 				},
 			},
+			Root: workflows.Root{
+				Name: "TODO",
+				Plan: workflows.Job{
+					Steps: p.generatePlanSteps(event.Repo.ID()),
+				},
+				Apply: workflows.Job{
+					Steps: p.generateApplySteps(event.Repo.ID()),
+				},
+			},
 		},
 	)
 
@@ -96,4 +108,39 @@ func (p *PushHandler) handle(ctx context.Context, event Push) error {
 	})
 
 	return nil
+}
+
+func (p *PushHandler) generatePlanSteps(repoID string) []workflows.Step {
+	// NOTE: for deployment workflows, we won't support command level user requests for log level output verbosity
+	var workflowSteps []workflows.Step
+
+	// TODO: replace example use of DefaultProjCfg with a project config generator that handles default vs. merged cfg case
+	projectConfig := p.GlobalCfg.DefaultProjCfg(p.Logger, repoID, "path", defaultWorkspace)
+	steps := projectConfig.Workflow.Plan.Steps
+	for _, step := range steps {
+		workflowSteps = append(workflowSteps, workflows.Step{
+			StepName:    step.StepName,
+			ExtraArgs:   step.ExtraArgs,
+			RunCommand:  step.RunCommand,
+			EnvVarName:  step.EnvVarName,
+			EnvVarValue: step.EnvVarValue,
+		})
+	}
+	return workflowSteps
+}
+
+func (p *PushHandler) generateApplySteps(repoID string) []workflows.Step {
+	var workflowSteps []workflows.Step
+	projectConfig := p.GlobalCfg.DefaultProjCfg(p.Logger, repoID, "path", defaultWorkspace)
+	steps := projectConfig.Workflow.Apply.Steps
+	for _, step := range steps {
+		workflowSteps = append(workflowSteps, workflows.Step{
+			StepName:    step.StepName,
+			ExtraArgs:   step.ExtraArgs,
+			RunCommand:  step.RunCommand,
+			EnvVarName:  step.EnvVarName,
+			EnvVarValue: step.EnvVarValue,
+		})
+	}
+	return workflowSteps
 }
