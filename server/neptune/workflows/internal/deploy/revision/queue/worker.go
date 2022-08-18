@@ -100,8 +100,9 @@ func (w *Worker) updateComplete(ctx workflow.Context, checkRunID int64) {
 	// intentionally infinitely retry since it's important we at least apply a completion status.
 	// we might want to not block on this and track this in the background so as to not block future deploys
 	_ = workflow.ExecuteActivity(ctx, w.Activities.UpdateCheckRun, activities.UpdateCheckRunRequest{
-		Title: "atlantis/deploy",
-		State: github.CheckRunComplete,
+		Title:      "atlantis/deploy",
+		State:      github.CheckRunComplete,
+		Conclusion: github.CheckRunSuccess,
 		// TODO: Add conclusion
 		Repo: w.Repo,
 		ID:   checkRunID,

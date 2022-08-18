@@ -4,8 +4,8 @@ type CheckRunState string
 type CheckRunConclusion string
 
 const (
-	Success          CheckRunConclusion = "success"
-	Failure          CheckRunConclusion = "failure"
+	CheckRunSuccess  CheckRunConclusion = "success"
+	CheckRunFailure  CheckRunConclusion = "failure"
 	CheckRunComplete CheckRunState      = "completed"
 	CheckRunPending  CheckRunState      = "in_progress"
 	CheckRunQueued   CheckRunState      = "queued"
