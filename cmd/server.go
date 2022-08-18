@@ -520,6 +520,11 @@ func (t *TemporalWorker) NewServer(userConfig server.UserConfig, config server.C
 			WebhookSecret: userConfig.GithubWebhookSecret,
 			PrivateKey:    string(privateKey),
 		},
+
+		//TODO: parameterize this
+		WebURL:   "https://github.com",
+		V3APIURL: "https://api.github.com",
+		V4APIURL: "https://api.github.com/graphql",
 	}
 	cfg := &temporalworker.Config{
 		AtlantisURL:     parsedURL,
