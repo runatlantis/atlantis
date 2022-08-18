@@ -38,8 +38,9 @@ type UpdateCheckRunResponse struct {
 
 func (a *githubActivities) UpdateCheckRun(ctx context.Context, request UpdateCheckRunRequest) (UpdateCheckRunResponse, error) {
 	output := github.CheckRunOutput{
-		Title: &request.Title,
-		Text:  github.String("this is test"),
+		Title:   &request.Title,
+		Text:    github.String("this is test"),
+		Summary: github.String("this is also a test"),
 	}
 
 	opts := github.UpdateCheckRunOptions{
@@ -72,8 +73,9 @@ func (a *githubActivities) UpdateCheckRun(ctx context.Context, request UpdateChe
 
 func (a *githubActivities) CreateCheckRun(ctx context.Context, request CreateCheckRunRequest) (CreateCheckRunResponse, error) {
 	output := github.CheckRunOutput{
-		Title: &request.Title,
-		Text:  github.String("this is test"),
+		Title:   &request.Title,
+		Text:    github.String("this is test"),
+		Summary: github.String("this is also a test"),
 	}
 
 	opts := github.CreateCheckRunOptions{
