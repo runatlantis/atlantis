@@ -369,6 +369,12 @@ Values are chosen in this order:
   ```
   Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
 
+- ### `--gh-allow-mergeable-bypass-apply`
+  ```bash
+  atlantis server --gh-allow-mergeable-bypass-apply
+  ```
+  Feature flag to enable ability to use `mergeable` mode with required apply status check.
+
 ### `--gitlab-hostname`
   ```bash
   atlantis server --gitlab-hostname="my.gitlab.enterprise.com"

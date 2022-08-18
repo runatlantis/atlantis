@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -44,6 +45,7 @@ type GithubClient struct {
 	v4QueryClient  *githubv4.Client
 	ctx            context.Context
 	logger         logging.SimpleLogging
+	config         GithubConfig
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -61,7 +63,7 @@ type GithubAppTemporarySecrets struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, logger logging.SimpleLogging) (*GithubClient, error) {
 	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
@@ -117,6 +119,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 		v4QueryClient:  v4QueryClient,
 		ctx:            context.Background(),
 		logger:         logger,
+		config:         config,
 	}, nil
 }
 
@@ -296,12 +299,118 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 	return approvalStatus, nil
 }
 
+// isRequiredCheck is a helper function to determine if a check is required or not
+func isRequiredCheck(check string, required []string) bool {
+	//in go1.18 can prob replace this with slices.Contains
+	for _, r := range required {
+		if r == check {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetCombinedStatusMinusApply checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
+func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest, vcstatusname string) (bool, error) {
+	//check combined status api
+	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, *pull.Head.Ref, nil)
+	if err != nil {
+		return false, errors.Wrap(err, "getting combined status")
+	}
+
+	//iterate over statuses - return false if we find one that isnt "apply" and doesnt have state = "success"
+	for _, r := range status.Statuses {
+		if strings.HasPrefix(*r.Context, fmt.Sprintf("%s/%s", vcstatusname, command.Apply.String())) {
+			continue
+		}
+		if *r.State != "success" {
+			return false, nil
+		}
+	}
+
+	//get required status checks
+	required, _, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner, repo.Name, *pull.Base.Ref)
+	if err != nil {
+		return false, errors.Wrap(err, "getting required status checks")
+	}
+
+	//check check suite/check run api
+	checksuites, _, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), repo.Owner, repo.Name, *pull.Head.Ref, nil)
+	if err != nil {
+		return false, errors.Wrap(err, "getting check suites for ref")
+	}
+
+	//iterate over check completed check suites - return false if we find one that doesnt have conclusion = "success"
+	for _, c := range checksuites.CheckSuites {
+		if *c.Status == "completed" {
+			fmt.Printf("Looking at suite %v\n", *c.ID)
+			//iterate over the runs inside the suite
+			suite, _, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), repo.Owner, repo.Name, *c.ID, nil)
+			if err != nil {
+				return false, errors.Wrap(err, "getting check runs for check suite")
+			}
+
+			for _, r := range suite.CheckRuns {
+				fmt.Printf("Looking at check run %s\n", *r.Name)
+				//check to see if the check is required
+				if isRequiredCheck(*r.Name, required.RequiredStatusChecks.Contexts) {
+					fmt.Println("Check is required")
+					if *c.Conclusion == "success" {
+						fmt.Println("Check is successful")
+						continue
+					} else {
+						fmt.Println("Check is failed")
+						return false, nil
+					}
+				} else {
+					//ignore checks that arent required
+					fmt.Println("Check is not required")
+					continue
+				}
+
+			}
+		}
+	}
+
+	return true, nil
+}
+
+// GetPullReviewDecision gets the pull review decision, which takes into account CODEOWNERS
+func (g *GithubClient) GetPullReviewDecision(repo models.Repo, pull models.PullRequest) (approvalStatus bool, err error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				ReviewDecision string
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":  githubv4.String(repo.Owner),
+		"name":   githubv4.String(repo.Name),
+		"number": githubv4.Int(pull.Num),
+	}
+
+	err = g.v4QueryClient.Query(g.ctx, &query, variables)
+	if err != nil {
+		return approvalStatus, errors.Wrap(err, "getting reviewDecision")
+	}
+
+	if query.Repository.PullRequest.ReviewDecision == "APPROVED" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 // PullIsMergeable returns true if the pull request is mergeable.
 func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	githubPR, err := g.GetPullRequest(repo, pull.Num)
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
 	}
+
 	state := githubPR.GetMergeableState()
 	// We map our mergeable check to when the GitHub merge button is clickable.
 	// This corresponds to the following states:
@@ -313,6 +422,31 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
+		//mergeable bypass apply code hidden by feature flag
+		if g.config.AllowMergeableBypassApply {
+			g.logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
+			if state == "blocked" {
+				//check status excluding atlantis apply
+				status, err := g.GetCombinedStatusMinusApply(repo, githubPR, vcsstatusname)
+				if err != nil {
+					return false, errors.Wrap(err, "getting pull request status")
+				}
+
+				fmt.Printf("Status was %v\n", status)
+
+				//check to see if pr is approved using reviewDecision
+				approved, err := g.GetPullReviewDecision(repo, pull)
+				if err != nil {
+					return false, errors.Wrap(err, "getting pull request reviewDecision")
+				}
+
+				//if all other status checks EXCEPT atlantis/apply are successful, and the PR is approved based on reviewDecision, let it proceed
+				if status && approved {
+					return true, nil
+				}
+			}
+		}
+
 		return false, nil
 	}
 	return true, nil
