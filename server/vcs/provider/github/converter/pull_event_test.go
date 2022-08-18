@@ -57,6 +57,7 @@ func TestConvert_PullRequestEvent(t *testing.T) {
 			Hostname: "github.com",
 			Type:     models.Github,
 		},
+		DefaultBranch: "main",
 	}
 	Equals(t, models.PullRequest{
 		URL:        Pull.GetHTMLURL(),

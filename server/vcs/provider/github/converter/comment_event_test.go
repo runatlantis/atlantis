@@ -56,6 +56,7 @@ func setup(t *testing.T) (github.IssueCommentEvent, models.Repo, models.PullRequ
 			Hostname: "github.com",
 			Type:     models.Github,
 		},
+		DefaultBranch: "main",
 	}
 
 	modelPull := models.PullRequest{

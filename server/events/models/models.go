@@ -58,6 +58,9 @@ type Repo struct {
 	SanitizedCloneURL string
 	// VCSHost is where this repo is hosted.
 	VCSHost VCSHost
+
+	// Repo's default branch
+	DefaultBranch string
 }
 
 // ID returns the atlantis ID for this repo.

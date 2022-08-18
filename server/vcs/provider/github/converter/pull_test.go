@@ -82,6 +82,7 @@ func TestParseGithubPull(t *testing.T) {
 			Hostname: "github.com",
 			Type:     models.Github,
 		},
+		DefaultBranch: "main",
 	}
 	assert.Equal(t, models.PullRequest{
 		URL:        Pull.GetHTMLURL(),

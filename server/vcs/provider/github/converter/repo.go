@@ -13,10 +13,20 @@ type RepoConverter struct {
 type externalRepo interface {
 	GetFullName() string
 	GetCloneURL() string
+	GetDefaultBranch() string
 }
 
 // ParseGithubRepo parses the response from the GitHub API endpoint that
 // returns a repo into the Atlantis model.
 func (c *RepoConverter) Convert(ghRepo externalRepo) (models.Repo, error) {
-	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), c.GithubUser, c.GithubToken)
+	repo, err := models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), c.GithubUser, c.GithubToken)
+
+	if err != nil {
+		return repo, err
+	}
+
+	// set the default branch here since it's annoying to do so within models since a lot of other code depends on it.
+	// We should be moving all that code here in the future anyways
+	repo.DefaultBranch = ghRepo.GetDefaultBranch()
+	return repo, nil
 }

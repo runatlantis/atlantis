@@ -13,12 +13,21 @@ import (
 	"go.temporal.io/sdk/client"
 )
 
+type PushAction string
+
+const (
+	DeletedAction PushAction = "deleted"
+	CreatedAction PushAction = "created"
+	UpdatedAction PushAction = "updated"
+)
+
 type Push struct {
 	Repo              models.Repo
 	Ref               vcs.Ref
 	Sha               string
 	Sender            vcs.User
 	InstallationToken int64
+	Action            PushAction
 }
 
 type signaler interface {
@@ -51,6 +60,17 @@ func (p *PushHandler) Handle(ctx context.Context, event Push) error {
 	}
 
 	if !shouldAllocate {
+		p.Logger.DebugContext(ctx, "handler not configured for allocation")
+		return nil
+	}
+
+	if event.Ref.Type != vcs.BranchRef || event.Ref.Name != event.Repo.DefaultBranch {
+		p.Logger.DebugContext(ctx, "dropping event for unexpected ref")
+		return nil
+	}
+
+	if event.Action == DeletedAction {
+		p.Logger.WarnContext(ctx, "ref was deleted, resources might still exist")
 		return nil
 	}
 

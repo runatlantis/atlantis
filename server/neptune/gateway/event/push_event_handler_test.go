@@ -11,6 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/sync"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
+	"github.com/runatlantis/atlantis/server/vcs"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/client"
 )
@@ -76,6 +77,130 @@ func (a *testAllocator) ShouldAllocate(featureID feature.Name, featureCtx featur
 	return a.expectedAllocation, a.expectedError
 }
 
+func TestHandlePushEvent_FiltersEvents(t *testing.T) {
+	logger := logging.NewNoopCtxLogger(t)
+	repoFullName := "nish/repo"
+	repoOwner := "nish"
+	repoName := "repo"
+	repoURL := "www.nish.com"
+	sha := "12345"
+
+	t.Run("filters non branch types", func(t *testing.T) {
+		e := event.Push{
+			Repo: models.Repo{
+				FullName: repoFullName,
+				Name:     repoName,
+				Owner:    repoOwner,
+				CloneURL: repoURL,
+			},
+			Sha: sha,
+			Ref: vcs.Ref{
+				Type: vcs.TagRef,
+				Name: "blah",
+			},
+		}
+		testSignaler := &testSignaler{t: t}
+		allocator := &testAllocator{
+			expectedAllocation: true,
+			expectedFeatureID:  feature.PlatformMode,
+			expectedFeatureCtx: feature.FeatureContext{
+				RepoName: repoFullName,
+			},
+			t: t,
+		}
+
+		handler := event.PushHandler{
+			Scheduler:      &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient: testSignaler,
+			Allocator:      allocator,
+			Logger:         logger,
+		}
+
+		err := handler.Handle(context.Background(), e)
+		assert.NoError(t, err)
+
+		assert.False(t, testSignaler.called)
+	})
+
+	t.Run("filters non-default branch types", func(t *testing.T) {
+		e := event.Push{
+			Repo: models.Repo{
+				FullName:      repoFullName,
+				Name:          repoName,
+				Owner:         repoOwner,
+				CloneURL:      repoURL,
+				DefaultBranch: "main",
+			},
+			Sha: sha,
+			Ref: vcs.Ref{
+				Type: vcs.BranchRef,
+				Name: "random",
+			},
+		}
+		testSignaler := &testSignaler{t: t}
+		allocator := &testAllocator{
+			expectedAllocation: true,
+			expectedFeatureID:  feature.PlatformMode,
+			expectedFeatureCtx: feature.FeatureContext{
+				RepoName: repoFullName,
+			},
+			t: t,
+		}
+
+		handler := event.PushHandler{
+			Scheduler:      &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient: testSignaler,
+			Allocator:      allocator,
+			Logger:         logger,
+		}
+
+		err := handler.Handle(context.Background(), e)
+		assert.NoError(t, err)
+
+		assert.False(t, testSignaler.called)
+	})
+
+	t.Run("filters deleted branches", func(t *testing.T) {
+		e := event.Push{
+			Repo: models.Repo{
+				FullName:      repoFullName,
+				Name:          repoName,
+				Owner:         repoOwner,
+				CloneURL:      repoURL,
+				DefaultBranch: "main",
+			},
+			Sha:    sha,
+			Action: event.DeletedAction,
+			Ref: vcs.Ref{
+				Type: vcs.BranchRef,
+				Name: "main",
+			},
+		}
+		testSignaler := &testSignaler{t: t}
+		allocator := &testAllocator{
+			expectedAllocation: true,
+			expectedFeatureID:  feature.PlatformMode,
+			expectedFeatureCtx: feature.FeatureContext{
+				RepoName: repoFullName,
+			},
+			t: t,
+		}
+
+		handler := event.PushHandler{
+			Scheduler:      &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient: testSignaler,
+			Allocator:      allocator,
+			Logger:         logger,
+		}
+
+		err := handler.Handle(context.Background(), e)
+		assert.NoError(t, err)
+
+		assert.False(t, testSignaler.called)
+	})
+
+}
+
 func TestHandlePushEvent(t *testing.T) {
 	logger := logging.NewNoopCtxLogger(t)
 
@@ -87,10 +212,15 @@ func TestHandlePushEvent(t *testing.T) {
 
 	e := event.Push{
 		Repo: models.Repo{
-			FullName: repoFullName,
-			Name:     repoName,
-			Owner:    repoOwner,
-			CloneURL: repoURL,
+			FullName:      repoFullName,
+			Name:          repoName,
+			Owner:         repoOwner,
+			CloneURL:      repoURL,
+			DefaultBranch: "main",
+		},
+		Ref: vcs.Ref{
+			Type: vcs.BranchRef,
+			Name: "main",
 		},
 		Sha: sha,
 	}

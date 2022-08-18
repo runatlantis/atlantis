@@ -42,9 +42,20 @@ func (p PushEvent) Convert(e *github.PushEvent) (event.Push, error) {
 
 	installationToken := githubapp.GetInstallationIDFromEvent(e)
 
+	action := event.UpdatedAction
+
+	if e.GetCreated() {
+		action = event.CreatedAction
+	}
+
+	if e.GetDeleted() {
+		action = event.DeletedAction
+	}
+
 	return event.Push{
-		Repo: repo,
-		Sha:  e.GetHeadCommit().GetSHA(),
+		Repo:   repo,
+		Sha:    e.GetHeadCommit().GetID(),
+		Action: action,
 		Sender: vcs.User{
 			Login: e.GetSender().GetLogin(),
 		},

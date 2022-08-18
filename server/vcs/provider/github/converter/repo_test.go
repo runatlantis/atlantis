@@ -10,10 +10,11 @@ import (
 )
 
 var Repo = github.Repository{
-	FullName: github.String("owner/repo"),
-	Owner:    &github.User{Login: github.String("owner")},
-	Name:     github.String("repo"),
-	CloneURL: github.String("https://github.com/owner/repo.git"),
+	FullName:      github.String("owner/repo"),
+	Owner:         &github.User{Login: github.String("owner")},
+	Name:          github.String("repo"),
+	CloneURL:      github.String("https://github.com/owner/repo.git"),
+	DefaultBranch: github.String("main"),
 }
 
 func TestParseGithubRepo(t *testing.T) {
@@ -33,5 +34,6 @@ func TestParseGithubRepo(t *testing.T) {
 			Hostname: "github.com",
 			Type:     models.Github,
 		},
+		DefaultBranch: "main",
 	}, r)
 }
