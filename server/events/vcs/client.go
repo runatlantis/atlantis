@@ -45,4 +45,5 @@ type Client interface {
 	// if BaseRepo had one repo config file, its content will placed on the second return value
 	DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error)
 	SupportsSingleFileDownload(repo models.Repo) bool
+	GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error)
 }

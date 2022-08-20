@@ -56,25 +56,6 @@ func (mock *MockSlackClient) TokenIsSet() bool {
 	return ret0
 }
 
-func (mock *MockSlackClient) ChannelExists(channelName string) (bool, error) {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockSlackClient().")
-	}
-	params := []pegomock.Param{channelName}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ChannelExists", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 bool
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(bool)
-		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
-		}
-	}
-	return ret0, ret1
-}
-
 func (mock *MockSlackClient) PostMessage(channel string, applyResult webhooks.ApplyResult) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSlackClient().")
@@ -161,32 +142,7 @@ func (c *MockSlackClient_TokenIsSet_OngoingVerification) GetCapturedArguments() 
 func (c *MockSlackClient_TokenIsSet_OngoingVerification) GetAllCapturedArguments() {
 }
 
-func (verifier *VerifierMockSlackClient) ChannelExists(channelName string) *MockSlackClient_ChannelExists_OngoingVerification {
-	params := []pegomock.Param{channelName}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ChannelExists", params, verifier.timeout)
-	return &MockSlackClient_ChannelExists_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
 
-type MockSlackClient_ChannelExists_OngoingVerification struct {
-	mock              *MockSlackClient
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *MockSlackClient_ChannelExists_OngoingVerification) GetCapturedArguments() string {
-	channelName := c.GetAllCapturedArguments()
-	return channelName[len(channelName)-1]
-}
-
-func (c *MockSlackClient_ChannelExists_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(string)
-		}
-	}
-	return
-}
 
 func (verifier *VerifierMockSlackClient) PostMessage(channel string, applyResult webhooks.ApplyResult) *MockSlackClient_PostMessage_OngoingVerification {
 	params := []pegomock.Param{channel, applyResult}

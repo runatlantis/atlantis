@@ -314,6 +314,23 @@ func (h VCSHostType) String() string {
 	return "<missing String() implementation>"
 }
 
+func NewVCSHostType(t string) (VCSHostType, error) {
+	switch t {
+	case "Github":
+		return Github, nil
+	case "Gitlab":
+		return Gitlab, nil
+	case "BitbucketCloud":
+		return BitbucketCloud, nil
+	case "BitbucketServer":
+		return BitbucketServer, nil
+	case "AzureDevops":
+		return AzureDevops, nil
+	}
+
+	return -1, fmt.Errorf("%q is not a valid type", t)
+}
+
 // SplitRepoFullName splits a repo full name up into its owner and repo
 // name segments. If the repoFullName is malformed, may return empty
 // strings for owner or repo.

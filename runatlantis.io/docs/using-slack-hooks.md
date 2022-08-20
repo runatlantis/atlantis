@@ -28,6 +28,7 @@ For this you'll need to:
   * `incoming-webhook`
   * `mpim:read`
 * Install the app onto your Slack workspace
+* Create a channel in your Slack workspace (e.g. `my-channel`), and add the app to it
 
 ## Configuring Atlantis
 
@@ -42,5 +43,22 @@ webhooks:
   kind: slack
   channel: my-channel
 ```
+
+If you are deploying Atlantis as a Helm chart, this can be implemented via the `config` parameter available for [chart customizations](https://github.com/runatlantis/helm-charts#customization):
+
+```
+
+## Use Server Side Config,
+## ref: https://www.runatlantis.io/docs/server-configuration.html
+config: |
+   ---
+   webhooks:
+     - event: apply
+       workspace-regex: .*
+       kind: slack
+       channel: my-channel
+```
+
+
 
 The `apply` event information will be sent to the `my-channel` Slack channel.
