@@ -17,10 +17,11 @@ type MultiEnvStepRunner struct {
 func (r *MultiEnvStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string) (string, error) {
 	res, err := r.RunStepRunner.Run(ctx, command, path, envs, false)
 	if err == nil {
-		envVars := strings.Split(res, ",")
-		if len(envVars) > 0 {
+		if len(res) > 0 {
 			var sb strings.Builder
 			sb.WriteString("Dynamic environment variables added:\n")
+
+			envVars := strings.Split(res, ",")
 			for _, item := range envVars {
 				// Only split after the first = found in case the environment variable value has
 				// = in it (as might be the case with access tokens)
