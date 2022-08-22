@@ -54,7 +54,7 @@ type UserConfig struct {
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
 	Port                            int    `mapstructure:"port"`
-  QuietPolicyChecks          bool   `mapstructure:"quiet-policy-checks"`
+  	QuietPolicyChecks          bool   `mapstructure:"quiet-policy-checks"`
 	RepoConfig                      string `mapstructure:"repo-config"`
 	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
 	RepoAllowlist                   string `mapstructure:"repo-allowlist"`
