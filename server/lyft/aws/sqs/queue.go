@@ -2,6 +2,7 @@ package sqs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -32,7 +33,8 @@ func (q *QueueWithStats) ReceiveMessage(ctx context.Context, req *sqs.ReceiveMes
 	errorCount := scope.Counter(Error)
 
 	response, err := q.Queue.ReceiveMessage(ctx, req, optFns...)
-	if err != nil {
+	// only consider it a failure if the error isn't due to a context cancellation
+	if err != nil && !errors.Is(err, context.Canceled) {
 		errorCount.Inc(1)
 		return response, fmt.Errorf("receiving messages from queue: %s: %w", q.QueueURL, err)
 	}
