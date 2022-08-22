@@ -157,6 +157,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient vcs.IGithubClient
 	var githubAppEnabled bool
+	var githubConfig vcs.GithubConfig
 	var githubCredentials vcs.GithubCredentials
 	var gitlabClient *vcs.GitlabClient
 	var bitbucketCloudClient *bitbucketcloud.Client
@@ -198,6 +199,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
+		if userConfig.GithubAllowMergeableBypassApply {
+			githubConfig = vcs.GithubConfig{
+				AllowMergeableBypassApply: true,
+			}
+		}
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
 			githubCredentials = &vcs.GithubUserCredentials{
@@ -227,7 +233,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger)
+		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, logger)
 		if err != nil {
 			return nil, err
 		}
