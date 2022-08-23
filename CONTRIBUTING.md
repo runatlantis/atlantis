@@ -33,25 +33,64 @@ open your browser to http://localhost:8080.
     If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
 
 ## Running Atlantis With Local Changes
-Docker compose is set up to start an atlantis container and ngrok container in the same network in order to expose the atlantis instance to the internet.  In order to do this, create a file in the repository called `atlantis.env` and add the required env vars for the atlantis server configuration.
 
-e.g.
-```
-ATLANTIS_GH_APP_ID=123
-ATLANTIS_GH_APP_KEY_FILE="/.ssh/somekey.pem"
-ATLANTIS_GH_WEBHOOK_SECRET=12345
-ATLANTIS_REPO_ALLOWLIST=<repo-url> [Eg: github.com/Altlantis-Dev/Atlantis]
-ATLANTIS_WRITE_GIT_CREDS=true 
-USE_STATSD=false [To avoid statsd error messages during development]
-```
-- You can generate you GH_APP_KEY_FILE [here](https://github.com/settings/keys). Download the key file and save it to ~/.ssh directory. Note: `~/.ssh` is mounted to allow for referencing any local ssh keys.
+The atlantis worker can't technically be run yet locally given it's dependency on sqs.  However, Docker compose is set up 
+to run a gateway, a temporal worker, temporalite and ngrok all in the same network.  ngrok allows us to expose localhost to the public internet in order to test github app integrations.
 
-Following this just run:
+There is some setup that is required in order to have your containers running and receiving webhooks.
+
+1. Setup your own personal github organization and test github app.
+2. Install this app to a test repo within your organization with all the correct atlantis permissions as our real app.
+3. Download the key file and save it to ~/.ssh directory. Note: `~/.ssh` is mounted to allow for referencing any local ssh keys.
+4. Create the following files:
+
+`~/atlantis-gateway.env`
+ATLANTIS_GH_APP_ID=<FILL THIS IN>
+ATLANTIS_GH_APP_KEY_FILE=/.ssh/your-key-file.pem
+ATLANTIS_GH_WEBHOOK_SECRET=<FILL THIS IN>
+ATLANTIS_GH_APP_SLUG=<FILL THIS IN>
+ATLANTIS_FF_OWNER=<FILL THIS IN>
+ATLANTIS_FF_REPO=<FILL THIS IN>
+ATLANTIS_FF_PATH=<FILL THIS IN>
+ATLANTIS_DATA_DIR=/tmp/
+ATLANTIS_LYFT_MODE=gateway
+ATLANTIS_REPO_CONFIG=/generated/repo-config.yaml
+ATLANTIS_WRITE_GIT_CREDS=true
+ATLANTIS_REPO_ALLOWLIST=<FILL THIS IN>
+ATLANTIS_ENABLE_POLICY_CHECKS=true
+ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
+ATLANTIS_PORT=4143
+ALLOWED_REPOS=<FILL THIS IN>
+
+`~/atlantis-temporalworker.env`
+ATLANTIS_GH_APP_ID=<FILL THIS IN>
+ATLANTIS_GH_APP_KEY_FILE=/.ssh/your-key-file.pem
+ATLANTIS_GH_WEBHOOK_SECRET=<FILL THIS IN>
+ATLANTIS_GH_APP_SLUG=<FILL THIS IN>
+ATLANTIS_FF_OWNER=<FILL THIS IN>
+ATLANTIS_FF_REPO=<FILL THIS IN>
+ATLANTIS_FF_PATH=<FILL THIS IN>
+ATLANTIS_DATA_DIR=/tmp/
+ATLANTIS_LYFT_MODE=temporalworker
+ATLANTIS_REPO_CONFIG=/generated/repo-config.yaml
+ATLANTIS_WRITE_GIT_CREDS=true
+ATLANTIS_REPO_ALLOWLIST=<FILL THIS IN>
+ATLANTIS_ENABLE_POLICY_CHECKS=true
+ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
+ATLANTIS_PORT=4142
+ALLOWED_REPOS=<FILL THIS IN>
+
+Once these steps are complete, everything should startup as normal. You just need to run:
 
 ```
 make build-service
+docker-compose build
 docker-compose up
 ```
+
+In order to have events routed to gateway, you'll need to visit `http://localhost:4040/` and copy the https url into your GitHub app.  
+
+In order to see the temporal ui visit `http://localhost:8233/`.
 
 ### Rebuilding
 

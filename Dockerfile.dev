@@ -1,6 +1,26 @@
-FROM runatlantis/atlantis:latest
+FROM ghcr.io/runatlantis/atlantis:v0.19.7
 COPY atlantis /usr/local/bin/atlantis
 # TODO: remove this once we get this in the base image
 ENV DEFAULT_CONFTEST_VERSION=0.25.0
 
+RUN apk add --no-cache openssl
+
+# Install dockerize for configuration templating at runtime.
+ENV DOCKERIZE_VERSION v0.6.1
+RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && tar -C /usr/local/bin -xzvf dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && rm dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+
+COPY . /atlantis/src/
+
 WORKDIR /atlantis/src
+
+RUN : \
+    && mkdir -p /generated \
+    && :
+
+COPY repo-config-dev-template.yaml /tmp/repo-config-dev-template.yaml
+
+RUN : \
+    && dockerize -template /tmp/repo-config-dev-template.yaml:/generated/repo-config.yaml \
+    && :

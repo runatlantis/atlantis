@@ -7,18 +7,35 @@ services:
         - 4040:4040
         environment:
             NGROK_PROTOCOL: http
-            NGROK_PORT: atlantis:4141
+            NGROK_PORT: atlantis-gateway:4143
         depends_on:
-        - atlantis
-    atlantis:
+        - atlantis-gateway
+    atlantis-gateway:
         build:
             context: .
             dockerfile: Dockerfile.dev
         ports:
-        - 4141:4141
+        - 4143:4143
         volumes:
             - ~/.ssh:/.ssh
             - ./:/atlantis/src
         # Contains the flags that atlantis uses in env var form
         env_file:
-            - ~/.atlantis.env
+            - ~/.atlantis-gateway.env
+    atlantis-temporalworker:
+        build:
+            context: .
+            dockerfile: Dockerfile.dev
+        ports:
+        - 4142:4142
+        volumes:
+            - ~/.ssh:/.ssh
+            - ./:/atlantis/src
+        # Contains the flags that atlantis uses in env var form
+        env_file:
+            - ~/.atlantis-temporalworker.env
+    temporalite:
+        build: https://github.com/temporalio/temporalite.git#main
+        ports:
+        - 7233:7233
+        - 8233:8233

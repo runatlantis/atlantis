@@ -101,6 +101,7 @@ type Temporal struct {
 	Port            string
 	Host            string
 	UseSystemCACert bool
+	Namespace       string
 }
 
 type TerraformLogFilters struct {
