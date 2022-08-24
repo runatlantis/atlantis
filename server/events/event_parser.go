@@ -617,15 +617,23 @@ func (e *EventParser) ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (pul
 		BaseRepo:   baseRepo,
 	}
 
-	switch event.ObjectAttributes.Action {
-	case "open":
-		eventType = models.OpenedPullEvent
-	case "update":
-		eventType = e.ParseGitlabMergeRequestUpdateEvent(event)
-	case "merge", "close":
-		eventType = models.ClosedPullEvent
-	default:
+	// If it's a draft PR we ignore it for auto-planning if configured to do so
+	// however it's still possible for users to run plan on it manually via a
+	// comment so if any draft PR is closed we still need to check if we need
+	// to delete its locks.
+	if event.ObjectAttributes.WorkInProgress && event.ObjectAttributes.Action != "close" && !e.AllowDraftPRs {
 		eventType = models.OtherPullEvent
+	} else {
+		switch event.ObjectAttributes.Action {
+		case "open":
+			eventType = models.OpenedPullEvent
+		case "update":
+			eventType = e.ParseGitlabMergeRequestUpdateEvent(event)
+		case "merge", "close":
+			eventType = models.ClosedPullEvent
+		default:
+			eventType = models.OtherPullEvent
+		}
 	}
 
 	user = models.User{

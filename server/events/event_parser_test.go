@@ -380,6 +380,25 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	Equals(t, models.ClosedPullState, pull.State)
 }
 
+func TestParseGitlabMergeEventFromDraft(t *testing.T) {
+	path := filepath.Join("testdata", "gitlab-merge-request-event-draft.json")
+	bytes, err := os.ReadFile(path)
+	Ok(t, err)
+	var event *gitlab.MergeEvent
+	err = json.Unmarshal(bytes, &event)
+	Ok(t, err)
+
+	_, evType, _, _, _, err := parser.ParseGitlabMergeRequestEvent(*event)
+	Ok(t, err)
+	Equals(t, models.OtherPullEvent, evType)
+
+	parser.AllowDraftPRs = true
+	defer func() { parser.AllowDraftPRs = false }()
+	_, evType, _, _, _, err = parser.ParseGitlabMergeRequestEvent(*event)
+	Ok(t, err)
+	Equals(t, models.OpenedPullEvent, evType)
+}
+
 // Should be able to parse a merge event from a repo that is in a subgroup,
 // i.e. instead of under an owner/repo it's under an owner/group/subgroup/repo.
 func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
