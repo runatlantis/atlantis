@@ -164,11 +164,19 @@ func TestParseGithubPullEvent(t *testing.T) {
 }
 
 func TestParseGithubPullEventFromDraft(t *testing.T) {
+	// verify that close event treated as 'close' events by default
+	closeEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	closeEvent.Action = github.String("closed")
+	closeEvent.PullRequest.Draft = github.Bool(true)
+
+	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&closeEvent)
+	Ok(t, err)
+	Equals(t, models.ClosedPullEvent, evType)
+
 	// verify that draft PRs are treated as 'other' events by default
 	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	draftPR := true
-	testEvent.PullRequest.Draft = &draftPR
-	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&testEvent)
+	testEvent.PullRequest.Draft = github.Bool(true)
+	_, evType, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	Ok(t, err)
 	Equals(t, models.OtherPullEvent, evType)
 	// verify that drafts are planned if requested
