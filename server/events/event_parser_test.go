@@ -381,20 +381,24 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 }
 
 func TestParseGitlabMergeEventFromDraft(t *testing.T) {
-	path := filepath.Join("testdata", "gitlab-merge-request-event-draft.json")
+	path := filepath.Join("testdata", "gitlab-merge-request-event.json")
 	bytes, err := os.ReadFile(path)
 	Ok(t, err)
-	var event *gitlab.MergeEvent
+
+	var event gitlab.MergeEvent
 	err = json.Unmarshal(bytes, &event)
 	Ok(t, err)
 
-	_, evType, _, _, _, err := parser.ParseGitlabMergeRequestEvent(*event)
+	testEvent := deepcopy.Copy(event).(gitlab.MergeEvent)
+	testEvent.ObjectAttributes.WorkInProgress = true
+
+	_, evType, _, _, _, err := parser.ParseGitlabMergeRequestEvent(testEvent)
 	Ok(t, err)
 	Equals(t, models.OtherPullEvent, evType)
 
 	parser.AllowDraftPRs = true
 	defer func() { parser.AllowDraftPRs = false }()
-	_, evType, _, _, _, err = parser.ParseGitlabMergeRequestEvent(*event)
+	_, evType, _, _, _, err = parser.ParseGitlabMergeRequestEvent(testEvent)
 	Ok(t, err)
 	Equals(t, models.OpenedPullEvent, evType)
 }
