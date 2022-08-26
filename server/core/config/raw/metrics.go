@@ -28,7 +28,7 @@ func (s *Statsd) Validate() error {
 	return validation.ValidateStruct(s,
 		validation.Field(&s.Host, validation.Required),
 		validation.Field(&s.Port, validation.Required),
-		validation.Field(&s.Host, is.IP),
+		validation.Field(&s.Host, is.Host),
 		validation.Field(&s.Port, is.Int))
 }
 
