@@ -72,7 +72,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 	t.Run("success hooks in cfg", func(t *testing.T) {
 		postWorkflowHooksSetup(t)
 
-		var unlockCalled *bool = newBool(false)
+		unlockCalled := newBool(false)
 		unlockFn := func() {
 			unlockCalled = newBool(true)
 		}
@@ -157,7 +157,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 	t.Run("error cloning", func(t *testing.T) {
 		postWorkflowHooksSetup(t)
 
-		var unlockCalled *bool = newBool(false)
+		unlockCalled := newBool(false)
 		unlockFn := func() {
 			unlockCalled = newBool(true)
 		}
@@ -189,7 +189,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 	t.Run("error running post hook", func(t *testing.T) {
 		postWorkflowHooksSetup(t)
 
-		var unlockCalled *bool = newBool(false)
+		unlockCalled := newBool(false)
 		unlockFn := func() {
 			unlockCalled = newBool(true)
 		}
