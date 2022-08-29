@@ -9,14 +9,16 @@ import (
 	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/client"
 	temporaltally "go.temporal.io/sdk/contrib/tally"
+	"go.temporal.io/sdk/workflow"
 	"logur.dev/logur"
 )
 
 func NewClient(scope tally.Scope, logger logur.Logger, cfg valid.Temporal) (client.Client, error) {
 	opts := client.Options{
-		Namespace:      cfg.Namespace,
-		MetricsHandler: temporaltally.NewMetricsHandler(scope),
-		Logger:         logur.LoggerToKV(logger),
+		Namespace:          cfg.Namespace,
+		MetricsHandler:     temporaltally.NewMetricsHandler(scope),
+		Logger:             logur.LoggerToKV(logger),
+		ContextPropagators: []workflow.ContextPropagator{&ctxPropagator{}},
 	}
 
 	if cfg.UseSystemCACert {

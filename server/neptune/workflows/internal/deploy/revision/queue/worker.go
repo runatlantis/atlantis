@@ -7,11 +7,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/steps"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
+	internalContext "github.com/runatlantis/atlantis/server/neptune/context"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -73,7 +73,7 @@ func (w *Worker) Work(ctx workflow.Context) {
 
 		revision := msg.Revision
 		checkRunID := msg.CheckRunID
-		ctx := workflow.WithValue(ctx, config.RevisionLogKey, revision)
+		ctx := workflow.WithValue(ctx, internalContext.SHAKey, revision)
 
 		w.updateInProgress(ctx, checkRunID)
 		err = w.work(ctx, revision)
@@ -136,7 +136,7 @@ func (w *Worker) updateInProgress(ctx workflow.Context, checkRunID int64) {
 func (w *Worker) work(ctx workflow.Context, revision string) error {
 	id, err := generateID(ctx)
 
-	ctx = workflow.WithValue(ctx, config.DeploymentIDLogKey, id)
+	ctx = workflow.WithValue(ctx, internalContext.DeploymentIDKey, id)
 
 	logger.Info(ctx, "Generated id")
 

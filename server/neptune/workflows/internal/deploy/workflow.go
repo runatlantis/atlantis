@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
@@ -48,11 +47,6 @@ func Workflow(ctx workflow.Context, request Request, terraformWorkflow func(ctx 
 		ScheduleToCloseTimeout: 5 * time.Second,
 	}
 	ctx = workflow.WithActivityOptions(ctx, options)
-
-	// set relevant logging context
-	ctx = workflow.WithValue(ctx, config.RepositoryLogKey, request.Repository.FullName)
-	ctx = workflow.WithValue(ctx, config.ProjectLogKey, request.Root.Name)
-	ctx = workflow.WithValue(ctx, config.GHRequestIDLogKey, request.GHRequestID)
 
 	runner := newRunner(ctx, request, terraformWorkflow)
 
