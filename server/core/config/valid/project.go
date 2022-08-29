@@ -14,6 +14,7 @@ const (
 	DeploymentWorkflowType  workflowType = "deployment_workflow"
 )
 
+// TODO: rename to root
 type Project struct {
 	Dir                     string
 	Workspace               string
