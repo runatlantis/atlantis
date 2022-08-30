@@ -335,7 +335,6 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 	//iterate over check completed check suites - return false if we find one that doesnt have conclusion = "success"
 	for _, c := range checksuites.CheckSuites {
 		if *c.Status == "completed" {
-			fmt.Printf("Looking at suite %v\n", *c.ID)
 			//iterate over the runs inside the suite
 			suite, _, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), repo.Owner, repo.Name, *c.ID, nil)
 			if err != nil {
@@ -343,20 +342,15 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 			}
 
 			for _, r := range suite.CheckRuns {
-				fmt.Printf("Looking at check run %s\n", *r.Name)
 				//check to see if the check is required
 				if isRequiredCheck(*r.Name, required.RequiredStatusChecks.Contexts) {
-					fmt.Println("Check is required")
 					if *c.Conclusion == "success" {
-						fmt.Println("Check is successful")
 						continue
 					} else {
-						fmt.Println("Check is failed")
 						return false, nil
 					}
 				} else {
 					//ignore checks that arent required
-					fmt.Println("Check is not required")
 					continue
 				}
 
@@ -422,8 +416,6 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 				if err != nil {
 					return false, errors.Wrap(err, "getting pull request status")
 				}
-
-				fmt.Printf("Status was %v\n", status)
 
 				//check to see if pr is approved using reviewDecision
 				approved, err := g.GetPullReviewDecision(repo, pull)
