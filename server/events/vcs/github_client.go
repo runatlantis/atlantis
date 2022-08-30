@@ -30,7 +30,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/shurcooL/githubv4"
-	"golang.org/x/oauth2"
 )
 
 // maxCommentLength is the maximum number of chars allowed in a single comment
@@ -95,16 +94,8 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		transport,
 		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
 	)
-	token, err := credentials.GetToken()
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get GitHub token")
-	}
-	src := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	httpClient := oauth2.NewClient(context.Background(), src)
 	// Use the client from shurcooL's githubv4 library for queries.
-	v4QueryClient := githubv4.NewEnterpriseClient(graphqlURL, httpClient)
+	v4QueryClient := githubv4.NewEnterpriseClient(graphqlURL, transport)
 
 	user, err := credentials.GetUser()
 	logger.Debug("GH User: %s", user)
