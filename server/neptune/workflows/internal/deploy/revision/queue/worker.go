@@ -9,7 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/steps"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	internalContext "github.com/runatlantis/atlantis/server/neptune/context"
 	"go.temporal.io/sdk/temporal"
@@ -33,7 +33,7 @@ type Worker struct {
 	Activities        workerActivities
 	Queue             *Queue
 	Repo              github.Repo
-	Root              steps.Root
+	Root              root.Root
 	TerraformWorkflow func(ctx workflow.Context, request terraform.Request) error
 
 	// mutable

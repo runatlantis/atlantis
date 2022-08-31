@@ -24,18 +24,18 @@ var DeployTaskQueue = deploy.TaskQueue
 
 var DeployNewRevisionSignalID = deploy.NewRevisionSignalID
 
-type Activities struct {
+type DeployActivities struct {
 	activities.Deploy
 }
 
-func NewActivities(appConfig githubapp.Config, scope tally.Scope) (*Activities, error) {
+func NewDeployActivities(appConfig githubapp.Config, scope tally.Scope) (*DeployActivities, error) {
 	deployActivities, err := activities.NewDeploy(appConfig, scope)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing deploy activities")
 	}
 
-	return &Activities{
+	return &DeployActivities{
 		Deploy: *deployActivities,
 	}, nil
 }

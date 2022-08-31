@@ -1,12 +1,43 @@
 package activities
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
+)
 
 type executeCommandActivities struct{}
 
-type ExecuteCommandRequest struct {
+type ExecuteCommandResponse struct {
+	Output string
 }
 
-func (t *terraformActivities) ExecuteCommand(ctx context.Context, request ExecuteCommandRequest) error {
-	return nil
+type ExecuteCommandRequest struct {
+	Step    job.Step
+	Path    string
+	EnvVars map[string]string
+}
+
+func (t *executeCommandActivities) ExecuteCommand(ctx context.Context, request ExecuteCommandRequest) (ExecuteCommandResponse, error) {
+	cmd := exec.Command("sh", "-c", request.Step.RunCommand) // #nosec
+	cmd.Dir = request.Path
+
+	finalEnvVars := os.Environ()
+	for key, val := range request.EnvVars {
+		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
+	}
+
+	cmd.Env = finalEnvVars
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return ExecuteCommandResponse{}, errors.Wrapf(err, "running %q in %q: \n%s", request.Step.RunCommand, request.Path, out)
+	}
+
+	return ExecuteCommandResponse{
+		Output: string(out),
+	}, nil
 }

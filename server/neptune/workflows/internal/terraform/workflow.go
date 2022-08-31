@@ -2,12 +2,27 @@ package terraform
 
 import (
 	"context"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/steps"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	job_runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job/step/cmd"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job/step/env"
 	"go.temporal.io/sdk/workflow"
-	"time"
 )
+
+type workerActivity struct {
+	*activities.Terraform
+	*activities.Github
+}
+
+// jobRunner runs a deploy plan/apply job
+type jobRunner interface {
+	Run(ctx workflow.Context, job job.Job, rootInstance *root.RootInstance) (string, error)
+}
 
 type PlanStatus int
 type PlanReview struct {
@@ -47,37 +62,50 @@ type workerActivities interface {
 	TerraformInit(context.Context, activities.TerraformInitRequest) error
 	TerraformPlan(context.Context, activities.TerraformPlanRequest) error
 	TerraformApply(context.Context, activities.TerraformApplyRequest) error
-	ExecuteCommand(context.Context, activities.ExecuteCommandRequest) error
+	ExecuteCommand(context.Context, activities.ExecuteCommandRequest) (activities.ExecuteCommandResponse, error)
 	Notify(context.Context, activities.NotifyRequest) error
 	Cleanup(context.Context, activities.CleanupRequest) error
 }
 
 type Runner struct {
 	Activities workerActivities
+	JobRunner  jobRunner
 	Request    Request
 }
 
 func newRunner(ctx workflow.Context, request Request) *Runner {
-	var a *activities.Terraform
+	var a *workerActivity
+
+	cmdStepRunner := cmd.Runner{
+		Activity: a,
+	}
 	return &Runner{
 		Activities: a,
 		Request:    request,
+		JobRunner: job_runner.NewRunner(
+			&cmdStepRunner,
+			&env.Runner{
+				CmdRunner: cmdStepRunner,
+			},
+		),
 	}
 }
 
 func (r *Runner) Run(ctx workflow.Context) error {
+	// Root instance has all the metadata needed to execute a step in a root
+	rootInstance := root.BuildRootInstanceFrom(r.Request.Root, r.Request.Repo)
+
 	// Clone repository into disk
 	err := workflow.ExecuteActivity(ctx, r.Activities.GithubRepoClone, activities.GithubRepoCloneRequest{}).Get(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, "executing GH repo clone")
 	}
-	// Run plan steps
-	for _, step := range r.Request.Root.Plan.Steps {
-		err := r.runStep(ctx, step)
-		if err != nil {
-			return errors.Wrap(err, "running step")
-		}
+
+	_, err = r.JobRunner.Run(ctx, r.Request.Root.Plan, rootInstance)
+	if err != nil {
+		return errors.Wrap(err, "running plan job")
 	}
+
 	// Wait for plan review signal
 	var planReview PlanReview
 	signalChan := workflow.GetSignalChannel(ctx, "planreview-repo-steps")
@@ -88,71 +116,17 @@ func (r *Runner) Run(ctx workflow.Context) error {
 	if planReview.Status == Rejected {
 		return nil
 	}
+
 	// Run apply steps
-	for _, step := range r.Request.Root.Apply.Steps {
-		err := r.runStep(ctx, step)
-		if err != nil {
-			return errors.Wrap(err, "running step")
-		}
+	_, err = r.JobRunner.Run(ctx, r.Request.Root.Apply, rootInstance)
+	if err != nil {
+		return errors.Wrap(err, "running apply job")
 	}
+
 	// Cleanup
 	err = workflow.ExecuteActivity(ctx, r.Activities.Cleanup, activities.CleanupRequest{}).Get(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, "cleaning up")
-	}
-	return nil
-}
-
-// TODO: wrap each case statement's ExecuteActivity with a specific Runner implementation;
-// activity itself should just handle the non-deterministic code chunk (i.e. running terraform operation, state updates)
-// ex:
-//type Runner interface {
-//	Run(ctx workflow.Context, step deploy.Step) error
-//}
-//case "init":
-//	err = initStepRunner.Run(ctx, step)
-//	if err != nil {
-//		return errors.Wrap(err, "executing terraform init")
-//	}
-func (r *Runner) runStep(ctx workflow.Context, step steps.Step) error {
-	var err error
-	switch step.StepName {
-	case "init":
-		err = workflow.ExecuteActivity(ctx, r.Activities.TerraformInit, activities.TerraformInitRequest{}).Get(ctx, nil)
-		if err != nil {
-			return errors.Wrap(err, "executing terraform init")
-		}
-	case "plan":
-		err = workflow.ExecuteActivity(ctx, r.Activities.TerraformPlan, activities.TerraformPlanRequest{}).Get(ctx, nil)
-		if err != nil {
-			return errors.Wrap(err, "executing terraform plan")
-		}
-		err = workflow.ExecuteActivity(ctx, r.Activities.Notify, activities.NotifyRequest{}).Get(ctx, nil)
-		if err != nil {
-			return errors.Wrap(err, "notifying plan result")
-		}
-	case "apply":
-		err = workflow.ExecuteActivity(ctx, r.Activities.TerraformApply, activities.TerraformApplyRequest{}).Get(ctx, nil)
-		if err != nil {
-			return errors.Wrap(err, "executing terraform apply")
-		}
-		err = workflow.ExecuteActivity(ctx, r.Activities.Notify, activities.NotifyRequest{}).Get(ctx, nil)
-		if err != nil {
-			return errors.Wrap(err, "notifying apply result")
-		}
-	case "run":
-		err = workflow.ExecuteActivity(ctx, r.Activities.ExecuteCommand, activities.ExecuteCommandRequest{}).Get(ctx, nil)
-		if err != nil {
-			return errors.Wrap(err, "executing custom command")
-		}
-	case "env":
-		err = workflow.ExecuteActivity(ctx, r.Activities.ExecuteCommand, activities.ExecuteCommandRequest{}).Get(ctx, nil)
-		if err != nil {
-			return errors.Wrap(err, "exporting custom env variables")
-		}
-	}
-	if err != nil {
-		return err
 	}
 	return nil
 }

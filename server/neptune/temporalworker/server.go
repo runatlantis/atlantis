@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"sync"
@@ -17,11 +16,9 @@ import (
 	"go.temporal.io/sdk/client"
 
 	"github.com/gorilla/mux"
-	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	neptune_http "github.com/runatlantis/atlantis/server/neptune/http"
 	"github.com/runatlantis/atlantis/server/neptune/temporal"
@@ -38,20 +35,6 @@ const (
 	ProjectJobsViewRouteName = "project-jobs-detail"
 )
 
-// Config is TemporalWorker specific user config
-type Config struct {
-	AtlantisURL     *url.URL
-	AtlantisVersion string
-	CtxLogger       logging.Logger
-	SslCertFile     string
-	SslKeyFile      string
-	Scope           tally.Scope
-	Closer          io.Closer
-	TemporalCfg     valid.Temporal
-	Port            int
-	App             githubapp.Config
-}
-
 type Server struct {
 	Logger          logging.Logger
 	HttpServerProxy *neptune_http.ServerProxy
@@ -59,13 +42,16 @@ type Server struct {
 	StatsScope      tally.Scope
 	StatsCloser     io.Closer
 	TemporalClient  client.Client
-	Activities      *workflows.Activities
+
+	DeployActivities    *workflows.DeployActivities
+	TerraformActivities *workflows.TerraformActivities
+	GithubActivities    *workflows.GithubActivities
 }
 
 func NewServer(config *Config) (*Server, error) {
 	jobsController := &controllers.JobsController{
-		AtlantisVersion:     config.AtlantisVersion,
-		AtlantisURL:         config.AtlantisURL,
+		AtlantisVersion:     config.ServerCfg.Version,
+		AtlantisURL:         config.ServerCfg.URL,
 		KeyGenerator:        controllers.JobIDKeyGenerator{},
 		StatsScope:          config.Scope,
 		Logger:              config.CtxLogger,
@@ -90,25 +76,45 @@ func NewServer(config *Config) (*Server, error) {
 	})
 	n.UseHandler(router)
 	httpServerProxy := &neptune_http.ServerProxy{
-		SSLCertFile: config.SslCertFile,
-		SSLKeyFile:  config.SslKeyFile,
-		Server:      &http.Server{Addr: fmt.Sprintf(":%d", config.Port), Handler: n},
+		SSLCertFile: config.AuthCfg.SslCertFile,
+		SSLKeyFile:  config.AuthCfg.SslKeyFile,
+		Server:      &http.Server{Addr: fmt.Sprintf(":%d", config.ServerCfg.Port), Handler: n},
 		Logger:      config.CtxLogger,
 	}
 
-	activities, err := workflows.NewActivities(config.App, config.Scope.SubScope("app"))
-
+	deployActivities, err := workflows.NewDeployActivities(
+		config.App,
+		config.Scope.SubScope("deploy"),
+	)
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing activities")
+		return nil, errors.Wrap(err, "initializing deploy activities")
 	}
+
+	terraformActivities, err := workflows.NewTerraformActivities(
+		config.Scope.SubScope("terraform"),
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing terraform activities")
+	}
+
+	githubActivities, err := workflows.NewGithubActiviies(
+		config.App,
+		config.Scope.SubScope("app"),
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing github activities")
+	}
+
 	server := Server{
-		Logger:          config.CtxLogger,
-		HttpServerProxy: httpServerProxy,
-		Port:            config.Port,
-		StatsScope:      config.Scope,
-		StatsCloser:     config.Closer,
-		TemporalClient:  temporalClient,
-		Activities:      activities,
+		Logger:              config.CtxLogger,
+		HttpServerProxy:     httpServerProxy,
+		Port:                config.ServerCfg.Port,
+		StatsScope:          config.Scope,
+		StatsCloser:         config.StatsCloser,
+		TemporalClient:      temporalClient,
+		DeployActivities:    deployActivities,
+		TerraformActivities: terraformActivities,
+		GithubActivities:    githubActivities,
 	}
 	return &server, nil
 }
@@ -124,7 +130,10 @@ func (s Server) Start() error {
 		w := worker.New(s.TemporalClient, workflows.DeployTaskQueue, worker.Options{
 			EnableSessionWorker: true,
 		})
-		w.RegisterActivity(s.Activities)
+		w.RegisterActivity(s.TerraformActivities)
+		w.RegisterActivity(s.DeployActivities)
+		w.RegisterActivity(s.GithubActivities)
+
 		w.RegisterWorkflow(workflows.Deploy)
 		w.RegisterWorkflow(workflows.Terraform)
 		if err := w.Run(worker.InterruptCh()); err != nil {

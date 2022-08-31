@@ -1,14 +1,4 @@
-package steps
-
-type Root struct {
-	Name  string
-	Apply Job
-	Plan  Job
-}
-
-type Job struct {
-	Steps []Step
-}
+package job
 
 // Step was taken from the Atlantis OG config, we might be able to clean this up/remove it
 type Step struct {

@@ -8,7 +8,8 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/steps"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	temporalInternal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/temporal"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"go.temporal.io/sdk/temporal"
@@ -23,6 +24,11 @@ const (
 
 	RevisionReceiveTimeout = 60 * time.Minute
 )
+
+type workerActivities struct {
+	*activities.Github
+	*activities.Deploy
+}
 
 type RunnerAction int64
 
@@ -70,17 +76,17 @@ func newRunner(ctx workflow.Context, request Request, terraformWorkflow func(ctx
 			InstallationToken: request.Repository.Credentials.InstallationToken,
 		},
 	}
-	root := steps.Root{
+	root := root.Root{
 		Name:  request.Root.Name,
-		Apply: steps.Job{Steps: convertToInternalSteps(request.Root.Apply.Steps)},
-		Plan:  steps.Job{Steps: convertToInternalSteps(request.Root.Plan.Steps)},
+		Apply: job.Job{Steps: convertToInternalSteps(request.Root.Apply.Steps)},
+		Plan:  job.Job{Steps: convertToInternalSteps(request.Root.Plan.Steps)},
 	}
 
 	// inject dependencies
 
 	// temporal effectively "injects" this, it just cares about the method names,
 	// so we're modeling our own DI around this.
-	var a *activities.Deploy
+	var a *workerActivities
 
 	revisionQueue := queue.NewQueue()
 	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, repo, a)
@@ -172,10 +178,10 @@ func (r *Runner) Run(ctx workflow.Context) error {
 	return nil
 }
 
-func convertToInternalSteps(requestSteps []Step) []steps.Step {
-	var terraformSteps []steps.Step
+func convertToInternalSteps(requestSteps []Step) []job.Step {
+	var terraformSteps []job.Step
 	for _, step := range requestSteps {
-		terraformSteps = append(terraformSteps, steps.Step{
+		terraformSteps = append(terraformSteps, job.Step{
 			StepName:    step.StepName,
 			ExtraArgs:   step.ExtraArgs,
 			RunCommand:  step.RunCommand,
