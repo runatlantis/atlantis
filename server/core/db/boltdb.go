@@ -20,12 +20,14 @@ import (
 type BoltDB struct {
 	db                    *bolt.DB
 	locksBucketName       []byte
+	queueBucketName       []byte
 	pullsBucketName       []byte
 	globalLocksBucketName []byte
 }
 
 const (
 	locksBucketName       = "runLocks"
+	queueBucketName       = "queue"
 	pullsBucketName       = "pulls"
 	globalLocksBucketName = "globalLocks"
 	pullKeySeparator      = "::"
@@ -50,6 +52,9 @@ func New(dataDir string) (*BoltDB, error) {
 		if _, err = tx.CreateBucketIfNotExists([]byte(locksBucketName)); err != nil {
 			return errors.Wrapf(err, "creating bucket %q", locksBucketName)
 		}
+		if _, err = tx.CreateBucketIfNotExists([]byte(queueBucketName)); err != nil {
+			return errors.Wrapf(err, "creating bucket %q", queueBucketName)
+		}
 		if _, err = tx.CreateBucketIfNotExists([]byte(pullsBucketName)); err != nil {
 			return errors.Wrapf(err, "creating bucket %q", pullsBucketName)
 		}
@@ -65,6 +70,7 @@ func New(dataDir string) (*BoltDB, error) {
 	return &BoltDB{
 		db:                    db,
 		locksBucketName:       []byte(locksBucketName),
+		queueBucketName:       []byte(queueBucketName),
 		pullsBucketName:       []byte(pullsBucketName),
 		globalLocksBucketName: []byte(globalLocksBucketName),
 	}, nil
@@ -75,18 +81,20 @@ func NewWithDB(db *bolt.DB, bucket string, globalBucket string) (*BoltDB, error)
 	return &BoltDB{
 		db:                    db,
 		locksBucketName:       []byte(bucket),
+		queueBucketName:       []byte(queueBucketName),
 		pullsBucketName:       []byte(pullsBucketName),
 		globalLocksBucketName: []byte(globalBucket),
 	}, nil
 }
 
 // TryLock attempts to create a new lock. If the lock is
-// acquired, it will return true and the lock returned will be newLock.
-// If the lock is not acquired, it will return false and the current
-// lock that is preventing this lock from being acquired.
-func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
+// acquired, it will return true, the lock returned which will be newLock.
+// If the lock is not acquired, it will return false, the current
+// lock that is preventing this lock from being acquired, and the enqueue status.
+func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, models.EnqueueStatus, error) {
 	var lockAcquired bool
 	var currLock models.ProjectLock
+	var enqueueStatus models.EnqueueStatus
 	key := b.lockKey(newLock.Project, newLock.Workspace)
 	newLockSerialized, _ := json.Marshal(newLock)
 	transactionErr := b.db.Update(func(tx *bolt.Tx) error {
@@ -101,28 +109,90 @@ func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, 
 			currLock = newLock
 			return nil
 		}
+		// checking if current lock is with the same PR
+		var currLock models.ProjectLock
+		if err := json.Unmarshal(currLockSerialized, &currLock); err != nil {
+			return errors.Wrap(err, "failed to deserialize current lock")
+		}
+		if currLock.Pull.Num == newLock.Pull.Num {
+			lockAcquired = true
+			return nil
+		}
 
 		// otherwise the lock fails, return to caller the run that's holding the lock
 		if err := json.Unmarshal(currLockSerialized, &currLock); err != nil {
 			return errors.Wrap(err, "failed to deserialize current lock")
 		}
 		lockAcquired = false
+
+		// Enqueuing
+		queueBucket := tx.Bucket(b.queueBucketName)
+		currQueueSerialized := queueBucket.Get([]byte(key))
+		// Queue doesn't exist, create one
+		if currQueueSerialized == nil {
+			newQueue := []models.ProjectLock{newLock}
+			newQueueSerialized, _ := json.Marshal(newQueue)
+			if err := queueBucket.Put([]byte(key), newQueueSerialized); err != nil {
+				return err
+			}
+			enqueueStatus = models.EnqueueStatus{
+				Status:              models.Enqueued,
+				ProjectLocksInFront: 1,
+			}
+			return nil
+		}
+		// Queue exists
+		var currQueue []models.ProjectLock
+		if err := json.Unmarshal(currQueueSerialized, &currQueue); err != nil {
+			return errors.Wrap(err, "failed to deserialize queue for current lock")
+		}
+
+		// Lock is already in the queue
+		if indexInQueue := findPullRequest(currQueue, newLock.Pull.Num); indexInQueue > -1 {
+			enqueueStatus = models.EnqueueStatus{
+				Status:              models.AlreadyInTheQueue,
+				ProjectLocksInFront: indexInQueue + 1,
+			}
+			return nil
+		}
+		// Not in the queue, add it
+		newQueue := append(currQueue, newLock)
+		newQueueSerialized, _ := json.Marshal(newQueue)
+		if err := queueBucket.Put([]byte(key), newQueueSerialized); err != nil {
+			return err
+		}
+		enqueueStatus = models.EnqueueStatus{
+			Status:              models.Enqueued,
+			ProjectLocksInFront: len(newQueue),
+		}
+
 		return nil
 	})
 
 	if transactionErr != nil {
-		return false, currLock, errors.Wrap(transactionErr, "DB transaction failed")
+		return false, currLock, enqueueStatus, errors.Wrap(transactionErr, "DB transaction failed")
 	}
 
-	return lockAcquired, currLock, nil
+	return lockAcquired, currLock, enqueueStatus, nil
+}
+
+func findPullRequest(locks []models.ProjectLock, pullRequestNumber int) int {
+	for i := range locks {
+		if locks[i].Pull.Num == pullRequestNumber {
+			return i
+		}
+	}
+
+	return -1
 }
 
 // Unlock attempts to unlock the project and workspace.
 // If there is no lock, then it will return a nil pointer.
 // If there is a lock, then it will delete it, and then return a pointer
 // to the deleted lock.
-func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock, error) {
+func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error) {
 	var lock models.ProjectLock
+	var dequeuedLock *models.ProjectLock
 	foundLock := false
 	key := b.lockKey(p, workspace)
 	err := b.db.Update(func(tx *bolt.Tx) error {
@@ -134,13 +204,51 @@ func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock
 			}
 			foundLock = true
 		}
-		return bucket.Delete([]byte(key))
+
+		// Dequeue next item
+		queueBucket := tx.Bucket(b.queueBucketName)
+		currQueueSerialized := queueBucket.Get([]byte(key))
+
+		// Queue doesn't exist
+		if currQueueSerialized == nil {
+			return bucket.Delete([]byte(key))
+		}
+
+		// Queue exists
+		var currQueue []models.ProjectLock
+		if err := json.Unmarshal(currQueueSerialized, &currQueue); err != nil {
+			return errors.Wrap(err, "failed to deserialize queue for current lock")
+		}
+
+		// Queue is empty
+		if len(currQueue) == 0 {
+			return bucket.Delete([]byte(key))
+		}
+
+		// Queue has items, get the next in line
+		var err error
+		dequeuedLock, err = b.dequeueNextInLine(currQueue, bucket, key, queueBucket)
+		return err
 	})
+
 	err = errors.Wrap(err, "DB transaction failed")
 	if foundLock {
-		return &lock, err
+		return &lock, dequeuedLock, err
 	}
-	return nil, err
+	return nil, nil, err
+}
+
+func (b *BoltDB) dequeueNextInLine(currQueue []models.ProjectLock, bucket *bolt.Bucket, key string, queueBucket *bolt.Bucket) (*models.ProjectLock, error) {
+	dequeuedLock := &currQueue[0]
+	newQueue := currQueue[1:]
+
+	dequeuedLockSerialized, _ := json.Marshal(*dequeuedLock)
+	if err := bucket.Put([]byte(key), dequeuedLockSerialized); err != nil {
+		return nil, errors.Wrap(err, "failed to give the lock to next PR in the queue")
+	}
+
+	newQueueSerialized, _ := json.Marshal(newQueue)
+	return dequeuedLock, queueBucket.Put([]byte(key), newQueueSerialized)
 }
 
 // List lists all current locks.
@@ -169,6 +277,25 @@ func (b *BoltDB) List() ([]models.ProjectLock, error) {
 	}
 
 	return locks, nil
+}
+
+func (b *BoltDB) GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error) {
+	var queue []models.ProjectLock
+	err := b.db.View(func(tx *bolt.Tx) error {
+		// construct lock key
+		key := b.lockKey(project, workspace)
+		queueBucket := tx.Bucket(b.queueBucketName)
+		currQueueSerialized := queueBucket.Get([]byte(key))
+		if err := json.Unmarshal(currQueueSerialized, &queue); err != nil {
+			return errors.Wrapf(err, "failed to deserialize queue for lock %q", queue)
+		}
+		return nil
+	})
+	if err != nil {
+		return queue, errors.Wrap(err, "DB transaction failed while fetching Queue")
+
+	}
+	return queue, err
 }
 
 // LockCommand attempts to create a new lock for a CommandName.
@@ -253,7 +380,7 @@ func (b *BoltDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
 }
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
-func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, models.DequeueStatus, error) {
 	var locks []models.ProjectLock
 	err := b.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(b.locksBucketName).Cursor()
@@ -268,19 +395,28 @@ func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.Projec
 				locks = append(locks, lock)
 			}
 		}
+
 		return nil
 	})
+
 	if err != nil {
-		return locks, err
+		return locks, models.DequeueStatus{ProjectLocks: nil}, err
 	}
+
+	var dequeuedLocks = make([]models.ProjectLock, 0, len(locks))
 
 	// delete the locks
 	for _, lock := range locks {
-		if _, err = b.Unlock(lock.Project, lock.Workspace); err != nil {
-			return locks, errors.Wrapf(err, "unlocking repo %s, path %s, workspace %s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)
+		var dequeuedLock *models.ProjectLock
+		if _, dequeuedLock, err = b.Unlock(lock.Project, lock.Workspace); err != nil {
+			return locks, models.DequeueStatus{ProjectLocks: nil}, errors.Wrapf(err, "unlocking repo %s, path %s, workspace %s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)
+		}
+		if dequeuedLock != nil {
+			dequeuedLocks = append(dequeuedLocks, *dequeuedLock)
 		}
 	}
-	return locks, nil
+
+	return locks, models.DequeueStatus{ProjectLocks: dequeuedLocks}, nil
 }
 
 // GetLock returns a pointer to the lock for that project and workspace.
