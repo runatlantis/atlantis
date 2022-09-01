@@ -1,6 +1,7 @@
 package github_test
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -36,8 +37,7 @@ func TestFetchSimple(t *testing.T) {
 		GithubHostname: testServer,
 		Logger:         logger,
 	}
-	destinationPath := fetcher.GenerateDirPath("nish/repo")
-	err = fetcher.Fetch(newBaseRepo(repoDir), sha, destinationPath)
+	destinationPath, _, err := fetcher.Fetch(context.Background(), newBaseRepo(repoDir), sha)
 	assert.NoError(t, err)
 
 	// Use rev-parse to verify at correct commit.
@@ -69,8 +69,7 @@ func TestFetchCheckout(t *testing.T) {
 		GithubHostname: testServer,
 		Logger:         logger,
 	}
-	destinationPath := fetcher.GenerateDirPath("nish/repo")
-	err = fetcher.Fetch(newBaseRepo(repoDir), sha1, destinationPath)
+	destinationPath, _, err := fetcher.Fetch(context.Background(), newBaseRepo(repoDir), sha1)
 	assert.NoError(t, err)
 
 	// Use rev-parse to verify at correct commit.
@@ -96,10 +95,9 @@ func TestFetchSimpleFailure(t *testing.T) {
 		GithubHostname: testServer,
 		Logger:         logger,
 	}
-	destinationPath := fetcher.GenerateDirPath("nish/repo")
 	repo := newBaseRepo(repoDir)
 	repo.DefaultBranch = "invalid-branch"
-	err = fetcher.Fetch(repo, sha, destinationPath)
+	_, _, err = fetcher.Fetch(context.Background(), repo, sha)
 	assert.Error(t, err)
 }
 
@@ -126,8 +124,7 @@ func TestFetchCheckoutFailure(t *testing.T) {
 		GithubHostname: testServer,
 		Logger:         logger,
 	}
-	destinationPath := fetcher.GenerateDirPath("nish/repo")
-	err = fetcher.Fetch(newBaseRepo(repoDir), "invalidsha", destinationPath)
+	_, _, err = fetcher.Fetch(context.Background(), newBaseRepo(repoDir), "invalidsha")
 	assert.Error(t, err)
 }
 

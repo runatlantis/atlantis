@@ -1,12 +1,11 @@
 package github
 
 import (
-	"net/http"
-	"strconv"
-
 	"github.com/gregjones/httpcache"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/uber-go/tally/v4"
+	"net/http"
+	"strconv"
 )
 
 const (

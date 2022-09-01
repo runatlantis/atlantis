@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/event/preworkflow"
+	middleware "github.com/runatlantis/atlantis/server/neptune/github"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,6 +18,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
 	cfgParser "github.com/runatlantis/atlantis/server/core/config"
@@ -47,6 +52,7 @@ import (
 type Config struct {
 	DataDir             string
 	AutoplanFileList    string
+	AppCfg              githubapp.Config
 	RepoAllowList       string
 	MaxProjectsPerPR    int
 	FFOwner             string
@@ -263,6 +269,36 @@ func NewServer(config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing temporal client")
 	}
 
+	ghToken, err := githubCredentials.GetToken()
+	if err != nil {
+		return nil, errors.Wrap(err, "fetching github token")
+	}
+	repoFetcher := &github.RepoFetcher{
+		DataDir:        config.DataDir,
+		Token:          ghToken,
+		GithubHostname: config.GithubHostname,
+		Logger:         ctxLogger,
+	}
+	hooksRunner := &preworkflow.HooksRunner{
+		GlobalCfg:    globalCfg,
+		HookExecutor: &preworkflow.HookExecutor{},
+	}
+	clientCreator, err := githubapp.NewDefaultCachingClientCreator(
+		config.AppCfg,
+		githubapp.WithClientMiddleware(
+			middleware.ClientMetrics(statsScope.SubScope("github")),
+		))
+
+	rootConfigBuilder := &event.RootConfigBuilder{
+		RepoFetcher:     repoFetcher,
+		HooksRunner:     hooksRunner,
+		ParserValidator: &event.ParserValidator{GlobalCfg: globalCfg},
+		RootFinder:      &event.RepoRootFinder{},
+		FileFetcher:     &github.RemoteFileFetcher{ClientCreator: clientCreator},
+		GlobalCfg:       globalCfg,
+		Logger:          ctxLogger,
+	}
+
 	gatewayEventsController := lyft_gateway.NewVCSEventsController(
 		statsScope,
 		[]byte(config.GithubWebhookSecret),
@@ -280,7 +316,7 @@ func NewServer(config Config) (*Server, error) {
 		featureAllocator,
 		asyncScheduler,
 		temporalClient,
-		globalCfg,
+		rootConfigBuilder,
 	)
 
 	router := mux.NewRouter()

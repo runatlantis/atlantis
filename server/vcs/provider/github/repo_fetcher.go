@@ -1,6 +1,7 @@
 package github
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/mitchellh/go-homedir"
@@ -24,15 +25,15 @@ type RepoFetcher struct {
 	Logger         logging.Logger
 }
 
-func (g *RepoFetcher) Fetch(baseRepo models.Repo, sha string, destinationPath string) error {
+func (g *RepoFetcher) Fetch(ctx context.Context, baseRepo models.Repo, sha string) (string, func(ctx context.Context, filePath string), error) {
 	home, err := homedir.Dir()
 	if err != nil {
-		return errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
+		return "", nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
 	}
 
 	// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#http-based-git-access-by-an-installation
 	if err := events.WriteGitCreds("x-access-token", g.Token, g.GithubHostname, home, g.Logger, true); err != nil {
-		return err
+		return "", nil, err
 	}
 	// Realistically, this is a super brittle way of supporting clones using gh app installation tokens
 	// This URL should be built during Repo creation and the struct should be immutable going forward.
@@ -40,20 +41,21 @@ func (g *RepoFetcher) Fetch(baseRepo models.Repo, sha string, destinationPath st
 	authURL := fmt.Sprintf("://x-access-token:%s", g.Token)
 	baseRepo.CloneURL = strings.Replace(baseRepo.CloneURL, "://:", authURL, 1)
 	baseRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://:", "://x-access-token:", 1)
-	return g.clone(baseRepo, sha, destinationPath)
+	return g.clone(ctx, baseRepo, sha)
 }
 
-func (g *RepoFetcher) clone(baseRepo models.Repo, sha string, destinationPath string) error {
+func (g *RepoFetcher) clone(ctx context.Context, baseRepo models.Repo, sha string) (string, func(ctx context.Context, filePath string), error) {
+	destinationPath := g.generateDirPath(baseRepo.Name)
 	// Create the directory and parents if necessary.
 	if err := os.MkdirAll(destinationPath, 0700); err != nil {
-		return errors.Wrap(err, "creating new directory")
+		return "", nil, errors.Wrap(err, "creating new directory")
 	}
 
 	// Fetch default branch into clone directory
 	cloneCmd := []string{"git", "clone", "--branch", baseRepo.DefaultBranch, "--single-branch", baseRepo.CloneURL, destinationPath}
 	_, err := g.run(cloneCmd, destinationPath)
 	if err != nil {
-		return errors.New("failed to clone directory")
+		return "", nil, errors.New("failed to clone directory")
 	}
 
 	// Return immediately if commit at HEAD of clone matches request commit
@@ -61,16 +63,21 @@ func (g *RepoFetcher) clone(baseRepo models.Repo, sha string, destinationPath st
 	revParseOutput, err := g.run(revParseCmd, destinationPath)
 	currCommit := strings.Trim(string(revParseOutput), "\n")
 	if strings.HasPrefix(currCommit, sha) {
-		return nil
+		return destinationPath, g.Cleanup, nil
 	}
 
 	// Otherwise, checkout the correct sha
 	checkoutCmd := []string{"git", "checkout", sha}
 	_, err = g.run(checkoutCmd, destinationPath)
 	if err != nil {
-		return errors.New(fmt.Sprintf("failed to checkout to sha: %s", sha))
+		g.Cleanup(ctx, destinationPath)
+		return "", nil, errors.New(fmt.Sprintf("failed to checkout to sha: %s", sha))
 	}
-	return nil
+	return destinationPath, g.Cleanup, nil
+}
+
+func (g *RepoFetcher) generateDirPath(repoName string) string {
+	return filepath.Join(g.DataDir, workingDirPrefix, repoName, uuid.New().String())
 }
 
 func (g *RepoFetcher) run(args []string, destinationPath string) ([]byte, error) {
@@ -85,10 +92,10 @@ func (g *RepoFetcher) run(args []string, destinationPath string) ([]byte, error)
 	return cmd.CombinedOutput()
 }
 
-func (g *RepoFetcher) Cleanup(filePath string) error {
-	return os.RemoveAll(filePath)
-}
-
-func (g *RepoFetcher) GenerateDirPath(repoName string) string {
-	return filepath.Join(g.DataDir, workingDirPrefix, repoName, uuid.New().String())
+func (g *RepoFetcher) Cleanup(ctx context.Context, filePath string) {
+	if err := os.RemoveAll(filePath); err != nil {
+		g.Logger.ErrorContext(ctx, "failed deleting cloned repo", map[string]interface{}{
+			"err": err,
+		})
+	}
 }

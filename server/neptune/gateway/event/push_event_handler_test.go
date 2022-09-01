@@ -2,6 +2,7 @@ package event_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -33,6 +34,8 @@ func (r testRun) Get(ctx context.Context, valuePtr interface{}) error {
 func (r testRun) GetWithOptions(ctx context.Context, valuePtr interface{}, options client.WorkflowRunGetOptions) error {
 	return nil
 }
+
+const testRoot = "testroot"
 
 type testSignaler struct {
 	t                    *testing.T
@@ -110,10 +113,11 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 		}
 
 		handler := event.PushHandler{
-			Scheduler:      &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient: testSignaler,
-			Allocator:      allocator,
-			Logger:         logger,
+			Allocator:         allocator,
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient:    testSignaler,
+			Logger:            logger,
+			RootConfigBuilder: &mockRootConfigBuilder{},
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -148,10 +152,11 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 		}
 
 		handler := event.PushHandler{
-			Scheduler:      &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient: testSignaler,
-			Allocator:      allocator,
-			Logger:         logger,
+			Allocator:         allocator,
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient:    testSignaler,
+			Logger:            logger,
+			RootConfigBuilder: &mockRootConfigBuilder{},
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -187,10 +192,11 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 		}
 
 		handler := event.PushHandler{
-			Scheduler:      &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient: testSignaler,
-			Allocator:      allocator,
-			Logger:         logger,
+			Allocator:         allocator,
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient:    testSignaler,
+			Logger:            logger,
+			RootConfigBuilder: &mockRootConfigBuilder{},
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -209,15 +215,16 @@ func TestHandlePushEvent(t *testing.T) {
 	repoName := "repo"
 	repoURL := "www.nish.com"
 	sha := "12345"
+	repo := models.Repo{
+		FullName:      repoFullName,
+		Name:          repoName,
+		Owner:         repoOwner,
+		CloneURL:      repoURL,
+		DefaultBranch: "main",
+	}
 
 	e := event.Push{
-		Repo: models.Repo{
-			FullName:      repoFullName,
-			Name:          repoName,
-			Owner:         repoOwner,
-			CloneURL:      repoURL,
-			DefaultBranch: "main",
-		},
+		Repo: repo,
 		Ref: vcs.Ref{
 			Type: vcs.BranchRef,
 			Name: "main",
@@ -237,10 +244,11 @@ func TestHandlePushEvent(t *testing.T) {
 		}
 
 		handler := event.PushHandler{
-			Scheduler:      &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient: testSignaler,
-			Allocator:      allocator,
-			Logger:         logger,
+			Allocator:         allocator,
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient:    testSignaler,
+			Logger:            logger,
+			RootConfigBuilder: &mockRootConfigBuilder{},
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -261,10 +269,11 @@ func TestHandlePushEvent(t *testing.T) {
 		}
 
 		handler := event.PushHandler{
-			Scheduler:      &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient: testSignaler,
-			Allocator:      allocator,
-			Logger:         logger,
+			Allocator:         allocator,
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient:    testSignaler,
+			Logger:            logger,
+			RootConfigBuilder: &mockRootConfigBuilder{},
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -276,7 +285,7 @@ func TestHandlePushEvent(t *testing.T) {
 	t.Run("signal success", func(t *testing.T) {
 		testSignaler := &testSignaler{
 			t:                  t,
-			expectedWorkflowID: repoFullName,
+			expectedWorkflowID: fmt.Sprintf("%s||%s", repoFullName, testRoot),
 			expectedSignalName: workflows.DeployNewRevisionSignalID,
 			expectedSignalArg: workflows.DeployNewRevisionSignalRequest{
 				Revision: sha,
@@ -293,7 +302,7 @@ func TestHandlePushEvent(t *testing.T) {
 					URL:      repoURL,
 				},
 				Root: workflows.Root{
-					Name: "TODO",
+					Name: testRoot,
 					Plan: workflows.Job{
 						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
 					},
@@ -311,16 +320,29 @@ func TestHandlePushEvent(t *testing.T) {
 			},
 			t: t,
 		}
-
+		ctx := context.Background()
+		rootCfg := valid.MergedProjectCfg{
+			Name: testRoot,
+			DeploymentWorkflow: valid.Workflow{
+				Plan:  valid.DefaultPlanStage,
+				Apply: valid.DefaultApplyStage,
+			},
+		}
+		rootCfgs := []*valid.MergedProjectCfg{
+			&rootCfg,
+		}
+		rootConfigBuilder := &mockRootConfigBuilder{
+			rootConfigs: rootCfgs,
+		}
 		handler := event.PushHandler{
-			Scheduler:      &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient: testSignaler,
-			Allocator:      allocator,
-			Logger:         logger,
-			GlobalCfg:      valid.NewGlobalCfg(),
+			Allocator:         allocator,
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient:    testSignaler,
+			Logger:            logger,
+			RootConfigBuilder: rootConfigBuilder,
 		}
 
-		err := handler.Handle(context.Background(), e)
+		err := handler.Handle(ctx, e)
 		assert.NoError(t, err)
 
 		assert.True(t, testSignaler.called)
@@ -329,7 +351,7 @@ func TestHandlePushEvent(t *testing.T) {
 	t.Run("signal error", func(t *testing.T) {
 		testSignaler := &testSignaler{
 			t:                  t,
-			expectedWorkflowID: repoFullName,
+			expectedWorkflowID: fmt.Sprintf("%s||%s", repoFullName, testRoot),
 			expectedSignalName: workflows.DeployNewRevisionSignalID,
 			expectedSignalArg: workflows.DeployNewRevisionSignalRequest{
 				Revision: sha,
@@ -346,7 +368,7 @@ func TestHandlePushEvent(t *testing.T) {
 					URL:      repoURL,
 				},
 				Root: workflows.Root{
-					Name: "TODO",
+					Name: testRoot,
 					Plan: workflows.Job{
 						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
 					},
@@ -366,15 +388,29 @@ func TestHandlePushEvent(t *testing.T) {
 			t: t,
 		}
 
+		ctx := context.Background()
+		rootCfg := valid.MergedProjectCfg{
+			Name: testRoot,
+			DeploymentWorkflow: valid.Workflow{
+				Plan:  valid.DefaultPlanStage,
+				Apply: valid.DefaultApplyStage,
+			},
+		}
+		rootCfgs := []*valid.MergedProjectCfg{
+			&rootCfg,
+		}
+		rootConfigBuilder := &mockRootConfigBuilder{
+			rootConfigs: rootCfgs,
+		}
 		handler := event.PushHandler{
-			Scheduler:      &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient: testSignaler,
-			Allocator:      allocator,
-			Logger:         logger,
-			GlobalCfg:      valid.NewGlobalCfg(),
+			Allocator:         allocator,
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient:    testSignaler,
+			Logger:            logger,
+			RootConfigBuilder: rootConfigBuilder,
 		}
 
-		err := handler.Handle(context.Background(), e)
+		err := handler.Handle(ctx, e)
 		assert.Error(t, err)
 
 		assert.True(t, testSignaler.called)
@@ -393,4 +429,13 @@ func convertTestSteps(steps []valid.Step) []workflows.Step {
 		})
 	}
 	return convertedSteps
+}
+
+type mockRootConfigBuilder struct {
+	rootConfigs []*valid.MergedProjectCfg
+	error       error
+}
+
+func (r *mockRootConfigBuilder) Build(_ context.Context, _ event.Push) ([]*valid.MergedProjectCfg, error) {
+	return r.rootConfigs, r.error
 }

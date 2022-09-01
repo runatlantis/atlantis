@@ -6,7 +6,6 @@ import (
 
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/handlers"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -43,7 +42,7 @@ func NewVCSEventsController(
 	featureAllocator feature.Allocator,
 	scheduler scheduler,
 	temporalClient client.Client,
-	globalCfg valid.GlobalCfg) *VCSEventsController {
+	rootConfigBuilder *gateway_handlers.RootConfigBuilder) *VCSEventsController {
 	pullEventWorkerProxy := gateway_handlers.NewPullEventWorkerProxy(
 		snsWriter, logger,
 	)
@@ -68,11 +67,11 @@ func NewVCSEventsController(
 	)
 
 	pushHandler := &gateway_handlers.PushHandler{
-		Allocator:      featureAllocator,
-		Scheduler:      scheduler,
-		Logger:         logger,
-		TemporalClient: temporalClient,
-		GlobalCfg:      globalCfg,
+		Allocator:         featureAllocator,
+		Scheduler:         scheduler,
+		Logger:            logger,
+		TemporalClient:    temporalClient,
+		RootConfigBuilder: rootConfigBuilder,
 	}
 
 	// lazy map of resolver providers to their resolver

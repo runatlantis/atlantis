@@ -215,7 +215,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		ctx.Log.InfoContext(ctx.RequestCtx, fmt.Sprintf("%d projects are to be planned based on their when_modified config", len(matchingProjects)))
 
 		for _, mp := range matchingProjects {
-			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
+			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Pull.BaseRepo.ID(), mp, repoCfg)
 			contextFlags := &command.ContextFlags{
 				ForceApply:    forceApply,
 				ParallelApply: repoCfg.ParallelApply,
@@ -524,12 +524,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		repoRelDir = projCfg.RepoRelDir
 		workspace = projCfg.Workspace
 		for _, mp := range matchingProjects {
-			projCfg = p.GlobalCfg.MergeProjectCfg(
-				ctx.Log,
-				ctx.Pull.BaseRepo.ID(),
-				mp,
-				*repoCfgPtr,
-			)
+			projCfg = p.GlobalCfg.MergeProjectCfg(ctx.Pull.BaseRepo.ID(), mp, *repoCfgPtr)
 
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(

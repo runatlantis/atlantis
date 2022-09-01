@@ -26,7 +26,7 @@ import (
 // RepoRootFinder implements rootFinder.
 type RepoRootFinder struct{}
 
-func (f *RepoRootFinder) DetermineRoots(modifiedFiles []string, config valid.RepoCfg) ([]valid.Project, error) {
+func (f *RepoRootFinder) FindRoots(modifiedFiles []string, config valid.RepoCfg) ([]valid.Project, error) {
 	// TODO: rename struct roots
 	var roots []valid.Project
 	for _, root := range config.Projects {

@@ -29,7 +29,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 			},
 		}
 		wh := preworkflow.HooksRunner{
-			HookExecutor: &MockSuccessPreWorkflowHookExecutor{},
+			HookExecutor: &mockPreWorkflowHookExecutor{},
 			GlobalCfg:    globalCfg,
 		}
 		err := wh.Run(fixtures.GithubRepo, repoDir)
@@ -53,7 +53,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 			},
 		}
 		wh := preworkflow.HooksRunner{
-			HookExecutor: &MockSuccessPreWorkflowHookExecutor{},
+			HookExecutor: &mockPreWorkflowHookExecutor{},
 			GlobalCfg:    globalCfg,
 		}
 		err := wh.Run(fixtures.GithubRepo, repoDir)
@@ -71,24 +71,20 @@ func TestRunPreHooks_Clone(t *testing.T) {
 			},
 		}
 		wh := preworkflow.HooksRunner{
-			HookExecutor: &MockFailurePreWorkflowHookExecutor{},
-			GlobalCfg:    globalCfg,
+			HookExecutor: &mockPreWorkflowHookExecutor{
+				error: errors.New("some error"),
+			},
+			GlobalCfg: globalCfg,
 		}
 		err := wh.Run(fixtures.GithubRepo, repoDir)
 		assert.Error(t, err, "error not nil")
 	})
 }
 
-type MockSuccessPreWorkflowHookExecutor struct {
+type mockPreWorkflowHookExecutor struct {
+	error error
 }
 
-func (m *MockSuccessPreWorkflowHookExecutor) Execute(_ *valid.PreWorkflowHook, _ models.Repo, _ string) error {
-	return nil
-}
-
-type MockFailurePreWorkflowHookExecutor struct {
-}
-
-func (m *MockFailurePreWorkflowHookExecutor) Execute(_ *valid.PreWorkflowHook, _ models.Repo, _ string) error {
-	return errors.New("some error")
+func (m *mockPreWorkflowHookExecutor) Execute(_ *valid.PreWorkflowHook, _ models.Repo, _ string) error {
+	return m.error
 }

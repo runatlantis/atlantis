@@ -224,7 +224,7 @@ func TestDefaultProjectFinder_DetermineRoots(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			rf := event.RepoRootFinder{}
-			projects, err := rf.DetermineRoots(c.modified, c.config)
+			projects, err := rf.FindRoots(c.modified, c.config)
 			assert.NoError(t, err)
 			assert.Equal(t, len(c.expProjPaths), len(projects))
 			for i, proj := range projects {

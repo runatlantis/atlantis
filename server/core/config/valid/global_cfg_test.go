@@ -10,7 +10,6 @@ import (
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -673,7 +672,7 @@ policies:
 
 			Equals(t,
 				c.exp,
-				global.MergeProjectCfg(logging.NewNoopCtxLogger(t), c.repoID, c.proj, valid.RepoCfg{}))
+				global.MergeProjectCfg(c.repoID, c.proj, valid.RepoCfg{}))
 		})
 	}
 }
@@ -872,7 +871,7 @@ repos:
 			}
 
 			global.PolicySets = emptyPolicySets
-			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopCtxLogger(t), c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
+			Equals(t, c.exp, global.MergeProjectCfg(c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
 		})
 	}
 }

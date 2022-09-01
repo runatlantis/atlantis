@@ -27,9 +27,10 @@ type AppCredentials struct {
 }
 
 type Root struct {
-	Name  string
-	Apply Job
-	Plan  Job
+	Name        string
+	Apply       Job
+	Plan        Job
+	RepoRelPath string
 }
 
 type Job struct {

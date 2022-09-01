@@ -108,6 +108,7 @@ type TerraformLogFilters struct {
 	Regexes []*regexp.Regexp
 }
 
+// TODO: rename project to roots
 type MergedProjectCfg struct {
 	ApplyRequirements   []string
 	Workflow            Workflow
@@ -247,7 +248,7 @@ func (g GlobalCfg) PlatformModeEnabled() bool {
 
 // MergeProjectCfg merges proj and rCfg with the global config to return a
 // final config. It assumes that all configs have been validated.
-func (g GlobalCfg) MergeProjectCfg(log logging.Logger, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
+func (g GlobalCfg) MergeProjectCfg(repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
 	var applyReqs []string
 	var workflow Workflow
 	var pullRequestWorkflow Workflow
