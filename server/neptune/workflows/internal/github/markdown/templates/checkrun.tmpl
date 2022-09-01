@@ -1,0 +1,4 @@
+| Operation | **Status** | **Logs** |  
+| - | - | - |
+| Plan | {{ if .PlanStatus }}`{{.PlanStatus}}`{{else}}N/A{{end}} |{{ if .PlanLogURL }}[Click Here]({{.PlanLogURL}}){{else}}N/A{{end}} |
+| Apply | {{ if .ApplyStatus }}`{{.ApplyStatus}}`{{else}}N/A{{end}} |{{ if .ApplyLogURL }}[Click Here]({{.ApplyLogURL}}){{else}}N/A{{end}} |

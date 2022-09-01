@@ -29,8 +29,8 @@ const (
 )
 
 type request struct {
-	RootInstance root.RootInstance
-	Step         job.Step
+	LocalRoot root.LocalRoot
+	Step      job.Step
 }
 
 type testExecuteActivity struct {
@@ -47,9 +47,9 @@ func testWorkflow(ctx workflow.Context, r request) (string, error) {
 
 	jobExecutionCtx := &job.ExecutionContext{
 		Context:   ctx,
-		Path:      r.RootInstance.Root.Path,
+		Path:      ProjectPath,
 		Envs:      map[string]string{},
-		TfVersion: r.RootInstance.Root.TfVersion,
+		TfVersion: r.LocalRoot.Root.TfVersion,
 	}
 
 	var a *testExecuteActivity
@@ -59,7 +59,7 @@ func testWorkflow(ctx workflow.Context, r request) (string, error) {
 		},
 	}
 
-	return envStepRunner.Run(jobExecutionCtx, &r.RootInstance, r.Step)
+	return envStepRunner.Run(jobExecutionCtx, &r.LocalRoot, r.Step)
 }
 
 func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
@@ -90,13 +90,12 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 	}, nil)
 
 	env.ExecuteWorkflow(testWorkflow, request{
-		RootInstance: root.RootInstance{
+		LocalRoot: root.LocalRoot{
 			Root: root.Root{
 				Name: ProjectName,
-				Path: ProjectPath,
+				Path: "project",
 			},
-			Repo: github.RepoInstance{
-				Path:  RepoPath,
+			Repo: github.Repo{
 				Name:  RepoName,
 				Owner: RepoOwner,
 				HeadCommit: github.Commit{
@@ -122,7 +121,7 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 
 func TestEnvRunne_EnvVarValueSet(t *testing.T) {
 	executioncontext := &job.ExecutionContext{}
-	rootInstance := &root.RootInstance{}
+	localRoot := &root.LocalRoot{}
 
 	step := job.Step{
 		EnvVarName:  "TEST_VAR",
@@ -131,7 +130,7 @@ func TestEnvRunne_EnvVarValueSet(t *testing.T) {
 
 	runner := env.Runner{}
 
-	out, err := runner.Run(executioncontext, rootInstance, step)
+	out, err := runner.Run(executioncontext, localRoot, step)
 	assert.Nil(t, err)
 	assert.Equal(t, out, step.EnvVarValue)
 }

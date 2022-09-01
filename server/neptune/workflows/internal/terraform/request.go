@@ -7,5 +7,5 @@ import (
 
 type Request struct {
 	Root root.Root
-	Repo github.RepoInstance
+	Repo github.Repo
 }

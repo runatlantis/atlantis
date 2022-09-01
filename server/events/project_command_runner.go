@@ -92,14 +92,6 @@ type ProjectCommandRunner interface {
 	ProjectVersionCommandRunner
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_job_url_setter.go JobURLSetter
-
-type JobURLSetter interface {
-	// SetJobURLWithStatus sets the commit status for the project represented by
-	// ctx and updates the status with and url to a job.
-	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus) error
-}
-
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_job_closer.go JobCloser
 
 // Job Closer closes a job by marking op complete and clearing up buffers if logs are successfully persisted

@@ -1,6 +1,8 @@
 package github
 
 type Repo struct {
+	HeadCommit Commit
+
 	// Owner is just the repo owner
 	Owner string
 	// Name is just the repo name, this will never have
@@ -18,12 +20,4 @@ func (r Repo) GetFullName() string {
 
 type AppCredentials struct {
 	InstallationToken int64
-}
-
-// Repo Instance is a Repo at a certain commit
-type RepoInstance struct {
-	HeadCommit Commit
-	Owner      string
-	Name       string
-	Path       string
 }

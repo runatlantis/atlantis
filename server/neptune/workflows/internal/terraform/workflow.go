@@ -1,7 +1,6 @@
 package terraform
 
 import (
-	"context"
 	"time"
 
 	"github.com/pkg/errors"
@@ -14,14 +13,14 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-type workerActivity struct {
+type workflowActivities struct {
 	*activities.Terraform
 	*activities.Github
 }
 
 // jobRunner runs a deploy plan/apply job
 type jobRunner interface {
-	Run(ctx workflow.Context, job job.Job, rootInstance *root.RootInstance) (string, error)
+	Run(ctx workflow.Context, job job.Job, localRoot *root.LocalRoot) (string, error)
 }
 
 type PlanStatus int
@@ -57,24 +56,14 @@ func Workflow(ctx workflow.Context, request Request) error {
 	return runner.Run(ctx)
 }
 
-type workerActivities interface {
-	GithubRepoClone(context.Context, activities.GithubRepoCloneRequest) error
-	TerraformInit(context.Context, activities.TerraformInitRequest) error
-	TerraformPlan(context.Context, activities.TerraformPlanRequest) error
-	TerraformApply(context.Context, activities.TerraformApplyRequest) error
-	ExecuteCommand(context.Context, activities.ExecuteCommandRequest) (activities.ExecuteCommandResponse, error)
-	Notify(context.Context, activities.NotifyRequest) error
-	Cleanup(context.Context, activities.CleanupRequest) error
-}
-
 type Runner struct {
-	Activities workerActivities
+	Activities *workflowActivities
 	JobRunner  jobRunner
 	Request    Request
 }
 
 func newRunner(ctx workflow.Context, request Request) *Runner {
-	var a *workerActivity
+	var a *workflowActivities
 
 	cmdStepRunner := cmd.Runner{
 		Activity: a,
@@ -92,16 +81,15 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 }
 
 func (r *Runner) Run(ctx workflow.Context) error {
-	// Root instance has all the metadata needed to execute a step in a root
-	rootInstance := root.BuildRootInstanceFrom(r.Request.Root, r.Request.Repo)
 
 	// Clone repository into disk
-	err := workflow.ExecuteActivity(ctx, r.Activities.GithubRepoClone, activities.GithubRepoCloneRequest{}).Get(ctx, nil)
+	var cloneResponse activities.GithubRepoCloneResponse
+	err := workflow.ExecuteActivity(ctx, r.Activities.GithubRepoClone, activities.GithubRepoCloneRequest{}).Get(ctx, &cloneResponse)
 	if err != nil {
 		return errors.Wrap(err, "executing GH repo clone")
 	}
 
-	_, err = r.JobRunner.Run(ctx, r.Request.Root.Plan, rootInstance)
+	_, err = r.JobRunner.Run(ctx, r.Request.Root.Plan, cloneResponse.LocalRoot)
 	if err != nil {
 		return errors.Wrap(err, "running plan job")
 	}
@@ -118,7 +106,7 @@ func (r *Runner) Run(ctx workflow.Context) error {
 	}
 
 	// Run apply steps
-	_, err = r.JobRunner.Run(ctx, r.Request.Root.Apply, rootInstance)
+	_, err = r.JobRunner.Run(ctx, r.Request.Root.Apply, cloneResponse.LocalRoot)
 	if err != nil {
 		return errors.Wrap(err, "running apply job")
 	}

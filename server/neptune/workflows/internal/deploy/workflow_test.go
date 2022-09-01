@@ -35,7 +35,7 @@ func (w *queueWorker) Work(ctx workflow.Context) {
 
 type receiver struct {
 	receiveCalled bool
-	ctx workflow.Context
+	ctx           workflow.Context
 }
 
 func (n *receiver) Receive(c workflow.ReceiveChannel, more bool) {

@@ -1,33 +1,37 @@
 package root
 
 import (
-	"path/filepath"
-
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 )
 
+// Root is the definition of a root
 type Root struct {
-	Name      string
+	Name string
+
+	// Path is the relative path from the repo
 	Path      string
 	TfVersion string
 	Apply     job.Job
 	Plan      job.Job
 }
 
-// Root Instance is a root at a certain commit with the repo info
-type RootInstance struct {
+// LocalRoot is a root that exists locally on disk
+type LocalRoot struct {
 	Root Root
-	Repo github.RepoInstance
+	// Path on disk
+	Path string
+	Repo github.Repo
 }
 
-func (r *RootInstance) RelativePathFromRepo() (string, error) {
-	return filepath.Rel(r.Repo.Path, r.Root.Path)
+func (r *LocalRoot) RelativePathFromRepo() string {
+	return r.Root.Path
 }
 
-func BuildRootInstanceFrom(root Root, repo github.RepoInstance) *RootInstance {
-	return &RootInstance{
+func BuildLocalRoot(root Root, repo github.Repo, path string) *LocalRoot {
+	return &LocalRoot{
 		Root: root,
 		Repo: repo,
+		Path: path,
 	}
 }

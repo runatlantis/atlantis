@@ -7,11 +7,11 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	temporalInternal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/temporal"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -47,14 +47,14 @@ type QueueWorker interface {
 	GetState() queue.WorkerState
 }
 
-func Workflow(ctx workflow.Context, request Request, terraformWorkflow func(ctx workflow.Context, request terraform.Request) error) error {
+func Workflow(ctx workflow.Context, request Request, tfWorkflow terraform.Workflow) error {
 	options := workflow.ActivityOptions{
 		TaskQueue:              TaskQueue,
 		ScheduleToCloseTimeout: 5 * time.Second,
 	}
 	ctx = workflow.WithActivityOptions(ctx, options)
 
-	runner := newRunner(ctx, request, terraformWorkflow)
+	runner := newRunner(ctx, request, tfWorkflow)
 
 	// blocking call
 	return runner.Run(ctx)
@@ -66,7 +66,7 @@ type Runner struct {
 	NewRevisionSignalChannel workflow.ReceiveChannel
 }
 
-func newRunner(ctx workflow.Context, request Request, terraformWorkflow func(ctx workflow.Context, request terraform.Request) error) *Runner {
+func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workflow) *Runner {
 	// convert to internal types, we should probably move these into another struct
 	repo := github.Repo{
 		Name:  request.Repository.Name,
@@ -76,6 +76,9 @@ func newRunner(ctx workflow.Context, request Request, terraformWorkflow func(ctx
 			InstallationToken: request.Repository.Credentials.InstallationToken,
 		},
 	}
+
+	// TODO: We should actually probably pass this with the revision because a revision
+	// can potentially change a root configuration
 	root := root.Root{
 		Name:  request.Root.Name,
 		Apply: job.Job{Steps: convertToInternalSteps(request.Root.Apply.Steps)},
@@ -90,13 +93,13 @@ func newRunner(ctx workflow.Context, request Request, terraformWorkflow func(ctx
 
 	revisionQueue := queue.NewQueue()
 	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, repo, a)
+	tfWorkflowRunner := terraform.NewWorkflowRunner(repo, a, tfWorkflow)
 
 	worker := &queue.Worker{
-		Queue:             revisionQueue,
-		Activities:        a,
-		Repo:              repo,
-		Root:              root,
-		TerraformWorkflow: terraformWorkflow,
+		Queue:                   revisionQueue,
+		Repo:                    repo,
+		Root:                    root,
+		TerraformWorkflowRunner: tfWorkflowRunner,
 	}
 
 	return &Runner{

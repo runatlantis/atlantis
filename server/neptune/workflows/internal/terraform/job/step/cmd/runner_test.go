@@ -27,8 +27,8 @@ const (
 )
 
 type request struct {
-	RootInstance root.RootInstance
-	Step         job.Step
+	LocalRoot root.LocalRoot
+	Step      job.Step
 }
 
 type testExecuteActivity struct {
@@ -48,9 +48,9 @@ func testWorkflow(ctx workflow.Context, r request) (string, error) {
 
 	jobExecutionCtx := &job.ExecutionContext{
 		Context:   ctx,
-		Path:      r.RootInstance.Root.Path,
+		Path:      ProjectPath,
 		Envs:      map[string]string{},
-		TfVersion: r.RootInstance.Root.TfVersion,
+		TfVersion: r.LocalRoot.Root.TfVersion,
 	}
 
 	var a *testExecuteActivity
@@ -58,7 +58,7 @@ func testWorkflow(ctx workflow.Context, r request) (string, error) {
 		Activity: a,
 	}
 
-	return cmdStepRunner.Run(jobExecutionCtx, &r.RootInstance, r.Step)
+	return cmdStepRunner.Run(jobExecutionCtx, &r.LocalRoot, r.Step)
 }
 
 func TestRunRunner_ShouldSetupEnvVars(t *testing.T) {
@@ -83,13 +83,12 @@ func TestRunRunner_ShouldSetupEnvVars(t *testing.T) {
 	env.RegisterWorkflow(testWorkflow)
 
 	env.ExecuteWorkflow(testWorkflow, request{
-		RootInstance: root.RootInstance{
+		LocalRoot: root.LocalRoot{
 			Root: root.Root{
 				Name: ProjectName,
-				Path: ProjectPath,
+				Path: "project",
 			},
-			Repo: github.RepoInstance{
-				Path:  RepoPath,
+			Repo: github.Repo{
 				Name:  RepoName,
 				Owner: RepoOwner,
 				HeadCommit: github.Commit{

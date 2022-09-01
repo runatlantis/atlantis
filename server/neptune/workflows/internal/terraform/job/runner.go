@@ -10,7 +10,7 @@ import (
 
 // stepRunner runs individual run steps
 type stepRunner interface {
-	Run(executionContext *job.ExecutionContext, rootInstance *root.RootInstance, step job.Step) (string, error)
+	Run(executionContext *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) (string, error)
 }
 
 type jobRunner struct {
@@ -28,16 +28,16 @@ func NewRunner(runStepRunner stepRunner, envStepRunner stepRunner) *jobRunner {
 func (r *jobRunner) Run(
 	ctx workflow.Context,
 	terraformJob job.Job,
-	rootInstance *root.RootInstance,
+	localRoot *root.LocalRoot,
 ) (string, error) {
 	var outputs []string
 
 	// Execution ctx for a job that handles setting up the env vars from the previous steps
 	jobExecutionCtx := &job.ExecutionContext{
 		Context:   ctx,
-		Path:      rootInstance.Root.Path,
+		Path:      localRoot.Root.Path,
 		Envs:      map[string]string{},
-		TfVersion: rootInstance.Root.TfVersion,
+		TfVersion: localRoot.Root.TfVersion,
 	}
 
 	for _, step := range terraformJob.Steps {
@@ -46,9 +46,9 @@ func (r *jobRunner) Run(
 
 		switch step.StepName {
 		case "run":
-			out, err = r.CmdStepRunner.Run(jobExecutionCtx, rootInstance, step)
+			out, err = r.CmdStepRunner.Run(jobExecutionCtx, localRoot, step)
 		case "env":
-			out, err = r.EnvStepRunner.Run(jobExecutionCtx, rootInstance, step)
+			out, err = r.EnvStepRunner.Run(jobExecutionCtx, localRoot, step)
 			jobExecutionCtx.Envs[step.EnvVarName] = out
 			// We reset out to the empty string because we don't want it to
 			// be printed to the PR, it's solely to set the environment variable.
