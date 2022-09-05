@@ -544,15 +544,15 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
-		ThenReturn([]models.ProjectCommandContext{
+		ThenReturn([]command.ProjectContext{
 			{
-				CommandName: models.PlanCommand,
+				CommandName: command.Plan,
 			},
 			{
-				CommandName: models.PlanCommand,
+				CommandName: command.Plan,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(models.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
 	fixtures.Pull.BaseRepo = fixtures.GithubRepo
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
@@ -571,14 +571,14 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(models.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.String("open")}
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	fixtures.Pull.BaseRepo = fixtures.GithubRepo
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.PlanCommand})
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 	locker.VerifyWasCalledOnce().UnlockByPull(fixtures.Pull.BaseRepo.FullName, fixtures.Pull.Num)
 }
@@ -594,10 +594,10 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(models.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
 	fixtures.Pull.BaseRepo = fixtures.GithubRepo
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.PlanCommand, ProjectName: "default"})
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "default"})
 	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(tmp)
 }
 
