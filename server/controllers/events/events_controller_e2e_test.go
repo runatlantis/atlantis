@@ -22,7 +22,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
-	lockingMocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
@@ -840,7 +839,6 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-	backend := lockingMocks.NewMockBackend()
 
 	// Real dependencies.
 	logger := logging.NewNoopLogger(t)
@@ -859,6 +857,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
+	backend := boltdb
 	lockingClient := locking.NewClient(boltdb)
 	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	projectLocker := &events.DefaultProjectLocker{
