@@ -80,11 +80,15 @@ const (
 	GitlabWebhookSecretFlag     = "gitlab-webhook-secret" // nolint: gosec
 	APISecretFlag               = "api-secret"
 	HidePrevPlanComments        = "hide-prev-plan-comments"
+	LockingDBType               = "locking-db-type"
 	LogLevelFlag                = "log-level"
 	ParallelPoolSize            = "parallel-pool-size"
 	StatsNamespace              = "stats-namespace"
 	AllowDraftPRs               = "allow-draft-prs"
 	PortFlag                    = "port"
+	RedisHost                   = "redis-host"
+	RedisPassword               = "redis-password"
+	RedisPort                   = "redis-port"
 	RepoConfigFlag              = "repo-config"
 	RepoConfigJSONFlag          = "repo-config-json"
 	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
@@ -123,10 +127,13 @@ const (
 	DefaultDataDir          = "~/.atlantis"
 	DefaultGHHostname       = "github.com"
 	DefaultGitlabHostname   = "gitlab.com"
+	DefaultLockingDBType    = "boltdb"
 	DefaultLogLevel         = "info"
 	DefaultParallelPoolSize = 15
 	DefaultStatsNamespace   = "atlantis"
 	DefaultPort             = 4141
+	DefaultRedisHost        = "redis"
+	DefaultRedisPort        = 6379
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
 	DefaultVCSStatusName    = "atlantis"
@@ -264,6 +271,10 @@ var stringFlags = map[string]stringFlag{
 	APISecretFlag: {
 		description: "Secret to validate requests made to the API",
 	},
+	LockingDBType: {
+		description:  "The locking database type to use for storing plan and apply locks.",
+		defaultValue: DefaultLockingDBType,
+	},
 	LogLevelFlag: {
 		description:  "Log level. Either debug, info, warn, or error.",
 		defaultValue: DefaultLogLevel,
@@ -271,6 +282,12 @@ var stringFlags = map[string]stringFlag{
 	StatsNamespace: {
 		description:  "Namespace for aggregating stats.",
 		defaultValue: DefaultStatsNamespace,
+	},
+	RedisHost: {
+		description: "The Redis Hostname for when using a Locking DB type of 'redis'.",
+	},
+	RedisPassword: {
+		description: "The Redis Password for when using a Locking DB type of 'redis'.",
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
@@ -449,6 +466,10 @@ var intFlags = map[string]intFlag{
 	PortFlag: {
 		description:  "Port to bind to.",
 		defaultValue: DefaultPort,
+	},
+	RedisPort: {
+		description:  "The Redis Port for when using a Locking DB type of 'redis'.",
+		defaultValue: DefaultRedisPort,
 	},
 }
 
