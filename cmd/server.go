@@ -693,6 +693,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.BitbucketBaseURL == "" {
 		c.BitbucketBaseURL = DefaultBitbucketBaseURL
 	}
+	if c.LockingDBType == "" {
+		c.LockingDBType = DefaultLockingDBType
+	}
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
 	}
@@ -704,6 +707,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
+	}
+	if c.RedisPort == 0 {
+		c.RedisPort = DefaultRedisPort
 	}
 	if c.TFDownloadURL == "" {
 		c.TFDownloadURL = DefaultTFDownloadURL

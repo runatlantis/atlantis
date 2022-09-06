@@ -287,7 +287,6 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	l := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	backend := mocks.NewMockBackend()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: repoName},
 	}
@@ -299,12 +298,13 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			RepoFullName: repoName,
 		},
 	}, nil)
+	var backend locking.Backend
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	db, err := db.New(tmp)
+	backend, err := db.New(tmp)
 	Ok(t, err)
 	// Seed the DB with a successful plan for that project (that is later discarded).
-	_, err = db.UpdatePullWithResults(pull, []command.ProjectResult{
+	_, err = backend.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
 			Command:    command.Plan,
 			RepoRelDir: projectPath,
@@ -329,7 +329,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
 	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
-	status, err := db.GetPullStatus(pull)
+	status, err := backend.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, status.Projects != nil, "status projects was nil")
 	Equals(t, []models.ProjectStatus{
@@ -353,7 +353,11 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	backend := mocks.NewMockBackend()
+	var backend locking.Backend
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	backend, err := db.New(tmp)
+	Ok(t, err)
 	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())).ThenReturn(errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
@@ -377,7 +381,11 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	dlc := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	backend := mocks.NewMockBackend()
+	var backend locking.Backend
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	backend, err := db.New(tmp)
+	Ok(t, err)
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
