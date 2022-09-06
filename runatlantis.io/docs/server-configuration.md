@@ -422,6 +422,16 @@ Values are chosen in this order:
   Hide previous plan comments to declutter PRs. This is only supported in
   GitHub currently.
 
+### `--locking-db-type`
+  ```bash
+  atlantis server --locking-db-type="<boltdb|redis>"
+  ```
+  The locking database type to use for storing plan and apply locks. Defaults to `boltdb`.
+
+  Notes:
+  * If set to `boltdb`, only one process may have access to the boltdb instance.
+  * If set to `redis`, then `--redis-host`, `--redis-port`, and `--redis-password` must be set.
+
 ### `--log-level`
   ```bash
   atlantis server --log-level="<debug|info|warn|error>"
@@ -439,6 +449,24 @@ Values are chosen in this order:
   atlantis server --port=8080
   ```
   Port to bind to. Defaults to `4141`.
+
+### `--redis-host`
+  ```bash
+  atlantis server --redis-host="localhost"
+  ```
+  The Redis Hostname for when using a Locking DB type of `redis`.
+
+### `--redis-password`
+  ```bash
+  atlantis server --redis-password="password123"
+  ```
+  The Redis Password for when using a Locking DB type of `redis`.
+
+### `--redis-port`
+  ```bash
+  atlantis server --redis-port=6379
+  ```
+  The Redis Port for when using a Locking DB type of `redis`. Defaults to `6379`.
 
 ### `--repo-config`
   ```bash
