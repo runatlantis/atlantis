@@ -206,7 +206,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	// Get Commit Statuses
-	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, mr.HeadPipeline.SHA, nil)
+	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, mr.SHA, nil)
 	if err != nil {
 		return false, err
 	}
@@ -221,7 +221,23 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		}
 	}
 
-	isPipelineSkipped := mr.HeadPipeline.Status == "skipped"
+	isPipelineSkipped := false
+	if mr.HeadPipeline != nil {
+		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
+	} else {
+		pipelines, _, err := g.Client.Pipelines.ListProjectPipelines(repo.FullName, &gitlab.ListProjectPipelinesOptions{
+			SHA: &mr.SHA,
+		})
+		if err != nil {
+			return false, err
+		}
+		for _, p := range pipelines {
+			if p.Status == "skipped" {
+				isPipelineSkipped = true
+				break
+			}
+		}
+	}
 	allowSkippedPipeline := project.AllowMergeOnSkippedPipeline && isPipelineSkipped
 	if mr.MergeStatus == "can_be_merged" &&
 		mr.ApprovalsBeforeMerge <= 0 &&
