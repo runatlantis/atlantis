@@ -381,7 +381,7 @@ func (r *RedisDB) pullKey(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("%s::%s::%d", hostname, repo, pull.Num), nil
 }
 
-func (b *RedisDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
+func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
 	return models.ProjectStatus{
 		Workspace:   p.Workspace,
 		RepoRelDir:  p.RepoRelDir,
