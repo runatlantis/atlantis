@@ -287,6 +287,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	l := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	backend := mocks.NewMockBackend()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: repoName},
 	}
@@ -321,7 +322,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 		VCSClient:         cp,
 		WorkingDirLocker:  workingDirLocker,
 		WorkingDir:        workingDir,
-		DB:                db,
+		Backend:           backend,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -352,18 +353,15 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	backend := mocks.NewMockBackend()
 	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())).ThenReturn(errors.New("err"))
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
-	db, err := db.New(tmp)
-	Ok(t, err)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,
 		WorkingDir:        workingDir,
 		WorkingDirLocker:  workingDirLocker,
-		DB:                db,
+		Backend:           backend,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -379,6 +377,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	dlc := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	backend := mocks.NewMockBackend()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
@@ -390,15 +389,11 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 			RepoFullName: "owner/repo",
 		},
 	}, nil)
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
-	db, err := db.New(tmp)
-	Ok(t, err)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,
-		DB:                db,
+		Backend:           backend,
 		WorkingDir:        workingDir,
 		WorkingDirLocker:  workingDirLocker,
 	}
