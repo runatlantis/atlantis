@@ -81,15 +81,18 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 }
 
 func (r *Runner) Run(ctx workflow.Context) error {
-
-	// Clone repository into disk
-	var cloneResponse activities.GithubRepoCloneResponse
-	err := workflow.ExecuteActivity(ctx, r.Activities.GithubRepoClone, activities.GithubRepoCloneRequest{}).Get(ctx, &cloneResponse)
+	// Download files into disk
+	var fetchRootResponse activities.FetchRootResponse
+	err := workflow.ExecuteActivity(ctx, r.Activities.FetchRoot, activities.FetchRootRequest{
+		Repo:         r.Request.Repo,
+		Root:         r.Request.Root,
+		DeploymentId: r.Request.DeploymentId,
+	}).Get(ctx, &fetchRootResponse)
 	if err != nil {
 		return errors.Wrap(err, "executing GH repo clone")
 	}
 
-	_, err = r.JobRunner.Run(ctx, r.Request.Root.Plan, cloneResponse.LocalRoot)
+	_, err = r.JobRunner.Run(ctx, r.Request.Root.Plan, fetchRootResponse.LocalRoot)
 	if err != nil {
 		return errors.Wrap(err, "running plan job")
 	}
@@ -106,13 +109,16 @@ func (r *Runner) Run(ctx workflow.Context) error {
 	}
 
 	// Run apply steps
-	_, err = r.JobRunner.Run(ctx, r.Request.Root.Apply, cloneResponse.LocalRoot)
+	_, err = r.JobRunner.Run(ctx, r.Request.Root.Apply, fetchRootResponse.LocalRoot)
 	if err != nil {
 		return errors.Wrap(err, "running apply job")
 	}
 
 	// Cleanup
-	err = workflow.ExecuteActivity(ctx, r.Activities.Cleanup, activities.CleanupRequest{}).Get(ctx, nil)
+	var cleanupResponse activities.CleanupResponse
+	err = workflow.ExecuteActivity(ctx, r.Activities.Cleanup, activities.CleanupRequest{
+		LocalRoot: fetchRootResponse.LocalRoot,
+	}).Get(ctx, &cleanupResponse)
 	if err != nil {
 		return errors.Wrap(err, "cleaning up")
 	}

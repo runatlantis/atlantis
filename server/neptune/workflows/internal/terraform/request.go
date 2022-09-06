@@ -6,6 +6,7 @@ import (
 )
 
 type Request struct {
-	Root root.Root
-	Repo github.Repo
+	Root         root.Root
+	Repo         github.Repo
+	DeploymentId string
 }

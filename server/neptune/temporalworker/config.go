@@ -31,4 +31,5 @@ type Config struct {
 	Scope       tally.Scope
 	App         githubapp.Config
 	StatsCloser io.Closer
+	DataDir     string
 }

@@ -50,8 +50,9 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, checkRunID int64, revision st
 		WorkflowID: id.String(),
 	})
 	terraformWorkflowRequest := terraform.Request{
-		Repo: r.Repo,
-		Root: root,
+		Repo:         r.Repo,
+		Root:         root,
+		DeploymentId: id.String(),
 	}
 
 	future := workflow.ExecuteChildWorkflow(ctx, r.Workflow, terraformWorkflowRequest)

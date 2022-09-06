@@ -530,6 +530,7 @@ func (t *TemporalWorker) NewServer(userConfig server.UserConfig, config server.C
 		CtxLogger:   ctxLogger,
 		Scope:       scope,
 		StatsCloser: closer,
+		DataDir:     userConfig.DataDir,
 	}
 	return temporalworker.NewServer(cfg)
 }

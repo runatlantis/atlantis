@@ -11,8 +11,8 @@ type GithubActivities struct {
 	activities.Github
 }
 
-func NewGithubActiviies(appConfig githubapp.Config, scope tally.Scope) (*GithubActivities, error) {
-	githubActivities, err := activities.NewGithub(appConfig, scope)
+func NewGithubActivities(appConfig githubapp.Config, scope tally.Scope, dataDir string) (*GithubActivities, error) {
+	githubActivities, err := activities.NewGithub(appConfig, scope, dataDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing github activities")
 	}

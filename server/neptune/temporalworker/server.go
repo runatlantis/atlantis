@@ -97,9 +97,10 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing terraform activities")
 	}
 
-	githubActivities, err := workflows.NewGithubActiviies(
+	githubActivities, err := workflows.NewGithubActivities(
 		config.App,
 		config.Scope.SubScope("app"),
+		config.DataDir,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing github activities")
