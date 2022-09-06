@@ -83,6 +83,7 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 		Name:  request.Root.Name,
 		Apply: job.Job{Steps: convertToInternalSteps(request.Root.Apply.Steps)},
 		Plan:  job.Job{Steps: convertToInternalSteps(request.Root.Plan.Steps)},
+		Path:  request.Root.RepoRelPath,
 	}
 
 	// inject dependencies
