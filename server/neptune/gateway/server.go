@@ -4,10 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
-	"github.com/runatlantis/atlantis/server/neptune/gateway/event/preworkflow"
-	middleware "github.com/runatlantis/atlantis/server/neptune/github"
-	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	"io"
 	"io/ioutil"
 	"log"
@@ -36,10 +32,14 @@ import (
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	lyft_gateway "github.com/runatlantis/atlantis/server/lyft/gateway"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/event/preworkflow"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/sync"
+	middleware "github.com/runatlantis/atlantis/server/neptune/github"
 	httpInternal "github.com/runatlantis/atlantis/server/neptune/http"
 	"github.com/runatlantis/atlantis/server/neptune/temporal"
 	"github.com/runatlantis/atlantis/server/vcs/markdown"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/wrappers"
 	"github.com/urfave/cli"
@@ -151,6 +151,9 @@ func NewServer(config Config) (*Server, error) {
 		FeatureAllocator: featureAllocator,
 		Logger:           ctxLogger,
 		GithubClient:     rawGithubClient,
+
+		// scope set to instrumented client's update_status which is futher subscoped to commit_status and checks in the client wrapper
+		Scope: statsScope.SubScope("github").SubScope("update_status"),
 	}
 
 	vcsClient := vcs.NewInstrumentedGithubClient(rawGithubClient, checksWrapperGhClient, statsScope, ctxLogger)
