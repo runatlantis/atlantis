@@ -92,6 +92,7 @@ func NewServer(config *Config) (*Server, error) {
 
 	terraformActivities, err := workflows.NewTerraformActivities(
 		config.Scope.SubScope("terraform"),
+		config.ServerCfg.URL,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing terraform activities")

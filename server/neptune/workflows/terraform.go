@@ -1,6 +1,8 @@
 package workflows
 
 import (
+	"net/url"
+
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/uber-go/tally/v4"
@@ -14,8 +16,8 @@ type TerraformActivities struct {
 	activities.Terraform
 }
 
-func NewTerraformActivities(scope tally.Scope) (*TerraformActivities, error) {
-	terraformActivities := activities.NewTerraform()
+func NewTerraformActivities(scope tally.Scope, serverURL *url.URL) (*TerraformActivities, error) {
+	terraformActivities := activities.NewTerraform(serverURL)
 	return &TerraformActivities{
 		Terraform: *terraformActivities,
 	}, nil

@@ -1,6 +1,8 @@
 package activities
 
 import (
+	"net/url"
+
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/github"
@@ -8,7 +10,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github/link"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/uber-go/tally/v4"
-	"net/url"
 )
 
 // Exported Activites should be here.
@@ -31,13 +32,17 @@ func NewDeploy(config githubapp.Config, scope tally.Scope) (*Deploy, error) {
 type Terraform struct {
 	*terraformActivities
 	*executeCommandActivities
+	*workerInfoActivity
 	*notifyActivities
 	*cleanupActivities
 }
 
-func NewTerraform() *Terraform {
+func NewTerraform(serverURL *url.URL) *Terraform {
 	return &Terraform{
 		executeCommandActivities: &executeCommandActivities{},
+		workerInfoActivity: &workerInfoActivity{
+			ServerURL: serverURL,
+		},
 	}
 }
 
