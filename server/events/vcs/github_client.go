@@ -30,7 +30,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/shurcooL/githubv4"
-	"golang.org/x/oauth2"
 )
 
 // maxCommentLength is the maximum number of chars allowed in a single comment
@@ -95,16 +94,8 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		transport,
 		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
 	)
-	token, err := credentials.GetToken()
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get GitHub token")
-	}
-	src := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	httpClient := oauth2.NewClient(context.Background(), src)
 	// Use the client from shurcooL's githubv4 library for queries.
-	v4QueryClient := githubv4.NewEnterpriseClient(graphqlURL, httpClient)
+	v4QueryClient := githubv4.NewEnterpriseClient(graphqlURL, transport)
 
 	user, err := credentials.GetUser()
 	logger.Debug("GH User: %s", user)
@@ -344,7 +335,6 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 	//iterate over check completed check suites - return false if we find one that doesnt have conclusion = "success"
 	for _, c := range checksuites.CheckSuites {
 		if *c.Status == "completed" {
-			fmt.Printf("Looking at suite %v\n", *c.ID)
 			//iterate over the runs inside the suite
 			suite, _, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), repo.Owner, repo.Name, *c.ID, nil)
 			if err != nil {
@@ -352,20 +342,15 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 			}
 
 			for _, r := range suite.CheckRuns {
-				fmt.Printf("Looking at check run %s\n", *r.Name)
 				//check to see if the check is required
 				if isRequiredCheck(*r.Name, required.RequiredStatusChecks.Contexts) {
-					fmt.Println("Check is required")
 					if *c.Conclusion == "success" {
-						fmt.Println("Check is successful")
 						continue
 					} else {
-						fmt.Println("Check is failed")
 						return false, nil
 					}
 				} else {
 					//ignore checks that arent required
-					fmt.Println("Check is not required")
 					continue
 				}
 
@@ -431,8 +416,6 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 				if err != nil {
 					return false, errors.Wrap(err, "getting pull request status")
 				}
-
-				fmt.Printf("Status was %v\n", status)
 
 				//check to see if pr is approved using reviewDecision
 				approved, err := g.GetPullReviewDecision(repo, pull)
