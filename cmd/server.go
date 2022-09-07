@@ -132,7 +132,6 @@ const (
 	DefaultParallelPoolSize = 15
 	DefaultStatsNamespace   = "atlantis"
 	DefaultPort             = 4141
-	DefaultRedisHost        = "redis"
 	DefaultRedisPort        = 6379
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
