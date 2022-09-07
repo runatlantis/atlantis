@@ -13,7 +13,7 @@ FROM ghcr.io/runatlantis/atlantis-base:2022.08.05 AS base
 ARG TARGETPLATFORM
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=1.2.4
+ENV DEFAULT_TERRAFORM_VERSION=1.2.9
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 1.0.11 1.1.9 ${DEFAULT_TERRAFORM_VERSION}" && \
