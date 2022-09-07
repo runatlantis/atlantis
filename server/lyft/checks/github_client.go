@@ -12,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
+	"github.com/uber-go/tally/v4"
 )
 
 var projectCommandTemplateWithLogs = `
@@ -99,6 +100,9 @@ type ChecksClientWrapper struct {
 	*vcs.GithubClient
 	FeatureAllocator feature.Allocator
 	Logger           logging.Logger
+
+	// Adds metric on checks vs commit status api usage to get an estimate of when all PRs have cut over to using the new status updates
+	Scope tally.Scope
 }
 
 func (c *ChecksClientWrapper) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
@@ -118,9 +122,11 @@ func (c *ChecksClientWrapper) UpdateStatus(ctx context.Context, request types.Up
 
 	// Empty status ID means we create a new check run
 	if request.StatusId == "" {
+		c.Scope.Counter("commit_status").Inc(1)
 		return c.createCheckRun(ctx, request)
 	}
 
+	c.Scope.Counter("checks").Inc(1)
 	return request.StatusId, c.updateCheckRun(ctx, request, request.StatusId)
 }
 
