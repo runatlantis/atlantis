@@ -16,7 +16,7 @@ import (
 
 var ctx = context.Background()
 
-// Redis is a database using Redis 7
+// Redis is a database using Redis 6
 type RedisDB struct {
 	client *redis.Client
 }
