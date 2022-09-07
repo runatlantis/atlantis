@@ -76,7 +76,7 @@ atlantis apply
 atlantis apply -d .
 
 # Runs apply in the `project1` directory of the repo with workspace `default`
-atlantis apply -d project1
+atlantis apply -p project1
 
 # Runs apply in the root directory of the repo with workspace `staging`
 atlantis apply -w staging
