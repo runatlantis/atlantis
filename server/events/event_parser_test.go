@@ -16,7 +16,6 @@ package events_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -500,7 +499,7 @@ func TestParseGitlabMergeEvent_Update_ActionType(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.filename, func(t *testing.T) {
 			path := filepath.Join("testdata", c.filename)
-			bytes, err := ioutil.ReadFile(path)
+			bytes, err := os.ReadFile(path)
 			Ok(t, err)
 
 			var event *gitlab.MergeEvent
