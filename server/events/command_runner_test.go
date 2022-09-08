@@ -91,7 +91,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	applyLockChecker = lockingmocks.NewMockApplyLockChecker()
 
 	dbUpdater = &events.DBUpdater{
-		DB: defaultBoltDB,
+		Backend: defaultBoltDB,
 	}
 
 	pullUpdater = &events.PullUpdater{
@@ -537,8 +537,8 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
+	dbUpdater.Backend = boltDB
+	applyCommandRunner.Backend = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -584,8 +584,8 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
+	dbUpdater.Backend = boltDB
+	applyCommandRunner.Backend = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -630,8 +630,8 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
+	dbUpdater.Backend = boltDB
+	applyCommandRunner.Backend = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -686,8 +686,8 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
+	dbUpdater.Backend = boltDB
+	applyCommandRunner.Backend = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -765,8 +765,8 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
+	dbUpdater.Backend = boltDB
+	applyCommandRunner.Backend = boltDB
 	pull := fixtures.Pull
 	pull.BaseRepo = fixtures.GithubRepo
 	_, err = boltDB.UpdatePullWithResults(pull, []command.ProjectResult{
