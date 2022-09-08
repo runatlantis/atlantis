@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Laisky/graphql"
 	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config"
@@ -38,13 +37,12 @@ const maxCommentLength = 65536
 
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
-	user           string
-	client         *github.Client
-	v4MutateClient *graphql.Client
-	v4QueryClient  *githubv4.Client
-	ctx            context.Context
-	logger         logging.SimpleLogging
-	config         GithubConfig
+	user     string
+	client   *github.Client
+	v4Client *githubv4.Client
+	ctx      context.Context
+	logger   logging.SimpleLogging
+	config   GithubConfig
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -82,20 +80,8 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		graphqlURL = fmt.Sprintf("https://%s/api/graphql", apiURL.Host)
 	}
 
-	// shurcooL's githubv4 library has a client ctor, but it doesn't support schema
-	// previews, which need custom Accept headers (https://developer.github.com/v4/previews)
-	// So for now use the graphql client, since the githubv4 library was basically
-	// a simple wrapper around it. And instead of using shurcooL's graphql lib, use
-	// Laisky's, since shurcooL's doesn't support custom headers.
-	// Once the Minimize Comment schema is official, this can revert back to using
-	// shurcooL's libraries completely.
-	v4MutateClient := graphql.NewClient(
-		graphqlURL,
-		transport,
-		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
-	)
 	// Use the client from shurcooL's githubv4 library for queries.
-	v4QueryClient := githubv4.NewEnterpriseClient(graphqlURL, transport)
+	v4Client := githubv4.NewEnterpriseClient(graphqlURL, transport)
 
 	user, err := credentials.GetUser()
 	logger.Debug("GH User: %s", user)
@@ -104,13 +90,12 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		return nil, errors.Wrap(err, "getting user")
 	}
 	return &GithubClient{
-		user:           user,
-		client:         client,
-		v4MutateClient: v4MutateClient,
-		v4QueryClient:  v4QueryClient,
-		ctx:            context.Background(),
-		logger:         logger,
-		config:         config,
+		user:     user,
+		client:   client,
+		v4Client: v4Client,
+		ctx:      context.Background(),
+		logger:   logger,
+		config:   config,
 	}, nil
 }
 
@@ -244,13 +229,11 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 				}
 			} `graphql:"minimizeComment(input:$input)"`
 		}
-		input := map[string]interface{}{
-			"input": githubv4.MinimizeCommentInput{
-				Classifier: githubv4.ReportedContentClassifiersOutdated,
-				SubjectID:  comment.GetNodeID(),
-			},
+		input := githubv4.MinimizeCommentInput{
+			Classifier: githubv4.ReportedContentClassifiersOutdated,
+			SubjectID:  comment.GetNodeID(),
 		}
-		if err := g.v4MutateClient.Mutate(g.ctx, &m, input); err != nil {
+		if err := g.v4Client.Mutate(g.ctx, &m, input, nil); err != nil {
 			return errors.Wrapf(err, "minimize comment %s", comment.GetNodeID())
 		}
 	}
@@ -377,7 +360,7 @@ func (g *GithubClient) GetPullReviewDecision(repo models.Repo, pull models.PullR
 		"number": githubv4.Int(pull.Num),
 	}
 
-	err = g.v4QueryClient.Query(g.ctx, &query, variables)
+	err = g.v4Client.Query(g.ctx, &query, variables)
 	if err != nil {
 		return approvalStatus, errors.Wrap(err, "getting reviewDecision")
 	}
@@ -563,7 +546,7 @@ func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) (
 	var teamNames []string
 	ctx := context.Background()
 	for {
-		err := g.v4QueryClient.Query(ctx, &q, variables)
+		err := g.v4Client.Query(ctx, &q, variables)
 		if err != nil {
 			return nil, err
 		}
