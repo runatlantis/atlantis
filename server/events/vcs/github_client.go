@@ -365,7 +365,7 @@ func (g *GithubClient) GetPullReviewDecision(repo models.Repo, pull models.PullR
 		return approvalStatus, errors.Wrap(err, "getting reviewDecision")
 	}
 
-	if query.Repository.PullRequest.ReviewDecision == "APPROVED" {
+	if query.Repository.PullRequest.ReviewDecision == "APPROVED" || len(query.Repository.PullRequest.ReviewDecision) == 0 {
 		return true, nil
 	}
 
