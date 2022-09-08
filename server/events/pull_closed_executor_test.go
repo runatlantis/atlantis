@@ -14,7 +14,7 @@
 package events_test
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -213,7 +213,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		var configBucket = "configBucket"
 		var pullsBucketName = "pulls"
 
-		f, err := ioutil.TempFile("", "")
+		f, err := os.CreateTemp("", "")
 		if err != nil {
 			panic(errors.Wrap(err, "failed to create temp file"))
 		}
