@@ -665,7 +665,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 	Ok(t, err)
 	branchProtectionJSON := string(jsBytes)
 
-	// Branch protection Response
+	// List check suites Response
 	jsBytes, err = os.ReadFile("fixtures/github-commit-check-suites.json")
 	Ok(t, err)
 	checkSuites := string(jsBytes)
