@@ -5,11 +5,13 @@ import (
 	"os"
 	"sort"
 
-	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/uber-go/tally"
 
+	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/logging"
+
 	"github.com/pkg/errors"
+
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -44,6 +46,7 @@ func NewInstrumentedProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
+	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
@@ -61,6 +64,7 @@ func NewInstrumentedProjectCommandBuilder(
 			commentBuilder,
 			skipCloneNoChanges,
 			EnableRegExpCmd,
+			AutoDetectModuleFiles,
 			AutoplanFileList,
 			scope,
 			logger,
@@ -81,21 +85,23 @@ func NewProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
+	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
-		ParserValidator:    parserValidator,
-		ProjectFinder:      projectFinder,
-		VCSClient:          vcsClient,
-		WorkingDir:         workingDir,
-		WorkingDirLocker:   workingDirLocker,
-		GlobalCfg:          globalCfg,
-		PendingPlanFinder:  pendingPlanFinder,
-		SkipCloneNoChanges: skipCloneNoChanges,
-		EnableRegExpCmd:    EnableRegExpCmd,
-		AutoplanFileList:   AutoplanFileList,
+		ParserValidator:       parserValidator,
+		ProjectFinder:         projectFinder,
+		VCSClient:             vcsClient,
+		WorkingDir:            workingDir,
+		WorkingDirLocker:      workingDirLocker,
+		GlobalCfg:             globalCfg,
+		PendingPlanFinder:     pendingPlanFinder,
+		SkipCloneNoChanges:    skipCloneNoChanges,
+		EnableRegExpCmd:       EnableRegExpCmd,
+		AutoDetectModuleFiles: AutoDetectModuleFiles,
+		AutoplanFileList:      AutoplanFileList,
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
@@ -157,6 +163,7 @@ type DefaultProjectCommandBuilder struct {
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	SkipCloneNoChanges           bool
 	EnableRegExpCmd              bool
+	AutoDetectModuleFiles        string
 	AutoplanFileList             string
 	EnableDiffMarkdownFormat     bool
 }
@@ -305,7 +312,13 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.
 		ctx.Log.Info("found no %s file", config.AtlantisYAMLFilename)
-		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList)
+		// build a module index for projects that are explicitly included
+		moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
+		if err != nil {
+			ctx.Log.Warn("error(s) loading project module dependencies: %s", err)
+		}
+		ctx.Log.Debug("moduleInfo for %s (matching %q) = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
+		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)

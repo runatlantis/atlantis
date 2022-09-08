@@ -332,6 +332,8 @@ github.com/hashicorp/serf v0.9.6/go.mod h1:TXZNMjZQijwlDvp+r0b63xZ45H7JmCmgg4gpT
 github.com/hashicorp/serf v0.9.7/go.mod h1:TXZNMjZQijwlDvp+r0b63xZ45H7JmCmgg4gpTwn9UV4=
 github.com/hashicorp/terraform-config-inspect v0.0.0-20200806211835-c481b8bfa41e h1:wIsEsIITggCC4FTO9PisDjy561UU7OPL6uTu7tnkHH8=
 github.com/hashicorp/terraform-config-inspect v0.0.0-20200806211835-c481b8bfa41e/go.mod h1:Z0Nnk4+3Cy89smEbrq+sl1bxc9198gIP4I7wcQF6Kqs=
+github.com/hashicorp/terraform-config-inspect v0.0.0-20211115214459-90acf1ca460f h1:R8UIC07Ha9jZYkdcJ51l4ownCB8xYwfJtrgZSMvqjWI=
+github.com/hashicorp/terraform-config-inspect v0.0.0-20211115214459-90acf1ca460f/go.mod h1:Z0Nnk4+3Cy89smEbrq+sl1bxc9198gIP4I7wcQF6Kqs=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/huandu/xstrings v1.3.1 h1:4jgBlKK6tLKFvO8u5pmYjG91cqytmDCDvGh7ECVFfFs=
 github.com/huandu/xstrings v1.3.1/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=

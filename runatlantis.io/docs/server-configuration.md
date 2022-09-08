@@ -134,6 +134,53 @@ Values are chosen in this order:
   * Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
     * `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
 
+
+::: warning NOTE
+By default, changes to modules will not trigger autoplanning. See the flags below. 
+:::
+
+### `--autoplan-modules`
+
+```bash
+  atlantis server --autoplan-modules=true'
+```
+
+Defaults to `false`. When set to `true`, Atlantis will trace the local modules of included projects.
+Included project are projects with files included by `--autoplan-file-list`. 
+After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
+`--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
+
+### `--autoplan-modules-from-projects`
+
+```bash
+  atlantis server --autoplan-modules-from-projects='**/init.tf'
+```
+
+Enables auto-planing of projects when a module dependency in the same repository has changed. 
+This is a list of file patterns like `autoplan-file-list`. 
+
+These patterns select **projects** to index based on the files matched. The index maps modules to the projects that depends on them,
+including projects that include the module via other modules. When a module file matching `autoplan-file-list` changes,
+all indexed projects will be planned.
+
+Current default is "" (disabled).
+
+Examples:
+
+ * `**/*.tf` - will index all projects that have a `.tf` file in their directory, and plan them whenever an in-repo module dependency has changed.
+ * `**/*.tf,!foo,!bar` - will index all projects containing `.tf` except `foo` and `bar` and plan them whenever an in-repo module dependency has changed.
+   This allows projects to opt-out of auto-planning when a module dependency changes.
+
+::: warning NOTE
+Modules that are not selected by autoplan-file-list will not be indexed and dependant projects will not be planned. This
+flag allows the *projects* to index to be selected, but the trigger for a plan must be a file in `autoplan-file-list`.
+:::
+
+::: warning NOTE
+This flag overrides `--autoplan-modules`. If you wish to disable auto-planning of modules, set this flag to an empty string,
+and set `--autoplan-modules` to `false`.
+:::
+
 ### `--azuredevops-hostname`
   ```bash
   atlantis server --azuredevops-hostname="dev.azure.com"

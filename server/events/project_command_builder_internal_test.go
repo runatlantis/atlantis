@@ -7,6 +7,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -625,6 +626,7 @@ projects:
 				&CommentParser{},
 				false,
 				false,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				statsScope,
 				logger,
@@ -827,6 +829,7 @@ projects:
 				&CommentParser{},
 				false,
 				true,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				statsScope,
 				logger,
@@ -1057,6 +1060,7 @@ workflows:
 				&CommentParser{},
 				false,
 				false,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				statsScope,
 				logger,
