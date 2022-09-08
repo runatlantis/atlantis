@@ -268,11 +268,6 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 				w.Write([]byte(issueResp)) // nolint: errcheck
 				return
 			case "POST /api/graphql":
-				if accept, has := r.Header["Accept"]; !has || accept[0] != "application/vnd.github.queen-beryl-preview+json" {
-					t.Error("missing preview header")
-					http.Error(w, "bad request", http.StatusBadRequest)
-					return
-				}
 				defer r.Body.Close() // nolint: errcheck
 				body, err := io.ReadAll(r.Body)
 				if err != nil {
