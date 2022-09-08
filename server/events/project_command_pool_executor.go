@@ -1,6 +1,7 @@
 package events
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/remeh/sizedwaitgroup"
@@ -48,5 +49,39 @@ func runProjectCmds(
 
 		results = append(results, res)
 	}
+	return command.Result{ProjectResults: results}
+}
+
+func splitByExecutionOrderGroup(cmds []command.ProjectContext) [][]command.ProjectContext {
+	groups := make(map[int][]command.ProjectContext)
+	for _, cmd := range cmds {
+		groups[cmd.ExecutionOrderGroup] = append(groups[cmd.ExecutionOrderGroup], cmd)
+	}
+
+	var groupKeys []int
+	for k := range groups {
+		groupKeys = append(groupKeys, k)
+	}
+	sort.Ints(groupKeys)
+
+	var res [][]command.ProjectContext
+	for _, group := range groupKeys {
+		res = append(res, groups[group])
+	}
+	return res
+}
+
+func runProjectCmdsParallelGroups(
+	cmds []command.ProjectContext,
+	runnerFunc prjCmdRunnerFunc,
+	poolSize int,
+) command.Result {
+	var results []command.ProjectResult
+	groups := splitByExecutionOrderGroup(cmds)
+	for _, group := range groups {
+		res := runProjectCmdsParallel(group, runnerFunc, poolSize)
+		results = append(results, res.ProjectResults...)
+	}
+
 	return command.Result{ProjectResults: results}
 }
