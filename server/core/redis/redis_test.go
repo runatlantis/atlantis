@@ -1,7 +1,16 @@
 package redis_test
 
 import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -29,22 +38,43 @@ var lock = models.ProjectLock{
 	Time:      time.Now(),
 }
 
-func TestLockCommandNotSetWithTLS(t *testing.T) {
-	t.Log("retrieving apply lock when there are none should return empty LockCommand")
+var (
+	cert   tls.Certificate
+	caPath string
+)
+
+func TestRedisWithTLS(t *testing.T) {
+	t.Log("connecting to redis over TLS")
+
+	// Setup the Miniredis Server for TLS
+	certBytes, keyBytes, err := generateLocalhostCert()
+	Ok(t, err)
+	certOut := new(bytes.Buffer)
+	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
+	certData := certOut.Bytes()
+	keyOut := new(bytes.Buffer)
+	pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
+	cert, err = tls.X509KeyPair(certData, keyOut.Bytes())
+	Ok(t, err)
+	certFile, err := os.CreateTemp("", "cert.*.pem")
+	Ok(t, err)
+	caPath = certFile.Name()
+	_, err = certFile.Write(certData)
+	Ok(t, err)
+	defer certFile.Close()
 	tlsConfig := &tls.Config{
-		Certificates:       make([]tls.Certificate, 1),
+		Certificates:       []tls.Certificate{cert},
 		InsecureSkipVerify: true,
 	}
+
+	// Start Server and Connect
 	s := miniredis.NewMiniRedis()
 	if err := s.StartTLS(tlsConfig); err != nil {
 		t.Fatalf("could not start miniredis: %s", err)
 		// not reached
 	}
 	t.Cleanup(s.Close)
-	r := newTestRedisTLS(s)
-	exists, err := r.CheckCommandLock(command.Apply)
-	Ok(t, err)
-	Assert(t, exists == nil, "exp nil")
+	_ = newTestRedisTLS(s)
 }
 
 func TestLockCommandNotSet(t *testing.T) {
@@ -771,7 +801,7 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 }
 
 func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {
-	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", false)
+	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", false, false)
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create test redis client"))
 	}
@@ -779,9 +809,45 @@ func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {
 }
 
 func newTestRedisTLS(mr *miniredis.Miniredis) *redis.RedisDB {
-	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", true)
+	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", true, true)
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create test redis client"))
 	}
 	return r
+}
+
+func generateLocalhostCert() ([]byte, []byte, error) {
+	var err error
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		return nil, keyBytes, err
+	}
+
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return nil, keyBytes, err
+	}
+
+	notBefore := time.Now()
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"Atlantis Test Suite"},
+		},
+		NotBefore: notBefore,
+		NotAfter:  notBefore.Add(time.Hour),
+		KeyUsage:  x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	return certBytes, keyBytes, err
 }

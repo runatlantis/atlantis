@@ -59,6 +59,7 @@ type UserConfig struct {
 	RedisPassword                   string `mapstructure:"redis-password"`
 	RedisPort                       int    `mapstructure:"redis-port"`
 	RedisTLSEnabled                 bool   `mapstructure:"redis-tls-enabled"`
+	RedisInsecureSkipVerify         bool   `mapstructure:"redis-insecure-skip-verify"`
 	RepoConfig                      string `mapstructure:"repo-config"`
 	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
 	RepoAllowlist                   string `mapstructure:"repo-allowlist"`

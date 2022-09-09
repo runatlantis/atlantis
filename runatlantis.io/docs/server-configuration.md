@@ -474,6 +474,16 @@ Values are chosen in this order:
   ```
   Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
 
+### `--redis-insecure-skip-verify`
+  ```bash
+  atlantis server --redis-insecure-skip-verify=false
+  ```
+  Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate. Defaults to `false`.
+
+  ::: warning SECURITY WARNING
+  If this is enabled, TLS is susceptible to machine-in-the-middle attacks unless custom verification is used.
+  :::
+
 ### `--repo-config`
   ```bash
   atlantis server --repo-config="path/to/repos.yaml"

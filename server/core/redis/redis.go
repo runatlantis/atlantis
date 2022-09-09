@@ -26,13 +26,14 @@ const (
 	pullKeySeparator = "::"
 )
 
-func New(hostname string, port int, password string, tlsEnabled bool) (*RedisDB, error) {
+func New(hostname string, port int, password string, tlsEnabled bool, insecureSkipVerify bool) (*RedisDB, error) {
 	var rdb *redis.Client
 
 	var tlsConfig *tls.Config
 	if tlsEnabled {
 		tlsConfig = &tls.Config{
-			MinVersion: tls.VersionTLS12,
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: insecureSkipVerify,
 		}
 	}
 
