@@ -33,7 +33,7 @@ func New(hostname string, port int, password string, tlsEnabled bool, insecureSk
 	if tlsEnabled {
 		tlsConfig = &tls.Config{
 			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: insecureSkipVerify,
+			InsecureSkipVerify: insecureSkipVerify, //nolint:gosec // In some cases, users may want to use this at their own caution
 		}
 	}
 

@@ -50,10 +50,12 @@ func TestRedisWithTLS(t *testing.T) {
 	certBytes, keyBytes, err := generateLocalhostCert()
 	Ok(t, err)
 	certOut := new(bytes.Buffer)
-	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
+	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
+	Ok(t, err)
 	certData := certOut.Bytes()
 	keyOut := new(bytes.Buffer)
-	pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
+	err = pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
+	Ok(t, err)
 	cert, err = tls.X509KeyPair(certData, keyOut.Bytes())
 	Ok(t, err)
 	certFile, err := os.CreateTemp("", "cert.*.pem")
@@ -64,7 +66,7 @@ func TestRedisWithTLS(t *testing.T) {
 	defer certFile.Close()
 	tlsConfig := &tls.Config{
 		Certificates:       []tls.Certificate{cert},
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true, //nolint:gosec // This is purely for testing
 	}
 
 	// Start Server and Connect
