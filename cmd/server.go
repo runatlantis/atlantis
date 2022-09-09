@@ -89,6 +89,7 @@ const (
 	RedisHost                   = "redis-host"
 	RedisPassword               = "redis-password"
 	RedisPort                   = "redis-port"
+	RedisTLSEnabled             = "redis-tls-enabled"
 	RepoConfigFlag              = "repo-config"
 	RepoConfigJSONFlag          = "repo-config-json"
 	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
@@ -133,6 +134,7 @@ const (
 	DefaultStatsNamespace   = "atlantis"
 	DefaultPort             = 4141
 	DefaultRedisPort        = 6379
+	DefaultRedisTLSEnabled  = false
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
 	DefaultVCSStatusName    = "atlantis"
@@ -403,6 +405,10 @@ var boolFlags = map[string]boolFlag{
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
 		defaultValue: false,
+	},
+	RedisTLSEnabled: {
+		description:  "Enable TLS on the connection to Redis with a min TLS version of 1.2",
+		defaultValue: DefaultRedisTLSEnabled,
 	},
 	RequireApprovalFlag: {
 		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",

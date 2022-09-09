@@ -3,6 +3,7 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -25,14 +26,28 @@ const (
 	pullKeySeparator = "::"
 )
 
-func New(hostname string, port int, password string) (*RedisDB, error) {
+func New(hostname string, port int, password string, tlsEnabled bool) (*RedisDB, error) {
+	var rdb *redis.Client
 
-	fmt.Println(hostname, port)
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", hostname, port),
-		Password: password,
-		DB:       0, // use default DB
+	var tlsConfig *tls.Config
+	if tlsEnabled {
+		tlsConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
+	}
+
+	rdb = redis.NewClient(&redis.Options{
+		Addr:      fmt.Sprintf("%s:%d", hostname, port),
+		Password:  password,
+		DB:        0, // use default DB
+		TLSConfig: tlsConfig,
 	})
+
+	// Check if connection is valid
+	err := rdb.Ping(ctx).Err()
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to connect to redis instance at %s:%d", hostname, port))
+	}
 
 	return &RedisDB{
 		client: rdb,

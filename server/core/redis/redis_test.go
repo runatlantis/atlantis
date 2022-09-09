@@ -1,6 +1,7 @@
 package redis_test
 
 import (
+	"crypto/tls"
 	"testing"
 	"time"
 
@@ -26,6 +27,24 @@ var lock = models.ProjectLock{
 	Workspace: workspace,
 	Project:   project,
 	Time:      time.Now(),
+}
+
+func TestLockCommandNotSetWithTLS(t *testing.T) {
+	t.Log("retrieving apply lock when there are none should return empty LockCommand")
+	tlsConfig := &tls.Config{
+		Certificates:       make([]tls.Certificate, 1),
+		InsecureSkipVerify: true,
+	}
+	s := miniredis.NewMiniRedis()
+	if err := s.StartTLS(tlsConfig); err != nil {
+		t.Fatalf("could not start miniredis: %s", err)
+		// not reached
+	}
+	t.Cleanup(s.Close)
+	r := newTestRedisTLS(s)
+	exists, err := r.CheckCommandLock(command.Apply)
+	Ok(t, err)
+	Assert(t, exists == nil, "exp nil")
 }
 
 func TestLockCommandNotSet(t *testing.T) {
@@ -752,7 +771,15 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 }
 
 func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {
-	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "")
+	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", false)
+	if err != nil {
+		panic(errors.Wrap(err, "failed to create test redis client"))
+	}
+	return r
+}
+
+func newTestRedisTLS(mr *miniredis.Miniredis) *redis.RedisDB {
+	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", true)
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create test redis client"))
 	}

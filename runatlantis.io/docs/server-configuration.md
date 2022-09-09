@@ -468,6 +468,12 @@ Values are chosen in this order:
   ```
   The Redis Port for when using a Locking DB type of `redis`. Defaults to `6379`.
 
+### `--redis-tls-enabled`
+  ```bash
+  atlantis server --redis-tls-enabled=false
+  ```
+  Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
+
 ### `--repo-config`
   ```bash
   atlantis server --repo-config="path/to/repos.yaml"

@@ -405,7 +405,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
 		logger.Info("Utilizing Redis DB")
-		backend, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword)
+		backend, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled)
 		if err != nil {
 			return nil, err
 		}
