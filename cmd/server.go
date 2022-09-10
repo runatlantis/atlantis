@@ -89,6 +89,8 @@ const (
 	RedisHost                   = "redis-host"
 	RedisPassword               = "redis-password"
 	RedisPort                   = "redis-port"
+	RedisTLSEnabled             = "redis-tls-enabled"
+	RedisInsecureSkipVerify     = "redis-insecure-skip-verify"
 	RepoConfigFlag              = "repo-config"
 	RepoConfigJSONFlag          = "repo-config-json"
 	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
@@ -118,27 +120,29 @@ const (
 	WebPasswordFlag            = "web-password"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
-	DefaultADBasicUser      = ""
-	DefaultADBasicPassword  = ""
-	DefaultADHostname       = "dev.azure.com"
-	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultCheckoutStrategy = "branch"
-	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
-	DefaultDataDir          = "~/.atlantis"
-	DefaultGHHostname       = "github.com"
-	DefaultGitlabHostname   = "gitlab.com"
-	DefaultLockingDBType    = "boltdb"
-	DefaultLogLevel         = "info"
-	DefaultParallelPoolSize = 15
-	DefaultStatsNamespace   = "atlantis"
-	DefaultPort             = 4141
-	DefaultRedisPort        = 6379
-	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
-	DefaultTFEHostname      = "app.terraform.io"
-	DefaultVCSStatusName    = "atlantis"
-	DefaultWebBasicAuth     = false
-	DefaultWebUsername      = "atlantis"
-	DefaultWebPassword      = "atlantis"
+	DefaultADBasicUser             = ""
+	DefaultADBasicPassword         = ""
+	DefaultADHostname              = "dev.azure.com"
+	DefaultAutoplanFileList        = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultCheckoutStrategy        = "branch"
+	DefaultBitbucketBaseURL        = bitbucketcloud.BaseURL
+	DefaultDataDir                 = "~/.atlantis"
+	DefaultGHHostname              = "github.com"
+	DefaultGitlabHostname          = "gitlab.com"
+	DefaultLockingDBType           = "boltdb"
+	DefaultLogLevel                = "info"
+	DefaultParallelPoolSize        = 15
+	DefaultStatsNamespace          = "atlantis"
+	DefaultPort                    = 4141
+	DefaultRedisPort               = 6379
+	DefaultRedisTLSEnabled         = false
+	DefaultRedisInsecureSkipVerify = false
+	DefaultTFDownloadURL           = "https://releases.hashicorp.com"
+	DefaultTFEHostname             = "app.terraform.io"
+	DefaultVCSStatusName           = "atlantis"
+	DefaultWebBasicAuth            = false
+	DefaultWebUsername             = "atlantis"
+	DefaultWebPassword             = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -403,6 +407,14 @@ var boolFlags = map[string]boolFlag{
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
 		defaultValue: false,
+	},
+	RedisTLSEnabled: {
+		description:  "Enable TLS on the connection to Redis with a min TLS version of 1.2",
+		defaultValue: DefaultRedisTLSEnabled,
+	},
+	RedisInsecureSkipVerify: {
+		description:  "Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate.",
+		defaultValue: DefaultRedisInsecureSkipVerify,
 	},
 	RequireApprovalFlag: {
 		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
