@@ -5,10 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/testsuite"
@@ -16,15 +18,19 @@ import (
 )
 
 type testQueue struct {
-	Queue []queue.Message
+	Queue []terraform.DeploymentInfo
 }
 
-func (q *testQueue) Push(msg queue.Message) {
+func (q *testQueue) Push(msg terraform.DeploymentInfo) {
 	q.Queue = append(q.Queue, msg)
 }
 
+type request struct {
+	Id uuid.UUID
+}
+
 type response struct {
-	Queue   []queue.Message
+	Queue   []terraform.DeploymentInfo
 	Timeout bool
 }
 
@@ -34,7 +40,7 @@ func (a *testActivities) CreateCheckRun(ctx context.Context, request activities.
 	return activities.CreateCheckRunResponse{}, nil
 }
 
-func testWorkflow(ctx workflow.Context) (response, error) {
+func testWorkflow(ctx workflow.Context, r request) (response, error) {
 
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		ScheduleToCloseTimeout: 5 * time.Second,
@@ -44,7 +50,9 @@ func testWorkflow(ctx workflow.Context) (response, error) {
 
 	var a *testActivities
 
-	receiver := revision.NewReceiver(ctx, queue, github.Repo{Name: "nish"}, a)
+	receiver := revision.NewReceiver(ctx, queue, github.Repo{Name: "nish"}, root.Root{Name: "root"}, a, func(ctx workflow.Context) (uuid.UUID, error) {
+		return r.Id, nil
+	})
 	selector := workflow.NewSelector(ctx)
 
 	selector.AddReceive(workflow.GetSignalChannel(ctx, "test-signal"), receiver.Receive)
@@ -79,13 +87,18 @@ func TestEnqueue(t *testing.T) {
 
 	env.RegisterActivity(a)
 
+	id := uuid.Must(uuid.NewUUID())
+
 	env.OnActivity(a.CreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
-		Title: "atlantis/deploy",
-		Sha:   rev,
-		Repo:  github.Repo{Name: "nish"},
+		Title:      "atlantis/deploy",
+		Sha:        rev,
+		Repo:       github.Repo{Name: "nish"},
+		ExternalID: id.String(),
 	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
-	env.ExecuteWorkflow(testWorkflow)
+	env.ExecuteWorkflow(testWorkflow, request{
+		Id: id,
+	})
 	env.AssertExpectations(t)
 	assert.True(t, env.IsWorkflowCompleted())
 
@@ -93,10 +106,12 @@ func TestEnqueue(t *testing.T) {
 	err := env.GetWorkflowResult(&resp)
 	assert.NoError(t, err)
 
-	assert.Equal(t, []queue.Message{
+	assert.Equal(t, []terraform.DeploymentInfo{
 		{
 			Revision:   rev,
 			CheckRunID: 1,
+			Root:       root.Root{Name: "root"},
+			ID:         id,
 		},
 	}, resp.Queue)
 	assert.False(t, resp.Timeout)

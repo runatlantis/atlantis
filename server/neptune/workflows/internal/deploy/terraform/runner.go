@@ -2,11 +2,7 @@ package terraform
 
 import (
 	"github.com/pkg/errors"
-	internalContext "github.com/runatlantis/atlantis/server/neptune/context"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"go.temporal.io/sdk/workflow"
@@ -15,7 +11,7 @@ import (
 type Workflow func(ctx workflow.Context, request terraform.Request) error
 
 type stateReceiver interface {
-	Receive(ctx workflow.Context, c workflow.ReceiveChannel, checkRunID int64)
+	Receive(ctx workflow.Context, c workflow.ReceiveChannel, deploymentInfo DeploymentInfo)
 }
 
 func NewWorkflowRunner(repo github.Repo, a receiverActivities, w Workflow) *WorkflowRunner {
@@ -35,32 +31,23 @@ type WorkflowRunner struct {
 	Workflow      Workflow
 }
 
-func (r *WorkflowRunner) Run(ctx workflow.Context, checkRunID int64, revision string, root root.Root) error {
-	id, err := sideeffect.GenerateUUID(ctx)
-
-	ctx = workflow.WithValue(ctx, internalContext.DeploymentIDKey, id)
-
-	logger.Info(ctx, "Generated id")
-
-	if err != nil {
-		return errors.Wrap(err, "generating id")
-	}
-
+func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo) error {
+	id := deploymentInfo.ID
 	ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 		WorkflowID: id.String(),
 	})
 	terraformWorkflowRequest := terraform.Request{
 		Repo:         r.Repo,
-		Root:         root,
+		Root:         deploymentInfo.Root,
 		DeploymentId: id.String(),
 		Revision:     revision,
 	}
 
 	future := workflow.ExecuteChildWorkflow(ctx, r.Workflow, terraformWorkflowRequest)
-	return r.awaitWorkflow(ctx, future, checkRunID)
+	return r.awaitWorkflow(ctx, future, deploymentInfo)
 }
 
-func (r *WorkflowRunner) awaitWorkflow(ctx workflow.Context, future workflow.ChildWorkflowFuture, checkRunID int64) error {
+func (r *WorkflowRunner) awaitWorkflow(ctx workflow.Context, future workflow.ChildWorkflowFuture, deploymentInfo DeploymentInfo) error {
 	var childWE workflow.Execution
 	if err := future.GetChildWorkflowExecution().Get(ctx, &childWE); err != nil {
 		return errors.Wrap(err, "getting child workflow execution")
@@ -72,7 +59,7 @@ func (r *WorkflowRunner) awaitWorkflow(ctx workflow.Context, future workflow.Chi
 	// handle accordingly
 	ch := workflow.GetSignalChannel(ctx, state.WorkflowStateChangeSignal)
 	selector.AddReceive(ch, func(c workflow.ReceiveChannel, _ bool) {
-		r.StateReceiver.Receive(ctx, c, checkRunID)
+		r.StateReceiver.Receive(ctx, c, deploymentInfo)
 	})
 	var workflowComplete bool
 	var err error

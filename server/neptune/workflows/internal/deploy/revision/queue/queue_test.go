@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,11 +26,11 @@ func TestQueue(t *testing.T) {
 	assert.True(t, q.IsEmpty())
 }
 
-func wrap(msg string) queue.Message {
-	return queue.Message{Revision: msg}
+func wrap(msg string) terraform.DeploymentInfo {
+	return terraform.DeploymentInfo{Revision: msg}
 
 }
 
-func unwrap(msg queue.Message) string {
+func unwrap(msg terraform.DeploymentInfo) string {
 	return msg.Revision
 }

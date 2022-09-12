@@ -4,10 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
-
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
@@ -15,12 +13,12 @@ import (
 
 type testTerraformWorkflowRunner struct{}
 
-func (r testTerraformWorkflowRunner) Run(ctx workflow.Context, checkRunID int64, revision string, root root.Root) error {
+func (r testTerraformWorkflowRunner) Run(ctx workflow.Context, deploymentInfo terraform.DeploymentInfo) error {
 	return nil
 }
 
 type request struct {
-	Queue []queue.Message
+	Queue []terraform.DeploymentInfo
 }
 
 type response struct {
@@ -47,11 +45,6 @@ func testWorkflow(ctx workflow.Context, r request) (response, error) {
 	worker := queue.Worker{
 		Queue:                   q,
 		TerraformWorkflowRunner: &testTerraformWorkflowRunner{},
-		Repo: github.Repo{
-			Name:  "hello",
-			Owner: "nish",
-			URL:   "git@github.com/nish/hello.git",
-		},
 	}
 
 	err := workflow.SetQueryHandler(ctx, "queue", func() (queueAndState, error) {
@@ -98,7 +91,7 @@ func TestWorker(t *testing.T) {
 	}, 10*time.Second)
 
 	env.ExecuteWorkflow(testWorkflow, request{
-		Queue: []queue.Message{
+		Queue: []terraform.DeploymentInfo{
 			{
 				Revision:   "1",
 				CheckRunID: 1234,

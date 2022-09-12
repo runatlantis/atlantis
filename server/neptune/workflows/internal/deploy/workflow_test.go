@@ -102,6 +102,5 @@ func TestRunner(t *testing.T) {
 		err := env.GetWorkflowResult(&resp)
 		assert.NoError(t, err)
 		assert.Equal(t, response{WorkerCtxCancelled: true, ReceiverCalled: true}, resp)
-
 	})
 }

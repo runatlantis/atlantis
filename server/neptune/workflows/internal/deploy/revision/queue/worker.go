@@ -5,14 +5,13 @@ import (
 
 	"github.com/runatlantis/atlantis/server/neptune/context"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
 type terraformWorkflowRunner interface {
-	Run(ctx workflow.Context, checkRunID int64, revision string, root root.Root) error
+	Run(ctx workflow.Context, deploymentInfo terraform.DeploymentInfo) error
 }
 
 type WorkerState string
@@ -25,8 +24,6 @@ const (
 
 type Worker struct {
 	Queue                   *Queue
-	Repo                    github.Repo
-	Root                    root.Root
 	TerraformWorkflowRunner terraformWorkflowRunner
 
 	// mutable
@@ -64,11 +61,10 @@ func (w *Worker) Work(ctx workflow.Context) {
 
 		msg := w.Queue.Pop()
 
-		revision := msg.Revision
-		checkRunID := msg.CheckRunID
-		ctx := workflow.WithValue(ctx, context.SHAKey, revision)
+		ctx := workflow.WithValue(ctx, context.SHAKey, msg.Revision)
+		ctx = workflow.WithValue(ctx, context.DeploymentIDKey, msg.ID)
 
-		err = w.TerraformWorkflowRunner.Run(ctx, checkRunID, revision, w.Root)
+		err = w.TerraformWorkflowRunner.Run(ctx, msg)
 
 		if err != nil {
 			logger.Error(ctx, "failed to deploy revision, moving to next one")

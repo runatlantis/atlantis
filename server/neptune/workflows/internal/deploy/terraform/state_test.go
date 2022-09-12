@@ -45,7 +45,9 @@ func testStateReceiveWorkflow(ctx workflow.Context, r stateReceiveRequest) error
 		}
 	})
 
-	receiver.Receive(ctx, ch, 1)
+	receiver.Receive(ctx, ch, terraform.DeploymentInfo{
+		CheckRunID: 1,
+	})
 
 	return nil
 }
@@ -59,9 +61,9 @@ func TestStateReceive(t *testing.T) {
 	}
 
 	cases := []struct {
-		State                      *state.Workflow
-		ExpectedCheckRunState      github.CheckRunState
-		ExpectedCheckRunConclusion github.CheckRunConclusion
+		State                 *state.Workflow
+		ExpectedCheckRunState github.CheckRunState
+		ExpectedActions       []github.CheckRunAction
 	}{
 		{
 			State: &state.Workflow{
@@ -79,8 +81,7 @@ func TestStateReceive(t *testing.T) {
 					Status: state.FailedJobStatus,
 				},
 			},
-			ExpectedCheckRunState:      github.CheckRunComplete,
-			ExpectedCheckRunConclusion: github.CheckRunFailure,
+			ExpectedCheckRunState: github.CheckRunFailure,
 		},
 		{
 			State: &state.Workflow{
@@ -89,8 +90,11 @@ func TestStateReceive(t *testing.T) {
 					Status: state.SuccessJobStatus,
 				},
 			},
-			ExpectedCheckRunState:      github.CheckRunComplete,
-			ExpectedCheckRunConclusion: github.CheckRunSuccess,
+			ExpectedCheckRunState: github.CheckRunPending,
+			ExpectedActions: []github.CheckRunAction{
+				github.CreatePlanReviewAction(github.Approve),
+				github.CreatePlanReviewAction(github.Reject),
+			},
 		},
 		{
 			State: &state.Workflow{
@@ -116,8 +120,7 @@ func TestStateReceive(t *testing.T) {
 					Status: state.FailedJobStatus,
 				},
 			},
-			ExpectedCheckRunState:      github.CheckRunComplete,
-			ExpectedCheckRunConclusion: github.CheckRunFailure,
+			ExpectedCheckRunState: github.CheckRunFailure,
 		},
 		{
 			State: &state.Workflow{
@@ -130,8 +133,7 @@ func TestStateReceive(t *testing.T) {
 					Status: state.SuccessJobStatus,
 				},
 			},
-			ExpectedCheckRunState:      github.CheckRunComplete,
-			ExpectedCheckRunConclusion: github.CheckRunSuccess,
+			ExpectedCheckRunState: github.CheckRunSuccess,
 		},
 	}
 
@@ -144,14 +146,14 @@ func TestStateReceive(t *testing.T) {
 			env.RegisterActivity(a)
 
 			env.OnActivity(a.UpdateCheckRun, mock.Anything, activities.UpdateCheckRunRequest{
-				Title:      "atlantis/deploy",
-				State:      c.ExpectedCheckRunState,
-				Conclusion: c.ExpectedCheckRunConclusion,
+				Title: "atlantis/deploy",
+				State: c.ExpectedCheckRunState,
 				Repo: github.Repo{
 					Name: "hello",
 				},
 				Summary: markdown.RenderWorkflowStateTmpl(c.State),
 				ID:      1,
+				Actions: c.ExpectedActions,
 			}).Return(activities.UpdateCheckRunResponse{}, nil)
 
 			env.ExecuteWorkflow(testStateReceiveWorkflow, stateReceiveRequest{

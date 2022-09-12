@@ -7,6 +7,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ type testStateReceiver struct {
 	payloads []testSignalPayload
 }
 
-func (r *testStateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel, checkRunID int64) {
+func (r *testStateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel, deploymentInfo terraform.DeploymentInfo) {
 
 	var payload testSignalPayload
 	c.Receive(ctx, &payload)
@@ -65,7 +66,18 @@ func parentWorkflow(ctx workflow.Context, r request) (response, error) {
 		Workflow:      testTerraformWorkflow,
 	}
 
-	if err := runner.Run(ctx, 1, "1234", root.Root{}); err != nil {
+	uuid, err := sideeffect.GenerateUUID(ctx)
+
+	if err != nil {
+		return response{}, nil
+	}
+
+	if err := runner.Run(ctx, terraform.DeploymentInfo{
+		ID:         uuid,
+		Revision:   "1234",
+		CheckRunID: 1,
+		Root:       root.Root{},
+	}); err != nil {
 		return response{}, err
 	}
 
