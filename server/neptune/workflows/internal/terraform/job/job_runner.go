@@ -37,7 +37,7 @@ func (r *jobRunner) Run(
 	// Execution ctx for a job that handles setting up the env vars from the previous steps
 	jobExecutionCtx := &job.ExecutionContext{
 		Context:   ctx,
-		Path:      localRoot.Root.Path,
+		Path:      localRoot.Path,
 		Envs:      map[string]string{},
 		TfVersion: localRoot.Root.TfVersion,
 	}
