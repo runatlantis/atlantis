@@ -2181,6 +2181,19 @@ Terraform will perform the following actions:
         zone_id = "redacted"
     }
 
+  # module.redacted.aws_route53_record.redacted_record_2 will be created
++ resource "aws_route53_record" "redacted_record" {
+      + fqdn    = "redacted.redacted.redacted.io"
+      + id      = "redacted_redacted.redacted.redacted.io_A"
+      + name    = "redacted.redacted.redacted.io"
+      + records = [
+            "foo",
+        ]
+      + ttl     = 300
+      + type    = "A"
+      + zone_id = "redacted"
+    }
+
 # helm_release.external_dns[0] will be updated in-place
 ~ resource "helm_release" "external_dns" {
       id                         = "external-dns"
@@ -2343,6 +2356,19 @@ Terraform will perform the following actions:
         ttl     = 300
         type    = "A"
         zone_id = "redacted"
+    }
+
+  # module.redacted.aws_route53_record.redacted_record_2 will be created
++ resource "aws_route53_record" "redacted_record" {
++       fqdn    = "redacted.redacted.redacted.io"
++       id      = "redacted_redacted.redacted.redacted.io_A"
++       name    = "redacted.redacted.redacted.io"
++       records = [
+            "foo",
+        ]
++       ttl     = 300
++       type    = "A"
++       zone_id = "redacted"
     }
 
 # helm_release.external_dns[0] will be updated in-place

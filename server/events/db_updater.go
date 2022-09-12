@@ -1,13 +1,13 @@
 package events
 
 import (
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 type DBUpdater struct {
-	DB *db.BoltDB
+	Backend locking.Backend
 }
 
 func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
@@ -23,5 +23,5 @@ func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, resu
 		filtered = append(filtered, r)
 	}
 	ctx.Log.Debug("updating DB with pull results")
-	return c.DB.UpdatePullWithResults(pull, filtered)
+	return c.Backend.UpdatePullWithResults(pull, filtered)
 }

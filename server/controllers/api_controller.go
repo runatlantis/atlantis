@@ -3,7 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -36,6 +36,7 @@ type APIRequest struct {
 	Repository string `validate:"required"`
 	Ref        string `validate:"required"`
 	Type       string `validate:"required"`
+	PR         int
 	Projects   []string
 	Paths      []struct {
 		Directory string
@@ -180,7 +181,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	}
 
 	// Parse the JSON payload
-	bytes, err := ioutil.ReadAll(r.Body)
+	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("failed to read request")
 	}
@@ -214,7 +215,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	return &request, &command.Context{
 		HeadRepo: baseRepo,
 		Pull: models.PullRequest{
-			Num:        0,
+			Num:        request.PR,
 			BaseBranch: request.Ref,
 			HeadBranch: request.Ref,
 			HeadCommit: request.Ref,

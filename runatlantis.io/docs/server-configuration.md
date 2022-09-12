@@ -422,6 +422,16 @@ Values are chosen in this order:
   Hide previous plan comments to declutter PRs. This is only supported in
   GitHub currently.
 
+### `--locking-db-type`
+  ```bash
+  atlantis server --locking-db-type="<boltdb|redis>"
+  ```
+  The locking database type to use for storing plan and apply locks. Defaults to `boltdb`.
+
+  Notes:
+  * If set to `boltdb`, only one process may have access to the boltdb instance.
+  * If set to `redis`, then `--redis-host`, `--redis-port`, and `--redis-password` must be set.
+
 ### `--log-level`
   ```bash
   atlantis server --log-level="<debug|info|warn|error>"
@@ -445,6 +455,40 @@ Values are chosen in this order:
   atlantis server --quiet-policy-checks
   ```
   Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
+
+### `--redis-host`
+  ```bash
+  atlantis server --redis-host="localhost"
+  ```
+  The Redis Hostname for when using a Locking DB type of `redis`.
+
+### `--redis-password`
+  ```bash
+  atlantis server --redis-password="password123"
+  ```
+  The Redis Password for when using a Locking DB type of `redis`.
+
+### `--redis-port`
+  ```bash
+  atlantis server --redis-port=6379
+  ```
+  The Redis Port for when using a Locking DB type of `redis`. Defaults to `6379`.
+
+### `--redis-tls-enabled`
+  ```bash
+  atlantis server --redis-tls-enabled=false
+  ```
+  Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
+
+### `--redis-insecure-skip-verify`
+  ```bash
+  atlantis server --redis-insecure-skip-verify=false
+  ```
+  Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate. Defaults to `false`.
+
+  ::: warning SECURITY WARNING
+  If this is enabled, TLS is susceptible to machine-in-the-middle attacks unless custom verification is used.
+  :::
 
 ### `--repo-config`
   ```bash
