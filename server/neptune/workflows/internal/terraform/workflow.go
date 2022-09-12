@@ -11,9 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
-	job_runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job/step/cmd"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job/step/env"
+	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"go.temporal.io/sdk/workflow"
 )
@@ -77,7 +75,7 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 	var ta *activities.Terraform
 	var ga *activities.Github
 
-	cmdStepRunner := cmd.Runner{
+	cmdStepRunner := runner.CmdStepRunner{
 		Activity: ta,
 	}
 
@@ -87,10 +85,13 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 		GithubActivities:    ga,
 		TerraformActivities: ta,
 		Request:             request,
-		JobRunner: job_runner.NewRunner(
+		JobRunner: runner.NewRunner(
 			&cmdStepRunner,
-			&env.Runner{
-				CmdRunner: cmdStepRunner,
+			&runner.EnvStepRunner{
+				CmdStepRunner: cmdStepRunner,
+			},
+			&runner.InitStepRunner{
+				Activity: ta,
 			},
 		),
 		Store: state.NewWorkflowStore(

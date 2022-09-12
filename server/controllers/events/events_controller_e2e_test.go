@@ -661,7 +661,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	ctxLogger := logging.NewNoopCtxLogger(t)
 	featureAllocator, _ := feature.NewStringSourcedAllocator(ctxLogger)
-	terraformClient, err := terraform.NewE2ETestClient(binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", downloader, false, projectCmdOutputHandler, featureAllocator)
+	terraformClient, err := terraform.NewE2ETestClient(binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", downloader, false, projectCmdOutputHandler)
 	Ok(t, err)
 
 	// Set real dependencies here.

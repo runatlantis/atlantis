@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -104,6 +105,12 @@ func (p *PushHandler) handle(ctx context.Context, event Push) error {
 
 func (p *PushHandler) startWorkflow(ctx context.Context, event Push, rootCfg *valid.MergedProjectCfg) (client.WorkflowRun, error) {
 	options := client.StartWorkflowOptions{TaskQueue: workflows.DeployTaskQueue}
+
+	var tfVersion string
+	if rootCfg.TerraformVersion != nil {
+		tfVersion = rootCfg.TerraformVersion.String()
+	}
+
 	run, err := p.TemporalClient.SignalWithStartWorkflow(
 		ctx,
 		fmt.Sprintf("%s||%s", event.Repo.FullName, rootCfg.Name),
@@ -139,6 +146,7 @@ func (p *PushHandler) startWorkflow(ctx context.Context, event Push, rootCfg *va
 					Steps: p.generateSteps(rootCfg.DeploymentWorkflow.Apply.Steps),
 				},
 				RepoRelPath: rootCfg.RepoRelDir,
+				TfVersion:   tfVersion,
 			},
 		},
 	)

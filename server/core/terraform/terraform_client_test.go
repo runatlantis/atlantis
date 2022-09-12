@@ -27,7 +27,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	fmocks "github.com/runatlantis/atlantis/server/lyft/feature/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -41,8 +40,7 @@ func TestNewClient_NoTF(t *testing.T) {
 	// Set PATH to only include our empty directory.
 	defer tempSetEnv(t, "PATH", tmp)()
 
-	allocator := fmocks.NewMockAllocator()
-	_, err := terraform.NewClient(binDir, cacheDir, "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
+	_, err := terraform.NewClient(binDir, cacheDir, "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
 	ErrEquals(t, "getting default version: terraform not found in $PATH. Set --default-tf-version or download terraform from https://www.terraform.io/downloads.html", err)
 }
 
@@ -68,9 +66,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	allocator := fmocks.NewMockAllocator()
-
-	c, err := terraform.NewClient(binDir, cacheDir, "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
+	c, err := terraform.NewClient(binDir, cacheDir, "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -102,9 +98,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	allocator := fmocks.NewMockAllocator()
-
-	c, err := terraform.NewClient(binDir, cacheDir, "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
+	c, err := terraform.NewClient(binDir, cacheDir, "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -120,9 +114,8 @@ func TestNewClient_BadVersion(t *testing.T) {
 	_, binDir, cacheDir, cleanup := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	defer cleanup()
-	allocator := fmocks.NewMockAllocator()
 
-	_, err := terraform.NewClient(binDir, cacheDir, "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler, allocator)
+	_, err := terraform.NewClient(binDir, cacheDir, "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
 	ErrEquals(t, "getting default version: parsing version malformed: Malformed version: malformed", err)
 }
 

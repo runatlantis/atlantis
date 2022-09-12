@@ -3,10 +3,11 @@ package activities
 import (
 	"context"
 
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/config/logger"
+	"github.com/runatlantis/atlantis/server/neptune/logger"
 )
 
-type dbActivities struct{}
+type dbActivities struct {
+}
 
 type FetchLatestDeploymentRequest struct {
 	RepositoryURL string

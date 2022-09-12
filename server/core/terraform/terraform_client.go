@@ -33,7 +33,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/lyft/feature"
 )
 
 var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
@@ -61,8 +60,6 @@ type DefaultClient struct {
 
 	versionCache   cache.ExecutionVersionCache
 	commandBuilder commandBuilder
-
-	featureAllocator feature.Allocator
 	*AsyncClient
 }
 
@@ -92,7 +89,6 @@ func NewClientWithVersionCache(
 	tfDownloader Downloader,
 	usePluginCache bool,
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
-	featureAllocator feature.Allocator,
 	versionCache cache.ExecutionVersionCache,
 ) (*DefaultClient, error) {
 	version, err := getDefaultVersion(defaultVersionStr, defaultVersionFlagName)
@@ -123,14 +119,13 @@ func NewClientWithVersionCache(
 	}
 
 	return &DefaultClient{
-		defaultVersion:   version,
-		binDir:           binDir,
-		downloader:       tfDownloader,
-		downloadBaseURL:  tfDownloadURL,
-		featureAllocator: featureAllocator,
-		AsyncClient:      asyncClient,
-		commandBuilder:   builder,
-		versionCache:     versionCache,
+		defaultVersion:  version,
+		binDir:          binDir,
+		downloader:      tfDownloader,
+		downloadBaseURL: tfDownloadURL,
+		AsyncClient:     asyncClient,
+		commandBuilder:  builder,
+		versionCache:    versionCache,
 	}, nil
 
 }
@@ -146,7 +141,6 @@ func NewE2ETestClient(
 	tfDownloader Downloader,
 	usePluginCache bool,
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
-	featureAllocator feature.Allocator,
 ) (*DefaultClient, error) {
 	versionCache := cache.NewLocalBinaryCache("terraform")
 	return NewClientWithVersionCache(
@@ -158,7 +152,6 @@ func NewE2ETestClient(
 		tfDownloader,
 		usePluginCache,
 		projectCmdOutputHandler,
-		featureAllocator,
 		versionCache,
 	)
 }
@@ -172,7 +165,6 @@ func NewClient(
 	tfDownloader Downloader,
 	usePluginCache bool,
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
-	featureAllocator feature.Allocator,
 ) (*DefaultClient, error) {
 	loader := VersionLoader{
 		downloader:  tfDownloader,
@@ -182,7 +174,7 @@ func NewClient(
 	versionCache := cache.NewExecutionVersionLayeredLoadingCache(
 		"terraform",
 		binDir,
-		loader.loadVersion,
+		loader.LoadVersion,
 	)
 	return NewClientWithVersionCache(
 		binDir,
@@ -193,7 +185,6 @@ func NewClient(
 		tfDownloader,
 		usePluginCache,
 		projectCmdOutputHandler,
-		featureAllocator,
 		versionCache,
 	)
 }
@@ -271,7 +262,14 @@ type VersionLoader struct {
 	downloadURL string
 }
 
-func (l *VersionLoader) loadVersion(v *version.Version, destPath string) (runtime_models.FilePath, error) {
+func NewVersionLoader(downloader Downloader, downloadURL string) *VersionLoader {
+	return &VersionLoader{
+		downloader:  downloader,
+		downloadURL: downloadURL,
+	}
+}
+
+func (l *VersionLoader) LoadVersion(v *version.Version, destPath string) (runtime_models.FilePath, error) {
 	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", l.downloadURL, v.String(), v.String())
 	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
 	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)

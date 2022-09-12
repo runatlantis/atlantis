@@ -1,4 +1,4 @@
-package temporalworker
+package config
 
 import (
 	"io"
@@ -21,15 +21,23 @@ type ServerConfig struct {
 	Port    int
 }
 
+type TerraformConfig struct {
+	DefaultVersionStr      string
+	DefaultVersionFlagName string
+	DownloadURL            string
+	LogFilters             valid.TerraformLogFilters
+}
+
 // Config is TemporalWorker specific user config
 type Config struct {
-	AuthCfg     AuthConfig
-	ServerCfg   ServerConfig
-	TemporalCfg valid.Temporal
+	AuthCfg      AuthConfig
+	ServerCfg    ServerConfig
+	TemporalCfg  valid.Temporal
+	TerraformCfg TerraformConfig
 
+	DataDir     string
 	CtxLogger   logging.Logger
 	Scope       tally.Scope
 	App         githubapp.Config
 	StatsCloser io.Closer
-	DataDir     string
 }

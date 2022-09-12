@@ -1,4 +1,4 @@
-package cmd_test
+package job_test
 
 import (
 	"context"
@@ -9,40 +9,23 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job/step/cmd"
+	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 )
 
-const (
-	RepoName    = "test-repo"
-	RepoOwner   = "test-owner"
-	RepoPath    = "test/repo"
-	ProjectName = "test-project"
-	ProjectPath = "test/repo/project"
-	RefName     = "main"
-	RefType     = "branch"
-	Dir         = "test-path"
-	UserName    = "test-user"
-)
-
-type request struct {
-	LocalRoot root.LocalRoot
-	Step      job.Step
-}
-
-type testExecuteActivity struct {
+type testCmdExecuteActivity struct {
 	t           *testing.T
 	expectedReq map[string]string
 }
 
-func (a *testExecuteActivity) ExecuteCommand(ctx context.Context, request activities.ExecuteCommandRequest) (activities.ExecuteCommandResponse, error) {
+func (a *testCmdExecuteActivity) ExecuteCommand(ctx context.Context, request activities.ExecuteCommandRequest) (activities.ExecuteCommandResponse, error) {
 	assert.Equal(a.t, a.expectedReq, request.EnvVars)
 	return activities.ExecuteCommandResponse{}, nil
 }
 
-func testWorkflow(ctx workflow.Context, r request) (string, error) {
+func testCmdWorkflow(ctx workflow.Context, r request) (string, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		ScheduleToCloseTimeout: 5 * time.Second,
 	})
@@ -54,8 +37,8 @@ func testWorkflow(ctx workflow.Context, r request) (string, error) {
 		TfVersion: r.LocalRoot.Root.TfVersion,
 	}
 
-	var a *testExecuteActivity
-	cmdStepRunner := cmd.Runner{
+	var a *testCmdExecuteActivity
+	cmdStepRunner := runner.CmdStepRunner{
 		Activity: a,
 	}
 
@@ -76,14 +59,14 @@ func TestRunRunner_ShouldSetupEnvVars(t *testing.T) {
 		"REPO_REL_DIR": "project",
 		"USER_NAME":    UserName,
 	}
-	testExecuteActivity := &testExecuteActivity{
+	testExecuteActivity := &testCmdExecuteActivity{
 		t:           t,
 		expectedReq: expectedEnvVars,
 	}
 	env.RegisterActivity(testExecuteActivity)
-	env.RegisterWorkflow(testWorkflow)
+	env.RegisterWorkflow(testCmdWorkflow)
 
-	env.ExecuteWorkflow(testWorkflow, request{
+	env.ExecuteWorkflow(testCmdWorkflow, request{
 		LocalRoot: root.LocalRoot{
 			Root: root.Root{
 				Name: ProjectName,

@@ -22,6 +22,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	neptune_http "github.com/runatlantis/atlantis/server/neptune/http"
 	"github.com/runatlantis/atlantis/server/neptune/temporal"
+	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
 	"github.com/uber-go/tally/v4"
 	"github.com/urfave/cli"
@@ -48,7 +49,7 @@ type Server struct {
 	GithubActivities    *workflows.GithubActivities
 }
 
-func NewServer(config *Config) (*Server, error) {
+func NewServer(config *config.Config) (*Server, error) {
 	jobsController := &controllers.JobsController{
 		AtlantisVersion:     config.ServerCfg.Version,
 		AtlantisURL:         config.ServerCfg.URL,
@@ -91,7 +92,8 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	terraformActivities, err := workflows.NewTerraformActivities(
-		config.Scope.SubScope("terraform"),
+		config.TerraformCfg,
+		config.DataDir,
 		config.ServerCfg.URL,
 	)
 	if err != nil {

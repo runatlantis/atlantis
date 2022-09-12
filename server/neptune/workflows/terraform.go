@@ -3,9 +3,11 @@ package workflows
 import (
 	"net/url"
 
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
+
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
-	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -16,8 +18,11 @@ type TerraformActivities struct {
 	activities.Terraform
 }
 
-func NewTerraformActivities(scope tally.Scope, serverURL *url.URL) (*TerraformActivities, error) {
-	terraformActivities := activities.NewTerraform(serverURL)
+func NewTerraformActivities(config config.TerraformConfig, dataDir string, serverURL *url.URL) (*TerraformActivities, error) {
+	terraformActivities, err := activities.NewTerraform(config, dataDir, serverURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing terraform activities")
+	}
 	return &TerraformActivities{
 		Terraform: *terraformActivities,
 	}, nil

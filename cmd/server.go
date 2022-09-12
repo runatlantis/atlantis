@@ -21,20 +21,20 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/palantir/go-githubapp/githubapp"
-	cfgParser "github.com/runatlantis/atlantis/server/core/config"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/metrics"
-
 	"github.com/docker/docker/pkg/fileutils"
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
+	cfgParser "github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/gateway"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker"
+	neptune "github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -515,22 +515,28 @@ func (t *TemporalWorker) NewServer(userConfig server.UserConfig, config server.C
 	if err != nil {
 		return nil, err
 	}
-	cfg := &temporalworker.Config{
-		AuthCfg: temporalworker.AuthConfig{
+
+	cfg := &neptune.Config{
+		AuthCfg: neptune.AuthConfig{
 			SslCertFile: userConfig.SSLCertFile,
 			SslKeyFile:  userConfig.SSLKeyFile,
 		},
-		ServerCfg: temporalworker.ServerConfig{
+		ServerCfg: neptune.ServerConfig{
 			URL:     parsedURL,
 			Version: config.AtlantisVersion,
 			Port:    userConfig.Port,
 		},
+		TerraformCfg: neptune.TerraformConfig{
+			DefaultVersionFlagName: config.DefaultTFVersionFlag,
+			DefaultVersionStr:      userConfig.DefaultTFVersion,
+			DownloadURL:            userConfig.TFDownloadURL,
+		},
+		DataDir:     userConfig.DataDir,
 		TemporalCfg: globalCfg.Temporal,
 		App:         appConfig,
 		CtxLogger:   ctxLogger,
 		Scope:       scope,
 		StatsCloser: closer,
-		DataDir:     userConfig.DataDir,
 	}
 	return temporalworker.NewServer(cfg)
 }

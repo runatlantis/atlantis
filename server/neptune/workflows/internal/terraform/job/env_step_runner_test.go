@@ -1,4 +1,4 @@
-package env_test
+package job_test
 
 import (
 	"context"
@@ -9,8 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job/step/cmd"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job/step/env"
+	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/testsuite"
@@ -34,14 +33,14 @@ type request struct {
 	Step      job.Step
 }
 
-type testExecuteActivity struct {
+type testEnvExecuteActivity struct {
 }
 
-func (a *testExecuteActivity) ExecuteCommand(ctx context.Context, request activities.ExecuteCommandRequest) (activities.ExecuteCommandResponse, error) {
+func (a *testEnvExecuteActivity) ExecuteCommand(ctx context.Context, request activities.ExecuteCommandRequest) (activities.ExecuteCommandResponse, error) {
 	return activities.ExecuteCommandResponse{}, nil
 }
 
-func testWorkflow(ctx workflow.Context, r request) (string, error) {
+func testEnvWorkflow(ctx workflow.Context, r request) (string, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		ScheduleToCloseTimeout: 5 * time.Second,
 	})
@@ -53,9 +52,9 @@ func testWorkflow(ctx workflow.Context, r request) (string, error) {
 		TfVersion: r.LocalRoot.Root.TfVersion,
 	}
 
-	var a *testExecuteActivity
-	envStepRunner := env.Runner{
-		CmdRunner: cmd.Runner{
+	var a *testCmdExecuteActivity
+	envStepRunner := runner.EnvStepRunner{
+		CmdStepRunner: runner.CmdStepRunner{
 			Activity: a,
 		},
 	}
@@ -67,9 +66,9 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 
-	testExecuteActivity := &testExecuteActivity{}
+	testExecuteActivity := &testCmdExecuteActivity{}
 	env.RegisterActivity(testExecuteActivity)
-	env.RegisterWorkflow(testWorkflow)
+	env.RegisterWorkflow(testCmdWorkflow)
 
 	env.OnActivity(testExecuteActivity.ExecuteCommand, mock.Anything, activities.ExecuteCommandRequest{
 		Step: job.Step{
@@ -90,7 +89,7 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 		Output: "Hello World",
 	}, nil)
 
-	env.ExecuteWorkflow(testWorkflow, request{
+	env.ExecuteWorkflow(testCmdWorkflow, request{
 		LocalRoot: root.LocalRoot{
 			Root: root.Root{
 				Name: ProjectName,
@@ -132,7 +131,7 @@ func TestEnvRunne_EnvVarValueSet(t *testing.T) {
 		EnvVarValue: "TEST_VALUE",
 	}
 
-	runner := env.Runner{}
+	runner := runner.EnvStepRunner{}
 
 	out, err := runner.Run(executioncontext, localRoot, step)
 	assert.Nil(t, err)

@@ -1,4 +1,4 @@
-package cmd
+package job
 
 import (
 	"context"
@@ -14,11 +14,11 @@ type executeCommandActivities interface {
 	ExecuteCommand(context.Context, activities.ExecuteCommandRequest) (activities.ExecuteCommandResponse, error)
 }
 
-type Runner struct {
+type CmdStepRunner struct {
 	Activity executeCommandActivities
 }
 
-func (r *Runner) Run(executionContext *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) (string, error) {
+func (r *CmdStepRunner) Run(executionContext *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) (string, error) {
 	relPath := localRoot.RelativePathFromRepo()
 	ref, err := localRoot.Repo.HeadCommit.Ref.String()
 	if err != nil {
