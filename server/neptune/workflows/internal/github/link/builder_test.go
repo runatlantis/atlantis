@@ -14,18 +14,15 @@ func Test_BuildDownloadLinkFromArchive(t *testing.T) {
 	testRoot := root.Root{
 		Path: "test/path",
 	}
-	testCommit := github.Commit{
-		Ref: "a1b2c3d",
-	}
 	testRepo := github.Repo{
-		HeadCommit: testCommit,
-		Owner:      "testowner",
-		Name:       "testrepo",
+		Owner: "testowner",
+		Name:  "testrepo",
 	}
+	testRevision := "a1b2c3d"
 	archiveURL, err := httpurl.Parse("https://github.com/testowner/testrepo/legacy.zip/refs/heads/main?token=testtoken123")
 	assert.NoError(t, err)
 	linkBuilder := link.Builder{}
-	downloadLink := linkBuilder.BuildDownloadLinkFromArchive(archiveURL, testRoot, testRepo)
+	downloadLink := linkBuilder.BuildDownloadLinkFromArchive(archiveURL, testRoot, testRepo, testRevision)
 	assert.Equal(t, expectedURL, downloadLink)
 }
 
@@ -34,17 +31,14 @@ func Test_BuildDownloadLinkFromArchive_NoToken(t *testing.T) {
 	testRoot := root.Root{
 		Path: "/test/path",
 	}
-	testCommit := github.Commit{
-		Ref: "a1b2c3d",
-	}
 	testRepo := github.Repo{
-		HeadCommit: testCommit,
-		Owner:      "testowner",
-		Name:       "testrepo",
+		Owner: "testowner",
+		Name:  "testrepo",
 	}
+	testRevision := "a1b2c3d"
 	archiveURL, err := httpurl.Parse("https://github.com/testowner/testrepo/legacy.zip/refs/heads/main")
 	assert.NoError(t, err)
 	linkBuilder := link.Builder{}
-	downloadLink := linkBuilder.BuildDownloadLinkFromArchive(archiveURL, testRoot, testRepo)
+	downloadLink := linkBuilder.BuildDownloadLinkFromArchive(archiveURL, testRoot, testRepo, testRevision)
 	assert.Equal(t, expectedURL, downloadLink)
 }

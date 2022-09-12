@@ -20,19 +20,23 @@ type Runner struct {
 
 func (r *Runner) Run(executionContext *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) (string, error) {
 	relPath := localRoot.RelativePathFromRepo()
+	ref, err := localRoot.Repo.HeadCommit.Ref.String()
+	if err != nil {
+		return "", errors.Wrap(err, "processing request ref")
+	}
 
 	envVars := map[string]string{
 		"REPO_NAME":    localRoot.Repo.Name,
 		"REPO_OWNER":   localRoot.Repo.Owner,
 		"DIR":          executionContext.Path,
-		"HEAD_COMMIT":  localRoot.Repo.HeadCommit.Ref,
+		"HEAD_COMMIT":  ref,
 		"PROJECT_NAME": localRoot.Root.Name,
 		"REPO_REL_DIR": relPath,
 		"USER_NAME":    localRoot.Repo.HeadCommit.Author.Username,
 	}
 
 	var resp activities.ExecuteCommandResponse
-	err := workflow.ExecuteActivity(executionContext.Context, r.Activity.ExecuteCommand, activities.ExecuteCommandRequest{
+	err = workflow.ExecuteActivity(executionContext.Context, r.Activity.ExecuteCommand, activities.ExecuteCommandRequest{
 		Step:    step,
 		Path:    executionContext.Path,
 		EnvVars: envVars,

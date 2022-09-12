@@ -179,6 +179,7 @@ func (r *Runner) Run(ctx workflow.Context) error {
 		Repo:         r.Request.Repo,
 		Root:         r.Request.Root,
 		DeploymentId: r.Request.DeploymentId,
+		Revision:     r.Request.Revision,
 	}).Get(ctx, &fetchRootResponse)
 
 	if err != nil {

@@ -356,3 +356,34 @@ func TestFetchRootError(t *testing.T) {
 	// assert results are expected
 	env.AssertExpectations(t)
 }
+
+func TestCleanupError(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	ga := &githubActivities{}
+	ta := &terraformActivities{}
+	env.RegisterActivity(ga)
+	env.RegisterActivity(ta)
+
+	// set activity expectations
+	env.OnActivity(ta.Cleanup, mock.Anything, activities.CleanupRequest{
+		LocalRoot: testLocalRoot,
+	}).Return(activities.CleanupResponse{}, assert.AnError)
+
+	// send approval of plan
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow("planreview-repo-steps", terraform.PlanReview{
+			Status: terraform.Approved,
+		})
+	}, 5*time.Second)
+
+	// execute workflow
+	env.ExecuteWorkflow(testTerraformWorkflow, request{})
+	assert.True(t, env.IsWorkflowCompleted())
+
+	// assert results are expected
+	env.AssertExpectations(t)
+	var resp response
+	err := env.GetWorkflowResult(&resp)
+	assert.Error(t, err)
+}

@@ -21,7 +21,8 @@ const (
 	RepoPath    = "test/repo"
 	ProjectName = "test-project"
 	ProjectPath = "test/repo/project"
-	HeadCommit  = "ref"
+	RefName     = "main"
+	RefType     = "branch"
 	Dir         = "test-path"
 	UserName    = "test-user"
 )
@@ -70,7 +71,7 @@ func TestRunRunner_ShouldSetupEnvVars(t *testing.T) {
 		"REPO_NAME":    RepoName,
 		"REPO_OWNER":   RepoOwner,
 		"DIR":          ProjectPath,
-		"HEAD_COMMIT":  HeadCommit,
+		"HEAD_COMMIT":  "refs/heads/main",
 		"PROJECT_NAME": ProjectName,
 		"REPO_REL_DIR": "project",
 		"USER_NAME":    UserName,
@@ -92,7 +93,10 @@ func TestRunRunner_ShouldSetupEnvVars(t *testing.T) {
 				Name:  RepoName,
 				Owner: RepoOwner,
 				HeadCommit: github.Commit{
-					Ref: HeadCommit,
+					Ref: github.Ref{
+						Name: RefName,
+						Type: RefType,
+					},
 					Author: github.User{
 						Username: UserName,
 					},

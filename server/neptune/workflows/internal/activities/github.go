@@ -132,6 +132,7 @@ type FetchRootRequest struct {
 	Repo         internal.Repo
 	Root         root.Root
 	DeploymentId string
+	Revision     string
 }
 
 type FetchRootResponse struct {
@@ -143,10 +144,13 @@ type FetchRootResponse struct {
 func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootRequest) (FetchRootResponse, error) {
 	ctx, cancel := temporal.StartHeartbeat(ctx, 10*time.Second)
 	defer cancel()
-
+	ref, err := request.Repo.HeadCommit.Ref.String()
+	if err != nil {
+		return FetchRootResponse{}, errors.Wrap(err, "processing request ref")
+	}
 	destinationPath := filepath.Join(a.DataDir, deploymentsDirName, request.DeploymentId)
 	opts := &github.RepositoryContentGetOptions{
-		Ref: request.Repo.HeadCommit.Ref,
+		Ref: ref,
 	}
 	client, err := a.ClientCreator.NewInstallationClient(request.Repo.Credentials.InstallationToken)
 	if err != nil {
@@ -161,7 +165,7 @@ func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootReque
 	if resp.StatusCode != http.StatusFound {
 		return FetchRootResponse{}, errors.Errorf("getting repo archive link returns non-302 status %d", resp.StatusCode)
 	}
-	downloadLink := a.LinkBuilder.BuildDownloadLinkFromArchive(archiveLink, request.Root, request.Repo)
+	downloadLink := a.LinkBuilder.BuildDownloadLinkFromArchive(archiveLink, request.Root, request.Repo, request.Revision)
 	err = getter.Get(destinationPath, downloadLink, getter.WithContext(ctx))
 	if err != nil {
 		return FetchRootResponse{}, errors.Wrap(err, "fetching and extracting zip")

@@ -214,6 +214,8 @@ func TestHandlePushEvent(t *testing.T) {
 	repoOwner := "nish"
 	repoName := "repo"
 	repoURL := "www.nish.com"
+	repoRefName := "main"
+	repoRefType := "branch"
 	sha := "12345"
 	repo := models.Repo{
 		FullName:      repoFullName,
@@ -300,6 +302,12 @@ func TestHandlePushEvent(t *testing.T) {
 					Name:     repoName,
 					Owner:    repoOwner,
 					URL:      repoURL,
+					HeadCommit: workflows.HeadCommit{
+						Ref: workflows.Ref{
+							Name: repoRefName,
+							Type: repoRefType,
+						},
+					},
 				},
 				Root: workflows.Root{
 					Name: testRoot,
@@ -366,6 +374,12 @@ func TestHandlePushEvent(t *testing.T) {
 					Name:     repoName,
 					Owner:    repoOwner,
 					URL:      repoURL,
+					HeadCommit: workflows.HeadCommit{
+						Ref: workflows.Ref{
+							Name: repoRefName,
+							Type: repoRefType,
+						},
+					},
 				},
 				Root: workflows.Root{
 					Name: testRoot,

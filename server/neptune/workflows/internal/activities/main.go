@@ -51,7 +51,7 @@ type Github struct {
 }
 
 type LinkBuilder interface {
-	BuildDownloadLinkFromArchive(archiveURL *url.URL, root root.Root, repo repo.Repo) string
+	BuildDownloadLinkFromArchive(archiveURL *url.URL, root root.Root, repo repo.Repo, revision string) string
 }
 
 func NewGithub(config githubapp.Config, scope tally.Scope, dataDir string) (*Github, error) {

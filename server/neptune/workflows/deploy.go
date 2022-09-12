@@ -17,6 +17,8 @@ type Root = deploy.Root
 type Job = deploy.Job
 type Step = deploy.Step
 type AppCredentials = deploy.AppCredentials
+type HeadCommit = deploy.Commit
+type Ref = deploy.Ref
 
 type DeployNewRevisionSignalRequest = revision.NewRevisionRequest
 
