@@ -103,13 +103,20 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 
 	var s []state.Workflow
 
+	runnerReq := terraform.Request{
+		Root:         testLocalRoot.Root,
+		Repo:         testGithubRepo,
+		DeploymentId: testDeploymentID,
+	}
+
 	subject := &terraform.Runner{
 		GithubActivities:    gAct,
 		TerraformActivities: tAct,
-		Request: terraform.Request{
-			Root:         testLocalRoot.Root,
-			Repo:         testGithubRepo,
-			DeploymentId: testDeploymentID,
+		Request:             runnerReq,
+		RootFetcher: &terraform.RootFetcher{
+			Request: runnerReq,
+			Ta: tAct,
+			Ga: gAct,
 		},
 		JobRunner: runner,
 		Store: state.NewWorkflowStoreWithGenerator(
@@ -387,7 +394,7 @@ func TestFetchRootError(t *testing.T) {
 	env.AssertExpectations(t)
 }
 
-func TestCleanupError(t *testing.T) {
+func TestCleanupErrorReturnsNoError(t *testing.T) {
 	var suite testsuite.WorkflowTestSuite
 	env := suite.NewTestWorkflowEnvironment()
 	ga := &githubActivities{}
@@ -415,5 +422,5 @@ func TestCleanupError(t *testing.T) {
 	env.AssertExpectations(t)
 	var resp response
 	err := env.GetWorkflowResult(&resp)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }

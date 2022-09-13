@@ -12,11 +12,11 @@ func Info(ctx workflow.Context, msg string) {
 	logger.Info(msg, kvs...)
 }
 
-func Warn(ctx workflow.Context, msg string) {
+func Warn(ctx workflow.Context, msg string, additionalKVs ...interface{}) {
 	logger := workflow.GetLogger(ctx)
 	kvs := context.ExtractFieldsAsList(ctx)
 
-	logger.Warn(msg, kvs...)
+	logger.Warn(msg, append(kvs, additionalKVs)...)
 }
 
 func Error(ctx workflow.Context, msg string, additionalKVs ...interface{}) {

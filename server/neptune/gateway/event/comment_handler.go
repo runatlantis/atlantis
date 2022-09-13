@@ -24,7 +24,6 @@ type Comment struct {
 	Timestamp time.Time
 }
 
-
 func NewCommentEventWorkerProxy(
 	logger logging.Logger,
 	snsWriter Writer,

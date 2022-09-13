@@ -76,6 +76,7 @@ type Runner struct {
 	JobRunner           jobRunner
 	Request             Request
 	Store               *state.WorkflowStore
+	RootFetcher         *RootFetcher
 }
 
 func newRunner(ctx workflow.Context, request Request) *Runner {
@@ -104,6 +105,11 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 				Activity: ta,
 			},
 		),
+		RootFetcher: &RootFetcher{
+			Request: request,
+			Ga:      ga,
+			Ta:      ta,
+		},
 		Store: state.NewWorkflowStore(
 			func(s *state.Workflow) error {
 				return workflow.SignalExternalWorkflow(ctx, parent.ID, parent.RunID, state.WorkflowStateChangeSignal, s).Get(ctx, nil)
@@ -194,33 +200,26 @@ func (r *Runner) Run(ctx workflow.Context) error {
 		return errors.Wrap(err, "getting worker info")
 	}
 
-	var fetchRootResponse activities.FetchRootResponse
-	err = workflow.ExecuteActivity(ctx, r.GithubActivities.FetchRoot, activities.FetchRootRequest{
-		Repo:         r.Request.Repo,
-		Root:         r.Request.Root,
-		DeploymentId: r.Request.DeploymentId,
-		Revision:     r.Request.Revision,
-	}).Get(ctx, &fetchRootResponse)
+	root, cleanup, err := r.RootFetcher.Fetch(ctx)
+	defer func() {
+		err := cleanup()
+
+		if err != nil {
+			logger.Warn(ctx, "error cleaning up local root", "err", err)
+		}
+	}()
 
 	if err != nil {
 		return errors.Wrap(err, "fetching root")
 	}
 
-	if err := r.Plan(ctx, fetchRootResponse.LocalRoot, response.ServerURL); err != nil {
+	if err := r.Plan(ctx, root, response.ServerURL); err != nil {
 		return errors.Wrap(err, "running plan job")
 	}
 
-	if err := r.Apply(ctx, fetchRootResponse.LocalRoot, response.ServerURL); err != nil {
+	if err := r.Apply(ctx, root, response.ServerURL); err != nil {
 		return errors.Wrap(err, "running apply job")
 	}
 
-	// Cleanup
-	var cleanupResponse activities.CleanupResponse
-	err = workflow.ExecuteActivity(ctx, r.TerraformActivities.Cleanup, activities.CleanupRequest{
-		LocalRoot: fetchRootResponse.LocalRoot,
-	}).Get(ctx, &cleanupResponse)
-	if err != nil {
-		return errors.Wrap(err, "cleaning up")
-	}
 	return nil
 }
