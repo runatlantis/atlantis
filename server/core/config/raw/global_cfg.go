@@ -159,10 +159,14 @@ func (r Repo) Validate() error {
 
 	branchValid := func(value interface{}) error {
 		branch := value.(string)
-		if !r.HasRegexBranch() {
+		if branch == "" {
 			return nil
 		}
-		_, err := regexp.Compile(branch[1 : len(branch)-1])
+		if !strings.HasPrefix(branch, "/") || !strings.HasSuffix(branch, "/") {
+			return errors.New("regex must begin and end with a slash '/'")
+		}
+		withoutSlashes := branch[1 : len(branch)-1]
+		_, err := regexp.Compile(withoutSlashes)
 		return errors.Wrapf(err, "parsing: %s", branch)
 	}
 

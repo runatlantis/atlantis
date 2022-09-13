@@ -43,7 +43,7 @@ func (p *ParserValidator) HasRepoCfg(absRepoDir string) (bool, error) {
 // ParseRepoCfg returns the parsed and validated atlantis.yaml config for the
 // repo at absRepoDir.
 // If there was no config file, it will return an os.IsNotExist(error).
-func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
+func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.GlobalCfg, repoID string, branch string) (valid.RepoCfg, error) {
 	configFile := p.repoCfgPath(absRepoDir, AtlantisYAMLFilename)
 	configData, err := os.ReadFile(configFile) // nolint: gosec
 
@@ -55,10 +55,10 @@ func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.Global
 		// able to detect if it's a NotExist err.
 		return valid.RepoCfg{}, err
 	}
-	return p.ParseRepoCfgData(configData, globalCfg, repoID)
+	return p.ParseRepoCfgData(configData, globalCfg, repoID, branch)
 }
 
-func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
+func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.GlobalCfg, repoID string, branch string) (valid.RepoCfg, error) {
 	var rawConfig raw.RepoCfg
 	if err := yaml.UnmarshalStrict(repoCfgData, &rawConfig); err != nil {
 		return valid.RepoCfg{}, err
@@ -71,6 +71,21 @@ func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.G
 	}
 
 	validConfig := rawConfig.ToValid()
+
+	// Filter the repo config's projects based on pull request's branch. Only
+	// keep projects that either:
+	//
+	//   - Have no branch regex defined at all (i.e. match all branches), or
+	//   - Those that have branch regex matching the PR's base branch.
+	//
+	i := 0
+	for _, p := range validConfig.Projects {
+		if branch == "" || p.BranchRegex == nil || p.BranchRegex.Match([]byte(branch)) {
+			validConfig.Projects[i] = p
+			i++
+		}
+	}
+	validConfig.Projects = validConfig.Projects[:i]
 
 	// We do the project name validation after we get the valid config because
 	// we need the defaults of dir and workspace to be populated.
