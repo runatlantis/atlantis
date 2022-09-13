@@ -358,7 +358,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
-	commitStatusUpdater := &command.VCSStatusUpdater{Client: vcsClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: userConfig.VCSStatusName}}
+	commitStatusUpdater := &command.VCSStatusUpdater{
+		Client: vcsClient,
+		TitleBuilder: vcs.StatusTitleBuilder{
+			TitlePrefix: userConfig.VCSStatusName,
+		},
+		DefaultDetailsURL: userConfig.DefaultCheckrunDetailsURL,
+	}
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
 

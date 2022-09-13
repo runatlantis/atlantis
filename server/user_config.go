@@ -85,6 +85,9 @@ type UserConfig struct {
 	LyftGatewaySnsTopicArn   string          `mapstructure:"lyft-gateway-sns-topic-arn"`
 	LyftMode                 string          `mapstructure:"lyft-mode"`
 	LyftWorkerQueueURL       string          `mapstructure:"lyft-worker-queue-url"`
+
+	// Supports adding a default URL to the checkrun UI when details URL is not set
+	DefaultCheckrunDetailsURL string `mapstructure:"default-checkrun-details-url"`
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed

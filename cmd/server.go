@@ -107,20 +107,21 @@ const (
 	LyftWorkerQueueUrlFlag       = "lyft-worker-queue-url"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
-	DefaultADBasicUser      = ""
-	DefaultADBasicPassword  = ""
-	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
-	DefaultCheckoutStrategy = "branch"
-	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
-	DefaultDataDir          = "~/.atlantis"
-	DefaultGHHostname       = "github.com"
-	DefaultGitlabHostname   = "gitlab.com"
-	DefaultLogLevel         = "info"
-	DefaultParallelPoolSize = 15
-	DefaultStatsNamespace   = "atlantis"
-	DefaultPort             = 4141
-	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
-	DefaultVCSStatusName    = "atlantis"
+	DefaultADBasicUser            = ""
+	DefaultADBasicPassword        = ""
+	DefaultAutoplanFileList       = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
+	DefaultCheckoutStrategy       = "branch"
+	DefaultCheckrunDetailsURLFlag = "default-checkrun-details-url"
+	DefaultBitbucketBaseURL       = bitbucketcloud.BaseURL
+	DefaultDataDir                = "~/.atlantis"
+	DefaultGHHostname             = "github.com"
+	DefaultGitlabHostname         = "gitlab.com"
+	DefaultLogLevel               = "info"
+	DefaultParallelPoolSize       = 15
+	DefaultStatsNamespace         = "atlantis"
+	DefaultPort                   = 4141
+	DefaultTFDownloadURL          = "https://releases.hashicorp.com"
+	DefaultVCSStatusName          = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -185,6 +186,9 @@ var stringFlags = map[string]stringFlag{
 	DataDirFlag: {
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	DefaultCheckrunDetailsURLFlag: {
+		description: "URL to redirect to if details URL is not set in the checkrun UI",
 	},
 	FFOwnerFlag: {
 		description: "Owner of the repo used to house feature flag configuration.",
@@ -448,30 +452,31 @@ func (c *GatewayCreator) NewServer(userConfig server.UserConfig, config server.C
 		return nil, err
 	}
 	cfg := gateway.Config{
-		DataDir:             userConfig.DataDir,
-		AutoplanFileList:    userConfig.AutoplanFileList,
-		AppCfg:              appConfig,
-		RepoAllowList:       userConfig.RepoAllowlist,
-		MaxProjectsPerPR:    userConfig.MaxProjectsPerPR,
-		EnablePlatformMode:  userConfig.EnablePlatformMode,
-		FFOwner:             userConfig.FFOwner,
-		FFRepo:              userConfig.FFRepo,
-		FFBranch:            userConfig.FFBranch,
-		FFPath:              userConfig.FFPath,
-		GithubHostname:      userConfig.GithubHostname,
-		GithubWebhookSecret: userConfig.GithubWebhookSecret,
-		GithubAppID:         userConfig.GithubAppID,
-		GithubAppKeyFile:    userConfig.GithubAppKeyFile,
-		GithubAppSlug:       userConfig.GithubAppSlug,
-		GithubStatusName:    userConfig.VCSStatusName,
-		LogLevel:            userConfig.ToLogLevel(),
-		StatsNamespace:      userConfig.StatsNamespace,
-		Port:                userConfig.Port,
-		RepoConfig:          userConfig.RepoConfig,
-		TFDownloadURL:       userConfig.TFDownloadURL,
-		SNSTopicArn:         userConfig.LyftGatewaySnsTopicArn,
-		SSLKeyFile:          userConfig.SSLKeyFile,
-		SSLCertFile:         userConfig.SSLCertFile,
+		DataDir:                   userConfig.DataDir,
+		AutoplanFileList:          userConfig.AutoplanFileList,
+		AppCfg:                    appConfig,
+		RepoAllowList:             userConfig.RepoAllowlist,
+		MaxProjectsPerPR:          userConfig.MaxProjectsPerPR,
+		EnablePlatformMode:        userConfig.EnablePlatformMode,
+		FFOwner:                   userConfig.FFOwner,
+		FFRepo:                    userConfig.FFRepo,
+		FFBranch:                  userConfig.FFBranch,
+		FFPath:                    userConfig.FFPath,
+		GithubHostname:            userConfig.GithubHostname,
+		GithubWebhookSecret:       userConfig.GithubWebhookSecret,
+		GithubAppID:               userConfig.GithubAppID,
+		GithubAppKeyFile:          userConfig.GithubAppKeyFile,
+		GithubAppSlug:             userConfig.GithubAppSlug,
+		GithubStatusName:          userConfig.VCSStatusName,
+		LogLevel:                  userConfig.ToLogLevel(),
+		StatsNamespace:            userConfig.StatsNamespace,
+		Port:                      userConfig.Port,
+		RepoConfig:                userConfig.RepoConfig,
+		TFDownloadURL:             userConfig.TFDownloadURL,
+		SNSTopicArn:               userConfig.LyftGatewaySnsTopicArn,
+		SSLKeyFile:                userConfig.SSLKeyFile,
+		SSLCertFile:               userConfig.SSLCertFile,
+		DefaultCheckrunDetailsURL: userConfig.DefaultCheckrunDetailsURL,
 	}
 	return gateway.NewServer(cfg)
 }

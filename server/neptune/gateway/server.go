@@ -50,30 +50,31 @@ import (
 
 // TODO: let's make this struct nicer using actual OOP instead of just a god type struct
 type Config struct {
-	DataDir             string
-	AutoplanFileList    string
-	AppCfg              githubapp.Config
-	RepoAllowList       string
-	MaxProjectsPerPR    int
-	EnablePlatformMode  bool
-	FFOwner             string
-	FFRepo              string
-	FFBranch            string
-	FFPath              string
-	GithubHostname      string
-	GithubWebhookSecret string
-	GithubAppID         int64
-	GithubAppKeyFile    string
-	GithubAppSlug       string
-	GithubStatusName    string
-	LogLevel            logging.LogLevel
-	StatsNamespace      string
-	Port                int
-	RepoConfig          string
-	TFDownloadURL       string
-	SNSTopicArn         string
-	SSLKeyFile          string
-	SSLCertFile         string
+	DataDir                   string
+	AutoplanFileList          string
+	AppCfg                    githubapp.Config
+	RepoAllowList             string
+	MaxProjectsPerPR          int
+	EnablePlatformMode        bool
+	FFOwner                   string
+	FFRepo                    string
+	FFBranch                  string
+	FFPath                    string
+	GithubHostname            string
+	GithubWebhookSecret       string
+	GithubAppID               int64
+	GithubAppKeyFile          string
+	GithubAppSlug             string
+	GithubStatusName          string
+	LogLevel                  logging.LogLevel
+	StatsNamespace            string
+	Port                      int
+	RepoConfig                string
+	TFDownloadURL             string
+	SNSTopicArn               string
+	SSLKeyFile                string
+	SSLCertFile               string
+	DefaultCheckrunDetailsURL string
 }
 
 type Server struct {

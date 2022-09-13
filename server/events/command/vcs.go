@@ -14,8 +14,9 @@ import (
 // VCSStatusUpdater updates the status of a commit with the VCS host. We set
 // the status to signify whether the plan/apply succeeds.
 type VCSStatusUpdater struct {
-	Client       vcs.Client
-	TitleBuilder vcs.StatusTitleBuilder
+	Client            vcs.Client
+	TitleBuilder      vcs.StatusTitleBuilder
+	DefaultDetailsURL string
 }
 
 func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, statusId string) (string, error) {
@@ -29,7 +30,7 @@ func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo,
 		StatusName:       src,
 		State:            status,
 		Description:      descrip,
-		DetailsURL:       "",
+		DetailsURL:       d.DefaultDetailsURL,
 		PullCreationTime: pull.CreatedAt,
 		StatusId:         statusId,
 		CommandName:      titleString(cmdName),
@@ -57,7 +58,7 @@ func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.
 		StatusName:       src,
 		State:            status,
 		Description:      fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb),
-		DetailsURL:       "",
+		DetailsURL:       d.DefaultDetailsURL,
 		PullCreationTime: pull.CreatedAt,
 		StatusId:         statusId,
 		CommandName:      titleString(cmdName),
