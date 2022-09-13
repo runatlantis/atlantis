@@ -145,10 +145,10 @@ func getCheckStateAndConclusion(internalState internal.CheckRunState) (string, s
 	case internal.CheckRunUnknown:
 		state = string(internal.CheckRunQueued)
 	case internal.CheckRunFailure:
-		state = "complete"
+		state = "completed"
 		conclusion = "failure"
 	case internal.CheckRunSuccess:
-		state = "complete"
+		state = "completed"
 		conclusion = "success"
 	default:
 		state = string(internalState)
