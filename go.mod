@@ -43,7 +43,6 @@ require (
 	github.com/xanzy/go-gitlab v0.69.0
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.23.0
-	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/yaml.v2 v2.4.0

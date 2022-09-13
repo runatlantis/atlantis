@@ -14,7 +14,6 @@
 package events
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"golang.org/x/sync/semaphore"
 )
 
 const workingDirPrefix = "repos"
@@ -204,15 +202,12 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	headRepo models.Repo,
 	p models.PullRequest) error {
 
-	value, _ := cloneLocks.LoadOrStore(cloneDir, semaphore.NewWeighted(1))
-	sem := value.(*semaphore.Weighted)
+	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
+	mutex := value.(*sync.Mutex)
 
-	defer sem.Release(1)
-	if acquired := sem.TryAcquire(1); !acquired {
-		err := sem.Acquire(context.TODO(), 1)
-		if err != nil {
-			return errors.Wrap(err, "waiting for repository to be cloned")
-		}
+	defer mutex.Unlock()
+	if locked := mutex.TryLock(); !locked {
+		mutex.Lock()
 		return nil
 	}
 
