@@ -100,6 +100,9 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 			&runner.InitStepRunner{
 				Activity: ta,
 			},
+			&runner.PlanStepRunner{
+				Activity: ta,
+			},
 		),
 		Store: state.NewWorkflowStore(
 			func(s *state.Workflow) error {

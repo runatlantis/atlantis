@@ -130,3 +130,51 @@ func TestTerraformInit_ExtraArgsTakesPrecedenceOverCommandArgs(t *testing.T) {
 	_, err = env.ExecuteActivity(tfActivity.TerraformInit, req)
 	assert.NoError(t, err)
 }
+
+func TestTerraformPlan(t *testing.T) {
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestActivityEnvironment()
+
+	ctx := context.Background()
+	path := "some/path"
+	jobID := "1234"
+	defVersion := "1.0.2"
+	reqVersion := "1.2.2"
+
+	defaultTfVersion, err := version.NewVersion(defVersion)
+	assert.Nil(t, err)
+
+	reqTfVersion, err := version.NewVersion(reqVersion)
+	assert.Nil(t, err)
+
+	testTfClient := testTfClient{
+		t:             t,
+		ctx:           ctx,
+		jobID:         jobID,
+		path:          path,
+		args:          []string{"plan", "-input=false", "-refresh=true", "-out=some/path/output.tfplan"},
+		customEnvVars: map[string]string{},
+		version:       reqTfVersion,
+		resp:          []terraform.Line{},
+	}
+
+	req := activities.TerraformPlanRequest{
+		Step: job.Step{
+			StepName: "plan",
+		},
+		Envs:      map[string]string{},
+		JobID:     jobID,
+		Path:      path,
+		TfVersion: reqVersion,
+	}
+
+	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion)
+	env.RegisterActivity(tfActivity)
+
+	resp, err := env.ExecuteActivity(tfActivity.TerraformPlan, req)
+	assert.NoError(t, err)
+
+	var planResp activities.TerraformPlanResponse
+	assert.Nil(t, resp.Get(&planResp))
+	assert.Equal(t, planResp.PlanFile, "some/path/output.tfplan")
+}
