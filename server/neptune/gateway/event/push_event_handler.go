@@ -36,6 +36,7 @@ type Push struct {
 type signaler interface {
 	SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
 		options client.StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (client.WorkflowRun, error)
+	SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error
 }
 
 type scheduler interface {

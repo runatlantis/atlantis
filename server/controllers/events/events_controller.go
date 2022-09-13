@@ -81,6 +81,12 @@ func (h unsupportedPushEventHandler) Handle(ctx context.Context, event event_typ
 	return fmt.Errorf("push events are not supported in this context")
 }
 
+type unsupportedCheckRunEventHandler struct {}
+
+func (h unsupportedCheckRunEventHandler) Handle(ctx context.Context, event event_types.CheckRun) error {
+	return fmt.Errorf("check run events are not supported in this context")
+}
+
 func NewRequestResolvers(
 	providerResolverInitializer map[models.VCSHostType]func() RequestResolver,
 	supportedProviders []models.VCSHostType,
@@ -151,6 +157,7 @@ func NewVCSEventsController(
 				commentHandler,
 				prHandler,
 				pushHandler,
+				unsupportedCheckRunEventHandler{},
 				allowDraftPRs,
 				repoConverter,
 				pullConverter,

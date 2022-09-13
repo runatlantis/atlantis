@@ -48,7 +48,7 @@ func (s *WorkflowStore) InitPlanJob(jobID fmt.Stringer, serverURL fmt.Stringer) 
 		Output: &JobOutput{
 			URL: outputURL,
 		},
-		Status: InProgressJobStatus,
+		Status: WaitingJobStatus,
 	}
 
 	return s.notifier(s.state)
@@ -64,7 +64,7 @@ func (s *WorkflowStore) InitApplyJob(jobID fmt.Stringer, serverURL fmt.Stringer)
 		Output: &JobOutput{
 			URL: outputURL,
 		},
-		Status: InProgressJobStatus,
+		Status: WaitingJobStatus,
 	}
 
 	return s.notifier(s.state)

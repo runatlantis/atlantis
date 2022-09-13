@@ -48,7 +48,8 @@ func (n *StateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel,
 		Summary: summary,
 	}
 
-	if workflowState.Plan.Status == state.SuccessJobStatus && workflowState.Apply == nil {
+	if workflowState.Plan.Status == state.SuccessJobStatus &&
+		workflowState.Apply != nil && workflowState.Apply.Status == state.WaitingJobStatus {
 		request.Actions = []github.CheckRunAction{
 			github.CreatePlanReviewAction(github.Approve),
 			github.CreatePlanReviewAction(github.Reject),
@@ -74,7 +75,7 @@ func (n *StateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel,
 func determineCheckRunState(workflowState *state.Workflow) github.CheckRunState {
 	if workflowState.Apply == nil {
 		switch workflowState.Plan.Status {
-		case state.InProgressJobStatus, state.SuccessJobStatus:
+		case state.InProgressJobStatus, state.SuccessJobStatus, state.WaitingJobStatus:
 			return github.CheckRunPending
 		case state.FailedJobStatus:
 			return github.CheckRunFailure
@@ -82,7 +83,7 @@ func determineCheckRunState(workflowState *state.Workflow) github.CheckRunState 
 	}
 
 	switch workflowState.Apply.Status {
-	case state.InProgressJobStatus:
+	case state.InProgressJobStatus, state.WaitingJobStatus:
 		return github.CheckRunPending
 	case state.SuccessJobStatus:
 		return github.CheckRunSuccess

@@ -14,6 +14,15 @@ import (
 // Export anything that callers need such as requests, signals, etc.
 type TerraformRequest = terraform.Request
 
+type TerraformPlanReviewSignalRequest = terraform.PlanReviewSignalRequest
+
+type TerraformPlanReviewStatus = terraform.PlanStatus
+
+const ApprovedPlanReviewStatus = terraform.Approved
+const RejectedPlanReviewStatus = terraform.Rejected
+
+const TerraformPlanReviewSignalName = terraform.PlanReviewSignalName
+
 type TerraformActivities struct {
 	activities.Terraform
 }

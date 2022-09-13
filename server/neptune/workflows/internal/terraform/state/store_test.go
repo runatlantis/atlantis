@@ -30,7 +30,7 @@ func TestInitPlanJob(t *testing.T) {
 	notifier := &testNotifier{
 		expectedState: &state.Workflow{
 			Plan: &state.Job{
-				Status: state.InProgressJobStatus,
+				Status: state.WaitingJobStatus,
 				Output: &state.JobOutput{
 					URL: exoectedURL,
 				},
@@ -61,7 +61,7 @@ func TestInitApplyJob(t *testing.T) {
 	notifier := &testNotifier{
 		expectedState: &state.Workflow{
 			Apply: &state.Job{
-				Status: state.InProgressJobStatus,
+				Status: state.WaitingJobStatus,
 				Output: &state.JobOutput{
 					URL: exoectedURL,
 				},
@@ -91,7 +91,7 @@ func TestUpdateApplyJob(t *testing.T) {
 	notifier := &testNotifier{
 		expectedState: &state.Workflow{
 			Apply: &state.Job{
-				Status: state.InProgressJobStatus,
+				Status: state.WaitingJobStatus,
 				Output: &state.JobOutput{
 					URL: exoectedURL,
 				},
@@ -127,7 +127,7 @@ func TestUpdatePlanJob(t *testing.T) {
 	notifier := &testNotifier{
 		expectedState: &state.Workflow{
 			Plan: &state.Job{
-				Status: state.InProgressJobStatus,
+				Status: state.WaitingJobStatus,
 				Output: &state.JobOutput{
 					URL: exoectedURL,
 				},

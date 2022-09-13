@@ -74,6 +74,11 @@ func NewVCSEventsController(
 		RootConfigBuilder: rootConfigBuilder,
 	}
 
+	checkRunHandler := &gateway_handlers.CheckRunHandler{
+		Logger:         logger,
+		TemporalClient: temporalClient,
+	}
+
 	// lazy map of resolver providers to their resolver
 	// laziness ensures we only instantiate the providers we support.
 	providerResolverInitializer := map[models.VCSHostType]func() events_controllers.RequestResolver{
@@ -85,6 +90,7 @@ func NewVCSEventsController(
 				commentHandler,
 				prHandler,
 				pushHandler,
+				checkRunHandler,
 				allowDraftPRs,
 				repoConverter,
 				pullConverter,

@@ -31,13 +31,20 @@ type jobRunner interface {
 }
 
 type PlanStatus int
-type PlanReview struct {
+type PlanReviewSignalRequest struct {
 	Status PlanStatus
+
+	// TODO: Output this info to the checks UI
+	User string
 }
 
 const (
 	Approved PlanStatus = iota
 	Rejected
+)
+
+const (
+	PlanReviewSignalName = "planreview"
 )
 
 func Workflow(ctx workflow.Context, request Request) error {
@@ -112,6 +119,10 @@ func (r *Runner) Plan(ctx workflow.Context, root *root.LocalRoot, serverURL *url
 		return errors.Wrap(err, "initializing job")
 	}
 
+	if err := r.Store.UpdatePlanJobWithStatus(state.InProgressJobStatus); err != nil {
+		return errors.Wrap(err, "updating job with in-progress status")
+	}
+
 	_, err = r.JobRunner.Run(ctx, r.Request.Root.Plan, root)
 
 	if err != nil {
@@ -137,31 +148,36 @@ func (r *Runner) Apply(ctx workflow.Context, root *root.LocalRoot, serverURL *ur
 	}
 
 	if err := r.Store.InitApplyJob(jobID, serverURL); err != nil {
-		return errors.Wrap(err, "initializing apply job")
+		return errors.Wrap(err, "initializing job")
 	}
 
 	// Wait for plan review signal
-	var planReview PlanReview
-	signalChan := workflow.GetSignalChannel(ctx, "planreview-repo-steps")
+	var planReview PlanReviewSignalRequest
+	signalChan := workflow.GetSignalChannel(ctx, PlanReviewSignalName)
 	_ = signalChan.Receive(ctx, &planReview)
 
 	if planReview.Status == Rejected {
 		if err := r.Store.UpdateApplyJobWithStatus(state.RejectedJobStatus); err != nil {
-			return errors.Wrap(err, "updating apply job with rejected status")
+			return errors.Wrap(err, "updating job with rejected status")
 		}
 		return nil
 	}
+
+	if err := r.Store.UpdateApplyJobWithStatus(state.InProgressJobStatus); err != nil {
+		return errors.Wrap(err, "updating job with in-progress status")
+	}
+
 	_, err = r.JobRunner.Run(ctx, r.Request.Root.Apply, root)
 	if err != nil {
 
 		if err := r.Store.UpdateApplyJobWithStatus(state.FailedJobStatus); err != nil {
-			return errors.Wrap(err, "updating apply job with failed status")
+			return errors.Wrap(err, "updating job with failed status")
 		}
-		return errors.Wrap(err, "running plan job")
+		return errors.Wrap(err, "running job")
 	}
 
 	if err := r.Store.UpdateApplyJobWithStatus(state.SuccessJobStatus); err != nil {
-		return errors.Wrap(err, "updating apply job with success status")
+		return errors.Wrap(err, "updating job with success status")
 	}
 
 	return nil

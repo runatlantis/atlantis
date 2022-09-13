@@ -69,6 +69,15 @@ func TestStateReceive(t *testing.T) {
 			State: &state.Workflow{
 				Plan: &state.Job{
 					Output: jobOutput,
+					Status: state.WaitingJobStatus,
+				},
+			},
+			ExpectedCheckRunState: github.CheckRunPending,
+		},
+		{
+			State: &state.Workflow{
+				Plan: &state.Job{
+					Output: jobOutput,
 					Status: state.InProgressJobStatus,
 				},
 			},
@@ -88,6 +97,19 @@ func TestStateReceive(t *testing.T) {
 				Plan: &state.Job{
 					Output: jobOutput,
 					Status: state.SuccessJobStatus,
+				},
+			},
+			ExpectedCheckRunState: github.CheckRunPending,
+		},
+		{
+			State: &state.Workflow{
+				Plan: &state.Job{
+					Output: jobOutput,
+					Status: state.SuccessJobStatus,
+				},
+				Apply: &state.Job{
+					Output: jobOutput,
+					Status: state.WaitingJobStatus,
 				},
 			},
 			ExpectedCheckRunState: github.CheckRunPending,

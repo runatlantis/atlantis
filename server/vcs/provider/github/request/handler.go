@@ -8,8 +8,8 @@ import (
 	"github.com/runatlantis/atlantis/server/http"
 
 	"github.com/runatlantis/atlantis/server/controllers/events/handlers"
-	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	contextInternal "github.com/runatlantis/atlantis/server/neptune/gateway/context"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 
 	"github.com/google/go-github/v45/github"
 	"github.com/runatlantis/atlantis/server/controllers/events/errors"
@@ -23,8 +23,6 @@ const (
 	githubHeader    = "X-Github-Event"
 	requestIDHeader = "X-Github-Delivery"
 )
-
-
 
 // interfaces used in Handler
 
@@ -41,6 +39,10 @@ type pushEventHandler interface {
 	Handle(ctx context.Context, e event.Push) error
 }
 
+type checkRunEventHandler interface {
+	Handle(ctx context.Context, e event.CheckRun) error
+}
+
 // converter interfaces
 type pullEventConverter interface {
 	Convert(event *github.PullRequestEvent) (event.PullRequest, error)
@@ -52,6 +54,10 @@ type commentEventConverter interface {
 
 type pushEventConverter interface {
 	Convert(event *github.PushEvent) (event.Push, error)
+}
+
+type checkRunEventConverter interface {
+	Convert(event *github.CheckRunEvent) (event.CheckRun, error)
 }
 
 // Matcher matches a provided request against some condition
@@ -68,6 +74,7 @@ func NewHandler(
 	commentHandler *handlers.CommentEvent,
 	prHandler *handlers.PullRequestEvent,
 	pushHandler pushEventHandler,
+	checkRunHandler checkRunEventHandler,
 	allowDraftPRs bool,
 	repoConverter converter.RepoConverter,
 	pullConverter converter.PullConverter,
@@ -92,25 +99,29 @@ func NewHandler(
 		pushEventConverter: converter.PushEvent{
 			RepoConverter: repoConverter,
 		},
-		pushHandler:   pushHandler,
-		webhookSecret: webhookSecret,
-		logger:        logger,
-		scope:         scope,
+		checkRunEventConverter: converter.CheckRunEvent{},
+		pushHandler:            pushHandler,
+		checkRunHandler:        checkRunHandler,
+		webhookSecret:          webhookSecret,
+		logger:                 logger,
+		scope:                  scope,
 	}
 }
 
 type Handler struct {
-	validator             requestValidator
-	commentHandler        commentEventHandler
-	prHandler             prEventHandler
-	pushHandler           pushEventHandler
-	parser                webhookParser
-	pullEventConverter    pullEventConverter
-	commentEventConverter commentEventConverter
-	pushEventConverter    pushEventConverter
-	webhookSecret         []byte
-	logger                logging.Logger
-	scope                 tally.Scope
+	validator              requestValidator
+	commentHandler         commentEventHandler
+	prHandler              prEventHandler
+	pushHandler            pushEventHandler
+	checkRunHandler        checkRunEventHandler
+	parser                 webhookParser
+	pullEventConverter     pullEventConverter
+	commentEventConverter  commentEventConverter
+	pushEventConverter     pushEventConverter
+	checkRunEventConverter checkRunEventConverter
+	webhookSecret          []byte
+	logger                 logging.Logger
+	scope                  tally.Scope
 
 	Matcher
 }
@@ -157,6 +168,9 @@ func (h *Handler) Handle(r *http.BufferedRequest) error {
 	case *github.PushEvent:
 		err = h.handlePushEvent(ctx, event)
 		scope = scope.SubScope("push")
+	case *github.CheckRunEvent:
+		err = h.handleCheckRunEvent(ctx, event)
+		scope = scope.SubScope("checkrun")
 	default:
 		h.logger.WarnContext(ctx, "Ignoring unsupported event")
 	}
@@ -210,4 +224,15 @@ func (h *Handler) handlePushEvent(ctx context.Context, e *github.PushEvent) erro
 	ctx = context.WithValue(ctx, contextInternal.SHAKey, pushEvent.Sha)
 
 	return h.pushHandler.Handle(ctx, pushEvent)
+}
+
+func (h *Handler) handleCheckRunEvent(ctx context.Context, e *github.CheckRunEvent) error {
+	checkRunEvent, err := h.checkRunEventConverter.Convert(e)
+
+	if err != nil {
+		return &errors.EventParsingError{Err: err}
+	}
+	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, checkRunEvent.Repo.FullName)
+
+	return h.checkRunHandler.Handle(ctx, checkRunEvent)
 }

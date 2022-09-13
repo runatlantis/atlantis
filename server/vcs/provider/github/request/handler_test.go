@@ -28,6 +28,17 @@ func (h assertingPushHandler) Handle(ctx context.Context, input event.Push) erro
 	return nil
 }
 
+type assertingCheckRunHandler struct {
+	t             *testing.T
+	expectedInput event.CheckRun
+}
+
+func (h assertingCheckRunHandler) Handle(ctx context.Context, input event.CheckRun) error {
+	assert.Equal(h.t, h.expectedInput, input)
+
+	return nil
+}
+
 // mocks/test implementations
 type assertingPRHandler struct {
 	expectedInput   event.PullRequest
@@ -70,6 +81,15 @@ type testPushEventConverter struct {
 
 func (c testPushEventConverter) Convert(_ *github.PushEvent) (event.Push, error) {
 	return c.returnedPushEvent, c.returnedParsePushEventError
+}
+
+type testCheckRunEventConverter struct {
+	returnedCheckRunEvent           event.CheckRun
+	returnedParseCheckRunEventError error
+}
+
+func (c testCheckRunEventConverter) Convert(_ *github.CheckRunEvent) (event.CheckRun, error) {
+	return c.returnedCheckRunEvent, c.returnedParseCheckRunEventError
 }
 
 type testPullEventConverter struct {
@@ -435,6 +455,115 @@ func TestHandlePushEvent(t *testing.T) {
 				pushEventConverter: testPushEventConverter{
 					returnedPushEvent:           internalEvent,
 					returnedParsePushEventError: c.returnedParsePushEventError,
+				},
+				parser: &testParser{
+					returnedEvent:             event,
+					returnedParseWebhookError: c.returnedParseWebhookError,
+				},
+				Matcher: Matcher{},
+			}
+
+			err = subject.Handle(request)
+			assert.IsType(t, c.expectedErr, err)
+		})
+
+	}
+}
+
+func TestHandleCheckRunEvent(t *testing.T) {
+	payload := []byte("payload")
+	secret := "secret"
+
+	log := logging.NewNoopCtxLogger(t)
+	scope, _, err := metrics.NewLoggingScope(logging.NewNoopCtxLogger(t), "atlantis")
+	assert.NoError(t, err)
+
+	rawRequest, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost, "",
+		bytes.NewBuffer([]byte("body")),
+	)
+	assert.NoError(t, err)
+
+	request, err := httputils.NewBufferedRequest(rawRequest)
+	assert.NoError(t, err)
+
+	internalEvent := event.CheckRun{
+		Name: "some name",
+	}
+
+	event := &github.CheckRunEvent{
+		Repo: &github.Repository{
+			Name: github.String("repo"),
+		},
+	}
+
+	t.Run("success", func(t *testing.T) {
+		subject := Handler{
+			logger:        log,
+			scope:         scope,
+			webhookSecret: []byte(secret),
+			checkRunHandler: assertingCheckRunHandler{
+				expectedInput: internalEvent,
+				t:             t,
+			},
+			validator: testValidator{
+				returnedPayload: payload,
+			},
+			checkRunEventConverter: testCheckRunEventConverter{
+				returnedCheckRunEvent: internalEvent,
+			},
+			parser: &testParser{
+				returnedEvent: event,
+			},
+			Matcher: Matcher{},
+		}
+
+		err = subject.Handle(request)
+		assert.NoError(t, err)
+	})
+
+	cases := []struct {
+		returnedParseWebhookError       error
+		returnedValidatorError          error
+		returnedParseCheckRunEventError error
+		expectedErr                     error
+		description                     string
+	}{
+		{
+			description:               "webhook parsing error",
+			returnedParseWebhookError: assert.AnError,
+			expectedErr:               &errors.WebhookParsingError{},
+		},
+		{
+			description:            "validator error",
+			returnedValidatorError: assert.AnError,
+			expectedErr:            &errors.RequestValidationError{},
+		},
+		{
+			description:                     "event parsing error",
+			returnedParseCheckRunEventError: assert.AnError,
+			expectedErr:                     &errors.EventParsingError{},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			subject := Handler{
+				logger:        log,
+				scope:         scope,
+				webhookSecret: []byte(secret),
+				checkRunHandler: assertingCheckRunHandler{
+					expectedInput: internalEvent,
+					t:             t,
+				},
+				validator: testValidator{
+					returnedPayload: payload,
+					returnedError:   c.returnedValidatorError,
+				},
+				checkRunEventConverter: testCheckRunEventConverter{
+					returnedCheckRunEvent:           internalEvent,
+					returnedParseCheckRunEventError: c.returnedParseCheckRunEventError,
 				},
 				parser: &testParser{
 					returnedEvent:             event,

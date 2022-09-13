@@ -7,6 +7,7 @@ type JobStatus string
 const WorkflowStateChangeSignal = "terraform-workflow-state-change"
 
 const (
+	WaitingJobStatus    JobStatus = "waiting"
 	InProgressJobStatus JobStatus = "in-progress"
 	RejectedJobStatus   JobStatus = "rejected"
 	FailedJobStatus     JobStatus = "failed"
