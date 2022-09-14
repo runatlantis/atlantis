@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/neptune/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/testsuite"
 )
@@ -70,9 +69,6 @@ func TestTerraformInit_TfVersionInRequestTakesPrecedence(t *testing.T) {
 	}
 
 	req := activities.TerraformInitRequest{
-		Step: job.Step{
-			StepName: "init",
-		},
 		Envs:      map[string]string{},
 		JobID:     jobID,
 		Path:      path,
@@ -114,9 +110,11 @@ func TestTerraformInit_ExtraArgsTakesPrecedenceOverCommandArgs(t *testing.T) {
 	}
 
 	req := activities.TerraformInitRequest{
-		Step: job.Step{
-			StepName:  "init",
-			ExtraArgs: []string{"-input=true"},
+		Args: []terraform.Argument{
+			{
+				Key:   "input",
+				Value: "true",
+			},
 		},
 		Envs:      map[string]string{},
 		JobID:     jobID,
@@ -159,9 +157,6 @@ func TestTerraformPlan(t *testing.T) {
 	}
 
 	req := activities.TerraformPlanRequest{
-		Step: job.Step{
-			StepName: "plan",
-		},
 		Envs:      map[string]string{},
 		JobID:     jobID,
 		Path:      path,

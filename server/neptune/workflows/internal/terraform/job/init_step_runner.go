@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/neptune/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
@@ -19,9 +20,14 @@ type InitStepRunner struct {
 }
 
 func (r *InitStepRunner) Run(executionContext *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) (string, error) {
+	args, err := terraform.NewArgumentList(step.ExtraArgs)
+
+	if err != nil {
+		return "", errors.Wrapf(err, "creating argument list")
+	}
 	var resp activities.TerraformInitResponse
-	err := workflow.ExecuteActivity(executionContext.Context, r.Activity.TerraformInit, activities.TerraformInitRequest{
-		Step:      step,
+	err = workflow.ExecuteActivity(executionContext.Context, r.Activity.TerraformInit, activities.TerraformInitRequest{
+		Args:      args,
 		Envs:      executionContext.Envs,
 		TfVersion: executionContext.TfVersion,
 		Path:      executionContext.Path,

@@ -2,7 +2,6 @@ package activities
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -10,14 +9,21 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/neptune/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 )
 
+var DisableInputArg = terraform.Argument{
+	Key:   "input",
+	Value: "false",
+}
+
+var RefreshArg = terraform.Argument{
+	Key:   "refresh",
+	Value: "true",
+}
+
 const (
-	DisableInputArg = "-input=false"
-	RefreshArg      = "-refresh=true"
-	OutArg          = "-out"
-	PlanOutputFile  = "output.tfplan"
+	outArgKey      = "out"
+	PlanOutputFile = "output.tfplan"
 )
 
 type TerraformClient interface {
@@ -38,7 +44,7 @@ func NewTerraformActivities(client TerraformClient, defaultTfVersion *version.Ve
 
 // Terraform Init
 type TerraformInitRequest struct {
-	Step      job.Step
+	Args      []terraform.Argument
 	Envs      map[string]string
 	JobID     string
 	TfVersion string
@@ -58,8 +64,8 @@ func (t *terraformActivities) TerraformInit(ctx context.Context, request Terrafo
 
 	cmd, err := terraform.NewCommandArguments(
 		terraform.Init,
-		[]string{DisableInputArg},
-		request.Step.ExtraArgs,
+		[]terraform.Argument{DisableInputArg},
+		request.Args...,
 	)
 	if err != nil {
 		return TerraformInitResponse{}, errors.Wrap(err, "building command arguments")
@@ -75,7 +81,7 @@ func (t *terraformActivities) TerraformInit(ctx context.Context, request Terrafo
 
 // Terraform Plan
 type TerraformPlanRequest struct {
-	Step      job.Step
+	Args      []terraform.Argument
 	Envs      map[string]string
 	JobID     string
 	TfVersion string
@@ -95,8 +101,11 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 	planFile := filepath.Join(request.Path, PlanOutputFile)
 	cmd, err := terraform.NewCommandArguments(
 		terraform.Plan,
-		[]string{DisableInputArg, RefreshArg, fmt.Sprintf("%s=%s", OutArg, planFile)},
-		request.Step.ExtraArgs,
+		[]terraform.Argument{DisableInputArg, RefreshArg, {
+			Key:   outArgKey,
+			Value: planFile,
+		}},
+		request.Args...,
 	)
 	if err != nil {
 		return TerraformPlanResponse{}, errors.Wrap(err, "building command arguments")
@@ -106,6 +115,7 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 	if err != nil {
 		return TerraformPlanResponse{}, errors.Wrap(err, "processing command output")
 	}
+
 	return TerraformPlanResponse{
 		PlanFile: planFile,
 	}, nil

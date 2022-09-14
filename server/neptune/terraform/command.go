@@ -7,58 +7,50 @@ import (
 	"github.com/pkg/errors"
 )
 
-type Operation int
+type Operation string
 
 const (
-	Init Operation = iota
-	Plan
-	Apply
+	Init  Operation = "init"
+	Plan  Operation = "plan"
+	Apply Operation = "apply"
+	Show  Operation = "show"
 )
 
-func (t Operation) String() string {
-	switch t {
-	case Init:
-		return "init"
-	case Plan:
-		return "plan"
-	case Apply:
-		return "apply"
-	}
-	return ""
-}
-
 // argument is the key value pair passed into the terraform command
-type argument struct {
+type Argument struct {
 	Key   string
 	Value string
 }
 
-func (a argument) build() string {
+func (a Argument) build() string {
 	return fmt.Sprintf("-%s=%s", a.Key, a.Value)
 }
 
-func newArgumentList(args []string) ([]argument, error) {
-	arguments := []argument{}
+// takes in a list of key/value argument pairs and parses them.
+// terraform arguments are expected to be in a certain form
+// ie. "-input=false" where input and false are the key values respectively.
+func NewArgumentList(args []string) ([]Argument, error) {
+	arguments := []Argument{}
 	for _, arg := range args {
 		typedArgument, err := newArgument(arg)
 		if err != nil {
-			return []argument{}, errors.Wrap(err, "building argument list")
+			return []Argument{}, errors.Wrap(err, "building argument list")
 		}
 		arguments = append(arguments, typedArgument)
 	}
 	return arguments, nil
 }
 
-func newArgument(arg string) (argument, error) {
+func newArgument(arg string) (Argument, error) {
 	// Remove any forward dashes and spaces
 	arg = strings.TrimLeft(arg, "- ")
 	coll := strings.Split(arg, "=")
 
 	if len(coll) != 2 {
-		return argument{}, errors.New(fmt.Sprintf("cannot parse argument: %s. argument can only have one =", arg))
+		return Argument{}, errors.New(fmt.Sprintf("cannot parse argument: %s. argument can only have one =", arg))
 	}
 
-	return argument{
+	return Argument{
 		Key:   coll[0],
 		Value: coll[1],
 	}, nil
@@ -66,25 +58,16 @@ func newArgument(arg string) (argument, error) {
 
 type CommandArguments struct {
 	Command     Operation
-	CommandArgs []argument
-	ExtraArgs   []argument
+	CommandArgs []Argument
+	ExtraArgs   []Argument
 }
 
-func NewCommandArguments(command Operation, commandArgs []string, extraArgs []string) (*CommandArguments, error) {
-	extraArguments, err := newArgumentList(extraArgs)
-	if err != nil {
-		return nil, errors.Wrap(err, "parsing extra arguments")
-	}
-
-	commandArguments, err := newArgumentList(commandArgs)
-	if err != nil {
-		return nil, errors.Wrap(err, "parsing command arguments")
-	}
+func NewCommandArguments(command Operation, commandArgs []Argument, extraArgs ...Argument) (*CommandArguments, error) {
 
 	return &CommandArguments{
 		Command:     command,
-		ExtraArgs:   extraArguments,
-		CommandArgs: commandArguments,
+		ExtraArgs:   extraArgs,
+		CommandArgs: commandArgs,
 	}, nil
 }
 
@@ -115,5 +98,5 @@ func (t CommandArguments) Build() []string {
 		}
 	}
 
-	return append([]string{t.Command.String()}, finalArgs...)
+	return append([]string{string(t.Command)}, finalArgs...)
 }
