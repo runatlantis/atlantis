@@ -16,17 +16,17 @@ type testTfClient struct {
 	ctx           context.Context
 	jobID         string
 	path          string
-	args          []string
+	cmd           *terraform.SubCommand
 	customEnvVars map[string]string
 	version       *version.Version
 
 	resp []terraform.Line
 }
 
-func (t *testTfClient) RunCommand(ctx context.Context, jobID string, path string, args []string, customEnvVars map[string]string, v *version.Version) <-chan terraform.Line {
+func (t *testTfClient) RunCommand(ctx context.Context, jobID string, path string, cmd *terraform.SubCommand, customEnvVars map[string]string, v *version.Version) <-chan terraform.Line {
 	assert.Equal(t.t, jobID, t.jobID)
 	assert.Equal(t.t, path, t.path)
-	assert.Equal(t.t, args, t.args)
+	assert.Equal(t.t, cmd, t.cmd)
 	assert.Equal(t.t, customEnvVars, t.customEnvVars)
 	assert.Equal(t.t, v, t.version)
 
@@ -57,12 +57,16 @@ func TestTerraformInit_TfVersionInRequestTakesPrecedence(t *testing.T) {
 	reqTfVersion, err := version.NewVersion(reqVersion)
 	assert.Nil(t, err)
 
+	expectedCmd := terraform.NewSubCommand(terraform.Init).WithArgs(terraform.Argument{
+		Key:   "input",
+		Value: "false",
+	})
 	testTfClient := testTfClient{
 		t:             t,
 		ctx:           ctx,
 		jobID:         jobID,
 		path:          path,
-		args:          []string{"init", "-input=false"},
+		cmd:           expectedCmd,
 		customEnvVars: map[string]string{},
 		version:       reqTfVersion,
 		resp:          []terraform.Line{},
@@ -98,12 +102,16 @@ func TestTerraformInit_ExtraArgsTakesPrecedenceOverCommandArgs(t *testing.T) {
 	reqTfVersion, err := version.NewVersion(reqVersion)
 	assert.Nil(t, err)
 
+	expectedCmd := terraform.NewSubCommand(terraform.Init).WithArgs(terraform.Argument{
+		Key:   "input",
+		Value: "true",
+	})
 	testTfClient := testTfClient{
 		t:             t,
 		ctx:           ctx,
 		jobID:         jobID,
 		path:          path,
-		args:          []string{"init", "-input=true"},
+		cmd:           expectedCmd,
 		customEnvVars: map[string]string{},
 		version:       reqTfVersion,
 		resp:          []terraform.Line{},
@@ -145,12 +153,24 @@ func TestTerraformPlan(t *testing.T) {
 	reqTfVersion, err := version.NewVersion(reqVersion)
 	assert.Nil(t, err)
 
+	expectedCmd := terraform.NewSubCommand(terraform.Plan).
+		WithArgs(terraform.Argument{
+			Key:   "input",
+			Value: "false",
+		}, terraform.Argument{
+			Key:   "refresh",
+			Value: "true",
+		}, terraform.Argument{
+			Key:   "out",
+			Value: "some/path/output.tfplan",
+		})
+
 	testTfClient := testTfClient{
 		t:             t,
 		ctx:           ctx,
 		jobID:         jobID,
 		path:          path,
-		args:          []string{"plan", "-input=false", "-refresh=true", "-out=some/path/output.tfplan"},
+		cmd:           expectedCmd,
 		customEnvVars: map[string]string{},
 		version:       reqTfVersion,
 		resp:          []terraform.Line{},

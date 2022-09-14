@@ -16,19 +16,19 @@ import (
 )
 
 type testCommandBuilder struct {
-	t       *testing.T
-	version *version.Version
-	path    string
-	args    []string
+	t          *testing.T
+	version    *version.Version
+	path       string
+	subCommand *SubCommand
 
 	resp *exec.Cmd
 	err  error
 }
 
-func (t *testCommandBuilder) Build(v *version.Version, path string, args []string) (*exec.Cmd, error) {
+func (t *testCommandBuilder) Build(v *version.Version, path string, subCommand *SubCommand) (*exec.Cmd, error) {
 	assert.Equal(t.t, t.version, v)
 	assert.Equal(t.t, t.path, path)
-	assert.Equal(t.t, t.args, args)
+	assert.Equal(t.t, t.subCommand, subCommand)
 
 	return t.resp, t.err
 }
@@ -39,9 +39,8 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	env := ts.NewTestActivityEnvironment()
 
 	path := "some/path"
-	args := []string{
-		"ARG1=$ARG1",
-	}
+
+	cmd := NewSubCommand(Plan)
 	jobID := "1234"
 	echoCommand := exec.Command("sh", "-c", "echo hello")
 	// ctx := context.Background()
@@ -50,7 +49,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		t:       t,
 		version: nil,
 		path:    path,
-		args:    args,
+		subCommand: cmd,
 		resp:    echoCommand,
 		err:     nil,
 	}
@@ -59,7 +58,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	}
 
 	testFunc := func(ctx context.Context) (string, error) {
-		ch := client.RunCommand(ctx, jobID, path, args, map[string]string{}, nil)
+		ch := client.RunCommand(ctx, jobID, path, cmd, map[string]string{}, nil)
 		return waitCh(ch)
 	}
 	env.RegisterActivity(testFunc)
@@ -77,9 +76,6 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	env := ts.NewTestActivityEnvironment()
 
 	path := "some/path"
-	args := []string{
-		"ARG1=$ARG1",
-	}
 	jobID := "1234"
 
 	// set up big file to test limitations.
@@ -101,11 +97,12 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	cmdStr := fmt.Sprintf("cat %s", filename)
 	cat := exec.Command("sh", "-c", cmdStr)
 
+	cmd := NewSubCommand(Plan)
 	testCommandBuilder := &testCommandBuilder{
 		t:       t,
 		version: nil,
 		path:    path,
-		args:    args,
+		subCommand: cmd,
 		resp:    cat,
 		err:     nil,
 	}
@@ -114,7 +111,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	}
 
 	testFunc := func(ctx context.Context) (string, error) {
-		ch := client.RunCommand(ctx, jobID, path, args, map[string]string{}, nil)
+		ch := client.RunCommand(ctx, jobID, path, cmd, map[string]string{}, nil)
 		return waitCh(ch)
 	}
 	env.RegisterActivity(testFunc)
@@ -131,17 +128,15 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	env := ts.NewTestActivityEnvironment()
 
 	path := "some/path"
-	args := []string{
-		"ARG1=$ARG1",
-	}
 	jobID := "1234"
 	echoCommand := exec.Command("sh", "-c", "echo stderr >&2")
 
+	cmd := NewSubCommand(Plan)
 	testCommandBuilder := &testCommandBuilder{
 		t:       t,
 		version: nil,
 		path:    path,
-		args:    args,
+		subCommand: cmd,
 		resp:    echoCommand,
 		err:     nil,
 	}
@@ -149,7 +144,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		CommandBuilder: testCommandBuilder,
 	}
 	testFunc := func(ctx context.Context) (string, error) {
-		ch := client.RunCommand(ctx, jobID, path, args, map[string]string{}, nil)
+		ch := client.RunCommand(ctx, jobID, path, cmd, map[string]string{}, nil)
 		return waitCh(ch)
 	}
 	env.RegisterActivity(testFunc)
@@ -166,17 +161,15 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	env := ts.NewTestActivityEnvironment()
 
 	path := "some/path"
-	args := []string{
-		"ARG1=$ARG1",
-	}
 	jobID := "1234"
 	echoCommand := exec.Command("sh", "-c", "echo dying && exit 1")
 
+	cmd := NewSubCommand(Plan)
 	testCommandBuilder := &testCommandBuilder{
 		t:       t,
 		version: nil,
 		path:    path,
-		args:    args,
+		subCommand: cmd,
 		resp:    echoCommand,
 		err:     nil,
 	}
@@ -185,7 +178,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	}
 
 	testFunc := func(ctx context.Context) (string, error) {
-		ch := client.RunCommand(ctx, jobID, path, args, map[string]string{}, nil)
+		ch := client.RunCommand(ctx, jobID, path, cmd, map[string]string{}, nil)
 		return waitCh(ch)
 	}
 	env.RegisterActivity(testFunc)

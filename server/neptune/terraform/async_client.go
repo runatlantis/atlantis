@@ -77,32 +77,32 @@ func NewAsyncClient(
 
 }
 
-type cmddBuilder interface {
-	Build(v *version.Version, path string, args []string) (*exec.Cmd, error)
+type cmdBuilder interface {
+	Build(v *version.Version, path string, subcommand *SubCommand) (*exec.Cmd, error)
 }
 
 type AsyncClient struct {
-	CommandBuilder cmddBuilder
+	CommandBuilder cmdBuilder
 }
 
-func (c *AsyncClient) RunCommand(ctx context.Context, jobID string, path string, args []string, customEnvVars map[string]string, v *version.Version) <-chan Line {
+func (c *AsyncClient) RunCommand(ctx context.Context, jobID string, path string, subcommand *SubCommand, customEnvVars map[string]string, v *version.Version) <-chan Line {
 	outCh := make(chan Line)
 
 	// We start a goroutine to do our work asynchronously and then immediately
 	// return our channels.
-	go c.runCommand(ctx, jobID, path, args, customEnvVars, v, outCh)
+	go c.runCommand(ctx, jobID, path, subcommand, customEnvVars, v, outCh)
 	return outCh
 }
 
-func (c *AsyncClient) runCommand(ctx context.Context, jobID string, path string, args []string, customEnvVars map[string]string, v *version.Version, outCh chan Line) {
+func (c *AsyncClient) runCommand(ctx context.Context, jobID string, path string, subcommand *SubCommand, customEnvVars map[string]string, v *version.Version, outCh chan Line) {
 	// Ensure we close our channels when we exit.
 	defer func() {
 		close(outCh)
 	}()
 
-	cmd, err := c.CommandBuilder.Build(v, path, args)
+	cmd, err := c.CommandBuilder.Build(v, path, subcommand)
 	if err != nil {
-		logger.Error(ctx, errors.Wrapf(err, "building command: %s", args).Error())
+		logger.Error(ctx, errors.Wrapf(err, "building command").Error())
 		outCh <- Line{Err: err}
 		return
 	}

@@ -27,7 +27,7 @@ const (
 )
 
 type TerraformClient interface {
-	RunCommand(ctx context.Context, jobID string, path string, args []string, customEnvVars map[string]string, v *version.Version) <-chan terraform.Line
+	RunCommand(ctx context.Context, jobID string, path string, subcommand *terraform.SubCommand, customEnvVars map[string]string, v *version.Version) <-chan terraform.Line
 }
 
 type terraformActivities struct {
@@ -62,16 +62,13 @@ func (t *terraformActivities) TerraformInit(ctx context.Context, request Terrafo
 		return TerraformInitResponse{}, err
 	}
 
-	cmd, err := terraform.NewCommandArguments(
-		terraform.Init,
-		[]terraform.Argument{DisableInputArg},
-		request.Args...,
-	)
-	if err != nil {
-		return TerraformInitResponse{}, errors.Wrap(err, "building command arguments")
+	args := []terraform.Argument{
+		DisableInputArg,
 	}
+	args = append(args, request.Args...)
+	cmd := terraform.NewSubCommand(terraform.Init).WithArgs(args...)
 
-	ch := t.TerraformClient.RunCommand(ctx, request.JobID, request.Path, cmd.Build(), request.Envs, tfVersion)
+	ch := t.TerraformClient.RunCommand(ctx, request.JobID, request.Path, cmd, request.Envs, tfVersion)
 	_, err = t.readCommandOutput(ch)
 	if err != nil {
 		return TerraformInitResponse{}, errors.Wrap(err, "processing command output")
@@ -99,18 +96,19 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 		return TerraformPlanResponse{}, err
 	}
 	planFile := filepath.Join(request.Path, PlanOutputFile)
-	cmd, err := terraform.NewCommandArguments(
-		terraform.Plan,
-		[]terraform.Argument{DisableInputArg, RefreshArg, {
+
+	args := []terraform.Argument{
+		DisableInputArg,
+		RefreshArg,
+		{
 			Key:   outArgKey,
 			Value: planFile,
-		}},
-		request.Args...,
-	)
-	if err != nil {
-		return TerraformPlanResponse{}, errors.Wrap(err, "building command arguments")
+		},
 	}
-	ch := t.TerraformClient.RunCommand(ctx, request.JobID, request.Path, cmd.Build(), request.Envs, tfVersion)
+	args = append(args, request.Args...)
+
+	cmd := terraform.NewSubCommand(terraform.Plan).WithArgs(args...)
+	ch := t.TerraformClient.RunCommand(ctx, request.JobID, request.Path, cmd, request.Envs, tfVersion)
 	_, err = t.readCommandOutput(ch)
 	if err != nil {
 		return TerraformPlanResponse{}, errors.Wrap(err, "processing command output")
