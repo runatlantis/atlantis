@@ -538,8 +538,8 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
+	dbUpdater.Backend = boltDB
+	applyCommandRunner.Backend = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -566,8 +566,8 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
+	dbUpdater.Backend = boltDB
+	applyCommandRunner.Backend = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -589,8 +589,8 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	dbUpdater.DB = boltDB
-	applyCommandRunner.DB = boltDB
+	dbUpdater.Backend = boltDB
+	applyCommandRunner.Backend = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
