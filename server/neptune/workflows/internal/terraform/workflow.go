@@ -104,6 +104,9 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 			&runner.PlanStepRunner{
 				Activity: ta,
 			},
+			&runner.ApplyStepRunner{
+				Activity: ta,
+			},
 		),
 		RootFetcher: &RootFetcher{
 			Request: request,

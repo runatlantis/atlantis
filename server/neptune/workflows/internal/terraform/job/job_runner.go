@@ -14,18 +14,20 @@ type stepRunner interface {
 }
 
 type jobRunner struct {
-	EnvStepRunner  stepRunner
-	CmdStepRunner  stepRunner
-	InitStepRunner stepRunner
-	PlanStepRunner stepRunner
+	EnvStepRunner   stepRunner
+	CmdStepRunner   stepRunner
+	InitStepRunner  stepRunner
+	PlanStepRunner  stepRunner
+	ApplyStepRunner stepRunner
 }
 
-func NewRunner(runStepRunner stepRunner, envStepRunner stepRunner, initStepRunner stepRunner, planStepRunner stepRunner) *jobRunner {
+func NewRunner(runStepRunner stepRunner, envStepRunner stepRunner, initStepRunner stepRunner, planStepRunner stepRunner, applyStepRunner stepRunner) *jobRunner {
 	return &jobRunner{
-		CmdStepRunner:  runStepRunner,
-		EnvStepRunner:  envStepRunner,
-		InitStepRunner: initStepRunner,
-		PlanStepRunner: planStepRunner,
+		CmdStepRunner:   runStepRunner,
+		EnvStepRunner:   envStepRunner,
+		InitStepRunner:  initStepRunner,
+		PlanStepRunner:  planStepRunner,
+		ApplyStepRunner: applyStepRunner,
 	}
 }
 
@@ -53,6 +55,8 @@ func (r *jobRunner) Run(
 			out, err = r.InitStepRunner.Run(jobExecutionCtx, localRoot, step)
 		case "plan":
 			out, err = r.PlanStepRunner.Run(jobExecutionCtx, localRoot, step)
+		case "apply":
+			out, err = r.ApplyStepRunner.Run(jobExecutionCtx, localRoot, step)
 		case "run":
 			out, err = r.CmdStepRunner.Run(jobExecutionCtx, localRoot, step)
 		case "env":

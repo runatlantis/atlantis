@@ -68,6 +68,7 @@ func newArgument(arg string) (Argument, error) {
 
 type SubCommand struct {
 	op    Operation
+	input string
 	args  []Argument
 	flags []Flag
 }
@@ -82,6 +83,12 @@ func NewSubCommand(op Operation) *SubCommand {
 // and sets them appropriately on the receiver
 func (c *SubCommand) WithArgs(args ...Argument) *SubCommand {
 	c.args = c.dedup(args)
+	return c
+}
+
+// WithInput adds a single command input
+func (c *SubCommand) WithInput(input string) *SubCommand {
+	c.input = input
 	return c
 }
 
@@ -106,6 +113,11 @@ func (c *SubCommand) Build() []string {
 		result = append(result, f.build())
 	}
 
+	// append input if it exists
+	if c.input != "" {
+		result = append(result, c.input)
+	}
+
 	return result
 }
 
@@ -124,7 +136,6 @@ func (c *SubCommand) dedup(args []Argument) []Argument {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-
 
 	for _, k := range keys {
 		finalArgs = append(finalArgs, Argument{

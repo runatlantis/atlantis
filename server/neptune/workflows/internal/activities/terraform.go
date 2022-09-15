@@ -95,7 +95,7 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 	if err != nil {
 		return TerraformPlanResponse{}, err
 	}
-	planFile := filepath.Join(request.Path, PlanOutputFile)
+	planFile := buildPlanFilePath(request.Path)
 
 	args := []terraform.Argument{
 		DisableInputArg,
@@ -122,10 +122,48 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 // Terraform Apply
 
 type TerraformApplyRequest struct {
+	Args      []terraform.Argument
+	Envs      map[string]string
+	JobID     string
+	TfVersion string
+	Path      string
 }
 
-func (t *terraformActivities) TerraformApply(ctx context.Context, request TerraformApplyRequest) error {
-	return nil
+type TerraformApplyResponse struct {
+	Output string
+}
+
+func (t *terraformActivities) TerraformApply(ctx context.Context, request TerraformApplyRequest) (TerraformApplyResponse, error) {
+	// Fail requests using a target flag, as Atlantis cannot support this functionality
+	if containsTargetFlag(request.Args) {
+		return TerraformApplyResponse{}, errors.New("request contains invalid -target flag")
+	}
+
+	tfVersion, err := t.resolveVersion(request.TfVersion)
+	if err != nil {
+		return TerraformApplyResponse{}, err
+	}
+
+	planFile := buildPlanFilePath(request.Path)
+	args := []terraform.Argument{DisableInputArg}
+	args = append(args, request.Args...)
+
+	cmd := terraform.NewSubCommand(terraform.Apply).WithInput(planFile).WithArgs(args...)
+	ch := t.TerraformClient.RunCommand(ctx, request.JobID, request.Path, cmd, request.Envs, tfVersion)
+	_, err = t.readCommandOutput(ch)
+	if err != nil {
+		return TerraformApplyResponse{}, errors.Wrap(err, "processing command output")
+	}
+	return TerraformApplyResponse{}, nil
+}
+
+func containsTargetFlag(args []terraform.Argument) bool {
+	for _, arg := range args {
+		if arg.Key == "target" {
+			return true
+		}
+	}
+	return false
 }
 
 func (t *terraformActivities) resolveVersion(v string) (*version.Version, error) {
@@ -162,4 +200,8 @@ func (t *terraformActivities) readCommandOutput(ch <-chan terraform.Line) (strin
 	// sanitize output by stripping out any ansi characters.
 	output = ansi.Strip(output)
 	return output, nil
+}
+
+func buildPlanFilePath(path string) string {
+	return filepath.Join(path, PlanOutputFile)
 }

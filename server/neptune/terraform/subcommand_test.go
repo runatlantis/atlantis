@@ -18,6 +18,14 @@ func TestCommandArguments_Build(t *testing.T) {
 		assert.Equal(t, []string{"show", "-json"}, c.Build())
 	})
 
+	t.Run("with input", func(t *testing.T) {
+		c := terraform.NewSubCommand(terraform.Apply)
+
+		c.WithInput("input.tfplan")
+
+		assert.Equal(t, []string{"apply", "input.tfplan"}, c.Build())
+	})
+
 	t.Run("with args", func(t *testing.T) {
 		c := terraform.NewSubCommand(terraform.Init)
 
