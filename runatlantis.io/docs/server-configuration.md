@@ -468,6 +468,12 @@ Values are chosen in this order:
   ```
   The Redis Port for when using a Locking DB type of `redis`. Defaults to `6379`.
 
+### `--redis-db`
+  ```bash
+  atlantis server --redis-db=0
+  ```
+  The Redis Database to use when using a Locking DB type of `redis`. Defaults to `0`.
+
 ### `--redis-tls-enabled`
   ```bash
   atlantis server --redis-tls-enabled=false
