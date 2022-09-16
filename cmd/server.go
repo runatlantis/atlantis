@@ -496,6 +496,7 @@ func (t *TemporalWorker) NewServer(userConfig server.UserConfig, config server.C
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build context logger")
 	}
+
 	globalCfg := valid.NewGlobalCfg()
 	validator := &cfgParser.ParserValidator{}
 	if userConfig.RepoConfig != "" {
@@ -535,7 +536,9 @@ func (t *TemporalWorker) NewServer(userConfig server.UserConfig, config server.C
 			DefaultVersionFlagName: config.DefaultTFVersionFlag,
 			DefaultVersionStr:      userConfig.DefaultTFVersion,
 			DownloadURL:            userConfig.TFDownloadURL,
+			LogFilters:             globalCfg.TerraformLogFilter,
 		},
+		JobCfg:      globalCfg.Jobs,
 		DataDir:     userConfig.DataDir,
 		TemporalCfg: globalCfg.Temporal,
 		App:         appConfig,

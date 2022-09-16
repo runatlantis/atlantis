@@ -31,6 +31,7 @@ func (r *InitStepRunner) Run(executionContext *job.ExecutionContext, localRoot *
 		Envs:      executionContext.Envs,
 		TfVersion: executionContext.TfVersion,
 		Path:      executionContext.Path,
+		JobID:     executionContext.JobID,
 	}).Get(executionContext, &resp)
 	if err != nil {
 		return "", errors.Wrap(err, "running terraform init activity")

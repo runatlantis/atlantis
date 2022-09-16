@@ -34,6 +34,7 @@ type Config struct {
 	ServerCfg    ServerConfig
 	TemporalCfg  valid.Temporal
 	TerraformCfg TerraformConfig
+	JobCfg       valid.Jobs
 
 	DataDir     string
 	CtxLogger   logging.Logger

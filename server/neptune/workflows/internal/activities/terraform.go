@@ -3,11 +3,9 @@ package activities
 import (
 	"context"
 	"path/filepath"
-	"strings"
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/neptune/terraform"
 )
 
@@ -30,15 +28,22 @@ type TerraformClient interface {
 	RunCommand(ctx context.Context, jobID string, path string, subcommand *terraform.SubCommand, customEnvVars map[string]string, v *version.Version) <-chan terraform.Line
 }
 
+type streamHandler interface {
+	Stream(ctx context.Context, jobID string, ch <-chan terraform.Line) error
+	Close(ctx context.Context, jobID string)
+}
+
 type terraformActivities struct {
 	TerraformClient  TerraformClient
 	DefaultTFVersion *version.Version
+	StreamHandler    streamHandler
 }
 
-func NewTerraformActivities(client TerraformClient, defaultTfVersion *version.Version) *terraformActivities {
+func NewTerraformActivities(client TerraformClient, defaultTfVersion *version.Version, streamHandler streamHandler) *terraformActivities {
 	return &terraformActivities{
 		TerraformClient:  client,
 		DefaultTFVersion: defaultTfVersion,
+		StreamHandler:    streamHandler,
 	}
 }
 
@@ -69,9 +74,10 @@ func (t *terraformActivities) TerraformInit(ctx context.Context, request Terrafo
 	cmd := terraform.NewSubCommand(terraform.Init).WithArgs(args...)
 
 	ch := t.TerraformClient.RunCommand(ctx, request.JobID, request.Path, cmd, request.Envs, tfVersion)
-	_, err = t.readCommandOutput(ch)
-	if err != nil {
-		return TerraformInitResponse{}, errors.Wrap(err, "processing command output")
+	// Read output and stream to active connections
+	// Stream is closed after we run the plan activity since both of them share the same job ID
+	if err := t.StreamHandler.Stream(ctx, request.JobID, ch); err != nil {
+		return TerraformInitResponse{}, errors.Wrap(err, "reading plan output")
 	}
 	return TerraformInitResponse{}, nil
 }
@@ -109,10 +115,12 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 
 	cmd := terraform.NewSubCommand(terraform.Plan).WithArgs(args...)
 	ch := t.TerraformClient.RunCommand(ctx, request.JobID, request.Path, cmd, request.Envs, tfVersion)
-	_, err = t.readCommandOutput(ch)
-	if err != nil {
-		return TerraformPlanResponse{}, errors.Wrap(err, "processing command output")
+
+	// Read output and stream to active connections
+	if err := t.StreamHandler.Stream(ctx, request.JobID, ch); err != nil {
+		return TerraformPlanResponse{}, errors.Wrap(err, "reading plan output")
 	}
+	defer t.StreamHandler.Close(ctx, request.JobID)
 
 	return TerraformPlanResponse{
 		PlanFile: planFile,
@@ -150,10 +158,13 @@ func (t *terraformActivities) TerraformApply(ctx context.Context, request Terraf
 
 	cmd := terraform.NewSubCommand(terraform.Apply).WithInput(planFile).WithArgs(args...)
 	ch := t.TerraformClient.RunCommand(ctx, request.JobID, request.Path, cmd, request.Envs, tfVersion)
-	_, err = t.readCommandOutput(ch)
-	if err != nil {
-		return TerraformApplyResponse{}, errors.Wrap(err, "processing command output")
+
+	// Read output and stream to active connections
+	if err := t.StreamHandler.Stream(ctx, request.JobID, ch); err != nil {
+		return TerraformApplyResponse{}, errors.Wrap(err, "reading apply output")
 	}
+	defer t.StreamHandler.Close(ctx, request.JobID)
+
 	return TerraformApplyResponse{}, nil
 }
 
@@ -181,25 +192,6 @@ func (t *terraformActivities) resolveVersion(v string) (*version.Version, error)
 		return version, nil
 	}
 	return t.DefaultTFVersion, nil
-}
-
-func (t *terraformActivities) readCommandOutput(ch <-chan terraform.Line) (string, error) {
-	var err error
-	var lines []string
-	for line := range ch {
-		if line.Err != nil {
-			err = errors.Wrap(line.Err, "executing command")
-			break
-		}
-		lines = append(lines, line.Line)
-	}
-	if err != nil {
-		return "", err
-	}
-	output := strings.Join(lines, "\n")
-	// sanitize output by stripping out any ansi characters.
-	output = ansi.Strip(output)
-	return output, nil
 }
 
 func buildPlanFilePath(path string) string {

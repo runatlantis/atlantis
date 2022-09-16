@@ -30,6 +30,7 @@ func (r *PlanStepRunner) Run(executionContext *job.ExecutionContext, _ *root.Loc
 		Args:      args,
 		Envs:      executionContext.Envs,
 		TfVersion: executionContext.TfVersion,
+		JobID:     executionContext.JobID,
 		Path:      executionContext.Path,
 	}).Get(executionContext, &resp)
 	if err != nil {

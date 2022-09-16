@@ -27,7 +27,7 @@ type terraformActivities interface {
 
 // jobRunner runs a deploy plan/apply job
 type jobRunner interface {
-	Run(ctx workflow.Context, job job.Job, localRoot *root.LocalRoot) (string, error)
+	Run(ctx workflow.Context, localRoot *root.LocalRoot, jobInstance job.JobInstance) (string, error)
 }
 
 type PlanStatus int
@@ -135,7 +135,10 @@ func (r *Runner) Plan(ctx workflow.Context, root *root.LocalRoot, serverURL *url
 		return errors.Wrap(err, "updating job with in-progress status")
 	}
 
-	_, err = r.JobRunner.Run(ctx, r.Request.Root.Plan, root)
+	_, err = r.JobRunner.Run(ctx, root, job.JobInstance{
+		Job:   r.Request.Root.Plan,
+		JobID: jobID.String(),
+	})
 
 	if err != nil {
 		if e := r.Store.UpdatePlanJobWithStatus(state.FailedJobStatus); e != nil {
@@ -179,7 +182,10 @@ func (r *Runner) Apply(ctx workflow.Context, root *root.LocalRoot, serverURL *ur
 		return errors.Wrap(err, "updating job with in-progress status")
 	}
 
-	_, err = r.JobRunner.Run(ctx, r.Request.Root.Apply, root)
+	_, err = r.JobRunner.Run(ctx, root, job.JobInstance{
+		Job:   r.Request.Root.Apply,
+		JobID: jobID.String(),
+	})
 	if err != nil {
 
 		if err := r.Store.UpdateApplyJobWithStatus(state.FailedJobStatus); err != nil {

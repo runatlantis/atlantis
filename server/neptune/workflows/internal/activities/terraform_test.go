@@ -11,6 +11,14 @@ import (
 	"go.temporal.io/sdk/testsuite"
 )
 
+type testStreamHandler struct{}
+
+func (t *testStreamHandler) Stream(ctx context.Context, jobID string, ch <-chan terraform.Line) error {
+	return nil
+}
+
+func (t *testStreamHandler) Close(ctx context.Context, jobID string) {}
+
 type testTfClient struct {
 	t             *testing.T
 	ctx           context.Context
@@ -79,7 +87,7 @@ func TestTerraformInit_TfVersionInRequestTakesPrecedence(t *testing.T) {
 		TfVersion: reqVersion,
 	}
 
-	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion)
+	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion, &testStreamHandler{})
 	env.RegisterActivity(tfActivity)
 
 	_, err = env.ExecuteActivity(tfActivity.TerraformInit, req)
@@ -130,7 +138,7 @@ func TestTerraformInit_ExtraArgsTakesPrecedenceOverCommandArgs(t *testing.T) {
 		TfVersion: reqVersion,
 	}
 
-	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion)
+	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion, &testStreamHandler{})
 	env.RegisterActivity(tfActivity)
 
 	_, err = env.ExecuteActivity(tfActivity.TerraformInit, req)
@@ -183,7 +191,7 @@ func TestTerraformPlan(t *testing.T) {
 		TfVersion: reqVersion,
 	}
 
-	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion)
+	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion, &testStreamHandler{})
 	env.RegisterActivity(tfActivity)
 
 	resp, err := env.ExecuteActivity(tfActivity.TerraformPlan, req)
@@ -235,7 +243,7 @@ func TestTerraformApply(t *testing.T) {
 		TfVersion: reqVersion,
 	}
 
-	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion)
+	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion, &testStreamHandler{})
 	env.RegisterActivity(tfActivity)
 
 	resp, err := env.ExecuteActivity(tfActivity.TerraformApply, req)
@@ -292,7 +300,7 @@ func TestTerraformApply_TargetFailure(t *testing.T) {
 		},
 	}
 
-	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion)
+	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion, &testStreamHandler{})
 	env.RegisterActivity(tfActivity)
 
 	_, err = env.ExecuteActivity(tfActivity.TerraformApply, req)

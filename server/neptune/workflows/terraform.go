@@ -1,11 +1,13 @@
 package workflows
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
 
+	terraform_model "github.com/runatlantis/atlantis/server/neptune/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"go.temporal.io/sdk/workflow"
@@ -27,8 +29,13 @@ type TerraformActivities struct {
 	activities.Terraform
 }
 
-func NewTerraformActivities(config config.TerraformConfig, dataDir string, serverURL *url.URL) (*TerraformActivities, error) {
-	terraformActivities, err := activities.NewTerraform(config, dataDir, serverURL)
+type streamHandler interface {
+	Stream(ctx context.Context, jobID string, ch <-chan terraform_model.Line) error
+	Close(ctx context.Context, jobID string)
+}
+
+func NewTerraformActivities(config config.TerraformConfig, dataDir string, serverURL *url.URL, streamHandler streamHandler) (*TerraformActivities, error) {
+	terraformActivities, err := activities.NewTerraform(config, dataDir, serverURL, streamHandler)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing terraform activities")
 	}

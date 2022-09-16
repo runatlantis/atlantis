@@ -15,15 +15,17 @@ import (
 
 	"go.temporal.io/sdk/client"
 
+	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/controllers"
-	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/logging"
 	neptune_http "github.com/runatlantis/atlantis/server/neptune/http"
 	"github.com/runatlantis/atlantis/server/neptune/temporal"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
+	"github.com/runatlantis/atlantis/server/neptune/temporalworker/controllers"
+	"github.com/runatlantis/atlantis/server/neptune/temporalworker/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
+	"github.com/runatlantis/atlantis/server/static"
 	"github.com/uber-go/tally/v4"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
@@ -37,12 +39,13 @@ const (
 )
 
 type Server struct {
-	Logger          logging.Logger
-	HttpServerProxy *neptune_http.ServerProxy
-	Port            int
-	StatsScope      tally.Scope
-	StatsCloser     io.Closer
-	TemporalClient  client.Client
+	Logger           logging.Logger
+	HttpServerProxy  *neptune_http.ServerProxy
+	Port             int
+	StatsScope       tally.Scope
+	StatsCloser      io.Closer
+	TemporalClient   client.Client
+	JobStreamHandler *job.StreamHandler
 
 	DeployActivities    *workflows.DeployActivities
 	TerraformActivities *workflows.TerraformActivities
@@ -50,23 +53,27 @@ type Server struct {
 }
 
 func NewServer(config *config.Config) (*Server, error) {
-	jobsController := &controllers.JobsController{
-		AtlantisVersion:     config.ServerCfg.Version,
-		AtlantisURL:         config.ServerCfg.URL,
-		KeyGenerator:        controllers.JobIDKeyGenerator{},
-		StatsScope:          config.Scope,
-		Logger:              config.CtxLogger,
-		ProjectJobsTemplate: templates.ProjectJobsTemplate,
+	// Build dependencies required for output handler and jobs controller
+	jobStore, err := job.NewStorageBackedStore(config.JobCfg, config.CtxLogger, config.Scope)
+	if err != nil {
+		return nil, errors.Wrapf(err, "initializing job store")
 	}
+	receiverRegistry := job.NewReceiverRegistry()
+
+	// terraform job output handler
+	jobStreamHandler := job.NewStreamHandler(jobStore, receiverRegistry, config.TerraformCfg.LogFilters, config.CtxLogger)
+	jobsController := controllers.NewJobsController(jobStore, receiverRegistry, config.ServerCfg, config.Scope, config.CtxLogger)
 
 	// temporal client + worker initialization
 	temporalClient, err := temporal.NewClient(config.Scope, config.CtxLogger, config.TemporalCfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing temporal client")
 	}
+
 	// router initialization
 	router := mux.NewRouter()
 	router.HandleFunc("/healthz", Healthz).Methods("GET")
+	router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	router.HandleFunc("/jobs/{job-id}", jobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
 	router.HandleFunc("/jobs/{job-id}/ws", jobsController.GetProjectJobsWS).Methods("GET")
 	n := negroni.New(&negroni.Recovery{
@@ -95,6 +102,7 @@ func NewServer(config *config.Config) (*Server, error) {
 		config.TerraformCfg,
 		config.DataDir,
 		config.ServerCfg.URL,
+		jobStreamHandler,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing terraform activities")
@@ -116,6 +124,7 @@ func NewServer(config *config.Config) (*Server, error) {
 		StatsScope:          config.Scope,
 		StatsCloser:         config.StatsCloser,
 		TemporalClient:      temporalClient,
+		JobStreamHandler:    jobStreamHandler,
 		DeployActivities:    deployActivities,
 		TerraformActivities: terraformActivities,
 		GithubActivities:    githubActivities,
@@ -158,6 +167,12 @@ func (s Server) Start() error {
 		if err != nil && err != http.ErrServerClosed {
 			s.Logger.Error(err.Error())
 		}
+	}()
+
+	// Start job output handler listener
+	// [WENGINES-4746] TODO: Clean up resources and exit gracefully on SIGTERM
+	go func() {
+		s.JobStreamHandler.Handle()
 	}()
 
 	<-stop

@@ -82,7 +82,7 @@ type jobRunner struct {
 	expectedError error
 }
 
-func (r *jobRunner) Run(ctx workflow.Context, j job.Job, localRoot *root.LocalRoot) (string, error) {
+func (r *jobRunner) Run(ctx workflow.Context, localRoot *root.LocalRoot, jobInstance job.JobInstance) (string, error) {
 	return "", r.expectedError
 }
 
@@ -115,8 +115,8 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 		Request:             runnerReq,
 		RootFetcher: &terraform.RootFetcher{
 			Request: runnerReq,
-			Ta: tAct,
-			Ga: gAct,
+			Ta:      tAct,
+			Ga:      gAct,
 		},
 		JobRunner: runner,
 		Store: state.NewWorkflowStoreWithGenerator(
