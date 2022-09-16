@@ -63,7 +63,7 @@ var policyCheckCommandRunner *events.PolicyCheckCommandRunner
 var approvePoliciesCommandRunner *events.ApprovePoliciesCommandRunner
 var planCommandRunner *events.PlanCommandRunner
 var applyLockChecker *lockingmocks.MockApplyLockChecker
-var locker *lockingmocks.MockLocker
+var lockingLocker *lockingmocks.MockLocker
 var applyCommandRunner *events.ApplyCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
@@ -90,7 +90,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	drainer = &events.Drainer{}
 	deleteLockCommand = eventmocks.NewMockDeleteLockCommand()
 	applyLockChecker = lockingmocks.NewMockApplyLockChecker()
-	locker = lockingmocks.NewMockLocker()
+	lockingLocker = lockingmocks.NewMockLocker()
 
 	dbUpdater = &events.DBUpdater{
 		Backend: defaultBoltDB,
@@ -135,7 +135,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		parallelPoolSize,
 		SilenceNoProjects,
 		defaultBoltDB,
-		locker,
+		lockingLocker,
 	)
 
 	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
@@ -557,7 +557,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	fixtures.Pull.BaseRepo = fixtures.GithubRepo
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	locker.VerifyWasCalledOnce().UnlockByPull(fixtures.Pull.BaseRepo.FullName, fixtures.Pull.Num)
+	lockingLocker.VerifyWasCalledOnce().UnlockByPull(fixtures.Pull.BaseRepo.FullName, fixtures.Pull.Num)
 }
 
 func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
@@ -580,7 +580,7 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	fixtures.Pull.BaseRepo = fixtures.GithubRepo
 	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	locker.VerifyWasCalledOnce().UnlockByPull(fixtures.Pull.BaseRepo.FullName, fixtures.Pull.Num)
+	lockingLocker.VerifyWasCalledOnce().UnlockByPull(fixtures.Pull.BaseRepo.FullName, fixtures.Pull.Num)
 }
 
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
