@@ -142,11 +142,6 @@ type TerraformApplyResponse struct {
 }
 
 func (t *terraformActivities) TerraformApply(ctx context.Context, request TerraformApplyRequest) (TerraformApplyResponse, error) {
-	// Fail requests using a target flag, as Atlantis cannot support this functionality
-	if containsTargetFlag(request.Args) {
-		return TerraformApplyResponse{}, errors.New("request contains invalid -target flag")
-	}
-
 	tfVersion, err := t.resolveVersion(request.TfVersion)
 	if err != nil {
 		return TerraformApplyResponse{}, err
