@@ -7,11 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/job"
-	"github.com/runatlantis/atlantis/server/neptune/terraform"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -93,21 +91,18 @@ func TestStreamHandler_Stream(t *testing.T) {
 
 		// Buffered channel to simplify testing since it's not blocking
 		mainTfCh := make(chan *job.OutputLine, len(logs))
-		streamHandler := job.StreamHandler{
+		streamHandler := &job.StreamHandler{
 			JobOutput:        mainTfCh,
 			Store:            &testStore{},
 			ReceiverRegistry: &testReceiverRegistry{},
 			Logger:           logging.NewNoopCtxLogger(t),
 		}
 
-		buffer := make(chan terraform.Line, 2)
-		go streamHandler.Stream(context.TODO(), jobID, buffer)
-
-		for _, line := range logs {
-			buffer <- terraform.Line{
-				Line: line,
+		go func() {
+			for _, line := range logs {
+				streamHandler.Stream(jobID, line)
 			}
-		}
+		}()
 
 		gotLogs := []string{}
 
@@ -124,36 +119,6 @@ func TestStreamHandler_Stream(t *testing.T) {
 			}
 		}
 		assert.Equal(t, logs, gotLogs)
-	})
-
-	t.Run("error when line error", func(t *testing.T) {
-		logError := errors.New("error")
-		expectedError := errors.Wrap(logError, "executing command")
-		logs := []terraform.Line{
-			terraform.Line{
-				Err: errors.New("error"),
-			},
-		}
-
-		// Buffered channel to simplify testing since it's not blocking
-		mainTfCh := make(chan *job.OutputLine, len(logs))
-		streamHandler := job.StreamHandler{
-			JobOutput:        mainTfCh,
-			Store:            &testStore{},
-			ReceiverRegistry: &testReceiverRegistry{},
-			Logger:           logging.NewNoopCtxLogger(t),
-		}
-
-		buffer := make(chan terraform.Line, 2)
-
-		go func() {
-			for _, line := range logs {
-				buffer <- line
-			}
-		}()
-
-		gotErr := streamHandler.Stream(context.TODO(), jobID, buffer)
-		assert.Equal(t, expectedError.Error(), gotErr.Error())
 	})
 }
 

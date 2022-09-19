@@ -1,254 +1,526 @@
-package activities_test
+package activities
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/neptune/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/testsuite"
 )
 
-type testStreamHandler struct{}
+type testStreamHandler struct {
+	received      []string
+	expectedJobID string
+	t             *testing.T
+	called        bool
+}
 
-func (t *testStreamHandler) Stream(ctx context.Context, jobID string, ch <-chan terraform.Line) error {
-	return nil
+func (t *testStreamHandler) Stream(jobID string, msg string) {
+	assert.Equal(t.t, t.expectedJobID, jobID)
+	t.received = append(t.received, msg)
+
+	t.called = true
+
 }
 
 func (t *testStreamHandler) Close(ctx context.Context, jobID string) {}
 
+type multiCallTfClient struct {
+	clients []*testTfClient
+
+	count int
+}
+
+func (t *multiCallTfClient) RunCommand(ctx context.Context, request *terraform.RunCommandRequest, options ...terraform.RunOptions) error {
+	if t.count >= len(t.clients) {
+		return fmt.Errorf("expected less calls to RunCommand")
+	}
+	t.clients[t.count].RunCommand(ctx, request, options...)
+	t.count++
+
+	return nil
+}
+
+func (t *multiCallTfClient) AssertExpectations() error {
+	if t.count != len(t.clients) {
+		return fmt.Errorf("expected %d calls but got %d", len(t.clients), t.count)
+	}
+	return nil
+}
+
 type testTfClient struct {
 	t             *testing.T
-	ctx           context.Context
 	jobID         string
 	path          string
 	cmd           *terraform.SubCommand
 	customEnvVars map[string]string
 	version       *version.Version
+	resp          string
 
-	resp []terraform.Line
+	expectedError error
 }
 
-func (t *testTfClient) RunCommand(ctx context.Context, jobID string, path string, cmd *terraform.SubCommand, customEnvVars map[string]string, v *version.Version) <-chan terraform.Line {
-	assert.Equal(t.t, jobID, t.jobID)
-	assert.Equal(t.t, path, t.path)
-	assert.Equal(t.t, cmd, t.cmd)
-	assert.Equal(t.t, customEnvVars, t.customEnvVars)
-	assert.Equal(t.t, v, t.version)
+func (t *testTfClient) RunCommand(ctx context.Context, request *terraform.RunCommandRequest, options ...terraform.RunOptions) error {
+	assert.Equal(t.t, t.path, request.RootPath)
+	assert.Equal(t.t, t.cmd, request.SubCommand)
+	assert.Equal(t.t, t.customEnvVars, request.AdditionalEnvVars)
+	assert.Equal(t.t, t.version, request.Version)
 
-	ch := make(chan terraform.Line)
-	go func(ch chan terraform.Line) {
-		defer close(ch)
-		for _, line := range t.resp {
-			ch <- line
+	for _, o := range options {
+		if o.StdOut != nil {
+			_, err := o.StdOut.Write([]byte(t.resp))
+			assert.NoError(t.t, err)
 		}
-	}(ch)
+	}
 
-	return ch
+	return t.expectedError
 
 }
-func TestTerraformInit_TfVersionInRequestTakesPrecedence(t *testing.T) {
-	ts := testsuite.WorkflowTestSuite{}
-	env := ts.NewTestActivityEnvironment()
 
-	ctx := context.Background()
-	path := "some/path"
-	jobID := "1234"
-	defVersion := "1.0.2"
-	reqVersion := "0.12.0"
-
-	defaultTfVersion, err := version.NewVersion(defVersion)
-	assert.Nil(t, err)
-
-	reqTfVersion, err := version.NewVersion(reqVersion)
-	assert.Nil(t, err)
-
-	expectedCmd := terraform.NewSubCommand(terraform.Init).WithArgs(terraform.Argument{
-		Key:   "input",
-		Value: "false",
-	})
-	testTfClient := testTfClient{
-		t:             t,
-		ctx:           ctx,
-		jobID:         jobID,
-		path:          path,
-		cmd:           expectedCmd,
-		customEnvVars: map[string]string{},
-		version:       reqTfVersion,
-		resp:          []terraform.Line{},
-	}
-
-	req := activities.TerraformInitRequest{
-		Envs:      map[string]string{},
-		JobID:     jobID,
-		Path:      path,
-		TfVersion: reqVersion,
-	}
-
-	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion, &testStreamHandler{})
-	env.RegisterActivity(tfActivity)
-
-	_, err = env.ExecuteActivity(tfActivity.TerraformInit, req)
-	assert.NoError(t, err)
-}
-
-func TestTerraformInit_ExtraArgsTakesPrecedenceOverCommandArgs(t *testing.T) {
-	ts := testsuite.WorkflowTestSuite{}
-	env := ts.NewTestActivityEnvironment()
-
-	ctx := context.Background()
-	path := "some/path"
-	jobID := "1234"
-	defVersion := "1.0.2"
-	reqVersion := "0.12.0"
-
-	defaultTfVersion, err := version.NewVersion(defVersion)
-	assert.Nil(t, err)
-
-	reqTfVersion, err := version.NewVersion(reqVersion)
-	assert.Nil(t, err)
-
-	expectedCmd := terraform.NewSubCommand(terraform.Init).WithArgs(terraform.Argument{
-		Key:   "input",
-		Value: "true",
-	})
-	testTfClient := testTfClient{
-		t:             t,
-		ctx:           ctx,
-		jobID:         jobID,
-		path:          path,
-		cmd:           expectedCmd,
-		customEnvVars: map[string]string{},
-		version:       reqTfVersion,
-		resp:          []terraform.Line{},
-	}
-
-	req := activities.TerraformInitRequest{
-		Args: []terraform.Argument{
-			{
-				Key:   "input",
-				Value: "true",
-			},
-		},
-		Envs:      map[string]string{},
-		JobID:     jobID,
-		Path:      path,
-		TfVersion: reqVersion,
-	}
-
-	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion, &testStreamHandler{})
-	env.RegisterActivity(tfActivity)
-
-	_, err = env.ExecuteActivity(tfActivity.TerraformInit, req)
-	assert.NoError(t, err)
-}
-
-func TestTerraformPlan(t *testing.T) {
-	ts := testsuite.WorkflowTestSuite{}
-	env := ts.NewTestActivityEnvironment()
-
-	ctx := context.Background()
-	path := "some/path"
-	jobID := "1234"
-	defVersion := "1.0.2"
-	reqVersion := "1.2.2"
-
-	defaultTfVersion, err := version.NewVersion(defVersion)
-	assert.Nil(t, err)
-
-	reqTfVersion, err := version.NewVersion(reqVersion)
-	assert.Nil(t, err)
-
-	expectedCmd := terraform.NewSubCommand(terraform.Plan).
-		WithArgs(terraform.Argument{
+func TestTerraformInit_RequestValidation(t *testing.T) {
+	defaultArgs := []terraform.Argument{
+		{
 			Key:   "input",
 			Value: "false",
-		}, terraform.Argument{
+		},
+	}
+	defaultVersion := "1.0.2"
+
+	cases := []struct {
+		RequestVersion  string
+		ExpectedVersion string
+		RequestArgs     []terraform.Argument
+		ExpectedArgs    []terraform.Argument
+	}{
+		{
+			RequestVersion:  "0.12.0",
+			ExpectedVersion: "0.12.0",
+			ExpectedArgs:    defaultArgs,
+		},
+		{
+			ExpectedArgs: []terraform.Argument{
+				{
+					Key:   "input",
+					Value: "true",
+				},
+			},
+			RequestArgs: []terraform.Argument{
+				{
+					Key:   "input",
+					Value: "true",
+				},
+			},
+			ExpectedVersion: defaultVersion,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run("request param takes precedence", func(t *testing.T) {
+			ts := testsuite.WorkflowTestSuite{}
+			env := ts.NewTestActivityEnvironment()
+
+			path := "some/path"
+			jobID := "1234"
+
+			expectedVersion, err := version.NewVersion(c.ExpectedVersion)
+			assert.Nil(t, err)
+
+			testTfClient := &testTfClient{
+				t:             t,
+				jobID:         jobID,
+				path:          path,
+				cmd:           terraform.NewSubCommand(terraform.Init).WithArgs(c.ExpectedArgs...),
+				customEnvVars: map[string]string{},
+				version:       expectedVersion,
+				resp:          "",
+			}
+
+			req := TerraformInitRequest{
+				Envs:      map[string]string{},
+				JobID:     jobID,
+				Path:      path,
+				TfVersion: c.RequestVersion,
+				Args:      c.RequestArgs,
+			}
+
+			tfActivity := NewTerraformActivities(testTfClient, expectedVersion, &testStreamHandler{
+				t: t,
+			})
+			env.RegisterActivity(tfActivity)
+
+			_, err = env.ExecuteActivity(tfActivity.TerraformInit, req)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestTerraformInit_StreamsOutput(t *testing.T) {
+	defaultArgs := []terraform.Argument{
+		{
+			Key:   "input",
+			Value: "false",
+		},
+	}
+	defaultVersion := "1.0.2"
+
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestActivityEnvironment()
+
+	path := "some/path"
+	jobID := "1234"
+
+	expectedMsgs := []string{"msg1", "msg2"}
+	expectedMsgStr := strings.Join(expectedMsgs, "\n")
+
+	expectedVersion, err := version.NewVersion(defaultVersion)
+	assert.NoError(t, err)
+
+	testTfClient := &testTfClient{
+		t:             t,
+		jobID:         jobID,
+		path:          path,
+		cmd:           terraform.NewSubCommand(terraform.Init).WithArgs(defaultArgs...),
+		customEnvVars: map[string]string{},
+		version:       expectedVersion,
+		resp:          expectedMsgStr,
+	}
+
+	req := TerraformInitRequest{
+		Envs:  map[string]string{},
+		JobID: jobID,
+		Path:  path,
+	}
+
+	streamHandler := &testStreamHandler{
+		t:             t,
+		received:      expectedMsgs,
+		expectedJobID: jobID,
+	}
+
+	tfActivity := NewTerraformActivities(testTfClient, expectedVersion, streamHandler)
+	env.RegisterActivity(tfActivity)
+
+	_, err = env.ExecuteActivity(tfActivity.TerraformInit, req)
+	assert.NoError(t, err)
+
+	assert.True(t, streamHandler.called)
+}
+
+func TestTerraformPlan_RequestValidation(t *testing.T) {
+	defaultArgs := []terraform.Argument{
+		{
+			Key:   "input",
+			Value: "false",
+		}, {
 			Key:   "refresh",
 			Value: "true",
-		}, terraform.Argument{
+		}, {
 			Key:   "out",
 			Value: "some/path/output.tfplan",
+		}}
+	defaultVersion := "1.0.2"
+
+	cases := []struct {
+		RequestVersion  string
+		ExpectedVersion string
+		RequestArgs     []terraform.Argument
+		ExpectedArgs    []terraform.Argument
+	}{
+		{
+			RequestVersion:  "0.12.0",
+			ExpectedVersion: "0.12.0",
+			ExpectedArgs:    defaultArgs,
+		},
+		{
+			ExpectedArgs: []terraform.Argument{
+				{
+					Key:   "input",
+					Value: "true",
+				}, {
+					Key:   "refresh",
+					Value: "true",
+				}, {
+					Key:   "out",
+					Value: "some/path/output.tfplan",
+				}},
+			RequestArgs: []terraform.Argument{
+				{
+					Key:   "input",
+					Value: "true",
+				},
+			},
+			ExpectedVersion: defaultVersion,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run("request param takes precedence", func(t *testing.T) {
+			ts := testsuite.WorkflowTestSuite{}
+			env := ts.NewTestActivityEnvironment()
+
+			path := "some/path"
+			jobID := "1234"
+
+			expectedVersion, err := version.NewVersion(c.ExpectedVersion)
+			assert.Nil(t, err)
+
+			testTfClient := multiCallTfClient{
+				clients: []*testTfClient{
+					{
+						t:             t,
+						jobID:         jobID,
+						path:          path,
+						cmd:           terraform.NewSubCommand(terraform.Plan).WithArgs(c.ExpectedArgs...),
+						customEnvVars: map[string]string{},
+						version:       expectedVersion,
+						resp:          "",
+					},
+					{
+						t:             t,
+						jobID:         jobID,
+						path:          path,
+						cmd:           terraform.NewSubCommand(terraform.Show).WithFlags(terraform.Flag{Value: "json"}).WithInput("some/path/output.tfplan"),
+						customEnvVars: map[string]string{},
+						version:       expectedVersion,
+						resp:          "{}",
+					},
+				},
+			}
+
+			req := TerraformPlanRequest{
+				Envs:      map[string]string{},
+				JobID:     jobID,
+				Path:      path,
+				TfVersion: c.RequestVersion,
+				Args:      c.RequestArgs,
+			}
+
+			tfActivity := NewTerraformActivities(&testTfClient, expectedVersion, &testStreamHandler{
+				t: t,
+			})
+			env.RegisterActivity(tfActivity)
+
+			_, err = env.ExecuteActivity(tfActivity.TerraformPlan, req)
+			assert.NoError(t, err)
+			assert.NoError(t, testTfClient.AssertExpectations())
 		})
-
-	testTfClient := testTfClient{
-		t:             t,
-		ctx:           ctx,
-		jobID:         jobID,
-		path:          path,
-		cmd:           expectedCmd,
-		customEnvVars: map[string]string{},
-		version:       reqTfVersion,
-		resp:          []terraform.Line{},
 	}
-
-	req := activities.TerraformPlanRequest{
-		Envs:      map[string]string{},
-		JobID:     jobID,
-		Path:      path,
-		TfVersion: reqVersion,
-	}
-
-	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion, &testStreamHandler{})
-	env.RegisterActivity(tfActivity)
-
-	resp, err := env.ExecuteActivity(tfActivity.TerraformPlan, req)
-	assert.NoError(t, err)
-
-	var planResp activities.TerraformPlanResponse
-	assert.Nil(t, resp.Get(&planResp))
-	assert.Equal(t, planResp.PlanFile, "some/path/output.tfplan")
 }
 
-func TestTerraformApply(t *testing.T) {
+func TestTerraformPlan_ReturnsResponse(t *testing.T) {
+	defaultArgs := []terraform.Argument{
+		{
+			Key:   "input",
+			Value: "false",
+		}, {
+			Key:   "refresh",
+			Value: "true",
+		}, {
+			Key:   "out",
+			Value: "some/path/output.tfplan",
+		}}
+	defaultVersion := "1.0.2"
+
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestActivityEnvironment()
 
-	ctx := context.Background()
 	path := "some/path"
 	jobID := "1234"
-	defVersion := "1.0.2"
-	reqVersion := "1.2.2"
 
-	defaultTfVersion, err := version.NewVersion(defVersion)
+	expectedMsgs := []string{"msg1", "msg2"}
+	expectedMsgStr := strings.Join(expectedMsgs, "\n")
+
+	expectedVersion, err := version.NewVersion(defaultVersion)
 	assert.Nil(t, err)
 
-	reqTfVersion, err := version.NewVersion(reqVersion)
-	assert.Nil(t, err)
+	testTfClient := multiCallTfClient{
+		clients: []*testTfClient{
+			{
+				t:             t,
+				jobID:         jobID,
+				path:          path,
+				cmd:           terraform.NewSubCommand(terraform.Plan).WithArgs(defaultArgs...),
+				customEnvVars: map[string]string{},
+				version:       expectedVersion,
+				resp:          expectedMsgStr,
+			},
+			{
+				t:             t,
+				jobID:         jobID,
+				path:          path,
+				cmd:           terraform.NewSubCommand(terraform.Show).WithFlags(terraform.Flag{Value: "json"}).WithInput("some/path/output.tfplan"),
+				customEnvVars: map[string]string{},
+				version:       expectedVersion,
+				resp:          "{\"format_version\": \"1.0\",\"resource_changes\":[{\"change\":{\"actions\":[\"update\"]},\"address\":\"type.resource\"}]}",
+			},
+		},
+	}
 
-	expectedCmd := terraform.NewSubCommand(terraform.Apply).
-		WithArgs(terraform.Argument{
-			Key:   "input",
-			Value: "false",
-		}).
-		WithInput("some/path/output.tfplan")
+	req := TerraformPlanRequest{
+		Envs:  map[string]string{},
+		JobID: jobID,
+		Path:  path,
+	}
 
-	testTfClient := testTfClient{
+	streamHandler := &testStreamHandler{
 		t:             t,
-		ctx:           ctx,
-		jobID:         jobID,
-		path:          path,
-		cmd:           expectedCmd,
-		customEnvVars: map[string]string{},
-		version:       reqTfVersion,
-		resp:          []terraform.Line{},
+		received:      expectedMsgs,
+		expectedJobID: jobID,
 	}
 
-	req := activities.TerraformApplyRequest{
-		Envs:      map[string]string{},
-		JobID:     jobID,
-		Path:      path,
-		TfVersion: reqVersion,
-	}
+	tfActivity := NewTerraformActivities(&testTfClient, expectedVersion, streamHandler)
 
-	tfActivity := activities.NewTerraformActivities(&testTfClient, defaultTfVersion, &testStreamHandler{})
 	env.RegisterActivity(tfActivity)
 
-	resp, err := env.ExecuteActivity(tfActivity.TerraformApply, req)
+	result, err := env.ExecuteActivity(tfActivity.TerraformPlan, req)
+	assert.NoError(t, err)
+	assert.NoError(t, testTfClient.AssertExpectations())
+
+	var resp TerraformPlanResponse
+	assert.NoError(t, result.Get(&resp))
+
+	assert.Equal(t, TerraformPlanResponse{
+		PlanFile: "some/path/output.tfplan",
+		Summary: terraform.PlanSummary{
+			Updates: []terraform.ResourceSummary{
+				{
+					Address: "type.resource",
+				},
+			},
+		},
+	}, resp)
+
+	assert.True(t, streamHandler.called)
+}
+
+func TestTerraformApply_RequestValidation(t *testing.T) {
+	defaultArgs := []terraform.Argument{
+		{
+			Key:   "input",
+			Value: "false",
+		},
+	}
+	defaultVersion := "1.0.2"
+
+	cases := []struct {
+		RequestVersion  string
+		ExpectedVersion string
+		RequestArgs     []terraform.Argument
+		ExpectedArgs    []terraform.Argument
+	}{
+		{
+			RequestVersion:  "0.12.0",
+			ExpectedVersion: "0.12.0",
+			ExpectedArgs:    defaultArgs,
+		},
+		{
+			ExpectedArgs: []terraform.Argument{
+				{
+					Key:   "input",
+					Value: "false",
+				}},
+			RequestArgs: []terraform.Argument{
+				{
+					Key:   "input",
+					Value: "false",
+				},
+			},
+			ExpectedVersion: defaultVersion,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run("request param takes precedence", func(t *testing.T) {
+			ts := testsuite.WorkflowTestSuite{}
+			env := ts.NewTestActivityEnvironment()
+
+			path := "some/path"
+			jobID := "1234"
+
+			expectedVersion, err := version.NewVersion(c.ExpectedVersion)
+			assert.Nil(t, err)
+
+			testClient := &testTfClient{
+				t:             t,
+				jobID:         jobID,
+				path:          path,
+				cmd:           terraform.NewSubCommand(terraform.Apply).WithArgs(c.ExpectedArgs...).WithInput("some/path/output.tfplan"),
+				customEnvVars: map[string]string{},
+				version:       expectedVersion,
+				resp:          "",
+			}
+
+			req := TerraformApplyRequest{
+				Envs:      map[string]string{},
+				JobID:     jobID,
+				Path:      path,
+				TfVersion: c.RequestVersion,
+				Args:      c.RequestArgs,
+			}
+
+			tfActivity := NewTerraformActivities(testClient, expectedVersion, &testStreamHandler{
+				t: t,
+			})
+			env.RegisterActivity(tfActivity)
+
+			_, err = env.ExecuteActivity(tfActivity.TerraformApply, req)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestTerraformApply_StreamsOutput(t *testing.T) {
+	defaultArgs := []terraform.Argument{
+		{
+			Key:   "input",
+			Value: "false",
+		},
+	}
+	defaultVersion := "1.0.2"
+
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestActivityEnvironment()
+
+	path := "some/path"
+	jobID := "1234"
+
+	expectedMsgs := []string{"msg1", "msg2"}
+	expectedMsgStr := strings.Join(expectedMsgs, "\n")
+
+	expectedVersion, err := version.NewVersion(defaultVersion)
 	assert.NoError(t, err)
 
-	var applyResp activities.TerraformApplyResponse
-	assert.Nil(t, resp.Get(&applyResp))
+	testTfClient := &testTfClient{
+		t:             t,
+		jobID:         jobID,
+		path:          path,
+		cmd:           terraform.NewSubCommand(terraform.Apply).WithArgs(defaultArgs...).WithInput("some/path/output.tfplan"),
+		customEnvVars: map[string]string{},
+		version:       expectedVersion,
+		resp:          expectedMsgStr,
+	}
+
+	req := TerraformApplyRequest{
+		Envs:  map[string]string{},
+		JobID: jobID,
+		Path:  path,
+	}
+
+	streamHandler := &testStreamHandler{
+		t:             t,
+		received:      expectedMsgs,
+		expectedJobID: jobID,
+	}
+
+	tfActivity := NewTerraformActivities(testTfClient, expectedVersion, streamHandler)
+	env.RegisterActivity(tfActivity)
+
+	_, err = env.ExecuteActivity(tfActivity.TerraformApply, req)
+	assert.NoError(t, err)
+
+	assert.True(t, streamHandler.called)
 }

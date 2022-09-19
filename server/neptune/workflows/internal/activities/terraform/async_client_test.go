@@ -1,13 +1,11 @@
 package terraform
 
 import (
+	"bytes"
 	"context"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -25,7 +23,7 @@ type testCommandBuilder struct {
 	err  error
 }
 
-func (t *testCommandBuilder) Build(v *version.Version, path string, subCommand *SubCommand) (*exec.Cmd, error) {
+func (t *testCommandBuilder) Build(ctx context.Context, v *version.Version, path string, subCommand *SubCommand) (*exec.Cmd, error) {
 	assert.Equal(t.t, t.version, v)
 	assert.Equal(t.t, t.path, path)
 	assert.Equal(t.t, t.subCommand, subCommand)
@@ -41,9 +39,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	path := "some/path"
 
 	cmd := NewSubCommand(Plan)
-	jobID := "1234"
 	echoCommand := exec.Command("sh", "-c", "echo hello")
-	// ctx := context.Background()
 
 	testCommandBuilder := &testCommandBuilder{
 		t:       t,
@@ -58,8 +54,16 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	}
 
 	testFunc := func(ctx context.Context) (string, error) {
-		ch := client.RunCommand(ctx, jobID, path, cmd, map[string]string{}, nil)
-		return waitCh(ch)
+		buf := &bytes.Buffer{}
+		r := &RunCommandRequest{
+			RootPath: path,
+			SubCommand: cmd,
+			AdditionalEnvVars: map[string]string{},
+		}
+		err := client.RunCommand(ctx, r, RunOptions{
+			StdOut: buf,
+		})
+		return buf.String(), err
 	}
 	env.RegisterActivity(testFunc)
 	resp, err := env.ExecuteActivity(testFunc)
@@ -67,60 +71,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 
 	var out string
 	assert.Nil(t, resp.Get(&out))
-	assert.Equal(t, "hello", out)
-}
-
-// Our implementation is bottlenecked on large output due to the way we pipe each line.
-func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
-	ts := testsuite.WorkflowTestSuite{}
-	env := ts.NewTestActivityEnvironment()
-
-	path := "some/path"
-	jobID := "1234"
-
-	// set up big file to test limitations.
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
-
-	filename := filepath.Join(tmp, "data")
-	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	assert.Nil(t, err)
-
-	var exp string
-	for i := 0; i < 1024; i++ {
-		s := strings.Repeat("0", 10) + "\n"
-		exp += s
-		_, err = f.WriteString(s)
-		assert.Nil(t, err)
-	}
-
-	cmdStr := fmt.Sprintf("cat %s", filename)
-	cat := exec.Command("sh", "-c", cmdStr)
-
-	cmd := NewSubCommand(Plan)
-	testCommandBuilder := &testCommandBuilder{
-		t:       t,
-		version: nil,
-		path:    path,
-		subCommand: cmd,
-		resp:    cat,
-		err:     nil,
-	}
-	client := &AsyncClient{
-		CommandBuilder: testCommandBuilder,
-	}
-
-	testFunc := func(ctx context.Context) (string, error) {
-		ch := client.RunCommand(ctx, jobID, path, cmd, map[string]string{}, nil)
-		return waitCh(ch)
-	}
-	env.RegisterActivity(testFunc)
-	resp, err := env.ExecuteActivity(testFunc)
-	assert.NoError(t, err)
-
-	var out string
-	assert.Nil(t, resp.Get(&out))
-	assert.Equal(t, strings.TrimRight(exp, "\n"), out)
+	assert.Equal(t, "hello\n", out)
 }
 
 func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
@@ -128,7 +79,6 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	env := ts.NewTestActivityEnvironment()
 
 	path := "some/path"
-	jobID := "1234"
 	echoCommand := exec.Command("sh", "-c", "echo stderr >&2")
 
 	cmd := NewSubCommand(Plan)
@@ -144,8 +94,17 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		CommandBuilder: testCommandBuilder,
 	}
 	testFunc := func(ctx context.Context) (string, error) {
-		ch := client.RunCommand(ctx, jobID, path, cmd, map[string]string{}, nil)
-		return waitCh(ch)
+		buf := &bytes.Buffer{}
+		r := &RunCommandRequest{
+			RootPath: path,
+			SubCommand: cmd,
+			AdditionalEnvVars: map[string]string{},
+		}
+		err := client.RunCommand(ctx, r, RunOptions{
+			StdOut: buf,
+			StdErr: buf,
+		})
+		return buf.String(), err
 	}
 	env.RegisterActivity(testFunc)
 	resp, err := env.ExecuteActivity(testFunc)
@@ -153,7 +112,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 
 	var out string
 	assert.Nil(t, resp.Get(&out))
-	assert.Equal(t, "stderr", out)
+	assert.Equal(t, "stderr\n", out)
 }
 
 func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
@@ -161,7 +120,6 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	env := ts.NewTestActivityEnvironment()
 
 	path := "some/path"
-	jobID := "1234"
 	echoCommand := exec.Command("sh", "-c", "echo dying && exit 1")
 
 	cmd := NewSubCommand(Plan)
@@ -178,23 +136,22 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	}
 
 	testFunc := func(ctx context.Context) (string, error) {
-		ch := client.RunCommand(ctx, jobID, path, cmd, map[string]string{}, nil)
-		return waitCh(ch)
+		buf := &bytes.Buffer{}
+		r := &RunCommandRequest{
+			RootPath: path,
+			SubCommand: cmd,
+			AdditionalEnvVars: map[string]string{},
+		}
+		err := client.RunCommand(ctx, r, RunOptions{
+			StdOut: buf,
+			StdErr: buf,
+		})
+		return buf.String(), err
 	}
+
 	env.RegisterActivity(testFunc)
 	_, err := env.ExecuteActivity(testFunc)
-	assert.ErrorContains(t, err, fmt.Sprintf(`running "/bin/sh -c echo dying && exit 1" in %q: exit status 1`, path))
-}
-
-func waitCh(ch <-chan Line) (string, error) {
-	var ls []string
-	for line := range ch {
-		if line.Err != nil {
-			return strings.Join(ls, "\n"), line.Err
-		}
-		ls = append(ls, line.Line)
-	}
-	return strings.Join(ls, "\n"), nil
+	assert.ErrorContains(t, err, `exit status 1`)
 }
 
 // TempDir creates a temporary directory and returns its path along

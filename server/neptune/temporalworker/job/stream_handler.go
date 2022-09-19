@@ -4,23 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/neptune/logger"
-	"github.com/runatlantis/atlantis/server/neptune/terraform"
 )
 
 type OutputLine struct {
 	JobID string
 	Line  string
-}
-
-type streamHandler interface {
-	Handle()
-	Stream(jobID string, ch <-chan terraform.Line) error
-	Close(ctx context.Context, jobID string)
 }
 
 func NewStreamHandler(
@@ -52,18 +44,11 @@ type StreamHandler struct {
 	Logger           logging.Logger
 }
 
-// Activity context since it's called from within an activity
-func (s *StreamHandler) Stream(ctx context.Context, jobID string, ch <-chan terraform.Line) error {
-	for line := range ch {
-		if line.Err != nil {
-			return errors.Wrap(line.Err, "executing command")
-		}
-		s.JobOutput <- &OutputLine{
-			JobID: jobID,
-			Line:  line.Line,
-		}
+func (s *StreamHandler) Stream(jobID string, msg string) {
+	s.JobOutput <- &OutputLine{
+		JobID: jobID,
+		Line:  msg,
 	}
-	return nil
 }
 
 func (s *StreamHandler) Handle() {
