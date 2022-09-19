@@ -805,7 +805,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		prPrjCmdRunner,
 		dbUpdater,
 		outputUpdater,
-		policyCheckCommandRunner,
+		events.NewPolicyCheckCommandRunner(dbUpdater, outputUpdater, commitStatusUpdater, prPrjCmdRunner, userConfig.ParallelPoolSize),
 		userConfig.ParallelPoolSize,
 	)
 
