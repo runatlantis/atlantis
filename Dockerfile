@@ -16,24 +16,25 @@ ARG TARGETPLATFORM
 ENV DEFAULT_TERRAFORM_VERSION=1.2.9
 
 # In the official Atlantis image we only have the latest of each Terraform version.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 1.0.11 1.1.9 ${DEFAULT_TERRAFORM_VERSION}" && \
-    case ${TARGETPLATFORM} in \
+    case "${TARGETPLATFORM}" in \
         "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
         "linux/arm64") TERRAFORM_ARCH=arm64 ;; \
         "linux/arm/v7") TERRAFORM_ARCH=arm ;; \
         *) echo "ERROR: 'TARGETPLATFORM' value expected: ${TARGETPLATFORM}"; exit 1 ;; \
     esac && \
     for VERSION in ${AVAILABLE_TERRAFORM_VERSIONS}; do \
-        curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip && \
-        curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_SHA256SUMS && \
-        sed -n "/terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip/p" terraform_${VERSION}_SHA256SUMS | sha256sum -c && \
-        mkdir -p /usr/local/bin/tf/versions/${VERSION} && \
-        unzip terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip -d /usr/local/bin/tf/versions/${VERSION} && \
-        ln -s /usr/local/bin/tf/versions/${VERSION}/terraform /usr/local/bin/terraform${VERSION} && \
-        rm terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip && \
-        rm terraform_${VERSION}_SHA256SUMS; \
+        curl -LOs "https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip" && \
+        curl -LOs "https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_SHA256SUMS" && \
+        sed -n "/terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip/p" "terraform_${VERSION}_SHA256SUMS" | sha256sum -c && \
+        mkdir -p "/usr/local/bin/tf/versions/${VERSION}" && \
+        unzip "terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip" -d "/usr/local/bin/tf/versions/${VERSION}" && \
+        ln -s "/usr/local/bin/tf/versions/${VERSION}/terraform" "/usr/local/bin/terraform${VERSION}" && \
+        rm "terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip" && \
+        rm "terraform_${VERSION}_SHA256SUMS"; \
     done && \
-    ln -s /usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform /usr/local/bin/terraform
+    ln -s "/usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform" /usr/local/bin/terraform
 
 ENV DEFAULT_CONFTEST_VERSION=0.34.0
 
