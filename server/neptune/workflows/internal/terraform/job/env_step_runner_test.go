@@ -77,8 +77,8 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 		},
 		Path: ProjectPath,
 		EnvVars: map[string]string{
-			"REPO_NAME":    RepoName,
-			"REPO_OWNER":   RepoOwner,
+			"BASE_REPO_NAME":    RepoName,
+			"BASE_REPO_OWNER":   RepoOwner,
 			"DIR":          ProjectPath,
 			"HEAD_COMMIT":  "refs/heads/main",
 			"PROJECT_NAME": ProjectName,

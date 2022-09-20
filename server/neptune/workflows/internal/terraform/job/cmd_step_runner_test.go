@@ -51,13 +51,13 @@ func TestRunRunner_ShouldSetupEnvVars(t *testing.T) {
 	env := ts.NewTestWorkflowEnvironment()
 
 	expectedEnvVars := map[string]string{
-		"REPO_NAME":    RepoName,
-		"REPO_OWNER":   RepoOwner,
-		"DIR":          ProjectPath,
-		"HEAD_COMMIT":  "refs/heads/main",
-		"PROJECT_NAME": ProjectName,
-		"REPO_REL_DIR": "project",
-		"USER_NAME":    UserName,
+		"BASE_REPO_NAME":  RepoName,
+		"BASE_REPO_OWNER": RepoOwner,
+		"DIR":             ProjectPath,
+		"HEAD_COMMIT":     "refs/heads/main",
+		"PROJECT_NAME":    ProjectName,
+		"REPO_REL_DIR":    "project",
+		"USER_NAME":       UserName,
 	}
 	testExecuteActivity := &testCmdExecuteActivity{
 		t:           t,

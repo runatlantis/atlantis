@@ -26,13 +26,13 @@ func (r *CmdStepRunner) Run(executionContext *job.ExecutionContext, localRoot *r
 	}
 
 	envVars := map[string]string{
-		"REPO_NAME":    localRoot.Repo.Name,
-		"REPO_OWNER":   localRoot.Repo.Owner,
-		"DIR":          executionContext.Path,
-		"HEAD_COMMIT":  ref,
-		"PROJECT_NAME": localRoot.Root.Name,
-		"REPO_REL_DIR": relPath,
-		"USER_NAME":    localRoot.Repo.HeadCommit.Author.Username,
+		"BASE_REPO_NAME":  localRoot.Repo.Name,
+		"BASE_REPO_OWNER": localRoot.Repo.Owner,
+		"DIR":             executionContext.Path,
+		"HEAD_COMMIT":     ref,
+		"PROJECT_NAME":    localRoot.Root.Name,
+		"REPO_REL_DIR":    relPath,
+		"USER_NAME":       localRoot.Repo.HeadCommit.Author.Username,
 	}
 
 	var resp activities.ExecuteCommandResponse
