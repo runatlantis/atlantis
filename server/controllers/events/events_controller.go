@@ -158,7 +158,7 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
 	logger := e.Logger.With("gh-request-id", githubReqID)
-	scope := e.Scope.SubScope("github.event")
+	scope := e.Scope.SubScope("github_event")
 
 	logger.Debug("request valid")
 
@@ -169,10 +169,10 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
 		resp = e.HandleGithubCommentEvent(event, githubReqID, logger)
-		scope = scope.SubScope(fmt.Sprintf("comment.%s", *event.Action))
+		scope = scope.SubScope(fmt.Sprintf("comment_%s", *event.Action))
 	case *github.PullRequestEvent:
 		resp = e.HandleGithubPullRequestEvent(logger, event, githubReqID)
-		scope = scope.SubScope(fmt.Sprintf("pr.%s", *event.Action))
+		scope = scope.SubScope(fmt.Sprintf("pr_%s", *event.Action))
 	default:
 		resp = HTTPResponse{
 			body: fmt.Sprintf("Ignoring unsupported event %s", githubReqID),
