@@ -82,8 +82,12 @@ type jobRunner struct {
 	expectedError error
 }
 
-func (r *jobRunner) Run(ctx workflow.Context, localRoot *root.LocalRoot, jobInstance job.JobInstance) (string, error) {
-	return "", r.expectedError
+func (r *jobRunner) Apply(ctx workflow.Context, localRoot *root.LocalRoot, jobID string, planFile string) error {
+	return r.expectedError
+}
+
+func (r *jobRunner) Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID string) (activities.TerraformPlanResponse, error) {
+	return activities.TerraformPlanResponse{}, r.expectedError
 }
 
 type request struct{}

@@ -116,7 +116,7 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 	if err != nil {
 		return TerraformPlanResponse{}, err
 	}
-	planFile := buildPlanFilePath(request.Path)
+	planFile := filepath.Join(request.Path, PlanOutputFile)
 
 	args := []terraform.Argument{
 		DisableInputArg,
@@ -183,6 +183,7 @@ type TerraformApplyRequest struct {
 	JobID     string
 	TfVersion string
 	Path      string
+	PlanFile  string
 }
 
 type TerraformApplyResponse struct {
@@ -195,7 +196,7 @@ func (t *terraformActivities) TerraformApply(ctx context.Context, request Terraf
 		return TerraformApplyResponse{}, err
 	}
 
-	planFile := buildPlanFilePath(request.Path)
+	planFile := request.PlanFile
 	args := []terraform.Argument{DisableInputArg}
 	args = append(args, request.Args...)
 
@@ -263,8 +264,4 @@ func (t *terraformActivities) resolveVersion(v string) (*version.Version, error)
 		return version, nil
 	}
 	return t.DefaultTFVersion, nil
-}
-
-func buildPlanFilePath(path string) string {
-	return filepath.Join(path, PlanOutputFile)
 }

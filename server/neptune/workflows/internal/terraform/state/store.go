@@ -6,6 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 )
 
 type urlGenerator interface {
@@ -18,6 +19,10 @@ type WorkflowStore struct {
 	state              *Workflow
 	notifier           UpdateNotifier
 	outputURLGenerator urlGenerator
+}
+
+type UpdateOptions struct {
+	PlanSummary terraform.PlanSummary
 }
 
 func NewWorkflowStoreWithGenerator(notifier UpdateNotifier, g urlGenerator) *WorkflowStore {
@@ -70,12 +75,16 @@ func (s *WorkflowStore) InitApplyJob(jobID fmt.Stringer, serverURL fmt.Stringer)
 	return s.notifier(s.state)
 }
 
-func (s *WorkflowStore) UpdatePlanJobWithStatus(status JobStatus) error {
+func (s *WorkflowStore) UpdatePlanJobWithStatus(status JobStatus, options ...UpdateOptions) error {
 	s.state.Plan.Status = status
+
+	for _, o := range options {
+		s.state.Plan.Output.Summary = o.PlanSummary
+	}
 	return s.notifier(s.state)
 }
 
-func (s *WorkflowStore) UpdateApplyJobWithStatus(status JobStatus) error {
+func (s *WorkflowStore) UpdateApplyJobWithStatus(status JobStatus, options ...UpdateOptions) error {
 	s.state.Apply.Status = status
 	return s.notifier(s.state)
 }

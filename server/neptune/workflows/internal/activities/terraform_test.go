@@ -460,6 +460,7 @@ func TestTerraformApply_RequestValidation(t *testing.T) {
 				Path:      path,
 				TfVersion: c.RequestVersion,
 				Args:      c.RequestArgs,
+				PlanFile:  "some/path/output.tfplan",
 			}
 
 			tfActivity := NewTerraformActivities(testClient, expectedVersion, &testStreamHandler{
@@ -505,9 +506,10 @@ func TestTerraformApply_StreamsOutput(t *testing.T) {
 	}
 
 	req := TerraformApplyRequest{
-		Envs:  map[string]string{},
-		JobID: jobID,
-		Path:  path,
+		Envs:     map[string]string{},
+		JobID:    jobID,
+		Path:     path,
+		PlanFile: "some/path/output.tfplan",
 	}
 
 	streamHandler := &testStreamHandler{

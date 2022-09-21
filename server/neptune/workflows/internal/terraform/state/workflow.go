@@ -1,6 +1,10 @@
 package state
 
-import "net/url"
+import (
+	"net/url"
+
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+)
 
 type JobStatus string
 
@@ -15,7 +19,10 @@ const (
 )
 
 type JobOutput struct {
-	URL *url.URL
+	URL     *url.URL
+
+	// populated for plan jobs
+	Summary terraform.PlanSummary
 }
 
 type Job struct {

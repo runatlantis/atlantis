@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
@@ -27,7 +26,8 @@ type terraformActivities interface {
 
 // jobRunner runs a deploy plan/apply job
 type jobRunner interface {
-	Run(ctx workflow.Context, localRoot *root.LocalRoot, jobInstance job.JobInstance) (string, error)
+	Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID string) (activities.TerraformPlanResponse, error)
+	Apply(ctx workflow.Context, localRoot *root.LocalRoot, jobID string, planFile string) error
 }
 
 type PlanStatus int
@@ -98,15 +98,6 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 			&runner.EnvStepRunner{
 				CmdStepRunner: cmdStepRunner,
 			},
-			&runner.InitStepRunner{
-				Activity: ta,
-			},
-			&runner.PlanStepRunner{
-				Activity: ta,
-			},
-			&runner.ApplyStepRunner{
-				Activity: ta,
-			},
 		),
 		RootFetcher: &RootFetcher{
 			Request: request,
@@ -121,41 +112,41 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 	}
 }
 
-func (r *Runner) Plan(ctx workflow.Context, root *root.LocalRoot, serverURL *url.URL) error {
+func (r *Runner) Plan(ctx workflow.Context, root *root.LocalRoot, serverURL *url.URL) (activities.TerraformPlanResponse, error) {
+	var response activities.TerraformPlanResponse
 	jobID, err := sideeffect.GenerateUUID(ctx)
 	if err != nil {
-		return errors.Wrap(err, "generating job id")
+		return response, errors.Wrap(err, "generating job id")
 	}
 
 	if err := r.Store.InitPlanJob(jobID, serverURL); err != nil {
-		return errors.Wrap(err, "initializing job")
+		return response, errors.Wrap(err, "initializing job")
 	}
 
 	if err := r.Store.UpdatePlanJobWithStatus(state.InProgressJobStatus); err != nil {
-		return errors.Wrap(err, "updating job with in-progress status")
+		return response, errors.Wrap(err, "updating job with in-progress status")
 	}
 
-	_, err = r.JobRunner.Run(ctx, root, job.JobInstance{
-		Job:   r.Request.Root.Plan,
-		JobID: jobID.String(),
-	})
+	response, err = r.JobRunner.Plan(ctx, root, jobID.String())
 
 	if err != nil {
 		if e := r.Store.UpdatePlanJobWithStatus(state.FailedJobStatus); e != nil {
 			logger.Error(ctx, "unable to update job with failed status, job failed with error. ", err)
-			return errors.Wrap(e, "updating job with failed status")
+			return response, errors.Wrap(e, "updating job with failed status")
 		}
-		return errors.Wrap(err, "running job")
+		return response, errors.Wrap(err, "running job")
 	}
-	if err := r.Store.UpdatePlanJobWithStatus(state.SuccessJobStatus); err != nil {
+	if err := r.Store.UpdatePlanJobWithStatus(state.SuccessJobStatus, state.UpdateOptions{
+		PlanSummary: response.Summary,
+	}); err != nil {
 		logger.Error(ctx, "unable to update job with success status")
-		return errors.Wrap(err, "updating job with success status")
+		return response, errors.Wrap(err, "updating job with success status")
 	}
 
-	return nil
+	return response, nil
 }
 
-func (r *Runner) Apply(ctx workflow.Context, root *root.LocalRoot, serverURL *url.URL) error {
+func (r *Runner) Apply(ctx workflow.Context, root *root.LocalRoot, serverURL *url.URL, planFile string) error {
 	jobID, err := sideeffect.GenerateUUID(ctx)
 
 	if err != nil {
@@ -182,10 +173,7 @@ func (r *Runner) Apply(ctx workflow.Context, root *root.LocalRoot, serverURL *ur
 		return errors.Wrap(err, "updating job with in-progress status")
 	}
 
-	_, err = r.JobRunner.Run(ctx, root, job.JobInstance{
-		Job:   r.Request.Root.Apply,
-		JobID: jobID.String(),
-	})
+	err = r.JobRunner.Apply(ctx, root, jobID.String(), planFile)
 	if err != nil {
 
 		if err := r.Store.UpdateApplyJobWithStatus(state.FailedJobStatus); err != nil {
@@ -222,11 +210,13 @@ func (r *Runner) Run(ctx workflow.Context) error {
 		return errors.Wrap(err, "fetching root")
 	}
 
-	if err := r.Plan(ctx, root, response.ServerURL); err != nil {
+	planResponse, err := r.Plan(ctx, root, response.ServerURL)
+	
+	if err != nil {
 		return errors.Wrap(err, "running plan job")
 	}
 
-	if err := r.Apply(ctx, root, response.ServerURL); err != nil {
+	if err := r.Apply(ctx, root, response.ServerURL, planResponse.PlanFile); err != nil {
 		return errors.Wrap(err, "running apply job")
 	}
 
