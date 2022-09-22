@@ -41,7 +41,7 @@ func (n *StateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel,
 	checkRunState := determineCheckRunState(workflowState)
 
 	request := activities.UpdateCheckRunRequest{
-		Title:   "atlantis/deploy",
+		Title:   BuildCheckRunTitle(deploymentInfo.Root.Name),
 		State:   checkRunState,
 		Repo:    n.Repo,
 		ID:      deploymentInfo.CheckRunID,

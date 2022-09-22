@@ -90,7 +90,7 @@ func TestEnqueue(t *testing.T) {
 	id := uuid.Must(uuid.NewUUID())
 
 	env.OnActivity(a.CreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
-		Title:      "atlantis/deploy",
+		Title:      "atlantis/deploy: root",
 		Sha:        rev,
 		Repo:       github.Repo{Name: "nish"},
 		ExternalID: id.String(),

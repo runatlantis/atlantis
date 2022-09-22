@@ -69,7 +69,7 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 
 	var resp activities.CreateCheckRunResponse
 	err = workflow.ExecuteActivity(ctx, n.activities.CreateCheckRun, activities.CreateCheckRunRequest{
-		Title:      "atlantis/deploy",
+		Title:      terraform.BuildCheckRunTitle(n.root.Name),
 		Sha:        request.Revision,
 		Repo:       n.repo,
 		ExternalID: id.String(),

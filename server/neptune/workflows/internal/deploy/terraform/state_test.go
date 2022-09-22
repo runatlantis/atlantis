@@ -10,6 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github/markdown"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -47,6 +48,7 @@ func testStateReceiveWorkflow(ctx workflow.Context, r stateReceiveRequest) error
 
 	receiver.Receive(ctx, ch, terraform.DeploymentInfo{
 		CheckRunID: 1,
+		Root:       root.Root{Name: "root"},
 	})
 
 	return nil
@@ -168,7 +170,7 @@ func TestStateReceive(t *testing.T) {
 			env.RegisterActivity(a)
 
 			env.OnActivity(a.UpdateCheckRun, mock.Anything, activities.UpdateCheckRunRequest{
-				Title: "atlantis/deploy",
+				Title: "atlantis/deploy: root",
 				State: c.ExpectedCheckRunState,
 				Repo: github.Repo{
 					Name: "hello",
