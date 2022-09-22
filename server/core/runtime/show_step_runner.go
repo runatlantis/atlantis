@@ -51,12 +51,13 @@ func (p *ShowStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext,
 	)
 
 	if err != nil {
-		return "", errors.Wrap(err, "running terraform show")
+		return output, errors.Wrap(err, "running terraform show")
 	}
 
 	if err := ioutil.WriteFile(showResultFile, []byte(output), os.ModePerm); err != nil {
 		return "", errors.Wrap(err, "writing terraform show result")
 	}
 
-	return output, nil
+	// don't return the output if it's successful since this is too large
+	return "", nil
 }

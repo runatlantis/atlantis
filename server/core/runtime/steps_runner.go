@@ -51,7 +51,7 @@ func (r *stepsRunner) Run(ctx context.Context, cmdCtx command.ProjectContext, ab
 		case "plan":
 			out, err = r.PlanRunner.Run(ctx, cmdCtx, step.ExtraArgs, absPath, envs)
 		case "show":
-			_, err = r.ShowRunner.Run(ctx, cmdCtx, step.ExtraArgs, absPath, envs)
+			out, err = r.ShowRunner.Run(ctx, cmdCtx, step.ExtraArgs, absPath, envs)
 		case "policy_check":
 			out, err = r.PolicyCheckRunner.Run(ctx, cmdCtx, step.ExtraArgs, absPath, envs)
 		case "apply":

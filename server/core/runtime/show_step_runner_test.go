@@ -44,7 +44,7 @@ func TestShowStepRunnner(t *testing.T) {
 			ctx, prjCtx, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, prjCtx.Workspace,
 		)).ThenReturn("success", nil)
 
-		r, err := subject.Run(ctx, prjCtx, []string{}, path, envs)
+		_, err := subject.Run(ctx, prjCtx, []string{}, path, envs)
 
 		Ok(t, err)
 
@@ -52,7 +52,6 @@ func TestShowStepRunnner(t *testing.T) {
 
 		actualStr := string(actual)
 		Assert(t, actualStr == "success", fmt.Sprintf("expected '%s' to be success", actualStr))
-		Assert(t, r == "success", fmt.Sprintf("expected '%s' to be success", r))
 
 	})
 
@@ -72,7 +71,7 @@ func TestShowStepRunnner(t *testing.T) {
 			ctx, prjCtx, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, v, prjCtx.Workspace,
 		)).ThenReturn("success", nil)
 
-		r, err := subject.Run(ctx, prjCtx, []string{}, path, envs)
+		_, err := subject.Run(ctx, prjCtx, []string{}, path, envs)
 
 		Ok(t, err)
 
@@ -80,18 +79,18 @@ func TestShowStepRunnner(t *testing.T) {
 
 		actualStr := string(actual)
 		Assert(t, actualStr == "success", "got expected result")
-		Assert(t, r == "success", "returned expected result")
 
 	})
 
 	t.Run("failure running command", func(t *testing.T) {
 		When(mockExecutor.RunCommandWithVersion(
 			ctx, prjCtx, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, prjCtx.Workspace,
-		)).ThenReturn("success", errors.New("error"))
+		)).ThenReturn("err", errors.New("error"))
 
-		_, err := subject.Run(ctx, prjCtx, []string{}, path, envs)
+		r, err := subject.Run(ctx, prjCtx, []string{}, path, envs)
 
 		Assert(t, err != nil, "error is returned")
+		Assert(t, r == "err", "returned expected result")
 
 	})
 
