@@ -177,6 +177,21 @@ type PullRequest struct {
 	State PullRequestState
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
+	// Title is a title of the pull request.
+	// Note: This attribute is currently implemented only for GitHub.
+	Title string
+}
+
+// A regex for skip ci
+// - [skip atlantis]
+// - [skip ci]
+// - [atlantis skip]
+// - [ci skip]
+var skipPullRequestKeywordRegex = regexp.MustCompile(`(\[skip (atlantis|ci)\])|(\[(atlantis|ci) skip\])`)
+
+// SkipByKeyword returns true if a title of the pull request motches skip keywords.
+func (p *PullRequest) SkipByKeyword() bool {
+	return skipPullRequestKeywordRegex.MatchString(p.Title)
 }
 
 // PullRequestOptions is used to set optional paralmeters for PullRequest

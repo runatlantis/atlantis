@@ -893,3 +893,12 @@ func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
 	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())
 	Equals(t, 0, drainer.GetStatus().InProgressOps)
 }
+
+func TestRunAutoplanCommand_SkipKeywordMatch(t *testing.T) {
+	t.Log("if a title of the pull request contains skip keywords then skip autoplan")
+	setup(t)
+	fixtures.Pull.BaseRepo = fixtures.GithubRepo
+	fixtures.Pull.Title = "[skip atlantis] foo"
+	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())
+}

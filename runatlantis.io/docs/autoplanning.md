@@ -37,3 +37,12 @@ or disable it all together you need to create an `atlantis.yaml` file.
 See
 * [Disabling Autoplanning](repo-level-atlantis-yaml.html#disabling-autoplanning)
 * [Configuring Planning](repo-level-atlantis-yaml.html#configuring-planning)
+
+::: tip
+If a title of pull request contains the following keywords, Atlantis will skip autoplanning. (This feature is currently implemented only for GitHub)
+
+* [skip atlantis]
+* [skip ci]
+* [atlantis skip]
+* [ci skip]
+:::

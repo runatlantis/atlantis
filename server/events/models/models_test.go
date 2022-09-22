@@ -159,6 +159,51 @@ func TestNewRepo_HTTPSAuth(t *testing.T) {
 	}, repo)
 }
 
+func TestPullRequest_SkipByKeyword(t *testing.T) {
+	cases := []struct {
+		title string
+		exp   bool
+	}{
+		{
+			"[skip atlantis] foo",
+			true,
+		},
+		{
+			"[skip ci] foo",
+			true,
+		},
+		{
+			"[atlantis skip] foo",
+			true,
+		},
+		{
+			"[ci skip] foo",
+			true,
+		},
+		{
+			"foo [ci skip]",
+			true,
+		},
+		{
+			"foo",
+			false,
+		},
+		{
+			"",
+			false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.title, func(t *testing.T) {
+			pull := &models.PullRequest{
+				Title: c.title,
+			}
+			Equals(t, c.exp, pull.SkipByKeyword())
+		})
+	}
+}
+
 func TestProject_String(t *testing.T) {
 	Equals(t, "repofullname=owner/repo path=my/path", (models.Project{
 		RepoFullName: "owner/repo",

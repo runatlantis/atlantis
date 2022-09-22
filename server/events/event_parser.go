@@ -536,6 +536,11 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel model
 		pullState = models.OpenPullState
 	}
 
+	title := ""
+	if pull.Title != nil {
+		title = *pull.Title
+	}
+
 	pullModel = models.PullRequest{
 		Author:     authorUsername,
 		HeadBranch: headBranch,
@@ -545,6 +550,7 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel model
 		State:      pullState,
 		BaseRepo:   baseRepo,
 		BaseBranch: baseBranch,
+		Title:      title,
 	}
 	return
 }

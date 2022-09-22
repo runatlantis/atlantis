@@ -163,6 +163,12 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
+	// Skip autoplan if a pull request matches skip keywords.
+	// We can always force to invoke plan with explicit comment command.
+	if pull.SkipByKeyword() {
+		return
+	}
+
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, nil)
 
 	if err != nil {
