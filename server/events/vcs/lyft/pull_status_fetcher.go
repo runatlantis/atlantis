@@ -58,7 +58,7 @@ func (s *SQBasedPullStatusFetcher) FetchPullStatus(repo models.Repo, pull models
 		return pullStatus, errors.Wrapf(err, "checking mergeability")
 	}
 
-	sqLocked, err := s.isPRLocked(statuses)
+	sqLocked, err := s.isPRLocked(statuses, checks)
 	if err != nil {
 		return pullStatus, errors.Wrapf(err, "checking sq lock status")
 	}
@@ -70,43 +70,57 @@ func (s *SQBasedPullStatusFetcher) FetchPullStatus(repo models.Repo, pull models
 	}, nil
 }
 
-func (s SQBasedPullStatusFetcher) isPRLocked(statuses []*github.RepoStatus) (bool, error) {
+func (s SQBasedPullStatusFetcher) isPRLocked(statuses []*github.RepoStatus, checks []*github.CheckRun) (bool, error) {
+	rawMetadata := ""
+
+	// First check statuses
 	for _, status := range statuses {
-		if status.GetContext() != SubmitQueueReadinessStatusContext {
-			continue
+		if status.GetContext() == SubmitQueueReadinessContext {
+			rawMetadata = status.GetDescription()
+			break
 		}
-
-		// When Submit queue status does not have tags assume PR is not locked
-		if status.GetDescription() == "" {
-			return false, nil
-		}
-
-		// Not using struct tags because there's no predefined schema for description.
-		description := make(map[string]interface{})
-		err := json.Unmarshal([]byte(status.GetDescription()), &description)
-		if err != nil {
-			return false, errors.Wrapf(err, "parsing status description")
-		}
-
-		waitingList, ok := description["waiting"]
-		if !ok {
-			// No waiting key means no lock.
-			return false, nil
-		}
-
-		typedWaitingList, ok := waitingList.([]interface{})
-		if !ok {
-			return false, fmt.Errorf("cast failed for %v", waitingList)
-		}
-		for _, item := range typedWaitingList {
-			if item == LockValue {
-				return true, nil
+	}
+	// Next try check runs if no statuses
+	if len(rawMetadata) == 0 {
+		for _, check := range checks {
+			if check.GetName() == SubmitQueueReadinessContext {
+				output := check.GetOutput()
+				if output != nil {
+					rawMetadata = output.GetTitle()
+				}
 			}
+			break
 		}
+	}
 
+	// No metadata found, assume not locked
+	if len(rawMetadata) == 0 {
+		return false, nil
+	}
+
+	// Not using struct tags because there's no predefined schema for description.
+	description := make(map[string]interface{})
+	err := json.Unmarshal([]byte(rawMetadata), &description)
+	if err != nil {
+		return false, errors.Wrapf(err, "parsing status description")
+	}
+
+	waitingList, ok := description["waiting"]
+	if !ok {
 		// No waiting key means no lock.
 		return false, nil
 	}
+
+	typedWaitingList, ok := waitingList.([]interface{})
+	if !ok {
+		return false, fmt.Errorf("cast failed for %v", waitingList)
+	}
+	for _, item := range typedWaitingList {
+		if item == LockValue {
+			return true, nil
+		}
+	}
+
 	// No Lock found.
 	return false, nil
 }

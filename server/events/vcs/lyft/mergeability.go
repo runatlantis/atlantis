@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	SubmitQueueReadinessStatusContext = "sq-ready-to-merge"
-	OwnersStatusContext               = "_owners-check"
+	SubmitQueueReadinessContext = "sq-ready-to-merge"
+	OwnersStatusContext         = "_owners-check"
 )
 
 // NameStateFilter filters statuses that correspond to atlantis apply
@@ -17,7 +17,7 @@ type NameStateFilter struct {
 
 // MewSQFilter filters statuses matching submit queue if they are pending.
 func NewSQFilter() NameStateFilter {
-	return NameStateFilter{statusName: SubmitQueueReadinessStatusContext, state: "pending"}
+	return NameStateFilter{statusName: SubmitQueueReadinessContext, state: "pending"}
 }
 
 func (f NameStateFilter) Filter(statuses []*github.RepoStatus) []*github.RepoStatus {
@@ -28,6 +28,28 @@ func (f NameStateFilter) Filter(statuses []*github.RepoStatus) []*github.RepoSta
 		}
 
 		filtered = append(filtered, status)
+	}
+
+	return filtered
+}
+
+type NameCheckFilter struct {
+	checkName string
+	status    string
+}
+
+func NewSQCheckFilter() NameCheckFilter {
+	return NameCheckFilter{checkName: SubmitQueueReadinessContext, status: "queued"}
+}
+
+func (f NameCheckFilter) Filter(checks []*github.CheckRun) []*github.CheckRun {
+	var filtered []*github.CheckRun
+	for _, check := range checks {
+		if check.GetStatus() == f.status && check.GetName() == f.checkName {
+			continue
+		}
+
+		filtered = append(filtered, check)
 	}
 
 	return filtered

@@ -6,9 +6,10 @@ import "github.com/runatlantis/atlantis/server/events/vcs/lyft"
 
 func NewLyftPullMergeabilityChecker(commitStatusPrefix string) MergeabilityChecker {
 	statusFilters := newValidStatusFilters(commitStatusPrefix)
-
 	statusFilters = append(statusFilters, lyft.NewSQFilter())
+
 	checksFilters := newValidChecksFilters(commitStatusPrefix)
+	checksFilters = append(checksFilters, lyft.NewSQCheckFilter())
 
 	supplementalChecker := newSupplementalMergeabilityChecker(statusFilters, checksFilters)
 	supplementalChecker = lyft.NewOwnersStatusChecker(supplementalChecker)

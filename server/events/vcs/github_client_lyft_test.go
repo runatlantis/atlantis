@@ -17,22 +17,21 @@ import (
 
 // TODO: move this test to the mergeability checker itself
 func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
-	checksJSON := `{
-		"check_runs": [
-		  {
-			"id": 4,
-			"status": "%s",
-			"conclusion": "%s",
-			"name": "mighty_readme",
-			"check_suite": {
-			  "id": 5
-			}
-		  }
-		]
-	  }`
+	checkJSON := `{
+		"id": 4,
+		"status": "%s",
+		"conclusion": "%s",
+		"name": "%s",
+		"check_suite": {
+		  "id": 5
+		}
+	}`
 	combinedStatusJSON := `{
 		"state": "success",
 		"statuses": [%s]
+	}`
+	combinedChecksJSON := `{
+		"check_runs": [%s]
 	}`
 	statusJSON := `{
         "url": "https://api.github.com/repos/octocat/Hello-World/statuses/6dcb09b5b57875f334f61aebed695e2e4193db5e",
@@ -58,13 +57,11 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 		1,
 	)
 
-	completedCheckResponse := fmt.Sprintf(checksJSON, "completed", "success")
-
 	cases := []struct {
-		description    string
-		statuses       []string
-		checksResponse string
-		expMergeable   bool
+		description  string
+		statuses     []string
+		checks       []string
+		expMergeable bool
 	}{
 		{
 			"sq-pending+owners-success+check-success",
@@ -72,7 +69,9 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 				fmt.Sprintf(statusJSON, "pending", "sq-ready-to-merge"),
 				fmt.Sprintf(statusJSON, "success", "_owners-check"),
 			},
-			completedCheckResponse,
+			[]string{
+				fmt.Sprintf(checkJSON, "completed", "success", "check-name"),
+			},
 			true,
 		},
 		{
@@ -80,7 +79,9 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 			[]string{
 				fmt.Sprintf(statusJSON, "pending", "sq-ready-to-merge"),
 			},
-			completedCheckResponse,
+			[]string{
+				fmt.Sprintf(checkJSON, "completed", "success", "check-name"),
+			},
 			false,
 		},
 		{
@@ -89,7 +90,9 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 				fmt.Sprintf(statusJSON, "pending", "sq-ready-to-merge"),
 				fmt.Sprintf(statusJSON, "failure", "_owners-check"),
 			},
-			completedCheckResponse,
+			[]string{
+				fmt.Sprintf(checkJSON, "completed", "success", "check-name"),
+			},
 			false,
 		},
 		{
@@ -99,7 +102,9 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 				fmt.Sprintf(statusJSON, "success", "_owners-check"),
 				fmt.Sprintf(statusJSON, "failure", "atlantis/apply"),
 			},
-			completedCheckResponse,
+			[]string{
+				fmt.Sprintf(checkJSON, "completed", "success", "check-name"),
+			},
 			true,
 		},
 		{
@@ -109,7 +114,9 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 				fmt.Sprintf(statusJSON, "success", "_owners-check"),
 				fmt.Sprintf(statusJSON, "failure", "atlantis/apply"),
 			},
-			fmt.Sprintf(checksJSON, "in_progress", ""),
+			[]string{
+				fmt.Sprintf(checkJSON, "in_progress", "", "check-name"),
+			},
 			false,
 		},
 		{
@@ -118,7 +125,9 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 				fmt.Sprintf(statusJSON, "pending", "sq-ready-to-merge"),
 				fmt.Sprintf(statusJSON, "success", "_owners-check"),
 			},
-			fmt.Sprintf(checksJSON, "in_progress", ""),
+			[]string{
+				fmt.Sprintf(checkJSON, "in_progress", "", "check-name"),
+			},
 			false,
 		},
 		{
@@ -127,8 +136,22 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 				fmt.Sprintf(statusJSON, "pending", "sq-ready-to-merge"),
 				fmt.Sprintf(statusJSON, "success", "_owners-check"),
 			},
-			fmt.Sprintf(checksJSON, "complete", "failure"),
+			[]string{
+				fmt.Sprintf(checkJSON, "complete", "failure", "check-name"),
+			},
 			false,
+		},
+		{
+			"sq-pending-check+owners-success+check-success",
+			[]string{
+				fmt.Sprintf(statusJSON, "pending", "sq-ready-to-merge"),
+				fmt.Sprintf(statusJSON, "success", "_owners-check"),
+			},
+			[]string{
+				fmt.Sprintf(checkJSON, "queued", "", "sq-ready-to-merge"),
+				fmt.Sprintf(checkJSON, "completed", "success", "check-name"),
+			},
+			true,
 		},
 	}
 
@@ -147,7 +170,9 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 						)) // nolint: errcheck
 						return
 					case "/api/v3/repos/owner/repo/commits/2/check-runs?per_page=100":
-						_, _ = w.Write([]byte(c.checksResponse))
+						_, _ = w.Write([]byte(
+							fmt.Sprintf(combinedChecksJSON, strings.Join(c.checks, ",")),
+						))
 						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
