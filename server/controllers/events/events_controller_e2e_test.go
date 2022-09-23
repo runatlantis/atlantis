@@ -1026,6 +1026,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		boltdb,
+		lockingClient,
 	)
 
 	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
