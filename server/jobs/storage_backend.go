@@ -47,11 +47,9 @@ func NewStorageBackend(jobs valid.Jobs, logger logging.Logger, featureAllocator 
 		containerName: containerName,
 	}
 
-	return &InstrumenetedStorageBackend{
+	return &InstrumentedStorageBackend{
 		StorageBackend: storageBackend,
-		readFailures:   scope.SubScope("storage_backend").Counter("read_failure"),
-		writeFailures:  scope.SubScope("storage_backend").Counter("write_failure"),
-		writeSuccesses: scope.SubScope("storage_backend").Counter("write_success"),
+		scope:          scope.SubScope("storage_backend"),
 	}, nil
 }
 
@@ -151,29 +149,36 @@ func (s *storageBackend) Write(key string, logs []string, _ string) (bool, error
 }
 
 // Adds instrumentation to storage backend
-type InstrumenetedStorageBackend struct {
+type InstrumentedStorageBackend struct {
 	StorageBackend
 
-	readFailures   tally.Counter
-	writeFailures  tally.Counter
-	writeSuccesses tally.Counter
+	scope tally.Scope
 }
 
-func (i *InstrumenetedStorageBackend) Read(key string) ([]string, error) {
+func (i *InstrumentedStorageBackend) Read(key string) ([]string, error) {
+	failureCount := i.scope.Counter("read_failure")
+	latency := i.scope.Timer("read_latency")
+	span := latency.Start()
+	defer span.Stop()
 	logs, err := i.StorageBackend.Read(key)
 	if err != nil {
-		i.readFailures.Inc(1)
+		failureCount.Inc(1)
 	}
 	return logs, err
 }
 
-func (i *InstrumenetedStorageBackend) Write(key string, logs []string, fullRepoName string) (bool, error) {
+func (i *InstrumentedStorageBackend) Write(key string, logs []string, fullRepoName string) (bool, error) {
+	failureCount := i.scope.Counter("write_failure")
+	successCount := i.scope.Counter("write_success")
+	latency := i.scope.Timer("write_latency")
+	span := latency.Start()
+	defer span.Stop()
 	ok, err := i.StorageBackend.Write(key, logs, fullRepoName)
 	if err != nil {
-		i.writeFailures.Inc(1)
+		failureCount.Inc(1)
 		return ok, err
 	}
-	i.writeSuccesses.Inc(1)
+	successCount.Inc(1)
 	return ok, err
 }
 
