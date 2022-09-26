@@ -244,6 +244,7 @@ allowed_regexp_prefixes:
 name: myname
 dir: mydir
 workspace: myworkspace
+execution_order_group: 0
 delete_source_branch_on_merge:
 autoplan:
 terraform_version: 0.11.0
@@ -256,6 +257,7 @@ workflow: myworkflow
 | name                                   | string                | none        | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                     |
 | dir                                    | string                | none        | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                    |
 | workspace                              | string                | `"default"` | no       | The [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                |
+| execution_order_group                  | int                   | `0`         | no       | Index of execution order group. Projects will be sort by this field before planning/applying                                                                                                                          |
 | autoplan                               | [Autoplan](#autoplan) | none        | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.html).                                                                                               |
 | delete_source_branch_on_merge          | bool                  | `false`     | no       | Automatically deletes the source branch on merge                                                                                                                                                                      |
 | terraform_version                      | string                | none        | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                          |
@@ -272,10 +274,8 @@ Atlantis supports this but requires the `name` key to be specified. See [Custom 
 ```yaml
 enabled: true
 when_modified: ["*.tf", "terragrunt.hcl"]
-execution_order_group: 0
 ```
 | Key                   | Type          | Default        | Required | Description                                                                                                                                                                                                                                                       |
 |-----------------------|---------------|----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | enabled               | boolean       | `true`         | no       | Whether autoplanning is enabled for this project.                                                                                                                                                                                                                 |
 | when_modified         | array[string] | `["**/*.tf*"]` | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.html). Paths are relative to the project's dir. |
-| execution_order_group | int           | `0`            | no       | Index of execution order group. Projects will be sort by this field before planning/applying                                                                                                                                                                      |
