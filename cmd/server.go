@@ -31,7 +31,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/gateway"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker"
 	neptune "github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
@@ -505,10 +504,6 @@ func (t *TemporalWorker) NewServer(userConfig server.UserConfig, config server.C
 			return nil, errors.Wrapf(err, "parsing %s file", userConfig.RepoConfig)
 		}
 	}
-	scope, closer, err := metrics.NewScope(globalCfg.Metrics, ctxLogger, userConfig.StatsNamespace)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create metrics scope")
-	}
 	parsedURL, err := server.ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
 		return nil, errors.Wrapf(err,
@@ -538,13 +533,13 @@ func (t *TemporalWorker) NewServer(userConfig server.UserConfig, config server.C
 			DownloadURL:            userConfig.TFDownloadURL,
 			LogFilters:             globalCfg.TerraformLogFilter,
 		},
-		JobCfg:      globalCfg.Jobs,
-		DataDir:     userConfig.DataDir,
-		TemporalCfg: globalCfg.Temporal,
-		App:         appConfig,
-		CtxLogger:   ctxLogger,
-		Scope:       scope,
-		StatsCloser: closer,
+		JobCfg:         globalCfg.Jobs,
+		DataDir:        userConfig.DataDir,
+		TemporalCfg:    globalCfg.Temporal,
+		App:            appConfig,
+		CtxLogger:      ctxLogger,
+		StatsNamespace: userConfig.StatsNamespace,
+		Metrics:        globalCfg.Metrics,
 	}
 	return temporalworker.NewServer(cfg)
 }

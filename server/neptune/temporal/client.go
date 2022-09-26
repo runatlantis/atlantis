@@ -1,24 +1,56 @@
 package temporal
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/client"
 	temporaltally "go.temporal.io/sdk/contrib/tally"
+	"go.temporal.io/sdk/converter"
+	"go.temporal.io/sdk/interceptor"
 	"go.temporal.io/sdk/workflow"
 	"logur.dev/logur"
 )
 
-func NewClient(scope tally.Scope, logger logur.Logger, cfg valid.Temporal) (client.Client, error) {
+const StatsNamespace = "temporalclient"
+
+type Options struct {
+	Interceptors  []interceptor.ClientInterceptor
+	StatsReporter tally.StatsReporter
+}
+
+func (o *Options) WithClientInterceptors(i ...interceptor.ClientInterceptor) *Options {
+	o.Interceptors = i
+	return o
+}
+
+func (o *Options) WithStatsReporter(reporter tally.StatsReporter) *Options {
+	o.StatsReporter = reporter
+	return o
+}
+
+func NewClient(logger logur.Logger, cfg valid.Temporal, options *Options) (client.Client, error) {
 	opts := client.Options{
 		Namespace:          cfg.Namespace,
-		MetricsHandler:     temporaltally.NewMetricsHandler(scope),
 		Logger:             logur.LoggerToKV(logger),
 		ContextPropagators: []workflow.ContextPropagator{&ctxPropagator{}},
+		Interceptors:       options.Interceptors,
+	}
+
+	var clientScope tally.Scope
+	var clientScopeCloser io.Closer
+	if options.StatsReporter != nil {
+		clientScope, clientScopeCloser = tally.NewRootScope(tally.ScopeOptions{
+			Prefix:   StatsNamespace,
+			Reporter: options.StatsReporter,
+		}, time.Second)
+		opts.MetricsHandler = temporaltally.NewMetricsHandler(clientScope)
 	}
 
 	if cfg.UseSystemCACert {
@@ -39,5 +71,154 @@ func NewClient(scope tally.Scope, logger logur.Logger, cfg valid.Temporal) (clie
 
 	}
 
-	return client.Dial(opts)
+	client, err := client.Dial(opts)
+	if err != nil {
+		return client, err
+	}
+
+	return &CustomClosingClient{
+		Client:      client,
+		statsCloser: clientScopeCloser,
+	}, nil
+}
+
+type CustomClosingClient struct {
+	client.Client
+	statsCloser io.Closer
+}
+
+func (c *CustomClosingClient) Close() {
+	c.Client.Close()
+
+	if c.statsCloser != nil {
+		c.statsCloser.Close()
+	}
+}
+
+func NewMetricsInterceptor(scope tally.Scope) interceptor.ClientInterceptor {
+	return &clientMetricsInterceptor{
+		scope: scope,
+	}
+}
+
+type clientMetricsInterceptor struct {
+	scope tally.Scope
+	// according to docs we should be embedding this for future changes
+	interceptor.ClientInterceptorBase
+}
+
+func (i *clientMetricsInterceptor) InterceptClient(
+	next interceptor.ClientOutboundInterceptor,
+) interceptor.ClientOutboundInterceptor {
+
+	return &clientMetricsOutboundInterceptor{
+		scope: i.scope,
+		ClientOutboundInterceptorBase: interceptor.ClientOutboundInterceptorBase{
+			Next: next,
+		},
+	}
+
+}
+
+type clientMetricsOutboundInterceptor struct {
+	scope tally.Scope
+	// according to docs we should be embedding this for future changes
+	interceptor.ClientOutboundInterceptorBase
+}
+
+func (i *clientMetricsOutboundInterceptor) ExecuteWorkflow(ctx context.Context, in *interceptor.ClientExecuteWorkflowInput) (client.WorkflowRun, error) {
+	s := i.scope.SubScope("execute_workflow")
+
+	timer := s.Timer("latency").Start()
+	defer timer.Stop()
+
+	run, err := i.ClientOutboundInterceptorBase.Next.ExecuteWorkflow(ctx, in)
+
+	if err != nil {
+		s.Counter("error").Inc(1)
+		return run, err
+	}
+
+	s.Counter("success").Inc(1)
+	return run, err
+
+}
+
+func (i *clientMetricsOutboundInterceptor) SignalWorkflow(ctx context.Context, in *interceptor.ClientSignalWorkflowInput) error {
+	s := i.scope.SubScope("signal_workflow")
+
+	timer := s.Timer("latency").Start()
+	defer timer.Stop()
+
+	if err := i.ClientOutboundInterceptorBase.Next.SignalWorkflow(ctx, in); err != nil {
+		s.Counter("error").Inc(1)
+		return err
+	}
+
+	s.Counter("success").Inc(1)
+	return nil
+}
+
+func (i *clientMetricsOutboundInterceptor) SignalWithStartWorkflow(ctx context.Context, in *interceptor.ClientSignalWithStartWorkflowInput) (client.WorkflowRun, error) {
+	s := i.scope.SubScope("signal_with_start_workflow")
+
+	timer := s.Timer("latency").Start()
+	defer timer.Stop()
+
+	run, err := i.ClientOutboundInterceptorBase.Next.SignalWithStartWorkflow(ctx, in)
+
+	if err != nil {
+		s.Counter("error").Inc(1)
+		return run, err
+	}
+
+	s.Counter("success").Inc(1)
+	return run, err
+}
+
+func (i *clientMetricsOutboundInterceptor) CancelWorkflow(ctx context.Context, in *interceptor.ClientCancelWorkflowInput) error {
+	s := i.scope.SubScope("cancel_workflow")
+
+	timer := s.Timer("latency").Start()
+	defer timer.Stop()
+
+	if err := i.ClientOutboundInterceptorBase.Next.CancelWorkflow(ctx, in); err != nil {
+		s.Counter("error").Inc(1)
+		return err
+	}
+
+	s.Counter("success").Inc(1)
+	return nil
+}
+
+func (i *clientMetricsOutboundInterceptor) TerminateWorkflow(ctx context.Context, in *interceptor.ClientTerminateWorkflowInput) error {
+	s := i.scope.SubScope("terminate_workflow")
+
+	timer := s.Timer("latency").Start()
+	defer timer.Stop()
+
+	if err := i.ClientOutboundInterceptorBase.Next.TerminateWorkflow(ctx, in); err != nil {
+		s.Counter("error").Inc(1)
+		return err
+	}
+
+	s.Counter("success").Inc(1)
+	return nil
+}
+
+func (i *clientMetricsOutboundInterceptor) QueryWorkflow(ctx context.Context, in *interceptor.ClientQueryWorkflowInput) (converter.EncodedValue, error) {
+	s := i.scope.SubScope("query_workflow")
+
+	timer := s.Timer("latency").Start()
+	defer timer.Stop()
+
+	val, err := i.ClientOutboundInterceptorBase.Next.QueryWorkflow(ctx, in)
+
+	if err != nil {
+		s.Counter("error").Inc(1)
+		return val, err
+	}
+
+	s.Counter("success").Inc(1)
+	return val, err
 }

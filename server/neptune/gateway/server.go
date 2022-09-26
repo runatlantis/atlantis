@@ -112,7 +112,13 @@ func NewServer(config Config) (*Server, error) {
 		}
 	}
 
-	statsScope, closer, err := metrics.NewScope(globalCfg.Metrics, ctxLogger, config.StatsNamespace)
+	statsReporter, err := metrics.NewReporter(globalCfg.Metrics, ctxLogger)
+
+	if err != nil {
+		return nil, err
+	}
+
+	statsScope, closer := metrics.NewScopeWithReporter(globalCfg.Metrics, ctxLogger, config.StatsNamespace, statsReporter)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +277,11 @@ func NewServer(config Config) (*Server, error) {
 		RepoConverter: repoConverter,
 	}
 
-	temporalClient, err := temporal.NewClient(statsScope, ctxLogger, globalCfg.Temporal)
+	opts := &temporal.Options{
+		StatsReporter: statsReporter,
+	}
+	opts = opts.WithClientInterceptors(temporal.NewMetricsInterceptor(statsScope))
+	temporalClient, err := temporal.NewClient(ctxLogger, globalCfg.Temporal, opts)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing temporal client")
@@ -421,6 +431,8 @@ func (s *Server) Shutdown() error {
 	if err := s.Server.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
 	}
+
+	s.TemporalClient.Close()
 
 	return nil
 }

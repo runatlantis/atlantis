@@ -14,7 +14,7 @@ import (
 )
 
 func NewLoggingScope(logger logging.Logger, statsNamespace string) (tally.Scope, io.Closer, error) {
-	reporter, err := newReporter(valid.Metrics{}, logger)
+	reporter, err := NewReporter(valid.Metrics{}, logger)
 
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "initializing stats reporter")
@@ -29,21 +29,26 @@ func NewLoggingScope(logger logging.Logger, statsNamespace string) (tally.Scope,
 }
 
 func NewScope(cfg valid.Metrics, logger logging.Logger, statsNamespace string) (tally.Scope, io.Closer, error) {
-	reporter, err := newReporter(cfg, logger)
+	reporter, err := NewReporter(cfg, logger)
 
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "initializing stats reporter")
 	}
 
+	scope, closer := NewScopeWithReporter(cfg, logger, statsNamespace, reporter)
+	return scope, closer, nil
+}
+
+func NewScopeWithReporter(cfg valid.Metrics, logger logging.Logger, statsNamespace string, reporter tally.StatsReporter) (tally.Scope, io.Closer) {
 	scope, closer := tally.NewRootScope(tally.ScopeOptions{
 		Prefix:   statsNamespace,
 		Reporter: reporter,
 	}, time.Second)
 
-	return scope, closer, nil
+	return scope, closer
 }
 
-func newReporter(cfg valid.Metrics, logger logging.Logger) (tally.StatsReporter, error) {
+func NewReporter(cfg valid.Metrics, logger logging.Logger) (tally.StatsReporter, error) {
 	if cfg.Statsd == nil {
 		// return logging reporter and proceed
 		return newLoggingReporter(logger), nil

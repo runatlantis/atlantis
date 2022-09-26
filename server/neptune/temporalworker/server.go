@@ -19,6 +19,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 	neptune_http "github.com/runatlantis/atlantis/server/neptune/http"
 	"github.com/runatlantis/atlantis/server/neptune/temporal"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
@@ -53,8 +54,19 @@ type Server struct {
 }
 
 func NewServer(config *config.Config) (*Server, error) {
+	statsReporter, err := metrics.NewReporter(config.Metrics, config.CtxLogger)
+
+	if err != nil {
+		return nil, err
+	}
+
+	scope, statsCloser := metrics.NewScopeWithReporter(config.Metrics, config.CtxLogger, config.StatsNamespace, statsReporter)
+	if err != nil {
+		return nil, err
+	}
+
 	// Build dependencies required for output handler and jobs controller
-	jobStore, err := job.NewStorageBackedStore(config.JobCfg, config.CtxLogger, config.Scope)
+	jobStore, err := job.NewStorageBackedStore(config.JobCfg, config.CtxLogger, scope)
 	if err != nil {
 		return nil, errors.Wrapf(err, "initializing job store")
 	}
@@ -62,10 +74,14 @@ func NewServer(config *config.Config) (*Server, error) {
 
 	// terraform job output handler
 	jobStreamHandler := job.NewStreamHandler(jobStore, receiverRegistry, config.TerraformCfg.LogFilters, config.CtxLogger)
-	jobsController := controllers.NewJobsController(jobStore, receiverRegistry, config.ServerCfg, config.Scope, config.CtxLogger)
+	jobsController := controllers.NewJobsController(jobStore, receiverRegistry, config.ServerCfg, scope, config.CtxLogger)
 
 	// temporal client + worker initialization
-	temporalClient, err := temporal.NewClient(config.Scope, config.CtxLogger, config.TemporalCfg)
+	opts := &temporal.Options{
+		StatsReporter: statsReporter,
+	}
+	opts = opts.WithClientInterceptors(temporal.NewMetricsInterceptor(scope))
+	temporalClient, err := temporal.NewClient(config.CtxLogger, config.TemporalCfg, opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing temporal client")
 	}
@@ -92,7 +108,7 @@ func NewServer(config *config.Config) (*Server, error) {
 
 	deployActivities, err := workflows.NewDeployActivities(
 		config.App,
-		config.Scope.SubScope("deploy"),
+		scope.SubScope("deploy"),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing deploy activities")
@@ -110,7 +126,7 @@ func NewServer(config *config.Config) (*Server, error) {
 
 	githubActivities, err := workflows.NewGithubActivities(
 		config.App,
-		config.Scope.SubScope("app"),
+		scope.SubScope("app"),
 		config.DataDir,
 	)
 	if err != nil {
@@ -121,8 +137,8 @@ func NewServer(config *config.Config) (*Server, error) {
 		Logger:              config.CtxLogger,
 		HttpServerProxy:     httpServerProxy,
 		Port:                config.ServerCfg.Port,
-		StatsScope:          config.Scope,
-		StatsCloser:         config.StatsCloser,
+		StatsScope:          scope,
+		StatsCloser:         statsCloser,
 		TemporalClient:      temporalClient,
 		JobStreamHandler:    jobStreamHandler,
 		DeployActivities:    deployActivities,
@@ -188,6 +204,9 @@ func (s Server) Start() error {
 	if err := s.HttpServerProxy.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
 	}
+
+	s.TemporalClient.Close()
+
 	return nil
 }
 
