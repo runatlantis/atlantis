@@ -28,10 +28,11 @@ type jobRunner struct {
 	CmdStepRunner stepRunner
 }
 
-func NewRunner(runStepRunner stepRunner, envStepRunner stepRunner) *jobRunner {
+func NewRunner(runStepRunner stepRunner, envStepRunner stepRunner, tfActivities terraformActivities) *jobRunner {
 	return &jobRunner{
 		CmdStepRunner: runStepRunner,
 		EnvStepRunner: envStepRunner,
+		Activity:      tfActivities,
 	}
 }
 
