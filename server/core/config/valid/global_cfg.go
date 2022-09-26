@@ -93,8 +93,9 @@ type Metrics struct {
 }
 
 type Statsd struct {
-	Port string
-	Host string
+	Port         string
+	Host         string
+	TagSeparator string
 }
 
 type Temporal struct {

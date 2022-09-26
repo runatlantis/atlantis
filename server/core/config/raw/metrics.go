@@ -11,8 +11,9 @@ type Metrics struct {
 }
 
 type Statsd struct {
-	Port string `yaml:"port" json:"port"`
-	Host string `yaml:"host" json:"host"`
+	Port         string `yaml:"port" json:"port"`
+	Host         string `yaml:"host" json:"host"`
+	TagSeparator string `yaml:"tag_separator" json:"tag_separator"`
 }
 
 func (s *Statsd) Validate() error {
@@ -34,8 +35,9 @@ func (m Metrics) ToValid() valid.Metrics {
 	if m.Statsd != nil {
 		return valid.Metrics{
 			Statsd: &valid.Statsd{
-				Host: m.Statsd.Host,
-				Port: m.Statsd.Port,
+				Host:         m.Statsd.Host,
+				Port:         m.Statsd.Port,
+				TagSeparator: m.Statsd.TagSeparator,
 			},
 		}
 	}

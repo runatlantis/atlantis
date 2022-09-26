@@ -59,5 +59,14 @@ func newReporter(cfg valid.Metrics, logger logging.Logger) (tally.StatsReporter,
 		return nil, errors.Wrap(err, "initializing statsd client")
 	}
 
-	return tallystatsd.NewReporter(client, tallystatsd.Options{}), nil
+	base := tallystatsd.NewReporter(client, tallystatsd.Options{})
+
+	if statsdCfg.TagSeparator != "" {
+		return base, nil
+	}
+
+	return &customTagReporter{
+		StatsReporter: base,
+		separator:     statsdCfg.TagSeparator,
+	}, nil
 }
