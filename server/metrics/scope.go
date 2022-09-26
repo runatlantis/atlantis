@@ -66,7 +66,7 @@ func NewReporter(cfg valid.Metrics, logger logging.Logger) (tally.StatsReporter,
 
 	base := tallystatsd.NewReporter(client, tallystatsd.Options{})
 
-	if statsdCfg.TagSeparator != "" {
+	if statsdCfg.TagSeparator == "" {
 		return base, nil
 	}
 
