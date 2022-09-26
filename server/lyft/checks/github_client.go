@@ -117,16 +117,15 @@ func (c *ChecksClientWrapper) UpdateStatus(ctx context.Context, request types.Up
 	}
 
 	if !shouldAllocate {
+		c.Scope.Counter("commit_status").Inc(1)
 		return c.GithubClient.UpdateStatus(ctx, request)
 	}
+	c.Scope.Counter("checks").Inc(1)
 
 	// Empty status ID means we create a new check run
 	if request.StatusId == "" {
-		c.Scope.Counter("commit_status").Inc(1)
 		return c.createCheckRun(ctx, request)
 	}
-
-	c.Scope.Counter("checks").Inc(1)
 	return request.StatusId, c.updateCheckRun(ctx, request, request.StatusId)
 }
 
