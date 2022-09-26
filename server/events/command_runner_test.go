@@ -231,6 +231,24 @@ func TestRunCommentCommand_PreWorkflowHookError(t *testing.T) {
 			Equals(t, cmd, cmdName)
 		})
 	}
+
+	t.Run("if pre workflow hook errors out for approve policies, set the policy check status to failed", func(t *testing.T) {
+		RegisterMockTestingT(t)
+		_ = setup(t)
+		ctx := context.Background()
+		modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, Num: fixtures.Pull.Num, State: models.OpenPullState}
+		preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
+
+		When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
+		When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyContextContext(), matchers.AnyPtrToEventsCommandContext())).ThenReturn(fmt.Errorf("catastrophic error"))
+
+		ch.PreWorkflowHooksCommandRunner = preWorkflowHooksCommandRunner
+
+		ch.RunCommentCommand(ctx, fixtures.GithubRepo, modelPull.BaseRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
+		_, _, _, status, cmdName, _ := commitUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName(), AnyString()).GetCapturedArguments()
+		Equals(t, models.FailedCommitStatus, status)
+		Equals(t, command.PolicyCheck, cmdName)
+	})
 }
 
 func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) {

@@ -202,8 +202,15 @@ func (c *DefaultCommandRunner) RunCommentCommand(ctx context.Context, baseRepo m
 	}
 
 	if err := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmdCtx); err != nil {
+		// Replace approve policies command with policy check if preworkflow hook fails since we don't use
+		// approve policies statuses
+		cmdName := cmd.Name
+		if cmdName == command.ApprovePolicies {
+			cmdName = command.PolicyCheck
+		}
+
 		c.Logger.ErrorContext(ctx, "Error running pre-workflow hooks", fields.PullRequestWithErr(pull, err))
-		c.CommitStatusUpdater.UpdateCombined(ctx, cmdCtx.HeadRepo, cmdCtx.Pull, models.FailedCommitStatus, cmd.Name, "")
+		c.CommitStatusUpdater.UpdateCombined(ctx, cmdCtx.HeadRepo, cmdCtx.Pull, models.FailedCommitStatus, cmdName, "")
 		return
 	}
 
