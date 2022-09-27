@@ -1,0 +1,17 @@
+{{ define "multiProjectVersion" -}}
+Ran {{.Command}} for {{ len .Results }} projects:
+
+{{ range $result := .Results }}1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`
+{{end}}
+{{ range $i, $result := .Results }}### {{add $i 1}}. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`
+{{$result.Rendered}}
+
+---
+{{end}}{{if .Verbose}}
+<details><summary>Log</summary>
+  <p>
+
+```
+{{.Log}}```
+</p></details>{{end}}
+{{ end }}

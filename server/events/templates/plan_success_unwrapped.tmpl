@@ -1,0 +1,13 @@
+{{ define "planSuccessUnwrapped" -}}
+```diff
+{{ if .EnableDiffMarkdownFormat }}{{.DiffMarkdownFormattedTerraformOutput}}{{else}}{{.TerraformOutput}}{{end}}
+```
+
+{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}{{ if not .DisableApply }}* :arrow_forward: To **apply** this plan, comment:
+    * `{{.ApplyCmd}}`
+{{end}}{{ if not .DisableRepoLocking }}* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})
+{{end}}* :repeat: To **plan** this project again, comment:
+    * `{{.RePlanCmd}}`{{end}}{{ if .HasDiverged }}
+
+:warning: The branch we're merging into is ahead, it is recommended to pull new commits first.{{end}}
+{{- end }}
