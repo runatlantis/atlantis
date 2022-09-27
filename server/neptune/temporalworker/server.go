@@ -13,8 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"go.temporal.io/sdk/client"
-
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -45,7 +43,7 @@ type Server struct {
 	Port             int
 	StatsScope       tally.Scope
 	StatsCloser      io.Closer
-	TemporalClient   client.Client
+	TemporalClient   *temporal.ClientWrapper
 	JobStreamHandler *job.StreamHandler
 
 	DeployActivities    *workflows.DeployActivities
@@ -156,7 +154,8 @@ func (s Server) Start() error {
 
 	go func() {
 		defer wg.Done()
-		w := worker.New(s.TemporalClient, workflows.DeployTaskQueue, worker.Options{
+		// pass the underlying client otherwise this will panic()
+		w := worker.New(s.TemporalClient.Client, workflows.DeployTaskQueue, worker.Options{
 			EnableSessionWorker: true,
 		})
 		w.RegisterActivity(s.TerraformActivities)

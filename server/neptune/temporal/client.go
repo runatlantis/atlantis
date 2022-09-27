@@ -35,7 +35,7 @@ func (o *Options) WithStatsReporter(reporter tally.StatsReporter) *Options {
 	return o
 }
 
-func NewClient(logger logur.Logger, cfg valid.Temporal, options *Options) (client.Client, error) {
+func NewClient(logger logur.Logger, cfg valid.Temporal, options *Options) (*ClientWrapper, error) {
 	opts := client.Options{
 		Namespace:          cfg.Namespace,
 		Logger:             logur.LoggerToKV(logger),
@@ -73,21 +73,25 @@ func NewClient(logger logur.Logger, cfg valid.Temporal, options *Options) (clien
 
 	client, err := client.Dial(opts)
 	if err != nil {
-		return client, err
+		return &ClientWrapper{}, err
 	}
 
-	return &CustomClosingClient{
+	return &ClientWrapper{
 		Client:      client,
 		statsCloser: clientScopeCloser,
 	}, nil
 }
 
-type CustomClosingClient struct {
+// ClientWrapper for now just exists to intercept Close()
+// so we can clean up our stats object.
+// Users still should feel free to refer to the underlying
+// client as necessary
+type ClientWrapper struct {
 	client.Client
 	statsCloser io.Closer
 }
 
-func (c *CustomClosingClient) Close() {
+func (c *ClientWrapper) Close() {
 	c.Client.Close()
 
 	if c.statsCloser != nil {
