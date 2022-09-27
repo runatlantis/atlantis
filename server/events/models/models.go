@@ -383,10 +383,6 @@ type PolicyCheckSuccess struct {
 	PolicyCheckOutput string
 	// LockURL is the full URL to the lock held by this policy check.
 	LockURL string
-	// RePlanCmd is the command that users should run to re-plan this project.
-	RePlanCmd string
-	// ApplyCmd is the command that users should run to apply this plan.
-	ApplyCmd string
 	// HasDiverged is true if we're using the checkout merge strategy and the
 	// branch we're merging into has been updated since we cloned and merged
 	// it.

@@ -427,8 +427,6 @@ $$$
 					PolicyCheckSuccess: &models.PolicyCheckSuccess{
 						PolicyCheckOutput: "2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions",
 						LockURL:           "lock-url",
-						RePlanCmd:         "atlantis plan -d path -w workspace",
-						ApplyCmd:          "atlantis apply -d path -w workspace",
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -442,11 +440,6 @@ $$$diff
 2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions
 $$$
 
-* :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
-* :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path -w workspace$
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
@@ -566,8 +559,6 @@ $$$
 					PolicyCheckSuccess: &models.PolicyCheckSuccess{
 						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 						LockURL:           "lock-url",
-						ApplyCmd:          "atlantis apply -d path -w workspace",
-						RePlanCmd:         "atlantis plan -d path -w workspace",
 					},
 				},
 				{
@@ -577,8 +568,6 @@ $$$
 					PolicyCheckSuccess: &models.PolicyCheckSuccess{
 						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 						LockURL:           "lock-url2",
-						ApplyCmd:          "atlantis apply -d path2 -w workspace",
-						RePlanCmd:         "atlantis plan -d path2 -w workspace",
 					},
 				},
 			},
@@ -593,11 +582,6 @@ $$$diff
 4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
 $$$
 
-* :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
-* :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path -w workspace$
 
 ---
 ### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
@@ -605,11 +589,6 @@ $$$diff
 4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
 $$$
 
-* :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path2 -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
-* :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path2 -w workspace$
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
@@ -763,8 +742,6 @@ $$$
 					PolicyCheckSuccess: &models.PolicyCheckSuccess{
 						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 						LockURL:           "lock-url",
-						ApplyCmd:          "atlantis apply -d path -w workspace",
-						RePlanCmd:         "atlantis plan -d path -w workspace",
 					},
 				},
 				{
@@ -791,11 +768,6 @@ $$$diff
 4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
 $$$
 
-* :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
-* :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path -w workspace$
 
 ---
 ### 2. dir: $path2$ workspace: $workspace$

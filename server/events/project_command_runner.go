@@ -243,8 +243,6 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 
 	return &models.PolicyCheckSuccess{
 		PolicyCheckOutput: outputs,
-		RePlanCmd:         ctx.RePlanCmd,
-		ApplyCmd:          ctx.ApplyCmd,
 
 		// set this to false right now because we don't have this information
 		// TODO: refactor the templates in a sane way so we don't need this

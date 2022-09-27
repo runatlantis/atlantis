@@ -3,12 +3,6 @@
 ```diff
 {{.PolicyCheckOutput}}
 ```
-
-{{ if ne .ApplyCmd  "" }}* :arrow_forward: To **apply** this plan, comment:
-    * `{{.ApplyCmd}}`{{end}}
-{{ if ne .LockURL  "" }}* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}}){{end}}
-{{ if ne .RePlanCmd  "" }}* :repeat: To re-run policies **plan** this project again by commenting:
-    * `{{.RePlanCmd}}`{{end}}
 </details>{{ if .HasDiverged }}
 
 :warning: The branch we're merging into is ahead, it is recommended to pull new commits first.{{end}}
