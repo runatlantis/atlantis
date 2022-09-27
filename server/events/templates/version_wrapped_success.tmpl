@@ -1,8 +1,6 @@
 {{ define "versionWrappedSuccess" -}}
 <details><summary>Show Output</summary>
 
-```
-{{.Output}}
-```
+{{ template "versionUnwrappedSuccess" . }}
 </details>
 {{- end }}

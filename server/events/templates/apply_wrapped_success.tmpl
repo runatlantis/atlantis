@@ -1,8 +1,6 @@
 {{ define "applyWrappedSuccess" -}}
 <details><summary>Show Output</summary>
 
-```diff
-{{.Output}}
-```
+{{ template "applyUnwrappedSuccess" . }}
 </details>
 {{- end }}

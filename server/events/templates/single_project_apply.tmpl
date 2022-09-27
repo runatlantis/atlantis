@@ -2,11 +2,5 @@
 {{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`
 
 {{$result.Rendered}}
-{{if .Verbose}}
-<details><summary>Log</summary>
-  <p>
-
-```
-{{.Log}}```
-</p></details>{{end}}
+{{ template "log" . }}
 {{ end }}
