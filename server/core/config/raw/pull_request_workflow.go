@@ -40,7 +40,20 @@ func (w PullRequestWorkflow) toValidStage(stage *Stage, defaultStage valid.Stage
 		return defaultStage
 	}
 
-	return stage.ToValid()
+	validStage := stage.ToValid()
+
+	// HACK: Extra args should be used for customer args passed in.
+	// We should have this logic built into the client and relevant context
+	// passed in to allow this.  
+	// Doing this here minimizes changes right now and ensures that even custom extra args
+	// will still have this default applied.
+	for _, s := range validStage.Steps {
+		if s.StepName == "plan" {
+			s.ExtraArgs = append(s.ExtraArgs, "-lock=false")
+		}
+	}
+
+	return validStage
 }
 
 func (w PullRequestWorkflow) ToValid(name string) valid.Workflow {
@@ -48,7 +61,7 @@ func (w PullRequestWorkflow) ToValid(name string) valid.Workflow {
 		Name: name,
 	}
 
-	v.Plan = w.toValidStage(w.Plan, valid.DefaultLocklessPlanStage)
+	v.Plan = w.toValidStage(w.Plan, valid.DefaultPlanStage)
 	v.PolicyCheck = w.toValidStage(w.PolicyCheck, valid.DefaultPolicyCheckStage)
 
 	return v
