@@ -1,7 +1,6 @@
 package events
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -43,14 +42,14 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *command.Co
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	statusId, err := a.commitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.PendingCommitStatus, command.PolicyCheck, "")
+	statusId, err := a.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.PendingCommitStatus, command.PolicyCheck, "", "")
 	if err != nil {
 		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
 
 	projectCmds, err := a.prjCmdBuilder.BuildApprovePoliciesCommands(ctx, cmd)
 	if err != nil {
-		if _, statusErr := a.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck, statusId); statusErr != nil {
+		if _, statusErr := a.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck, statusId, ""); statusErr != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		a.outputUpdater.UpdateOutput(ctx, cmd, command.Result{Error: err})
@@ -62,7 +61,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *command.Co
 		// If there were no projects modified, we set successful commit statuses
 		// with 0/0 projects approve_policies successfully because some users require
 		// the Atlantis status to be passing for all pull requests.
-		if _, err := a.commitStatusUpdater.UpdateCombinedCount(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0, statusId); err != nil {
+		if _, err := a.commitStatusUpdater.UpdateCombinedCount(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0, statusId); err != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 		}
 		return
@@ -74,7 +73,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *command.Co
 	// Noop when github checks is not enabled.
 	policyCheckOutputStore, err := a.policyCheckOutputGenerator.GeneratePolicyCheckOutputStore(ctx, cmd)
 	if err != nil {
-		if _, statusErr := a.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck, statusId); statusErr != nil {
+		if _, statusErr := a.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck, statusId, ""); statusErr != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		a.outputUpdater.UpdateOutput(ctx, cmd, command.Result{Error: err})
@@ -134,7 +133,7 @@ func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *command.Context, 
 		status = models.FailedCommitStatus
 	}
 
-	if _, err := a.commitStatusUpdater.UpdateCombinedCount(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, numSuccess, len(pullStatus.Projects), statusId); err != nil {
+	if _, err := a.commitStatusUpdater.UpdateCombinedCount(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, numSuccess, len(pullStatus.Projects), statusId); err != nil {
 		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
 }

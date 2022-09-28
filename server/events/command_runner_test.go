@@ -226,7 +226,7 @@ func TestRunCommentCommand_PreWorkflowHookError(t *testing.T) {
 			ch.PreWorkflowHooksCommandRunner = preWorkflowHooksCommandRunner
 
 			ch.RunCommentCommand(ctx, fixtures.GithubRepo, modelPull.BaseRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: cmd}, time.Now())
-			_, _, _, status, cmdName, _ := commitUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName(), AnyString()).GetCapturedArguments()
+			_, _, _, status, cmdName, _, _ := commitUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName(), AnyString(), AnyString()).GetCapturedArguments()
 			Equals(t, models.FailedCommitStatus, status)
 			Equals(t, cmd, cmdName)
 		})
@@ -245,7 +245,7 @@ func TestRunCommentCommand_PreWorkflowHookError(t *testing.T) {
 		ch.PreWorkflowHooksCommandRunner = preWorkflowHooksCommandRunner
 
 		ch.RunCommentCommand(ctx, fixtures.GithubRepo, modelPull.BaseRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
-		_, _, _, status, cmdName, _ := commitUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName(), AnyString()).GetCapturedArguments()
+		_, _, _, status, cmdName, _, _ := commitUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName(), AnyString(), AnyString()).GetCapturedArguments()
 		Equals(t, models.FailedCommitStatus, status)
 		Equals(t, command.PolicyCheck, cmdName)
 	})
@@ -407,7 +407,7 @@ func TestRunAutoplanCommand_PreWorkflowHookError(t *testing.T) {
 	ch.PreWorkflowHooksCommandRunner = preWorkflowHooksCommandRunner
 
 	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now())
-	_, _, _, status, cmdName, _ := commitUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName(), AnyString()).GetCapturedArguments()
+	_, _, _, status, cmdName, _, _ := commitUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsCommitStatus(), matchers.AnyCommandName(), AnyString(), AnyString()).GetCapturedArguments()
 	Equals(t, models.FailedCommitStatus, status)
 	Equals(t, command.Plan, cmdName)
 }

@@ -105,6 +105,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		},
 		Workspace:  "default",
 		RepoRelDir: ".",
+		RequestCtx: ctx,
 	}
 
 	When(mockStepsRunner.Run(ctx, prjCtx, repoDir)).ThenReturn("run\napply\nplan\ninit", nil)
@@ -662,6 +663,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 					},
 					Mergeable: true,
 				},
+				RequestCtx: ctx,
 			}
 
 			When(mockStepsRunner.Run(ctx, prjCtx, repoDir)).ThenReturn("run\napply\nplan\ninit", nil)
@@ -714,6 +716,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		PullReqStatus: models.PullReqStatus{
 			Mergeable: true,
 		},
+		RequestCtx: ctx,
 	}
 	When(mockStepsRunner.Run(ctx, prjCtx, ".")).ThenReturn("apply", fmt.Errorf("something went wrong"))
 

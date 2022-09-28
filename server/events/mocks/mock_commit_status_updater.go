@@ -28,11 +28,11 @@ func NewMockCommitStatusUpdater(options ...pegomock.Option) *MockCommitStatusUpd
 func (mock *MockCommitStatusUpdater) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockCommitStatusUpdater) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockCommitStatusUpdater) UpdateCombined(_param0 context.Context, _param1 models.Repo, _param2 models.PullRequest, _param3 models.CommitStatus, _param4 fmt.Stringer, _param5 string) (string, error) {
+func (mock *MockCommitStatusUpdater) UpdateCombined(_param0 context.Context, _param1 models.Repo, _param2 models.PullRequest, _param3 models.CommitStatus, _param4 fmt.Stringer, _param5 string, _param6 string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommitStatusUpdater().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5}
+	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5, _param6}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdateCombined", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -122,8 +122,8 @@ type VerifierMockCommitStatusUpdater struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockCommitStatusUpdater) UpdateCombined(_param0 context.Context, _param1 models.Repo, _param2 models.PullRequest, _param3 models.CommitStatus, _param4 fmt.Stringer, _param5 string) *MockCommitStatusUpdater_UpdateCombined_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5}
+func (verifier *VerifierMockCommitStatusUpdater) UpdateCombined(_param0 context.Context, _param1 models.Repo, _param2 models.PullRequest, _param3 models.CommitStatus, _param4 fmt.Stringer, _param5 string, _param6 string) *MockCommitStatusUpdater_UpdateCombined_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5, _param6}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateCombined", params, verifier.timeout)
 	return &MockCommitStatusUpdater_UpdateCombined_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -133,12 +133,12 @@ type MockCommitStatusUpdater_UpdateCombined_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockCommitStatusUpdater_UpdateCombined_OngoingVerification) GetCapturedArguments() (context.Context, models.Repo, models.PullRequest, models.CommitStatus, fmt.Stringer, string) {
-	_param0, _param1, _param2, _param3, _param4, _param5 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1], _param3[len(_param3)-1], _param4[len(_param4)-1], _param5[len(_param5)-1]
+func (c *MockCommitStatusUpdater_UpdateCombined_OngoingVerification) GetCapturedArguments() (context.Context, models.Repo, models.PullRequest, models.CommitStatus, fmt.Stringer, string, string) {
+	_param0, _param1, _param2, _param3, _param4, _param5, _param6 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1], _param3[len(_param3)-1], _param4[len(_param4)-1], _param5[len(_param5)-1], _param6[len(_param6)-1]
 }
 
-func (c *MockCommitStatusUpdater_UpdateCombined_OngoingVerification) GetAllCapturedArguments() (_param0 []context.Context, _param1 []models.Repo, _param2 []models.PullRequest, _param3 []models.CommitStatus, _param4 []fmt.Stringer, _param5 []string) {
+func (c *MockCommitStatusUpdater_UpdateCombined_OngoingVerification) GetAllCapturedArguments() (_param0 []context.Context, _param1 []models.Repo, _param2 []models.PullRequest, _param3 []models.CommitStatus, _param4 []fmt.Stringer, _param5 []string, _param6 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]context.Context, len(c.methodInvocations))
@@ -164,6 +164,10 @@ func (c *MockCommitStatusUpdater_UpdateCombined_OngoingVerification) GetAllCaptu
 		_param5 = make([]string, len(c.methodInvocations))
 		for u, param := range params[5] {
 			_param5[u] = param.(string)
+		}
+		_param6 = make([]string, len(c.methodInvocations))
+		for u, param := range params[6] {
+			_param6[u] = param.(string)
 		}
 	}
 	return

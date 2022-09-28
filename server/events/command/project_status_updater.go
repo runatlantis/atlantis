@@ -46,7 +46,7 @@ func (p ProjectStatusUpdater) UpdateProjectStatus(ctx ProjectContext, status mod
 	if err != nil {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
-	statusId, err := p.ProjectCommitStatusUpdater.UpdateProject(context.TODO(), ctx, ctx.CommandName, status, url, ctx.StatusId)
+	statusId, err := p.ProjectCommitStatusUpdater.UpdateProject(ctx.RequestCtx, ctx, ctx.CommandName, status, url, ctx.StatusId)
 
 	// Close the Job if the operation is complete
 	if status == models.SuccessCommitStatus || status == models.FailedCommitStatus {

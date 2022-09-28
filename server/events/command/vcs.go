@@ -19,7 +19,7 @@ type VCSStatusUpdater struct {
 	DefaultDetailsURL string
 }
 
-func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, statusId string) (string, error) {
+func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, statusId string, output string) (string, error) {
 	src := d.TitleBuilder.Build(cmdName.String())
 	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
 
@@ -34,6 +34,7 @@ func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo,
 		PullCreationTime: pull.CreatedAt,
 		StatusId:         statusId,
 		CommandName:      titleString(cmdName),
+		Output:           output,
 	}
 	return d.Client.UpdateStatus(ctx, request)
 }

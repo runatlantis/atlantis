@@ -75,7 +75,7 @@ func TestUpdateCombined(t *testing.T) {
 			s := command.VCSStatusUpdater{Client: client, TitleBuilder: titleBuilder}
 			ctx := context.Background()
 
-			_, err := s.UpdateCombined(ctx, models.Repo{}, models.PullRequest{}, c.status, c.command, "")
+			_, err := s.UpdateCombined(ctx, models.Repo{}, models.PullRequest{}, c.status, c.command, "", "")
 			Ok(t, err)
 
 			expSrc := fmt.Sprintf("atlantis/%s", c.command)

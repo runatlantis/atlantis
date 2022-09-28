@@ -51,14 +51,14 @@ func (r *AutoplanValidator) isValid(ctx context.Context, logger logging.Logger, 
 	if !r.validateCtxAndComment(cmdCtx) {
 		return false, errors.New("invalid command context")
 	}
-	err := r.PreWorkflowHooksCommandRunner.RunPreHooks(context.TODO(), cmdCtx)
+	err := r.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmdCtx)
 	if err != nil {
 		cmdCtx.Log.ErrorContext(cmdCtx.RequestCtx, fmt.Sprintf("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan))
 	}
 
 	projectCmds, err := r.PrjCmdBuilder.BuildAutoplanCommands(cmdCtx)
 	if err != nil {
-		if _, statusErr := r.CommitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.FailedCommitStatus, command.Plan, ""); statusErr != nil {
+		if _, statusErr := r.CommitStatusUpdater.UpdateCombined(ctx, baseRepo, pull, models.FailedCommitStatus, command.Plan, "", ""); statusErr != nil {
 			cmdCtx.Log.WarnContext(cmdCtx.RequestCtx, fmt.Sprintf("unable to update commit status: %v", statusErr))
 		}
 		// If error happened after clone was made, we should clean it up here too
@@ -87,7 +87,7 @@ func (r *AutoplanValidator) isValid(ctx context.Context, logger logging.Logger, 
 	if len(projectCmds) == 0 {
 		cmdCtx.Log.InfoContext(cmdCtx.RequestCtx, "no modified projects have been found")
 		for _, cmd := range []command.Name{command.Plan, command.Apply, command.PolicyCheck} {
-			if _, err := r.CommitStatusUpdater.UpdateCombinedCount(context.TODO(), baseRepo, pull, models.SuccessCommitStatus, cmd, 0, 0, ""); err != nil {
+			if _, err := r.CommitStatusUpdater.UpdateCombinedCount(ctx, baseRepo, pull, models.SuccessCommitStatus, cmd, 0, 0, ""); err != nil {
 				cmdCtx.Log.WarnContext(cmdCtx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 			}
 		}

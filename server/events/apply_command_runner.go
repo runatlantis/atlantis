@@ -1,7 +1,6 @@
 package events
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -80,7 +79,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 		return
 	}
 
-	statusId, err := a.commitStatusUpdater.UpdateCombined(context.TODO(), baseRepo, pull, models.PendingCommitStatus, cmd.CommandName(), "")
+	statusId, err := a.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.PendingCommitStatus, cmd.CommandName(), "", "")
 	if err != nil {
 		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
@@ -103,7 +102,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 
 	if err != nil {
-		if _, statusErr := a.commitStatusUpdater.UpdateCombined(context.TODO(), ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName(), statusId); statusErr != nil {
+		if _, statusErr := a.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName(), statusId, ""); statusErr != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		a.outputUpdater.UpdateOutput(ctx, cmd, command.Result{Error: err})
@@ -160,7 +159,7 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 	}
 
 	if _, err := a.commitStatusUpdater.UpdateCombinedCount(
-		context.TODO(),
+		ctx.RequestCtx,
 		ctx.Pull.BaseRepo,
 		ctx.Pull,
 		status,
