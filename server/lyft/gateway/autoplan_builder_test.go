@@ -155,6 +155,36 @@ func TestIsValid_TerraformChanges(t *testing.T) {
 	workingDirLocker.VerifyWasCalledOnce().TryLock(AnyString(), AnyInt(), AnyString())
 }
 
+func TestIsValid_PreworkflowHookError(t *testing.T) {
+	t.Log("verify returns false if preworkflow hook fails")
+	_ = setupAutoplan(t)
+	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyContextContext(), matchers.AnyPtrToEventsCommandContext())).ThenReturn(errors.New("error"))
+	log := logging.NewNoopCtxLogger(t)
+	When(workingDir.Delete(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(nil)
+	When(workingDirLocker.TryLock(AnyString(), AnyInt(), AnyString())).ThenReturn(func() {}, nil)
+	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+			},
+			{
+				CommandName: command.Plan,
+			},
+		}, nil)
+
+	containsTerraformChanges := autoplanValidator.InstrumentedIsValid(context.TODO(), log, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
+	Assert(t, containsTerraformChanges == false, "should not have terraform changes")
+	commitStatusUpdater.VerifyWasCalled(Times(1)).UpdateCombined(
+		matchers.AnyContextContext(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		matchers.AnyModelsCommitStatus(),
+		matchers.AnyModelsCommandName(),
+		AnyString(),
+		AnyString(),
+	)
+}
+
 func TestPullRequestHasTerraformChanges_NoTerraformChanges(t *testing.T) {
 	t.Log("verify returns false if terraform changes don't exist")
 	vcsClient := setupAutoplan(t)
