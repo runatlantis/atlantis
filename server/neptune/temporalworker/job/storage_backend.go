@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/neptune/logger"
 	"github.com/uber-go/tally/v4"
 )
 
@@ -55,92 +54,52 @@ type storageBackend struct {
 }
 
 func (s storageBackend) Read(key string) (logs []string, err error) {
-
-	// Read from  /output directory
-	key = fmt.Sprintf("%s/%s", OutputPrefix, key)
-	readContainerFn := func(item stow.Item, err error) error {
-		if err != nil {
-			return errors.Wrapf(err, "reading item: %s", item.Name())
-		}
-
-		// Skip if not right item
-		if item.Name() != key {
-			return nil
-		}
-
-		r, err := item.Open()
-		if err != nil {
-			return errors.Wrapf(err, "building reader for item: %s", item.Name())
-		}
-
-		buf := new(strings.Builder)
-		_, err = io.Copy(buf, r)
-		if err != nil {
-			return errors.Wrapf(err, "building buffer for item: %s", item.Name())
-		}
-
-		logs = strings.Split(buf.String(), "\n")
-		return nil
-	}
-
-	readLocationFn := func(container stow.Container, err error) error {
-		if err != nil {
-			return errors.Wrap(err, "reading containers")
-		}
-
-		// Skip if not right container
-		if container.Name() != s.containerName {
-			return nil
-		}
-
-		return stow.Walk(container, key, PageSize, readContainerFn)
-	}
-
 	s.logger.Info(fmt.Sprintf("reading object for job: %s in container: %s", key, s.containerName))
-	err = stow.WalkContainers(s.location, s.containerName, PageSize, readLocationFn)
+
+	container, err := s.location.Container(s.containerName)
+	if err != nil {
+		return []string{}, errors.Wrap(err, "resolving container")
+	}
+
+	key = fmt.Sprintf("%s/%s", OutputPrefix, key)
+	item, err := container.Item(key)
+	if err != nil {
+		return []string{}, errors.Wrap(err, "getting item")
+	}
+
+	r, err := item.Open()
+	if err != nil {
+		return []string{}, errors.Wrap(err, "reading item")
+	}
+
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, r)
+	if err != nil {
+		return []string{}, errors.Wrapf(err, "copying to buffer")
+	}
+
+	logs = strings.Split(buf.String(), "\n")
 	return
 }
 
 // Activity context since it's called from within an activity
 func (s storageBackend) Write(ctx context.Context, key string, logs []string) (bool, error) {
-	// Write to /output directory
-	key = fmt.Sprintf("%s/%s", OutputPrefix, key)
+	container, err := s.location.Container(s.containerName)
+	if err != nil {
+		return false, errors.Wrap(err, "resolving container")
+	}
 
-	containerFound := false
 	logString := strings.Join(logs, "\n")
 	size := int64(len(logString))
 	reader := strings.NewReader(logString)
 
-	// Function to write to container
-	writeFn := func(container stow.Container, err error) error {
-		if err != nil {
-			return errors.Wrap(err, "walking containers")
-		}
-
-		// Skip if not right container
-		if container.Name() != s.containerName {
-			return nil
-		}
-
-		containerFound = true
-		_, err = container.Put(key, reader, size, nil)
-		if err != nil {
-			return errors.Wrapf(err, "uploading object for job: %s", key)
-		}
-
-		logger.Info(ctx, fmt.Sprintf("successfully uploaded object for job: %s", key))
-		return nil
-	}
-
-	logger.Info(ctx, fmt.Sprintf("uploading object for job: %s to container: %s", key, s.containerName))
-	err := stow.WalkContainers(s.location, s.containerName, PageSize, writeFn)
+	key = fmt.Sprintf("%s/%s", OutputPrefix, key)
+	_, err = container.Put(key, reader, size, nil)
 	if err != nil {
-		return false, err
+		return false, errors.Wrapf(err, "uploading object for job: %s", key)
 	}
 
-	if !containerFound {
-		return false, fmt.Errorf("container: %s not found", s.containerName)
-	}
+	s.logger.Info(fmt.Sprintf("successfully uploaded object for job: %s", key))
 	return true, nil
 }
 
