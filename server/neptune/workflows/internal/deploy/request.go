@@ -44,12 +44,20 @@ type AppCredentials struct {
 	InstallationToken int64
 }
 
+type PlanMode string
+
+const (
+	DestroyPlanMode PlanMode = "destroy"
+	NormalPlanMode  PlanMode = "normal"
+)
+
 type Root struct {
 	Name        string
 	Apply       Job
 	Plan        Job
 	RepoRelPath string
 	TfVersion   string
+	PlanMode    PlanMode
 }
 
 type Job struct {

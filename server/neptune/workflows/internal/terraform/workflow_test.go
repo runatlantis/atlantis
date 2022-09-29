@@ -33,14 +33,16 @@ var testGithubRepo = github.Repo{
 var testLocalRoot = &root.LocalRoot{
 	Root: root.Root{
 		Name: testRootName,
-		Plan: job.Job{
-			Steps: []job.Step{
-				{
-					StepName: "step1",
+		Plan: job.Plan{
+			Terraform: job.Terraform{
+				Steps: []job.Step{
+					{
+						StepName: "step1",
+					},
 				},
 			},
 		},
-		Apply: job.Job{
+		Apply: job.Terraform{
 			Steps: []job.Step{
 				{
 					StepName: "step2",

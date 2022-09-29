@@ -332,6 +332,7 @@ func TestHandlePushEvent(t *testing.T) {
 					Apply: workflows.Job{
 						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
 					},
+					PlanMode:  workflows.NormalPlanMode,
 					TfVersion: version.String(),
 				},
 			},
@@ -350,6 +351,84 @@ func TestHandlePushEvent(t *testing.T) {
 			DeploymentWorkflow: valid.Workflow{
 				Plan:  valid.DefaultPlanStage,
 				Apply: valid.DefaultApplyStage,
+			},
+			TerraformVersion: version,
+		}
+		rootCfgs := []*valid.MergedProjectCfg{
+			&rootCfg,
+		}
+		rootConfigBuilder := &mockRootConfigBuilder{
+			rootConfigs: rootCfgs,
+		}
+		handler := event.PushHandler{
+			Allocator:         allocator,
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			TemporalClient:    testSignaler,
+			Logger:            logger,
+			RootConfigBuilder: rootConfigBuilder,
+		}
+
+		err := handler.Handle(ctx, e)
+		assert.NoError(t, err)
+
+		assert.True(t, testSignaler.called)
+	})
+
+	t.Run("signal success - destroy plan", func(t *testing.T) {
+		testSignaler := &testSignaler{
+			t:                  t,
+			expectedWorkflowID: fmt.Sprintf("%s||%s", repoFullName, testRoot),
+			expectedSignalName: workflows.DeployNewRevisionSignalID,
+			expectedSignalArg: workflows.DeployNewRevisionSignalRequest{
+				Revision: sha,
+			},
+			expectedWorkflow: workflows.Deploy,
+			expectedOptions: client.StartWorkflowOptions{
+				TaskQueue: workflows.DeployTaskQueue,
+			},
+			expectedWorkflowArgs: workflows.DeployRequest{
+				Repository: workflows.Repo{
+					FullName: repoFullName,
+					Name:     repoName,
+					Owner:    repoOwner,
+					URL:      repoURL,
+					HeadCommit: workflows.HeadCommit{
+						Ref: workflows.Ref{
+							Name: repoRefName,
+							Type: repoRefType,
+						},
+					},
+				},
+				Root: workflows.Root{
+					Name: testRoot,
+					Plan: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
+					},
+					Apply: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
+					},
+					PlanMode:  workflows.DestroyPlanMode,
+					TfVersion: version.String(),
+				},
+			},
+		}
+		allocator := &testAllocator{
+			expectedAllocation: true,
+			expectedFeatureID:  feature.PlatformMode,
+			expectedFeatureCtx: feature.FeatureContext{
+				RepoName: repoFullName,
+			},
+			t: t,
+		}
+		ctx := context.Background()
+		rootCfg := valid.MergedProjectCfg{
+			Name: testRoot,
+			DeploymentWorkflow: valid.Workflow{
+				Plan:  valid.DefaultPlanStage,
+				Apply: valid.DefaultApplyStage,
+			},
+			Tags: map[string]string{
+				event.Deprecated: event.Destroy,
 			},
 			TerraformVersion: version,
 		}
@@ -406,6 +485,7 @@ func TestHandlePushEvent(t *testing.T) {
 					Apply: workflows.Job{
 						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
 					},
+					PlanMode:  workflows.NormalPlanMode,
 					TfVersion: version.String(),
 				},
 			},

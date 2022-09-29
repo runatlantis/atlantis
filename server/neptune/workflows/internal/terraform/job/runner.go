@@ -48,13 +48,13 @@ func (r *jobRunner) Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID 
 
 	var resp activities.TerraformPlanResponse
 
-	for _, step := range localRoot.Root.Plan.Steps {
+	for _, step := range localRoot.Root.Plan.GetSteps() {
 		var err error
 		switch step.StepName {
 		case "init":
 			err = r.init(jobCtx, localRoot, step)
 		case "plan":
-			resp, err = r.plan(jobCtx, step.ExtraArgs)
+			resp, err = r.plan(jobCtx, localRoot.Root.Plan.Mode, step.ExtraArgs)
 		}
 
 		if err != nil {
@@ -81,7 +81,7 @@ func (r *jobRunner) Apply(ctx workflow.Context, localRoot *root.LocalRoot, jobID
 		JobID:     jobID,
 	}
 
-	for _, step := range localRoot.Root.Apply.Steps {
+	for _, step := range localRoot.Root.Apply.GetSteps() {
 		var err error
 		switch step.StepName {
 		case "apply":
@@ -122,7 +122,7 @@ func (r *jobRunner) apply(ctx *job.ExecutionContext, planFile string, step job.S
 	return nil
 }
 
-func (r *jobRunner) plan(ctx *job.ExecutionContext, extraArgs []string) (activities.TerraformPlanResponse, error) {
+func (r *jobRunner) plan(ctx *job.ExecutionContext, mode *job.PlanMode, extraArgs []string) (activities.TerraformPlanResponse, error) {
 	var resp activities.TerraformPlanResponse
 
 	args, err := terraform.NewArgumentList(extraArgs)
@@ -135,6 +135,7 @@ func (r *jobRunner) plan(ctx *job.ExecutionContext, extraArgs []string) (activit
 		TfVersion: ctx.TfVersion,
 		JobID:     ctx.JobID,
 		Path:      ctx.Path,
+		Mode:      mode,
 	}).Get(ctx, &resp)
 	if err != nil {
 		return resp, errors.Wrap(err, "running terraform plan activity")

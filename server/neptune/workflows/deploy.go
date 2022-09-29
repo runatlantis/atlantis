@@ -20,6 +20,11 @@ type AppCredentials = deploy.AppCredentials
 type HeadCommit = deploy.Commit
 type Ref = deploy.Ref
 
+type PlanMode = deploy.PlanMode
+
+const DestroyPlanMode = deploy.DestroyPlanMode
+const NormalPlanMode = deploy.NormalPlanMode
+
 type DeployNewRevisionSignalRequest = revision.NewRevisionRequest
 
 var DeployTaskQueue = deploy.TaskQueue

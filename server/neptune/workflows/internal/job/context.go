@@ -1,6 +1,7 @@
 package job
 
 import (
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -13,11 +14,28 @@ type ExecutionContext struct {
 	JobID string
 }
 
-type Job struct {
+type PlanMode string
+
+func NewDestroyPlanMode() *PlanMode {
+	m := PlanMode("destroy")
+	return &m
+}
+
+type Plan struct {
+	Mode *PlanMode
+	Terraform
+}
+
+func (m PlanMode) ToFlag() terraform.Flag {
+	return terraform.Flag{
+		Value: string(m),
+	}
+}
+
+type Terraform struct {
 	Steps []Step
 }
 
-type JobInstance struct {
-	Job
-	JobID string
+func (j Terraform) GetSteps() []Step {
+	return j.Steps
 }

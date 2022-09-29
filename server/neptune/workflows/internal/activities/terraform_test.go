@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/testsuite"
 )
@@ -229,6 +230,8 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 		ExpectedVersion string
 		RequestArgs     []terraform.Argument
 		ExpectedArgs    []terraform.Argument
+		ExpectedFlags   []terraform.Flag
+		PlanMode        *job.PlanMode
 	}{
 		{
 			RequestVersion:  "0.12.0",
@@ -255,6 +258,16 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 			},
 			ExpectedVersion: defaultVersion,
 		},
+		{
+			ExpectedArgs:    defaultArgs,
+			ExpectedVersion: defaultVersion,
+			PlanMode:        job.NewDestroyPlanMode(),
+			ExpectedFlags: []terraform.Flag{
+				{
+					Value: "destroy",
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -274,7 +287,7 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 						t:             t,
 						jobID:         jobID,
 						path:          path,
-						cmd:           terraform.NewSubCommand(terraform.Plan).WithArgs(c.ExpectedArgs...),
+						cmd:           terraform.NewSubCommand(terraform.Plan).WithArgs(c.ExpectedArgs...).WithFlags(c.ExpectedFlags...),
 						customEnvVars: map[string]string{},
 						version:       expectedVersion,
 						resp:          "",
@@ -297,6 +310,7 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 				Path:      path,
 				TfVersion: c.RequestVersion,
 				Args:      c.RequestArgs,
+				Mode:      c.PlanMode,
 			}
 
 			tfActivity := NewTerraformActivities(&testTfClient, expectedVersion, &testStreamHandler{

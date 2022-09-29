@@ -12,8 +12,8 @@ type Root struct {
 	// Path is the relative path from the repo
 	Path      string
 	TfVersion string
-	Apply     job.Job
-	Plan      job.Job
+	Apply     job.Terraform
+	Plan      job.Plan
 }
 
 // LocalRoot is a root that exists locally on disk

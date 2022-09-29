@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 )
 
 var DisableInputArg = terraform.Argument{
@@ -100,6 +101,7 @@ type TerraformPlanRequest struct {
 	JobID     string
 	TfVersion string
 	Path      string
+	Mode      *job.PlanMode
 }
 
 type TerraformPlanResponse struct {
@@ -127,10 +129,15 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 		},
 	}
 	args = append(args, request.Args...)
+	var flags []terraform.Flag
+
+	if request.Mode != nil {
+		flags = append(flags, request.Mode.ToFlag())
+	}
 
 	planRequest := &terraform.RunCommandRequest{
 		RootPath:          request.Path,
-		SubCommand:        terraform.NewSubCommand(terraform.Plan).WithArgs(args...),
+		SubCommand:        terraform.NewSubCommand(terraform.Plan).WithArgs(args...).WithFlags(flags...),
 		AdditionalEnvVars: request.Envs,
 		Version:           tfVersion,
 	}

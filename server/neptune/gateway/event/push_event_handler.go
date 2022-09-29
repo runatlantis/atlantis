@@ -24,6 +24,11 @@ const (
 	UpdatedAction PushAction = "updated"
 )
 
+const (
+	Deprecated = "deprecated"
+	Destroy    = "-destroy"
+)
+
 type Push struct {
 	Repo              models.Repo
 	Ref               vcs.Ref
@@ -148,10 +153,20 @@ func (p *PushHandler) startWorkflow(ctx context.Context, event Push, rootCfg *va
 				},
 				RepoRelPath: rootCfg.RepoRelDir,
 				TfVersion:   tfVersion,
+				PlanMode:    p.generatePlanMode(rootCfg),
 			},
 		},
 	)
 	return run, err
+}
+
+func (p *PushHandler) generatePlanMode(cfg *valid.MergedProjectCfg) workflows.PlanMode {
+	t, ok := cfg.Tags[Deprecated]
+	if ok && t == Destroy {
+		return workflows.DestroyPlanMode
+	}
+
+	return workflows.NormalPlanMode
 }
 
 func (p *PushHandler) generateSteps(steps []valid.Step) []workflows.Step {
