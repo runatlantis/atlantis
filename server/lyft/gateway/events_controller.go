@@ -47,8 +47,8 @@ func NewVCSEventsController(
 		snsWriter, logger,
 	)
 
-	asyncAutoplannerWorkerProxy := gateway_handlers.NewAsynchronousAutoplannerWorkerProxy(
-		autoplanValidator, logger, pullEventWorkerProxy,
+	asyncAutoplannerWorkerProxy := gateway_handlers.NewAutoplannerValidatorProxy(
+		autoplanValidator, logger, pullEventWorkerProxy, scheduler,
 	)
 
 	prHandler := handlers.NewPullRequestEventWithEventTypeHandlers(

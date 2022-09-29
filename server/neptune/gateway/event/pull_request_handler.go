@@ -19,18 +19,17 @@ type PullRequest struct {
 	Timestamp time.Time
 }
 
-func NewAsynchronousAutoplannerWorkerProxy(
+func NewAutoplannerValidatorProxy(
 	autoplanValidator EventValidator,
 	logger logging.Logger,
 	workerProxy *PullEventWorkerProxy,
-) *AsyncAutoplannerWorkerProxy {
-	return &AsyncAutoplannerWorkerProxy{
-		proxy: &SynchronousAutoplannerWorkerProxy{
-			autoplanValidator: autoplanValidator,
-			workerProxy:       workerProxy,
-			logger:            logger,
-		},
-		logger: logger,
+	scheduler scheduler,
+) *AutoplannerValidatorProxy {
+	return &AutoplannerValidatorProxy{
+		autoplanValidator: autoplanValidator,
+		workerProxy:       workerProxy,
+		logger:            logger,
+		scheduler:         scheduler,
 	}
 }
 
@@ -42,29 +41,14 @@ type Writer interface {
 	WriteWithContext(ctx context.Context, payload []byte) error
 }
 
-type AsyncAutoplannerWorkerProxy struct {
-	proxy  *SynchronousAutoplannerWorkerProxy
-	logger logging.Logger
-}
-
-func (p *AsyncAutoplannerWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, event PullRequest) error {
-	go func() {
-		err := p.proxy.Handle(ctx, request, event)
-
-		if err != nil {
-			p.logger.ErrorContext(ctx, err.Error())
-		}
-	}()
-	return nil
-}
-
-type SynchronousAutoplannerWorkerProxy struct {
+type AutoplannerValidatorProxy struct {
 	autoplanValidator EventValidator
 	workerProxy       *PullEventWorkerProxy
 	logger            logging.Logger
+	scheduler         scheduler
 }
 
-func (p *SynchronousAutoplannerWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, event PullRequest) error {
+func (p *AutoplannerValidatorProxy) handle(ctx context.Context, request *http.BufferedRequest, event PullRequest) error {
 	if ok := p.autoplanValidator.InstrumentedIsValid(
 		ctx,
 		p.logger,
@@ -79,6 +63,12 @@ func (p *SynchronousAutoplannerWorkerProxy) Handle(ctx context.Context, request 
 	p.logger.WarnContext(ctx, "request isn't valid and will not be proxied to sns")
 
 	return nil
+}
+
+func (p *AutoplannerValidatorProxy) Handle(ctx context.Context, request *http.BufferedRequest, event PullRequest) error {
+	return p.scheduler.Schedule(ctx, func(ctx context.Context) error {
+		return p.handle(ctx, request, event)
+	})
 }
 
 func NewPullEventWorkerProxy(
