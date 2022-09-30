@@ -6,9 +6,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request/converter"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -17,6 +18,7 @@ type idGenerator func(ctx workflow.Context) (uuid.UUID, error)
 
 type NewRevisionRequest struct {
 	Revision string
+	Root     request.Root
 }
 
 type Queue interface {
@@ -27,12 +29,11 @@ type Activities interface {
 	CreateCheckRun(ctx context.Context, request activities.CreateCheckRunRequest) (activities.CreateCheckRunResponse, error)
 }
 
-func NewReceiver(ctx workflow.Context, queue Queue, repo github.Repo, root root.Root, activities Activities, generator idGenerator) *Receiver {
+func NewReceiver(ctx workflow.Context, queue Queue, repo github.Repo, activities Activities, generator idGenerator) *Receiver {
 	return &Receiver{
 		queue:       queue,
 		ctx:         ctx,
 		repo:        repo,
-		root:        root,
 		activities:  activities,
 		idGenerator: generator,
 	}
@@ -43,7 +44,6 @@ type Receiver struct {
 	ctx         workflow.Context
 	activities  Activities
 	repo        github.Repo
-	root        root.Root
 	idGenerator idGenerator
 }
 
@@ -55,6 +55,8 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 
 	var request NewRevisionRequest
 	c.Receive(n.ctx, &request)
+
+	root := converter.Root(request.Root)
 
 	ctx := workflow.WithRetryPolicy(n.ctx, temporal.RetryPolicy{
 		MaximumAttempts: 5,
@@ -69,7 +71,7 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 
 	var resp activities.CreateCheckRunResponse
 	err = workflow.ExecuteActivity(ctx, n.activities.CreateCheckRun, activities.CreateCheckRunRequest{
-		Title:      terraform.BuildCheckRunTitle(n.root.Name),
+		Title:      terraform.BuildCheckRunTitle(root.Name),
 		Sha:        request.Revision,
 		Repo:       n.repo,
 		ExternalID: id.String(),
@@ -82,7 +84,7 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 
 	n.queue.Push(terraform.DeploymentInfo{
 		ID:         id,
-		Root:       n.root,
+		Root:       root,
 		Revision:   request.Revision,
 		CheckRunID: resp.ID,
 	})

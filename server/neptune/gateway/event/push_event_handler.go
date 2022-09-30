@@ -123,6 +123,18 @@ func (p *PushHandler) startWorkflow(ctx context.Context, event Push, rootCfg *va
 		workflows.DeployNewRevisionSignalID,
 		workflows.DeployNewRevisionSignalRequest{
 			Revision: event.Sha,
+			Root: workflows.Root{
+				Name: rootCfg.Name,
+				Plan: workflows.Job{
+					Steps: p.generateSteps(rootCfg.DeploymentWorkflow.Plan.Steps),
+				},
+				Apply: workflows.Job{
+					Steps: p.generateSteps(rootCfg.DeploymentWorkflow.Apply.Steps),
+				},
+				RepoRelPath: rootCfg.RepoRelDir,
+				TfVersion:   tfVersion,
+				PlanMode:    p.generatePlanMode(rootCfg),
+			},
 		},
 		options,
 		workflows.Deploy,
@@ -142,18 +154,6 @@ func (p *PushHandler) startWorkflow(ctx context.Context, event Push, rootCfg *va
 						Type: string(event.Ref.Type),
 					},
 				},
-			},
-			Root: workflows.Root{
-				Name: rootCfg.Name,
-				Plan: workflows.Job{
-					Steps: p.generateSteps(rootCfg.DeploymentWorkflow.Plan.Steps),
-				},
-				Apply: workflows.Job{
-					Steps: p.generateSteps(rootCfg.DeploymentWorkflow.Apply.Steps),
-				},
-				RepoRelPath: rootCfg.RepoRelDir,
-				TfVersion:   tfVersion,
-				PlanMode:    p.generatePlanMode(rootCfg),
 			},
 		},
 	)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
@@ -25,7 +26,7 @@ func (q *testQueue) Push(msg terraform.DeploymentInfo) {
 	q.Queue = append(q.Queue, msg)
 }
 
-type request struct {
+type req struct {
 	Id uuid.UUID
 }
 
@@ -40,7 +41,7 @@ func (a *testActivities) CreateCheckRun(ctx context.Context, request activities.
 	return activities.CreateCheckRunResponse{}, nil
 }
 
-func testWorkflow(ctx workflow.Context, r request) (response, error) {
+func testWorkflow(ctx workflow.Context, r req) (response, error) {
 
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		ScheduleToCloseTimeout: 5 * time.Second,
@@ -50,7 +51,7 @@ func testWorkflow(ctx workflow.Context, r request) (response, error) {
 
 	var a *testActivities
 
-	receiver := revision.NewReceiver(ctx, queue, github.Repo{Name: "nish"}, root.Root{Name: "root"}, a, func(ctx workflow.Context) (uuid.UUID, error) {
+	receiver := revision.NewReceiver(ctx, queue, github.Repo{Name: "nish"}, a, func(ctx workflow.Context) (uuid.UUID, error) {
 		return r.Id, nil
 	})
 	selector := workflow.NewSelector(ctx)
@@ -80,6 +81,9 @@ func TestEnqueue(t *testing.T) {
 	env.RegisterDelayedCallback(func() {
 		env.SignalWorkflow("test-signal", revision.NewRevisionRequest{
 			Revision: rev,
+			Root: request.Root{
+				Name: "root",
+			},
 		})
 	}, 0)
 
@@ -96,7 +100,7 @@ func TestEnqueue(t *testing.T) {
 		ExternalID: id.String(),
 	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
-	env.ExecuteWorkflow(testWorkflow, request{
+	env.ExecuteWorkflow(testWorkflow, req{
 		Id: id,
 	})
 	env.AssertExpectations(t)

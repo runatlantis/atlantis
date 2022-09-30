@@ -306,6 +306,17 @@ func TestHandlePushEvent(t *testing.T) {
 			expectedSignalName: workflows.DeployNewRevisionSignalID,
 			expectedSignalArg: workflows.DeployNewRevisionSignalRequest{
 				Revision: sha,
+				Root: workflows.Root{
+					Name: testRoot,
+					Plan: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
+					},
+					Apply: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
+					},
+					PlanMode:  workflows.NormalPlanMode,
+					TfVersion: version.String(),
+				},
 			},
 			expectedWorkflow: workflows.Deploy,
 			expectedOptions: client.StartWorkflowOptions{
@@ -323,17 +334,6 @@ func TestHandlePushEvent(t *testing.T) {
 							Type: repoRefType,
 						},
 					},
-				},
-				Root: workflows.Root{
-					Name: testRoot,
-					Plan: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
-					},
-					Apply: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
-					},
-					PlanMode:  workflows.NormalPlanMode,
-					TfVersion: version.String(),
 				},
 			},
 		}
@@ -381,6 +381,17 @@ func TestHandlePushEvent(t *testing.T) {
 			expectedSignalName: workflows.DeployNewRevisionSignalID,
 			expectedSignalArg: workflows.DeployNewRevisionSignalRequest{
 				Revision: sha,
+				Root: workflows.Root{
+					Name: testRoot,
+					Plan: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
+					},
+					Apply: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
+					},
+					PlanMode:  workflows.DestroyPlanMode,
+					TfVersion: version.String(),
+				},
 			},
 			expectedWorkflow: workflows.Deploy,
 			expectedOptions: client.StartWorkflowOptions{
@@ -398,17 +409,6 @@ func TestHandlePushEvent(t *testing.T) {
 							Type: repoRefType,
 						},
 					},
-				},
-				Root: workflows.Root{
-					Name: testRoot,
-					Plan: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
-					},
-					Apply: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
-					},
-					PlanMode:  workflows.DestroyPlanMode,
-					TfVersion: version.String(),
 				},
 			},
 		}
@@ -459,6 +459,17 @@ func TestHandlePushEvent(t *testing.T) {
 			expectedSignalName: workflows.DeployNewRevisionSignalID,
 			expectedSignalArg: workflows.DeployNewRevisionSignalRequest{
 				Revision: sha,
+				Root: workflows.Root{
+					Name: testRoot,
+					Plan: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
+					},
+					Apply: workflows.Job{
+						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
+					},
+					PlanMode:  workflows.NormalPlanMode,
+					TfVersion: version.String(),
+				},
 			},
 			expectedWorkflow: workflows.Deploy,
 			expectedOptions: client.StartWorkflowOptions{
@@ -476,17 +487,6 @@ func TestHandlePushEvent(t *testing.T) {
 							Type: repoRefType,
 						},
 					},
-				},
-				Root: workflows.Root{
-					Name: testRoot,
-					Plan: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
-					},
-					Apply: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
-					},
-					PlanMode:  workflows.NormalPlanMode,
-					TfVersion: version.String(),
 				},
 			},
 			expectedErr: assert.AnError,

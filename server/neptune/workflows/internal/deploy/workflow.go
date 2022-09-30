@@ -9,8 +9,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	temporalInternal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/temporal"
 	"go.temporal.io/sdk/temporal"
@@ -86,19 +84,7 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 
 	// TODO: We should actually probably pass this with the revision because a revision
 	// can potentially change a root configuration
-	root := root.Root{
-		Name: request.Root.Name,
-		Apply: job.Terraform{
-			Steps: convertToInternalSteps(request.Root.Apply.Steps),
-		},
-		Plan: job.Plan{
-			Terraform: job.Terraform{
-				Steps: convertToInternalSteps(request.Root.Plan.Steps)},
-			Mode: convertToInternalMode(request.Root.PlanMode),
-		},
-		Path:      request.Root.RepoRelPath,
-		TfVersion: request.Root.TfVersion,
-	}
+	
 
 	// inject dependencies
 
@@ -107,7 +93,7 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 	var a *workerActivities
 
 	revisionQueue := queue.NewQueue()
-	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, repo, root, a, sideeffect.GenerateUUID)
+	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, repo, a, sideeffect.GenerateUUID)
 	tfWorkflowRunner := terraform.NewWorkflowRunner(repo, a, tfWorkflow)
 
 	worker := &queue.Worker{
@@ -192,28 +178,4 @@ func (r *Runner) Run(ctx workflow.Context) error {
 	wg.Wait(ctx)
 
 	return nil
-}
-
-//TODO: move these to the internal converter pattern to remove clutter from this file
-func convertToInternalMode(mode PlanMode) *job.PlanMode {
-	switch mode {
-	case DestroyPlanMode:
-		return job.NewDestroyPlanMode()
-	}
-
-	return nil
-}
-
-func convertToInternalSteps(requestSteps []Step) []job.Step {
-	var terraformSteps []job.Step
-	for _, step := range requestSteps {
-		terraformSteps = append(terraformSteps, job.Step{
-			StepName:    step.StepName,
-			ExtraArgs:   step.ExtraArgs,
-			RunCommand:  step.RunCommand,
-			EnvVarName:  step.EnvVarName,
-			EnvVarValue: step.EnvVarValue,
-		})
-	}
-	return terraformSteps
 }
