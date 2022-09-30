@@ -12,7 +12,7 @@ import (
 
 // repoFetcher manages a cloned repo's workspace on disk for running commands.
 type repoFetcher interface {
-	Fetch(ctx context.Context, baseRepo models.Repo, sha string) (string, func(ctx context.Context, filePath string), error)
+	Fetch(ctx context.Context, baseRepo models.Repo, branch string, sha string) (string, func(ctx context.Context, filePath string), error)
 }
 
 // hooksRunner runs preworkflow hooks for a given repository/commit
@@ -47,22 +47,22 @@ type RootConfigBuilder struct {
 	Logger          logging.Logger
 }
 
-func (b *RootConfigBuilder) Build(ctx context.Context, event Push) ([]*valid.MergedProjectCfg, error) {
+func (b *RootConfigBuilder) Build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64) ([]*valid.MergedProjectCfg, error) {
 	// Generate a new filepath location and clone repo into it
-	repoDir, cleanup, err := b.RepoFetcher.Fetch(ctx, event.Repo, event.Sha)
+	repoDir, cleanup, err := b.RepoFetcher.Fetch(ctx, repo, branch, sha)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("creating temporary clone at path: %s", repoDir))
 	}
 	defer cleanup(ctx, repoDir)
 
 	// Run pre-workflow hooks
-	err = b.HooksRunner.Run(event.Repo, repoDir)
+	err = b.HooksRunner.Run(repo, repoDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "running pre-workflow hooks")
 	}
 
 	// Fetch files modified in commit
-	modifiedFiles, err := b.FileFetcher.GetModifiedFilesFromCommit(ctx, event.Repo, event.Sha, event.InstallationToken)
+	modifiedFiles, err := b.FileFetcher.GetModifiedFilesFromCommit(ctx, repo, sha, installationToken)
 	if err != nil {
 		return nil, errors.Wrapf(err, "finding modified files: %s", modifiedFiles)
 	}
@@ -70,7 +70,7 @@ func (b *RootConfigBuilder) Build(ctx context.Context, event Push) ([]*valid.Mer
 	// Parse repo configs into specific root configs (i.e. roots)
 	// TODO: rename project to roots
 	var mergedRootCfgs []*valid.MergedProjectCfg
-	repoCfg, err := b.ParserValidator.ParseRepoCfg(repoDir, event.Repo.ID())
+	repoCfg, err := b.ParserValidator.ParseRepoCfg(repoDir, repo.ID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 	}
@@ -79,7 +79,7 @@ func (b *RootConfigBuilder) Build(ctx context.Context, event Push) ([]*valid.Mer
 		return nil, errors.Wrap(err, "determining roots")
 	}
 	for _, mr := range matchingRoots {
-		mergedRootCfg := b.GlobalCfg.MergeProjectCfg(event.Repo.ID(), mr, repoCfg)
+		mergedRootCfg := b.GlobalCfg.MergeProjectCfg(repo.ID(), mr, repoCfg)
 		mergedRootCfgs = append(mergedRootCfgs, &mergedRootCfg)
 	}
 	return mergedRootCfgs, nil

@@ -23,4 +23,3 @@ func TestHealthz(t *testing.T) {
   "status": "ok"
 }`, string(body))
 }
-

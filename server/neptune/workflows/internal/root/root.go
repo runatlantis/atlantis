@@ -14,7 +14,10 @@ type Root struct {
 	TfVersion string
 	Apply     job.Terraform
 	Plan      job.Plan
+	Trigger   Trigger
 }
+
+type Trigger string
 
 // LocalRoot is a root that exists locally on disk
 type LocalRoot struct {

@@ -58,11 +58,14 @@ func NewVCSEventsController(
 		pullEventWorkerProxy,
 	)
 
+	deploySignaler := &gateway_handlers.DeployWorkflowSignaler{
+		TemporalClient: temporalClient,
+	}
 	commentHandler := handlers.NewCommentEventWithCommandHandler(
 		commentParser,
 		repoAllowlistChecker,
 		vcsClient,
-		gateway_handlers.NewCommentEventWorkerProxy(logger, snsWriter),
+		gateway_handlers.NewCommentEventWorkerProxy(logger, snsWriter, featureAllocator, rootConfigBuilder, scheduler, deploySignaler, vcsClient),
 		logger,
 	)
 
@@ -70,7 +73,7 @@ func NewVCSEventsController(
 		Allocator:         featureAllocator,
 		Scheduler:         scheduler,
 		Logger:            logger,
-		TemporalClient:    temporalClient,
+		DeploySignaler:    deploySignaler,
 		RootConfigBuilder: rootConfigBuilder,
 	}
 

@@ -2,7 +2,6 @@ package event_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -18,64 +17,7 @@ import (
 	"go.temporal.io/sdk/client"
 )
 
-type testRun struct{}
-
-func (r testRun) GetID() string {
-	return "123"
-}
-
-func (r testRun) GetRunID() string {
-	return "456"
-}
-
-func (r testRun) Get(ctx context.Context, valuePtr interface{}) error {
-	return nil
-}
-
-func (r testRun) GetWithOptions(ctx context.Context, valuePtr interface{}, options client.WorkflowRunGetOptions) error {
-	return nil
-}
-
 const testRoot = "testroot"
-
-type testSignaler struct {
-	t                    *testing.T
-	expectedWorkflowID   string
-	expectedRunID        string
-	expectedSignalName   string
-	expectedSignalArg    interface{}
-	expectedOptions      client.StartWorkflowOptions
-	expectedWorkflow     interface{}
-	expectedWorkflowArgs interface{}
-	expectedErr          error
-
-	called bool
-}
-
-func (s *testSignaler) SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error {
-	s.called = true
-	assert.Equal(s.t, s.expectedWorkflowID, workflowID)
-	assert.Equal(s.t, s.expectedRunID, runID)
-	assert.Equal(s.t, s.expectedSignalName, signalName)
-	assert.Equal(s.t, s.expectedSignalArg, arg)
-
-	return s.expectedErr
-}
-
-func (s *testSignaler) SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
-	options client.StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (client.WorkflowRun, error) {
-
-	s.called = true
-
-	assert.Equal(s.t, s.expectedWorkflowID, workflowID)
-	assert.Equal(s.t, s.expectedSignalName, signalName)
-	assert.Equal(s.t, s.expectedSignalArg, signalArg)
-	assert.Equal(s.t, s.expectedOptions, options)
-	assert.IsType(s.t, s.expectedWorkflow, workflow)
-	assert.Equal(s.t, []interface{}{s.expectedWorkflowArgs}, workflowArgs)
-
-	return testRun{}, s.expectedErr
-}
 
 type testAllocator struct {
 	t                  *testing.T
@@ -114,7 +56,6 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 				Name: "blah",
 			},
 		}
-		testSignaler := &testSignaler{t: t}
 		allocator := &testAllocator{
 			expectedAllocation: true,
 			expectedFeatureID:  feature.PlatformMode,
@@ -127,15 +68,13 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 		handler := event.PushHandler{
 			Allocator:         allocator,
 			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient:    testSignaler,
+			DeploySignaler:    &mockDeploySignaler{},
 			Logger:            logger,
 			RootConfigBuilder: &mockRootConfigBuilder{},
 		}
 
 		err := handler.Handle(context.Background(), e)
 		assert.NoError(t, err)
-
-		assert.False(t, testSignaler.called)
 	})
 
 	t.Run("filters non-default branch types", func(t *testing.T) {
@@ -153,7 +92,7 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 				Name: "random",
 			},
 		}
-		testSignaler := &testSignaler{t: t}
+
 		allocator := &testAllocator{
 			expectedAllocation: true,
 			expectedFeatureID:  feature.PlatformMode,
@@ -166,15 +105,13 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 		handler := event.PushHandler{
 			Allocator:         allocator,
 			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient:    testSignaler,
+			DeploySignaler:    &mockDeploySignaler{},
 			Logger:            logger,
 			RootConfigBuilder: &mockRootConfigBuilder{},
 		}
 
 		err := handler.Handle(context.Background(), e)
 		assert.NoError(t, err)
-
-		assert.False(t, testSignaler.called)
 	})
 
 	t.Run("filters deleted branches", func(t *testing.T) {
@@ -193,7 +130,6 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 				Name: "main",
 			},
 		}
-		testSignaler := &testSignaler{t: t}
 		allocator := &testAllocator{
 			expectedAllocation: true,
 			expectedFeatureID:  feature.PlatformMode,
@@ -206,15 +142,13 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 		handler := event.PushHandler{
 			Allocator:         allocator,
 			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient:    testSignaler,
+			DeploySignaler:    &mockDeploySignaler{},
 			Logger:            logger,
 			RootConfigBuilder: &mockRootConfigBuilder{},
 		}
 
 		err := handler.Handle(context.Background(), e)
 		assert.NoError(t, err)
-
-		assert.False(t, testSignaler.called)
 	})
 
 }
@@ -229,8 +163,6 @@ func TestHandlePushEvent(t *testing.T) {
 	repoOwner := "nish"
 	repoName := "repo"
 	repoURL := "www.nish.com"
-	repoRefName := "main"
-	repoRefType := "branch"
 	sha := "12345"
 	repo := models.Repo{
 		FullName:      repoFullName,
@@ -250,7 +182,6 @@ func TestHandlePushEvent(t *testing.T) {
 	}
 
 	t.Run("allocation result false", func(t *testing.T) {
-		testSignaler := &testSignaler{t: t}
 		allocator := &testAllocator{
 			expectedAllocation: false,
 			expectedFeatureID:  feature.PlatformMode,
@@ -263,19 +194,16 @@ func TestHandlePushEvent(t *testing.T) {
 		handler := event.PushHandler{
 			Allocator:         allocator,
 			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient:    testSignaler,
+			DeploySignaler:    &mockDeploySignaler{},
 			Logger:            logger,
 			RootConfigBuilder: &mockRootConfigBuilder{},
 		}
 
 		err := handler.Handle(context.Background(), e)
 		assert.NoError(t, err)
-
-		assert.False(t, testSignaler.called)
 	})
 
 	t.Run("allocation error", func(t *testing.T) {
-		testSignaler := &testSignaler{t: t}
 		allocator := &testAllocator{
 			expectedError:     assert.AnError,
 			expectedFeatureID: feature.PlatformMode,
@@ -288,55 +216,16 @@ func TestHandlePushEvent(t *testing.T) {
 		handler := event.PushHandler{
 			Allocator:         allocator,
 			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient:    testSignaler,
+			DeploySignaler:    &mockDeploySignaler{},
 			Logger:            logger,
 			RootConfigBuilder: &mockRootConfigBuilder{},
 		}
 
 		err := handler.Handle(context.Background(), e)
 		assert.NoError(t, err)
-
-		assert.False(t, testSignaler.called)
 	})
 
 	t.Run("signal success", func(t *testing.T) {
-		testSignaler := &testSignaler{
-			t:                  t,
-			expectedWorkflowID: fmt.Sprintf("%s||%s", repoFullName, testRoot),
-			expectedSignalName: workflows.DeployNewRevisionSignalID,
-			expectedSignalArg: workflows.DeployNewRevisionSignalRequest{
-				Revision: sha,
-				Root: workflows.Root{
-					Name: testRoot,
-					Plan: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
-					},
-					Apply: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
-					},
-					PlanMode:  workflows.NormalPlanMode,
-					TfVersion: version.String(),
-				},
-			},
-			expectedWorkflow: workflows.Deploy,
-			expectedOptions: client.StartWorkflowOptions{
-				TaskQueue: workflows.DeployTaskQueue,
-			},
-			expectedWorkflowArgs: workflows.DeployRequest{
-				Repository: workflows.Repo{
-					FullName: repoFullName,
-					Name:     repoName,
-					Owner:    repoOwner,
-					URL:      repoURL,
-					HeadCommit: workflows.HeadCommit{
-						Ref: workflows.Ref{
-							Name: repoRefName,
-							Type: repoRefType,
-						},
-					},
-				},
-			},
-		}
 		allocator := &testAllocator{
 			expectedAllocation: true,
 			expectedFeatureID:  feature.PlatformMode,
@@ -363,134 +252,16 @@ func TestHandlePushEvent(t *testing.T) {
 		handler := event.PushHandler{
 			Allocator:         allocator,
 			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient:    testSignaler,
+			DeploySignaler:    &mockDeploySignaler{run: &testRun{}},
 			Logger:            logger,
 			RootConfigBuilder: rootConfigBuilder,
 		}
 
 		err := handler.Handle(ctx, e)
 		assert.NoError(t, err)
-
-		assert.True(t, testSignaler.called)
-	})
-
-	t.Run("signal success - destroy plan", func(t *testing.T) {
-		testSignaler := &testSignaler{
-			t:                  t,
-			expectedWorkflowID: fmt.Sprintf("%s||%s", repoFullName, testRoot),
-			expectedSignalName: workflows.DeployNewRevisionSignalID,
-			expectedSignalArg: workflows.DeployNewRevisionSignalRequest{
-				Revision: sha,
-				Root: workflows.Root{
-					Name: testRoot,
-					Plan: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
-					},
-					Apply: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
-					},
-					PlanMode:  workflows.DestroyPlanMode,
-					TfVersion: version.String(),
-				},
-			},
-			expectedWorkflow: workflows.Deploy,
-			expectedOptions: client.StartWorkflowOptions{
-				TaskQueue: workflows.DeployTaskQueue,
-			},
-			expectedWorkflowArgs: workflows.DeployRequest{
-				Repository: workflows.Repo{
-					FullName: repoFullName,
-					Name:     repoName,
-					Owner:    repoOwner,
-					URL:      repoURL,
-					HeadCommit: workflows.HeadCommit{
-						Ref: workflows.Ref{
-							Name: repoRefName,
-							Type: repoRefType,
-						},
-					},
-				},
-			},
-		}
-		allocator := &testAllocator{
-			expectedAllocation: true,
-			expectedFeatureID:  feature.PlatformMode,
-			expectedFeatureCtx: feature.FeatureContext{
-				RepoName: repoFullName,
-			},
-			t: t,
-		}
-		ctx := context.Background()
-		rootCfg := valid.MergedProjectCfg{
-			Name: testRoot,
-			DeploymentWorkflow: valid.Workflow{
-				Plan:  valid.DefaultPlanStage,
-				Apply: valid.DefaultApplyStage,
-			},
-			Tags: map[string]string{
-				event.Deprecated: event.Destroy,
-			},
-			TerraformVersion: version,
-		}
-		rootCfgs := []*valid.MergedProjectCfg{
-			&rootCfg,
-		}
-		rootConfigBuilder := &mockRootConfigBuilder{
-			rootConfigs: rootCfgs,
-		}
-		handler := event.PushHandler{
-			Allocator:         allocator,
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient:    testSignaler,
-			Logger:            logger,
-			RootConfigBuilder: rootConfigBuilder,
-		}
-
-		err := handler.Handle(ctx, e)
-		assert.NoError(t, err)
-
-		assert.True(t, testSignaler.called)
 	})
 
 	t.Run("signal error", func(t *testing.T) {
-		testSignaler := &testSignaler{
-			t:                  t,
-			expectedWorkflowID: fmt.Sprintf("%s||%s", repoFullName, testRoot),
-			expectedSignalName: workflows.DeployNewRevisionSignalID,
-			expectedSignalArg: workflows.DeployNewRevisionSignalRequest{
-				Revision: sha,
-				Root: workflows.Root{
-					Name: testRoot,
-					Plan: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultPlanStage.Steps),
-					},
-					Apply: workflows.Job{
-						Steps: convertTestSteps(valid.DefaultApplyStage.Steps),
-					},
-					PlanMode:  workflows.NormalPlanMode,
-					TfVersion: version.String(),
-				},
-			},
-			expectedWorkflow: workflows.Deploy,
-			expectedOptions: client.StartWorkflowOptions{
-				TaskQueue: workflows.DeployTaskQueue,
-			},
-			expectedWorkflowArgs: workflows.DeployRequest{
-				Repository: workflows.Repo{
-					FullName: repoFullName,
-					Name:     repoName,
-					Owner:    repoOwner,
-					URL:      repoURL,
-					HeadCommit: workflows.HeadCommit{
-						Ref: workflows.Ref{
-							Name: repoRefName,
-							Type: repoRefType,
-						},
-					},
-				},
-			},
-			expectedErr: assert.AnError,
-		}
 		allocator := &testAllocator{
 			expectedAllocation: true,
 			expectedFeatureID:  feature.PlatformMode,
@@ -518,15 +289,13 @@ func TestHandlePushEvent(t *testing.T) {
 		handler := event.PushHandler{
 			Allocator:         allocator,
 			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			TemporalClient:    testSignaler,
+			DeploySignaler:    &mockDeploySignaler{error: assert.AnError},
 			Logger:            logger,
 			RootConfigBuilder: rootConfigBuilder,
 		}
 
 		err := handler.Handle(ctx, e)
 		assert.Error(t, err)
-
-		assert.True(t, testSignaler.called)
 	})
 }
 
@@ -544,11 +313,20 @@ func convertTestSteps(steps []valid.Step) []workflows.Step {
 	return convertedSteps
 }
 
+type mockDeploySignaler struct {
+	run   client.WorkflowRun
+	error error
+}
+
+func (d *mockDeploySignaler) SignalWithStartWorkflow(_ context.Context, _ *valid.MergedProjectCfg, _ models.Repo, _ string, _ int64, _ vcs.Ref, _ workflows.Trigger) (client.WorkflowRun, error) {
+	return d.run, d.error
+}
+
 type mockRootConfigBuilder struct {
 	rootConfigs []*valid.MergedProjectCfg
 	error       error
 }
 
-func (r *mockRootConfigBuilder) Build(_ context.Context, _ event.Push) ([]*valid.MergedProjectCfg, error) {
+func (r *mockRootConfigBuilder) Build(_ context.Context, _ models.Repo, _ string, _ string, _ int64) ([]*valid.MergedProjectCfg, error) {
 	return r.rootConfigs, r.error
 }

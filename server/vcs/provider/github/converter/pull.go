@@ -2,10 +2,10 @@ package converter
 
 import (
 	"fmt"
-
 	"github.com/google/go-github/v45/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/vcs"
 )
 
 // PullConverter converts a github pull request to our internal model
@@ -56,6 +56,10 @@ func (p *PullConverter) Convert(pull *github.PullRequest) (models.PullRequest, e
 	if pull.GetState() == "open" {
 		pullState = models.OpenPullState
 	}
+	ref := vcs.Ref{
+		Type: vcs.BranchRef,
+		Name: pull.Head.GetRef(),
+	}
 
 	return models.PullRequest{
 		Author:     authorUsername,
@@ -70,5 +74,6 @@ func (p *PullConverter) Convert(pull *github.PullRequest) (models.PullRequest, e
 		ClosedAt:   closedAt,
 		UpdatedAt:  updatedAt,
 		CreatedAt:  createdAt,
+		HeadRef:    ref,
 	}, nil
 }

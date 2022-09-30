@@ -1,6 +1,7 @@
 package converter_test
 
 import (
+	"github.com/runatlantis/atlantis/server/vcs"
 	"testing"
 	"time"
 
@@ -95,5 +96,9 @@ func TestParseGithubPull(t *testing.T) {
 		BaseRepo:   expBaseRepo,
 		HeadRepo:   expBaseRepo,
 		UpdatedAt:  timestamp,
+		HeadRef: vcs.Ref{
+			Type: "branch",
+			Name: "ref",
+		},
 	}, pullRes)
 }

@@ -7,6 +7,13 @@ const (
 	NormalPlanMode  PlanMode = "normal"
 )
 
+type Trigger string
+
+const (
+	MergeTrigger  Trigger = "merge"
+	ManualTrigger Trigger = "manual"
+)
+
 type Root struct {
 	Name        string
 	Apply       Job
@@ -14,6 +21,7 @@ type Root struct {
 	RepoRelPath string
 	TfVersion   string
 	PlanMode    PlanMode
+	Trigger     Trigger
 }
 
 type Job struct {

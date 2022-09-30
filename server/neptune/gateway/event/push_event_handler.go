@@ -2,8 +2,6 @@ package event
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -24,11 +22,6 @@ const (
 	UpdatedAction PushAction = "updated"
 )
 
-const (
-	Deprecated = "deprecated"
-	Destroy    = "-destroy"
-)
-
 type Push struct {
 	Repo              models.Repo
 	Ref               vcs.Ref
@@ -38,24 +31,22 @@ type Push struct {
 	Action            PushAction
 }
 
-type signaler interface {
-	SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
-		options client.StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (client.WorkflowRun, error)
-	SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error
-}
-
 type scheduler interface {
 	Schedule(ctx context.Context, f sync.Executor) error
 }
 
+type deploySignaler interface {
+	SignalWithStartWorkflow(ctx context.Context, rootCfg *valid.MergedProjectCfg, repo models.Repo, revision string, installationToken int64, ref vcs.Ref, trigger workflows.Trigger) (client.WorkflowRun, error)
+}
+
 type rootConfigBuilder interface {
-	Build(ctx context.Context, event Push) ([]*valid.MergedProjectCfg, error)
+	Build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64) ([]*valid.MergedProjectCfg, error)
 }
 
 type PushHandler struct {
 	Allocator         feature.Allocator
 	Scheduler         scheduler
-	TemporalClient    signaler
+	DeploySignaler    deploySignaler
 	Logger            logging.Logger
 	RootConfigBuilder rootConfigBuilder
 }
@@ -91,13 +82,20 @@ func (p *PushHandler) Handle(ctx context.Context, event Push) error {
 }
 
 func (p *PushHandler) handle(ctx context.Context, event Push) error {
-	rootCfgs, err := p.RootConfigBuilder.Build(ctx, event)
+	rootCfgs, err := p.RootConfigBuilder.Build(ctx, event.Repo, event.Ref.Name, event.Sha, event.InstallationToken)
 	if err != nil {
 		return errors.Wrap(err, "generating roots")
 	}
 	for _, rootCfg := range rootCfgs {
 		ctx = context.WithValue(ctx, contextInternal.ProjectKey, rootCfg.Name)
-		run, err := p.startWorkflow(ctx, event, rootCfg)
+		run, err := p.DeploySignaler.SignalWithStartWorkflow(
+			ctx,
+			rootCfg,
+			event.Repo,
+			event.Sha,
+			event.InstallationToken,
+			event.Ref,
+			workflows.MergeTrigger)
 		if err != nil {
 			return errors.Wrap(err, "signalling workflow")
 		}
@@ -107,79 +105,4 @@ func (p *PushHandler) handle(ctx context.Context, event Push) error {
 		})
 	}
 	return nil
-}
-
-func (p *PushHandler) startWorkflow(ctx context.Context, event Push, rootCfg *valid.MergedProjectCfg) (client.WorkflowRun, error) {
-	options := client.StartWorkflowOptions{TaskQueue: workflows.DeployTaskQueue}
-
-	var tfVersion string
-	if rootCfg.TerraformVersion != nil {
-		tfVersion = rootCfg.TerraformVersion.String()
-	}
-
-	run, err := p.TemporalClient.SignalWithStartWorkflow(
-		ctx,
-		fmt.Sprintf("%s||%s", event.Repo.FullName, rootCfg.Name),
-		workflows.DeployNewRevisionSignalID,
-		workflows.DeployNewRevisionSignalRequest{
-			Revision: event.Sha,
-			Root: workflows.Root{
-				Name: rootCfg.Name,
-				Plan: workflows.Job{
-					Steps: p.generateSteps(rootCfg.DeploymentWorkflow.Plan.Steps),
-				},
-				Apply: workflows.Job{
-					Steps: p.generateSteps(rootCfg.DeploymentWorkflow.Apply.Steps),
-				},
-				RepoRelPath: rootCfg.RepoRelDir,
-				TfVersion:   tfVersion,
-				PlanMode:    p.generatePlanMode(rootCfg),
-			},
-		},
-		options,
-		workflows.Deploy,
-		// TODO: add other request params as we support them
-		workflows.DeployRequest{
-			Repository: workflows.Repo{
-				URL:      event.Repo.CloneURL,
-				FullName: event.Repo.FullName,
-				Name:     event.Repo.Name,
-				Owner:    event.Repo.Owner,
-				Credentials: workflows.AppCredentials{
-					InstallationToken: event.InstallationToken,
-				},
-				HeadCommit: workflows.HeadCommit{
-					Ref: workflows.Ref{
-						Name: event.Ref.Name,
-						Type: string(event.Ref.Type),
-					},
-				},
-			},
-		},
-	)
-	return run, err
-}
-
-func (p *PushHandler) generatePlanMode(cfg *valid.MergedProjectCfg) workflows.PlanMode {
-	t, ok := cfg.Tags[Deprecated]
-	if ok && t == Destroy {
-		return workflows.DestroyPlanMode
-	}
-
-	return workflows.NormalPlanMode
-}
-
-func (p *PushHandler) generateSteps(steps []valid.Step) []workflows.Step {
-	// NOTE: for deployment workflows, we won't support command level user requests for log level output verbosity
-	var workflowSteps []workflows.Step
-	for _, step := range steps {
-		workflowSteps = append(workflowSteps, workflows.Step{
-			StepName:    step.StepName,
-			ExtraArgs:   step.ExtraArgs,
-			RunCommand:  step.RunCommand,
-			EnvVarName:  step.EnvVarName,
-			EnvVarValue: step.EnvVarValue,
-		})
-	}
-	return workflowSteps
 }

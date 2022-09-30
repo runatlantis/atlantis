@@ -2,6 +2,7 @@ package converter
 
 import (
 	"fmt"
+	"github.com/palantir/go-githubapp/githubapp"
 	"time"
 
 	"github.com/google/go-github/v45/github"
@@ -54,14 +55,17 @@ func (e CommentEventConverter) Convert(comment *github.IssueCommentEvent) (event
 		return event.Comment{}, errors.Wrap(err, "converting pull request type")
 	}
 
+	installationToken := githubapp.GetInstallationIDFromEvent(comment)
+
 	return event.Comment{
-		BaseRepo:  pull.BaseRepo,
-		HeadRepo:  pull.HeadRepo,
-		Pull:      pull,
-		User:      user,
-		PullNum:   pullNum,
-		VCSHost:   models.Github,
-		Timestamp: eventTimestamp,
-		Comment:   comment.GetComment().GetBody(),
+		BaseRepo:          pull.BaseRepo,
+		HeadRepo:          pull.HeadRepo,
+		Pull:              pull,
+		User:              user,
+		PullNum:           pullNum,
+		VCSHost:           models.Github,
+		Timestamp:         eventTimestamp,
+		InstallationToken: installationToken,
+		Comment:           comment.GetComment().GetBody(),
 	}, nil
 }

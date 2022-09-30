@@ -19,6 +19,7 @@ func Root(external request.Root) root.Root {
 		},
 		Path:      external.RepoRelPath,
 		TfVersion: external.TfVersion,
+		Trigger:   root.Trigger(external.Trigger),
 	}
 
 }

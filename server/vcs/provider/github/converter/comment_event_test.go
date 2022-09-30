@@ -1,6 +1,7 @@
 package converter_test
 
 import (
+	"github.com/runatlantis/atlantis/server/vcs"
 	"testing"
 
 	"github.com/google/go-github/v45/github"
@@ -70,6 +71,10 @@ func setup(t *testing.T) (github.IssueCommentEvent, models.Repo, models.PullRequ
 		BaseRepo:   modelRepo,
 		HeadRepo:   modelRepo,
 		UpdatedAt:  *Pull.UpdatedAt,
+		HeadRef: vcs.Ref{
+			Type: "branch",
+			Name: "ref",
+		},
 	}
 
 	return comment, modelRepo, modelPull, pullConverter

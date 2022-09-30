@@ -1,6 +1,7 @@
 package converter_test
 
 import (
+	"github.com/runatlantis/atlantis/server/vcs"
 	"testing"
 
 	"github.com/google/go-github/v45/github"
@@ -70,6 +71,10 @@ func TestConvert_PullRequestEvent(t *testing.T) {
 		BaseRepo:   expBaseRepo,
 		HeadRepo:   expBaseRepo,
 		UpdatedAt:  timestamp,
+		HeadRef: vcs.Ref{
+			Type: "branch",
+			Name: "ref",
+		},
 	}, actPull.Pull)
 	Equals(t, models.OpenedPullEvent, actPull.EventType)
 	Equals(t, models.User{Username: "user"}, actPull.User)

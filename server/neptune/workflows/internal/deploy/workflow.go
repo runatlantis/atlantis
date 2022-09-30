@@ -82,10 +82,6 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 		},
 	}
 
-	// TODO: We should actually probably pass this with the revision because a revision
-	// can potentially change a root configuration
-	
-
 	// inject dependencies
 
 	// temporal effectively "injects" this, it just cares about the method names,

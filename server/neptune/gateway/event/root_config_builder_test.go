@@ -52,7 +52,7 @@ func TestRootConfigBuilder_Success(t *testing.T) {
 	expProjectConfigs := []*valid.MergedProjectCfg{
 		&projCfg,
 	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent)
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
 	assert.NoError(t, err)
 	assert.Equal(t, expProjectConfigs, projectConfigs)
 }
@@ -63,7 +63,7 @@ func TestRootConfigBuilder_DetermineRootsError(t *testing.T) {
 		error: expectedErr,
 	}
 	rcb.RootFinder = mockRootFinder
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent)
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -75,7 +75,7 @@ func TestRootConfigBuilder_ParserValidatorParseError(t *testing.T) {
 		error: expectedErr,
 	}
 	rcb.ParserValidator = mockParserValidator
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent)
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -86,7 +86,7 @@ func TestRootConfigBuilder_GetModifiedFilesError(t *testing.T) {
 	rcb.FileFetcher = &mockFileFetcher{
 		error: expectedErr,
 	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent)
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 }
@@ -96,7 +96,7 @@ func TestRootConfigBuilder_CloneError(t *testing.T) {
 	rcb.RepoFetcher = &mockRepoFetcher{
 		cloneError: expectedErr,
 	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent)
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -108,7 +108,7 @@ func TestRootConfigBuilder_HooksRunnerError(t *testing.T) {
 		error: expectedErr,
 	}
 	rcb.HooksRunner = mockHooksRunner
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent)
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -121,7 +121,7 @@ type mockRepoFetcher struct {
 	cloneError error
 }
 
-func (r *mockRepoFetcher) Fetch(_ context.Context, _ models.Repo, _ string) (string, func(ctx context.Context, filePath string), error) {
+func (r *mockRepoFetcher) Fetch(_ context.Context, _ models.Repo, _ string, _ string) (string, func(ctx context.Context, filePath string), error) {
 	return "", func(ctx context.Context, filePath string) {}, r.cloneError
 }
 

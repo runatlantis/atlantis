@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/vcs"
 
 	"github.com/pkg/errors"
 )
@@ -186,6 +187,7 @@ type PullRequest struct {
 	ClosedAt time.Time
 	// CreatedAt is the time the PR was created.
 	CreatedAt time.Time
+	HeadRef   vcs.Ref
 }
 
 type PullRequestState int

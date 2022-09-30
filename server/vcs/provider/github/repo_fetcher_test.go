@@ -37,7 +37,8 @@ func TestFetchSimple(t *testing.T) {
 		GithubHostname: testServer,
 		Logger:         logger,
 	}
-	destinationPath, _, err := fetcher.Fetch(context.Background(), newBaseRepo(repoDir), sha)
+	repo := newBaseRepo(repoDir)
+	destinationPath, _, err := fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha)
 	assert.NoError(t, err)
 
 	// Use rev-parse to verify at correct commit.
@@ -69,7 +70,39 @@ func TestFetchCheckout(t *testing.T) {
 		GithubHostname: testServer,
 		Logger:         logger,
 	}
-	destinationPath, _, err := fetcher.Fetch(context.Background(), newBaseRepo(repoDir), sha1)
+	repo := newBaseRepo(repoDir)
+	destinationPath, _, err := fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha1)
+	assert.NoError(t, err)
+
+	// Use rev-parse to verify at correct commit.
+	actCommit := runCmd(t, destinationPath, "git", "rev-parse", "HEAD")
+	assert.Equal(t, expCommit, actCommit)
+}
+
+// Fetch a non default branch
+func TestFetchNonDefaultBranch(t *testing.T) {
+	// Initialize the git repo.
+	repoDir, cleanupRepo := initRepo(t)
+	defer cleanupRepo()
+
+	// Create branch and append commit
+	runCmd(t, repoDir, "git", "checkout", "-b", "test-branch")
+	sha := appendCommit(t, repoDir, ".gitkeep", "initial commit")
+	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	dataDir, cleanupDataDir := tempDir(t)
+	defer cleanupDataDir()
+	defer disableSSLVerification()()
+	testServer, err := fixtures.GithubAppTestServer(t)
+	assert.NoError(t, err)
+	logger := logging.NewNoopCtxLogger(t)
+	fetcher := &github.RepoFetcher{
+		DataDir:        dataDir,
+		GithubHostname: testServer,
+		Logger:         logger,
+	}
+	repo := newBaseRepo(repoDir)
+	destinationPath, _, err := fetcher.Fetch(context.Background(), repo, "test-branch", sha)
 	assert.NoError(t, err)
 
 	// Use rev-parse to verify at correct commit.
@@ -97,7 +130,7 @@ func TestFetchSimpleFailure(t *testing.T) {
 	}
 	repo := newBaseRepo(repoDir)
 	repo.DefaultBranch = "invalid-branch"
-	_, _, err = fetcher.Fetch(context.Background(), repo, sha)
+	_, _, err = fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha)
 	assert.Error(t, err)
 }
 
@@ -124,7 +157,34 @@ func TestFetchCheckoutFailure(t *testing.T) {
 		GithubHostname: testServer,
 		Logger:         logger,
 	}
-	_, _, err = fetcher.Fetch(context.Background(), newBaseRepo(repoDir), "invalidsha")
+	repo := newBaseRepo(repoDir)
+	_, _, err = fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, "invalidsha")
+	assert.Error(t, err)
+}
+
+// Fetch with correct branch
+func TestFetchNonDefaultBranchFailure(t *testing.T) {
+	// Initialize the git repo.
+	repoDir, cleanupRepo := initRepo(t)
+	defer cleanupRepo()
+
+	// Create branch and append commit
+	runCmd(t, repoDir, "git", "checkout", "-b", "test-branch")
+	sha := appendCommit(t, repoDir, ".gitkeep", "initial commit")
+
+	dataDir, cleanupDataDir := tempDir(t)
+	defer cleanupDataDir()
+	defer disableSSLVerification()()
+	testServer, err := fixtures.GithubAppTestServer(t)
+	assert.NoError(t, err)
+	logger := logging.NewNoopCtxLogger(t)
+	fetcher := &github.RepoFetcher{
+		DataDir:        dataDir,
+		GithubHostname: testServer,
+		Logger:         logger,
+	}
+	repo := newBaseRepo(repoDir)
+	_, _, err = fetcher.Fetch(context.Background(), repo, "invalid-branch", sha)
 	assert.Error(t, err)
 }
 
