@@ -15,6 +15,7 @@ type terraformActivities interface {
 	TerraformInit(ctx context.Context, request activities.TerraformInitRequest) (activities.TerraformInitResponse, error)
 	TerraformPlan(ctx context.Context, request activities.TerraformPlanRequest) (activities.TerraformPlanResponse, error)
 	TerraformApply(ctx context.Context, request activities.TerraformApplyRequest) (activities.TerraformApplyResponse, error)
+	CloseJob(ctx context.Context, request activities.CloseJobRequest) error
 }
 
 // stepRunner runs individual run steps
@@ -45,6 +46,7 @@ func (r *jobRunner) Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID 
 		TfVersion: localRoot.Root.TfVersion,
 		JobID:     jobID,
 	}
+	defer r.closeTerraformJob(jobCtx)
 
 	var resp activities.TerraformPlanResponse
 
@@ -80,6 +82,7 @@ func (r *jobRunner) Apply(ctx workflow.Context, localRoot *root.LocalRoot, jobID
 		TfVersion: localRoot.Root.TfVersion,
 		JobID:     jobID,
 	}
+	defer r.closeTerraformJob(jobCtx)
 
 	for _, step := range localRoot.Root.Apply.GetSteps() {
 		var err error
@@ -140,6 +143,7 @@ func (r *jobRunner) plan(ctx *job.ExecutionContext, mode *job.PlanMode, extraArg
 	if err != nil {
 		return resp, errors.Wrap(err, "running terraform plan activity")
 	}
+
 	return resp, nil
 }
 
@@ -176,4 +180,10 @@ func (r *jobRunner) runOptionalSteps(ctx *job.ExecutionContext, localRoot *root.
 	}
 
 	return nil
+}
+
+func (r *jobRunner) closeTerraformJob(ctx *job.ExecutionContext) {
+	workflow.ExecuteActivity(ctx, r.Activity.CloseJob, activities.CloseJobRequest{
+		JobID: ctx.JobID,
+	}).Get(ctx, nil)
 }

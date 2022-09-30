@@ -50,6 +50,7 @@ type Terraform struct {
 	*workerInfoActivity
 	*notifyActivities
 	*cleanupActivities
+	*jobActivities
 }
 
 func NewTerraform(config config.TerraformConfig, dataDir string, serverURL *url.URL, streamHandler streamHandler) (*Terraform, error) {
@@ -92,6 +93,9 @@ func NewTerraform(config config.TerraformConfig, dataDir string, serverURL *url.
 			TerraformClient:  tfClient,
 			StreamHandler:    streamHandler,
 			DefaultTFVersion: defaultTfVersion,
+		},
+		jobActivities: &jobActivities{
+			StreamCloser: streamHandler,
 		},
 	}, nil
 }

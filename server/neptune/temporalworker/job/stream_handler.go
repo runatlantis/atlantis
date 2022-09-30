@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/neptune/logger"
 )
 
 type OutputLine struct {
@@ -69,11 +69,12 @@ func (s *StreamHandler) Handle() {
 }
 
 // Activity context since it's called from within an activity
-func (s *StreamHandler) Close(ctx context.Context, jobID string) {
+func (s *StreamHandler) Close(ctx context.Context, jobID string) error {
 	s.ReceiverRegistry.Close(ctx, jobID)
 
 	// Update job status and persist to storage if configured
 	if err := s.Store.Close(ctx, jobID, Complete); err != nil {
-		logger.Error(ctx, fmt.Sprintf("updating jobs status to complete, %v", err))
+		return errors.Wrapf(err, "closing job store for ID: %s", jobID)
 	}
+	return nil
 }
