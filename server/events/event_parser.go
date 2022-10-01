@@ -923,10 +923,8 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 
 		if strings.Contains(uri.Host, "visualstudio.com") {
 			owner = strings.Split(uri.Host, ".")[0]
-		} else if strings.Contains(uri.Host, "dev.azure.com") {
-			owner = strings.Split(uri.Path, "/")[1]
 		} else {
-			owner = strings.Split(uri.Path, "/")[1] // to support owner for self hosted
+			owner = strings.Split(uri.Path, "/")[1]
 		}
 	}
 
