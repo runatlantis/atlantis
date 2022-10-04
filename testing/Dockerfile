@@ -1,6 +1,6 @@
 FROM golang:1.17
 
-RUN apt-get update && apt-get install unzip
+RUN apt-get update && apt-get install unzip sudo
 
 # Install Terraform
 ENV TERRAFORM_VERSION=1.3.1
