@@ -15,11 +15,10 @@ jobs:
   test:
     name: runner / gotest
     runs-on: ubuntu-22.04
-    permissions: write-all
     container: ghcr.io/runatlantis/testing-env:2022.09.13
     steps:
       # user in image needs write access to do anything
       - name: setup
-        run: chmod -R 777 $GITHUB_WORKSPACE /github /__w/_temp
-      - uses: actions/checkout@v3
+        run: chmod -R 700 $GITHUB_WORKSPACE /github /__w/_temp
+      - uses: actions/checkout@v3.0.2
       - run: make test-all
