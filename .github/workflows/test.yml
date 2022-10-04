@@ -7,10 +7,6 @@ on:
   pull_request:
     branches:
       - "master"
-
-permissions: read-all|write-all
-
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
@@ -19,6 +15,7 @@ jobs:
   test:
     name: runner / gotest
     runs-on: ubuntu-22.04
+    permissions: read-all|write-all
     container: ghcr.io/runatlantis/testing-env:2022.09.13
     steps:
       # user in image needs write access to do anything
