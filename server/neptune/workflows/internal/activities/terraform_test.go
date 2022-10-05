@@ -28,10 +28,6 @@ func (t *testStreamHandler) Stream(jobID string, msg string) {
 
 }
 
-func (t *testStreamHandler) Close(ctx context.Context, jobID string) error {
-	return nil
-}
-
 type multiCallTfClient struct {
 	clients []*testTfClient
 

@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -28,6 +29,7 @@ type Store interface {
 	Write(jobID string, output string) error
 	Remove(jobID string)
 	Close(ctx context.Context, jobID string, status JobStatus) error
+	Cleanup(ctx context.Context) error
 }
 
 func NewStorageBackedStore(config valid.Jobs, logger logging.Logger, scope tally.Scope) (*StorageBackendJobStore, error) {
@@ -37,26 +39,28 @@ func NewStorageBackedStore(config valid.Jobs, logger logging.Logger, scope tally
 	}
 
 	return &StorageBackendJobStore{
-		Store: &InMemoryStore{
+		InMemoryStore: &InMemoryStore{
 			jobs: map[string]*Job{},
 		},
 		storageBackend: storageBackend,
+		logger:         logger,
 	}, nil
 }
 
 func NewTestStorageBackedStore(logger logging.Logger, storageBackend StorageBackend, jobs map[string]*Job) *StorageBackendJobStore {
 	return &StorageBackendJobStore{
-		Store: &InMemoryStore{
+		InMemoryStore: &InMemoryStore{
 			jobs: jobs,
 		},
 		storageBackend: storageBackend,
+		logger:         logger,
 	}
 }
 
 // Setup job store for testing
 func NewTestJobStore(storageBackend StorageBackend, jobs map[string]*Job) *StorageBackendJobStore {
 	return &StorageBackendJobStore{
-		Store: &InMemoryStore{
+		InMemoryStore: &InMemoryStore{
 			jobs: jobs,
 		},
 		storageBackend: storageBackend,
@@ -124,15 +128,23 @@ func (m *InMemoryStore) Remove(jobID string) {
 	delete(m.jobs, jobID)
 }
 
+func (m *InMemoryStore) GetJobs() map[string]*Job {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.jobs
+}
+
 // Storage backend job store deals with handling jobs in backend storage
 type StorageBackendJobStore struct {
-	Store
+	*InMemoryStore
 	storageBackend StorageBackend
+	logger         logging.Logger
 }
 
 func (s *StorageBackendJobStore) Get(jobID string) (*Job, error) {
 	// Get job from memory
-	if jobInMem, _ := s.Store.Get(jobID); jobInMem != nil {
+	if jobInMem, _ := s.InMemoryStore.Get(jobID); jobInMem != nil {
 		return jobInMem, nil
 	}
 
@@ -149,18 +161,19 @@ func (s *StorageBackendJobStore) Get(jobID string) (*Job, error) {
 }
 
 func (s StorageBackendJobStore) Write(jobID string, output string) error {
-	return s.Store.Write(jobID, output)
+	return s.InMemoryStore.Write(jobID, output)
 }
 
 // Activity context since it's called from within an activity
 func (s *StorageBackendJobStore) Close(ctx context.Context, jobID string, status JobStatus) error {
-	if err := s.Store.Close(ctx, jobID, status); err != nil {
+	if err := s.InMemoryStore.Close(ctx, jobID, status); err != nil {
 		return err
 	}
 
-	job, err := s.Store.Get(jobID)
+	job, err := s.InMemoryStore.Get(jobID)
 	if err != nil || job == nil {
 		return errors.Wrapf(err, "retrieving job: %s from memory store", jobID)
+
 	}
 
 	ok, err := s.storageBackend.Write(ctx, jobID, job.Output)
@@ -170,11 +183,30 @@ func (s *StorageBackendJobStore) Close(ctx context.Context, jobID string, status
 
 	// Remove from memory if successfully persisted
 	if ok {
-		s.Store.Remove(jobID)
+		s.InMemoryStore.Remove(jobID)
 	}
 	return nil
 }
 
 func (s *StorageBackendJobStore) Remove(jobID string) {
-	s.Store.Remove(jobID)
+	s.InMemoryStore.Remove(jobID)
+}
+
+// Persist all jobs in memory
+func (s *StorageBackendJobStore) Cleanup(ctx context.Context) error {
+	failedJobs := []string{}
+	for jobID, job := range s.InMemoryStore.GetJobs() {
+		_, err := s.storageBackend.Write(ctx, jobID, job.Output)
+
+		// Track failed jobs, log errors and continue with other jobs
+		if err != nil {
+			s.logger.ErrorContext(ctx, fmt.Sprintf("failed to persist job %s on cleanup: %s", jobID, err))
+			failedJobs = append(failedJobs, jobID)
+		}
+	}
+
+	if len(failedJobs) > 0 {
+		return errors.Errorf("failed to persist jobs: %s\n", strings.Join(failedJobs, ","))
+	}
+	return nil
 }

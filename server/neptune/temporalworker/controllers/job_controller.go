@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -22,15 +21,10 @@ type multiplexor interface {
 
 type receiverRegistry interface {
 	AddReceiver(jobID string, ch chan string)
-	Broadcast(msg job.OutputLine)
-	Close(ctx context.Context, jobID string)
 }
 
 type store interface {
 	Get(jobID string) (*job.Job, error)
-	Write(jobID string, output string) error
-	Remove(jobID string)
-	Close(ctx context.Context, jobID string, status job.JobStatus) error
 }
 
 type JobsController struct {

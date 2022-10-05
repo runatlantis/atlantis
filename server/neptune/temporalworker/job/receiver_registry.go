@@ -5,26 +5,27 @@ import (
 	"sync"
 )
 
-type receiverRegistry interface {
+type ReceiverRegistry interface {
 	AddReceiver(jobID string, ch chan string)
 	Broadcast(msg OutputLine)
+	CleanUp()
 
 	// Activity context
 	Close(ctx context.Context, jobID string)
 }
 
-type ReceiverRegistry struct {
+type receiverRegistry struct {
 	receivers map[string]map[chan string]bool
 	lock      sync.RWMutex
 }
 
-func NewReceiverRegistry() *ReceiverRegistry {
-	return &ReceiverRegistry{
+func NewReceiverRegistry() *receiverRegistry {
+	return &receiverRegistry{
 		receivers: map[string]map[chan string]bool{},
 	}
 }
 
-func (r *ReceiverRegistry) AddReceiver(jobID string, ch chan string) {
+func (r *receiverRegistry) AddReceiver(jobID string, ch chan string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -35,7 +36,7 @@ func (r *ReceiverRegistry) AddReceiver(jobID string, ch chan string) {
 	r.receivers[jobID][ch] = true
 }
 
-func (r *ReceiverRegistry) Broadcast(msg OutputLine) {
+func (r *receiverRegistry) Broadcast(msg OutputLine) {
 	for ch := range r.getReceivers(msg.JobID) {
 		select {
 		case ch <- msg.Line:
@@ -46,7 +47,7 @@ func (r *ReceiverRegistry) Broadcast(msg OutputLine) {
 }
 
 // Activity context since it's called from within an activity
-func (r *ReceiverRegistry) Close(ctx context.Context, jobID string) {
+func (r *receiverRegistry) Close(ctx context.Context, jobID string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -58,14 +59,28 @@ func (r *ReceiverRegistry) Close(ctx context.Context, jobID string) {
 	delete(r.receivers, jobID)
 }
 
-func (r *ReceiverRegistry) getReceivers(jobID string) map[chan string]bool {
+// Called on Shutdown
+func (r *receiverRegistry) CleanUp() {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	for jobId, recvMap := range r.receivers {
+		for ch := range recvMap {
+			close(ch)
+			delete(r.receivers[jobId], ch)
+		}
+		delete(r.receivers, jobId)
+	}
+}
+
+func (r *receiverRegistry) getReceivers(jobID string) map[chan string]bool {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
 	return r.receivers[jobID]
 }
 
-func (r *ReceiverRegistry) removeReceiver(jobID string, ch chan string) {
+func (r *receiverRegistry) removeReceiver(jobID string, ch chan string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 

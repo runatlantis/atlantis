@@ -40,6 +40,10 @@ func (t *testStore) Close(ctx context.Context, jobID string, status job.JobStatu
 	return t.Err
 }
 
+func (t *testStore) Cleanup(ctx context.Context) error {
+	return t.Err
+}
+
 type strictTestStore struct {
 	t   *testing.T
 	get struct {
@@ -55,6 +59,10 @@ type strictTestStore struct {
 		count   int
 	}
 	close struct {
+		runners []*testStore
+		count   int
+	}
+	cleanup struct {
 		runners []*testStore
 		count   int
 	}
@@ -93,6 +101,15 @@ func (t strictTestStore) Close(ctx context.Context, jobID string, status job.Job
 	}
 	err := t.close.runners[t.close.count].Close(ctx, jobID, status)
 	t.close.count += 1
+	return err
+}
+
+func (t strictTestStore) Cleanup(ctx context.Context) error {
+	if t.cleanup.count > len(t.cleanup.runners)-1 {
+		t.t.FailNow()
+	}
+	err := t.cleanup.runners[t.cleanup.count].Cleanup(ctx)
+	t.cleanup.count += 1
 	return err
 }
 

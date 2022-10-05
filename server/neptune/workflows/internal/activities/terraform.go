@@ -39,7 +39,6 @@ type TerraformClient interface {
 
 type streamHandler interface {
 	Stream(jobID string, msg string)
-	Close(ctx context.Context, jobID string) error
 }
 
 type terraformActivities struct {

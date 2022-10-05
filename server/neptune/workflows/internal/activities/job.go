@@ -8,7 +8,7 @@ import (
 )
 
 type streamCloser interface {
-	Close(ctx context.Context, jobID string) error
+	CloseJob(ctx context.Context, jobID string) error
 }
 
 type jobActivities struct {
@@ -20,7 +20,7 @@ type CloseJobRequest struct {
 }
 
 func (t *jobActivities) CloseJob(ctx context.Context, request CloseJobRequest) error {
-	err := t.StreamCloser.Close(ctx, request.JobID)
+	err := t.StreamCloser.CloseJob(ctx, request.JobID)
 	if err != nil {
 		logger.Error(ctx, errors.Wrapf(err, "closing job").Error())
 	}

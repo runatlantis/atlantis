@@ -4,21 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"github.com/runatlantis/atlantis/server/logging"
 )
+
+type StreamCloserFn func()
 
 type OutputLine struct {
 	JobID string
 	Line  string
 }
 
-func NewStreamHandler(
+func NewTestStreamHandler(
 	jobStore Store,
-	receiverRegistry receiverRegistry,
+	receiverRegistry ReceiverRegistry,
 	logFilters valid.TerraformLogFilters,
+	streamChan chan *OutputLine,
 	logger logging.Logger,
 ) *StreamHandler {
 
@@ -26,9 +28,8 @@ func NewStreamHandler(
 		Regexes: logFilters.Regexes,
 	}
 
-	jobOutputChan := make(chan *OutputLine)
 	return &StreamHandler{
-		JobOutput:        jobOutputChan,
+		JobOutput:        streamChan,
 		Store:            jobStore,
 		ReceiverRegistry: receiverRegistry,
 		LogFilter:        logFilter,
@@ -36,10 +37,35 @@ func NewStreamHandler(
 	}
 }
 
+func NewStreamHandler(
+	jobStore Store,
+	receiverRegistry ReceiverRegistry,
+	logFilters valid.TerraformLogFilters,
+	logger logging.Logger,
+) (*StreamHandler, StreamCloserFn) {
+
+	logFilter := filter.LogFilter{
+		Regexes: logFilters.Regexes,
+	}
+
+	streamChan := make(chan *OutputLine)
+	streamCloserFn := func() {
+		close(streamChan)
+	}
+
+	return &StreamHandler{
+		JobOutput:        streamChan,
+		Store:            jobStore,
+		ReceiverRegistry: receiverRegistry,
+		LogFilter:        logFilter,
+		Logger:           logger,
+	}, streamCloserFn
+}
+
 type StreamHandler struct {
 	JobOutput        chan *OutputLine
 	Store            Store
-	ReceiverRegistry receiverRegistry
+	ReceiverRegistry ReceiverRegistry
 	LogFilter        filter.LogFilter
 	Logger           logging.Logger
 }
@@ -69,12 +95,12 @@ func (s *StreamHandler) Handle() {
 }
 
 // Activity context since it's called from within an activity
-func (s *StreamHandler) Close(ctx context.Context, jobID string) error {
+func (s *StreamHandler) CloseJob(ctx context.Context, jobID string) error {
 	s.ReceiverRegistry.Close(ctx, jobID)
+	return s.Store.Close(ctx, jobID, Complete)
+}
 
-	// Update job status and persist to storage if configured
-	if err := s.Store.Close(ctx, jobID, Complete); err != nil {
-		return errors.Wrapf(err, "closing job store for ID: %s", jobID)
-	}
-	return nil
+func (s *StreamHandler) CleanUp(ctx context.Context) error {
+	s.ReceiverRegistry.CleanUp()
+	return s.Store.Cleanup(ctx)
 }
