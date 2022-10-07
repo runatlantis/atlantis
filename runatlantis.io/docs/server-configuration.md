@@ -605,6 +605,7 @@ Values are chosen in this order:
 ### `--silence-whitelist-errors`
   <Badge text="Deprecated" type="warn"/>
   Deprecated for `--silence-allowlist-errors`.
+
 ### `--silence-allowlist-errors`
   ```bash
   atlantis server --silence-allowlist-errors
