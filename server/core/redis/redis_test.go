@@ -148,7 +148,7 @@ func TestMixedLocksPresent(t *testing.T) {
 	_, err := r.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	_, _, err = r.TryLock(lock)
+	_, _, _, err = r.TryLock(lock)
 	Ok(t, err)
 
 	ls, err := r.List()
@@ -169,7 +169,7 @@ func TestListOneLock(t *testing.T) {
 	t.Log("listing locks when there is one should return it")
 	s := miniredis.RunT(t)
 	r := newTestRedis(s)
-	_, _, err := r.TryLock(lock)
+	_, _, _, err := r.TryLock(lock)
 	Ok(t, err)
 	ls, err := r.List()
 	Ok(t, err)
@@ -192,7 +192,7 @@ func TestListMultipleLocks(t *testing.T) {
 	for _, r := range repos {
 		newLock := lock
 		newLock.Project = models.NewProject(r, "path")
-		_, _, err := rdb.TryLock(newLock)
+		_, _, _, err := rdb.TryLock(newLock)
 		Ok(t, err)
 	}
 	ls, err := rdb.List()
@@ -213,9 +213,9 @@ func TestListAddRemove(t *testing.T) {
 	t.Log("listing after adding and removing should return none")
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
-	_, _, err := rdb.TryLock(lock)
+	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
-	_, err = rdb.Unlock(project, workspace)
+	_, _, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
 	ls, err := rdb.List()
@@ -227,7 +227,7 @@ func TestLockingNoLocks(t *testing.T) {
 	t.Log("with no locks yet, lock should succeed")
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
-	acquired, currLock, err := rdb.TryLock(lock)
+	acquired, currLock, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 	Equals(t, true, acquired)
 	Equals(t, lock, currLock)
@@ -237,14 +237,14 @@ func TestLockingExistingLock(t *testing.T) {
 	t.Log("if there is an existing lock, lock should...")
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
-	_, _, err := rdb.TryLock(lock)
+	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
 	t.Log("...succeed if the new project has a different path")
 	{
 		newLock := lock
 		newLock.Project = models.NewProject(project.RepoFullName, "different/path")
-		acquired, currLock, err := rdb.TryLock(newLock)
+		acquired, currLock, _, err := rdb.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
 		Equals(t, pullNum, currLock.Pull.Num)
@@ -254,7 +254,7 @@ func TestLockingExistingLock(t *testing.T) {
 	{
 		newLock := lock
 		newLock.Workspace = "different-workspace"
-		acquired, currLock, err := rdb.TryLock(newLock)
+		acquired, currLock, _, err := rdb.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
 		Equals(t, newLock, currLock)
@@ -264,7 +264,7 @@ func TestLockingExistingLock(t *testing.T) {
 	{
 		newLock := lock
 		newLock.Project = models.NewProject("different/repo", project.Path)
-		acquired, currLock, err := rdb.TryLock(newLock)
+		acquired, currLock, _, err := rdb.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
 		Equals(t, newLock, currLock)
@@ -274,7 +274,7 @@ func TestLockingExistingLock(t *testing.T) {
 	{
 		newLock := lock
 		newLock.Pull.Num = lock.Pull.Num + 1
-		acquired, currLock, err := rdb.TryLock(newLock)
+		acquired, currLock, _, err := rdb.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, false, acquired)
 		Equals(t, currLock.Pull.Num, pullNum)
@@ -285,7 +285,7 @@ func TestUnlockingNoLocks(t *testing.T) {
 	t.Log("unlocking with no locks should succeed")
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
-	_, err := rdb.Unlock(project, workspace)
+	_, _, err := rdb.Unlock(project, workspace)
 
 	Ok(t, err)
 }
@@ -295,9 +295,9 @@ func TestUnlocking(t *testing.T) {
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
 
-	_, _, err := rdb.TryLock(lock)
+	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
-	_, err = rdb.Unlock(project, workspace)
+	_, _, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
 	// should be no locks listed
@@ -308,7 +308,7 @@ func TestUnlocking(t *testing.T) {
 	// should be able to re-lock that repo with a new pull num
 	newLock := lock
 	newLock.Pull.Num = lock.Pull.Num + 1
-	acquired, currLock, err := rdb.TryLock(newLock)
+	acquired, currLock, _, err := rdb.TryLock(newLock)
 	Ok(t, err)
 	Equals(t, true, acquired)
 	Equals(t, newLock, currLock)
@@ -319,32 +319,32 @@ func TestUnlockingMultiple(t *testing.T) {
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
 
-	_, _, err := rdb.TryLock(lock)
+	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
 	new := lock
 	new.Project.RepoFullName = "new/repo"
-	_, _, err = rdb.TryLock(new)
+	_, _, _, err = rdb.TryLock(new)
 	Ok(t, err)
 
 	new2 := lock
 	new2.Project.Path = "new/path"
-	_, _, err = rdb.TryLock(new2)
+	_, _, _, err = rdb.TryLock(new2)
 	Ok(t, err)
 
 	new3 := lock
 	new3.Workspace = "new-workspace"
-	_, _, err = rdb.TryLock(new3)
+	_, _, _, err = rdb.TryLock(new3)
 	Ok(t, err)
 
 	// now try and unlock them
-	_, err = rdb.Unlock(new3.Project, new3.Workspace)
+	_, _, err = rdb.Unlock(new3.Project, new3.Workspace)
 	Ok(t, err)
-	_, err = rdb.Unlock(new2.Project, workspace)
+	_, _, err = rdb.Unlock(new2.Project, workspace)
 	Ok(t, err)
-	_, err = rdb.Unlock(new.Project, workspace)
+	_, _, err = rdb.Unlock(new.Project, workspace)
 	Ok(t, err)
-	_, err = rdb.Unlock(project, workspace)
+	_, _, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
 	// should be none left
@@ -358,7 +358,7 @@ func TestUnlockByPullNone(t *testing.T) {
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
 
-	_, err := rdb.UnlockByPull("any/repo", 1)
+	_, _, err := rdb.UnlockByPull("any/repo", 1)
 	Ok(t, err)
 }
 
@@ -366,12 +366,12 @@ func TestUnlockByPullOne(t *testing.T) {
 	t.Log("with one lock, UnlockByPull should...")
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
-	_, _, err := rdb.TryLock(lock)
+	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
 	t.Log("...delete nothing when its the same repo but a different pull")
 	{
-		_, err := rdb.UnlockByPull(project.RepoFullName, pullNum+1)
+		_, _, err := rdb.UnlockByPull(project.RepoFullName, pullNum+1)
 		Ok(t, err)
 		ls, err := rdb.List()
 		Ok(t, err)
@@ -379,7 +379,7 @@ func TestUnlockByPullOne(t *testing.T) {
 	}
 	t.Log("...delete nothing when its the same pull but a different repo")
 	{
-		_, err := rdb.UnlockByPull("different/repo", pullNum)
+		_, _, err := rdb.UnlockByPull("different/repo", pullNum)
 		Ok(t, err)
 		ls, err := rdb.List()
 		Ok(t, err)
@@ -387,7 +387,7 @@ func TestUnlockByPullOne(t *testing.T) {
 	}
 	t.Log("...delete the lock when its the same repo and pull")
 	{
-		_, err := rdb.UnlockByPull(project.RepoFullName, pullNum)
+		_, _, err := rdb.UnlockByPull(project.RepoFullName, pullNum)
 		Ok(t, err)
 		ls, err := rdb.List()
 		Ok(t, err)
@@ -399,12 +399,12 @@ func TestUnlockByPullAfterUnlock(t *testing.T) {
 	t.Log("after locking and unlocking, UnlockByPull should be successful")
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
-	_, _, err := rdb.TryLock(lock)
+	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
-	_, err = rdb.Unlock(project, workspace)
+	_, _, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
-	_, err = rdb.UnlockByPull(project.RepoFullName, pullNum)
+	_, _, err = rdb.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
 	ls, err := rdb.List()
 	Ok(t, err)
@@ -415,17 +415,17 @@ func TestUnlockByPullMatching(t *testing.T) {
 	t.Log("UnlockByPull should delete all locks in that repo and pull num")
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
-	_, _, err := rdb.TryLock(lock)
+	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
 	// add additional locks with the same repo and pull num but different paths/workspaces
 	new := lock
 	new.Project.Path = "dif/path"
-	_, _, err = rdb.TryLock(new)
+	_, _, _, err = rdb.TryLock(new)
 	Ok(t, err)
 	new2 := lock
 	new2.Workspace = "new-workspace"
-	_, _, err = rdb.TryLock(new2)
+	_, _, _, err = rdb.TryLock(new2)
 	Ok(t, err)
 
 	// there should now be 3
@@ -434,7 +434,7 @@ func TestUnlockByPullMatching(t *testing.T) {
 	Equals(t, 3, len(ls))
 
 	// should all be unlocked
-	_, err = rdb.UnlockByPull(project.RepoFullName, pullNum)
+	_, _, err = rdb.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
 	ls, err = rdb.List()
 	Ok(t, err)
@@ -454,7 +454,7 @@ func TestGetLock(t *testing.T) {
 	t.Log("getting a lock should return the lock")
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
-	_, _, err := rdb.TryLock(lock)
+	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
 	l, err := rdb.GetLock(project, workspace)
