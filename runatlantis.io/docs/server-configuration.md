@@ -134,6 +134,12 @@ Values are chosen in this order:
   * Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
     * `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
 
+### `--azuredevops-hostname`
+  ```bash
+  atlantis server --azuredevops-hostname="dev.azure.com"
+  ```
+  Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
+
 ### `--azuredevops-webhook-password`
   ```bash
   atlantis server --azuredevops-webhook-password="password123"
@@ -253,6 +259,12 @@ Values are chosen in this order:
   ```
   Disable atlantis auto planning
 
+### `--disable-markdown-folding`
+  ```bash
+  atlantis server --disable-markdown-folding
+  ```
+  Disable folding in markdown output.
+
 ### `--disable-repo-locking`
   ```bash
   atlantis server --disable-repo-locking
@@ -346,6 +358,12 @@ Values are chosen in this order:
 
   After which Atlantis will display your new app's credentials: your app's ID, its generated `--gh-webhook-secret` and the contents of the file for `--gh-app-key-file`. Update your Atlantis config accordingly, and restart the server.
   :::
+
+### `--gh-app-slug`
+  ```bash
+  atlantis server --gh-app-slug="myappslug"
+  ```
+  A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`.
 
 ### `--gh-app-key-file`
   ```bash
@@ -724,3 +742,21 @@ Values are chosen in this order:
   ::: warning SECURITY WARNING
   This does write secrets to disk and should only be enabled in a secure environment.
   :::
+
+### `--web-basic-auth`
+  ```bash
+  atlantis server --web-basic-auth
+  ```
+  Enable Basic Authentication on the Atlantis web service.
+
+### `--web-username`
+  ```bash
+  atlantis server --web-username="atlantis"
+  ```
+  Username used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--web-password`
+  ```bash
+  atlantis server --web-password="atlantis"
+  ```
+  Password used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
