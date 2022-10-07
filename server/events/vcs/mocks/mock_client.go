@@ -170,7 +170,7 @@ func (mock *MockClient) GetTeamNamesForUser(repo models.Repo, user models.User) 
 	return ret0, ret1
 }
 
-func (mock *MockClient) PullIsMergeable(_param0 models.Repo, _param1 models.PullRequest) (bool, error) {
+func (mock *MockClient) PullIsMergeable(_param0 models.Repo, _param1 models.PullRequest, vcsstatusname string) (bool, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
@@ -202,6 +202,25 @@ func (mock *MockClient) SupportsSingleFileDownload(_param0 models.Repo) bool {
 		}
 	}
 	return ret0
+}
+
+func (mock *MockClient) GetCloneURL(_param0 models.VCSHostType, _param1 string) (string, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockClient().")
+	}
+	params := []pegomock.Param{_param0, _param1}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetCloneURL", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 string
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(string)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
 }
 
 func (mock *MockClient) UpdateStatus(_param0 models.Repo, _param1 models.PullRequest, _param2 models.CommitStatus, _param3 string, _param4 string, _param5 string) error {

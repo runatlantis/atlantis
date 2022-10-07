@@ -163,11 +163,19 @@ func TestParseGithubPullEvent(t *testing.T) {
 }
 
 func TestParseGithubPullEventFromDraft(t *testing.T) {
+	// verify that close event treated as 'close' events by default
+	closeEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	closeEvent.Action = github.String("closed")
+	closeEvent.PullRequest.Draft = github.Bool(true)
+
+	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&closeEvent)
+	Ok(t, err)
+	Equals(t, models.ClosedPullEvent, evType)
+
 	// verify that draft PRs are treated as 'other' events by default
 	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	draftPR := true
-	testEvent.PullRequest.Draft = &draftPR
-	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&testEvent)
+	testEvent.PullRequest.Draft = github.Bool(true)
+	_, evType, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	Ok(t, err)
 	Equals(t, models.OtherPullEvent, evType)
 	// verify that drafts are planned if requested
@@ -379,6 +387,29 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	Equals(t, models.ClosedPullState, pull.State)
 }
 
+func TestParseGitlabMergeEventFromDraft(t *testing.T) {
+	path := filepath.Join("testdata", "gitlab-merge-request-event.json")
+	bytes, err := os.ReadFile(path)
+	Ok(t, err)
+
+	var event gitlab.MergeEvent
+	err = json.Unmarshal(bytes, &event)
+	Ok(t, err)
+
+	testEvent := deepcopy.Copy(event).(gitlab.MergeEvent)
+	testEvent.ObjectAttributes.WorkInProgress = true
+
+	_, evType, _, _, _, err := parser.ParseGitlabMergeRequestEvent(testEvent)
+	Ok(t, err)
+	Equals(t, models.OtherPullEvent, evType)
+
+	parser.AllowDraftPRs = true
+	defer func() { parser.AllowDraftPRs = false }()
+	_, evType, _, _, _, err = parser.ParseGitlabMergeRequestEvent(testEvent)
+	Ok(t, err)
+	Equals(t, models.OpenedPullEvent, evType)
+}
+
 // Should be able to parse a merge event from a repo that is in a subgroup,
 // i.e. instead of under an owner/repo it's under an owner/group/subgroup/repo.
 func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
@@ -430,6 +461,57 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 	Equals(t, models.User{Username: "lkysow"}, actUser)
 }
 
+func TestParseGitlabMergeEvent_Update_ActionType(t *testing.T) {
+	cases := []struct {
+		filename string
+		exp      models.PullRequestEventType
+	}{
+		{
+			filename: "gitlab-merge-request-event-update-title.json",
+			exp:      models.OtherPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-update-new-commit.json",
+			exp:      models.UpdatedPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-update-labels.json",
+			exp:      models.OtherPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-update-description.json",
+			exp:      models.OtherPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-update-assignee.json",
+			exp:      models.OtherPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-update-mixed.json",
+			exp:      models.OtherPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-update-target-branch.json",
+			exp:      models.UpdatedPullEvent,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.filename, func(t *testing.T) {
+			path := filepath.Join("testdata", c.filename)
+			bytes, err := os.ReadFile(path)
+			Ok(t, err)
+
+			var event *gitlab.MergeEvent
+			err = json.Unmarshal(bytes, &event)
+			Ok(t, err)
+			_, evType, _, _, _, err := parser.ParseGitlabMergeRequestEvent(*event)
+			Ok(t, err)
+			Equals(t, c.exp, evType)
+		})
+	}
+}
+
 func TestParseGitlabMergeEvent_ActionType(t *testing.T) {
 	cases := []struct {
 		action string
@@ -438,10 +520,6 @@ func TestParseGitlabMergeEvent_ActionType(t *testing.T) {
 		{
 			action: "open",
 			exp:    models.OpenedPullEvent,
-		},
-		{
-			action: "update",
-			exp:    models.UpdatedPullEvent,
 		},
 		{
 			action: "merge",

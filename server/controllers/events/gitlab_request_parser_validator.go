@@ -14,6 +14,7 @@
 package events
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -61,8 +62,7 @@ func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, 
 
 	// Validate secret if specified.
 	headerSecret := r.Header.Get(secretHeader)
-	secretStr := string(secret)
-	if len(secret) != 0 && headerSecret != secretStr {
+	if len(secret) != 0 && subtle.ConstantTimeCompare(secret, []byte(headerSecret)) != 1 {
 		return nil, fmt.Errorf("header %s=%s did not match expected secret", secretHeader, headerSecret)
 	}
 

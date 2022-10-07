@@ -10,7 +10,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/core/terraform"
+	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -41,7 +41,7 @@ type AsyncTFExec interface {
 	// Callers can use the input channel to pass stdin input to the command.
 	// If any error is passed on the out channel, there will be no
 	// further output (so callers are free to exit).
-	RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line)
+	RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line)
 }
 
 // StatusUpdater brings the interface from CommitStatusUpdater into this package
@@ -50,8 +50,9 @@ type StatusUpdater interface {
 	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 // Runner mirrors events.StepRunner as a way to bring it into this package
+//
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 type Runner interface {
 	Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }

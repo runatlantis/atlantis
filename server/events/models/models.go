@@ -3,7 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the License);
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an AS IS BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -68,7 +70,8 @@ func (r Repo) ID() string {
 // NewRepo constructs a Repo object. repoFullName is the owner/repo form,
 // cloneURL can be with or without .git at the end
 // ex. https://github.com/runatlantis/atlantis.git OR
-//     https://github.com/runatlantis/atlantis
+//
+//	https://github.com/runatlantis/atlantis
 func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
@@ -314,12 +317,30 @@ func (h VCSHostType) String() string {
 	return "<missing String() implementation>"
 }
 
+func NewVCSHostType(t string) (VCSHostType, error) {
+	switch t {
+	case "Github":
+		return Github, nil
+	case "Gitlab":
+		return Gitlab, nil
+	case "BitbucketCloud":
+		return BitbucketCloud, nil
+	case "BitbucketServer":
+		return BitbucketServer, nil
+	case "AzureDevops":
+		return AzureDevops, nil
+	}
+
+	return -1, fmt.Errorf("%q is not a valid type", t)
+}
+
 // SplitRepoFullName splits a repo full name up into its owner and repo
 // name segments. If the repoFullName is malformed, may return empty
 // strings for owner or repo.
 // Ex. runatlantis/atlantis => (runatlantis, atlantis)
-//     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
-//     azuredevops/project/atlantis => (azuredevops/project, atlantis)
+//
+//	gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
+//	azuredevops/project/atlantis => (azuredevops/project, atlantis)
 func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 	lastSlashIdx := strings.LastIndex(repoFullName, "/")
 	if lastSlashIdx == -1 || lastSlashIdx == len(repoFullName)-1 {
@@ -363,10 +384,12 @@ func (p *PlanSuccess) Summary() string {
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
-	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~])`)
+	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s=\s|\s->\s|<<|\{|\(known after apply\)|\[)(.*)`)
+	diffListRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
 	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
 
-	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1")
+	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5")
+	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
 
 	return formattedTerraformOutput

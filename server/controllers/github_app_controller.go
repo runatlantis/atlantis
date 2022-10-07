@@ -55,7 +55,8 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 
 	g.Logger.Debug("Exchanging GitHub app code for app credentials")
 	creds := &vcs.GithubAnonymousCredentials{}
-	client, err := vcs.NewGithubClient(g.GithubHostname, creds, g.Logger)
+	config := vcs.GithubConfig{}
+	client, err := vcs.NewGithubClient(g.GithubHostname, creds, config, g.Logger)
 	if err != nil {
 		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return
@@ -119,6 +120,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 			"pull_requests":    "write",
 			"repository_hooks": "write",
 			"statuses":         "write",
+			"administration":   "read",
 		},
 	}
 

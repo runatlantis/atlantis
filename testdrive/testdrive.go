@@ -3,7 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the License);
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an AS IS BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -124,7 +126,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	colorstring.Println("[green]=> fork completed![reset]")
 
 	// Detect terraform and install it if not installed.
-	_, err := exec.LookPath("terraform")
+	terraformPath, err := exec.LookPath("terraform")
 	if err != nil {
 		colorstring.Println("[yellow]=> terraform not found in $PATH.[reset]")
 		colorstring.Println("=> downloading terraform ")
@@ -142,18 +144,25 @@ Follow these instructions to create a token (we don't store any tokens):
 		}
 		colorstring.Println("[green]=> installed terraform successfully at /usr/local/bin[reset]")
 	} else {
-		colorstring.Println("[green]=> terraform found in $PATH![reset]")
+		colorstring.Printf("[green]=> terraform found in $PATH at %s\n[reset]", terraformPath)
 	}
 
-	// Download ngrok.
-	colorstring.Println("=> downloading ngrok  ")
-	s.Start()
-	ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
-	if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
-		return errors.Wrapf(err, "downloading and unzipping ngrok")
+	// Detect ngrok and install it if not installed
+	ngrokPath, ngrokErr := exec.LookPath("ngrok")
+	if ngrokErr != nil {
+		colorstring.Println("[yellow]=> ngrok not found in $PATH.[reset]")
+		colorstring.Println("=> downloading ngrok")
+		s.Start()
+		ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
+		if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
+			return errors.Wrapf(err, "downloading and unzipping ngrok")
+		}
+		s.Stop()
+		colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
+		ngrokPath = "/tmp/ngrok"
+	} else {
+		colorstring.Printf("[green]=> ngrok found in $PATH at %s\n[reset]", ngrokPath)
 	}
-	s.Stop()
-	colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
 
 	// Create ngrok tunnel.
 	colorstring.Println("=> creating secure tunnel")
@@ -188,7 +197,7 @@ tunnels:
 	tunnelReadyLog := regexp.MustCompile("client session established")
 	tunnelTimeout := 20 * time.Second
 	cancelNgrok, ngrokErrors, err := execAndWaitForStderr(&wg, tunnelReadyLog, tunnelTimeout,
-		"/tmp/ngrok", "start", "atlantis", "--config", ngrokConfigFile.Name(), "--log", "stderr", "--log-format", "term")
+		ngrokPath, "start", "atlantis", "--config", ngrokConfigFile.Name(), "--log", "stderr", "--log-format", "term")
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	if err != nil {
 		s.Stop()

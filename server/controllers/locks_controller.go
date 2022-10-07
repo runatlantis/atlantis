@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/controllers/templates"
-	"github.com/runatlantis/atlantis/server/core/db"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -28,7 +27,7 @@ type LocksController struct {
 	LockDetailTemplate templates.TemplateWriter
 	WorkingDir         events.WorkingDir
 	WorkingDirLocker   events.WorkingDirLocker
-	DB                 *db.BoltDB
+	Backend            locking.Backend
 	DeleteLockCommand  events.DeleteLockCommand
 }
 
@@ -157,7 +156,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 				l.Logger.Err("unable to delete workspace: %s", err)
 			}
 		}
-		if err := l.DB.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
+		if err := l.Backend.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
 			l.Logger.Err("unable to update project status: %s", err)
 		}
 

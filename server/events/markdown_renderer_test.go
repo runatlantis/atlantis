@@ -2173,11 +2173,53 @@ Terraform will perform the following actions:
         id      = "redacted_redacted.redacted.redacted.io_A"
         name    = "redacted.redacted.redacted.io"
       ~ records = [
+            "foo",
           - "redacted",
         ] -> (known after apply)
         ttl     = 300
         type    = "A"
         zone_id = "redacted"
+    }
+
+  # module.redacted.aws_route53_record.redacted_record_2 will be created
++ resource "aws_route53_record" "redacted_record" {
+      + fqdn    = "redacted.redacted.redacted.io"
+      + id      = "redacted_redacted.redacted.redacted.io_A"
+      + name    = "redacted.redacted.redacted.io"
+      + records = [
+            "foo",
+        ]
+      + ttl     = 300
+      + type    = "A"
+      + zone_id = "redacted"
+    }
+
+# helm_release.external_dns[0] will be updated in-place
+~ resource "helm_release" "external_dns" {
+      id                         = "external-dns"
+      name                       = "external-dns"
+    ~ values                     = [
+        - <<-EOT
+            image:
+              tag: "0.12.0"
+              pullSecrets:
+              - XXXXX
+
+            domainFilters: ["xxxxx","xxxxx"]
+            base64:
+              +dGhpcyBpcyBzb21lIHN0cmluZyBvciBzb21ldGhpbmcKCg==
+          EOT,
+        + <<-EOT
+            image:
+              tag: "0.12.0"
+              pullSecrets:
+              - XXXXX
+
+            domainFilters: ["xxxxx","xxxxx"]
+            base64:
+              +dGhpcyBpcyBzb21lIHN0cmluZyBvciBzb21ldGhpbmcKCg==
+          EOT,
+      ]
     }
 
 Plan: 1 to add, 1 to change, 1 to destroy.
@@ -2308,11 +2350,53 @@ Terraform will perform the following actions:
         id      = "redacted_redacted.redacted.redacted.io_A"
         name    = "redacted.redacted.redacted.io"
 !       records = [
+            "foo",
 -           "redacted",
         ] -> (known after apply)
         ttl     = 300
         type    = "A"
         zone_id = "redacted"
+    }
+
+  # module.redacted.aws_route53_record.redacted_record_2 will be created
++ resource "aws_route53_record" "redacted_record" {
++       fqdn    = "redacted.redacted.redacted.io"
++       id      = "redacted_redacted.redacted.redacted.io_A"
++       name    = "redacted.redacted.redacted.io"
++       records = [
+            "foo",
+        ]
++       ttl     = 300
++       type    = "A"
++       zone_id = "redacted"
+    }
+
+# helm_release.external_dns[0] will be updated in-place
+! resource "helm_release" "external_dns" {
+      id                         = "external-dns"
+      name                       = "external-dns"
+!     values                     = [
+-         <<-EOT
+            image:
+              tag: "0.12.0"
+              pullSecrets:
+              - XXXXX
+
+            domainFilters: ["xxxxx","xxxxx"]
+            base64:
+              +dGhpcyBpcyBzb21lIHN0cmluZyBvciBzb21ldGhpbmcKCg==
+          EOT,
++         <<-EOT
+            image:
+              tag: "0.12.0"
+              pullSecrets:
+              - XXXXX
+
+            domainFilters: ["xxxxx","xxxxx"]
+            base64:
+              +dGhpcyBpcyBzb21lIHN0cmluZyBvciBzb21ldGhpbmcKCg==
+          EOT,
+      ]
     }
 
 Plan: 1 to add, 1 to change, 1 to destroy.

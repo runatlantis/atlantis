@@ -3,6 +3,7 @@ package events
 import (
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -305,13 +306,14 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		// our algorithm determines was modified.
 		ctx.Log.Info("found no %s file", config.AtlantisYAMLFilename)
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList)
-		if err != nil {
-			return nil, errors.Wrapf(err, "finding modified projects: %s", modifiedFiles)
-		}
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
-			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
+			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, repoDir)
+			if err != nil {
+				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", repoDir)
+			}
+			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)
 
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
@@ -328,6 +330,10 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 				)...)
 		}
 	}
+
+	sort.Slice(projCtxs, func(i, j int) bool {
+		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
+	})
 
 	return projCtxs, nil
 }
@@ -466,6 +472,11 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *command.Cont
 		}
 		cmds = append(cmds, commentCmds...)
 	}
+
+	sort.Slice(cmds, func(i, j int) bool {
+		return cmds[i].ExecutionOrderGroup < cmds[j].ExecutionOrderGroup
+	})
+
 	return cmds, nil
 }
 

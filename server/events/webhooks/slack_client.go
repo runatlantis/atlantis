@@ -30,7 +30,6 @@ const (
 type SlackClient interface {
 	AuthTest() error
 	TokenIsSet() bool
-	ChannelExists(channelName string) (bool, error)
 	PostMessage(channel string, applyResult ApplyResult) error
 }
 
@@ -63,31 +62,6 @@ func (d *DefaultSlackClient) AuthTest() error {
 
 func (d *DefaultSlackClient) TokenIsSet() bool {
 	return d.Token != ""
-}
-
-func (d *DefaultSlackClient) ChannelExists(channelName string) (bool, error) {
-	var (
-		cursor   string
-		channels []slack.Channel
-		err      error
-	)
-
-	for {
-		channels, cursor, err = d.Slack.GetConversations(&slack.GetConversationsParameters{Cursor: cursor})
-		if err != nil {
-			return false, err
-		}
-		for _, channel := range channels {
-			if channel.Name == channelName {
-				return true, nil
-			}
-		}
-		if cursor == "" {
-			break
-		}
-	}
-
-	return false, nil
 }
 
 func (d *DefaultSlackClient) PostMessage(channel string, applyResult ApplyResult) error {

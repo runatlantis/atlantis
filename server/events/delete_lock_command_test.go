@@ -79,7 +79,7 @@ func TestDeleteLock_Success(t *testing.T) {
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:           l,
 		Logger:           logging.NewNoopLogger(t),
-		DB:               db,
+		Backend:          db,
 		WorkingDirLocker: workingDirLocker,
 		WorkingDir:       workingDir,
 	}

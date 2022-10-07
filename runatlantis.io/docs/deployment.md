@@ -63,11 +63,12 @@ To install:
       token: bar
       secret: baz
     ```
-1. Edit `values.yaml` and set your `orgWhitelist` (see [Repo Whitelist](server-configuration.html#repo-whitelist) for more information)
+1. Edit `values.yaml` and set your `orgAllowlist` (see [Repo Allowlist](server-configuration.md#repo-allowlist) for more information)
     ```yaml
-    orgWhitelist: github.com/runatlantis/*
+    orgAllowlist: github.com/runatlantis/*
     ```
-1. Configure any other variables (see [https://github.com/helm/charts/tree/master/stable/atlantis#customization](https://github.com/helm/charts/tree/master/stable/atlantis#customization)
+    **Note**: For helm chart version < `4.0.2`, `orgWhitelist` must be used instead. 
+1. Configure any other variables (see [https://github.com/runatlantis/helm-charts#customization](https://github.com/runatlantis/helm-charts#customization)
     for documentation)
 1. Run
     ```sh
@@ -103,7 +104,7 @@ If you're using Bitbucket Cloud then there is no webhook secret since it's not s
 :::
 
 Next, edit the manifests below as follows:
-1. Replace `<VERSION>` in `image: runatlantis/atlantis:<VERSION>` with the most recent version from [https://github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest).
+1. Replace `<VERSION>` in `image: ghcr.io/runatlantis/atlantis:<VERSION>` with the most recent version from [https://github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest).
     * NOTE: You never want to run with `:latest` because if your Pod moves to a new node, Kubernetes will pull the latest image and you might end
 up upgrading Atlantis by accident!
 2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_ALLOWLIST` with the allowlist pattern
@@ -149,7 +150,7 @@ spec:
         fsGroup: 1000 # Atlantis group (1000) read/write access to volumes.
       containers:
       - name: atlantis
-        image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
+        image: ghcr.io/runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
         - name: ATLANTIS_REPO_ALLOWLIST
           value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
@@ -297,7 +298,7 @@ spec:
     spec:
       containers:
       - name: atlantis
-        image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
+        image: ghcr.io/runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
         - name: ATLANTIS_REPO_ALLOWLIST
           value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.

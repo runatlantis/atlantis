@@ -824,6 +824,36 @@ repos:
 				PolicySets:      emptyPolicySets,
 			},
 		},
+		"execution order group is set": {
+			gCfg:   "",
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:       "mydir",
+				Workspace: "myworkspace",
+				Name:      String("myname"),
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{".tf"},
+					Enabled:      true,
+				},
+				ExecutionOrderGroup: 10,
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{},
+				Workflow: valid.Workflow{
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultPlanStage,
+				},
+				RepoRelDir:          "mydir",
+				Workspace:           "myworkspace",
+				Name:                "myname",
+				AutoplanEnabled:     true,
+				PolicySets:          emptyPolicySets,
+				ExecutionOrderGroup: 10,
+			},
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

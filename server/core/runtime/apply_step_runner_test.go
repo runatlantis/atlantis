@@ -2,7 +2,6 @@ package runtime_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +12,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	"github.com/runatlantis/atlantis/server/core/terraform"
+	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -53,7 +52,7 @@ func TestRun_Success(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
-	err := ioutil.WriteFile(planPath, nil, 0600)
+	err := os.WriteFile(planPath, nil, 0600)
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
 		Log:                logger,
@@ -84,7 +83,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "projectname-default.tfplan")
-	err := ioutil.WriteFile(planPath, nil, 0600)
+	err := os.WriteFile(planPath, nil, 0600)
 
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
@@ -371,11 +370,11 @@ type remoteApplyMock struct {
 }
 
 // RunCommandAsync fakes out running terraform async.
-func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line) {
 	r.CalledArgs = args
 
 	in := make(chan string)
-	out := make(chan terraform.Line)
+	out := make(chan runtimemodels.Line)
 
 	// We use a wait group to ensure our sending and receiving routines have
 	// completed.
@@ -398,10 +397,10 @@ func (r *remoteApplyMock) RunCommandAsync(ctx command.ProjectContext, path strin
 	// Asynchronously send the lines we're supposed to.
 	go func() {
 		for _, line := range strings.Split(r.LinesToSend, "\n") {
-			out <- terraform.Line{Line: line}
+			out <- runtimemodels.Line{Line: line}
 		}
 		if r.Err != nil {
-			out <- terraform.Line{Err: r.Err}
+			out <- runtimemodels.Line{Err: r.Err}
 		}
 		close(out)
 		wg.Done()

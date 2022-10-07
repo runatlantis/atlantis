@@ -27,7 +27,7 @@ type Client interface {
 	CreateComment(repo models.Repo, pullNum int, comment string, command string) error
 	HidePrevCommandComments(repo models.Repo, pullNum int, command string) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error)
-	PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error)
+	PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error)
 	// UpdateStatus updates the commit status to state for pull. src is the
 	// source of this status. This should be relatively static across runs,
 	// ex. atlantis/plan or atlantis/apply.
@@ -45,4 +45,5 @@ type Client interface {
 	// if BaseRepo had one repo config file, its content will placed on the second return value
 	DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error)
 	SupportsSingleFileDownload(repo models.Repo) bool
+	GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error)
 }
