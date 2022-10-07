@@ -1,10 +1,10 @@
-# v0.19.9
+# v0.20.0
 
 Bugfixes and new Features
 
 ## What's Changed
 
-https://github.com/runatlantis/atlantis/releases/tag/v0.19.9
+https://github.com/runatlantis/atlantis/releases/tag/v0.20.0
 
 # v0.19.8
 
