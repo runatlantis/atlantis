@@ -123,6 +123,10 @@ func (c *ChecksOutputUpdater) handleCommandFailure(ctx *command.Context, cmd Pul
 
 func (c *ChecksOutputUpdater) buildJobURL(ctx *command.Context, cmd command.Name, jobID string) string {
 
+	if jobID == "" {
+		return ""
+	}
+
 	// Only support streaming logs for plan and apply operation for now
 	if cmd == command.Plan || cmd == command.Apply {
 		jobURL, err := c.JobURLGenerator.GenerateProjectJobURL(jobID)

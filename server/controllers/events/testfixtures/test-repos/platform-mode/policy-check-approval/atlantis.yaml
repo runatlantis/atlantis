@@ -1,4 +1,5 @@
 version: 3
+workflow_mode_type: platform
 projects:
 - dir: .
   workspace: default

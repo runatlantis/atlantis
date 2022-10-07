@@ -3,58 +3,92 @@ package command
 import (
 	"fmt"
 
+	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 )
 
-func NewPlatformModeFeatureRunner(
-	featureAllocator feature.Allocator,
-	platformModeEnabled bool,
-	logger logging.Logger,
-	allocatedRunner command.Runner,
-	unallocatedRunner command.Runner,
-) *PlatformModeFeatureRunner {
-	return &PlatformModeFeatureRunner{
-		featureAllocator:    featureAllocator,
-		platformModeEnabled: platformModeEnabled,
-		logger:              logger,
-		allocatedRunner:     allocatedRunner,
-		unallocatedRunner:   unallocatedRunner,
-	}
+// DefaultProjectCommandRunner implements ProjectCommandRunner.
+type PlatformModeProjectRunner struct { //create object and test
+	PlatformModeRunner events.ProjectCommandRunner
+	PrModeRunner       events.ProjectCommandRunner
+	Allocator          feature.Allocator
+	Logger             logging.Logger
 }
 
-// PlatformModeFeatureRunner basic struct to that prepares a runner based on if
-// the platform mode feature is enabled for the repo and if the server is
-// running in platform mode
-type PlatformModeFeatureRunner struct {
-	featureAllocator    feature.Allocator
-	platformModeEnabled bool
-	logger              logging.Logger
-	allocatedRunner     command.Runner
-	unallocatedRunner   command.Runner
-}
-
-// Wrap returns CommentCommandRunner that encapsulates feature flags decision
-// inside a CommentCommandRunner interface
-func (r *PlatformModeFeatureRunner) Run(ctx *command.Context, cmd *command.Comment) {
-	// if platform mode is not enable run unallocatedRunner runner. No need
-	// to invoke feature allocator
-	if !r.platformModeEnabled {
-		r.unallocatedRunner.Run(ctx, cmd)
-		return
-	}
-
-	// prCreationTime defaults to time.Unix(0, 0) to ensure features are turned on by default
-	shouldAllocate, err := r.featureAllocator.ShouldAllocate(feature.PlatformMode, feature.FeatureContext{RepoName: ctx.HeadRepo.FullName})
+// Plan runs terraform plan for the project described by ctx.
+func (p *PlatformModeProjectRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
+	shouldAllocate, err := p.Allocator.ShouldAllocate(feature.PlatformMode, feature.FeatureContext{RepoName: ctx.HeadRepo.FullName})
 	if err != nil {
-		r.logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.PlatformMode, err))
+		p.Logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.PlatformMode, err))
 	}
 
-	if !shouldAllocate {
-		r.unallocatedRunner.Run(ctx, cmd)
-		return
+	if shouldAllocate && (ctx.WorkflowModeType == valid.PlatformWorkflowMode) {
+		return p.PlatformModeRunner.Plan(ctx)
 	}
 
-	r.allocatedRunner.Run(ctx, cmd)
+	return p.PrModeRunner.Plan(ctx)
+}
+
+// PolicyCheck evaluates policies defined with Rego for the project described by ctx.
+func (p *PlatformModeProjectRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
+	shouldAllocate, err := p.Allocator.ShouldAllocate(feature.PlatformMode, feature.FeatureContext{RepoName: ctx.HeadRepo.FullName})
+	if err != nil {
+		p.Logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.PlatformMode, err))
+	}
+
+	if shouldAllocate && (ctx.WorkflowModeType == valid.PlatformWorkflowMode) {
+		return p.PlatformModeRunner.PolicyCheck(ctx)
+	}
+
+	return p.PrModeRunner.PolicyCheck(ctx)
+}
+
+// Apply runs terraform apply for the project described by ctx.
+func (p *PlatformModeProjectRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
+	shouldAllocate, err := p.Allocator.ShouldAllocate(feature.PlatformMode, feature.FeatureContext{RepoName: ctx.HeadRepo.FullName})
+	if err != nil {
+		p.Logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.PlatformMode, err))
+	}
+
+	if shouldAllocate && (ctx.WorkflowModeType == valid.PlatformWorkflowMode) {
+		return command.ProjectResult{
+			Command:      command.Apply,
+			RepoRelDir:   ctx.RepoRelDir,
+			Workspace:    ctx.Workspace,
+			ProjectName:  ctx.ProjectName,
+			StatusId:     ctx.StatusId,
+			ApplySuccess: "atlantis apply is disabled for this project. Please track the deployment when the PR is merged. ",
+		}
+	}
+
+	return p.PrModeRunner.Apply(ctx)
+}
+
+func (p *PlatformModeProjectRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
+	shouldAllocate, err := p.Allocator.ShouldAllocate(feature.PlatformMode, feature.FeatureContext{RepoName: ctx.HeadRepo.FullName})
+	if err != nil {
+		p.Logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.PlatformMode, err))
+	}
+
+	if shouldAllocate && (ctx.WorkflowModeType == valid.PlatformWorkflowMode) {
+		return p.PlatformModeRunner.ApprovePolicies(ctx)
+	}
+
+	return p.PrModeRunner.ApprovePolicies(ctx)
+}
+
+func (p *PlatformModeProjectRunner) Version(ctx command.ProjectContext) command.ProjectResult {
+	shouldAllocate, err := p.Allocator.ShouldAllocate(feature.PlatformMode, feature.FeatureContext{RepoName: ctx.HeadRepo.FullName})
+	if err != nil {
+		p.Logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.PlatformMode, err))
+	}
+
+	if shouldAllocate && (ctx.WorkflowModeType == valid.PlatformWorkflowMode) {
+		return p.PlatformModeRunner.Version(ctx)
+	}
+
+	return p.PrModeRunner.Version(ctx)
 }

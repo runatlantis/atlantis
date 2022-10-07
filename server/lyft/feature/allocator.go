@@ -61,20 +61,13 @@ type Allocator interface {
 	ShouldAllocate(featureID Name, featureCtx FeatureContext) (bool, error)
 }
 
-// PercentageBasedAllocator allocates features based on a percentage of the total repositories
-// at the time of writing, go-feature-flag is primarily used as the backend for this allocator:
-// https://thomaspoignant.github.io/go-feature-flag/
-type PercentageBasedAllocator struct {
-	logger logging.Logger
-}
-
 func NewGHSourcedAllocator(repoConfig RepoConfig, githubClient vcs.IGithubClient, logger logging.Logger) (Allocator, error) {
 	// fail if no github client is provided
 	if githubClient == nil {
 		return nil, errors.New("no github client provided")
 	}
 
-	err := ffclient.Init(
+	ff, err := ffclient.New(
 		ffclient.Config{
 			Context:   context.Background(),
 			Retriever: &CustomGithubRetriever{client: githubClient, cfg: repoConfig},
@@ -85,7 +78,7 @@ func NewGHSourcedAllocator(repoConfig RepoConfig, githubClient vcs.IGithubClient
 		return nil, errors.Wrapf(err, "initializing feature allocator")
 	}
 
-	return &PercentageBasedAllocator{logger: logger}, err
+	return &PercentageBasedAllocator{logger: logger, featureFlag: ff}, err
 
 }
 
@@ -93,11 +86,15 @@ func NewGHSourcedAllocator(repoConfig RepoConfig, githubClient vcs.IGithubClient
 // This is used for e2e testing.  This should reflect the configuration we intend to test.
 //
 // External configuration shouldn't be dialed up to 100 unless we've tested that scenario here.
-func NewStringSourcedAllocator(logger logging.Logger) (Allocator, error) {
-	err := ffclient.Init(
+func NewStringSourcedAllocator(logger logging.Logger) (*PercentageBasedAllocator, error) {
+	return NewStringSourcedAllocatorWithRetriever(logger, Configuration)
+}
+
+func NewStringSourcedAllocatorWithRetriever(logger logging.Logger, retriever ffclient.Retriever) (*PercentageBasedAllocator, error) {
+	ff, err := ffclient.New(
 		ffclient.Config{
 			Context:   context.Background(),
-			Retriever: Configuration,
+			Retriever: retriever,
 		},
 	)
 
@@ -105,7 +102,15 @@ func NewStringSourcedAllocator(logger logging.Logger) (Allocator, error) {
 		return nil, errors.Wrapf(err, "initializing feature allocator")
 	}
 
-	return &PercentageBasedAllocator{logger: logger}, err
+	return &PercentageBasedAllocator{logger: logger, featureFlag: ff}, err
+}
+
+// PercentageBasedAllocator allocates features based on a percentage of the total repositories
+// at the time of writing, go-feature-flag is primarily used as the backend for this allocator:
+// https://thomaspoignant.github.io/go-feature-flag/
+type PercentageBasedAllocator struct {
+	logger      logging.Logger
+	featureFlag *ffclient.GoFeatureFlag
 }
 
 func (r *PercentageBasedAllocator) ShouldAllocate(featureID Name, featureContext FeatureContext) (bool, error) {
@@ -115,7 +120,7 @@ func (r *PercentageBasedAllocator) ShouldAllocate(featureID Name, featureContext
 		AddCustom("prCreationTime", featureContext.PullCreationTime.Unix()).
 		Build()
 
-	shouldAllocate, err := ffclient.BoolVariation(string(featureID), repo, false)
+	shouldAllocate, err := r.featureFlag.BoolVariation(string(featureID), repo, false)
 
 	// if we error out we shouldn't enable the feature, could be risky
 	// Note: if the feature doesn't exist, the library returns the default value.
@@ -124,4 +129,8 @@ func (r *PercentageBasedAllocator) ShouldAllocate(featureID Name, featureContext
 	}
 
 	return shouldAllocate, nil
+}
+
+func (r *PercentageBasedAllocator) Close() {
+	r.featureFlag.Close()
 }

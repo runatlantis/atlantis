@@ -1233,6 +1233,12 @@ workflows:
 						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.PullRequestWorkflows["default"],
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.DeploymentWorkflows["default"],
+				},
 			},
 		},
 		"workflow stages empty": {
@@ -1252,6 +1258,12 @@ workflows:
 						Plan:        valid.DefaultPlanStage,
 						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
+				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.PullRequestWorkflows["default"],
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
 			},
 		},
@@ -1273,6 +1285,12 @@ workflows:
 						PolicyCheck: valid.DefaultPolicyCheckStage,
 						Apply:       valid.DefaultApplyStage,
 					},
+				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.PullRequestWorkflows["default"],
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
 			},
 		},
@@ -1351,6 +1369,12 @@ policies:
 						},
 					},
 				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.PullRequestWorkflows["default"],
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.DeploymentWorkflows["default"],
+				},
 			},
 		},
 		"id regex with trailing slash": {
@@ -1368,6 +1392,12 @@ repos:
 				},
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
+				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.PullRequestWorkflows["default"],
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
 			},
 		},
@@ -1388,6 +1418,12 @@ repos:
 				},
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
+				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.PullRequestWorkflows["default"],
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
 			},
 		},
@@ -1426,6 +1462,16 @@ workflows:
 								},
 							},
 						},
+						PullRequestWorkflow: &valid.Workflow{
+							Name:        "default",
+							Plan:        valid.DefaultLocklessPlanStage,
+							PolicyCheck: valid.DefaultPolicyCheckStage,
+						},
+						DeploymentWorkflow: &valid.Workflow{
+							Name:  "default",
+							Plan:  valid.DefaultPlanStage,
+							Apply: valid.DefaultApplyStage,
+						},
 						AllowedWorkflows:     []string{},
 						AllowedOverrides:     []string{},
 						AllowCustomWorkflows: Bool(false),
@@ -1446,6 +1492,20 @@ workflows:
 								},
 							},
 						},
+					},
+				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": {
+						Name:        "default",
+						Plan:        valid.DefaultLocklessPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
+					},
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": {
+						Name:  "default",
+						Plan:  valid.DefaultPlanStage,
+						Apply: valid.DefaultApplyStage,
 					},
 				},
 			},
@@ -1491,7 +1551,7 @@ workflows:
 }
 
 func TestParseGlobalCfg_PlatformMode(t *testing.T) {
-	defaultCfg := valid.NewGlobalCfg().EnablePlatformMode()
+	defaultCfg := valid.NewGlobalCfg()
 	preWorkflowHook := &valid.PreWorkflowHook{
 		StepName:   "run",
 		RunCommand: "custom workflow command",
@@ -1628,7 +1688,6 @@ policies:
       source: local
 `,
 			exp: valid.GlobalCfg{
-				WorkflowMode: valid.PlatformWorkflowMode,
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
@@ -1688,7 +1747,6 @@ deployment_workflows:
       - run: custom
 `,
 			exp: valid.GlobalCfg{
-				WorkflowMode: valid.PlatformWorkflowMode,
 				Repos: []valid.Repo{
 					{
 						IDRegex:           regexp.MustCompile(".*"),
@@ -1773,7 +1831,7 @@ deployment_workflows:
 			path := filepath.Join(tmp, "conf.yaml")
 			Ok(t, ioutil.WriteFile(path, []byte(c.input), 0600))
 
-			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfg().EnablePlatformMode())
+			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfg())
 
 			if c.expErr != "" {
 				expErr := strings.Replace(c.expErr, "<tmp>", path, -1)
@@ -1933,6 +1991,12 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					"default": valid.NewGlobalCfg().Workflows["default"],
 					"custom":  customWorkflow,
 				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": valid.NewGlobalCfg().PullRequestWorkflows["default"],
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": valid.NewGlobalCfg().DeploymentWorkflows["default"],
+				},
 				PolicySets: valid.PolicySets{
 					Version: conftestVersion,
 					PolicySets: []valid.PolicySet{
@@ -2025,7 +2089,7 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
-	globalCfg := valid.NewGlobalCfg().EnablePlatformMode()
+	globalCfg := valid.NewGlobalCfg()
 
 	cases := map[string]struct {
 		json   string
@@ -2103,7 +2167,6 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 }
 `,
 			exp: valid.GlobalCfg{
-				WorkflowMode: valid.PlatformWorkflowMode,
 				Repos: []valid.Repo{
 					globalCfg.Repos[0],
 					{

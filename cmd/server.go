@@ -62,7 +62,6 @@ const (
 	DisableApplyFlag           = "disable-apply"
 	DisableAutoplanFlag        = "disable-autoplan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
-	EnablePlatformModeFlag     = "enable-platform-mode"
 	EnableRegExpCmdFlag        = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat   = "enable-diff-markdown-format"
 	FFOwnerFlag                = "ff-owner"
@@ -329,10 +328,6 @@ var boolFlags = map[string]boolFlag{
 		description:  "Disable atlantis auto planning feature",
 		defaultValue: false,
 	},
-	EnablePlatformModeFlag: {
-		description:  "Enable Atlantis to run in platform mode, where it will run plan and policy checks inside the PR and run plan and apply after PR is merged.",
-		defaultValue: false,
-	},
 	EnableRegExpCmdFlag: {
 		description:  "Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.",
 		defaultValue: false,
@@ -456,7 +451,6 @@ func (c *GatewayCreator) NewServer(userConfig server.UserConfig, config server.C
 		AppCfg:                    appConfig,
 		RepoAllowList:             userConfig.RepoAllowlist,
 		MaxProjectsPerPR:          userConfig.MaxProjectsPerPR,
-		EnablePlatformMode:        userConfig.EnablePlatformMode,
 		FFOwner:                   userConfig.FFOwner,
 		FFRepo:                    userConfig.FFRepo,
 		FFBranch:                  userConfig.FFBranch,

@@ -55,7 +55,6 @@ type Config struct {
 	AppCfg                    githubapp.Config
 	RepoAllowList             string
 	MaxProjectsPerPR          int
-	EnablePlatformMode        bool
 	FFOwner                   string
 	FFRepo                    string
 	FFBranch                  string
@@ -101,9 +100,6 @@ func NewServer(config Config) (*Server, error) {
 	}
 
 	globalCfg := valid.NewGlobalCfg()
-	if config.EnablePlatformMode {
-		globalCfg = globalCfg.EnablePlatformMode()
-	}
 	validator := &cfgParser.ParserValidator{}
 	if config.RepoConfig != "" {
 		globalCfg, err = validator.ParseGlobalCfg(config.RepoConfig, globalCfg)

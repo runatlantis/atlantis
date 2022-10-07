@@ -96,7 +96,6 @@ var testFlags = map[string]interface{}{
 	LyftModeFlag:                 "",
 	LyftWorkerQueueUrlFlag:       "",
 	DisableAutoplanFlag:          true,
-	EnablePlatformModeFlag:       false,
 	EnableRegExpCmdFlag:          false,
 	EnableDiffMarkdownFormat:     false,
 }

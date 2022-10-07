@@ -67,7 +67,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/command/apply"
 	"github.com/runatlantis/atlantis/server/events/command/policies"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -184,10 +183,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	validator := &cfgParser.ParserValidator{}
 
 	globalCfg := valid.NewGlobalCfg()
-
-	if userConfig.EnablePlatformMode {
-		globalCfg = globalCfg.EnablePlatformMode()
-	}
 
 	if userConfig.RepoConfig != "" {
 		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
@@ -535,36 +530,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                        ctxLogger,
 	}
 
-	projectContextBuilder := wrappers.
+	legacyProjectContextBuilder := wrappers.
 		WrapProjectContext(events.NewProjectCommandContextBuilder(commentParser)).
 		WithInstrumentation(statsScope)
 
-	prProjectContextBuilder := wrappers.
-		WrapProjectContext(events.NewPRProjectCommandContextBuilder(commentParser)).
+	projectContextBuilder := wrappers.
+		WrapProjectContext(events.NewPlatformModeProjectCommandContextBuilder(commentParser, legacyProjectContextBuilder, ctxLogger, featureAllocator)).
 		WithInstrumentation(statsScope)
 
 	if userConfig.EnablePolicyChecks {
 		projectContextBuilder = projectContextBuilder.EnablePolicyChecks(commentParser)
-		prProjectContextBuilder = prProjectContextBuilder.EnablePolicyChecks(commentParser)
 	}
+
 
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		projectContextBuilder,
-		validator,
-		&events.DefaultProjectFinder{},
-		vcsClient,
-		workingDir,
-		workingDirLocker,
-		globalCfg,
-		pendingPlanFinder,
-		userConfig.EnableRegExpCmd,
-		userConfig.AutoplanFileList,
-		ctxLogger,
-		userConfig.MaxProjectsPerPR,
-	)
-
-	prProjectCommandBuilder := events.NewProjectCommandBuilder(
-		prProjectContextBuilder,
 		validator,
 		&events.DefaultProjectFinder{},
 		vcsClient,
@@ -701,7 +681,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectCommitStatusUpdater: commitStatusUpdater,
 	}
 
-	prjCmdRunner := wrappers.
+	legacyPrjCmdRunner := wrappers.
 		WrapProjectRunner(unwrappedPrjCmdRunner).
 		WithSync(
 			projectLocker,
@@ -721,13 +701,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		applyRequirementHandler,
 	)
 
-	prPrjCmdRunner := wrappers.
+	platformModePrjCmdRunner := wrappers.
 		WrapProjectRunner(unwrappedPRPrjCmdRunner).
 		WithAuditing(snsWriter).
 		WithInstrumentation().
 		WithJobs(
 			statusUpdater,
 		)
+
+	prjCmdRunner := &lyftCommands.PlatformModeProjectRunner{
+		PlatformModeRunner: platformModePrjCmdRunner,
+		PrModeRunner:       legacyPrjCmdRunner,
+		Allocator:          featureAllocator,
+		Logger:             ctxLogger,
+	}
 
 	pullReqStatusFetcher := lyft_vcs.NewSQBasedPullStatusFetcher(
 		githubClient,
@@ -796,62 +783,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 	)
 
-	prPlanCommandRunner := events.NewPlanCommandRunner(
-		vcsClient,
-		pendingPlanFinder,
-		workingDir,
-		commitStatusUpdater,
-		prProjectCommandBuilder,
-		prPrjCmdRunner,
-		dbUpdater,
-		outputUpdater,
-		events.NewPolicyCheckCommandRunner(dbUpdater, outputUpdater, commitStatusUpdater, prPrjCmdRunner, userConfig.ParallelPoolSize),
-		userConfig.ParallelPoolSize,
-	)
-
-	prPolicyCheckOutputGenerator := &policies.CommandOutputGenerator{
-		PrjCommandRunner:  prPrjCmdRunner,
-		PrjCommandBuilder: prProjectCommandBuilder,
-		FeatureAllocator:  featureAllocator,
-	}
-
-	prApprovePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
-		commitStatusUpdater,
-		prProjectCommandBuilder,
-		prPrjCmdRunner,
-		outputUpdater,
-		dbUpdater,
-		prPolicyCheckOutputGenerator,
-	)
-
-	featuredPlanRunner := lyftCommands.NewPlatformModeFeatureRunner(
-		featureAllocator,
-		userConfig.EnablePlatformMode,
-		ctxLogger,
-		prPlanCommandRunner,
-		planCommandRunner,
-	)
-
-	featuredApplyRunner := lyftCommands.NewPlatformModeFeatureRunner(
-		featureAllocator,
-		userConfig.EnablePlatformMode,
-		ctxLogger,
-		apply.NewDisabledRunner(outputUpdater),
-		applyCommandRunner,
-	)
-
-	featuredPolicyCheckRunner := lyftCommands.NewPlatformModeFeatureRunner(
-		featureAllocator,
-		userConfig.EnablePlatformMode,
-		ctxLogger,
-		prApprovePoliciesCommandRunner,
-		approvePoliciesCommandRunner,
-	)
-
 	commentCommandRunnerByCmd := map[command.Name]command.Runner{
-		command.Plan:            featuredPlanRunner,
-		command.Apply:           featuredApplyRunner,
-		command.ApprovePolicies: featuredPolicyCheckRunner,
+		command.Plan:            planCommandRunner,
+		command.Apply:           applyCommandRunner,
+		command.ApprovePolicies: approvePoliciesCommandRunner,
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
 	}

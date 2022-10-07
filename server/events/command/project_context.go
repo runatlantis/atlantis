@@ -77,6 +77,7 @@ func NewProjectContext(
 		PullReqStatus:        pullStatus,
 		JobID:                uuid.New().String(),
 		RequestCtx:           ctx.RequestCtx,
+		WorkflowModeType:     projCfg.WorkflowMode,
 	}
 }
 
@@ -155,6 +156,8 @@ type ProjectContext struct {
 	RequestCtx context.Context
 	// StatusId is used for consecutive status updates in the step runners
 	StatusId string
+
+	WorkflowModeType valid.WorkflowModeType
 }
 
 // ProjectCloneDir creates relative path to clone the repo to. If we are running

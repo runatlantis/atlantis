@@ -22,6 +22,7 @@ type RepoCfg struct {
 	ParallelApply        bool
 	ParallelPlan         bool
 	ParallelPolicyCheck  bool
+	WorkflowModeType     WorkflowModeType
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {

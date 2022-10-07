@@ -27,15 +27,16 @@ import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/jobs"
+	lyftCommand "github.com/runatlantis/atlantis/server/lyft/command"
 	event_types "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/request"
+	ffclient "github.com/thomaspoignant/go-feature-flag"
 
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/command/apply"
 	"github.com/runatlantis/atlantis/server/events/command/policies"
 	"github.com/runatlantis/atlantis/server/vcs/markdown"
 
@@ -76,8 +77,7 @@ func (m *NoopTFDownloader) GetAny(dst, src string, opts ...getter.ClientOption) 
 	return nil
 }
 
-type LocalConftestCache struct {
-}
+type LocalConftestCache struct{}
 
 func (m *LocalConftestCache) Get(key *version.Version) (string, error) {
 	return exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
@@ -542,6 +542,13 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 }
 
 func TestGitHubWorkflowPullRequestsWorkflows(t *testing.T) {
+	featureConfig := feature.StringRetriever(`platform-mode:
+  percentage: 100
+  true: true
+  false: false
+  default: false
+  trackEvents: false`)
+
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -600,12 +607,13 @@ func TestGitHubWorkflowPullRequestsWorkflows(t *testing.T) {
 			w := httptest.NewRecorder()
 			// reset userConfig
 			userConfig := &server.UserConfig{}
-			userConfig.EnablePlatformMode = true
 			userConfig.EnablePolicyChecks = true
 
 			ghClient := &testGithubClient{ExpectedModifiedFiles: c.ModifiedFiles}
 
-			headSHA, ctrl, _ := setupE2E(t, c.RepoDir, userConfig, ghClient)
+			headSHA, ctrl, _ := setupE2E(t, c.RepoDir, userConfig, ghClient, e2eOptions{
+				featureConfig: featureConfig,
+			})
 
 			ghClient.ExpectedPull = GitHubPullRequestParsed(headSHA)
 			ghClient.ExpectedApprovalStatus = models.ApprovalStatus{IsApproved: true}
@@ -640,7 +648,19 @@ func TestGitHubWorkflowPullRequestsWorkflows(t *testing.T) {
 	}
 }
 
-func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig, ghClient vcs.IGithubClient) (string, events_controllers.VCSEventsController, locking.ApplyLocker) {
+type e2eOptions struct {
+	featureConfig ffclient.Retriever
+}
+
+func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig, ghClient vcs.IGithubClient, options ...e2eOptions) (string, events_controllers.VCSEventsController, locking.ApplyLocker) {
+
+	var featureConfig ffclient.Retriever
+	for _, o := range options {
+		if o.featureConfig != nil {
+			featureConfig = o.featureConfig
+		}
+	}
+
 	// env vars
 	// need this to be set or we'll fail the policy check step
 	os.Setenv(policy.DefaultConftestVersionEnvKey, "0.25.0")
@@ -658,6 +678,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	lockURLGenerator := &testLockURLGenerator{}
 	webhookSender := &testWebhookSender{}
+
 	conftestCache := &LocalConftestCache{}
 	downloader := &NoopTFDownloader{}
 	overrideCloneURL := fmt.Sprintf("file://%s", repoDir)
@@ -666,7 +687,19 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	projectCmdOutputHandler := &jobs.NoopProjectOutputHandler{}
 
 	ctxLogger := logging.NewNoopCtxLogger(t)
-	featureAllocator, _ := feature.NewStringSourcedAllocator(ctxLogger)
+
+	var featureAllocator *feature.PercentageBasedAllocator
+	var featureAllocatorErr error
+	if featureConfig != nil {
+		featureAllocator, featureAllocatorErr = feature.NewStringSourcedAllocatorWithRetriever(ctxLogger, featureConfig)
+	} else {
+		featureAllocator, featureAllocatorErr = feature.NewStringSourcedAllocator(ctxLogger)
+	}
+
+	Ok(t, featureAllocatorErr)
+
+	t.Cleanup(featureAllocator.Close)
+
 	terraformClient, err := terraform.NewE2ETestClient(binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", downloader, false, projectCmdOutputHandler)
 	Ok(t, err)
 
@@ -708,10 +741,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	locker := events.NewDefaultWorkingDirLocker()
 	parser := &config.ParserValidator{}
 
-	if userConfig.EnablePlatformMode {
-		globalCfg = globalCfg.EnablePlatformMode()
-	}
-
 	expCfgPath := filepath.Join(absRepoPath(t, repoFixtureDir), "repos.yaml")
 	if _, err := os.Stat(expCfgPath); err == nil {
 		globalCfg, err = parser.ParseGlobalCfg(expCfgPath, globalCfg)
@@ -738,11 +767,9 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		WrapProjectContext(events.NewProjectCommandContextBuilder(commentParser)).
 		WithInstrumentation(statsScope)
 
-	if userConfig.EnablePlatformMode {
-		projectContextBuilder = wrappers.
-			WrapProjectContext(events.NewPRProjectCommandContextBuilder(commentParser)).
-			WithInstrumentation(statsScope)
-	}
+	projectContextBuilder = wrappers.
+		WrapProjectContext(events.NewPlatformModeProjectCommandContextBuilder(commentParser, projectContextBuilder, ctxLogger, featureAllocator)).
+		WithInstrumentation(statsScope)
 
 	if userConfig.EnablePolicyChecks {
 		projectContextBuilder = projectContextBuilder.EnablePolicyChecks(commentParser)
@@ -826,19 +853,27 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	applyRequirementHandler := &events.AggregateApplyRequirements{
 		WorkingDir: workingDir,
 	}
-
-	prjCmdRunner := wrappers.WrapProjectRunner(
-		events.NewProjectCommandRunner(
-			stepsRunner,
-			workingDir,
-			webhookSender,
-			locker,
-			applyRequirementHandler,
-		),
+	unwrappedRunner := events.NewProjectCommandRunner(
+		stepsRunner,
+		workingDir,
+		webhookSender,
+		locker,
+		applyRequirementHandler,
 	)
 
-	if !userConfig.EnablePlatformMode {
-		prjCmdRunner = prjCmdRunner.WithSync(projectLocker, lockURLGenerator)
+	legacyPrjCmdRunner := wrappers.WrapProjectRunner(
+		unwrappedRunner,
+	).WithSync(projectLocker, lockURLGenerator)
+
+	platformModePrjCmdRunner := wrappers.WrapProjectRunner(
+		unwrappedRunner,
+	)
+
+	prjCmdRunner := &lyftCommand.PlatformModeProjectRunner{
+		PlatformModeRunner: platformModePrjCmdRunner,
+		PrModeRunner:       legacyPrjCmdRunner,
+		Allocator:          featureAllocator,
+		Logger:             ctxLogger,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -907,22 +942,19 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 	var applyCommandRunner command.Runner
 	e2ePullReqStatusFetcher := lyft_vcs.NewSQBasedPullStatusFetcher(ghClient, vcs.NewLyftPullMergeabilityChecker("atlantis"))
-	if userConfig.EnablePlatformMode {
-		applyCommandRunner = apply.NewDisabledRunner(pullUpdater)
-	} else {
-		applyCommandRunner = events.NewApplyCommandRunner(
-			vcsClient,
-			false,
-			applyLocker,
-			e2eStatusUpdater,
-			projectCommandBuilder,
-			prjCmdRunner,
-			pullUpdater,
-			dbUpdater,
-			parallelPoolSize,
-			e2ePullReqStatusFetcher,
-		)
-	}
+
+	applyCommandRunner = events.NewApplyCommandRunner(
+		vcsClient,
+		false,
+		applyLocker,
+		e2eStatusUpdater,
+		projectCommandBuilder,
+		prjCmdRunner,
+		pullUpdater,
+		dbUpdater,
+		parallelPoolSize,
+		e2ePullReqStatusFetcher,
+	)
 
 	commentCommandRunnerByCmd := map[command.Name]command.Runner{
 		command.Plan:            planCommandRunner,
@@ -1225,10 +1257,16 @@ func mkSubDirs(t *testing.T) (string, string, string) {
 
 // Will fail test if conftest isn't in path and isn't version >= 0.25.0
 func ensureRunningConftest(t *testing.T) {
-	localPath, err := exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
+
+	var localPath string
+	var err error
+	localPath, err = exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
 	if err != nil {
-		t.Logf("conftest >= %s must be installed to run this test", ConftestVersion)
-		t.FailNow()
+		localPath, err = exec.LookPath("conftest")
+		if err != nil {
+			t.Logf("error finding conftest binary %s", err)
+			t.FailNow()
+		}
 	}
 	versionOutBytes, err := exec.Command(localPath, "--version").Output() // #nosec
 	if err != nil {

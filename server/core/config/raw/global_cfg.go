@@ -122,11 +122,8 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 
 	defaultRepo := &defaultCfg.Repos[0]
 	validWorkflows := g.Workflows.ToValid(defaultCfg)
-	var validPullRequestWorkflows, validDeploymentWorkflows map[string]valid.Workflow
-	if defaultCfg.PlatformModeEnabled() {
-		validPullRequestWorkflows = g.PullRequestWorkflows.ToValid(defaultCfg)
-		validDeploymentWorkflows = g.DeploymentWorkflows.ToValid(defaultCfg)
-	}
+	validPullRequestWorkflows := g.PullRequestWorkflows.ToValid(defaultCfg)
+	validDeploymentWorkflows := g.DeploymentWorkflows.ToValid(defaultCfg)
 
 	// Handle the special case where they're redefining the default
 	// workflow. In this case, our default repo config references
@@ -155,7 +152,6 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	repos = append(defaultCfg.Repos, repos...)
 
 	return valid.GlobalCfg{
-		WorkflowMode:         defaultCfg.WorkflowMode,
 		Repos:                repos,
 		Workflows:            validWorkflows,
 		PullRequestWorkflows: validPullRequestWorkflows,

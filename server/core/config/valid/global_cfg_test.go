@@ -44,82 +44,6 @@ func TestNewGlobalCfg(t *testing.T) {
 			},
 		},
 	}
-
-	baseCfg := valid.GlobalCfg{
-		Repos: []valid.Repo{
-			{
-				IDRegex:              regexp.MustCompile(".*"),
-				BranchRegex:          regexp.MustCompile(".*"),
-				ApplyRequirements:    []string{},
-				Workflow:             &expDefaultWorkflow,
-				AllowedWorkflows:     []string{},
-				AllowedOverrides:     []string{},
-				AllowCustomWorkflows: Bool(false),
-				CheckoutStrategy:     "branch",
-			},
-		},
-		Workflows: map[string]valid.Workflow{
-			"default": expDefaultWorkflow,
-		},
-	}
-
-	t.Run("new global config", func(t *testing.T) {
-		act := valid.NewGlobalCfg()
-		// For each test, we change our expected cfg based on the parameters.
-		var exp valid.GlobalCfg
-		exp = deepcopy.Copy(baseCfg).(valid.GlobalCfg)
-		exp.Repos[0].IDRegex = regexp.MustCompile(".*") // deepcopy doesn't copy the regex.
-		exp.Repos[0].BranchRegex = regexp.MustCompile(".*")
-
-		Equals(t, exp, act)
-
-		// Have to hand-compare regexes because Equals doesn't do it.
-		for i, actRepo := range act.Repos {
-			expRepo := exp.Repos[i]
-			if expRepo.IDRegex != nil {
-				Assert(t, expRepo.IDRegex.String() == actRepo.IDRegex.String(),
-					"%q != %q for repos[%d]", expRepo.IDRegex.String(), actRepo.IDRegex.String(), i)
-			}
-			if expRepo.BranchRegex != nil {
-				Assert(t, expRepo.BranchRegex.String() == actRepo.BranchRegex.String(),
-					"%q != %q for repos[%d]", expRepo.BranchRegex.String(), actRepo.BranchRegex.String(), i)
-			}
-		}
-	})
-}
-
-func TestPlatformModeNewGlobalCfg(t *testing.T) {
-	expDefaultWorkflow := valid.Workflow{
-		Name: "default",
-		Apply: valid.Stage{
-			Steps: []valid.Step{
-				{
-					StepName: "apply",
-				},
-			},
-		},
-		PolicyCheck: valid.Stage{
-			Steps: []valid.Step{
-				{
-					StepName: "show",
-				},
-				{
-					StepName: "policy_check",
-				},
-			},
-		},
-		Plan: valid.Stage{
-			Steps: []valid.Step{
-				{
-					StepName: "init",
-				},
-				{
-					StepName: "plan",
-				},
-			},
-		},
-	}
-
 	expDefaultPRWorkflow := valid.Workflow{
 		Name: "default",
 		PolicyCheck: valid.Stage{
@@ -165,8 +89,8 @@ func TestPlatformModeNewGlobalCfg(t *testing.T) {
 			},
 		},
 	}
+
 	baseCfg := valid.GlobalCfg{
-		WorkflowMode: valid.PlatformWorkflowMode,
 		Repos: []valid.Repo{
 			{
 				IDRegex:              regexp.MustCompile(".*"),
@@ -192,27 +116,29 @@ func TestPlatformModeNewGlobalCfg(t *testing.T) {
 		},
 	}
 
-	act := valid.NewGlobalCfg().EnablePlatformMode()
+	t.Run("new global config", func(t *testing.T) {
+		act := valid.NewGlobalCfg()
+		// For each test, we change our expected cfg based on the parameters.
+		var exp valid.GlobalCfg
+		exp = deepcopy.Copy(baseCfg).(valid.GlobalCfg)
+		exp.Repos[0].IDRegex = regexp.MustCompile(".*") // deepcopy doesn't copy the regex.
+		exp.Repos[0].BranchRegex = regexp.MustCompile(".*")
 
-	// For each test, we change our expected cfg based on the parameters.
-	exp := deepcopy.Copy(baseCfg).(valid.GlobalCfg)
-	exp.Repos[0].IDRegex = regexp.MustCompile(".*") // deepcopy doesn't copy the regex.
-	exp.Repos[0].BranchRegex = regexp.MustCompile(".*")
+		Equals(t, exp, act)
 
-	Equals(t, exp, act)
-
-	// Have to hand-compare regexes because Equals doesn't do it.
-	for i, actRepo := range act.Repos {
-		expRepo := exp.Repos[i]
-		if expRepo.IDRegex != nil {
-			Assert(t, expRepo.IDRegex.String() == actRepo.IDRegex.String(),
-				"%q != %q for repos[%d]", expRepo.IDRegex.String(), actRepo.IDRegex.String(), i)
+		// Have to hand-compare regexes because Equals doesn't do it.
+		for i, actRepo := range act.Repos {
+			expRepo := exp.Repos[i]
+			if expRepo.IDRegex != nil {
+				Assert(t, expRepo.IDRegex.String() == actRepo.IDRegex.String(),
+					"%q != %q for repos[%d]", expRepo.IDRegex.String(), actRepo.IDRegex.String(), i)
+			}
+			if expRepo.BranchRegex != nil {
+				Assert(t, expRepo.BranchRegex.String() == actRepo.BranchRegex.String(),
+					"%q != %q for repos[%d]", expRepo.BranchRegex.String(), actRepo.BranchRegex.String(), i)
+			}
 		}
-		if expRepo.BranchRegex != nil {
-			Assert(t, expRepo.BranchRegex.String() == actRepo.BranchRegex.String(),
-				"%q != %q for repos[%d]", expRepo.BranchRegex.String(), actRepo.BranchRegex.String(), i)
-		}
-	}
+	})
 }
 
 func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
@@ -440,7 +366,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 					{
 						IDRegex:              regexp.MustCompile(".*"),
 						AllowCustomWorkflows: Bool(true),
-						AllowedOverrides:     []string{"workflow"},
+						AllowedOverrides:     []string{"workflow", "pull_request_workflow", "deployment_workflow"},
 					},
 				},
 			},
@@ -454,6 +380,12 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 					},
 				},
 				Workflows: map[string]valid.Workflow{
+					"repodefined": {},
+				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"repodefined": {},
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
 					"repodefined": {},
 				},
 			},
@@ -484,7 +416,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 					{
 						IDRegex:              regexp.MustCompile(".*"),
 						BranchRegex:          regexp.MustCompile(".*"),
-						AllowedOverrides:     []string{"workflow"},
+						AllowedOverrides:     []string{"workflow", "pull_request_workflow", "deployment_workflow"},
 						AllowCustomWorkflows: Bool(false),
 					},
 				},
@@ -496,13 +428,30 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
+				PullRequestWorkflows: map[string]valid.Workflow{
+					"default": {
+						Name:        "default",
+						PolicyCheck: valid.DefaultPolicyCheckStage,
+						Plan:        valid.DefaultLocklessPlanStage,
+					},
+				},
+				DeploymentWorkflows: map[string]valid.Workflow{
+					"default": {
+
+						Name:  "default",
+						Apply: valid.DefaultApplyStage,
+						Plan:  valid.DefaultPlanStage,
+					},
+				},
 			},
 			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
 					{
-						Dir:          ".",
-						Workspace:    "default",
-						WorkflowName: String("default"),
+						Dir:                     ".",
+						Workspace:               "default",
+						WorkflowName:            String("default"),
+						PullRequestWorkflowName: String("default"),
+						DeploymentWorkflowName:  String("default"),
 					},
 				},
 			},
@@ -597,6 +546,16 @@ policies:
 					Plan:        valid.DefaultPlanStage,
 					PolicyCheck: valid.DefaultPolicyCheckStage,
 				},
+				PullRequestWorkflow: valid.Workflow{
+					Name:        "default",
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultLocklessPlanStage,
+				},
+				DeploymentWorkflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
+				},
 				PolicySets: valid.PolicySets{
 					Version: nil,
 					PolicySets: []valid.PolicySet{
@@ -637,6 +596,16 @@ policies:
 					Apply:       valid.DefaultApplyStage,
 					Plan:        valid.DefaultPlanStage,
 					PolicyCheck: valid.DefaultPolicyCheckStage,
+				},
+				PullRequestWorkflow: valid.Workflow{
+					Name:        "default",
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultLocklessPlanStage,
+				},
+				DeploymentWorkflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
 				},
 				PolicySets: valid.PolicySets{
 					Version: version,
@@ -683,7 +652,6 @@ func TestGlobalCfg_MergeProjectCfg(t *testing.T) {
 	cases := map[string]struct {
 		gCfg          string
 		repoID        string
-		platformMode  bool
 		proj          valid.Project
 		repoWorkflows map[string]valid.Workflow
 		exp           valid.MergedProjectCfg
@@ -718,6 +686,76 @@ workflows:
 						},
 					},
 				},
+				PullRequestWorkflow: valid.Workflow{
+					Name:        "default",
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultLocklessPlanStage,
+				},
+				DeploymentWorkflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
+				},
+				RepoRelDir:      ".",
+				Workspace:       "default",
+				Name:            "",
+				AutoplanEnabled: false,
+				PolicySets:      emptyPolicySets,
+			},
+		},
+		"repos can use server-side defined pr and deployment workflow if allowed": {
+			gCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [workflow, pull_request_workflow, deployment_workflow]
+pull_request_workflows:
+  custom:
+    plan:
+      steps: [plan]
+deployment_workflows:
+  custom:
+    plan:
+      steps: [plan]
+    apply:
+      steps: []`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:                     ".",
+				Workspace:               "default",
+				PullRequestWorkflowName: String("custom"),
+				DeploymentWorkflowName:  String("custom"),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{},
+				Workflow: valid.Workflow{
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultPlanStage,
+				},
+				PullRequestWorkflow: valid.Workflow{
+					Name:        "custom",
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan: valid.Stage{
+						Steps: []valid.Step{
+							{
+								StepName: "plan",
+							},
+						},
+					},
+				},
+				DeploymentWorkflow: valid.Workflow{
+					Name: "custom",
+					Plan: valid.Stage{
+						Steps: []valid.Step{
+							{
+								StepName: "plan",
+							},
+						},
+					},
+					Apply: valid.Stage{},
+				},
 				RepoRelDir:      ".",
 				Workspace:       "default",
 				Name:            "",
@@ -746,6 +784,16 @@ repos:
 					Apply:       valid.DefaultApplyStage,
 					PolicyCheck: valid.DefaultPolicyCheckStage,
 					Plan:        valid.DefaultPlanStage,
+				},
+				PullRequestWorkflow: valid.Workflow{
+					Name:        "default",
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultLocklessPlanStage,
+				},
+				DeploymentWorkflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
 				},
 				RepoRelDir:      ".",
 				Workspace:       "default",
@@ -779,6 +827,16 @@ repos:
 					PolicyCheck: valid.DefaultPolicyCheckStage,
 					Plan:        valid.DefaultPlanStage,
 				},
+				PullRequestWorkflow: valid.Workflow{
+					Name:        "default",
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultLocklessPlanStage,
+				},
+				DeploymentWorkflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
+				},
 				RepoRelDir:      "mydir",
 				Workspace:       "myworkspace",
 				Name:            "myname",
@@ -807,6 +865,16 @@ repos:
 					PolicyCheck: valid.DefaultPolicyCheckStage,
 					Plan:        valid.DefaultPlanStage,
 				},
+				PullRequestWorkflow: valid.Workflow{
+					Name:        "default",
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultLocklessPlanStage,
+				},
+				DeploymentWorkflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
+				},
 				RepoRelDir:      "mydir",
 				Workspace:       "myworkspace",
 				Name:            "myname",
@@ -815,9 +883,8 @@ repos:
 			},
 		},
 		"merge platform mode default config": {
-			platformMode: true,
-			gCfg:         "",
-			repoID:       "github.com/owner/repo",
+			gCfg:   "",
+			repoID: "github.com/owner/repo",
 			proj: valid.Project{
 				Dir:       "mydir",
 				Workspace: "myworkspace",
@@ -858,9 +925,6 @@ repos:
 			tmp, cleanup := TempDir(t)
 			defer cleanup()
 			global := valid.NewGlobalCfg()
-			if c.platformMode {
-				global = global.EnablePlatformMode()
-			}
 
 			if c.gCfg != "" {
 				path := filepath.Join(tmp, "config.yaml")
