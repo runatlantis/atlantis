@@ -295,13 +295,13 @@ Values are chosen in this order:
   ```
   Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 
-  Useful to enable for use with Github.
+  Useful to enable for use with GitHub.
 
 ### `--gh-hostname`
   ```bash
   atlantis server --gh-hostname="my.github.enterprise.com"
   ```
-  Hostname of your GitHub Enterprise installation. If using [Github.com](https://github.com),
+  Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
   don't set. Defaults to `github.com`.
 
 ### `--gh-token`
@@ -335,7 +335,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-org="myorgname"
   ```
-  GitHub organization name. Set to enable creating a private Github app for this organization.
+  GitHub organization name. Set to enable creating a private GitHub app for this organization.
 
 ### `--gh-app-id`
   ```bash
