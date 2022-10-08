@@ -40,7 +40,7 @@ Available in Atlantis versions **newer** than 0.13.0.
 
 
 - Start Atlantis with fake github username and token (`atlantis server --gh-user fake --gh-token fake --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`). If installing as an **Organization**, remember to add `--gh-org your-github-org` to this command.
-- Visit `https://$ATLANTIS_HOST/github-app/setup` and click on **Setup** to create the app on Github. You'll be redirected back to Atlantis
+- Visit `https://$ATLANTIS_HOST/github-app/setup` and click on **Setup** to create the app on GitHub. You'll be redirected back to Atlantis
 - A link to install your app, along with its secrets, will be shown on the screen. Record your app's credentials and install your app for your user/org by following said link.
 - Create a file with the contents of the GitHub App Key, e.g. `atlantis-app-key.pem`
 - Restart Atlantis with new flags: `atlantis server --gh-app-id <your id> --gh-app-key-file atlantis-app-key.pem --gh-webhook-secret <your secret> --write-git-creds --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`.
