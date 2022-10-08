@@ -387,7 +387,7 @@ Values are chosen in this order:
   ```
   Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
 
-- ### `--gh-allow-mergeable-bypass-apply`
+### `--gh-allow-mergeable-bypass-apply`
   ```bash
   atlantis server --gh-allow-mergeable-bypass-apply
   ```
