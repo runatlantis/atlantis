@@ -51,6 +51,25 @@ Available in Atlantis versions **newer** than 0.13.0.
 Only a single installation per GitHub App is supported at the moment.
 :::
 
+#### Permissions
+
+GitHub App needs these permissions. These are automatically set when a GitHub app is created.
+
+::: tip NOTE
+Since v0.19.7, a new permission for `Administration` has been added. If you have already created a GitHub app, updating Atlantis to v0.19.7 will not automatically add this permission, so you will need to set it manually.
+:::
+
+| Type            | Access              | 
+| --------------- | ------------------- | 
+| Administration  | Read-only           | 
+| Checks          | Read and write      | 
+| Commit statuses | Read and write      | 
+| Contents        | Read and write      | 
+| Issues          | Read and write      | 
+| Metadata        | Read-only (default) | 
+| Pull requests   | Read and write      | 
+| Webhooks        | Read and write      | 
+
 ### GitLab
 - Follow: [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
 - Create a token with **api** scope
