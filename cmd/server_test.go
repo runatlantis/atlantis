@@ -84,6 +84,7 @@ var testFlags = map[string]interface{}{
 	GitlabTokenFlag:            "gitlab-token",
 	GitlabUserFlag:             "gitlab-user",
 	GitlabWebhookSecretFlag:    "gitlab-secret",
+	LockingDBType:              "boltdb",
 	LogLevelFlag:               "debug",
 	StatsNamespace:             "atlantis",
 	AllowDraftPRs:              true,

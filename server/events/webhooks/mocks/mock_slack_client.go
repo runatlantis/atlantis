@@ -142,8 +142,6 @@ func (c *MockSlackClient_TokenIsSet_OngoingVerification) GetCapturedArguments() 
 func (c *MockSlackClient_TokenIsSet_OngoingVerification) GetAllCapturedArguments() {
 }
 
-
-
 func (verifier *VerifierMockSlackClient) PostMessage(channel string, applyResult webhooks.ApplyResult) *MockSlackClient_PostMessage_OngoingVerification {
 	params := []pegomock.Param{channel, applyResult}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "PostMessage", params, verifier.timeout)

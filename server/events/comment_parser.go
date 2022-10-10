@@ -96,12 +96,12 @@ type CommentParseResult struct {
 // Parse parses the comment as an Atlantis command.
 //
 // Valid commands contain:
-// - The initial "executable" name, 'run' or 'atlantis' or '@GithubUser'
-//   where GithubUser is the API user Atlantis is running as.
-// - Then a command: 'plan', 'apply', 'unlock', 'version, 'approve_policies',
-//   or 'help'.
-// - Then optional flags, then an optional separator '--' followed by optional
-//   extra flags to be appended to the terraform plan/apply command.
+//   - The initial "executable" name, 'run' or 'atlantis' or '@GithubUser'
+//     where GithubUser is the API user Atlantis is running as.
+//   - Then a command: 'plan', 'apply', 'unlock', 'version, 'approve_policies',
+//     or 'help'.
+//   - Then optional flags, then an optional separator '--' followed by optional
+//     extra flags to be appended to the terraform plan/apply command.
 //
 // Examples:
 // - atlantis help
@@ -112,7 +112,6 @@ type CommentParseResult struct {
 // - atlantis unlock
 // - atlantis version
 // - atlantis approve_policies
-//
 func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) CommentParseResult {
 	comment := strings.TrimSpace(rawComment)
 

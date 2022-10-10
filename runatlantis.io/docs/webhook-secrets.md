@@ -17,7 +17,7 @@ Azure DevOps uses Basic authentication for webhooks rather than webhook secrets.
 :::
 
 ::: tip NOTE
-An app-wide token is generated during [Github App setup](access-credentials.html#github-app). You can recover it by navigating to the [Github app settings page](https://github.com/settings/apps) and selecting "Edit" next to your Atlantis app's name. Token appears after clicking "Edit" under the Webhook header.
+An app-wide token is generated during [GitHub App setup](access-credentials.html#github-app). You can recover it by navigating to the [GitHub app settings page](https://github.com/settings/apps) and selecting "Edit" next to your Atlantis app's name. Token appears after clicking "Edit" under the Webhook header.
 :::
 
 ::: warning

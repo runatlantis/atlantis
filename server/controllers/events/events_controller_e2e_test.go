@@ -857,6 +857,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
+	backend := boltdb
 	lockingClient := locking.NewClient(boltdb)
 	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	projectLocker := &events.DefaultProjectLocker{
@@ -986,7 +987,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	}
 
 	dbUpdater := &events.DBUpdater{
-		DB: boltdb,
+		Backend: backend,
 	}
 
 	pullUpdater := &events.PullUpdater{
@@ -1025,6 +1026,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		boltdb,
+		lockingClient,
 	)
 
 	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
@@ -1093,7 +1095,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              boltdb,
+		PullStatusFetcher:              backend,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
@@ -1106,7 +1108,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 			Locker:                   lockingClient,
 			VCSClient:                e2eVCSClient,
 			WorkingDir:               workingDir,
-			DB:                       boltdb,
+			Backend:                  backend,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 		},
@@ -1372,11 +1374,12 @@ func ensureRunning014(t *testing.T) {
 }
 
 // versionRegex extracts the version from `terraform version` output.
-//     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
-//	   => 0.12.0-alpha4
 //
-//     Terraform v0.11.10
-//	   => 0.11.10
+//	    Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
+//		   => 0.12.0-alpha4
+//
+//	    Terraform v0.11.10
+//		   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
 var versionConftestRegex = regexp.MustCompile("Version: (.*?)(\\s.*)?\n")

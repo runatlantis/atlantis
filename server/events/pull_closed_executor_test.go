@@ -14,7 +14,7 @@
 package events_test
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -47,7 +47,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		WorkingDir:         w,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
-		DB:                 db,
+		Backend:            db,
 	}
 	err = errors.New("err")
 	When(w.Delete(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(err)
@@ -67,7 +67,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		Locker:             l,
 		WorkingDir:         w,
-		DB:                 db,
+		Backend:            db,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	err = errors.New("err")
@@ -90,7 +90,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 		Locker:     l,
 		VCSClient:  cp,
 		WorkingDir: w,
-		DB:         db,
+		Backend:    db,
 	}
 	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
 	err = pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
@@ -176,7 +176,7 @@ func TestCleanUpPullComments(t *testing.T) {
 				Locker:     l,
 				VCSClient:  cp,
 				WorkingDir: w,
-				DB:         db,
+				Backend:    db,
 			}
 			t.Log("testing: " + c.Description)
 			When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)
@@ -213,7 +213,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		var configBucket = "configBucket"
 		var pullsBucketName = "pulls"
 
-		f, err := ioutil.TempFile("", "")
+		f, err := os.CreateTemp("", "")
 		if err != nil {
 			panic(errors.Wrap(err, "failed to create temp file"))
 		}
@@ -254,7 +254,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		pullClosedExecutor := events.PullClosedExecutor{
 			Locker:                   locker,
 			WorkingDir:               workingDir,
-			DB:                       db,
+			Backend:                  db,
 			VCSClient:                client,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: prjCmdOutHandler,

@@ -9,7 +9,7 @@ concurrency:
 jobs:
   golangci-lint:
     name: runner / golangci-lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
     - name: golangci-lint
@@ -21,7 +21,7 @@ jobs:
   # Use revive via golangci-lint binary with "warning" level.
   revive:
     name: runner / revive
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
@@ -35,7 +35,7 @@ jobs:
   # You can add more and more supported linters with different config.
   errcheck:
     name: runner / errcheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
