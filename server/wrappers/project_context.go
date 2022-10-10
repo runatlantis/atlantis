@@ -11,7 +11,7 @@ type projectContext struct {
 
 func WrapProjectContext(
 	projectCtxBuilder events.ProjectCommandContextBuilder,
-) *projectContext {
+) *projectContext { //nolint:golint // avoiding refactor while adding linter action
 	return &projectContext{
 		projectCtxBuilder,
 	}

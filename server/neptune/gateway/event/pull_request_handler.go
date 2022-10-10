@@ -20,7 +20,7 @@ type PullRequest struct {
 }
 
 func NewAutoplannerValidatorProxy(
-	autoplanValidator EventValidator,
+	autoplanValidator Validator,
 	logger logging.Logger,
 	workerProxy *PullEventWorkerProxy,
 	scheduler scheduler,
@@ -33,7 +33,7 @@ func NewAutoplannerValidatorProxy(
 	}
 }
 
-type EventValidator interface {
+type Validator interface {
 	InstrumentedIsValid(ctx context.Context, logger logging.Logger, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) bool
 }
 
@@ -42,7 +42,7 @@ type Writer interface {
 }
 
 type AutoplannerValidatorProxy struct {
-	autoplanValidator EventValidator
+	autoplanValidator Validator
 	workerProxy       *PullEventWorkerProxy
 	logger            logging.Logger
 	scheduler         scheduler

@@ -3,16 +3,17 @@ package github
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 )
 
 const workingDirPrefix = "repos"
@@ -61,6 +62,9 @@ func (g *RepoFetcher) clone(ctx context.Context, repo models.Repo, branch string
 	// Return immediately if commit at HEAD of clone matches request commit
 	revParseCmd := []string{"git", "rev-parse", "HEAD"}
 	revParseOutput, err := g.run(revParseCmd, destinationPath)
+	if err != nil {
+		return "", nil, errors.Wrap(err, "running rev-parse")
+	}
 	currCommit := strings.Trim(string(revParseOutput), "\n")
 	if strings.HasPrefix(currCommit, sha) {
 		return destinationPath, g.Cleanup, nil

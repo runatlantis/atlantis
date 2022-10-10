@@ -34,7 +34,7 @@ type ProjectLocker interface {
 	// The third return value is a function that can be called to unlock the
 	// lock. It will only be set if the lock was acquired. Any errors will set
 	// error.
-	TryLock(log logging.Logger, requestCtx context.Context, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error)
+	TryLock(requestCtx context.Context, log logging.Logger, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error)
 }
 
 // DefaultProjectLocker implements ProjectLocker.
@@ -59,7 +59,7 @@ type TryLockResponse struct {
 }
 
 // TryLock implements ProjectLocker.TryLock.
-func (p *DefaultProjectLocker) TryLock(log logging.Logger, requestCtx context.Context, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error) {
+func (p *DefaultProjectLocker) TryLock(requestCtx context.Context, log logging.Logger, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error) {
 	lockAttempt, err := p.Locker.TryLock(project, workspace, pull, user)
 	if err != nil {
 		return nil, err

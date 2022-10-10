@@ -2,8 +2,9 @@ package command_test
 
 import (
 	"context"
-	"gopkg.in/go-playground/assert.v1"
 	"testing"
+
+	"gopkg.in/go-playground/assert.v1"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
@@ -63,7 +64,7 @@ func (r *testRunner) Version(ctx command.ProjectContext) command.ProjectResult {
 
 func TestPlatformModeProjectRunner_plan(t *testing.T) {
 	expectedResult := command.ProjectResult{
-		JobId: "1234y",
+		JobID: "1234y",
 	}
 
 	cases := []struct {
@@ -133,7 +134,7 @@ func TestPlatformModeProjectRunner_plan(t *testing.T) {
 
 func TestPlatformModeProjectRunner_policyCheck(t *testing.T) {
 	expectedResult := command.ProjectResult{
-		JobId: "1234y",
+		JobID: "1234y",
 	}
 
 	cases := []struct {
@@ -220,7 +221,7 @@ func TestPlatformModeProjectRunner_apply(t *testing.T) {
 					RepoRelDir:   "reldir",
 					Workspace:    "default",
 					ProjectName:  "project",
-					StatusId:     "id",
+					StatusID:     "id",
 					Command:      command.Apply,
 					ApplySuccess: "atlantis apply is disabled for this project. Please track the deployment when the PR is merged. ",
 				},
@@ -229,7 +230,7 @@ func TestPlatformModeProjectRunner_apply(t *testing.T) {
 				RepoRelDir:   "reldir",
 				Workspace:    "default",
 				ProjectName:  "project",
-				StatusId:     "id",
+				StatusID:     "id",
 				Command:      command.Apply,
 				ApplySuccess: "atlantis apply is disabled for this project. Please track the deployment when the PR is merged. ",
 			},
@@ -242,11 +243,11 @@ func TestPlatformModeProjectRunner_apply(t *testing.T) {
 			platformRunner:   &testRunner{},
 			prModeRunner: &testRunner{
 				expectedApplyResult: command.ProjectResult{
-					JobId: "1234y",
+					JobID: "1234y",
 				},
 			},
 			expectedResult: command.ProjectResult{
-				JobId: "1234y",
+				JobID: "1234y",
 			},
 		},
 		{
@@ -256,11 +257,11 @@ func TestPlatformModeProjectRunner_apply(t *testing.T) {
 			platformRunner:   &testRunner{},
 			prModeRunner: &testRunner{
 				expectedApplyResult: command.ProjectResult{
-					JobId: "1234y",
+					JobID: "1234y",
 				},
 			},
 			expectedResult: command.ProjectResult{
-				JobId: "1234y",
+				JobID: "1234y",
 			},
 		},
 	}
@@ -288,7 +289,7 @@ func TestPlatformModeProjectRunner_apply(t *testing.T) {
 				RepoRelDir:       "reldir",
 				Workspace:        "default",
 				ProjectName:      "project",
-				StatusId:         "id",
+				StatusID:         "id",
 				WorkflowModeType: c.workflowModeType,
 			})
 
@@ -299,7 +300,7 @@ func TestPlatformModeProjectRunner_apply(t *testing.T) {
 
 func TestPlatformModeProjectRunner_approvePolicies(t *testing.T) {
 	expectedResult := command.ProjectResult{
-		JobId: "1234y",
+		JobID: "1234y",
 	}
 
 	cases := []struct {
@@ -369,7 +370,7 @@ func TestPlatformModeProjectRunner_approvePolicies(t *testing.T) {
 
 func TestPlatformModeProjectRunner_version(t *testing.T) {
 	expectedResult := command.ProjectResult{
-		JobId: "1234y",
+		JobID: "1234y",
 	}
 
 	cases := []struct {

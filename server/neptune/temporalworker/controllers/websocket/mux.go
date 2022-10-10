@@ -29,7 +29,7 @@ type multiplexor struct {
 	registry     partitionRegistry
 }
 
-func NewMultiplexor(log logging.Logger, keyGenerator partitionKeyGenerator, registry partitionRegistry) *multiplexor {
+func NewMultiplexor(log logging.Logger, keyGenerator partitionKeyGenerator, registry partitionRegistry) *multiplexor { //nolint:golint // avoiding refactor while adding linter action
 	return &multiplexor{
 		writer:       NewWriter(log),
 		keyGenerator: keyGenerator,

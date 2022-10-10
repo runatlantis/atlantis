@@ -1,10 +1,11 @@
 package jobs_test
 
 import (
-	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"regexp"
 	"sync"
 	"testing"
+
+	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 
 	. "github.com/petergtz/pegomock"
 	"github.com/stretchr/testify/assert"
@@ -210,7 +211,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		assert.Empty(t, job.Output)
 		assert.Empty(t, dfProjectOutputHandler.GetReceiverBufferForPull(ctx.JobID))
-		assert.Empty(t, dfProjectOutputHandler.GetJobIdMapForPull(pullContext))
+		assert.Empty(t, dfProjectOutputHandler.GetJobIDMapForPull(pullContext))
 	})
 
 	t.Run("close conn buffer after streaming logs for completed operation", func(t *testing.T) {

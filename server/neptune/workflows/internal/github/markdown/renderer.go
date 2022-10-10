@@ -2,7 +2,7 @@ package markdown
 
 import (
 	"bytes"
-	_ "embed"
+	_ "embed" //embedding files
 	"fmt"
 	"html/template"
 

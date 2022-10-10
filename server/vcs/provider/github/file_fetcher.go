@@ -3,11 +3,12 @@ package github
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	gh "github.com/google/go-github/v45/github"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"net/http"
 )
 
 type RemoteFileFetcher struct {
@@ -25,6 +26,9 @@ func (r *RemoteFileFetcher) GetModifiedFilesFromCommit(ctx context.Context, repo
 			opts.Page = nextPage
 		}
 		client, err := r.ClientCreator.NewInstallationClient(installationToken)
+		if err != nil {
+			return files, errors.Wrap(err, "creating installation client")
+		}
 		repositoryCommit, resp, err := client.Repositories.GetCommit(ctx, repo.Owner, repo.Name, sha, &opts)
 		if err != nil {
 			return nil, errors.Wrap(err, "error fetching repository commit")

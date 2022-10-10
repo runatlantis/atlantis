@@ -2,9 +2,10 @@ package activities
 
 import (
 	"context"
+	"os"
+
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
-	"os"
 )
 
 type cleanupActivities struct{}
@@ -18,7 +19,7 @@ type CleanupResponse struct{}
 
 // TODO: cleanup log streaming resources
 
-func (t *terraformActivities) Cleanup(ctx context.Context, request CleanupRequest) (CleanupResponse, error) {
+func (t *cleanupActivities) Cleanup(ctx context.Context, request CleanupRequest) (CleanupResponse, error) {
 	if err := os.RemoveAll(request.LocalRoot.Path); err != nil {
 		return CleanupResponse{}, errors.Wrapf(err, "deleting path: %s", request.LocalRoot.Path)
 	}

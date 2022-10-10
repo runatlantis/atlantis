@@ -19,7 +19,7 @@ type VCSStatusUpdater struct {
 	DefaultDetailsURL string
 }
 
-func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, statusId string, output string) (string, error) {
+func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, statusID string, output string) (string, error) {
 	src := d.TitleBuilder.Build(cmdName.String())
 	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
 
@@ -32,14 +32,14 @@ func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo,
 		Description:      descrip,
 		DetailsURL:       d.DefaultDetailsURL,
 		PullCreationTime: pull.CreatedAt,
-		StatusId:         statusId,
+		StatusID:         statusID,
 		CommandName:      titleString(cmdName),
 		Output:           output,
 	}
 	return d.Client.UpdateStatus(ctx, request)
 }
 
-func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int, statusId string) (string, error) {
+func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName fmt.Stringer, numSuccess int, numTotal int, statusID string) (string, error) {
 	src := d.TitleBuilder.Build(cmdName.String())
 	cmdVerb := "unknown"
 
@@ -61,7 +61,7 @@ func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.
 		Description:      fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb),
 		DetailsURL:       d.DefaultDetailsURL,
 		PullCreationTime: pull.CreatedAt,
-		StatusId:         statusId,
+		StatusID:         statusID,
 		CommandName:      titleString(cmdName),
 
 		// Additional fields for github checks rendering
@@ -72,7 +72,7 @@ func (d *VCSStatusUpdater) UpdateCombinedCount(ctx context.Context, repo models.
 	return d.Client.UpdateStatus(ctx, request)
 }
 
-func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error) {
+func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error) {
 	projectID := projectCtx.ProjectName
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", projectCtx.RepoRelDir, projectCtx.Workspace)
@@ -91,7 +91,7 @@ func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx Project
 		Description:      description,
 		DetailsURL:       url,
 		PullCreationTime: projectCtx.Pull.CreatedAt,
-		StatusId:         statusId,
+		StatusID:         statusID,
 
 		CommandName: titleString(cmdName),
 		Project:     projectCtx.ProjectName,

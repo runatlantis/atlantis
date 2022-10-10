@@ -38,7 +38,8 @@ func (t *multiCallTfClient) RunCommand(ctx context.Context, request *terraform.R
 	if t.count >= len(t.clients) {
 		return fmt.Errorf("expected less calls to RunCommand")
 	}
-	t.clients[t.count].RunCommand(ctx, request, options...)
+	_ = t.clients[t.count].RunCommand(ctx, request, options...)
+
 	t.count++
 
 	return nil

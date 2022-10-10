@@ -10,13 +10,13 @@ import (
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 )
 
-type testJobUrlGenerator struct {
-	expectedUrl string
+type testJobURLGenerator struct {
+	expectedURL string
 	expectedErr error
 }
 
-func (t *testJobUrlGenerator) GenerateProjectJobURL(jobID string) (string, error) {
-	return t.expectedUrl, t.expectedErr
+func (t *testJobURLGenerator) GenerateProjectJobURL(jobID string) (string, error) {
+	return t.expectedURL, t.expectedErr
 }
 
 type testJobCloser struct {
@@ -28,42 +28,42 @@ func (t *testJobCloser) CloseJob(jobID string, repo models.Repo) {
 }
 
 type testCommitStatusUpdater struct {
-	expectedStatusId string
+	expectedStatusID string
 	expectedError    error
 }
 
-func (t *testCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error) {
-	return t.expectedStatusId, t.expectedError
+func (t *testCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error) {
+	return t.expectedStatusID, t.expectedError
 }
 
 func TestProjectStatusUpdater_CloseJobWhenOperationComplete(t *testing.T) {
 
-	jobUrlGenerator := testJobUrlGenerator{
-		expectedUrl: "url",
+	jobURLGenerator := testJobURLGenerator{
+		expectedURL: "url",
 		expectedErr: nil,
 	}
 
 	jobCloser := testJobCloser{}
 
 	commitStatusUpdater := testCommitStatusUpdater{
-		expectedStatusId: "1234",
+		expectedStatusID: "1234",
 		expectedError:    nil,
 	}
 
 	prjStatusUpdater := command.ProjectStatusUpdater{
-		ProjectJobURLGenerator:     &jobUrlGenerator,
+		ProjectJobURLGenerator:     &jobURLGenerator,
 		FeatureAllocator:           testFeatureAllocator{isChecksEnabled: true},
 		JobCloser:                  &jobCloser,
 		ProjectCommitStatusUpdater: &commitStatusUpdater,
 	}
 
-	statusId, err := prjStatusUpdater.UpdateProjectStatus(command.ProjectContext{}, models.SuccessCommitStatus)
+	statusID, err := prjStatusUpdater.UpdateProjectStatus(command.ProjectContext{}, models.SuccessCommitStatus)
 
 	if err != nil {
 		t.FailNow()
 	}
 
-	if statusId != "1234" {
+	if statusID != "1234" {
 		t.FailNow()
 	}
 
@@ -74,32 +74,32 @@ func TestProjectStatusUpdater_CloseJobWhenOperationComplete(t *testing.T) {
 
 func TestProjectStatusUpdater_DoNotCloseJobWhenInProgress(t *testing.T) {
 
-	jobUrlGenerator := testJobUrlGenerator{
-		expectedUrl: "url",
+	jobURLGenerator := testJobURLGenerator{
+		expectedURL: "url",
 		expectedErr: nil,
 	}
 
 	jobCloser := testJobCloser{}
 
 	commitStatusUpdater := testCommitStatusUpdater{
-		expectedStatusId: "1234",
+		expectedStatusID: "1234",
 		expectedError:    nil,
 	}
 
 	prjStatusUpdater := command.ProjectStatusUpdater{
-		ProjectJobURLGenerator:     &jobUrlGenerator,
+		ProjectJobURLGenerator:     &jobURLGenerator,
 		FeatureAllocator:           testFeatureAllocator{isChecksEnabled: true},
 		JobCloser:                  &jobCloser,
 		ProjectCommitStatusUpdater: &commitStatusUpdater,
 	}
 
-	statusId, err := prjStatusUpdater.UpdateProjectStatus(command.ProjectContext{}, models.PendingCommitStatus)
+	statusID, err := prjStatusUpdater.UpdateProjectStatus(command.ProjectContext{}, models.PendingCommitStatus)
 
 	if err != nil {
 		t.FailNow()
 	}
 
-	if statusId != "1234" {
+	if statusID != "1234" {
 		t.FailNow()
 	}
 
@@ -114,11 +114,4 @@ type testFeatureAllocator struct {
 
 func (t testFeatureAllocator) ShouldAllocate(featureID feature.Name, featureCtx feature.FeatureContext) (bool, error) {
 	return t.isChecksEnabled, nil
-}
-
-type testPrjCmdBuilder struct {
-	expectedResp struct {
-		prjCtxs []command.ProjectContext
-		err     error
-	}
 }

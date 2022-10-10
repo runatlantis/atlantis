@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"regexp"
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -24,17 +23,6 @@ type Line struct {
 	// Line is the contents of the line (without the newline).
 	Line string
 }
-
-// Setting the buffer size to 10mb
-const bufioScannerBufferSize = 10 * 1024 * 1024
-
-// versionRegex extracts the version from `terraform version` output.
-//     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
-//	   => 0.12.0-alpha4
-//
-//     Terraform v0.11.10
-//	   => 0.11.10
-var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
 func NewAsyncClient(
 	cfg ClientConfig,

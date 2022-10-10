@@ -302,6 +302,9 @@ func NewServer(config Config) (*Server, error) {
 		githubapp.WithClientMiddleware(
 			middleware.ClientMetrics(statsScope.SubScope("github")),
 		))
+	if err != nil {
+		return nil, errors.Wrap(err, "creating github client creator")
+	}
 
 	rootConfigBuilder := &event.RootConfigBuilder{
 		RepoFetcher:     repoFetcher,

@@ -3,18 +3,19 @@ package event_test
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 var pushEvent event.Push
 var rcb event.RootConfigBuilder
 var globalCfg valid.GlobalCfg
-var expectedErr = errors.New("some error")
+var expectedErr = errors.New("some error") //nolint:golint // error name is fine for testing purposes
 
 func setupTesting(t *testing.T) {
 	globalCfg = valid.NewGlobalCfg()
@@ -117,7 +118,6 @@ func TestRootConfigBuilder_HooksRunnerError(t *testing.T) {
 // Mock implementations
 
 type mockRepoFetcher struct {
-	dirPath    string
 	cloneError error
 }
 

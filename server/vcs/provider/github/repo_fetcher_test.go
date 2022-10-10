@@ -4,11 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
-	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/vcs/provider/github"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -16,6 +11,12 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
+	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
+	"github.com/stretchr/testify/assert"
 )
 
 // Fetch from provided branch
@@ -212,7 +213,7 @@ func appendCommit(t *testing.T, repoDir string, fileName string, commitMessage s
 	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
 	output := runCmd(t, repoDir, "git", "commit", "-m", commitMessage)
 	// hacky regex to fetch commit sha
-	re := regexp.MustCompile("\\w+]")
+	re := regexp.MustCompile(`\w+]`)
 	commitResult := re.FindString(output)
 	sha := commitResult[:len(commitResult)-1]
 	runCmd(t, repoDir, "git", "branch", "branch", "-f")

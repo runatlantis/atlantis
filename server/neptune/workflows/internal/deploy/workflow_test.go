@@ -25,7 +25,7 @@ func (w *queueWorker) GetState() queue.WorkerState {
 func (w *queueWorker) Work(ctx workflow.Context) {
 	w.state = queue.WorkingWorkerState
 	// sleep and then flip to waiting
-	workflow.Sleep(ctx, 60*time.Second)
+	_ = workflow.Sleep(ctx, 60*time.Second)
 
 	w.state = queue.WaitingWorkerState
 

@@ -2,6 +2,7 @@ package sync
 
 import (
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -17,10 +18,10 @@ type ProjectSyncer struct {
 
 func (p *ProjectSyncer) Plan(ctx command.ProjectContext) command.ProjectResult {
 	result, lockResponse := p.sync(ctx, command.Plan, p.ProjectCommandRunner.Plan)
-	lockUrl := p.LockURLGenerator.GenerateLockURL(lockResponse.LockKey)
+	lockURL := p.LockURLGenerator.GenerateLockURL(lockResponse.LockKey)
 
 	if result.PlanSuccess != nil {
-		result.PlanSuccess.LockURL = lockUrl
+		result.PlanSuccess.LockURL = lockURL
 	}
 
 	return result
@@ -34,10 +35,10 @@ func (p *ProjectSyncer) PolicyCheck(ctx command.ProjectContext) command.ProjectR
 	// at which point we will unlock again to preserve functionality
 	// If we fail to capture the lock here (super unlikely) then we error out and the user is forced to replan
 	result, lockResponse := p.sync(ctx, command.PolicyCheck, p.ProjectCommandRunner.PolicyCheck)
-	lockUrl := p.LockURLGenerator.GenerateLockURL(lockResponse.LockKey)
+	lockURL := p.LockURLGenerator.GenerateLockURL(lockResponse.LockKey)
 
 	if result.PolicyCheckSuccess != nil {
-		result.PolicyCheckSuccess.LockURL = lockUrl
+		result.PolicyCheckSuccess.LockURL = lockURL
 	}
 
 	return result
@@ -59,7 +60,7 @@ func (p *ProjectSyncer) sync(
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockResponse, err := p.Locker.TryLock(ctx.Log, ctx.RequestCtx, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
+	lockResponse, err := p.Locker.TryLock(ctx.RequestCtx, ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
 	if err != nil {
 		result.Error = errors.Wrap(err, "acquiring lock")
 		return

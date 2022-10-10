@@ -122,7 +122,7 @@ func (c *AsyncClient) RunCommandAsyncWithInput(ctx context.Context, prjCtx comma
 	return outCh
 }
 
-func (c *AsyncClient) WriteOutput(stdReader io.ReadCloser, outCh chan helpers.Line, prjCtx command.ProjectContext) {
+func (c *AsyncClient) WriteOutput(stdReader io.Reader, outCh chan helpers.Line, prjCtx command.ProjectContext) {
 	s := bufio.NewScanner(stdReader)
 	buf := []byte{}
 	s.Buffer(buf, BufioScannerBufferSize)

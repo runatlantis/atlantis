@@ -119,8 +119,7 @@ func TestNewGlobalCfg(t *testing.T) {
 	t.Run("new global config", func(t *testing.T) {
 		act := valid.NewGlobalCfg()
 		// For each test, we change our expected cfg based on the parameters.
-		var exp valid.GlobalCfg
-		exp = deepcopy.Copy(baseCfg).(valid.GlobalCfg)
+		exp := deepcopy.Copy(baseCfg).(valid.GlobalCfg)
 		exp.Repos[0].IDRegex = regexp.MustCompile(".*") // deepcopy doesn't copy the regex.
 		exp.Repos[0].BranchRegex = regexp.MustCompile(".*")
 

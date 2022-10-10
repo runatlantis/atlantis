@@ -38,15 +38,15 @@ func (r *Router) GenerateLockURL(lockID string) string {
 	return r.AtlantisURL.String() + lockURL.String()
 }
 
-func (r *Router) GenerateProjectJobURL(jobId string) (string, error) {
-	if jobId == "" {
+func (r *Router) GenerateProjectJobURL(jobID string) (string, error) {
+	if jobID == "" {
 		return "", fmt.Errorf("no job id in ctx")
 	}
 	jobURL, err := r.Underlying.Get((r.ProjectJobsViewRouteName)).URL(
-		"job-id", jobId,
+		"job-id", jobID,
 	)
 	if err != nil {
-		return "", errors.Wrapf(err, "creating job url for %s", jobId)
+		return "", errors.Wrapf(err, "creating job url for %s", jobID)
 	}
 
 	return r.AtlantisURL.String() + jobURL.String(), nil

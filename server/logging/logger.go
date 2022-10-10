@@ -45,7 +45,7 @@ type logger struct {
 	Closer
 }
 
-func NewLoggerFromLevel(lvl LogLevel) (*logger, error) {
+func NewLoggerFromLevel(lvl LogLevel) (*logger, error) { //nolint:golint // avoiding refactor while adding linter action
 	structuredLogger, err := NewStructuredLoggerFromLevel(lvl)
 	if err != nil {
 		return &logger{}, err

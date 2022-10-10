@@ -9,25 +9,25 @@ import (
 	http "net/http"
 )
 
-func AnyHttpResponseWriter() http.ResponseWriter {
+func AnyHTTPResponseWriter() http.ResponseWriter {
 	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(http.ResponseWriter))(nil)).Elem()))
 	var nullValue http.ResponseWriter
 	return nullValue
 }
 
-func EqHttpResponseWriter(value http.ResponseWriter) http.ResponseWriter {
+func EqHTTPResponseWriter(value http.ResponseWriter) http.ResponseWriter {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
 	var nullValue http.ResponseWriter
 	return nullValue
 }
 
-func NotEqHttpResponseWriter(value http.ResponseWriter) http.ResponseWriter {
+func NotEqHTTPResponseWriter(value http.ResponseWriter) http.ResponseWriter {
 	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
 	var nullValue http.ResponseWriter
 	return nullValue
 }
 
-func HttpResponseWriterThat(matcher pegomock.ArgumentMatcher) http.ResponseWriter {
+func HTTPResponseWriterThat(matcher pegomock.ArgumentMatcher) http.ResponseWriter {
 	pegomock.RegisterMatcher(matcher)
 	var nullValue http.ResponseWriter
 	return nullValue

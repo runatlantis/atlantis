@@ -154,8 +154,8 @@ type ProjectContext struct {
 	JobID string
 	// RequestCtx is the context generated when request is first received from VCS
 	RequestCtx context.Context
-	// StatusId is used for consecutive status updates in the step runners
-	StatusId string
+	// StatusID is used for consecutive status updates in the step runners
+	StatusID string
 
 	WorkflowModeType valid.WorkflowModeType
 }

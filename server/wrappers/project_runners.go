@@ -12,7 +12,7 @@ type projectCommand struct {
 	events.ProjectCommandRunner
 }
 
-func WrapProjectRunner(projectRunner events.ProjectCommandRunner) *projectCommand {
+func WrapProjectRunner(projectRunner events.ProjectCommandRunner) *projectCommand { //nolint:golint // avoiding refactor while adding linter action
 	return &projectCommand{
 		projectRunner,
 	}
@@ -21,12 +21,12 @@ func WrapProjectRunner(projectRunner events.ProjectCommandRunner) *projectComman
 // WithSync add project level locking to projects
 func (d *projectCommand) WithSync(
 	projectLocker events.ProjectLocker,
-	projectLockUrl events.LockURLGenerator,
+	projectLockURL events.LockURLGenerator,
 ) *projectCommand {
 	d.ProjectCommandRunner = &sync.ProjectSyncer{
 		ProjectCommandRunner: d.ProjectCommandRunner,
 		Locker:               projectLocker,
-		LockURLGenerator:     projectLockUrl,
+		LockURLGenerator:     projectLockURL,
 	}
 
 	return d

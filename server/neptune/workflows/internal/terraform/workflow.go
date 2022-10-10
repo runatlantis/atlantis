@@ -2,7 +2,7 @@ package terraform
 
 import (
 	"context"
-	"net/url"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -113,7 +113,7 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 	}
 }
 
-func (r *Runner) Plan(ctx workflow.Context, root *root.LocalRoot, serverURL *url.URL) (activities.TerraformPlanResponse, error) {
+func (r *Runner) Plan(ctx workflow.Context, root *root.LocalRoot, serverURL fmt.Stringer) (activities.TerraformPlanResponse, error) {
 	var response activities.TerraformPlanResponse
 	jobID, err := sideeffect.GenerateUUID(ctx)
 	if err != nil {
@@ -147,7 +147,7 @@ func (r *Runner) Plan(ctx workflow.Context, root *root.LocalRoot, serverURL *url
 	return response, nil
 }
 
-func (r *Runner) Apply(ctx workflow.Context, root *root.LocalRoot, serverURL *url.URL, planFile string) error {
+func (r *Runner) Apply(ctx workflow.Context, root *root.LocalRoot, serverURL fmt.Stringer, planFile string) error {
 	jobID, err := sideeffect.GenerateUUID(ctx)
 
 	if err != nil {

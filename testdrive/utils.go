@@ -31,7 +31,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 const hashicorpReleasesURL = "https://releases.hashicorp.com"
@@ -41,7 +41,7 @@ const ngrokAPIURL = "localhost:41414" // We hope this isn't used.
 const atlantisPort = 4141
 
 func readPassword() (string, error) {
-	password, err := terminal.ReadPassword(int(syscall.Stdin)) // nolint: unconvert
+	password, err := term.ReadPassword(int(syscall.Stdin)) // nolint: unconvert
 	return string(password), err
 }
 

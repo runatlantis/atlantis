@@ -3,6 +3,7 @@ package events_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,15 +15,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type testJobUrlGenerator struct {
+type testJobURLGenerator struct {
 	t        *testing.T
-	expJobId string
+	expJobID string
 	url      string
 	err      error
 }
 
-func (t *testJobUrlGenerator) GenerateProjectJobURL(jobID string) (string, error) {
-	assert.Equal(t.t, t.expJobId, jobID)
+func (t *testJobURLGenerator) GenerateProjectJobURL(jobID string) (string, error) {
+	assert.Equal(t.t, t.expJobID, jobID)
 	return t.url, t.err
 }
 
@@ -43,7 +44,7 @@ func (t *testRenderer) Render(res command.Result, cmdName command.Name, baseRepo
 
 	return t.expectedOutput
 }
-func (t *testRenderer) RenderProject(prjRes command.ProjectResult, cmdName command.Name, baseRepo models.Repo) string {
+func (t *testRenderer) RenderProject(prjRes command.ProjectResult, cmdName fmt.Stringer, baseRepo models.Repo) string {
 	assert.Equal(t.t, t.expectedProjectResult, prjRes)
 	assert.Equal(t.t, t.expectedCmdName, cmdName)
 	assert.Equal(t.t, t.expectedRepo, baseRepo)
@@ -63,7 +64,7 @@ func (c *strictTestChecksClient) UpdateStatus(ctx context.Context, request types
 		return "", errors.New("more calls than expected")
 	}
 	_, err := c.clients[c.count].UpdateStatus(ctx, request)
-	c.count += 1
+	c.count++
 	return "", err
 }
 
@@ -146,10 +147,10 @@ func TestChecksOutputUpdater_ProjectResults(t *testing.T) {
 				expectedOutput:        output,
 				expectedProjectResult: projectResult,
 			},
-			TitleBuilder: vcs.StatusTitleBuilder{"nish"},
-			JobURLGenerator: &testJobUrlGenerator{
+			TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "nish"},
+			JobURLGenerator: &testJobURLGenerator{
 				t:        t,
-				expJobId: "",
+				expJobID: "",
 				url:      "",
 				err:      nil,
 			},
@@ -201,10 +202,10 @@ func TestChecksOutputUpdater_ProjectResults(t *testing.T) {
 				expectedOutput:        output,
 				expectedProjectResult: projectResult,
 			},
-			TitleBuilder: vcs.StatusTitleBuilder{"nish"},
-			JobURLGenerator: &testJobUrlGenerator{
+			TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "nish"},
+			JobURLGenerator: &testJobURLGenerator{
 				t:        t,
-				expJobId: "",
+				expJobID: "",
 				url:      "",
 				err:      nil,
 			},
@@ -256,10 +257,10 @@ func TestChecksOutputUpdater_ProjectResults(t *testing.T) {
 				expectedOutput:        output,
 				expectedProjectResult: projectResult,
 			},
-			TitleBuilder: vcs.StatusTitleBuilder{"nish"},
-			JobURLGenerator: &testJobUrlGenerator{
+			TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "nish"},
+			JobURLGenerator: &testJobURLGenerator{
 				t:        t,
-				expJobId: "",
+				expJobID: "",
 				url:      "",
 				err:      nil,
 			},
@@ -339,10 +340,10 @@ func TestChecksOutputUpdater_ProjectResults_ApprovePolicies(t *testing.T) {
 				expectedOutput:        output,
 				expectedProjectResult: result,
 			},
-			TitleBuilder: vcs.StatusTitleBuilder{"nish"},
-			JobURLGenerator: &testJobUrlGenerator{
+			TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "nish"},
+			JobURLGenerator: &testJobURLGenerator{
 				t:        t,
-				expJobId: "",
+				expJobID: "",
 				url:      "",
 				err:      nil,
 			},
@@ -399,10 +400,10 @@ func TestChecksOutputUpdater_CommandFailure(t *testing.T) {
 		}
 		subject := events.ChecksOutputUpdater{
 			VCSClient:    client,
-			TitleBuilder: vcs.StatusTitleBuilder{"nish"},
-			JobURLGenerator: &testJobUrlGenerator{
+			TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "nish"},
+			JobURLGenerator: &testJobURLGenerator{
 				t:        t,
-				expJobId: "",
+				expJobID: "",
 				url:      "",
 				err:      nil,
 			},
@@ -438,10 +439,10 @@ func TestChecksOutputUpdater_CommandFailure(t *testing.T) {
 		}
 		subject := events.ChecksOutputUpdater{
 			VCSClient:    client,
-			TitleBuilder: vcs.StatusTitleBuilder{"nish"},
-			JobURLGenerator: &testJobUrlGenerator{
+			TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "nish"},
+			JobURLGenerator: &testJobURLGenerator{
 				t:        t,
-				expJobId: "",
+				expJobID: "",
 				url:      "",
 				err:      nil,
 			},
@@ -475,10 +476,10 @@ func TestChecksOutputUpdater_CommandFailure(t *testing.T) {
 		}
 		subject := events.ChecksOutputUpdater{
 			VCSClient:    client,
-			TitleBuilder: vcs.StatusTitleBuilder{"nish"},
-			JobURLGenerator: &testJobUrlGenerator{
+			TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "nish"},
+			JobURLGenerator: &testJobURLGenerator{
 				t:        t,
-				expJobId: "",
+				expJobID: "",
 				url:      "",
 				err:      nil,
 			},

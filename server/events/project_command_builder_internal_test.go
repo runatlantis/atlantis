@@ -800,7 +800,7 @@ workflows:
 						if stepName == "env" {
 							expSteps = append(expSteps, valid.Step{
 								StepName:    stepName,
-								EnvVarName:  valid.TF_LOG_ENV_VAR,
+								EnvVarName:  valid.TfLogEnvVar,
 								EnvVarValue: c.logLevel,
 							})
 						} else {

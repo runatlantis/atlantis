@@ -24,11 +24,11 @@ func NewMockProjectJobURLGenerator(options ...pegomock.Option) *MockProjectJobUR
 func (mock *MockProjectJobURLGenerator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockProjectJobURLGenerator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockProjectJobURLGenerator) GenerateProjectJobURL(jobId string) (string, error) {
+func (mock *MockProjectJobURLGenerator) GenerateProjectJobURL(jobID string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectJobURLGenerator().")
 	}
-	params := []pegomock.Param{jobId}
+	params := []pegomock.Param{jobID}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GenerateProjectJobURL", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -80,8 +80,8 @@ type VerifierMockProjectJobURLGenerator struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockProjectJobURLGenerator) GenerateProjectJobURL(jobId string) *MockProjectJobURLGenerator_GenerateProjectJobURL_OngoingVerification {
-	params := []pegomock.Param{jobId}
+func (verifier *VerifierMockProjectJobURLGenerator) GenerateProjectJobURL(jobID string) *MockProjectJobURLGenerator_GenerateProjectJobURL_OngoingVerification {
+	params := []pegomock.Param{jobID}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GenerateProjectJobURL", params, verifier.timeout)
 	return &MockProjectJobURLGenerator_GenerateProjectJobURL_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -92,8 +92,8 @@ type MockProjectJobURLGenerator_GenerateProjectJobURL_OngoingVerification struct
 }
 
 func (c *MockProjectJobURLGenerator_GenerateProjectJobURL_OngoingVerification) GetCapturedArguments() string {
-	jobId := c.GetAllCapturedArguments()
-	return jobId[len(jobId)-1]
+	jobID := c.GetAllCapturedArguments()
+	return jobID[len(jobID)-1]
 }
 
 func (c *MockProjectJobURLGenerator_GenerateProjectJobURL_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {

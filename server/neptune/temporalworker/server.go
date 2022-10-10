@@ -45,7 +45,7 @@ const (
 
 type Server struct {
 	Logger            logging.Logger
-	HttpServerProxy   *neptune_http.ServerProxy
+	HTTPServerProxy   *neptune_http.ServerProxy
 	Port              int
 	StatsScope        tally.Scope
 	StatsCloser       io.Closer
@@ -140,7 +140,7 @@ func NewServer(config *config.Config) (*Server, error) {
 
 	server := Server{
 		Logger:              config.CtxLogger,
-		HttpServerProxy:     httpServerProxy,
+		HTTPServerProxy:     httpServerProxy,
 		Port:                config.ServerCfg.Port,
 		StatsScope:          scope,
 		StatsCloser:         statsCloser,
@@ -190,7 +190,7 @@ func (s Server) Start() error {
 	s.Logger.Info(fmt.Sprintf("Atlantis started - listening on port %v", s.Port))
 
 	go func() {
-		err := s.HttpServerProxy.ListenAndServe()
+		err := s.HTTPServerProxy.ListenAndServe()
 
 		if err != nil && err != http.ErrServerClosed {
 			s.Logger.Error(err.Error())
@@ -226,7 +226,7 @@ func (s Server) Start() error {
 
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := s.HttpServerProxy.Shutdown(ctx); err != nil {
+	if err := s.HTTPServerProxy.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
 	}
 

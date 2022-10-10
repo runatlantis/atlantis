@@ -2,9 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
 	command "github.com/runatlantis/atlantis/server/events/command"
+	"reflect"
 )
 
 func AnyPtrToCommandContext() *command.Context {

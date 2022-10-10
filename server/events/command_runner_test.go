@@ -46,7 +46,6 @@ import (
 
 var projectCommandBuilder *mocks.MockProjectCommandBuilder
 var projectCommandRunner *mocks.MockProjectCommandRunner
-var eventParsing *mocks.MockEventParsing
 var ch events.DefaultCommandRunner
 var fa events.ForceApplyCommandRunner
 var workingDir events.WorkingDir

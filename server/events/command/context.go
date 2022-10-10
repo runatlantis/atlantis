@@ -3,13 +3,14 @@ package command
 import (
 	"context"
 	"time"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/uber-go/tally/v4"
 )
 
 // CommandTrigger represents the how the command was triggered
-type CommandTrigger int
+type CommandTrigger int //nolint:golint // avoiding refactor while adding linter action
 
 const (
 	// Commands that are automatically triggered (ie. automatic plans)

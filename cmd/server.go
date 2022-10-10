@@ -98,11 +98,11 @@ const (
 	SSLKeyFileFlag               = "ssl-key-file"
 	TFDownloadURLFlag            = "tf-download-url"
 	VCSStatusName                = "vcs-status-name"
-	WriteGitCredsFlag            = "write-git-creds"
+	WriteGitFileFlag             = "write-git-creds"
 	LyftAuditJobsSnsTopicArnFlag = "lyft-audit-jobs-sns-topic-arn"
 	LyftGatewaySnsTopicArnFlag   = "lyft-gateway-sns-topic-arn"
 	LyftModeFlag                 = "lyft-mode"
-	LyftWorkerQueueUrlFlag       = "lyft-worker-queue-url"
+	LyftWorkerQueueURLFlag       = "lyft-worker-queue-url"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser            = ""
@@ -309,7 +309,7 @@ var stringFlags = map[string]stringFlag{
 			"hybrid:  Runs atlantis with both a gateway event handler and sqs handler to perform both gateway and worker behaviors.",
 		defaultValue: "",
 	},
-	LyftWorkerQueueUrlFlag: {
+	LyftWorkerQueueURLFlag: {
 		description:  "Provide queue of AWS SQS queue for atlantis work to pull GH events from and process.",
 		defaultValue: "",
 	},
@@ -349,7 +349,7 @@ var boolFlags = map[string]boolFlag{
 		description:  "Toggle off folding in markdown output.",
 		defaultValue: false,
 	},
-	WriteGitCredsFlag: {
+	WriteGitFileFlag: {
 		description: "Write out a .git-credentials file with the provider user and token to allow cloning private modules over HTTPS or SSH." +
 			" This writes secrets to disk and should only be enabled in a secure environment.",
 		defaultValue: false,

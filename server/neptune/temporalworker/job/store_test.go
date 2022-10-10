@@ -120,7 +120,8 @@ func TestJobStore_Write(t *testing.T) {
 		storageBackend := &testStorageBackend{}
 		jobStore := job.NewTestStorageBackedStore(logging.NewNoopCtxLogger(t), storageBackend, map[string]*job.Job{})
 
-		jobStore.Write(jobID, outpuMsg)
+		err := jobStore.Write(jobID, outpuMsg)
+		assert.NoError(t, err)
 
 		// Assert job
 		jb, err := jobStore.Get(jobID)
@@ -135,8 +136,10 @@ func TestJobStore_Write(t *testing.T) {
 		jobStore := job.NewTestStorageBackedStore(logging.NewNoopCtxLogger(t), storageBackend, map[string]*job.Job{})
 		output := []string{outpuMsg, outpuMsg}
 
-		jobStore.Write(jobID, output[0])
-		jobStore.Write(jobID, output[1])
+		err := jobStore.Write(jobID, output[0])
+		assert.NoError(t, err)
+		err = jobStore.Write(jobID, output[1])
+		assert.NoError(t, err)
 
 		// Assert job
 		jb, err := jobStore.Get(jobID)
@@ -148,7 +151,7 @@ func TestJobStore_Write(t *testing.T) {
 	t.Run("error when job status complete", func(t *testing.T) {
 		// Setup job store
 		jobsMap := map[string]*job.Job{
-			jobID: &job.Job{
+			jobID: {
 				Output: []string{outpuMsg},
 				Status: job.Complete,
 			},
@@ -169,7 +172,7 @@ func TestJobStore_Close(t *testing.T) {
 	t.Run("retain job in memory when persist fails", func(t *testing.T) {
 		// Create new job and add it to store
 		jobsMap := map[string]*job.Job{
-			jobID: &job.Job{
+			jobID: {
 				Output: []string{outputMsg},
 				Status: job.Processing},
 		}
@@ -207,7 +210,7 @@ func TestJobStore_Close(t *testing.T) {
 	t.Run("retain job in memory when storage backend not configured", func(t *testing.T) {
 		// Create new job and add it to store
 		jobsMap := map[string]*job.Job{
-			jobID: &job.Job{
+			jobID: {
 				Output: []string{outputMsg},
 				Status: job.Processing,
 			},
@@ -229,7 +232,7 @@ func TestJobStore_Close(t *testing.T) {
 	t.Run("delete from memory when persist succeeds", func(t *testing.T) {
 		// Create new job and add it to store
 		jobsMap := map[string]*job.Job{
-			jobID: &job.Job{
+			jobID: {
 				Output: []string{outputMsg},
 				Status: job.Processing,
 			},
@@ -285,7 +288,7 @@ func TestJobStore_Cleanup(t *testing.T) {
 	t.Run("successfully persists all jobs in memory", func(t *testing.T) {
 		// Create new job and add it to store
 		jobsMap := map[string]*job.Job{
-			jobID: &job.Job{
+			jobID: {
 				Output: []string{outputMsg},
 				Status: job.Processing,
 			},
@@ -313,7 +316,7 @@ func TestJobStore_Cleanup(t *testing.T) {
 	t.Run("error when atleast one job fails to persist", func(t *testing.T) {
 		// Create new job and add it to store
 		jobsMap := map[string]*job.Job{
-			jobID: &job.Job{
+			jobID: {
 				Output: []string{outputMsg},
 				Status: job.Processing,
 			},
@@ -335,9 +338,8 @@ func TestJobStore_Cleanup(t *testing.T) {
 			},
 		}
 		jobStore := job.NewTestStorageBackedStore(logging.NewNoopCtxLogger(t), storageBackend, jobsMap)
-		expectedErr := fmt.Errorf("failed to persist jobs: %s\n", jobID)
 		err := jobStore.Cleanup(context.TODO())
-		assert.EqualError(t, err, expectedErr.Error())
+		assert.Error(t, err)
 	})
 
 }

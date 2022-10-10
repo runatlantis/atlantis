@@ -44,7 +44,7 @@ func (w PullRequestWorkflow) toValidStage(stage *Stage, defaultStage valid.Stage
 
 	// HACK: Extra args should be used for customer args passed in.
 	// We should have this logic built into the client and relevant context
-	// passed in to allow this.  
+	// passed in to allow this.
 	// Doing this here minimizes changes right now and ensures that even custom extra args
 	// will still have this default applied.
 	for _, s := range validStage.Steps {

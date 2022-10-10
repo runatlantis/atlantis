@@ -253,7 +253,7 @@ func TestDetermineProjects(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			projects := m.DetermineProjects(noopLogger, context.TODO(), c.files, modifiedRepo, c.repoDir, c.autoplanFileList)
+			projects := m.DetermineProjects(context.TODO(), noopLogger, c.files, modifiedRepo, c.repoDir, c.autoplanFileList)
 
 			// Extract the paths from the projects. We use a slice here instead of a
 			// map so we can test whether there are duplicates returned.

@@ -1,8 +1,9 @@
 package http
 
 import (
-	"github.com/runatlantis/atlantis/server/logging"
 	"net/http"
+
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 type ServerProxy struct {
@@ -15,7 +16,7 @@ type ServerProxy struct {
 func (p *ServerProxy) ListenAndServe() error {
 	if p.SSLCertFile != "" && p.SSLKeyFile != "" {
 		return p.Server.ListenAndServeTLS(p.SSLCertFile, p.SSLKeyFile)
-	} else {
-		return p.Server.ListenAndServe()
 	}
+
+	return p.Server.ListenAndServe()
 }

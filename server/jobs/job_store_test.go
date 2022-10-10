@@ -76,7 +76,8 @@ func TestJobStore_AppendOutput(t *testing.T) {
 		jobID := "1234"
 		output := "Test log message"
 
-		jobStore.AppendOutput(jobID, output)
+		err := jobStore.AppendOutput(jobID, output)
+		assert.NoError(t, err)
 
 		// Assert job
 		job, err := jobStore.Get(jobID)
@@ -92,8 +93,11 @@ func TestJobStore_AppendOutput(t *testing.T) {
 		jobID := "1234"
 		output := []string{"Test log message", "Test log message 2"}
 
-		jobStore.AppendOutput(jobID, output[0])
-		jobStore.AppendOutput(jobID, output[1])
+		err := jobStore.AppendOutput(jobID, output[0])
+		assert.NoError(t, err)
+
+		err = jobStore.AppendOutput(jobID, output[1])
+		assert.NoError(t, err)
 
 		// Assert job
 		job, err := jobStore.Get(jobID)

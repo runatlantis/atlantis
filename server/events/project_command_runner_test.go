@@ -62,8 +62,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		WithSync(mockLocker, mockURLGenerator{})
 
 	When(mockLocker.TryLock(
-		matchers.AnyLoggingLogger(),
 		matchers.AnyContextContext(),
+		matchers.AnyLoggingLogger(),
 		matchers.AnyModelsPullRequest(),
 		matchers.AnyModelsUser(),
 		AnyString(),
@@ -214,15 +214,15 @@ type strictTestCommitStatusUpdater struct {
 	count          int
 }
 
-// UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error)
-func (t *strictTestCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error) {
+// UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error)
+func (t *strictTestCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error) {
 	if t.count > (len(t.statusUpdaters) - 1) {
 		return "", errors.New("more calls than expected")
 	}
 
-	statusId, err := t.statusUpdaters[t.count].UpdateProject(ctx, projectCtx, cmdName, status, url, statusId)
-	t.count += 1
-	return statusId, err
+	statusID, err := t.statusUpdaters[t.count].UpdateProject(ctx, projectCtx, cmdName, status, url, statusID)
+	t.count++
+	return statusID, err
 }
 
 type testCommitStatusUpdater struct {
@@ -231,22 +231,22 @@ type testCommitStatusUpdater struct {
 	expPrjCtx   command.ProjectContext
 	expCmdName  fmt.Stringer
 	expStatus   models.CommitStatus
-	expUrl      string
-	expStatusId string
+	expURL      string
+	expStatusID string
 
-	statusId string
+	statusID string
 	err      error
 }
 
-func (t *testCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error) {
+func (t *testCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error) {
 	assert.Equal(t.t, t.expCtx, ctx)
 	assert.Equal(t.t, t.expPrjCtx, projectCtx)
 	assert.Equal(t.t, t.expCmdName, cmdName)
 	assert.Equal(t.t, t.expStatus, status)
-	assert.Equal(t.t, t.expUrl, url)
-	assert.Equal(t.t, t.expStatusId, statusId)
+	assert.Equal(t.t, t.expURL, url)
+	assert.Equal(t.t, t.expStatusID, statusID)
 
-	return t.statusId, t.err
+	return t.statusID, t.err
 }
 
 type testProjectCommandRunner struct {
@@ -343,7 +343,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 			var prjResult command.ProjectResult
 			var expCommitStatus models.CommitStatus
 
-			mockJobUrlGenerator := commandMocks.NewMockJobURLGenerator()
+			mockJobURLGenerator := commandMocks.NewMockJobURLGenerator()
 			mockJobCloser := mocks.NewMockJobCloser()
 
 			if c.Success {
@@ -374,26 +374,26 @@ func TestProjectOutputWrapper(t *testing.T) {
 
 			mockCommitStatusUpdater := strictTestCommitStatusUpdater{
 				statusUpdaters: []*testCommitStatusUpdater{
-					&testCommitStatusUpdater{
+					{
 						t:           t,
 						expCtx:      context.TODO(),
 						expPrjCtx:   prjCtx,
 						expCmdName:  c.CommandName,
 						expStatus:   models.PendingCommitStatus,
-						expStatusId: "",
-						expUrl:      "",
-						statusId:    "",
+						expStatusID: "",
+						expURL:      "",
+						statusID:    "",
 						err:         nil,
 					},
-					&testCommitStatusUpdater{
+					{
 						t:           t,
 						expCtx:      context.TODO(),
 						expPrjCtx:   prjCtx,
 						expCmdName:  c.CommandName,
 						expStatus:   expCommitStatus,
-						expStatusId: "",
-						expUrl:      "",
-						statusId:    "",
+						expStatusID: "",
+						expURL:      "",
+						statusID:    "",
 						err:         nil,
 					},
 				},
@@ -403,7 +403,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 
 			projectUpdater := command.ProjectStatusUpdater{
 				JobCloser:                  mockJobCloser,
-				ProjectJobURLGenerator:     mockJobUrlGenerator,
+				ProjectJobURLGenerator:     mockJobURLGenerator,
 				ProjectCommitStatusUpdater: &mockCommitStatusUpdater,
 				FeatureAllocator:           &featureAllocator,
 			}

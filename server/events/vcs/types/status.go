@@ -17,7 +17,7 @@ type UpdateStatusRequest struct {
 	// if not present, should be -1
 	PullNum          int
 	PullCreationTime time.Time
-	StatusId         string
+	StatusID         string
 
 	// Fields used to support templating project level command for github checks
 	CommandName string

@@ -45,7 +45,7 @@ const (
 )
 
 // github checks conclusion
-type ChecksConclusion int
+type ChecksConclusion int //nolint:golint // avoiding refactor while adding linter action
 
 const (
 	Neutral ChecksConclusion = iota
@@ -96,7 +96,7 @@ func (e CheckStatus) String() string {
 }
 
 // [WENGINES-4643] TODO: Remove this wrapper and add checks implementation to UpdateStatus() directly after github checks is stable
-type ChecksClientWrapper struct {
+type ChecksClientWrapper struct { //nolint:golint // avoiding refactor while adding linter action
 	*vcs.GithubClient
 	FeatureAllocator feature.Allocator
 	Logger           logging.Logger
@@ -123,10 +123,10 @@ func (c *ChecksClientWrapper) UpdateStatus(ctx context.Context, request types.Up
 	c.Scope.Counter("checks").Inc(1)
 
 	// Empty status ID means we create a new check run
-	if request.StatusId == "" {
+	if request.StatusID == "" {
 		return c.createCheckRun(ctx, request)
 	}
-	return request.StatusId, c.updateCheckRun(ctx, request, request.StatusId)
+	return request.StatusID, c.updateCheckRun(ctx, request, request.StatusID)
 }
 
 func (c *ChecksClientWrapper) createCheckRun(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
@@ -150,7 +150,7 @@ func (c *ChecksClientWrapper) createCheckRun(ctx context.Context, request types.
 	return c.GithubClient.CreateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, createCheckRunOpts)
 }
 
-func (c *ChecksClientWrapper) updateCheckRun(ctx context.Context, request types.UpdateStatusRequest, checkRunId string) error {
+func (c *ChecksClientWrapper) updateCheckRun(ctx context.Context, request types.UpdateStatusRequest, checkRunID string) error {
 	status, conclusion := c.resolveChecksStatus(request.State)
 	updateCheckRunOpts := github.UpdateCheckRunOptions{
 		Name:   request.StatusName,
@@ -167,12 +167,12 @@ func (c *ChecksClientWrapper) updateCheckRun(ctx context.Context, request types.
 		updateCheckRunOpts.Conclusion = &conclusion
 	}
 
-	checkRunIdInt, err := strconv.ParseInt(checkRunId, 10, 64)
+	checkRunIDInt, err := strconv.ParseInt(checkRunID, 10, 64)
 	if err != nil {
 		return err
 	}
 
-	return c.GithubClient.UpdateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, checkRunIdInt, updateCheckRunOpts)
+	return c.GithubClient.UpdateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, checkRunIDInt, updateCheckRunOpts)
 }
 
 func (c *ChecksClientWrapper) resolveState(state models.CommitStatus) string {

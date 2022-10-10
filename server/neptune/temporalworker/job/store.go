@@ -12,7 +12,7 @@ import (
 	"github.com/uber-go/tally/v4"
 )
 
-type JobStatus int
+type JobStatus int //nolint:golint // avoiding refactor while adding linter action
 
 const (
 	Processing JobStatus = iota

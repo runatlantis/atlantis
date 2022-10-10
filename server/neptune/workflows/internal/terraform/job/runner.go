@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	logger "github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"go.temporal.io/sdk/workflow"
@@ -23,21 +24,21 @@ type stepRunner interface {
 	Run(executionContext *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) (string, error)
 }
 
-type jobRunner struct {
+type JobRunner struct { ///nolint:golint // avoiding refactor while adding linter action
 	Activity      terraformActivities
 	EnvStepRunner stepRunner
 	CmdStepRunner stepRunner
 }
 
-func NewRunner(runStepRunner stepRunner, envStepRunner stepRunner, tfActivities terraformActivities) *jobRunner {
-	return &jobRunner{
+func NewRunner(runStepRunner stepRunner, envStepRunner stepRunner, tfActivities terraformActivities) *JobRunner {
+	return &JobRunner{
 		CmdStepRunner: runStepRunner,
 		EnvStepRunner: envStepRunner,
 		Activity:      tfActivities,
 	}
 }
 
-func (r *jobRunner) Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID string) (activities.TerraformPlanResponse, error) {
+func (r *JobRunner) Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID string) (activities.TerraformPlanResponse, error) {
 	// Execution ctx for a job that handles setting up the env vars from the previous steps
 	jobCtx := &job.ExecutionContext{
 		Context:   ctx,
@@ -73,7 +74,7 @@ func (r *jobRunner) Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID 
 	return resp, nil
 }
 
-func (r *jobRunner) Apply(ctx workflow.Context, localRoot *root.LocalRoot, jobID string, planFile string) error {
+func (r *JobRunner) Apply(ctx workflow.Context, localRoot *root.LocalRoot, jobID string, planFile string) error {
 	// Execution ctx for a job that handles setting up the env vars from the previous steps
 	jobCtx := &job.ExecutionContext{
 		Context:   ctx,
@@ -104,7 +105,7 @@ func (r *jobRunner) Apply(ctx workflow.Context, localRoot *root.LocalRoot, jobID
 	return nil
 }
 
-func (r *jobRunner) apply(ctx *job.ExecutionContext, planFile string, step job.Step) error {
+func (r *JobRunner) apply(ctx *job.ExecutionContext, planFile string, step job.Step) error {
 	args, err := terraform.NewArgumentList(step.ExtraArgs)
 
 	if err != nil {
@@ -125,7 +126,7 @@ func (r *jobRunner) apply(ctx *job.ExecutionContext, planFile string, step job.S
 	return nil
 }
 
-func (r *jobRunner) plan(ctx *job.ExecutionContext, mode *job.PlanMode, extraArgs []string) (activities.TerraformPlanResponse, error) {
+func (r *JobRunner) plan(ctx *job.ExecutionContext, mode *job.PlanMode, extraArgs []string) (activities.TerraformPlanResponse, error) {
 	var resp activities.TerraformPlanResponse
 
 	args, err := terraform.NewArgumentList(extraArgs)
@@ -147,7 +148,7 @@ func (r *jobRunner) plan(ctx *job.ExecutionContext, mode *job.PlanMode, extraArg
 	return resp, nil
 }
 
-func (r *jobRunner) init(ctx *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) error {
+func (r *JobRunner) init(ctx *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) error {
 	args, err := terraform.NewArgumentList(step.ExtraArgs)
 
 	if err != nil {
@@ -167,7 +168,7 @@ func (r *jobRunner) init(ctx *job.ExecutionContext, localRoot *root.LocalRoot, s
 	return nil
 }
 
-func (r *jobRunner) runOptionalSteps(ctx *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) error {
+func (r *JobRunner) runOptionalSteps(ctx *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) error {
 	switch step.StepName {
 	case "run":
 		_, err := r.CmdStepRunner.Run(ctx, localRoot, step)
@@ -182,8 +183,12 @@ func (r *jobRunner) runOptionalSteps(ctx *job.ExecutionContext, localRoot *root.
 	return nil
 }
 
-func (r *jobRunner) closeTerraformJob(ctx *job.ExecutionContext) {
-	workflow.ExecuteActivity(ctx, r.Activity.CloseJob, activities.CloseJobRequest{
+func (r *JobRunner) closeTerraformJob(ctx *job.ExecutionContext) {
+	err := workflow.ExecuteActivity(ctx, r.Activity.CloseJob, activities.CloseJobRequest{
 		JobID: ctx.JobID,
 	}).Get(ctx, nil)
+
+	if err != nil {
+		logger.Error(ctx, "Error closing job", "err", err)
+	}
 }

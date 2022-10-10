@@ -38,7 +38,7 @@ type Server struct {
 }
 
 func NewServer() *Server {
-	temporal, err := client.NewClient(client.Options{})
+	temporal, err := client.NewLazyClient(client.Options{})
 	if err != nil {
 		panic(err)
 	}

@@ -112,7 +112,7 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 	runnerReq := terraform.Request{
 		Root:         testLocalRoot.Root,
 		Repo:         testGithubRepo,
-		DeploymentId: testDeploymentID,
+		DeploymentID: testDeploymentID,
 	}
 
 	subject := &terraform.Runner{
@@ -183,7 +183,7 @@ func TestSuccess(t *testing.T) {
 	env.OnActivity(ga.FetchRoot, mock.Anything, activities.FetchRootRequest{
 		Repo:         testGithubRepo,
 		Root:         testLocalRoot.Root,
-		DeploymentId: testDeploymentID,
+		DeploymentID: testDeploymentID,
 	}).Return(activities.FetchRootResponse{
 		LocalRoot: testLocalRoot,
 	}, nil)
@@ -293,7 +293,7 @@ func TestPlanRejection(t *testing.T) {
 	env.OnActivity(ga.FetchRoot, mock.Anything, activities.FetchRootRequest{
 		Repo:         testGithubRepo,
 		Root:         testLocalRoot.Root,
-		DeploymentId: testDeploymentID,
+		DeploymentID: testDeploymentID,
 	}).Return(activities.FetchRootResponse{
 		LocalRoot: testLocalRoot,
 	}, nil)
@@ -383,7 +383,7 @@ func TestFetchRootError(t *testing.T) {
 	env.OnActivity(ga.FetchRoot, mock.Anything, activities.FetchRootRequest{
 		Repo:         testGithubRepo,
 		Root:         testLocalRoot.Root,
-		DeploymentId: testDeploymentID,
+		DeploymentID: testDeploymentID,
 	}).Return(activities.FetchRootResponse{
 		LocalRoot: testLocalRoot,
 	}, assert.AnError)

@@ -6,7 +6,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-
 func GenerateUUID(ctx workflow.Context) (uuid.UUID, error) {
 	// UUIDErr allows us to extract both the id and the err from the sideeffect
 	// not sure if there is a better way to do this

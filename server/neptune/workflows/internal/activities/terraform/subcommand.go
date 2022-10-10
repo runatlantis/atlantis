@@ -132,7 +132,7 @@ func (c *SubCommand) dedup(args []Argument) []Argument {
 	// let's sort our keys to ensure a deterministic order
 	// for testing at least
 	var keys []string
-	for k, _ := range tmp {
+	for k := range tmp {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)

@@ -59,7 +59,7 @@ func (p *PlatformModeProjectRunner) Apply(ctx command.ProjectContext) command.Pr
 			RepoRelDir:   ctx.RepoRelDir,
 			Workspace:    ctx.Workspace,
 			ProjectName:  ctx.ProjectName,
-			StatusId:     ctx.StatusId,
+			StatusID:     ctx.StatusID,
 			ApplySuccess: "atlantis apply is disabled for this project. Please track the deployment when the PR is merged. ",
 		}
 	}

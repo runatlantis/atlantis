@@ -80,7 +80,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	statusId, err := p.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan, "", "")
+	statusID, err := p.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan, "", "")
 	if err != nil {
 		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
@@ -101,7 +101,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("writing results: %s", err))
 	}
 
-	p.updateCommitStatus(ctx, pullStatus, statusId)
+	p.updateCommitStatus(ctx, pullStatus, statusID)
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
 	if len(policyCheckCmds) > 0 && !result.HasErrors() {
@@ -124,14 +124,14 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 	pull := ctx.Pull
 
 	// creating status for the first time
-	statusId, err := p.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.PendingCommitStatus, command.Plan, "", "")
+	statusID, err := p.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.PendingCommitStatus, command.Plan, "", "")
 	if err != nil {
 		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
 
 	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
 	if err != nil {
-		if _, statusErr := p.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan, statusId, ""); statusErr != nil {
+		if _, statusErr := p.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan, statusID, ""); statusErr != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		p.outputUpdater.UpdateOutput(ctx, cmd, command.Result{Error: err})
@@ -143,7 +143,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 	// Only run commands in parallel if enabled
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
-		ctx.Log.InfoContext(ctx.RequestCtx, fmt.Sprintf("Running applies in parallel"))
+		ctx.Log.InfoContext(ctx.RequestCtx, "Running applies in parallel")
 		result = runProjectCmdsParallel(projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
@@ -160,7 +160,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 		return
 	}
 
-	p.updateCommitStatus(ctx, pullStatus, statusId)
+	p.updateCommitStatus(ctx, pullStatus, statusID)
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
@@ -178,7 +178,7 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	}
 }
 
-func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus, statusId string) {
+func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus, statusID string) {
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus
@@ -201,20 +201,9 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		command.Plan,
 		numSuccess,
 		len(pullStatus.Projects),
-		statusId,
+		statusID,
 	); err != nil {
 		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
-	}
-}
-
-// deletePlans deletes all plans generated in this ctx.
-func (p *PlanCommandRunner) deletePlans(ctx *command.Context) {
-	pullDir, err := p.workingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
-	if err != nil {
-		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("getting pull dir: %s", err))
-	}
-	if err := p.pendingPlanFinder.DeletePlans(pullDir); err != nil {
-		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("deleting pending plans: %s", err))
 	}
 }
 

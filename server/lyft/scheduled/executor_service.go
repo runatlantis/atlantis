@@ -131,7 +131,7 @@ func (s *ExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGrou
 		for {
 			select {
 			case <-ctx.Done():
-				s.log.Warn(fmt.Sprintf("Received interrupt, cancelling job"))
+				s.log.Warn("Received interrupt, cancelling job")
 				return
 			case <-ticker.C:
 				jd.Job.Run()

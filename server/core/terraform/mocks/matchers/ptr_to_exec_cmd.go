@@ -2,9 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
 	exec "os/exec"
+	"reflect"
 )
 
 func AnyPtrToExecCmd() *exec.Cmd {

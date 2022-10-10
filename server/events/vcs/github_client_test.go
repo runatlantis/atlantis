@@ -702,11 +702,6 @@ func TestGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 
 }
 
-func helper(str string) *string {
-	temp := str
-	return &temp
-}
-
 func TestGithubClient_MarkdownPullLink(t *testing.T) {
 	mergeabilityChecker := vcs.NewPullMergeabilityChecker("atlantis")
 	client, err := vcs.NewGithubClient("hostname", &vcs.GithubUserCredentials{"user", "pass"}, logging.NewNoopCtxLogger(t), mergeabilityChecker)

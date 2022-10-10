@@ -127,8 +127,8 @@ func (a *ApplyStepRunner) runRemoteApply(
 	}
 
 	// updateStatusF will update the commit status and log any error.
-	updateStatusF := func(status models.CommitStatus, url string, statusId string) {
-		if _, err := a.CommitStatusUpdater.UpdateProject(ctx, prjCtx, command.Apply, status, url, statusId); err != nil {
+	updateStatusF := func(status models.CommitStatus, url string, statusID string) {
+		if _, err := a.CommitStatusUpdater.UpdateProject(ctx, prjCtx, command.Apply, status, url, statusID); err != nil {
 			prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("unable to update status: %s", err))
 		}
 	}
@@ -155,7 +155,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
-			updateStatusF(models.PendingCommitStatus, runURL, prjCtx.StatusId)
+			updateStatusF(models.PendingCommitStatus, runURL, prjCtx.StatusID)
 			nextLineIsRunURL = false
 		}
 
@@ -165,7 +165,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 			// Check if the plan is as expected.
 			planChangedErr = a.remotePlanChanged(string(planfileBytes), strings.Join(lines, "\n"), tfVersion)
 			if planChangedErr != nil {
-				prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("plan generated during apply does not match expected plan, aborting"))
+				prjCtx.Log.ErrorContext(prjCtx.RequestCtx, "plan generated during apply does not match expected plan, aborting")
 				inCh <- "no\n"
 				// Need to continue so we read all the lines, otherwise channel
 				// sender (in TerraformClient) will block indefinitely waiting
@@ -179,16 +179,16 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	output := strings.Join(lines, "\n")
 	if planChangedErr != nil {
-		updateStatusF(models.FailedCommitStatus, runURL, prjCtx.StatusId)
+		updateStatusF(models.FailedCommitStatus, runURL, prjCtx.StatusID)
 		// The output isn't important if the plans don't match so we just
 		// discard it.
 		return "", planChangedErr
 	}
 
 	if err != nil {
-		updateStatusF(models.FailedCommitStatus, runURL, prjCtx.StatusId)
+		updateStatusF(models.FailedCommitStatus, runURL, prjCtx.StatusID)
 	} else {
-		updateStatusF(models.SuccessCommitStatus, runURL, prjCtx.StatusId)
+		updateStatusF(models.SuccessCommitStatus, runURL, prjCtx.StatusID)
 	}
 	return output, err
 }

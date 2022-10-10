@@ -19,8 +19,6 @@ import (
 	"go.temporal.io/sdk/client"
 )
 
-const githubHeader = "X-Github-Event"
-
 type scheduler interface {
 	Schedule(ctx context.Context, f sync.Executor) error
 }
@@ -29,7 +27,7 @@ func NewVCSEventsController(
 	scope tally.Scope,
 	webhookSecret []byte,
 	allowDraftPRs bool,
-	autoplanValidator gateway_handlers.EventValidator,
+	autoplanValidator gateway_handlers.Validator,
 	snsWriter gateway_handlers.Writer,
 	commentParser events.CommentParsing,
 	repoAllowlistChecker *events.RepoAllowlistChecker,

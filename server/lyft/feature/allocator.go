@@ -12,7 +12,7 @@ import (
 )
 
 // Add more attributes as needed to determine eligibility of a feature
-type FeatureContext struct {
+type FeatureContext struct { //nolint:golint // avoiding refactor while adding linter action
 	RepoName         string
 	PullCreationTime time.Time
 }

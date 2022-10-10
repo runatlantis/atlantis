@@ -14,6 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 type NoopTFDownloader struct{}
@@ -104,7 +105,8 @@ func TestStepsRunner_Run(t *testing.T) {
 			When(mockRun.Run(ctx, prjCtx, "", repoDir, expEnvs)).ThenReturn("run", nil)
 			When(mockEnv.Run(ctx, prjCtx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
 
-			runner.Run(ctx, prjCtx, repoDir)
+			_, err := runner.Run(ctx, prjCtx, repoDir)
+			assert.NoError(t, err)
 
 			for _, step := range c.expSteps {
 				switch step {

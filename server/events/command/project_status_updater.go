@@ -27,7 +27,7 @@ type JobURLGenerator interface {
 type CommitStatusUpdater interface {
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
-	UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error)
+	UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error)
 }
 
 type StatusUpdater interface {
@@ -46,11 +46,11 @@ func (p ProjectStatusUpdater) UpdateProjectStatus(ctx ProjectContext, status mod
 	if err != nil {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
-	statusId, err := p.ProjectCommitStatusUpdater.UpdateProject(ctx.RequestCtx, ctx, ctx.CommandName, status, url, ctx.StatusId)
+	statusID, err := p.ProjectCommitStatusUpdater.UpdateProject(ctx.RequestCtx, ctx, ctx.CommandName, status, url, ctx.StatusID)
 
 	// Close the Job if the operation is complete
 	if status == models.SuccessCommitStatus || status == models.FailedCommitStatus {
 		p.JobCloser.CloseJob(ctx.JobID, ctx.BaseRepo)
 	}
-	return statusId, err
+	return statusID, err
 }

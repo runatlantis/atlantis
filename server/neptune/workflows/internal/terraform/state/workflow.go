@@ -19,7 +19,7 @@ const (
 )
 
 type JobOutput struct {
-	URL     *url.URL
+	URL *url.URL
 
 	// populated for plan jobs
 	Summary terraform.PlanSummary

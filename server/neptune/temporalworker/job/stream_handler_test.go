@@ -37,7 +37,7 @@ func TestStreamHandler_Handle(t *testing.T) {
 				count   int
 			}{
 				runners: []*testStore{
-					&testStore{
+					{
 						t:      t,
 						JobID:  jobID,
 						Output: outputMsg,
@@ -52,7 +52,7 @@ func TestStreamHandler_Handle(t *testing.T) {
 				count   int
 			}{
 				runners: []*testReceiverRegistry{
-					&testReceiverRegistry{
+					{
 						t: t,
 						Msg: job.OutputLine{
 							JobID: jobID,
@@ -134,7 +134,7 @@ func TestStreamHandler_Close(t *testing.T) {
 				count   int
 			}{
 				runners: []*testReceiverRegistry{
-					&testReceiverRegistry{
+					{
 						t:     t,
 						JobID: jobID,
 					},
@@ -149,7 +149,7 @@ func TestStreamHandler_Close(t *testing.T) {
 				count   int
 			}{
 				runners: []*testStore{
-					&testStore{
+					{
 						t:      t,
 						JobID:  jobID,
 						Status: job.Complete,
@@ -164,7 +164,8 @@ func TestStreamHandler_Close(t *testing.T) {
 			nil,
 			logging.NewNoopCtxLogger(t),
 		)
-		streamHandler.CloseJob(context.Background(), jobID)
+		err := streamHandler.CloseJob(context.Background(), jobID)
+		assert.NoError(t, err)
 	})
 }
 
@@ -178,7 +179,7 @@ func TestStreamHandler_Cleanup(t *testing.T) {
 				count   int
 			}{
 				runners: []*testReceiverRegistry{
-					&testReceiverRegistry{
+					{
 						t: t,
 					},
 				},
@@ -192,7 +193,7 @@ func TestStreamHandler_Cleanup(t *testing.T) {
 				count   int
 			}{
 				runners: []*testStore{
-					&testStore{
+					{
 						t: t,
 					},
 				},
@@ -205,6 +206,7 @@ func TestStreamHandler_Cleanup(t *testing.T) {
 			nil,
 			logging.NewNoopCtxLogger(t),
 		)
-		streamHandler.CleanUp(context.Background())
+		err := streamHandler.CleanUp(context.Background())
+		assert.NoError(t, err)
 	})
 }

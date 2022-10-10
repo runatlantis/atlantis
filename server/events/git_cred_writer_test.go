@@ -36,8 +36,8 @@ func TestWriteGitCreds_Appends(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
-	credsFile := filepath.Join(tmp, ".git-credentials")
-	err := ioutil.WriteFile(credsFile, []byte("contents"), 0600)
+	file := filepath.Join(tmp, ".git-credentials")
+	err := ioutil.WriteFile(file, []byte("contents"), 0600)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)
@@ -56,9 +56,9 @@ func TestWriteGitCreds_NoModification(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
-	credsFile := filepath.Join(tmp, ".git-credentials")
+	file := filepath.Join(tmp, ".git-credentials")
 	contents := "line1\nhttps://user:token@hostname\nline2"
-	err := ioutil.WriteFile(credsFile, []byte(contents), 0600)
+	err := ioutil.WriteFile(file, []byte(contents), 0600)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)
@@ -74,9 +74,9 @@ func TestWriteGitCreds_ReplaceApp(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
-	credsFile := filepath.Join(tmp, ".git-credentials")
+	file := filepath.Join(tmp, ".git-credentials")
 	contents := "line1\nhttps://x-access-token:v1.87dddddddddddddddd@github.com\nline2"
-	err := ioutil.WriteFile(credsFile, []byte(contents), 0600)
+	err := ioutil.WriteFile(file, []byte(contents), 0600)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)
@@ -93,9 +93,9 @@ func TestWriteGitCreds_AppendApp(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
-	credsFile := filepath.Join(tmp, ".git-credentials")
+	file := filepath.Join(tmp, ".git-credentials")
 	contents := ""
-	err := ioutil.WriteFile(credsFile, []byte(contents), 0600)
+	err := ioutil.WriteFile(file, []byte(contents), 0600)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)
@@ -113,20 +113,20 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
-	credsFile := filepath.Join(tmp, ".git-credentials")
-	err := ioutil.WriteFile(credsFile, []byte("can't see me!"), 0000)
+	file := filepath.Join(tmp, ".git-credentials")
+	err := ioutil.WriteFile(file, []byte("can't see me!"), 0000)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)
-	expErr := fmt.Sprintf("open %s: permission denied", credsFile)
+	expErr := fmt.Sprintf("open %s: permission denied", file)
 	actErr := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	ErrContains(t, expErr, actErr)
 }
 
 // Test that if we can't write, we error out.
 func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
-	credsFile := "/this/dir/does/not/exist/.git-credentials"
-	expErr := fmt.Sprintf("writing generated .git-credentials file with user, token and hostname to %s: open %s: no such file or directory", credsFile, credsFile)
+	file := "/this/dir/does/not/exist/.git-credentials"
+	expErr := fmt.Sprintf("writing generated .git-credentials file with user, token and hostname to %s: open %s: no such file or directory", file, file)
 	actErr := events.WriteGitCreds("user", "token", "hostname", "/this/dir/does/not/exist", logger, false)
 	ErrEquals(t, expErr, actErr)
 }

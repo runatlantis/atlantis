@@ -19,8 +19,8 @@ import (
 func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home string, logger logging.Logger, ghAccessToken bool) error {
 	const credsFilename = ".git-credentials"
 	credsFile := filepath.Join(home, credsFilename)
-	credsFileContentsPattern := `https://%s:%s@%s`
-	config := fmt.Sprintf(credsFileContentsPattern, gitUser, gitToken, gitHostname)
+	fileContentsPattern := `https://%s:%s@%s`
+	config := fmt.Sprintf(fileContentsPattern, gitUser, gitToken, gitHostname)
 
 	// If the file doesn't exist, write it.
 	if _, err := os.Stat(credsFile); err != nil {

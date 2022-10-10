@@ -157,22 +157,22 @@ type MockCSU struct {
 	CalledCommand    string
 	CalledNumSuccess int
 	CalledNumTotal   int
-	CalledStatusId   string
+	CalledStatusID   string
 }
 
-func (m *MockCSU) UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command fmt.Stringer, numSuccess int, numTotal int, statusId string) (string, error) {
+func (m *MockCSU) UpdateCombinedCount(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command fmt.Stringer, numSuccess int, numTotal int, statusID string) (string, error) {
 	m.CalledRepo = repo
 	m.CalledPull = pull
 	m.CalledStatus = status
 	m.CalledCommand = command.String()
 	m.CalledNumSuccess = numSuccess
 	m.CalledNumTotal = numTotal
-	m.CalledStatusId = statusId
+	m.CalledStatusID = statusID
 	return "", nil
 }
-func (m *MockCSU) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command fmt.Stringer, statusId string, output string) (string, error) {
+func (m *MockCSU) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command fmt.Stringer, statusID string, output string) (string, error) {
 	return "", nil
 }
-func (m *MockCSU) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusId string) (string, error) {
+func (m *MockCSU) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error) {
 	return "", nil
 }

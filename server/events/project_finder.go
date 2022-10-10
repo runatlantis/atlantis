@@ -35,7 +35,7 @@ type ProjectFinder interface {
 	// DetermineProjects returns the list of projects that were modified based on
 	// the modifiedFiles. The list will be de-duplicated.
 	// absRepoDir is the path to the cloned repo on disk.
-	DetermineProjects(log logging.Logger, requestCtx context.Context, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project
+	DetermineProjects(requestCtx context.Context, log logging.Logger, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project
 	// DetermineProjectsViaConfig returns the list of projects that were modified
 	// based on modifiedFiles and the repo's config.
 	// absRepoDir is the path to the cloned repo on disk.
@@ -49,7 +49,7 @@ var ignoredFilenameFragments = []string{"terraform.tfstate", "terraform.tfstate.
 type DefaultProjectFinder struct{}
 
 // See ProjectFinder.DetermineProjects.
-func (p *DefaultProjectFinder) DetermineProjects(log logging.Logger, requestCtx context.Context, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project {
+func (p *DefaultProjectFinder) DetermineProjects(requestCtx context.Context, log logging.Logger, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project {
 	var projects []models.Project
 
 	modifiedTerraformFiles := p.filterToFileList(log, modifiedFiles, autoplanFileList)

@@ -19,7 +19,7 @@ import (
 	"strings"
 	"text/template"
 
-	_ "embed"
+	_ "embed" // embedding files
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -88,7 +88,7 @@ func (m *Renderer) Render(res command.Result, cmdName command.Name, baseRepo mod
 }
 
 // RenderProject formats the data into a markdown string for a project
-func (m *Renderer) RenderProject(prjRes command.ProjectResult, cmdName command.Name, baseRepo models.Repo) string {
+func (m *Renderer) RenderProject(prjRes command.ProjectResult, cmdName fmt.Stringer, baseRepo models.Repo) string {
 	commandStr := strings.Title(strings.ReplaceAll(cmdName.String(), "_", " "))
 	common := commonData{
 		Command:                  commandStr,
@@ -124,11 +124,11 @@ func (m *Renderer) countSuccesses(results []command.ProjectResult) (numPlanSucce
 	for _, result := range results {
 		switch {
 		case result.PlanSuccess != nil:
-			numPlanSuccesses += 1
+			numPlanSuccesses++
 		case result.PolicyCheckSuccess != nil:
-			numPolicyCheckSuccesses += 1
+			numPolicyCheckSuccesses++
 		case result.VersionSuccess != "":
-			numVersionSuccesses += 1
+			numVersionSuccesses++
 		}
 	}
 	return

@@ -445,30 +445,6 @@ func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
 	Equals(t, exp, s)
 }
 
-var adMergeSuccess = `{
-	"status": "completed",
-	"mergeStatus": "succeeded",
-	"autoCompleteSetBy": {
-					"id": "54d125f7-69f7-4191-904f-c5b96b6261c8",
-					"displayName": "Jamal Hartnett",
-					"uniqueName": "fabrikamfiber4@hotmail.com",
-					"url": "https://vssps.dev.azure.com/fabrikam/_apis/Identities/54d125f7-69f7-4191-904f-c5b96b6261c8",
-					"imageUrl": "https://dev.azure.com/fabrikam/DefaultCollection/_api/_common/identityImage?id=54d125f7-69f7-4191-904f-c5b96b6261c8"
-	},
-	"pullRequestId": 22,
-	"completionOptions": {
-					"bypassPolicy":false,
-					"bypassReason":"",
-					"deleteSourceBranch":false,
-					"mergeCommitMessage":"TEST MERGE COMMIT MESSAGE",
-					"mergeStrategy":"noFastForward",
-					"squashMerge":false,
-					"transitionWorkItems":true,
-					"triggeredByAutoComplete":false
-	}
-}
-`
-
 func TestAzureDevopsClient_GitStatusContextFromSrc(t *testing.T) {
 	cases := []struct {
 		src      string

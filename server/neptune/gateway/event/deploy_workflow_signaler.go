@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"fmt"
+
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
@@ -99,7 +100,7 @@ func (d *DeployWorkflowSignaler) generateSteps(steps []valid.Step) []workflows.S
 	return workflowSteps
 }
 
-func (p *DeployWorkflowSignaler) generatePlanMode(cfg *valid.MergedProjectCfg) workflows.PlanMode {
+func (d *DeployWorkflowSignaler) generatePlanMode(cfg *valid.MergedProjectCfg) workflows.PlanMode {
 	t, ok := cfg.Tags[Deprecated]
 	if ok && t == Destroy {
 		return workflows.DestroyPlanMode

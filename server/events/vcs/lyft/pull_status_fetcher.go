@@ -88,8 +88,8 @@ func (s SQBasedPullStatusFetcher) isPRLocked(statuses []*github.RepoStatus, chec
 				if output != nil {
 					rawMetadata = output.GetTitle()
 				}
+				break
 			}
-			break
 		}
 	}
 

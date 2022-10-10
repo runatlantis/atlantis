@@ -23,7 +23,7 @@ func (t testFeatureAllocator) ShouldAllocate(featureID feature.Name, featureCtx 
 
 func TestChecksClientWrapper(t *testing.T) {
 	mergeabilityChecker := vcs.NewPullMergeabilityChecker("atlantis")
-	client, err := vcs.NewGithubClient("github.com", &vcs.GithubUserCredentials{"user", "pass"}, logging.NewNoopCtxLogger(t), mergeabilityChecker)
+	client, err := vcs.NewGithubClient("github.com", &vcs.GithubUserCredentials{User: "user", Token: "pass"}, logging.NewNoopCtxLogger(t), mergeabilityChecker)
 	assert.Nil(t, err)
 
 	scope := tally.NewTestScope("test", nil)

@@ -19,7 +19,7 @@ type receiverRegistry struct {
 	lock      sync.RWMutex
 }
 
-func NewReceiverRegistry() *receiverRegistry {
+func NewReceiverRegistry() *receiverRegistry { //nolint:golint // avoiding refactor while adding linter action
 	return &receiverRegistry{
 		receivers: map[string]map[chan string]bool{},
 	}
@@ -64,12 +64,12 @@ func (r *receiverRegistry) CleanUp() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	for jobId, recvMap := range r.receivers {
+	for jobID, recvMap := range r.receivers {
 		for ch := range recvMap {
 			close(ch)
-			delete(r.receivers[jobId], ch)
+			delete(r.receivers[jobID], ch)
 		}
-		delete(r.receivers, jobId)
+		delete(r.receivers, jobID)
 	}
 }
 

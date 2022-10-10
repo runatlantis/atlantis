@@ -73,7 +73,7 @@ func (t strictTestStore) Get(jobID string) (*job.Job, error) {
 		t.t.FailNow()
 	}
 	job, err := t.get.runners[t.get.count].Get(jobID)
-	t.get.count += 1
+	t.get.count++
 	return job, err
 }
 
@@ -82,7 +82,7 @@ func (t strictTestStore) Write(jobID string, output string) error {
 		t.t.FailNow()
 	}
 	err := t.write.runners[t.write.count].Write(jobID, output)
-	t.write.count += 1
+	t.write.count++
 	return err
 }
 
@@ -91,8 +91,7 @@ func (t strictTestStore) Remove(jobID string) {
 		t.t.FailNow()
 	}
 	t.remove.runners[t.remove.count].Remove(jobID)
-	t.remove.count += 1
-	return
+	t.remove.count++
 }
 
 func (t strictTestStore) Close(ctx context.Context, jobID string, status job.JobStatus) error {
@@ -100,7 +99,7 @@ func (t strictTestStore) Close(ctx context.Context, jobID string, status job.Job
 		t.t.FailNow()
 	}
 	err := t.close.runners[t.close.count].Close(ctx, jobID, status)
-	t.close.count += 1
+	t.close.count++
 	return err
 }
 
@@ -109,7 +108,7 @@ func (t strictTestStore) Cleanup(ctx context.Context) error {
 		t.t.FailNow()
 	}
 	err := t.cleanup.runners[t.cleanup.count].Cleanup(ctx)
-	t.cleanup.count += 1
+	t.cleanup.count++
 	return err
 }
 
@@ -153,7 +152,7 @@ func TestPartitionRegistry_Register(t *testing.T) {
 				count   int
 			}{
 				runners: []*testStore{
-					&testStore{
+					{
 						t:     t,
 						JobID: jobID,
 						Job: job.Job{
@@ -171,7 +170,7 @@ func TestPartitionRegistry_Register(t *testing.T) {
 				count   int
 			}{
 				runners: []*testReceiverRegistry{
-					&testReceiverRegistry{
+					{
 						t:     t,
 						JobID: jobID,
 						Ch:    buffer,
@@ -202,7 +201,7 @@ func TestPartitionRegistry_Register(t *testing.T) {
 				count   int
 			}{
 				runners: []*testStore{
-					&testStore{
+					{
 						t:     t,
 						JobID: jobID,
 						Job: job.Job{
@@ -220,7 +219,7 @@ func TestPartitionRegistry_Register(t *testing.T) {
 				count   int
 			}{
 				runners: []*testReceiverRegistry{
-					&testReceiverRegistry{
+					{
 						t:     t,
 						JobID: jobID,
 						Ch:    buffer,

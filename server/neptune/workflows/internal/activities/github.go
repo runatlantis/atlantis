@@ -160,7 +160,7 @@ func getCheckStateAndConclusion(internalState internal.CheckRunState) (string, s
 type FetchRootRequest struct {
 	Repo         internal.Repo
 	Root         root.Root
-	DeploymentId string
+	DeploymentID string
 	Revision     string
 }
 
@@ -177,7 +177,7 @@ func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootReque
 	if err != nil {
 		return FetchRootResponse{}, errors.Wrap(err, "processing request ref")
 	}
-	destinationPath := filepath.Join(a.DataDir, deploymentsDirName, request.DeploymentId)
+	destinationPath := filepath.Join(a.DataDir, deploymentsDirName, request.DeploymentID)
 	opts := &github.RepositoryContentGetOptions{
 		Ref: ref,
 	}

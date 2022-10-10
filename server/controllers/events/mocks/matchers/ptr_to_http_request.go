@@ -9,25 +9,25 @@ import (
 	http "net/http"
 )
 
-func AnyPtrToHttpRequest() *http.Request {
+func AnyPtrToHTTPRequest() *http.Request {
 	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(*http.Request))(nil)).Elem()))
 	var nullValue *http.Request
 	return nullValue
 }
 
-func EqPtrToHttpRequest(value *http.Request) *http.Request {
+func EqPtrToHTTPRequest(value *http.Request) *http.Request {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
 	var nullValue *http.Request
 	return nullValue
 }
 
-func NotEqPtrToHttpRequest(value *http.Request) *http.Request {
+func NotEqPtrToHTTPRequest(value *http.Request) *http.Request {
 	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
 	var nullValue *http.Request
 	return nullValue
 }
 
-func PtrToHttpRequestThat(matcher pegomock.ArgumentMatcher) *http.Request {
+func PtrToHTTPRequestThat(matcher pegomock.ArgumentMatcher) *http.Request {
 	pegomock.RegisterMatcher(matcher)
 	var nullValue *http.Request
 	return nullValue

@@ -172,14 +172,14 @@ func TestPost_GitlabMergeRequestError(t *testing.T) {
 	t.Log("if getting the gitlab merge request fails we return 400 with error")
 
 	// setup
-	e, gl, p, _, _, _, gl_getter := setup(t)
+	e, gl, p, _, _, _, glGetter := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{}
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
 	When(p.ParseGitlabMergeRequestEvent(gitlab.MergeEvent{})).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
-	When(gl_getter.GetMergeRequest(repo.FullName, pullRequest.Num)).ThenReturn(nil, errors.New("error"))
+	When(glGetter.GetMergeRequest(repo.FullName, pullRequest.Num)).ThenReturn(nil, errors.New("error"))
 	w := httptest.NewRecorder()
 
 	// act

@@ -32,7 +32,7 @@ func TestAtlantisMessageHandler_PostSuccess(t *testing.T) {
 
 	err := handler.ProcessMessage(toSqsMessage(t, req))
 	assert.NoError(t, err)
-	mockPostHandler.VerifyWasCalledOnce().Post(matchers.AnyHttpResponseWriter(), matchers.AnyPtrToHttpRequest())
+	mockPostHandler.VerifyWasCalledOnce().Post(matchers.AnyHTTPResponseWriter(), matchers.AnyPtrToHTTPRequest())
 	Assert(t, testScope.Snapshot().Counters()["test.success+"].Value() == 1, "message handler was successful")
 }
 
@@ -49,7 +49,7 @@ func TestAtlantisMessageHandler_Error(t *testing.T) {
 	invalidMessage := types.Message{}
 	err := handler.ProcessMessage(invalidMessage)
 	assert.Error(t, err)
-	mockPostHandler.VerifyWasCalled(Never()).Post(matchers.AnyHttpResponseWriter(), matchers.AnyPtrToHttpRequest())
+	mockPostHandler.VerifyWasCalled(Never()).Post(matchers.AnyHTTPResponseWriter(), matchers.AnyPtrToHTTPRequest())
 	Assert(t, testScope.Snapshot().Counters()["test.error+"].Value() == 1, "message handler was not successful")
 }
 
@@ -58,7 +58,7 @@ func toSqsMessage(t *testing.T, req *http.Request) types.Message {
 	err := req.Write(buffer)
 	assert.NoError(t, err)
 	return types.Message{
-		Body: aws.String(string(buffer.Bytes())),
+		Body: aws.String(buffer.String()),
 	}
 }
 

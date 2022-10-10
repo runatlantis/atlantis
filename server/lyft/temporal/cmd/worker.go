@@ -43,7 +43,7 @@ func NewWorkerCmd(config WorkerConfig) *cobra.Command {
 }
 
 func NewWorker(config WorkerConfig) worker.Worker {
-	workflowClient, err := client.NewClient(client.Options{})
+	workflowClient, err := client.NewLazyClient(client.Options{})
 
 	if err != nil {
 		log.Fatal(err.Error())

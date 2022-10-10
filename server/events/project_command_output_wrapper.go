@@ -16,14 +16,14 @@ type ProjectOutputWrapper struct {
 }
 
 func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectResult {
-	statusId, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.PendingCommitStatus)
+	statusID, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.PendingCommitStatus)
 	if err != nil {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
 
-	// Write the statusId to project context which is used by the command runners when making consecutive status updates
+	// Write the statusID to project context which is used by the command runners when making consecutive status updates
 	// Noop when checks is not enabled
-	ctx.StatusId = statusId
+	ctx.StatusID = statusID
 
 	result := p.ProjectCommandRunner.Plan(ctx)
 	if result.Error != nil || result.Failure != "" {
@@ -41,14 +41,14 @@ func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectR
 }
 
 func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
-	statusId, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.PendingCommitStatus)
+	statusID, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.PendingCommitStatus)
 	if err != nil {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
 
-	// Write the statusId to project context which is used by the command runners when making consecutive status updates
+	// Write the statusID to project context which is used by the command runners when making consecutive status updates
 	// Noop when checks is not enabled
-	ctx.StatusId = statusId
+	ctx.StatusID = statusID
 
 	result := p.ProjectCommandRunner.Apply(ctx)
 	if result.Error != nil || result.Failure != "" {

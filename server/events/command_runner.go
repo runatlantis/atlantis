@@ -16,7 +16,6 @@ package events
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -26,7 +25,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/logging/fields"
-	contextInternal "github.com/runatlantis/atlantis/server/neptune/gateway/context"
 	"github.com/runatlantis/atlantis/server/recovery"
 	"github.com/uber-go/tally/v4"
 )
@@ -104,7 +102,6 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(ctx context.Context, baseRepo 
 	}
 	defer c.Drainer.OpDone()
 
-	//ctx = newCtx(ctx, baseRepo.FullName, pull.Num)
 	defer c.logPanics(ctx)
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
@@ -140,7 +137,10 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(ctx context.Context, baseRepo 
 
 	if err := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmdCtx); err != nil {
 		c.Logger.ErrorContext(ctx, "Error running pre-workflow hooks", fields.PullRequestWithErr(pull, err))
-		c.CommitStatusUpdater.UpdateCombined(ctx, cmdCtx.HeadRepo, cmdCtx.Pull, models.FailedCommitStatus, command.Plan, "", err.Error())
+		_, err := c.CommitStatusUpdater.UpdateCombined(ctx, cmdCtx.HeadRepo, cmdCtx.Pull, models.FailedCommitStatus, command.Plan, "", err.Error())
+		if err != nil {
+			c.Logger.ErrorContext(ctx, err.Error())
+		}
 		return
 	}
 
@@ -163,7 +163,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(ctx context.Context, baseRepo m
 	}
 	defer c.Drainer.OpDone()
 
-	//ctx = newCtx(ctx, baseRepo.FullName, pullNum)
 	defer c.logPanics(ctx)
 
 	scope := c.StatsScope.SubScope("comment")
@@ -210,18 +209,16 @@ func (c *DefaultCommandRunner) RunCommentCommand(ctx context.Context, baseRepo m
 		}
 
 		c.Logger.ErrorContext(ctx, "Error running pre-workflow hooks", fields.PullRequestWithErr(pull, err))
-		c.CommitStatusUpdater.UpdateCombined(ctx, cmdCtx.HeadRepo, cmdCtx.Pull, models.FailedCommitStatus, cmdName, "", err.Error())
+		_, err := c.CommitStatusUpdater.UpdateCombined(ctx, cmdCtx.HeadRepo, cmdCtx.Pull, models.FailedCommitStatus, cmdName, "", err.Error())
+		if err != nil {
+			c.Logger.ErrorContext(ctx, err.Error())
+		}
 		return
 	}
 
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
 
 	cmdRunner.Run(cmdCtx, cmd)
-}
-
-func newCtx(ctx context.Context, repoFullName string, pullNum int) context.Context {
-	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, repoFullName)
-	return context.WithValue(ctx, contextInternal.PullNumKey, strconv.Itoa(pullNum))
 }
 
 func (c *DefaultCommandRunner) validateCtxAndComment(cmdCtx *command.Context) bool {

@@ -164,15 +164,6 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	}
 }
 
-func (g GlobalCfg) toValidWorkflows(workflows map[string]Workflow) map[string]valid.Workflow {
-	validWorkflows := make(map[string]valid.Workflow)
-	for k, v := range workflows {
-		validatedWorkflow := v.ToValid(k)
-		validWorkflows[k] = validatedWorkflow
-	}
-	return validWorkflows
-}
-
 // HasRegexID returns true if r is configured with a regex id instead of an
 // exact match id.
 func (r Repo) HasRegexID() bool {

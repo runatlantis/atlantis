@@ -52,7 +52,7 @@ func ExtractFieldsAsList(ctx KVStore) []interface{} {
 }
 
 // Copies fields from a context to a new context created from a given base.
-func CopyFields(base context.Context, from context.Context) context.Context {
+func CopyFields(base context.Context, from KVStore) context.Context {
 	for _, k := range Keys {
 		base = context.WithValue(base, k, from.Value(k))
 	}

@@ -42,12 +42,12 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	echoCommand := exec.Command("sh", "-c", "echo hello")
 
 	testCommandBuilder := &testCommandBuilder{
-		t:       t,
-		version: nil,
-		path:    path,
+		t:          t,
+		version:    nil,
+		path:       path,
 		subCommand: cmd,
-		resp:    echoCommand,
-		err:     nil,
+		resp:       echoCommand,
+		err:        nil,
 	}
 	client := &AsyncClient{
 		CommandBuilder: testCommandBuilder,
@@ -56,8 +56,8 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	testFunc := func(ctx context.Context) (string, error) {
 		buf := &bytes.Buffer{}
 		r := &RunCommandRequest{
-			RootPath: path,
-			SubCommand: cmd,
+			RootPath:          path,
+			SubCommand:        cmd,
 			AdditionalEnvVars: map[string]string{},
 		}
 		err := client.RunCommand(ctx, r, RunOptions{
@@ -83,12 +83,12 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 
 	cmd := NewSubCommand(Plan)
 	testCommandBuilder := &testCommandBuilder{
-		t:       t,
-		version: nil,
-		path:    path,
+		t:          t,
+		version:    nil,
+		path:       path,
 		subCommand: cmd,
-		resp:    echoCommand,
-		err:     nil,
+		resp:       echoCommand,
+		err:        nil,
 	}
 	client := &AsyncClient{
 		CommandBuilder: testCommandBuilder,
@@ -96,8 +96,8 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	testFunc := func(ctx context.Context) (string, error) {
 		buf := &bytes.Buffer{}
 		r := &RunCommandRequest{
-			RootPath: path,
-			SubCommand: cmd,
+			RootPath:          path,
+			SubCommand:        cmd,
 			AdditionalEnvVars: map[string]string{},
 		}
 		err := client.RunCommand(ctx, r, RunOptions{
@@ -124,12 +124,12 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 
 	cmd := NewSubCommand(Plan)
 	testCommandBuilder := &testCommandBuilder{
-		t:       t,
-		version: nil,
-		path:    path,
+		t:          t,
+		version:    nil,
+		path:       path,
 		subCommand: cmd,
-		resp:    echoCommand,
-		err:     nil,
+		resp:       echoCommand,
+		err:        nil,
 	}
 	client := &AsyncClient{
 		CommandBuilder: testCommandBuilder,
@@ -138,8 +138,8 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	testFunc := func(ctx context.Context) (string, error) {
 		buf := &bytes.Buffer{}
 		r := &RunCommandRequest{
-			RootPath: path,
-			SubCommand: cmd,
+			RootPath:          path,
+			SubCommand:        cmd,
 			AdditionalEnvVars: map[string]string{},
 		}
 		err := client.RunCommand(ctx, r, RunOptions{
