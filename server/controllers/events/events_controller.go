@@ -139,8 +139,9 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 }
 
 type HTTPError struct {
-	err  error
-	code int
+	err        error
+	code       int
+	isSilenced bool
 }
 
 type HTTPResponse struct {
@@ -180,7 +181,9 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	}
 
 	if resp.err.code != 0 {
-		logger.Err("error handling gh post code: %d err: %s", resp.err.code, resp.err.err.Error())
+		if !resp.err.isSilenced {
+			logger.Err("error handling gh post code: %d err: %s", resp.err.code, resp.err.err.Error())
+		}
 		scope.Counter(fmt.Sprintf("error_%d", resp.err.code)).Inc(1)
 		w.WriteHeader(resp.err.code)
 		fmt.Fprintln(w, resp.err.err.Error())
@@ -294,8 +297,9 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{
-				code: http.StatusBadRequest,
-				err:  wrapped,
+				code:       http.StatusBadRequest,
+				err:        wrapped,
+				isSilenced: false,
 			},
 		}
 	}
@@ -401,8 +405,9 @@ func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.Simple
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{
-				code: http.StatusBadRequest,
-				err:  wrapped,
+				code:       http.StatusBadRequest,
+				err:        wrapped,
+				isSilenced: false,
 			},
 		}
 	}
@@ -425,8 +430,9 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 		return HTTPResponse{
 			body: err.Error(),
 			err: HTTPError{
-				code: http.StatusForbidden,
-				err:  err,
+				code:       http.StatusForbidden,
+				err:        err,
+				isSilenced: e.SilenceAllowlistErrors,
 			},
 		}
 	}
@@ -453,8 +459,9 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 			return HTTPResponse{
 				body: err.Error(),
 				err: HTTPError{
-					code: http.StatusForbidden,
-					err:  err,
+					code:       http.StatusForbidden,
+					err:        err,
+					isSilenced: false,
 				},
 			}
 		}
@@ -538,11 +545,13 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		e.commentNotAllowlisted(baseRepo, pullNum)
 
 		err := errors.New("Repo not allowlisted")
+
 		return HTTPResponse{
 			body: err.Error(),
 			err: HTTPError{
-				err:  err,
-				code: http.StatusForbidden,
+				err:        err,
+				code:       http.StatusForbidden,
+				isSilenced: e.SilenceAllowlistErrors,
 			},
 		}
 	}
