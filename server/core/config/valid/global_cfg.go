@@ -2,11 +2,12 @@ package valid
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/graymeta/stow"
-	"github.com/graymeta/stow/s3"
+	stow_s3 "github.com/graymeta/stow/s3"
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
-	"regexp"
 )
 
 const MergeableApplyReq = "mergeable"
@@ -37,6 +38,12 @@ const (
 	PlatformWorkflowMode
 )
 
+type BackendType string
+
+const (
+	S3Backend BackendType = "s3"
+)
+
 // GlobalCfg is the final parsed version of server-side repo config.
 type GlobalCfg struct {
 	Repos                []Repo
@@ -46,8 +53,21 @@ type GlobalCfg struct {
 	PolicySets           PolicySets
 	Metrics              Metrics
 	Jobs                 Jobs
+	PersistenceConfig    PersistenceConfig
 	TerraformLogFilter   TerraformLogFilters
 	Temporal             Temporal
+}
+
+type PersistenceConfig struct {
+	Deployments StoreConfig
+	Jobs        StoreConfig
+}
+
+type StoreConfig struct {
+	ContainerName string
+	Prefix        string
+	BackendType   BackendType
+	Config        stow.Config
 }
 
 // Interface to configure the storage backends
@@ -75,7 +95,7 @@ func (s *S3) GetConfigMap() stow.Config {
 	// Only supports Iam auth type for now
 	// TODO: Add accesskeys auth type
 	return stow.ConfigMap{
-		s3.ConfigAuthType: "iam",
+		stow_s3.ConfigAuthType: "iam",
 	}
 }
 

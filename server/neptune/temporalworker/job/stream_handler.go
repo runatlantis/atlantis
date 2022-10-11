@@ -87,7 +87,7 @@ func (s *StreamHandler) Handle() {
 		s.ReceiverRegistry.Broadcast(*msg)
 
 		// Append new log to the output buffer for the job
-		err := s.Store.Write(msg.JobID, msg.Line)
+		err := s.Store.Write(context.Background(), msg.JobID, msg.Line)
 		if err != nil {
 			s.Logger.Warn(fmt.Sprintf("appending log: %s for job: %s: %v", msg.Line, msg.JobID, err))
 		}

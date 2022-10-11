@@ -1,13 +1,12 @@
 package workflows
 
 import (
-	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
-	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -39,8 +38,8 @@ type DeployActivities struct {
 	activities.Deploy
 }
 
-func NewDeployActivities(appConfig githubapp.Config, scope tally.Scope) (*DeployActivities, error) {
-	deployActivities, err := activities.NewDeploy(appConfig, scope)
+func NewDeployActivities(deploymentCfg valid.StoreConfig) (*DeployActivities, error) {
+	deployActivities, err := activities.NewDeploy(deploymentCfg)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing deploy activities")

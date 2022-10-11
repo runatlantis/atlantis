@@ -19,12 +19,12 @@ type testStore struct {
 	Status job.JobStatus
 }
 
-func (t *testStore) Get(jobID string) (*job.Job, error) {
+func (t *testStore) Get(ctx context.Context, jobID string) (*job.Job, error) {
 	assert.Equal(t.t, t.JobID, jobID)
 	return &t.Job, t.Err
 }
 
-func (t *testStore) Write(jobID string, output string) error {
+func (t *testStore) Write(ctx context.Context, jobID string, output string) error {
 	assert.Equal(t.t, t.JobID, jobID)
 	assert.Equal(t.t, t.Output, output)
 	return t.Err
@@ -68,20 +68,20 @@ type strictTestStore struct {
 	}
 }
 
-func (t strictTestStore) Get(jobID string) (*job.Job, error) {
+func (t strictTestStore) Get(ctx context.Context, jobID string) (*job.Job, error) {
 	if t.get.count > len(t.get.runners)-1 {
 		t.t.FailNow()
 	}
-	job, err := t.get.runners[t.get.count].Get(jobID)
+	job, err := t.get.runners[t.get.count].Get(ctx, jobID)
 	t.get.count++
 	return job, err
 }
 
-func (t strictTestStore) Write(jobID string, output string) error {
+func (t strictTestStore) Write(ctx context.Context, jobID string, output string) error {
 	if t.write.count > len(t.write.runners)-1 {
 		t.t.FailNow()
 	}
-	err := t.write.runners[t.write.count].Write(jobID, output)
+	err := t.write.runners[t.write.count].Write(ctx, jobID, output)
 	t.write.count++
 	return err
 }
@@ -132,7 +132,7 @@ func TestPartitionRegistry_Register(t *testing.T) {
 		}
 
 		buffer := make(chan string, 100)
-		go partitionRegistry.Register(jobID, buffer)
+		go partitionRegistry.Register(context.Background(), jobID, buffer)
 
 		receivedLogs := []string{}
 		for line := range buffer {
@@ -189,7 +189,7 @@ func TestPartitionRegistry_Register(t *testing.T) {
 			for range buffer {
 			}
 		}()
-		partitionRegistry.Register(jobID, buffer)
+		partitionRegistry.Register(context.Background(), jobID, buffer)
 	})
 
 	t.Run("closes receiver after streaming complete job", func(t *testing.T) {
@@ -241,7 +241,7 @@ func TestPartitionRegistry_Register(t *testing.T) {
 			}
 			wg.Done()
 		}()
-		partitionRegistry.Register(jobID, buffer)
+		partitionRegistry.Register(context.Background(), jobID, buffer)
 
 		// Read goroutine exits only when the buffer is closed
 		wg.Wait()

@@ -8,10 +8,13 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	legacy_tf "github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/github"
+	"github.com/runatlantis/atlantis/server/neptune/storage"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/job"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/deployment"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	repo "github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github/link"
@@ -39,9 +42,22 @@ type Deploy struct {
 	*dbActivities
 }
 
-func NewDeploy(config githubapp.Config, scope tally.Scope) (*Deploy, error) {
+func NewDeploy(deploymentStoreCfg valid.StoreConfig) (*Deploy, error) {
+
+	storageClient, err := storage.NewClient(deploymentStoreCfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "intializing stow client")
+	}
+
+	deploymentStore, err := deployment.NewStore(storageClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing deployment info store")
+	}
+
 	return &Deploy{
-		dbActivities: &dbActivities{},
+		dbActivities: &dbActivities{
+			DeploymentInfoStore: deploymentStore,
+		},
 	}, nil
 }
 

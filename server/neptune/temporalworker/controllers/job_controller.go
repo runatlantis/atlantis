@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,7 +25,7 @@ type receiverRegistry interface {
 }
 
 type store interface {
-	Get(jobID string) (*job.Job, error)
+	Get(ctx context.Context, jobID string) (*job.Job, error)
 }
 
 type JobsController struct {

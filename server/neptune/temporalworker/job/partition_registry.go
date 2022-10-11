@@ -1,6 +1,7 @@
 package job
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/runatlantis/atlantis/server/logging"
@@ -11,7 +12,7 @@ type receiverAdder interface {
 }
 
 type storeGetter interface {
-	Get(jobID string) (*Job, error)
+	Get(ctx context.Context, jobID string) (*Job, error)
 }
 
 type PartitionRegistry struct {
@@ -20,8 +21,8 @@ type PartitionRegistry struct {
 	Logger           logging.Logger
 }
 
-func (p PartitionRegistry) Register(key string, buffer chan string) {
-	job, err := p.Store.Get(key)
+func (p PartitionRegistry) Register(ctx context.Context, key string, buffer chan string) {
+	job, err := p.Store.Get(ctx, key)
 	if err != nil || job == nil {
 		p.Logger.Error(fmt.Sprintf("getting key partition: %s, err: %v", key, err))
 		return
