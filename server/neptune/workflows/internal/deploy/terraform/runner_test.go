@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
@@ -62,7 +61,6 @@ func parentWorkflow(ctx workflow.Context, r request) (response, error) {
 	receiver := &testStateReceiver{}
 	runner := &terraform.WorkflowRunner{
 		StateReceiver: receiver,
-		Repo:          github.Repo{},
 		Workflow:      testTerraformWorkflow,
 	}
 

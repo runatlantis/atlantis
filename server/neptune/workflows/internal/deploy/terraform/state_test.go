@@ -36,7 +36,6 @@ func testStateReceiveWorkflow(ctx workflow.Context, r stateReceiveRequest) error
 	ch := workflow.NewChannel(ctx)
 
 	receiver := &terraform.StateReceiver{
-		Repo:     github.Repo{Name: "hello"},
 		Activity: &testActivities{},
 	}
 
@@ -49,6 +48,7 @@ func testStateReceiveWorkflow(ctx workflow.Context, r stateReceiveRequest) error
 	receiver.Receive(ctx, ch, terraform.DeploymentInfo{
 		CheckRunID: 1,
 		Root:       root.Root{Name: "root"},
+		Repo:       github.Repo{Name: "hello"},
 	})
 
 	return nil

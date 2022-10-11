@@ -8,7 +8,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	temporalInternal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/temporal"
 	"go.temporal.io/sdk/temporal"
@@ -66,22 +65,6 @@ type Runner struct {
 }
 
 func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workflow) *Runner {
-	// convert to internal types, we should probably move these into another struct
-	repo := github.Repo{
-		Name:  request.Repository.Name,
-		Owner: request.Repository.Owner,
-		URL:   request.Repository.URL,
-		Credentials: github.AppCredentials{
-			InstallationToken: request.Repository.Credentials.InstallationToken,
-		},
-		HeadCommit: github.Commit{
-			Ref: github.Ref{
-				Name: request.Repository.HeadCommit.Ref.Name,
-				Type: request.Repository.HeadCommit.Ref.Type,
-			},
-		},
-	}
-
 	// inject dependencies
 
 	// temporal effectively "injects" this, it just cares about the method names,
@@ -89,14 +72,13 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 	var a *workerActivities
 
 	revisionQueue := queue.NewQueue()
-	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, repo, a, sideeffect.GenerateUUID)
-	tfWorkflowRunner := terraform.NewWorkflowRunner(repo, a, tfWorkflow)
+	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, a, sideeffect.GenerateUUID)
+	tfWorkflowRunner := terraform.NewWorkflowRunner(a, tfWorkflow)
 
 	worker := &queue.Worker{
 		Queue:                   revisionQueue,
 		TerraformWorkflowRunner: tfWorkflowRunner,
 		DbActivities:            a,
-		Repo:                    repo,
 	}
 
 	return &Runner{

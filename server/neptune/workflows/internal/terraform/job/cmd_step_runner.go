@@ -2,9 +2,9 @@ package job
 
 import (
 	"context"
-
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"go.temporal.io/sdk/workflow"
@@ -16,11 +16,12 @@ type executeCommandActivities interface {
 
 type CmdStepRunner struct {
 	Activity executeCommandActivities
+	Ref      github.Ref
 }
 
 func (r *CmdStepRunner) Run(executionContext *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) (string, error) {
 	relPath := localRoot.RelativePathFromRepo()
-	ref, err := localRoot.Repo.HeadCommit.Ref.String()
+	ref, err := r.Ref.String()
 	if err != nil {
 		return "", errors.Wrap(err, "processing request ref")
 	}
@@ -32,7 +33,6 @@ func (r *CmdStepRunner) Run(executionContext *job.ExecutionContext, localRoot *r
 		"HEAD_COMMIT":     ref,
 		"PROJECT_NAME":    localRoot.Root.Name,
 		"REPO_REL_DIR":    relPath,
-		"USER_NAME":       localRoot.Repo.HeadCommit.Author.Username,
 	}
 
 	var resp activities.ExecuteCommandResponse

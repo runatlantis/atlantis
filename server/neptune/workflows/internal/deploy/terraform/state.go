@@ -17,7 +17,6 @@ type receiverActivities interface {
 }
 
 type StateReceiver struct {
-	Repo     github.Repo
 	Activity receiverActivities
 }
 
@@ -43,7 +42,7 @@ func (n *StateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel,
 	request := activities.UpdateCheckRunRequest{
 		Title:   BuildCheckRunTitle(deploymentInfo.Root.Name),
 		State:   checkRunState,
-		Repo:    n.Repo,
+		Repo:    deploymentInfo.Repo,
 		ID:      deploymentInfo.CheckRunID,
 		Summary: summary,
 	}

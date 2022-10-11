@@ -17,7 +17,6 @@ type Root = request.Root
 type Job = request.Job
 type Step = request.Step
 type AppCredentials = request.AppCredentials
-type HeadCommit = request.Commit
 type Ref = request.Ref
 type PlanMode = request.PlanMode
 type Trigger = request.Trigger

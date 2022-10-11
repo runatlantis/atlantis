@@ -53,10 +53,6 @@ func testWorkflow(ctx workflow.Context, r request) (response, error) {
 		Queue:                   q,
 		TerraformWorkflowRunner: &testTerraformWorkflowRunner{},
 		DbActivities:            wa,
-		Repo: github.Repo{
-			Owner: "owner",
-			Name:  "test",
-		},
 	}
 
 	err := workflow.SetQueryHandler(ctx, "queue", func() (queueAndState, error) {
@@ -111,6 +107,10 @@ func TestWorker(t *testing.T) {
 			Root: root.Root{
 				Name: "root_1",
 			},
+			Repo: github.Repo{
+				Owner: "owner",
+				Name:  "test",
+			},
 		},
 		{
 			ID:         uuid.UUID{},
@@ -118,6 +118,10 @@ func TestWorker(t *testing.T) {
 			CheckRunID: 5678,
 			Root: root.Root{
 				Name: "root_2",
+			},
+			Repo: github.Repo{
+				Owner: "owner",
+				Name:  "test",
 			},
 		},
 	}
@@ -172,6 +176,10 @@ func TestWorker(t *testing.T) {
 				Root: root.Root{
 					Name: "root_1",
 				},
+				Repo: github.Repo{
+					Owner: "owner",
+					Name:  "test",
+				},
 			},
 			{
 				ID:         uuid.UUID{},
@@ -179,6 +187,10 @@ func TestWorker(t *testing.T) {
 				CheckRunID: 5678,
 				Root: root.Root{
 					Name: "root_2",
+				},
+				Repo: github.Repo{
+					Owner: "owner",
+					Name:  "test",
 				},
 			},
 		},

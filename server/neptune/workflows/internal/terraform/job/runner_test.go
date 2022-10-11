@@ -22,15 +22,6 @@ const JobID = "1234"
 var repo = github.Repo{
 	Name:  RepoName,
 	Owner: RepoOwner,
-	HeadCommit: github.Commit{
-		Ref: github.Ref{
-			Name: RefName,
-			Type: RefType,
-		},
-		Author: github.User{
-			Username: UserName,
-		},
-	},
 }
 
 type testTerraformActivity struct {

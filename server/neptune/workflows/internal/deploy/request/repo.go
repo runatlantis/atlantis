@@ -22,11 +22,7 @@ type Repo struct {
 	URL string
 
 	Credentials AppCredentials
-	HeadCommit  Commit
-}
-
-type Commit struct {
-	Ref Ref
+	Ref         Ref
 }
 
 type Ref struct {

@@ -2,7 +2,6 @@ package job
 
 import (
 	"context"
-
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"

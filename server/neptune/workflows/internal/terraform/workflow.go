@@ -85,6 +85,7 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 
 	cmdStepRunner := runner.CmdStepRunner{
 		Activity: ta,
+		Ref:      request.Repo.Ref,
 	}
 
 	parent := workflow.GetInfo(ctx).ParentWorkflowExecution

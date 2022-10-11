@@ -2,7 +2,6 @@ package terraform
 
 import (
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"go.temporal.io/sdk/workflow"
@@ -14,12 +13,10 @@ type stateReceiver interface {
 	Receive(ctx workflow.Context, c workflow.ReceiveChannel, deploymentInfo DeploymentInfo)
 }
 
-func NewWorkflowRunner(repo github.Repo, a receiverActivities, w Workflow) *WorkflowRunner {
+func NewWorkflowRunner(a receiverActivities, w Workflow) *WorkflowRunner {
 	return &WorkflowRunner{
-		Repo:     repo,
 		Workflow: w,
 		StateReceiver: &StateReceiver{
-			Repo:     repo,
 			Activity: a,
 		},
 	}
@@ -27,7 +24,6 @@ func NewWorkflowRunner(repo github.Repo, a receiverActivities, w Workflow) *Work
 
 type WorkflowRunner struct {
 	StateReceiver stateReceiver
-	Repo          github.Repo
 	Workflow      Workflow
 }
 
@@ -37,8 +33,8 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 		WorkflowID: id.String(),
 	})
 	terraformWorkflowRequest := terraform.Request{
-		Repo:         r.Repo,
 		Root:         deploymentInfo.Root,
+		Repo:         deploymentInfo.Repo,
 		DeploymentID: id.String(),
 		Revision:     deploymentInfo.Revision,
 	}

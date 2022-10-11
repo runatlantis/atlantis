@@ -1,8 +1,6 @@
 package github
 
 type Repo struct {
-	HeadCommit Commit
-
 	// Owner is just the repo owner
 	Owner string
 	// Name is just the repo name, this will never have
@@ -12,6 +10,7 @@ type Repo struct {
 	URL string
 
 	Credentials AppCredentials
+	Ref         Ref
 }
 
 func (r Repo) GetFullName() string {
