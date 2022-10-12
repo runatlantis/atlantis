@@ -18,7 +18,7 @@ const (
 	Err               = Key("err")
 )
 
-var Keys = []Key{RequestIDKey, RepositoryKey, PullNumKey, ProjectKey, SHAKey, InstallationIDKey}
+var Keys = []Key{RequestIDKey, RepositoryKey, PullNumKey, ProjectKey, SHAKey, InstallationIDKey, Err}
 
 // Extracts relevant fields from context for structured logging.
 func ExtractFields(ctx context.Context) map[string]interface{} {
