@@ -115,7 +115,7 @@ a pull request mergeable.
 :::
 
 ::: warning
-If you set `atlantis/apply` to the mergeable requirement, use the `--gh-allow-mergeable-bypass-apply` flag or set the `ATLANTIS_GH_MERGEABLE_BYPASS_APPLY=true` environment variable. This flag and environment variable allow the mergeable check before executing `atlantis apply` to skip checking the status of `atlantis/apply`.
+If you set `atlantis/apply` to the mergeable requirement, use the `--gh-allow-mergeable-bypass-apply` flag or set the `ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY=true` environment variable. This flag and environment variable allow the mergeable check before executing `atlantis apply` to skip checking the status of `atlantis/apply`.
 :::
 
 #### GitLab
