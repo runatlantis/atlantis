@@ -23,7 +23,7 @@ type testJobCloser struct {
 	called bool
 }
 
-func (t *testJobCloser) CloseJob(jobID string, repo models.Repo) {
+func (t *testJobCloser) CloseJob(ctx context.Context, jobID string, repo models.Repo) {
 	t.called = true
 }
 

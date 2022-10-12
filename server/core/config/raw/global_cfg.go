@@ -20,10 +20,10 @@ type GlobalCfg struct {
 	DeploymentWorkflows  DeploymentWorkflows  `yaml:"deployment_workflows" json:"deployment_workflows"`
 	PolicySets           PolicySets           `yaml:"policies" json:"policies"`
 	Metrics              Metrics              `yaml:"metrics" json:"metrics"`
-	Jobs                 Jobs                 `yaml:"jobs" json:"jobs"`
 	TerraformLogFilters  TerraformLogFilters  `yaml:"terraform_log_filters" json:"terraform_log_filters"`
 	Temporal             Temporal             `yaml:"temporal" json:"temporal"`
 	Persistence          Persistence          `yaml:"persistence" json:"persistence"`
+	Jobs                 Jobs                 `yaml:"jobs" json:"jobs"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
@@ -75,9 +75,9 @@ func (g GlobalCfg) Validate() error {
 		validation.Field(&g.PullRequestWorkflows),
 		validation.Field(&g.DeploymentWorkflows),
 		validation.Field(&g.Metrics),
-		validation.Field(&g.Jobs),
 		validation.Field(&g.TerraformLogFilters),
 		validation.Field(&g.Persistence),
+		validation.Field(&g.Jobs),
 	)
 	if err != nil {
 		return err
@@ -153,6 +153,12 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	}
 	repos = append(defaultCfg.Repos, repos...)
 
+	// Override the persistence configuration for jobs if configured for backwards compatibility
+	validPersistenceConfig := g.Persistence.ToValid()
+	if g.Jobs.StorageBackend != nil {
+		validPersistenceConfig.Jobs = g.Jobs.ToStoreConfig()
+	}
+
 	return valid.GlobalCfg{
 		Repos:                repos,
 		Workflows:            validWorkflows,
@@ -160,8 +166,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 		DeploymentWorkflows:  validDeploymentWorkflows,
 		PolicySets:           policySets,
 		Metrics:              g.Metrics.ToValid(),
-		Jobs:                 g.Jobs.ToValid(),
-		PersistenceConfig:    g.Persistence.ToValid(),
+		PersistenceConfig:    validPersistenceConfig,
 		TerraformLogFilter:   g.TerraformLogFilters.ToValid(),
 		Temporal:             g.Temporal.ToValid(),
 	}

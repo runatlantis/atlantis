@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -45,13 +46,13 @@ type ProjectCommandOutputHandler interface {
 
 	// Register registers a channel and blocks until it is caught up. Callers should call this asynchronously when attempting
 	// to read the channel in the same goroutine
-	Register(jobID string, receiver chan string)
+	Register(ctx context.Context, jobID string, receiver chan string)
 
 	// Cleans up resources for a pull
 	CleanUp(pullInfo PullInfo)
 
 	// Persists job to storage backend and marks operation complete
-	CloseJob(jobID string, repo models.Repo)
+	CloseJob(ctx context.Context, jobID string, repo models.Repo)
 }
 
 // AsyncProjectCommandOutputHandler is a handler to transport terraform client
@@ -137,8 +138,8 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 	}
 }
 
-func (p *AsyncProjectCommandOutputHandler) Register(jobID string, connection chan string) {
-	job, err := p.JobStore.Get(jobID)
+func (p *AsyncProjectCommandOutputHandler) Register(ctx context.Context, jobID string, connection chan string) {
+	job, err := p.JobStore.Get(ctx, jobID)
 	if err != nil || job == nil {
 		p.logger.Error(fmt.Sprintf("getting job: %s, err: %v", jobID, err))
 		return
@@ -159,12 +160,12 @@ func (p *AsyncProjectCommandOutputHandler) Register(jobID string, connection cha
 	p.receiverRegistry.AddReceiver(jobID, connection)
 }
 
-func (p *AsyncProjectCommandOutputHandler) CloseJob(jobID string, repo models.Repo) {
+func (p *AsyncProjectCommandOutputHandler) CloseJob(ctx context.Context, jobID string, repo models.Repo) {
 	// Close active connections and remove receivers from registry
 	p.receiverRegistry.CloseAndRemoveReceiversForJob(jobID)
 
 	// Update job status and persist to storage if configured
-	if err := p.JobStore.SetJobCompleteStatus(jobID, repo.FullName, Complete); err != nil {
+	if err := p.JobStore.SetJobCompleteStatus(ctx, jobID, Complete); err != nil {
 		p.logger.Error(fmt.Sprintf("updating jobs status to complete, %v", err))
 	}
 }
@@ -206,10 +207,11 @@ func (p *NoopProjectOutputHandler) Send(ctx command.ProjectContext, msg string) 
 func (p *NoopProjectOutputHandler) Handle() {
 }
 
-func (p *NoopProjectOutputHandler) Register(jobID string, receiver chan string) {}
+func (p *NoopProjectOutputHandler) Register(ctx context.Context, jobID string, receiver chan string) {
+}
 
 func (p *NoopProjectOutputHandler) CleanUp(pullInfo PullInfo) {
 }
 
-func (p *NoopProjectOutputHandler) CloseJob(jobID string, repo models.Repo) {
+func (p *NoopProjectOutputHandler) CloseJob(ctx context.Context, jobID string, repo models.Repo) {
 }

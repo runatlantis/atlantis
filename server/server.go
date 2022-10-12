@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/events/terraform/filter"
+	"github.com/runatlantis/atlantis/server/neptune/storage"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/runatlantis/atlantis/server/instrumentation"
@@ -390,7 +391,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	projectJobsScope := statsScope.SubScope("getprojectjobs")
 
-	storageBackend, err := jobs.NewStorageBackend(globalCfg.Jobs, ctxLogger, featureAllocator, projectJobsScope)
+	storageClient, err := storage.NewClient(globalCfg.PersistenceConfig.Jobs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "initializing stow client")
+	}
+
+	storageBackend, err := jobs.NewStorageBackend(storageClient, ctxLogger, featureAllocator, projectJobsScope)
 	if err != nil {
 		return nil, errors.Wrapf(err, "initializing storage backend")
 	}

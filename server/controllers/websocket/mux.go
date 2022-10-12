@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -16,7 +17,7 @@ type PartitionKeyGenerator interface {
 // PartitionRegistry is the registry holding each partition
 // and is responsible for registering/deregistering new buffers
 type PartitionRegistry interface {
-	Register(key string, buffer chan string)
+	Register(ctx context.Context, key string, buffer chan string)
 }
 
 type Multiplexor interface {
@@ -62,7 +63,7 @@ func (m *multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 	// if the job DNE, the job is marked complete and we close the ws conn immediately
 
 	// spinning up a goroutine for this since we are attempting to block on the read side.
-	go m.registry.Register(key, buffer)
+	go m.registry.Register(context.Background(), key, buffer)
 
 	return errors.Wrapf(m.writer.Write(w, r, buffer), "writing to ws %s", key)
 }

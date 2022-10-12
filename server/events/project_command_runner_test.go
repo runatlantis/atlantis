@@ -344,7 +344,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 			var expCommitStatus models.CommitStatus
 
 			mockJobURLGenerator := commandMocks.NewMockJobURLGenerator()
-			mockJobCloser := mocks.NewMockJobCloser()
+			mockJobCloser := commandMocks.NewMockJobCloser()
 
 			if c.Success {
 				prjResult = command.ProjectResult{

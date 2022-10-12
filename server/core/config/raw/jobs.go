@@ -2,6 +2,8 @@ package raw
 
 import (
 	validation "github.com/go-ozzo/ozzo-validation"
+	"github.com/graymeta/stow"
+	stow_s3 "github.com/graymeta/stow/s3"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
@@ -11,10 +13,6 @@ type Jobs struct {
 
 type StorageBackend struct {
 	S3 *S3 `yaml:"s3" json:"s3"`
-}
-
-type S3 struct {
-	BucketName string `yaml:"bucket-name" json:"bucket-name"`
 }
 
 func (j Jobs) Validate() error {
@@ -44,12 +42,6 @@ func (s *StorageBackend) ToValid() valid.StorageBackend {
 	}
 }
 
-func (s S3) Validate() error {
-	return validation.ValidateStruct(&s,
-		validation.Field(&s.BucketName, validation.Required),
-	)
-}
-
 func (j *Jobs) ToValid() valid.Jobs {
 	if j.StorageBackend == nil {
 		return valid.Jobs{}
@@ -58,5 +50,16 @@ func (j *Jobs) ToValid() valid.Jobs {
 	storageBackend := j.StorageBackend.ToValid()
 	return valid.Jobs{
 		StorageBackend: &storageBackend,
+	}
+}
+
+func (j *Jobs) ToStoreConfig() valid.StoreConfig {
+	return valid.StoreConfig{
+		ContainerName: j.StorageBackend.S3.BucketName,
+		BackendType:   valid.S3Backend,
+		Config: stow.ConfigMap{
+			stow_s3.ConfigAuthType: "iam",
+		},
+		Prefix: "ouptut",
 	}
 }

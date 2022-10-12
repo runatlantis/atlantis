@@ -12,7 +12,7 @@ import (
 
 // Job Closer closes a job by marking op complete and clearing up buffers if logs are successfully persisted
 type JobCloser interface {
-	CloseJob(jobID string, repo models.Repo)
+	CloseJob(ctx context.Context, jobID string, repo models.Repo)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_job_url_generator.go ProjectJobURLGenerator
@@ -50,7 +50,7 @@ func (p ProjectStatusUpdater) UpdateProjectStatus(ctx ProjectContext, status mod
 
 	// Close the Job if the operation is complete
 	if status == models.SuccessCommitStatus || status == models.FailedCommitStatus {
-		p.JobCloser.CloseJob(ctx.JobID, ctx.BaseRepo)
+		p.JobCloser.CloseJob(ctx.RequestCtx, ctx.JobID, ctx.BaseRepo)
 	}
 	return statusID, err
 }

@@ -4,6 +4,7 @@
 package mocks
 
 import (
+	context "context"
 	pegomock "github.com/petergtz/pegomock"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	models "github.com/runatlantis/atlantis/server/events/models"
@@ -35,11 +36,11 @@ func (mock *MockProjectCommandOutputHandler) CleanUp(_param0 jobs.PullInfo) {
 	pegomock.GetGenericMockFrom(mock).Invoke("CleanUp", params, []reflect.Type{})
 }
 
-func (mock *MockProjectCommandOutputHandler) CloseJob(_param0 string, _param1 models.Repo) {
+func (mock *MockProjectCommandOutputHandler) CloseJob(_param0 context.Context, _param1 string, _param2 models.Repo) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{_param0, _param1, _param2}
 	pegomock.GetGenericMockFrom(mock).Invoke("CloseJob", params, []reflect.Type{})
 }
 
@@ -51,11 +52,11 @@ func (mock *MockProjectCommandOutputHandler) Handle() {
 	pegomock.GetGenericMockFrom(mock).Invoke("Handle", params, []reflect.Type{})
 }
 
-func (mock *MockProjectCommandOutputHandler) Register(_param0 string, _param1 chan string) {
+func (mock *MockProjectCommandOutputHandler) Register(_param0 context.Context, _param1 string, _param2 chan string) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{_param0, _param1, _param2}
 	pegomock.GetGenericMockFrom(mock).Invoke("Register", params, []reflect.Type{})
 }
 
@@ -131,8 +132,8 @@ func (c *MockProjectCommandOutputHandler_CleanUp_OngoingVerification) GetAllCapt
 	return
 }
 
-func (verifier *VerifierMockProjectCommandOutputHandler) CloseJob(_param0 string, _param1 models.Repo) *MockProjectCommandOutputHandler_CloseJob_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockProjectCommandOutputHandler) CloseJob(_param0 context.Context, _param1 string, _param2 models.Repo) *MockProjectCommandOutputHandler_CloseJob_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1, _param2}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CloseJob", params, verifier.timeout)
 	return &MockProjectCommandOutputHandler_CloseJob_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -142,21 +143,25 @@ type MockProjectCommandOutputHandler_CloseJob_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockProjectCommandOutputHandler_CloseJob_OngoingVerification) GetCapturedArguments() (string, models.Repo) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+func (c *MockProjectCommandOutputHandler_CloseJob_OngoingVerification) GetCapturedArguments() (context.Context, string, models.Repo) {
+	_param0, _param1, _param2 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
 }
 
-func (c *MockProjectCommandOutputHandler_CloseJob_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.Repo) {
+func (c *MockProjectCommandOutputHandler_CloseJob_OngoingVerification) GetAllCapturedArguments() (_param0 []context.Context, _param1 []string, _param2 []models.Repo) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
+		_param0 = make([]context.Context, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(string)
+			_param0[u] = param.(context.Context)
 		}
-		_param1 = make([]models.Repo, len(c.methodInvocations))
+		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.Repo)
+			_param1[u] = param.(string)
+		}
+		_param2 = make([]models.Repo, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(models.Repo)
 		}
 	}
 	return
@@ -179,8 +184,8 @@ func (c *MockProjectCommandOutputHandler_Handle_OngoingVerification) GetCaptured
 func (c *MockProjectCommandOutputHandler_Handle_OngoingVerification) GetAllCapturedArguments() {
 }
 
-func (verifier *VerifierMockProjectCommandOutputHandler) Register(_param0 string, _param1 chan string) *MockProjectCommandOutputHandler_Register_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockProjectCommandOutputHandler) Register(_param0 context.Context, _param1 string, _param2 chan string) *MockProjectCommandOutputHandler_Register_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1, _param2}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Register", params, verifier.timeout)
 	return &MockProjectCommandOutputHandler_Register_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -190,21 +195,25 @@ type MockProjectCommandOutputHandler_Register_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockProjectCommandOutputHandler_Register_OngoingVerification) GetCapturedArguments() (string, chan string) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+func (c *MockProjectCommandOutputHandler_Register_OngoingVerification) GetCapturedArguments() (context.Context, string, chan string) {
+	_param0, _param1, _param2 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
 }
 
-func (c *MockProjectCommandOutputHandler_Register_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []chan string) {
+func (c *MockProjectCommandOutputHandler_Register_OngoingVerification) GetAllCapturedArguments() (_param0 []context.Context, _param1 []string, _param2 []chan string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
+		_param0 = make([]context.Context, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(string)
+			_param0[u] = param.(context.Context)
 		}
-		_param1 = make([]chan string, len(c.methodInvocations))
+		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(chan string)
+			_param1[u] = param.(string)
+		}
+		_param2 = make([]chan string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(chan string)
 		}
 	}
 	return

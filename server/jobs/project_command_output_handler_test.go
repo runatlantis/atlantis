@@ -14,6 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/jobs/mocks"
+	"github.com/runatlantis/atlantis/server/jobs/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	. "github.com/runatlantis/atlantis/testing"
@@ -77,7 +78,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		var expectedMsg string
 		projectOutputHandler, jobStore := createProjectCommandOutputHandler(t)
 
-		When(jobStore.Get(AnyString())).ThenReturn(&jobs.Job{}, nil)
+		When(jobStore.Get(matchers.AnyContextContext(), AnyString())).ThenReturn(&jobs.Job{}, nil)
 		ch := make(chan string)
 
 		// read from channel
@@ -92,7 +93,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		projectOutputHandler.Register(ctx.RequestCtx, ctx.JobID, ch)
 
 		wg.Add(1)
 		projectOutputHandler.Send(ctx, Msg)
@@ -108,7 +109,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		projectOutputHandler, jobStore := createProjectCommandOutputHandler(t)
 		strippedMessage := "InvalidMessage test"
 
-		When(jobStore.Get(AnyString())).ThenReturn(&jobs.Job{}, nil)
+		When(jobStore.Get(matchers.AnyContextContext(), AnyString())).ThenReturn(&jobs.Job{}, nil)
 		ch := make(chan string)
 
 		// read from channel
@@ -123,7 +124,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		projectOutputHandler.Register(ctx.RequestCtx, ctx.JobID, ch)
 
 		wg.Add(1)
 		// even if stripped message is sent first, registered channel will never receive it, making expectedMsg == Msg
@@ -142,7 +143,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		projectOutputHandler, jobStore := createProjectCommandOutputHandler(t)
 
 		// Mocking the job store acts like populating the buffer
-		When(jobStore.Get(AnyString())).ThenReturn(&jobs.Job{
+		When(jobStore.Get(matchers.AnyContextContext(), AnyString())).ThenReturn(&jobs.Job{
 			Output: []string{Msg},
 			Status: jobs.Processing,
 		}, nil)
@@ -158,7 +159,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		wg.Add(1)
 
 		// Register the channel and wait for msg in the buffer to be read
-		projectOutputHandler.Register(ctx.JobID, ch)
+		projectOutputHandler.Register(ctx.RequestCtx, ctx.JobID, ch)
 		wg.Wait()
 
 		close(ch)
@@ -170,7 +171,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 	t.Run("clean up all jobs when PR is closed", func(t *testing.T) {
 		var wg sync.WaitGroup
 		projectOutputHandler, jobStore := createProjectCommandOutputHandler(t)
-		When(jobStore.Get(AnyString())).ThenReturn(&jobs.Job{}, nil)
+		When(jobStore.Get(matchers.AnyContextContext(), AnyString())).ThenReturn(&jobs.Job{}, nil)
 
 		ch := make(chan string)
 
@@ -178,7 +179,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		projectOutputHandler.Register(ctx.RequestCtx, ctx.JobID, ch)
 
 		wg.Add(1)
 
@@ -206,7 +207,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		dfProjectOutputHandler, ok := projectOutputHandler.(*jobs.AsyncProjectCommandOutputHandler)
 		assert.True(t, ok)
 
-		job, err := dfProjectOutputHandler.JobStore.Get(ctx.JobID)
+		job, err := dfProjectOutputHandler.JobStore.Get(ctx.RequestCtx, ctx.JobID)
 		Ok(t, err)
 
 		assert.Empty(t, job.Output)
@@ -220,7 +221,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 			Output: []string{"a", "b"},
 			Status: jobs.Complete,
 		}
-		When(jobStore.Get(AnyString())).ThenReturn(&job, nil)
+		When(jobStore.Get(matchers.AnyContextContext(), AnyString())).ThenReturn(&job, nil)
 
 		ch := make(chan string)
 
@@ -236,7 +237,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		projectOutputHandler.Register(ctx.RequestCtx, ctx.JobID, ch)
 
 		assert.True(t, <-opComplete)
 	})

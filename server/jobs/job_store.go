@@ -1,9 +1,11 @@
 package jobs
 
 import (
+	"context"
 	"fmt"
-	"github.com/uber-go/tally/v4"
 	"sync"
+
+	"github.com/uber-go/tally/v4"
 
 	"github.com/pkg/errors"
 )
@@ -24,14 +26,14 @@ type Job struct {
 
 type JobStore interface {
 	// Gets the job from the in memory buffer, if available and if not, reaches to the storage backend
-	Get(jobID string) (*Job, error)
+	Get(ctx context.Context, jobID string) (*Job, error)
 
 	// Appends a given string to a job's output if the job is not complete yet
 	AppendOutput(jobID string, output string) error
 
 	// Sets a job status to complete and triggers any associated workflow,
 	// e.g: if the status is complete, the job is flushed to the associated storage backend
-	SetJobCompleteStatus(jobID string, fullRepoName string, status JobStatus) error
+	SetJobCompleteStatus(ctx context.Context, jobID string, status JobStatus) error
 
 	// Removes a job from the store
 	RemoveJob(jobID string)
@@ -64,7 +66,7 @@ type InMemoryJobStore struct {
 	lock sync.RWMutex
 }
 
-func (m *InMemoryJobStore) Get(jobID string) (*Job, error) {
+func (m *InMemoryJobStore) Get(ctx context.Context, jobID string) (*Job, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -92,7 +94,7 @@ func (m *InMemoryJobStore) AppendOutput(jobID string, output string) error {
 	return nil
 }
 
-func (m *InMemoryJobStore) SetJobCompleteStatus(jobID string, fullRepoName string, status JobStatus) error {
+func (m *InMemoryJobStore) SetJobCompleteStatus(ctx context.Context, jobID string, status JobStatus) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -125,14 +127,14 @@ type StorageBackendJobStore struct {
 	scope          tally.Scope
 }
 
-func (s *StorageBackendJobStore) Get(jobID string) (*Job, error) {
+func (s *StorageBackendJobStore) Get(ctx context.Context, jobID string) (*Job, error) {
 	// Get job from memory
-	if jobInMem, _ := s.JobStore.Get(jobID); jobInMem != nil {
+	if jobInMem, _ := s.JobStore.Get(ctx, jobID); jobInMem != nil {
 		return jobInMem, nil
 	}
 
 	// Get from storage backend if not in memory
-	logs, err := s.storageBackend.Read(jobID)
+	logs, err := s.storageBackend.Read(ctx, jobID)
 	if err != nil {
 		return nil, errors.Wrap(err, "reading from backend storage")
 	}
@@ -147,18 +149,18 @@ func (s StorageBackendJobStore) AppendOutput(jobID string, output string) error 
 	return s.JobStore.AppendOutput(jobID, output)
 }
 
-func (s *StorageBackendJobStore) SetJobCompleteStatus(jobID string, fullRepoName string, status JobStatus) error {
-	if err := s.JobStore.SetJobCompleteStatus(jobID, fullRepoName, status); err != nil {
+func (s *StorageBackendJobStore) SetJobCompleteStatus(ctx context.Context, jobID string, status JobStatus) error {
+	if err := s.JobStore.SetJobCompleteStatus(ctx, jobID, status); err != nil {
 		return err
 	}
 
-	job, err := s.JobStore.Get(jobID)
+	job, err := s.JobStore.Get(ctx, jobID)
 	if err != nil || job == nil {
 		return errors.Wrapf(err, "retrieving job: %s from memory store", jobID)
 	}
 	subScope := s.scope.SubScope("set_job_complete_status")
 	subScope.Counter("write_attempt").Inc(1)
-	ok, err := s.storageBackend.Write(jobID, job.Output, fullRepoName)
+	ok, err := s.storageBackend.Write(ctx, jobID, job.Output)
 	if err != nil {
 		return errors.Wrapf(err, "persisting job: %s", jobID)
 	}

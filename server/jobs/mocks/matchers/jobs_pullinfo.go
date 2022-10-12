@@ -8,19 +8,19 @@ import (
 	jobs "github.com/runatlantis/atlantis/server/jobs"
 )
 
-func AnyJobsPullInfof() jobs.PullInfo {
+func AnyJobsPullInfo() jobs.PullInfo {
 	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(jobs.PullInfo))(nil)).Elem()))
 	var nullValue jobs.PullInfo
 	return nullValue
 }
 
-func EqJobsPullInfof(value jobs.PullInfo) jobs.PullInfo {
+func EqJobsPullInfo(value jobs.PullInfo) jobs.PullInfo {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
 	var nullValue jobs.PullInfo
 	return nullValue
 }
 
-func NotEqJobsPullInfof(value jobs.PullInfo) jobs.PullInfo {
+func NotEqJobsPullInfo(value jobs.PullInfo) jobs.PullInfo {
 	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
 	var nullValue jobs.PullInfo
 	return nullValue

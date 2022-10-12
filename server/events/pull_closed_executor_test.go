@@ -14,10 +14,12 @@
 package events_test
 
 import (
-	"github.com/runatlantis/atlantis/server/events/terraform/filter"
-	"github.com/uber-go/tally/v4"
+	"context"
 	"io/ioutil"
 	"testing"
+
+	"github.com/runatlantis/atlantis/server/events/terraform/filter"
+	"github.com/uber-go/tally/v4"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -287,7 +289,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		// Assert log streaming resources are cleaned up.
 		dfPrjCmdOutputHandler := prjCmdOutHandler.(*jobs.AsyncProjectCommandOutputHandler)
 
-		job, err := dfPrjCmdOutputHandler.JobStore.Get(ctx.PullInfof())
+		job, err := dfPrjCmdOutputHandler.JobStore.Get(context.Background(), ctx.PullInfof())
 		Ok(t, err)
 
 		assert.Empty(t, job.Output)

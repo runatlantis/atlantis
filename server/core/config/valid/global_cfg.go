@@ -52,7 +52,6 @@ type GlobalCfg struct {
 	DeploymentWorkflows  map[string]Workflow
 	PolicySets           PolicySets
 	Metrics              Metrics
-	Jobs                 Jobs
 	PersistenceConfig    PersistenceConfig
 	TerraformLogFilter   TerraformLogFilters
 	Temporal             Temporal

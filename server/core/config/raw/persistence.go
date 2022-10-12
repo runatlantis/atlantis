@@ -55,3 +55,13 @@ type DataStore struct {
 func (ds DataStore) Validate() error {
 	return validation.ValidateStruct(&ds, validation.Field(&ds.S3))
 }
+
+type S3 struct {
+	BucketName string `yaml:"bucket-name" json:"bucket-name"`
+}
+
+func (s S3) Validate() error {
+	return validation.ValidateStruct(&s,
+		validation.Field(&s.BucketName, validation.Required),
+	)
+}
