@@ -2,6 +2,7 @@ package activities
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -13,6 +14,15 @@ import (
 	internal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/temporal"
+)
+
+type DiffDirection string
+
+const (
+	DirectionAhead     DiffDirection = "ahead"
+	DirectionBehind    DiffDirection = "behind"
+	DirectionIdentical DiffDirection = "identical"
+	DirectionDiverged  DiffDirection = "diverged"
 )
 
 const deploymentsDirName = "deployments"
@@ -202,5 +212,35 @@ func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootReque
 	localRoot := root.BuildLocalRoot(request.Root, request.Repo, destinationPath)
 	return FetchRootResponse{
 		LocalRoot: localRoot,
+	}, nil
+}
+
+type CompareCommitRequest struct {
+	DeployRequestRevision  string
+	LatestDeployedRevision string
+	Repo                   internal.Repo
+}
+
+type CompareCommitResponse struct {
+	CommitComparison DiffDirection
+}
+
+func (a *githubActivities) CompareCommit(ctx context.Context, request CompareCommitRequest) (CompareCommitResponse, error) {
+	client, err := a.ClientCreator.NewInstallationClient(request.Repo.Credentials.InstallationToken)
+	if err != nil {
+		return CompareCommitResponse{}, errors.Wrap(err, "creating installation client")
+	}
+
+	comparison, resp, err := client.Repositories.CompareCommits(ctx, request.Repo.Owner, request.Repo.Name, request.LatestDeployedRevision, request.DeployRequestRevision, &github.ListOptions{})
+	if err != nil {
+		return CompareCommitResponse{}, errors.Wrap(err, "comparing commits")
+	}
+
+	if comparison.GetStatus() == "" || resp.StatusCode != http.StatusOK {
+		return CompareCommitResponse{}, fmt.Errorf("invalid commit comparison status: %s, Status Code: %d", comparison.GetStatus(), resp.StatusCode)
+	}
+
+	return CompareCommitResponse{
+		CommitComparison: DiffDirection(comparison.GetStatus()),
 	}, nil
 }
