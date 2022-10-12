@@ -44,7 +44,7 @@ func (d *DeployWorkflowSignaler) SignalWithStartWorkflow(
 
 	run, err := d.TemporalClient.SignalWithStartWorkflow(
 		ctx,
-		fmt.Sprintf("%s||%s", repo.FullName, rootCfg.Name),
+		buildDeployWorkflowID(repo.FullName, rootCfg.Name),
 		workflows.DeployNewRevisionSignalID,
 		workflows.DeployNewRevisionSignalRequest{
 			Revision: revision,
@@ -80,6 +80,10 @@ func (d *DeployWorkflowSignaler) SignalWithStartWorkflow(
 		workflows.DeployRequest{},
 	)
 	return run, err
+}
+
+func buildDeployWorkflowID(repoName string, rootName string) string {
+	return fmt.Sprintf("%s||%s", repoName, rootName)
 }
 
 func (d *DeployWorkflowSignaler) generateSteps(steps []valid.Step) []workflows.Step {

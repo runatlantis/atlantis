@@ -2,6 +2,7 @@ package event_test
 
 import (
 	"context"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/logging"
@@ -72,7 +73,7 @@ func TestCheckRunHandler(t *testing.T) {
 		assert.False(t, signaler.called)
 	})
 
-	t.Run("signal success", func(t *testing.T) {
+	t.Run("plan signal success", func(t *testing.T) {
 		user := "nish"
 		workflowID := "wfid"
 		signaler := &testSignaler{
@@ -99,6 +100,54 @@ func TestCheckRunHandler(t *testing.T) {
 		err := subject.Handle(context.Background(), e)
 		assert.NoError(t, err)
 		assert.True(t, signaler.called)
+	})
+
+	t.Run("unlock signal success", func(t *testing.T) {
+		user := "nish"
+		workflowID := "testrepo||testroot"
+		signaler := &testSignaler{
+			t:                  t,
+			expectedWorkflowID: workflowID,
+			expectedSignalName: workflows.DeployUnlockSignalName,
+			expectedSignalArg: workflows.DeployUnlockSignalRequest{
+				User: user,
+			},
+		}
+		subject := event.CheckRunHandler{
+			Logger:         logging.NewNoopCtxLogger(t),
+			TemporalClient: signaler,
+		}
+		e := event.CheckRun{
+			Action: event.RequestedActionChecksAction{
+				Identifier: "Unlock",
+			},
+			ExternalID: workflowID,
+			User:       user,
+			Repo:       models.Repo{FullName: "testrepo"},
+			Name:       "atlantis/deploy: testroot",
+		}
+		err := subject.Handle(context.Background(), e)
+		assert.NoError(t, err)
+		assert.True(t, signaler.called)
+	})
+
+	t.Run("invalid root name", func(t *testing.T) {
+		user := "nish"
+		workflowID := "testrepo||testroot"
+		subject := event.CheckRunHandler{
+			Logger: logging.NewNoopCtxLogger(t),
+		}
+		e := event.CheckRun{
+			Action: event.RequestedActionChecksAction{
+				Identifier: "Unlock",
+			},
+			ExternalID: workflowID,
+			User:       user,
+			Repo:       models.Repo{FullName: "testrepo"},
+			Name:       "atlantis/invalid: testroot",
+		}
+		err := subject.Handle(context.Background(), e)
+		assert.ErrorContains(t, err, "unable to determine root name")
 	})
 
 	t.Run("signal error", func(t *testing.T) {

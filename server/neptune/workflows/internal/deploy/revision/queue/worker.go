@@ -31,7 +31,13 @@ const (
 	WaitingWorkerState  WorkerState = "waiting"
 	WorkingWorkerState  WorkerState = "working"
 	CompleteWorkerState WorkerState = "complete"
+
+	UnlockSignalName = "unlock"
 )
+
+type UnlockSignalRequest struct {
+	User string
+}
 
 type Worker struct {
 	Queue                   *Queue

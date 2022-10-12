@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -12,6 +13,8 @@ import (
 )
 
 const RequestedActionType = "requested_action"
+
+var checkRunRegex = regexp.MustCompile("atlantis/deploy: (?P<name>.+)")
 
 type CheckRunAction interface {
 	GetType() string
@@ -61,16 +64,20 @@ func (h *CheckRunHandler) Handle(ctx context.Context, event CheckRun) error {
 	if !ok {
 		return fmt.Errorf("event action type does not match string type.  This is likely a code bug")
 	}
-
-	status, err := toPlanReviewStatus(action)
-
-	if err != nil {
-		return errors.Wrap(err, "converting action to plan status")
+	switch action.Identifier {
+	case "Unlock":
+		return h.signalUnlockWorkflowChannel(ctx, event)
+	case "Approve":
+		return h.signalPlanReviewWorkflowChannel(ctx, event, workflows.ApprovedPlanReviewStatus)
+	case "Reject":
+		return h.signalPlanReviewWorkflowChannel(ctx, event, workflows.RejectedPlanReviewStatus)
 	}
+	return fmt.Errorf("unknown action id %s", action.Identifier)
+}
 
-	err = h.TemporalClient.SignalWorkflow(
+func (h *CheckRunHandler) signalPlanReviewWorkflowChannel(ctx context.Context, event CheckRun, status workflows.TerraformPlanReviewStatus) error {
+	err := h.TemporalClient.SignalWorkflow(
 		ctx,
-
 		// assumed that we're using the check run external id as our workflow id
 		event.ExternalID,
 		// keeping this empty is fine since temporal will find the currently running workflow
@@ -80,23 +87,34 @@ func (h *CheckRunHandler) Handle(ctx context.Context, event CheckRun) error {
 			Status: status,
 			User:   event.User,
 		})
-
 	if err != nil {
 		return errors.Wrapf(err, "signaling workflow with id: %s", event.ExternalID)
 	}
-
 	h.Logger.InfoContext(ctx, fmt.Sprintf("Signaled workflow with id %s, review status, %d", event.ExternalID, status))
-
 	return nil
 }
 
-func toPlanReviewStatus(action RequestedActionChecksAction) (workflows.TerraformPlanReviewStatus, error) {
-	switch action.Identifier {
-	case "Approve":
-		return workflows.ApprovedPlanReviewStatus, nil
-	case "Reject":
-		return workflows.RejectedPlanReviewStatus, nil
+func (h *CheckRunHandler) signalUnlockWorkflowChannel(ctx context.Context, event CheckRun) error {
+	// Parse out root from check run name
+	matches := checkRunRegex.FindStringSubmatch(event.Name)
+	if len(matches) != 2 {
+		return fmt.Errorf("unable to determine root name")
 	}
+	rootName := matches[checkRunRegex.SubexpIndex("name")]
 
-	return workflows.RejectedPlanReviewStatus, fmt.Errorf("unknown action id %s", action.Identifier)
+	err := h.TemporalClient.SignalWorkflow(
+		ctx,
+		// deploy workflow id is repo||root (the name of the check run is the root)
+		buildDeployWorkflowID(event.Repo.FullName, rootName),
+		// keeping this empty is fine since temporal will find the currently running workflow
+		"",
+		workflows.DeployUnlockSignalName,
+		workflows.DeployUnlockSignalRequest{
+			User: event.User,
+		})
+	if err != nil {
+		return errors.Wrapf(err, "signaling workflow with id: %s", event.ExternalID)
+	}
+	h.Logger.InfoContext(ctx, fmt.Sprintf("Signaled workflow with id %s to unlock", event.ExternalID))
+	return nil
 }

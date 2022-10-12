@@ -7,6 +7,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -27,6 +28,9 @@ const NormalPlanMode = request.NormalPlanMode
 const ManualTrigger = request.ManualTrigger
 const MergeTrigger = request.MergeTrigger
 
+const DeployUnlockSignalName = queue.UnlockSignalName
+
+type DeployUnlockSignalRequest = queue.UnlockSignalRequest
 type DeployNewRevisionSignalRequest = revision.NewRevisionRequest
 
 var DeployTaskQueue = deploy.TaskQueue
