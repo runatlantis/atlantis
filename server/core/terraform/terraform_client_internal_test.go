@@ -125,7 +125,7 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion_Error(t *testing.T) {
 
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(echoCommand, nil)
 	out, err := client.RunCommandWithVersion(ctx, prjCtx, path, args, map[string]string{}, nil, workspace)
-	ErrEquals(t, fmt.Sprintf(`running "/bin/sh -c echo dying && exit 1" in %q: exit status 1`, path), err)
+	ErrEquals(t, fmt.Sprintf(`running "/usr/bin/sh -c echo dying && exit 1" in %q: exit status 1`, path), err)
 	// Test that we still get our output.
 	Equals(t, "dying\n", out)
 }
