@@ -30,9 +30,7 @@ func ExtractFields(ctx KVStore) map[string]interface{} {
 	args := make(map[string]interface{})
 
 	for _, k := range Keys {
-		if v, ok := ctx.Value(k).(string); ok {
-			args[k.String()] = v
-		}
+		args[k.String()] = ctx.Value(k)
 	}
 
 	return args
@@ -42,10 +40,8 @@ func ExtractFieldsAsList(ctx KVStore) []interface{} {
 	var args []interface{}
 
 	for _, k := range Keys {
-		if v, ok := ctx.Value(k).(string); ok {
-			args = append(args, k)
-			args = append(args, v)
-		}
+		args = append(args, k)
+		args = append(args, ctx.Value(k))
 	}
 
 	return args
