@@ -7,6 +7,10 @@ on:
     tags:
       - v*.*.* # stable release like, v0.19.2
       - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/atlantis-image.yml'
   workflow_dispatch:
 
 concurrency:
@@ -45,7 +49,7 @@ jobs:
       with:
         context: .
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
-        push: true
+        push: ${{ github.event_name != 'pull_request' }}
         tags: |
           ghcr.io/${{ github.repository_owner }}/atlantis:dev
 
@@ -60,7 +64,7 @@ jobs:
       with:
         context: .
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
-        push: true
+        push: ${{ github.event_name != 'pull_request' }}
         tags: |
           ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_VERSION }}
           ghcr.io/${{ github.repository_owner }}/atlantis:prerelease-latest
@@ -71,7 +75,7 @@ jobs:
       with:
         context: .
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
-        push: true
+        push: ${{ github.event_name != 'pull_request' }}
         tags: |
           ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_VERSION }}
           ghcr.io/${{ github.repository_owner }}/atlantis:latest
