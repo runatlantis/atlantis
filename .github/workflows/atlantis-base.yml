@@ -7,6 +7,10 @@ on:
       - '.github/workflows/atlantis-base.yml'
     branches:
       - "master"
+  pull_request:
+    paths:
+      - 'docker-base/**'
+      - '.github/workflows/atlantis-base.yml'
   workflow_dispatch:
 
 defaults:
