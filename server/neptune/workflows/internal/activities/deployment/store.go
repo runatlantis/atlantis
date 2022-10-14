@@ -59,7 +59,7 @@ func (s *Store) GetDeploymentInfo(ctx context.Context, repoName string, rootName
 	return &deploymentInfo, nil
 }
 
-func (s *Store) SetDeploymentInfo(ctx context.Context, deploymentInfo root.DeploymentInfo) error {
+func (s *Store) SetDeploymentInfo(ctx context.Context, deploymentInfo *root.DeploymentInfo) error {
 	key := BuildKey(deploymentInfo.Repo.GetFullName(), deploymentInfo.Root.Name)
 	object, err := json.Marshal(deploymentInfo)
 	if err != nil {

@@ -149,14 +149,14 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 	env.OnActivity(da.CompareCommit, mock.Anything, activities.CompareCommitRequest{
 		Repo:                   repo,
 		DeployRequestRevision:  deploymentInfoList[1].Revision,
-		LatestDeployedRevision: latestDeployment.Revision,
+		LatestDeployedRevision: deploymentInfoList[0].Revision,
 	}).Return(activities.CompareCommitResponse{
 		CommitComparison: activities.DirectionAhead,
 	}, nil)
 
 	// Mock StoreLatestDeploymentRequest for both requests
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, activities.StoreLatestDeploymentRequest{
-		DeploymentInfo: root.DeploymentInfo{
+		DeploymentInfo: &root.DeploymentInfo{
 			Version:    queue.DeploymentInfoVersion,
 			ID:         uuid.UUID{}.String(),
 			CheckRunID: deploymentInfoList[0].CheckRunID,
@@ -168,7 +168,7 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 		},
 	}).Return(nil)
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, activities.StoreLatestDeploymentRequest{
-		DeploymentInfo: root.DeploymentInfo{
+		DeploymentInfo: &root.DeploymentInfo{
 			Version:    queue.DeploymentInfoVersion,
 			ID:         uuid.UUID{}.String(),
 			CheckRunID: deploymentInfoList[1].CheckRunID,
@@ -183,6 +183,8 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 	env.ExecuteWorkflow(testWorkflow, request{
 		Queue: deploymentInfoList,
 	})
+
+	env.AssertExpectations(t)
 
 	var resp response
 	err := env.GetWorkflowResult(&resp)
@@ -254,6 +256,8 @@ func TestWorker_CompareCommit_SkipDeploy(t *testing.T) {
 				Queue: deploymentInfoList,
 			})
 
+			env.AssertExpectations(t)
+
 			var resp response
 			err := env.GetWorkflowResult(&resp)
 			assert.NoError(t, err)
@@ -322,6 +326,8 @@ func TestWorker_CompareCommit_Deploy(t *testing.T) {
 				Queue: deploymentInfoList,
 			})
 
+			env.AssertExpectations(t)
+
 			var resp response
 			err := env.GetWorkflowResult(&resp)
 			assert.NoError(t, err)
@@ -331,6 +337,57 @@ func TestWorker_CompareCommit_Deploy(t *testing.T) {
 		})
 	}
 
+}
+
+func TestWorker_FirstDeploy(t *testing.T) {
+	deploymentInfo, _, _, fetchDeploymentRequest, _, _, storeLatestDeploymentReq := getTestArtifacts()
+	fetchDeploymentResponse := activities.FetchLatestDeploymentResponse{
+		DeploymentInfo: nil,
+	}
+
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestWorkflowEnvironment()
+
+	da := testDeployActivity{}
+	// we set this callback so we can query the state of the queue
+	// after all processing has complete to determine whether we should
+	// shutdown the worker
+	env.RegisterDelayedCallback(func() {
+		encoded, err := env.QueryWorkflow("queue")
+
+		assert.NoError(t, err)
+
+		var q queueAndState
+		err = encoded.Get(&q)
+
+		assert.NoError(t, err)
+
+		assert.True(t, q.QueueIsEmpty)
+		assert.Equal(t, queue.WaitingWorkerState, q.State)
+
+		env.CancelWorkflow()
+
+	}, 10*time.Second)
+
+	deploymentInfoList := []terraform.DeploymentInfo{
+		deploymentInfo,
+	}
+
+	env.OnActivity(da.FetchLatestDeployment, mock.Anything, fetchDeploymentRequest).Return(fetchDeploymentResponse, nil)
+	env.OnActivity(da.StoreLatestDeployment, mock.Anything, storeLatestDeploymentReq).Return(nil)
+
+	env.ExecuteWorkflow(testWorkflow, request{
+		Queue: deploymentInfoList,
+	})
+
+	env.AssertExpectations(t)
+
+	var resp response
+	err := env.GetWorkflowResult(&resp)
+	assert.NoError(t, err)
+
+	assert.Equal(t, queue.CompleteWorkerState, resp.EndState)
+	assert.True(t, resp.QueueIsEmpty)
 }
 
 type testDeployActivity struct{}
@@ -399,7 +456,7 @@ func getTestArtifacts() (
 	}
 
 	storeDeploymentRequest = activities.StoreLatestDeploymentRequest{
-		DeploymentInfo: root.DeploymentInfo{
+		DeploymentInfo: &root.DeploymentInfo{
 			Version:    queue.DeploymentInfoVersion,
 			ID:         deploymentInfo.ID.String(),
 			CheckRunID: deploymentInfo.CheckRunID,

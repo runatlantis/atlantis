@@ -9,7 +9,7 @@ import (
 
 type store interface {
 	GetDeploymentInfo(ctx context.Context, repoName string, rootName string) (*root.DeploymentInfo, error)
-	SetDeploymentInfo(ctx context.Context, deploymentInfo root.DeploymentInfo) error
+	SetDeploymentInfo(ctx context.Context, deploymentInfo *root.DeploymentInfo) error
 }
 
 type dbActivities struct {
@@ -37,7 +37,7 @@ func (a *dbActivities) FetchLatestDeployment(ctx context.Context, request FetchL
 }
 
 type StoreLatestDeploymentRequest struct {
-	DeploymentInfo root.DeploymentInfo
+	DeploymentInfo *root.DeploymentInfo
 }
 
 func (a *dbActivities) StoreLatestDeployment(ctx context.Context, request StoreLatestDeploymentRequest) error {
