@@ -20,7 +20,7 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v3.1.0
     - name: Login to Packages Container registry
       uses: docker/login-action@v2
       with:

@@ -11,7 +11,7 @@ jobs:
     name: runner / golangci-lint
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v3.1.0
     - name: golangci-lint
       uses: reviewdog/action-golangci-lint@v2
       with:
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3.1.0
       - name: revive
         uses: reviewdog/action-golangci-lint@v2
         with:
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3.1.0
       - name: errcheck
         uses: reviewdog/action-golangci-lint@v2
         with:
