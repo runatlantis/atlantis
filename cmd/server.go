@@ -86,6 +86,7 @@ const (
 	StatsNamespace              = "stats-namespace"
 	AllowDraftPRs               = "allow-draft-prs"
 	PortFlag                    = "port"
+	RedisDB                     = "redis-db"
 	RedisHost                   = "redis-host"
 	RedisPassword               = "redis-password"
 	RedisPort                   = "redis-port"
@@ -134,6 +135,7 @@ const (
 	DefaultParallelPoolSize        = 15
 	DefaultStatsNamespace          = "atlantis"
 	DefaultPort                    = 4141
+	DefaultRedisDB                 = 0
 	DefaultRedisPort               = 6379
 	DefaultRedisTLSEnabled         = false
 	DefaultRedisInsecureSkipVerify = false
@@ -478,6 +480,10 @@ var intFlags = map[string]intFlag{
 		description:  "Port to bind to.",
 		defaultValue: DefaultPort,
 	},
+	RedisDB: {
+		description:  "The Redis Database to use when using a Locking DB type of 'redis'.",
+		defaultValue: DefaultRedisDB,
+	},
 	RedisPort: {
 		description:  "The Redis Port for when using a Locking DB type of 'redis'.",
 		defaultValue: DefaultRedisPort,
@@ -718,6 +724,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
+	}
+	if c.RedisDB == 0 {
+		c.RedisDB = DefaultRedisDB
 	}
 	if c.RedisPort == 0 {
 		c.RedisPort = DefaultRedisPort

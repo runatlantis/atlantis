@@ -28,19 +28,23 @@ const (
 
 // Step represents a single action/command to perform. In YAML, it can be set as
 // 1. A single string for a built-in command:
-//    - init
-//    - plan
-//    - policy_check
+//   - init
+//   - plan
+//   - policy_check
+//
 // 2. A map for an env step with name and command or value
-//    - env:
-//        name: test
-//        command: echo 312
-//        value: value
+//   - env:
+//     name: test
+//     command: echo 312
+//     value: value
+//
 // 3. A map for a built-in command and extra_args:
-//    - plan:
-//        extra_args: [-var-file=staging.tfvars]
+//   - plan:
+//     extra_args: [-var-file=staging.tfvars]
+//
 // 4. A map for a custom run command:
-//    - run: my custom command
+//   - run: my custom command
+//
 // Here we parse step in the most generic fashion possible. See fields for more
 // details.
 type Step struct {
