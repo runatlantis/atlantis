@@ -12,7 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/storage"
 )
 
-type JobStatus int //nolint:golint // avoiding refactor while adding linter action
+type JobStatus int //nolint:revive // avoiding refactor while adding linter action
 
 const (
 	Processing JobStatus = iota
@@ -211,7 +211,7 @@ func (s *StorageBackendJobStore) Cleanup(ctx context.Context) error {
 	}
 
 	if len(failedJobs) > 0 {
-		return errors.Errorf("failed to persist jobs: %s\n", strings.Join(failedJobs, ","))
+		return errors.Errorf("failed to persist jobs: %s", strings.Join(failedJobs, ","))
 	}
 	return nil
 }

@@ -23,7 +23,7 @@ func NewStepsRunner(
 	versionStepRunner Runner,
 	runStepRunner CustomRunner,
 	envStepRunner EnvRunner,
-) *stepsRunner { //nolint:golint // avoiding refactor while adding linter action
+) *stepsRunner { //nolint:revive // avoiding refactor while adding linter action
 	stepsRunner := &stepsRunner{}
 
 	stepsRunner.InitRunner = initStepRunner

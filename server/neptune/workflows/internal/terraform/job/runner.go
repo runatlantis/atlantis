@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
@@ -23,7 +24,7 @@ type stepRunner interface {
 	Run(executionContext *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) (string, error)
 }
 
-type JobRunner struct { ///nolint:golint // avoiding refactor while adding linter action
+type JobRunner struct { ///nolint:revive // avoiding refactor while adding linter action
 	Activity      terraformActivities
 	EnvStepRunner stepRunner
 	CmdStepRunner stepRunner

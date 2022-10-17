@@ -29,7 +29,7 @@ const DefaultWorkflowName = "default"
 // TODO: Make this more customizable, not everyone wants this rigid workflow
 // maybe something along the lines of defining overridable/non-overrideable apply
 // requirements in the config and removing the flag to enable policy checking.
-var NonOverrideableApplyReqs []string = []string{PoliciesPassedApplyReq}
+var NonOverrideableApplyReqs = []string{PoliciesPassedApplyReq}
 
 type WorkflowModeType int
 

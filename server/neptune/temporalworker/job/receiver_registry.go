@@ -19,7 +19,7 @@ type receiverRegistry struct {
 	lock      sync.RWMutex
 }
 
-func NewReceiverRegistry() *receiverRegistry { //nolint:golint // avoiding refactor while adding linter action
+func NewReceiverRegistry() *receiverRegistry { //nolint:revive // avoiding refactor while adding linter action
 	return &receiverRegistry{
 		receivers: map[string]map[chan string]bool{},
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 // CommandTrigger represents the how the command was triggered
-type CommandTrigger int //nolint:golint // avoiding refactor while adding linter action
+type CommandTrigger int //nolint:revive // avoiding refactor while adding linter action
 
 const (
 	// Commands that are automatically triggered (ie. automatic plans)

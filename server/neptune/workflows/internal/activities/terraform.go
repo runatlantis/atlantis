@@ -47,7 +47,7 @@ type terraformActivities struct {
 	StreamHandler    streamHandler
 }
 
-func NewTerraformActivities(client TerraformClient, defaultTfVersion *version.Version, streamHandler streamHandler) *terraformActivities { //nolint:golint // avoiding refactor while adding linter action
+func NewTerraformActivities(client TerraformClient, defaultTfVersion *version.Version, streamHandler streamHandler) *terraformActivities { //nolint:revive // avoiding refactor while adding linter action
 	return &terraformActivities{
 		TerraformClient:  client,
 		DefaultTFVersion: defaultTfVersion,

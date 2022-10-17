@@ -57,7 +57,7 @@ func newArgument(arg string) (Argument, error) {
 	coll := strings.Split(arg, "=")
 
 	if len(coll) != 2 {
-		return Argument{}, errors.New(fmt.Sprintf("cannot parse argument: %s. argument can only have one =", arg))
+		return Argument{}, fmt.Errorf("cannot parse argument: %s. argument can only have one =", arg)
 	}
 
 	return Argument{

@@ -15,7 +15,7 @@ import (
 var pushEvent event.Push
 var rcb event.RootConfigBuilder
 var globalCfg valid.GlobalCfg
-var expectedErr = errors.New("some error") //nolint:golint // error name is fine for testing purposes
+var expectedErr = errors.New("some error") //nolint:revive // error name is fine for testing purposes
 
 func setupTesting(t *testing.T) {
 	globalCfg = valid.NewGlobalCfg()

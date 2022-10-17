@@ -95,7 +95,7 @@ func (p *SourceResolverProxy) Resolve(policySet valid.PolicySet) (string, error)
 	case valid.LocalPolicySet:
 		return p.localSourceResolver.Resolve(policySet)
 	default:
-		return "", errors.New(fmt.Sprintf("unable to resolve policy set source %s", source))
+		return "", fmt.Errorf("unable to resolve policy set source %s", source)
 	}
 }
 
@@ -237,7 +237,7 @@ func getDefaultVersion() (*version.Version, error) {
 	defaultVersion, exists := os.LookupEnv(DefaultConftestVersionEnvKey)
 
 	if !exists {
-		return nil, errors.New(fmt.Sprintf("%s not set.", DefaultConftestVersionEnvKey))
+		return nil, fmt.Errorf("%s not set", DefaultConftestVersionEnvKey)
 	}
 
 	wrappedVersion, err := version.NewVersion(defaultVersion)

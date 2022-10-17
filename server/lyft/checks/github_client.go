@@ -45,7 +45,7 @@ const (
 )
 
 // github checks conclusion
-type ChecksConclusion int //nolint:golint // avoiding refactor while adding linter action
+type ChecksConclusion int //nolint:revive // avoiding refactor while adding linter action
 
 const (
 	Neutral ChecksConclusion = iota
@@ -96,7 +96,7 @@ func (e CheckStatus) String() string {
 }
 
 // [WENGINES-4643] TODO: Remove this wrapper and add checks implementation to UpdateStatus() directly after github checks is stable
-type ChecksClientWrapper struct { //nolint:golint // avoiding refactor while adding linter action
+type ChecksClientWrapper struct { //nolint:revive // avoiding refactor while adding linter action
 	*vcs.GithubClient
 	FeatureAllocator feature.Allocator
 	Logger           logging.Logger

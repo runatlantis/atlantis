@@ -12,7 +12,7 @@ type projectCommand struct {
 	events.ProjectCommandRunner
 }
 
-func WrapProjectRunner(projectRunner events.ProjectCommandRunner) *projectCommand { //nolint:golint // avoiding refactor while adding linter action
+func WrapProjectRunner(projectRunner events.ProjectCommandRunner) *projectCommand { //nolint:revive // avoiding refactor while adding linter action
 	return &projectCommand{
 		projectRunner,
 	}

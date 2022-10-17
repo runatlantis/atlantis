@@ -179,7 +179,7 @@ func TestGetLock_NoOpLocker(t *testing.T) {
 	l := locking.NewNoOpLocker()
 	lock, err := l.GetLock("owner/repo/path/workspace")
 	Ok(t, err)
-	var expected *models.ProjectLock = nil
+	var expected *models.ProjectLock
 	Equals(t, expected, lock)
 }
 

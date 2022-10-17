@@ -1,21 +1,17 @@
 linters:
   enable:
-  - deadcode
   - errcheck
   - gochecknoinits
 # We don't use goconst because it gives false positives in the tests.
 #  - goconst
   - gofmt
-  - golint
+  - revive
   - gosec
   - gosimple
   - ineffassign
-  - interfacer
   - staticcheck
-  - structcheck
   - typecheck
   - unconvert
   - unused
-  - varcheck
   - vet
   - vetshadow
