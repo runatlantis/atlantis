@@ -56,7 +56,7 @@ func (g *RepoFetcher) clone(ctx context.Context, repo models.Repo, branch string
 	cloneCmd := []string{"git", "clone", "--branch", branch, "--single-branch", repo.CloneURL, destinationPath}
 	_, err := g.run(cloneCmd, destinationPath)
 	if err != nil {
-		return "", nil, errors.New("failed to clone directory")
+		return "", nil, errors.Wrap(err, "failed to clone directory")
 	}
 
 	// Return immediately if commit at HEAD of clone matches request commit
@@ -75,7 +75,7 @@ func (g *RepoFetcher) clone(ctx context.Context, repo models.Repo, branch string
 	_, err = g.run(checkoutCmd, destinationPath)
 	if err != nil {
 		g.Cleanup(ctx, destinationPath)
-		return "", nil, errors.New(fmt.Sprintf("failed to checkout to sha: %s", sha))
+		return "", nil, errors.Wrap(err, fmt.Sprintf("failed to checkout to sha: %s", sha))
 	}
 	return destinationPath, g.Cleanup, nil
 }
