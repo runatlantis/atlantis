@@ -19,6 +19,11 @@ type Root struct {
 
 type Trigger string
 
+const (
+	MergeTrigger  Trigger = "merge"
+	ManualTrigger Trigger = "manual"
+)
+
 // LocalRoot is a root that exists locally on disk
 type LocalRoot struct {
 	Root Root

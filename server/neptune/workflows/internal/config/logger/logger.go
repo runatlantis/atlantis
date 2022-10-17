@@ -5,11 +5,11 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-func Info(ctx workflow.Context, msg string) {
+func Info(ctx workflow.Context, msg string, additionalKVs ...interface{}) {
 	logger := workflow.GetLogger(ctx)
 	kvs := context.ExtractFieldsAsList(ctx)
 
-	logger.Info(msg, kvs...)
+	logger.Info(msg, append(kvs, additionalKVs)...)
 }
 
 func Warn(ctx workflow.Context, msg string, additionalKVs ...interface{}) {

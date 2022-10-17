@@ -6,6 +6,11 @@ import (
 	"github.com/google/go-github/v45/github"
 )
 
+const (
+	UnlockLabel       = "Unlock"
+	UnlockDescription = "Unlock this plan to proceed"
+)
+
 type CheckRunState string
 
 type CheckRunAction struct {
@@ -21,6 +26,13 @@ func (a CheckRunAction) ToGithubAction() *github.CheckRunAction {
 		// we encode the label as the id since there's a 20 char limit anyways
 		// and we can use the check run external id to map to the correct workflow
 		Identifier: a.Label,
+	}
+}
+
+func CreateUnlockAction() CheckRunAction {
+	return CheckRunAction{
+		Description: UnlockDescription,
+		Label:       UnlockLabel,
 	}
 }
 
