@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
 	terraform_model "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	job_model "github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"

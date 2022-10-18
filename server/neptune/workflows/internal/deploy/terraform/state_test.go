@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github/markdown"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github/markdown"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"

@@ -5,7 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
-	internal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
+	internal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
 	"github.com/uber-go/tally/v4"
 )
 

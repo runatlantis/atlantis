@@ -19,7 +19,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
-	internalGithub "github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
+	internalGithub "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"

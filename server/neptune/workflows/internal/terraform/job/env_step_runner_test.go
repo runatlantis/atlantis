@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"

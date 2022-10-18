@@ -13,9 +13,9 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/storage"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/deployment"
+	internal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github/link"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
-	internal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github/link"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 )
 
