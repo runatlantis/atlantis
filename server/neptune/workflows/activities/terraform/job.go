@@ -1,7 +1,7 @@
 package terraform
 
 import (
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/execute"
 )
 
 type PlanApprovalType string

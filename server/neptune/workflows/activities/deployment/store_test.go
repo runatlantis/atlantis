@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/neptune/storage"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/deployment"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/deployment"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -3,7 +3,7 @@ package terraform_test
 import (
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/stretchr/testify/assert"
 )
 

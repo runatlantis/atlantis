@@ -11,9 +11,9 @@ import (
 	"github.com/google/go-github/v45/github"
 	"github.com/hashicorp/go-getter"
 	"github.com/pkg/errors"
-	internal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/temporal"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	internal "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/temporal"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 )
 
 type ClientContext struct {

@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/execute"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	logger "github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"go.temporal.io/sdk/workflow"
 )

@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 )
 
 type urlGenerator interface {

@@ -3,8 +3,8 @@ package job
 import (
 	"strings"
 
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/execute"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 )
 
 type EnvStepRunner struct {

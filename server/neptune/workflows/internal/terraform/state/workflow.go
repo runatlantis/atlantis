@@ -3,7 +3,7 @@ package state
 import (
 	"net/url"
 
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 )
 
 type JobStatus string

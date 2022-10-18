@@ -4,8 +4,8 @@ import (
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
-	internal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
+	internal "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/uber-go/tally/v4"
 )
 
