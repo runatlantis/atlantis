@@ -9,9 +9,9 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/deployment"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/testsuite"
@@ -21,12 +21,12 @@ import (
 type testTerraformWorkflowRunner struct {
 }
 
-func (r testTerraformWorkflowRunner) Run(ctx workflow.Context, deploymentInfo terraform.DeploymentInfo) error {
+func (r testTerraformWorkflowRunner) Run(ctx workflow.Context, deploymentInfo terraformWorkflow.DeploymentInfo) error {
 	return nil
 }
 
 type request struct {
-	Queue []terraform.DeploymentInfo
+	Queue []terraformWorkflow.DeploymentInfo
 }
 
 type response struct {
@@ -119,12 +119,12 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 		Name:  "test",
 	}
 
-	deploymentInfoList := []terraform.DeploymentInfo{
+	deploymentInfoList := []terraformWorkflow.DeploymentInfo{
 		{
 			ID:         uuid.UUID{},
 			Revision:   "1",
 			CheckRunID: 1234,
-			Root: root.Root{
+			Root: terraform.Root{
 				Name: "root_1",
 			},
 			Repo: repo,
@@ -133,7 +133,7 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 			ID:         uuid.UUID{},
 			Revision:   "2",
 			CheckRunID: 5678,
-			Root: root.Root{
+			Root: terraform.Root{
 				Name: "root_2",
 			},
 			Repo: repo,
@@ -176,7 +176,7 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 			CheckRunID: deploymentInfoList[0].CheckRunID,
 			Revision:   deploymentInfoList[0].Revision,
 			Repo:       repo,
-			Root: root.Root{
+			Root: terraform.Root{
 				Name: deploymentInfoList[0].Root.Name,
 			},
 		},
@@ -188,7 +188,7 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 			CheckRunID: deploymentInfoList[1].CheckRunID,
 			Revision:   deploymentInfoList[1].Revision,
 			Repo:       repo,
-			Root: root.Root{
+			Root: terraform.Root{
 				Name: deploymentInfoList[1].Root.Name,
 			},
 		},
@@ -222,7 +222,7 @@ func TestWorker_CompareCommit_SkipDeploy(t *testing.T) {
 				CommitComparison: activities.DirectionBehind,
 			},
 			updateCheckRunRequest: activities.UpdateCheckRunRequest{
-				Title:   terraform.BuildCheckRunTitle(deploymentInfo.Root.Name),
+				Title:   terraformWorkflow.BuildCheckRunTitle(deploymentInfo.Root.Name),
 				State:   github.CheckRunFailure,
 				Repo:    repo,
 				ID:      deploymentInfo.CheckRunID,
@@ -256,7 +256,7 @@ func TestWorker_CompareCommit_SkipDeploy(t *testing.T) {
 
 			}, 10*time.Second)
 
-			deploymentInfoList := []terraform.DeploymentInfo{
+			deploymentInfoList := []terraformWorkflow.DeploymentInfo{
 				deploymentInfo,
 			}
 
@@ -313,7 +313,7 @@ func TestWorker_CompareCommit_DeployAhead(t *testing.T) {
 
 	}, 10*time.Second)
 
-	deploymentInfoList := []terraform.DeploymentInfo{
+	deploymentInfoList := []terraformWorkflow.DeploymentInfo{
 		deploymentInfo,
 	}
 
@@ -366,11 +366,11 @@ func TestWorker_CompareCommit_DeployDiverged(t *testing.T) {
 
 	}, 10*time.Second)
 
-	deploymentInfoList := []terraform.DeploymentInfo{
+	deploymentInfoList := []terraformWorkflow.DeploymentInfo{
 		deploymentInfo,
 	}
 	updateCheckRunRequest := activities.UpdateCheckRunRequest{
-		Title:   terraform.BuildCheckRunTitle(deploymentInfo.Root.Name),
+		Title:   terraformWorkflow.BuildCheckRunTitle(deploymentInfo.Root.Name),
 		State:   github.CheckRunPending,
 		Repo:    deploymentInfo.Repo,
 		ID:      deploymentInfo.CheckRunID,
@@ -430,7 +430,7 @@ func TestWorker_FirstDeploy(t *testing.T) {
 
 	}, 10*time.Second)
 
-	deploymentInfoList := []terraform.DeploymentInfo{
+	deploymentInfoList := []terraformWorkflow.DeploymentInfo{
 		deploymentInfo,
 	}
 
@@ -471,7 +471,7 @@ func (t *testDeployActivity) UpdateCheckRun(ctx context.Context, request activit
 
 // Setup test artifacts for compare commit tests
 func getTestArtifacts() (
-	deploymentInfo terraform.DeploymentInfo,
+	deploymentInfo terraformWorkflow.DeploymentInfo,
 	latestDeployedRevision deployment.Info,
 	repo github.Repo,
 	fetchDeploymentRequest activities.FetchLatestDeploymentRequest,
@@ -484,11 +484,11 @@ func getTestArtifacts() (
 		Name:  "test",
 	}
 
-	deploymentInfo = terraform.DeploymentInfo{
+	deploymentInfo = terraformWorkflow.DeploymentInfo{
 		ID:         uuid.UUID{},
 		Revision:   "1",
 		CheckRunID: 1234,
-		Root: root.Root{
+		Root: terraform.Root{
 			Name: "root_1",
 		},
 		Repo: repo,

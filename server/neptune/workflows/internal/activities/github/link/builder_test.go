@@ -6,13 +6,13 @@ import (
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github/link"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_BuildDownloadLinkFromArchive(t *testing.T) {
 	expectedURL := "https://github.com/testowner/testrepo/legacy.zip/refs/heads/main//testowner-testrepo-a1b2c3d/test/path?archive=zip&token=testtoken123"
-	testRoot := root.Root{
+	testRoot := terraform.Root{
 		Path: "test/path",
 	}
 	testRepo := github.Repo{
@@ -29,7 +29,7 @@ func Test_BuildDownloadLinkFromArchive(t *testing.T) {
 
 func Test_BuildDownloadLinkFromArchive_NoToken(t *testing.T) {
 	expectedURL := "https://github.com/testowner/testrepo/legacy.zip/refs/heads/main//testowner-testrepo-a1b2c3d/test/path?archive=zip"
-	testRoot := root.Root{
+	testRoot := terraform.Root{
 		Path: "/test/path",
 	}
 	testRepo := github.Repo{

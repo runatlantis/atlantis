@@ -7,14 +7,14 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/deployment"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
 type terraformWorkflowRunner interface {
-	Run(ctx workflow.Context, deploymentInfo terraform.DeploymentInfo) error
+	Run(ctx workflow.Context, deploymentInfo terraformWorkflow.DeploymentInfo) error
 }
 
 type dbActivities interface {
@@ -44,7 +44,7 @@ const (
 	DivergedCommitsSummary = "The current deployment has diverged from the default branch, so we have locked the root. This is most likely the result of this PR performing a manual deployment. To override that lock and allow the main branch to perform new deployments, select the Unlock button."
 )
 
-func (p *RevisionProcessor) Process(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
+func (p *RevisionProcessor) Process(ctx workflow.Context, requestedDeployment terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
 	latestDeployment, err := p.fetchLatestDeployment(ctx, requestedDeployment, latestDeployment)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (p *RevisionProcessor) Process(ctx workflow.Context, requestedDeployment te
 	return latestDeployment, nil
 }
 
-func (p *RevisionProcessor) getDeployRequestCommitDirection(ctx workflow.Context, deployRequest terraform.DeploymentInfo, latestDeployment *deployment.Info) (activities.DiffDirection, error) {
+func (p *RevisionProcessor) getDeployRequestCommitDirection(ctx workflow.Context, deployRequest terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info) (activities.DiffDirection, error) {
 	var compareCommitResp activities.CompareCommitResponse
 	err := workflow.ExecuteActivity(ctx, p.Activities.CompareCommit, activities.CompareCommitRequest{
 		DeployRequestRevision:  deployRequest.Revision,
@@ -95,12 +95,12 @@ func (p *RevisionProcessor) getDeployRequestCommitDirection(ctx workflow.Context
 }
 
 // worker should not block on updating check runs for invalid deploy requests so let's retry for UpdateCheckrunRetryCount only
-func (p *RevisionProcessor) updateCheckRun(ctx workflow.Context, deployRequest terraform.DeploymentInfo, state github.CheckRunState, summary string, actions []github.CheckRunAction) error {
+func (p *RevisionProcessor) updateCheckRun(ctx workflow.Context, deployRequest terraformWorkflow.DeploymentInfo, state github.CheckRunState, summary string, actions []github.CheckRunAction) error {
 	ctx = workflow.WithRetryPolicy(ctx, temporal.RetryPolicy{
 		MaximumAttempts: UpdateCheckRunRetryCount,
 	})
 	return workflow.ExecuteActivity(ctx, p.Activities.UpdateCheckRun, activities.UpdateCheckRunRequest{
-		Title:   terraform.BuildCheckRunTitle(deployRequest.Root.Name),
+		Title:   terraformWorkflow.BuildCheckRunTitle(deployRequest.Root.Name),
 		State:   state,
 		Repo:    deployRequest.Repo,
 		ID:      deployRequest.CheckRunID,
@@ -110,9 +110,9 @@ func (p *RevisionProcessor) updateCheckRun(ctx workflow.Context, deployRequest t
 }
 
 // For merged deployments, notify user of a force apply lock status and lock future deployments until signal is received
-func (p *RevisionProcessor) waitForUserUnlock(ctx workflow.Context, deploymentInfo terraform.DeploymentInfo) error {
+func (p *RevisionProcessor) waitForUserUnlock(ctx workflow.Context, deploymentInfo terraformWorkflow.DeploymentInfo) error {
 	// We won't lock a manually triggered root
-	if deploymentInfo.Root.Trigger == root.ManualTrigger {
+	if deploymentInfo.Root.Trigger == terraform.ManualTrigger {
 		return nil
 	}
 	err := p.updateCheckRun(ctx, deploymentInfo, github.CheckRunPending, DivergedCommitsSummary, []github.CheckRunAction{github.CreateUnlockAction()})
@@ -127,7 +127,7 @@ func (p *RevisionProcessor) waitForUserUnlock(ctx workflow.Context, deploymentIn
 	return nil
 }
 
-func (p *RevisionProcessor) fetchLatestDeployment(ctx workflow.Context, deploymentInfo terraform.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
+func (p *RevisionProcessor) fetchLatestDeployment(ctx workflow.Context, deploymentInfo terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
 	// Skip fetching latest deployment it it's already in memory
 	if latestDeployment != nil {
 		return latestDeployment, nil
@@ -143,7 +143,7 @@ func (p *RevisionProcessor) fetchLatestDeployment(ctx workflow.Context, deployme
 	return resp.DeploymentInfo, nil
 }
 
-func (p *RevisionProcessor) buildLatestDeployment(deployRequest terraform.DeploymentInfo) *deployment.Info {
+func (p *RevisionProcessor) buildLatestDeployment(deployRequest terraformWorkflow.DeploymentInfo) *deployment.Info {
 	return &deployment.Info{
 		Version:    DeploymentInfoVersion,
 		ID:         deployRequest.ID.String(),

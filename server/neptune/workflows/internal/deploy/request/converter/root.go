@@ -4,11 +4,10 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 )
 
-func Root(external request.Root) root.Root {
-	return root.Root{
+func Root(external request.Root) terraform.Root {
+	return terraform.Root{
 		Name: external.Name,
 		Apply: execute.Job{
 			Steps: steps(external.Apply.Steps),
@@ -21,7 +20,7 @@ func Root(external request.Root) root.Root {
 		},
 		Path:      external.RepoRelPath,
 		TfVersion: external.TfVersion,
-		Trigger:   root.Trigger(external.Trigger),
+		Trigger:   terraform.Trigger(external.Trigger),
 	}
 
 }

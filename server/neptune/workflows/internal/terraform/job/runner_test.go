@@ -9,7 +9,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
 	terraform_model "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/stretchr/testify/assert"
@@ -67,7 +66,7 @@ func testJobPlanWorkflow(ctx workflow.Context, r terraform.Request) (activities.
 		ScheduleToCloseTimeout: 100 * time.Second,
 	})
 
-	localRoot := root.LocalRoot{
+	localRoot := terraform_model.LocalRoot{
 		Root: r.Root,
 		Repo: r.Repo,
 		Path: ProjectPath,
@@ -91,7 +90,7 @@ func testJobApplyWorkflow(ctx workflow.Context, r terraform.Request) error {
 		ScheduleToCloseTimeout: 100 * time.Second,
 	})
 
-	localRoot := root.LocalRoot{
+	localRoot := terraform_model.LocalRoot{
 		Root: r.Root,
 		Repo: r.Repo,
 		Path: ProjectPath,
@@ -187,8 +186,8 @@ func TestJobRunner_Apply(t *testing.T) {
 	})
 }
 
-func getTestRootFor(stepName string) root.Root {
-	return root.Root{
+func getTestRootFor(stepName string) terraform_model.Root {
+	return terraform_model.Root{
 		Name: ProjectName,
 		Path: "project",
 		Plan: terraform_model.PlanJob{

@@ -16,7 +16,6 @@ import (
 	internal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github/link"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 )
 
 const (
@@ -145,7 +144,7 @@ type Github struct {
 }
 
 type LinkBuilder interface {
-	BuildDownloadLinkFromArchive(archiveURL *url.URL, root root.Root, repo internal.Repo, revision string) string
+	BuildDownloadLinkFromArchive(archiveURL *url.URL, root terraform.Root, repo internal.Repo, revision string) string
 }
 
 func NewGithub(client githubClient, dataDir string, getter gogetter) (*Github, error) {

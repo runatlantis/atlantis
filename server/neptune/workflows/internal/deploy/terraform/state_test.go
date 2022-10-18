@@ -9,8 +9,8 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github/markdown"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	internalTerraform "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -35,7 +35,7 @@ func testStateReceiveWorkflow(ctx workflow.Context, r stateReceiveRequest) error
 	})
 	ch := workflow.NewChannel(ctx)
 
-	receiver := &terraform.StateReceiver{
+	receiver := &internalTerraform.StateReceiver{
 		Activity: &testActivities{},
 	}
 
@@ -45,9 +45,9 @@ func testStateReceiveWorkflow(ctx workflow.Context, r stateReceiveRequest) error
 		}
 	})
 
-	receiver.Receive(ctx, ch, terraform.DeploymentInfo{
+	receiver.Receive(ctx, ch, internalTerraform.DeploymentInfo{
 		CheckRunID: 1,
-		Root:       root.Root{Name: "root"},
+		Root:       terraform.Root{Name: "root"},
 		Repo:       github.Repo{Name: "hello"},
 	})
 

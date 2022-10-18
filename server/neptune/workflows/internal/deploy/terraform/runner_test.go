@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
+	internalTerraform "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
@@ -18,7 +18,7 @@ type testStateReceiver struct {
 	payloads []testSignalPayload
 }
 
-func (r *testStateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel, deploymentInfo terraform.DeploymentInfo) {
+func (r *testStateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel, deploymentInfo internalTerraform.DeploymentInfo) {
 
 	var payload testSignalPayload
 	c.Receive(ctx, &payload)
@@ -59,7 +59,7 @@ type response struct {
 
 func parentWorkflow(ctx workflow.Context, r request) (response, error) {
 	receiver := &testStateReceiver{}
-	runner := &terraform.WorkflowRunner{
+	runner := &internalTerraform.WorkflowRunner{
 		StateReceiver: receiver,
 		Workflow:      testTerraformWorkflow,
 	}
@@ -70,11 +70,11 @@ func parentWorkflow(ctx workflow.Context, r request) (response, error) {
 		return response{}, nil
 	}
 
-	if err := runner.Run(ctx, terraform.DeploymentInfo{
+	if err := runner.Run(ctx, internalTerraform.DeploymentInfo{
 		ID:         uuid,
 		Revision:   "1234",
 		CheckRunID: 1,
-		Root:       root.Root{},
+		Root:       terraform.Root{},
 	}); err != nil {
 		return response{}, err
 	}

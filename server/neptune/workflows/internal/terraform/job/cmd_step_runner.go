@@ -7,7 +7,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -20,7 +20,7 @@ type CmdStepRunner struct {
 	Ref      github.Ref
 }
 
-func (r *CmdStepRunner) Run(executionContext *ExecutionContext, localRoot *root.LocalRoot, step execute.Step) (string, error) {
+func (r *CmdStepRunner) Run(executionContext *ExecutionContext, localRoot *terraform.LocalRoot, step execute.Step) (string, error) {
 	relPath := localRoot.RelativePathFromRepo()
 	ref, err := r.Ref.String()
 	if err != nil {

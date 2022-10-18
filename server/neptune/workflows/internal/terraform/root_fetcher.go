@@ -3,7 +3,7 @@ package terraform
 import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -14,7 +14,7 @@ type RootFetcher struct {
 }
 
 // Fetch returns a local root and a cleanup function
-func (r *RootFetcher) Fetch(ctx workflow.Context) (*root.LocalRoot, func() error, error) {
+func (r *RootFetcher) Fetch(ctx workflow.Context) (*terraform.LocalRoot, func() error, error) {
 	var fetchRootResponse activities.FetchRootResponse
 	err := workflow.ExecuteActivity(ctx, r.Ga.FetchRoot, activities.FetchRootRequest{
 		Repo:         r.Request.Repo,

@@ -5,13 +5,13 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 )
 
 type cleanupActivities struct{}
 
 type CleanupRequest struct {
-	LocalRoot *root.LocalRoot
+	LocalRoot *terraform.LocalRoot
 }
 
 // Let's start off with an empty struct in case we ever need to add to it

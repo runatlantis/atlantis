@@ -8,7 +8,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	logger "github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -30,7 +29,7 @@ type terraformActivities interface {
 
 // stepRunner runs individual run steps
 type stepRunner interface {
-	Run(executionContext *ExecutionContext, localRoot *root.LocalRoot, step execute.Step) (string, error)
+	Run(executionContext *ExecutionContext, localRoot *terraform.LocalRoot, step execute.Step) (string, error)
 }
 
 type JobRunner struct { ///nolint:revive // avoiding refactor while adding linter action
@@ -47,7 +46,7 @@ func NewRunner(runStepRunner stepRunner, envStepRunner stepRunner, tfActivities 
 	}
 }
 
-func (r *JobRunner) Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID string) (activities.TerraformPlanResponse, error) {
+func (r *JobRunner) Plan(ctx workflow.Context, localRoot *terraform.LocalRoot, jobID string) (activities.TerraformPlanResponse, error) {
 	// Execution ctx for a job that handles setting up the env vars from the previous steps
 	jobCtx := &ExecutionContext{
 		Context:   ctx,
@@ -83,7 +82,7 @@ func (r *JobRunner) Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID 
 	return resp, nil
 }
 
-func (r *JobRunner) Apply(ctx workflow.Context, localRoot *root.LocalRoot, jobID string, planFile string) error {
+func (r *JobRunner) Apply(ctx workflow.Context, localRoot *terraform.LocalRoot, jobID string, planFile string) error {
 	// Execution ctx for a job that handles setting up the env vars from the previous steps
 	jobCtx := &ExecutionContext{
 		Context:   ctx,
@@ -157,7 +156,7 @@ func (r *JobRunner) plan(ctx *ExecutionContext, mode *terraform.PlanMode, extraA
 	return resp, nil
 }
 
-func (r *JobRunner) init(ctx *ExecutionContext, localRoot *root.LocalRoot, step execute.Step) error {
+func (r *JobRunner) init(ctx *ExecutionContext, localRoot *terraform.LocalRoot, step execute.Step) error {
 	args, err := terraform.NewArgumentList(step.ExtraArgs)
 
 	if err != nil {
@@ -177,7 +176,7 @@ func (r *JobRunner) init(ctx *ExecutionContext, localRoot *root.LocalRoot, step 
 	return nil
 }
 
-func (r *JobRunner) runOptionalSteps(ctx *ExecutionContext, localRoot *root.LocalRoot, step execute.Step) error {
+func (r *JobRunner) runOptionalSteps(ctx *ExecutionContext, localRoot *terraform.LocalRoot, step execute.Step) error {
 	switch step.StepName {
 	case "run":
 		_, err := r.CmdStepRunner.Run(ctx, localRoot, step)

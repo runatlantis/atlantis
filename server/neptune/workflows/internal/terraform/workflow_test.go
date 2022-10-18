@@ -11,7 +11,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
 	terraformModel "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
@@ -31,8 +30,8 @@ var testGithubRepo = github.Repo{
 	Name: testRepoName,
 }
 
-var testLocalRoot = &root.LocalRoot{
-	Root: root.Root{
+var testLocalRoot = &terraformModel.LocalRoot{
+	Root: terraformModel.Root{
 		Name: testRootName,
 		Plan: terraformModel.PlanJob{
 			Job: execute.Job{
@@ -85,11 +84,11 @@ type jobRunner struct {
 	expectedError error
 }
 
-func (r *jobRunner) Apply(ctx workflow.Context, localRoot *root.LocalRoot, jobID string, planFile string) error {
+func (r *jobRunner) Apply(ctx workflow.Context, localRoot *terraformModel.LocalRoot, jobID string, planFile string) error {
 	return r.expectedError
 }
 
-func (r *jobRunner) Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID string) (activities.TerraformPlanResponse, error) {
+func (r *jobRunner) Plan(ctx workflow.Context, localRoot *terraformModel.LocalRoot, jobID string) (activities.TerraformPlanResponse, error) {
 	return activities.TerraformPlanResponse{}, r.expectedError
 }
 

@@ -9,7 +9,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
@@ -27,8 +26,8 @@ type terraformActivities interface {
 
 // jobRunner runs a deploy plan/apply job
 type jobRunner interface {
-	Plan(ctx workflow.Context, localRoot *root.LocalRoot, jobID string) (activities.TerraformPlanResponse, error)
-	Apply(ctx workflow.Context, localRoot *root.LocalRoot, jobID string, planFile string) error
+	Plan(ctx workflow.Context, localRoot *terraform.LocalRoot, jobID string) (activities.TerraformPlanResponse, error)
+	Apply(ctx workflow.Context, localRoot *terraform.LocalRoot, jobID string, planFile string) error
 }
 
 type PlanStatus int
@@ -115,7 +114,7 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 	}
 }
 
-func (r *Runner) Plan(ctx workflow.Context, root *root.LocalRoot, serverURL fmt.Stringer) (activities.TerraformPlanResponse, error) {
+func (r *Runner) Plan(ctx workflow.Context, root *terraform.LocalRoot, serverURL fmt.Stringer) (activities.TerraformPlanResponse, error) {
 	var response activities.TerraformPlanResponse
 	jobID, err := sideeffect.GenerateUUID(ctx)
 	if err != nil {
@@ -149,7 +148,7 @@ func (r *Runner) Plan(ctx workflow.Context, root *root.LocalRoot, serverURL fmt.
 	return response, nil
 }
 
-func (r *Runner) waitForPlanReview(ctx workflow.Context, root *root.LocalRoot) PlanStatus {
+func (r *Runner) waitForPlanReview(ctx workflow.Context, root *terraform.LocalRoot) PlanStatus {
 	// Wait for plan review signal
 	var planReview PlanReviewSignalRequest
 
@@ -164,7 +163,7 @@ func (r *Runner) waitForPlanReview(ctx workflow.Context, root *root.LocalRoot) P
 	return planReview.Status
 }
 
-func (r *Runner) Apply(ctx workflow.Context, root *root.LocalRoot, serverURL fmt.Stringer, planFile string) error {
+func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverURL fmt.Stringer, planFile string) error {
 	jobID, err := sideeffect.GenerateUUID(ctx)
 
 	if err != nil {

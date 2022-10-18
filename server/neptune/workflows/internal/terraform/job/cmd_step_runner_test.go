@@ -8,7 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/testsuite"
@@ -70,8 +70,8 @@ func TestRunRunner_ShouldSetupEnvVars(t *testing.T) {
 	env.RegisterWorkflow(testCmdWorkflow)
 
 	env.ExecuteWorkflow(testCmdWorkflow, request{
-		LocalRoot: root.LocalRoot{
-			Root: root.Root{
+		LocalRoot: terraform.LocalRoot{
+			Root: terraform.Root{
 				Name: ProjectName,
 				Path: "project",
 			},

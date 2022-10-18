@@ -6,7 +6,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,7 +23,7 @@ const (
 )
 
 type request struct {
-	LocalRoot root.LocalRoot
+	LocalRoot terraform.LocalRoot
 	Step      execute.Step
 }
 
@@ -54,8 +54,8 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 	}, nil)
 
 	env.ExecuteWorkflow(testCmdWorkflow, request{
-		LocalRoot: root.LocalRoot{
-			Root: root.Root{
+		LocalRoot: terraform.LocalRoot{
+			Root: terraform.Root{
 				Name: ProjectName,
 				Path: "project",
 			},
@@ -79,7 +79,7 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 
 func TestEnvRunne_EnvVarValueSet(t *testing.T) {
 	executioncontext := &runner.ExecutionContext{}
-	localRoot := &root.LocalRoot{}
+	localRoot := &terraform.LocalRoot{}
 
 	step := execute.Step{
 		EnvVarName:  "TEST_VAR",
