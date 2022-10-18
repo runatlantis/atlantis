@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
@@ -148,6 +149,21 @@ func (r *Runner) Plan(ctx workflow.Context, root *root.LocalRoot, serverURL fmt.
 	return response, nil
 }
 
+func (r *Runner) waitForPlanReview(ctx workflow.Context, root *root.LocalRoot) PlanStatus {
+	// Wait for plan review signal
+	var planReview PlanReviewSignalRequest
+
+	if root.Root.Plan.Approval == job.AutoApproval {
+		return Approved
+	}
+
+	// if this root is configured for manual approval we block until we receive a signal
+	signalChan := workflow.GetSignalChannel(ctx, PlanReviewSignalName)
+	_ = signalChan.Receive(ctx, &planReview)
+
+	return planReview.Status
+}
+
 func (r *Runner) Apply(ctx workflow.Context, root *root.LocalRoot, serverURL fmt.Stringer, planFile string) error {
 	jobID, err := sideeffect.GenerateUUID(ctx)
 
@@ -159,12 +175,9 @@ func (r *Runner) Apply(ctx workflow.Context, root *root.LocalRoot, serverURL fmt
 		return errors.Wrap(err, "initializing job")
 	}
 
-	// Wait for plan review signal
-	var planReview PlanReviewSignalRequest
-	signalChan := workflow.GetSignalChannel(ctx, PlanReviewSignalName)
-	_ = signalChan.Receive(ctx, &planReview)
+	planStatus := r.waitForPlanReview(ctx, root)
 
-	if planReview.Status == Rejected {
+	if planStatus == Rejected {
 		if err := r.Store.UpdateApplyJobWithStatus(state.RejectedJobStatus); err != nil {
 			return errors.Wrap(err, "updating job with rejected status")
 		}

@@ -41,7 +41,8 @@ const (
 type BackendType string
 
 const (
-	S3Backend BackendType = "s3"
+	S3Backend    BackendType = "s3"
+	LocalBackend BackendType = "local"
 )
 
 // GlobalCfg is the final parsed version of server-side repo config.

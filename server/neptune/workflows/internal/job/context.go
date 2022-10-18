@@ -14,6 +14,13 @@ type ExecutionContext struct {
 	JobID string
 }
 
+type PlanApprovalType string
+
+const (
+	ManualApproval PlanApprovalType = "manual"
+	AutoApproval   PlanApprovalType = "auto"
+)
+
 type PlanMode string
 
 func NewDestroyPlanMode() *PlanMode {
@@ -22,7 +29,8 @@ func NewDestroyPlanMode() *PlanMode {
 }
 
 type Plan struct {
-	Mode *PlanMode
+	Mode     *PlanMode
+	Approval PlanApprovalType
 	Terraform
 }
 

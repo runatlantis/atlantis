@@ -37,17 +37,17 @@ type TerraformClient interface {
 	RunCommand(ctx context.Context, request *terraform.RunCommandRequest, options ...terraform.RunOptions) error
 }
 
-type streamHandler interface {
+type streamer interface {
 	Stream(jobID string, msg string)
 }
 
 type terraformActivities struct {
 	TerraformClient  TerraformClient
 	DefaultTFVersion *version.Version
-	StreamHandler    streamHandler
+	StreamHandler    streamer
 }
 
-func NewTerraformActivities(client TerraformClient, defaultTfVersion *version.Version, streamHandler streamHandler) *terraformActivities { //nolint:revive // avoiding refactor while adding linter action
+func NewTerraformActivities(client TerraformClient, defaultTfVersion *version.Version, streamHandler streamer) *terraformActivities { //nolint:revive // avoiding refactor while adding linter action
 	return &terraformActivities{
 		TerraformClient:  client,
 		DefaultTFVersion: defaultTfVersion,

@@ -4,17 +4,36 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"time"
 
 	"github.com/google/go-github/v45/github"
 	"github.com/hashicorp/go-getter"
-	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	internal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/temporal"
 )
+
+type ClientContext struct {
+	InstallationToken int64
+	context.Context
+}
+
+var HashiGetter = func(ctx context.Context, dst, src string) error {
+	return getter.Get(dst, src, getter.WithContext(ctx))
+}
+
+// wraps hashicorp's go getter to allow for testing
+type gogetter func(ctx context.Context, dst, src string) error
+
+type githubClient interface {
+	CreateCheckRun(ctx internal.Context, owner, repo string, opts github.CreateCheckRunOptions) (*github.CheckRun, *github.Response, error)
+	UpdateCheckRun(ctx internal.Context, owner, repo string, checkRunID int64, opts github.UpdateCheckRunOptions) (*github.CheckRun, *github.Response, error)
+	GetArchiveLink(ctx internal.Context, owner, repo string, archiveformat github.ArchiveFormat, opts *github.RepositoryContentGetOptions, followRedirects bool) (*url.URL, *github.Response, error)
+	CompareCommits(ctx internal.Context, owner, repo string, base, head string, opts *github.ListOptions) (*github.CommitsComparison, *github.Response, error)
+}
 
 type DiffDirection string
 
@@ -28,9 +47,10 @@ const (
 const deploymentsDirName = "deployments"
 
 type githubActivities struct {
-	ClientCreator githubapp.ClientCreator
-	DataDir       string
-	LinkBuilder   LinkBuilder
+	Client      githubClient
+	DataDir     string
+	LinkBuilder LinkBuilder
+	Getter      gogetter
 }
 
 type CreateCheckRunRequest struct {
@@ -88,13 +108,10 @@ func (a *githubActivities) UpdateCheckRun(ctx context.Context, request UpdateChe
 		opts.Conclusion = github.String(conclusion)
 	}
 
-	client, err := a.ClientCreator.NewInstallationClient(request.Repo.Credentials.InstallationToken)
-
-	if err != nil {
-		return UpdateCheckRunResponse{}, errors.Wrap(err, "creating installation client")
-	}
-
-	run, _, err := client.Checks.UpdateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, request.ID, opts)
+	run, _, err := a.Client.UpdateCheckRun(
+		internal.ContextWithInstallationToken(ctx, request.Repo.Credentials.InstallationToken),
+		request.Repo.Owner, request.Repo.Name, request.ID, opts,
+	)
 
 	if err != nil {
 		return UpdateCheckRunResponse{}, errors.Wrap(err, "creating check run")
@@ -126,13 +143,10 @@ func (a *githubActivities) CreateCheckRun(ctx context.Context, request CreateChe
 		opts.Conclusion = &conclusion
 	}
 
-	client, err := a.ClientCreator.NewInstallationClient(request.Repo.Credentials.InstallationToken)
-
-	if err != nil {
-		return CreateCheckRunResponse{}, errors.Wrap(err, "creating installation client")
-	}
-
-	run, _, err := client.Checks.CreateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, opts)
+	run, _, err := a.Client.CreateCheckRun(
+		internal.ContextWithInstallationToken(ctx, request.Repo.Credentials.InstallationToken),
+		request.Repo.Owner, request.Repo.Name, opts,
+	)
 
 	if err != nil {
 		return CreateCheckRunResponse{}, errors.Wrap(err, "creating check run")
@@ -191,12 +205,8 @@ func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootReque
 	opts := &github.RepositoryContentGetOptions{
 		Ref: ref,
 	}
-	client, err := a.ClientCreator.NewInstallationClient(request.Repo.Credentials.InstallationToken)
-	if err != nil {
-		return FetchRootResponse{}, errors.Wrap(err, "creating installation client")
-	}
 	// note: this link exists for 5 minutes when fetching a private repository archive
-	archiveLink, resp, err := client.Repositories.GetArchiveLink(ctx, request.Repo.Owner, request.Repo.Name, github.Zipball, opts, true)
+	archiveLink, resp, err := a.Client.GetArchiveLink(internal.ContextWithInstallationToken(ctx, request.Repo.Credentials.InstallationToken), request.Repo.Owner, request.Repo.Name, github.Zipball, opts, true)
 	if err != nil {
 		return FetchRootResponse{}, errors.Wrap(err, "getting repo archive link")
 	}
@@ -205,7 +215,7 @@ func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootReque
 		return FetchRootResponse{}, errors.Errorf("getting repo archive link returns non-302 status %d", resp.StatusCode)
 	}
 	downloadLink := a.LinkBuilder.BuildDownloadLinkFromArchive(archiveLink, request.Root, request.Repo, request.Revision)
-	err = getter.Get(destinationPath, downloadLink, getter.WithContext(ctx))
+	err = a.Getter(ctx, destinationPath, downloadLink)
 	if err != nil {
 		return FetchRootResponse{}, errors.Wrap(err, "fetching and extracting zip")
 	}
@@ -226,12 +236,8 @@ type CompareCommitResponse struct {
 }
 
 func (a *githubActivities) CompareCommit(ctx context.Context, request CompareCommitRequest) (CompareCommitResponse, error) {
-	client, err := a.ClientCreator.NewInstallationClient(request.Repo.Credentials.InstallationToken)
-	if err != nil {
-		return CompareCommitResponse{}, errors.Wrap(err, "creating installation client")
-	}
+	comparison, resp, err := a.Client.CompareCommits(internal.ContextWithInstallationToken(ctx, request.Repo.Credentials.InstallationToken), request.Repo.Owner, request.Repo.Name, request.LatestDeployedRevision, request.DeployRequestRevision, &github.ListOptions{})
 
-	comparison, resp, err := client.Repositories.CompareCommits(ctx, request.Repo.Owner, request.Repo.Name, request.LatestDeployedRevision, request.DeployRequestRevision, &github.ListOptions{})
 	if err != nil {
 		return CompareCommitResponse{}, errors.Wrap(err, "comparing commits")
 	}

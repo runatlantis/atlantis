@@ -14,14 +14,17 @@ const (
 	ManualTrigger Trigger = "manual"
 )
 
+type PlanApprovalType string
+
 type Root struct {
-	Name        string
-	Apply       Job
-	Plan        Job
-	RepoRelPath string
-	TfVersion   string
-	PlanMode    PlanMode
-	Trigger     Trigger
+	Name             string
+	Apply            Job
+	Plan             Job
+	RepoRelPath      string
+	TfVersion        string
+	PlanMode         PlanMode
+	PlanApprovalType string
+	Trigger          Trigger
 }
 
 type Job struct {

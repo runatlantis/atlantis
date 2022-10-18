@@ -28,19 +28,12 @@ func NewAsyncClient(
 	cfg ClientConfig,
 	defaultVersion string,
 	tfDownloader terraform.Downloader,
+	versionCache cache.ExecutionVersionCache,
 ) (*AsyncClient, error) {
 	version, err := getDefaultVersion(defaultVersion)
 	if err != nil {
 		return nil, errors.Wrapf(err, "getting default version")
 	}
-
-	loader := terraform.NewVersionLoader(tfDownloader, cfg.TfDownloadURL)
-
-	versionCache := cache.NewExecutionVersionLayeredLoadingCache(
-		"terraform",
-		cfg.BinDir,
-		loader.LoadVersion,
-	)
 
 	// warm the cache with this version
 	_, err = versionCache.Get(version)

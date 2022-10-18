@@ -7,12 +7,12 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/logger"
 )
 
-type streamCloser interface {
+type closer interface {
 	CloseJob(ctx context.Context, jobID string) error
 }
 
 type jobActivities struct {
-	StreamCloser streamCloser
+	StreamCloser closer
 }
 
 type CloseJobRequest struct {

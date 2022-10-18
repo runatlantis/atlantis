@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
-	"github.com/runatlantis/atlantis/server/neptune/temporalworker/job"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
@@ -25,16 +24,16 @@ const RejectedPlanReviewStatus = terraform.Rejected
 const TerraformPlanReviewSignalName = terraform.PlanReviewSignalName
 
 type TerraformActivities struct {
-	activities.Terraform
+	*activities.Terraform
 }
 
-func NewTerraformActivities(config config.TerraformConfig, dataDir string, serverURL *url.URL, streamHandler *job.StreamHandler) (*TerraformActivities, error) {
+func NewTerraformActivities(config config.TerraformConfig, dataDir string, serverURL *url.URL, streamHandler activities.StreamCloser) (*TerraformActivities, error) {
 	terraformActivities, err := activities.NewTerraform(config, dataDir, serverURL, streamHandler)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing terraform activities")
 	}
 	return &TerraformActivities{
-		Terraform: *terraformActivities,
+		Terraform: terraformActivities,
 	}, nil
 }
 
