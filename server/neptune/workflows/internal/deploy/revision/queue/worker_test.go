@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/deployment"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/github"
@@ -139,7 +140,7 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 		},
 	}
 
-	latestDeployment := root.DeploymentInfo{
+	latestDeployment := deployment.Info{
 		Revision: "2345",
 	}
 
@@ -169,7 +170,7 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 
 	// Mock StoreLatestDeploymentRequest for both requests
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, activities.StoreLatestDeploymentRequest{
-		DeploymentInfo: &root.DeploymentInfo{
+		DeploymentInfo: &deployment.Info{
 			Version:    queue.DeploymentInfoVersion,
 			ID:         uuid.UUID{}.String(),
 			CheckRunID: deploymentInfoList[0].CheckRunID,
@@ -181,7 +182,7 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 		},
 	}).Return(nil)
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, activities.StoreLatestDeploymentRequest{
-		DeploymentInfo: &root.DeploymentInfo{
+		DeploymentInfo: &deployment.Info{
 			Version:    queue.DeploymentInfoVersion,
 			ID:         uuid.UUID{}.String(),
 			CheckRunID: deploymentInfoList[1].CheckRunID,
@@ -471,7 +472,7 @@ func (t *testDeployActivity) UpdateCheckRun(ctx context.Context, request activit
 // Setup test artifacts for compare commit tests
 func getTestArtifacts() (
 	deploymentInfo terraform.DeploymentInfo,
-	latestDeployedRevision root.DeploymentInfo,
+	latestDeployedRevision deployment.Info,
 	repo github.Repo,
 	fetchDeploymentRequest activities.FetchLatestDeploymentRequest,
 	fetchDeploymentResponse activities.FetchLatestDeploymentResponse,
@@ -493,7 +494,7 @@ func getTestArtifacts() (
 		Repo: repo,
 	}
 
-	latestDeployedRevision = root.DeploymentInfo{
+	latestDeployedRevision = deployment.Info{
 		Revision: "3455",
 	}
 
@@ -503,7 +504,7 @@ func getTestArtifacts() (
 	}
 
 	fetchDeploymentResponse = activities.FetchLatestDeploymentResponse{
-		DeploymentInfo: &root.DeploymentInfo{
+		DeploymentInfo: &deployment.Info{
 			Revision: latestDeployedRevision.Revision,
 			Repo:     repo,
 		},
@@ -516,7 +517,7 @@ func getTestArtifacts() (
 	}
 
 	storeDeploymentRequest = activities.StoreLatestDeploymentRequest{
-		DeploymentInfo: &root.DeploymentInfo{
+		DeploymentInfo: &deployment.Info{
 			Version:    queue.DeploymentInfoVersion,
 			ID:         deploymentInfo.ID.String(),
 			CheckRunID: deploymentInfo.CheckRunID,

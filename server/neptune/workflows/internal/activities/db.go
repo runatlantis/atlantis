@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/deployment"
 )
 
 type store interface {
-	GetDeploymentInfo(ctx context.Context, repoName string, rootName string) (*root.DeploymentInfo, error)
-	SetDeploymentInfo(ctx context.Context, deploymentInfo *root.DeploymentInfo) error
+	GetDeploymentInfo(ctx context.Context, repoName string, rootName string) (*deployment.Info, error)
+	SetDeploymentInfo(ctx context.Context, deploymentInfo *deployment.Info) error
 }
 
 type dbActivities struct {
@@ -22,7 +22,7 @@ type FetchLatestDeploymentRequest struct {
 }
 
 type FetchLatestDeploymentResponse struct {
-	DeploymentInfo *root.DeploymentInfo
+	DeploymentInfo *deployment.Info
 }
 
 func (a *dbActivities) FetchLatestDeployment(ctx context.Context, request FetchLatestDeploymentRequest) (FetchLatestDeploymentResponse, error) {
@@ -37,7 +37,7 @@ func (a *dbActivities) FetchLatestDeployment(ctx context.Context, request FetchL
 }
 
 type StoreLatestDeploymentRequest struct {
-	DeploymentInfo *root.DeploymentInfo
+	DeploymentInfo *deployment.Info
 }
 
 func (a *dbActivities) StoreLatestDeployment(ctx context.Context, request StoreLatestDeploymentRequest) error {

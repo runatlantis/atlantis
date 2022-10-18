@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	internalContext "github.com/runatlantis/atlantis/server/neptune/context"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/deployment"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -14,7 +14,7 @@ import (
 const DeploymentInfoVersion = "1.0.0"
 
 type revisionProcessor interface {
-	Process(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo, latestDeployment *root.DeploymentInfo) (*root.DeploymentInfo, error)
+	Process(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error)
 }
 
 type WorkerState string
@@ -47,7 +47,7 @@ func (w *Worker) Work(ctx workflow.Context) {
 		w.state = CompleteWorkerState
 	}()
 
-	var latestDeployment *root.DeploymentInfo
+	var latestDeployment *deployment.Info
 	for {
 		if w.Queue.IsEmpty() {
 			w.state = WaitingWorkerState

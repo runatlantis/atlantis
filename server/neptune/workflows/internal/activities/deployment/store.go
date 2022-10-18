@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/storage"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 )
 
 type client interface {
@@ -27,7 +26,7 @@ type Store struct {
 	stowClient client
 }
 
-func (s *Store) GetDeploymentInfo(ctx context.Context, repoName string, rootName string) (*root.DeploymentInfo, error) {
+func (s *Store) GetDeploymentInfo(ctx context.Context, repoName string, rootName string) (*Info, error) {
 	key := BuildKey(repoName, rootName)
 
 	reader, err := s.stowClient.Get(ctx, key)
@@ -50,7 +49,7 @@ func (s *Store) GetDeploymentInfo(ctx context.Context, repoName string, rootName
 
 	decoder := json.NewDecoder(reader)
 
-	var deploymentInfo root.DeploymentInfo
+	var deploymentInfo Info
 	err = decoder.Decode(&deploymentInfo)
 	if err != nil {
 		return nil, errors.Wrap(err, "decoding item")
@@ -59,7 +58,7 @@ func (s *Store) GetDeploymentInfo(ctx context.Context, repoName string, rootName
 	return &deploymentInfo, nil
 }
 
-func (s *Store) SetDeploymentInfo(ctx context.Context, deploymentInfo *root.DeploymentInfo) error {
+func (s *Store) SetDeploymentInfo(ctx context.Context, deploymentInfo *Info) error {
 	key := BuildKey(deploymentInfo.Repo.GetFullName(), deploymentInfo.Root.Name)
 	object, err := json.Marshal(deploymentInfo)
 	if err != nil {
