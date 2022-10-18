@@ -3,6 +3,7 @@ package github_test
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -19,6 +20,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type testTokenGetter struct {
+	token string
+	err   error
+}
+
+func (t *testTokenGetter) GetToken() (string, error) {
+	return t.token, t.err
+}
+
 // Fetch from provided branch
 func TestFetchSimple(t *testing.T) {
 	// Initialize the git repo.
@@ -34,9 +44,10 @@ func TestFetchSimple(t *testing.T) {
 	assert.NoError(t, err)
 	logger := logging.NewNoopCtxLogger(t)
 	fetcher := &github.RepoFetcher{
-		DataDir:        dataDir,
-		GithubHostname: testServer,
-		Logger:         logger,
+		DataDir:           dataDir,
+		GithubHostname:    testServer,
+		Logger:            logger,
+		GithubCredentials: &testTokenGetter{},
 	}
 	repo := newBaseRepo(repoDir)
 	destinationPath, _, err := fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha)
@@ -67,9 +78,10 @@ func TestFetchCheckout(t *testing.T) {
 	assert.NoError(t, err)
 	logger := logging.NewNoopCtxLogger(t)
 	fetcher := &github.RepoFetcher{
-		DataDir:        dataDir,
-		GithubHostname: testServer,
-		Logger:         logger,
+		DataDir:           dataDir,
+		GithubHostname:    testServer,
+		Logger:            logger,
+		GithubCredentials: &testTokenGetter{},
 	}
 	repo := newBaseRepo(repoDir)
 	destinationPath, _, err := fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha1)
@@ -98,9 +110,10 @@ func TestFetchNonDefaultBranch(t *testing.T) {
 	assert.NoError(t, err)
 	logger := logging.NewNoopCtxLogger(t)
 	fetcher := &github.RepoFetcher{
-		DataDir:        dataDir,
-		GithubHostname: testServer,
-		Logger:         logger,
+		DataDir:           dataDir,
+		GithubHostname:    testServer,
+		Logger:            logger,
+		GithubCredentials: &testTokenGetter{},
 	}
 	repo := newBaseRepo(repoDir)
 	destinationPath, _, err := fetcher.Fetch(context.Background(), repo, "test-branch", sha)
@@ -125,9 +138,10 @@ func TestFetchSimpleFailure(t *testing.T) {
 	assert.NoError(t, err)
 	logger := logging.NewNoopCtxLogger(t)
 	fetcher := &github.RepoFetcher{
-		DataDir:        dataDir,
-		GithubHostname: testServer,
-		Logger:         logger,
+		DataDir:           dataDir,
+		GithubHostname:    testServer,
+		Logger:            logger,
+		GithubCredentials: &testTokenGetter{},
 	}
 	repo := newBaseRepo(repoDir)
 	repo.DefaultBranch = "invalid-branch"
@@ -154,9 +168,10 @@ func TestFetchCheckoutFailure(t *testing.T) {
 	assert.NoError(t, err)
 	logger := logging.NewNoopCtxLogger(t)
 	fetcher := &github.RepoFetcher{
-		DataDir:        dataDir,
-		GithubHostname: testServer,
-		Logger:         logger,
+		DataDir:           dataDir,
+		GithubHostname:    testServer,
+		Logger:            logger,
+		GithubCredentials: &testTokenGetter{},
 	}
 	repo := newBaseRepo(repoDir)
 	_, _, err = fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, "invalidsha")
@@ -180,13 +195,39 @@ func TestFetchNonDefaultBranchFailure(t *testing.T) {
 	assert.NoError(t, err)
 	logger := logging.NewNoopCtxLogger(t)
 	fetcher := &github.RepoFetcher{
-		DataDir:        dataDir,
-		GithubHostname: testServer,
-		Logger:         logger,
+		DataDir:           dataDir,
+		GithubHostname:    testServer,
+		Logger:            logger,
+		GithubCredentials: &testTokenGetter{},
 	}
 	repo := newBaseRepo(repoDir)
 	_, _, err = fetcher.Fetch(context.Background(), repo, "invalid-branch", sha)
 	assert.Error(t, err)
+}
+
+func TestFetch_ErrorGettingGHToken(t *testing.T) {
+	// Initialize the git repo.
+	repoDir, cleanupRepo := initRepo(t)
+	defer cleanupRepo()
+	sha := appendCommit(t, repoDir, ".gitkeep", "initial commit")
+
+	dataDir, cleanupDataDir := tempDir(t)
+	defer cleanupDataDir()
+	defer disableSSLVerification()()
+	testServer, err := fixtures.GithubAppTestServer(t)
+	assert.NoError(t, err)
+	logger := logging.NewNoopCtxLogger(t)
+	fetcher := &github.RepoFetcher{
+		DataDir:        dataDir,
+		GithubHostname: testServer,
+		Logger:         logger,
+		GithubCredentials: &testTokenGetter{
+			err: errors.New("error"),
+		},
+	}
+	repo := newBaseRepo(repoDir)
+	_, _, err = fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha)
+	assert.ErrorContains(t, err, "error")
 }
 
 func newBaseRepo(repoDir string) models.Repo {

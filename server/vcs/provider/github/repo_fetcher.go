@@ -18,12 +18,16 @@ import (
 
 const workingDirPrefix = "repos"
 
+type tokenGetter interface {
+	GetToken() (string, error)
+}
+
 // RepoFetcher implements repoFetcher through git clone operations
 type RepoFetcher struct {
-	DataDir        string
-	Token          string
-	GithubHostname string
-	Logger         logging.Logger
+	DataDir           string
+	GithubHostname    string
+	Logger            logging.Logger
+	GithubCredentials tokenGetter
 }
 
 func (g *RepoFetcher) Fetch(ctx context.Context, repo models.Repo, branch string, sha string) (string, func(ctx context.Context, filePath string), error) {
@@ -32,14 +36,19 @@ func (g *RepoFetcher) Fetch(ctx context.Context, repo models.Repo, branch string
 		return "", nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
 	}
 
+	ghToken, err := g.GithubCredentials.GetToken()
+	if err != nil {
+		return "", nil, errors.Wrap(err, "fetching github token")
+	}
+
 	// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#http-based-git-access-by-an-installation
-	if err := events.WriteGitCreds("x-access-token", g.Token, g.GithubHostname, home, g.Logger, true); err != nil {
+	if err := events.WriteGitCreds("x-access-token", ghToken, g.GithubHostname, home, g.Logger, true); err != nil {
 		return "", nil, err
 	}
 	// Realistically, this is a super brittle way of supporting clones using gh app installation tokens
 	// This URL should be built during Repo creation and the struct should be immutable going forward.
 	// Doing this requires a larger refactor however, and can probably be coupled with supporting > 1 installation
-	authURL := fmt.Sprintf("://x-access-token:%s", g.Token)
+	authURL := fmt.Sprintf("://x-access-token:%s", ghToken)
 	repo.CloneURL = strings.Replace(repo.CloneURL, "://:", authURL, 1)
 	repo.SanitizedCloneURL = strings.Replace(repo.SanitizedCloneURL, "://:", "://x-access-token:", 1)
 	return g.clone(ctx, repo, branch, sha)

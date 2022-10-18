@@ -283,15 +283,11 @@ func NewServer(config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing temporal client")
 	}
 
-	ghToken, err := githubCredentials.GetToken()
-	if err != nil {
-		return nil, errors.Wrap(err, "fetching github token")
-	}
 	repoFetcher := &github.RepoFetcher{
-		DataDir:        config.DataDir,
-		Token:          ghToken,
-		GithubHostname: config.GithubHostname,
-		Logger:         ctxLogger,
+		DataDir:           config.DataDir,
+		GithubCredentials: githubCredentials,
+		GithubHostname:    config.GithubHostname,
+		Logger:            ctxLogger,
 	}
 	hooksRunner := &preworkflow.HooksRunner{
 		GlobalCfg:    globalCfg,
