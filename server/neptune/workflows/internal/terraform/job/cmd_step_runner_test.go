@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +30,7 @@ func testCmdWorkflow(ctx workflow.Context, r request) (string, error) {
 		ScheduleToCloseTimeout: 5 * time.Second,
 	})
 
-	jobExecutionCtx := &job.ExecutionContext{
+	jobExecutionCtx := &runner.ExecutionContext{
 		Context:   ctx,
 		Path:      ProjectPath,
 		Envs:      map[string]string{},
@@ -80,7 +80,7 @@ func TestRunRunner_ShouldSetupEnvVars(t *testing.T) {
 				Owner: RepoOwner,
 			},
 		},
-		Step: job.Step{},
+		Step: execute.Step{},
 	})
 
 	var resp string

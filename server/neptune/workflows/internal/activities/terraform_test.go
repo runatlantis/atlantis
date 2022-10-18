@@ -8,7 +8,6 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/testsuite"
 )
@@ -230,7 +229,7 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 		RequestArgs     []terraform.Argument
 		ExpectedArgs    []terraform.Argument
 		ExpectedFlags   []terraform.Flag
-		PlanMode        *job.PlanMode
+		PlanMode        *terraform.PlanMode
 	}{
 		{
 			RequestVersion:  "0.12.0",
@@ -260,7 +259,7 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 		{
 			ExpectedArgs:    defaultArgs,
 			ExpectedVersion: defaultVersion,
-			PlanMode:        job.NewDestroyPlanMode(),
+			PlanMode:        terraform.NewDestroyPlanMode(),
 			ExpectedFlags: []terraform.Flag{
 				{
 					Value: "destroy",

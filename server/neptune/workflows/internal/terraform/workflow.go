@@ -7,8 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
@@ -153,7 +153,7 @@ func (r *Runner) waitForPlanReview(ctx workflow.Context, root *root.LocalRoot) P
 	// Wait for plan review signal
 	var planReview PlanReviewSignalRequest
 
-	if root.Root.Plan.Approval == job.AutoApproval {
+	if root.Root.Plan.Approval == terraform.AutoApproval {
 		return Approved
 	}
 

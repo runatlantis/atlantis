@@ -1,4 +1,4 @@
-package job
+package execute
 
 // Step was taken from the Atlantis OG config, we might be able to clean this up/remove it
 type Step struct {
@@ -12,4 +12,12 @@ type Step struct {
 	EnvVarName string
 	// EnvVarValue is the value to set EnvVarName to.
 	EnvVarValue string
+}
+
+type Job struct {
+	Steps []Step
+}
+
+func (j Job) GetSteps() []Step {
+	return j.Steps
 }

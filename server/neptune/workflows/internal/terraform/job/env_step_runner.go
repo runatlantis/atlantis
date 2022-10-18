@@ -3,7 +3,7 @@ package job
 import (
 	"strings"
 
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 )
 
@@ -11,7 +11,7 @@ type EnvStepRunner struct {
 	CmdStepRunner CmdStepRunner
 }
 
-func (e *EnvStepRunner) Run(executionContext *job.ExecutionContext, localRoot *root.LocalRoot, step job.Step) (string, error) {
+func (e *EnvStepRunner) Run(executionContext *ExecutionContext, localRoot *root.LocalRoot, step execute.Step) (string, error) {
 	if step.EnvVarValue != "" {
 		return step.EnvVarValue, nil
 	}

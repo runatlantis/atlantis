@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
 	terraform_model "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
-	job_model "github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
@@ -73,7 +73,7 @@ func testJobPlanWorkflow(ctx workflow.Context, r terraform.Request) (activities.
 		Path: ProjectPath,
 	}
 
-	jobExecutionCtx := &job_model.ExecutionContext{
+	jobExecutionCtx := &job.ExecutionContext{
 		Context:   ctx,
 		Path:      ProjectPath,
 		Envs:      map[string]string{},
@@ -97,7 +97,7 @@ func testJobApplyWorkflow(ctx workflow.Context, r terraform.Request) error {
 		Path: ProjectPath,
 	}
 
-	jobExecutionCtx := &job_model.ExecutionContext{
+	jobExecutionCtx := &job.ExecutionContext{
 		Context:   ctx,
 		Path:      ProjectPath,
 		Envs:      map[string]string{},
@@ -191,9 +191,9 @@ func getTestRootFor(stepName string) root.Root {
 	return root.Root{
 		Name: ProjectName,
 		Path: "project",
-		Plan: job_model.Plan{
-			Terraform: job_model.Terraform{
-				Steps: []job_model.Step{
+		Plan: terraform_model.PlanJob{
+			Job: execute.Job{
+				Steps: []execute.Step{
 					{
 						StepName: stepName,
 					},

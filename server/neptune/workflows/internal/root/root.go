@@ -1,8 +1,9 @@
 package root
 
 import (
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 )
 
 // Root is the definition of a root
@@ -12,8 +13,8 @@ type Root struct {
 	// Path is the relative path from the repo
 	Path      string
 	TfVersion string
-	Apply     job.Terraform
-	Plan      job.Plan
+	Apply     execute.Job
+	Plan      terraform.PlanJob
 	Trigger   Trigger
 }
 

@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +24,7 @@ const (
 
 type request struct {
 	LocalRoot root.LocalRoot
-	Step      job.Step
+	Step      execute.Step
 }
 
 func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
@@ -36,7 +36,7 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 	env.RegisterWorkflow(testCmdWorkflow)
 
 	env.OnActivity(testExecuteActivity.ExecuteCommand, mock.Anything, activities.ExecuteCommandRequest{
-		Step: job.Step{
+		Step: execute.Step{
 			StepName:   "env",
 			RunCommand: "echo 'Hello World'",
 		},
@@ -64,7 +64,7 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 				Owner: RepoOwner,
 			},
 		},
-		Step: job.Step{
+		Step: execute.Step{
 			StepName:   "env",
 			RunCommand: "echo 'Hello World'",
 		},
@@ -78,10 +78,10 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 }
 
 func TestEnvRunne_EnvVarValueSet(t *testing.T) {
-	executioncontext := &job.ExecutionContext{}
+	executioncontext := &runner.ExecutionContext{}
 	localRoot := &root.LocalRoot{}
 
-	step := job.Step{
+	step := execute.Step{
 		EnvVarName:  "TEST_VAR",
 		EnvVarValue: "TEST_VALUE",
 	}

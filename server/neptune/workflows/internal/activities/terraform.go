@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 )
 
 var DisableInputArg = terraform.Argument{
@@ -100,7 +99,7 @@ type TerraformPlanRequest struct {
 	JobID     string
 	TfVersion string
 	Path      string
-	Mode      *job.PlanMode
+	Mode      *terraform.PlanMode
 }
 
 type TerraformPlanResponse struct {

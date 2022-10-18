@@ -1,22 +1,23 @@
 package converter
 
 import (
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 )
 
 func Root(external request.Root) root.Root {
 	return root.Root{
 		Name: external.Name,
-		Apply: job.Terraform{
+		Apply: execute.Job{
 			Steps: steps(external.Apply.Steps),
 		},
-		Plan: job.Plan{
-			Terraform: job.Terraform{
+		Plan: terraform.PlanJob{
+			Job: execute.Job{
 				Steps: steps(external.Plan.Steps)},
 			Mode:     mode(external.PlanMode),
-			Approval: job.PlanApprovalType(external.PlanApprovalType),
+			Approval: terraform.PlanApprovalType(external.PlanApprovalType),
 		},
 		Path:      external.RepoRelPath,
 		TfVersion: external.TfVersion,
@@ -25,19 +26,19 @@ func Root(external request.Root) root.Root {
 
 }
 
-func mode(mode request.PlanMode) *job.PlanMode {
+func mode(mode request.PlanMode) *terraform.PlanMode {
 	switch mode {
 	case request.DestroyPlanMode:
-		return job.NewDestroyPlanMode()
+		return terraform.NewDestroyPlanMode()
 	}
 
 	return nil
 }
 
-func steps(requestSteps []request.Step) []job.Step {
-	var terraformSteps []job.Step
+func steps(requestSteps []request.Step) []execute.Step {
+	var terraformSteps []execute.Step
 	for _, step := range requestSteps {
-		terraformSteps = append(terraformSteps, job.Step{
+		terraformSteps = append(terraformSteps, execute.Step{
 			StepName:    step.StepName,
 			ExtraArgs:   step.ExtraArgs,
 			RunCommand:  step.RunCommand,

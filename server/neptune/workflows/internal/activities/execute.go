@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 )
 
 type executeCommandActivities struct{}
@@ -17,7 +17,7 @@ type ExecuteCommandResponse struct {
 }
 
 type ExecuteCommandRequest struct {
-	Step    job.Step
+	Step    execute.Step
 	Path    string
 	EnvVars map[string]string
 }

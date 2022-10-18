@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/github"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/job"
+	terraformModel "github.com/runatlantis/atlantis/server/neptune/workflows/internal/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/root"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
@@ -33,17 +34,17 @@ var testGithubRepo = github.Repo{
 var testLocalRoot = &root.LocalRoot{
 	Root: root.Root{
 		Name: testRootName,
-		Plan: job.Plan{
-			Terraform: job.Terraform{
-				Steps: []job.Step{
+		Plan: terraformModel.PlanJob{
+			Job: execute.Job{
+				Steps: []execute.Step{
 					{
 						StepName: "step1",
 					},
 				},
 			},
 		},
-		Apply: job.Terraform{
-			Steps: []job.Step{
+		Apply: execute.Job{
+			Steps: []execute.Step{
 				{
 					StepName: "step2",
 				},
