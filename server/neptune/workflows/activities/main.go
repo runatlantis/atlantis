@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/go-version"
+	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime/cache"
@@ -13,9 +14,11 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/storage"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/deployment"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	internal "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github/link"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
+	"github.com/uber-go/tally/v4"
 )
 
 const (
@@ -147,7 +150,7 @@ type LinkBuilder interface {
 	BuildDownloadLinkFromArchive(archiveURL *url.URL, root terraform.Root, repo internal.Repo, revision string) string
 }
 
-func NewGithub(client githubClient, dataDir string, getter gogetter) (*Github, error) {
+func NewGithubWithClient(client githubClient, dataDir string, getter gogetter) (*Github, error) {
 	return &Github{
 		githubActivities: &githubActivities{
 			Client:      client,
@@ -156,6 +159,24 @@ func NewGithub(client githubClient, dataDir string, getter gogetter) (*Github, e
 			Getter:      getter,
 		},
 	}, nil
+}
+
+func NewGithub(appConfig githubapp.Config, scope tally.Scope, dataDir string) (*Github, error) {
+	clientCreator, err := githubapp.NewDefaultCachingClientCreator(
+		appConfig,
+		githubapp.WithClientMiddleware(
+			github.ClientMetrics(scope.SubScope("app")),
+		))
+
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing client creator")
+	}
+
+	client := &internal.Client{
+		ClientCreator: clientCreator,
+	}
+
+	return NewGithubWithClient(client, dataDir, HashiGetter)
 }
 
 func mkSubDir(parentDir string, subDir string) (string, error) {

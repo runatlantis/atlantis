@@ -26,9 +26,9 @@ import (
 )
 
 type a struct {
-	*workflows.GithubActivities
-	*workflows.TerraformActivities
-	*workflows.DeployActivities
+	*activities.Github
+	*activities.Terraform
+	*activities.Deploy
 }
 
 func TestDeployWorkflow(t *testing.T) {
@@ -141,7 +141,7 @@ func buildConfig(t *testing.T) config.Config {
 
 func initAndRegisterActivities(t *testing.T, env *testsuite.TestWorkflowEnvironment) *testSingletons {
 	cfg := buildConfig(t)
-	deployActivities, err := workflows.NewDeployActivities(cfg.DeploymentConfig)
+	deployActivities, err := activities.NewDeploy(cfg.DeploymentConfig)
 
 	assert.NoError(t, err)
 
@@ -163,7 +163,7 @@ func initAndRegisterActivities(t *testing.T, env *testsuite.TestWorkflowEnvironm
 
 	githubClient := &testGithubClient{}
 
-	githubActivities, err := activities.NewGithub(
+	githubActivities, err := activities.NewGithubWithClient(
 		githubClient,
 		cfg.DataDir,
 		GetLocalTestRoot,
@@ -177,13 +177,9 @@ func initAndRegisterActivities(t *testing.T, env *testsuite.TestWorkflowEnvironm
 
 	return &testSingletons{
 		a: &a{
-			GithubActivities: &workflows.GithubActivities{
-				Github: githubActivities,
-			},
-			TerraformActivities: &workflows.TerraformActivities{
-				Terraform: terraformActivities,
-			},
-			DeployActivities: deployActivities,
+			Github:    githubActivities,
+			Terraform: terraformActivities,
+			Deploy:    deployActivities,
 		},
 		githubClient: githubClient,
 		streamCloser: streamCloser,
