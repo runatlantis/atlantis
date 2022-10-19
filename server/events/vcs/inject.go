@@ -12,15 +12,8 @@ func NewPullMergeabilityChecker(commitStatusPrefix string) MergeabilityChecker {
 }
 
 func newValidStatusFilters(commitStatusPrefix string) []ValidStatusFilter {
-	titleMatcher := StatusTitleMatcher{TitlePrefix: commitStatusPrefix}
-
-	// TODO: Remove apply status filter after github checks is fully rolled out.
-	applyStatusFilter := &ApplyStatusFilter{
-		statusTitleMatcher: titleMatcher,
-	}
-
 	return []ValidStatusFilter{
-		SuccessStateFilter, applyStatusFilter,
+		SuccessStateFilter,
 	}
 }
 

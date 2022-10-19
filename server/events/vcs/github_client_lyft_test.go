@@ -100,10 +100,10 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 			[]string{
 				fmt.Sprintf(statusJSON, "pending", "sq-ready-to-merge"),
 				fmt.Sprintf(statusJSON, "success", "_owners-check"),
-				fmt.Sprintf(statusJSON, "failure", "atlantis/apply"),
 			},
 			[]string{
 				fmt.Sprintf(checkJSON, "completed", "success", "check-name"),
+				fmt.Sprintf(checkJSON, "completed", "failure", "atlantis/apply"),
 			},
 			true,
 		},

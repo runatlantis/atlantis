@@ -584,58 +584,63 @@ func TestGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
         "updated_at": "2012-08-20T01:19:13Z"
 	  }`
 	checksJSON := `{
-		"check_runs": [
-		  {
 			"id": 4,
 			"status": "%s",
 			"conclusion": "%s",
-			"name": "mighty_readme",
+			"name": "%s",
 			"check_suite": {
 			  "id": 5
 			}
-		  }
-		]
+	}`
+	combinedChecksJSON := `{
+		"total_count": %d,
+		"check_runs": [%s]
 	}`
 
-	completedCheckResponse := fmt.Sprintf(checksJSON, "completed", "success")
+	completedCheckResponse := fmt.Sprintf(checksJSON, "completed", "success", "mighty-readme")
 
 	cases := []struct {
-		description    string
-		statuses       []string
-		checksResponse string
-		expMergeable   bool
+		description  string
+		statuses     []string
+		checks       []string
+		expMergeable bool
 	}{
 		{
 			"apply-failure",
+			[]string{},
 			[]string{
-				fmt.Sprintf(statusJSON, "failure", "atlantis/apply"),
+				completedCheckResponse,
+				fmt.Sprintf(checksJSON, "complete", "failure", "atlantis/apply"),
 			},
-			completedCheckResponse,
 			true,
 		},
 		{
 			"apply-project-failure",
+			[]string{},
 			[]string{
-				fmt.Sprintf(statusJSON, "failure", "atlantis/apply: terraform_cloud_workspace"),
+				fmt.Sprintf(checksJSON, "complete", "failure", "atlantis/apply: terraform_cloud_workspace"),
+				completedCheckResponse,
 			},
-			completedCheckResponse,
 			true,
 		},
 		{
 			"plan+apply-failure",
 			[]string{
 				fmt.Sprintf(statusJSON, "failure", "atlantis/plan"),
-				fmt.Sprintf(statusJSON, "failure", "atlantis/apply"),
 			},
-			completedCheckResponse,
+			[]string{
+				completedCheckResponse,
+				fmt.Sprintf(checksJSON, "complete", "failure", "atlantis/apply"),
+			},
 			false,
 		},
 		{
 			"apply-failure-checks-failed",
+			[]string{},
 			[]string{
-				fmt.Sprintf(statusJSON, "failure", "atlantis/apply"),
+				fmt.Sprintf(checksJSON, "complete", "failure", "mighty-readme"),
+				fmt.Sprintf(checksJSON, "complete", "failure", "atlantis/apply"),
 			},
-			fmt.Sprintf(checksJSON, "complete", "failure"),
 			false,
 		},
 		{
@@ -643,7 +648,9 @@ func TestGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 			[]string{
 				fmt.Sprintf(statusJSON, "success", "atlantis/plan"),
 			},
-			fmt.Sprintf(checksJSON, "in_progress", ""),
+			[]string{
+				fmt.Sprintf(checksJSON, "in_progress", "", "mighty-readme"),
+			},
 			false,
 		},
 	}
@@ -660,7 +667,9 @@ func TestGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 						)) // nolint: errcheck
 						return
 					case "/api/v3/repos/owner/repo/commits/2/check-runs?per_page=100":
-						_, _ = w.Write([]byte(c.checksResponse))
+						_, _ = w.Write([]byte(
+							fmt.Sprintf(combinedChecksJSON, len(c.checks), strings.Join(c.checks, ",")),
+						))
 						return
 					case "/api/v3/repos/owner/repo/pulls/1":
 						w.Write([]byte(pullResponse)) // nolint: errcheck

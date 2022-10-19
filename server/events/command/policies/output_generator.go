@@ -5,20 +5,14 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/lyft/feature"
 )
 
 type CommandOutputGenerator struct {
 	PrjCommandRunner  events.ProjectPolicyCheckCommandRunner
 	PrjCommandBuilder events.ProjectPlanCommandBuilder
-	FeatureAllocator  feature.Allocator
 }
 
 func (f *CommandOutputGenerator) GeneratePolicyCheckOutputStore(ctx *command.Context, cmd *command.Comment) (command.PolicyCheckOutputStore, error) {
-	if !f.isChecksEnabled(ctx) {
-		return command.PolicyCheckOutputStore{}, nil
-	}
-
 	prjCmds, err := f.PrjCommandBuilder.BuildPlanCommands(ctx, &command.Comment{
 		RepoRelDir:  cmd.RepoRelDir,
 		Name:        command.Plan,
@@ -63,17 +57,4 @@ func (f *CommandOutputGenerator) getPolicyCheckCommands(
 		}
 	}
 	return policyCheckCmds
-}
-
-func (f *CommandOutputGenerator) isChecksEnabled(ctx *command.Context) bool {
-	shouldAllocate, err := f.FeatureAllocator.ShouldAllocate(feature.GithubChecks, feature.FeatureContext{
-		RepoName:         ctx.HeadRepo.FullName,
-		PullCreationTime: ctx.Pull.CreatedAt,
-	})
-	if err != nil {
-		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.GithubChecks, err))
-		return false
-	}
-
-	return shouldAllocate
 }

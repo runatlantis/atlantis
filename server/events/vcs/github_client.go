@@ -33,10 +33,87 @@ import (
 	"github.com/shurcooL/githubv4"
 )
 
+var projectCommandTemplateWithLogs = `
+| **Command Name** | **Project** | **Workspace** | **Status** | **Logs** |  
+| - | - | - | - | - |
+| %s  | {%s}  | {%s}  | {%s}  | %s  | 
+`
+
+var projectCommandTemplate = `
+| **Command Name**  | **Project** | **Workspace** | **Status** | 
+| - | - | - | - |
+| %s  | {%s}  | {%s}  | {%s}  |
+`
+
+var commandTemplate = `
+| **Command Name**  |  **Status** |  
+| - | - |
+| %s  | {%s}  | 
+`
+
+var commandTemplateWithCount = `
+| **Command Name** | **Num Total** | **Num Success** | **Status** |  
+| - | - | - | - |
+| %s | {%s} | {%s} | {%s} |  
+`
+
+// github checks conclusion
+type ChecksConclusion int //nolint:golint // avoiding refactor while adding linter action
+
+const (
+	Neutral ChecksConclusion = iota
+	TimedOut
+	ActionRequired
+	Cancelled
+	Failure
+	Success
+)
+
+func (e ChecksConclusion) String() string {
+	switch e {
+	case Neutral:
+		return "neutral"
+	case TimedOut:
+		return "timed_out"
+	case ActionRequired:
+		return "action_required"
+	case Cancelled:
+		return "cancelled"
+	case Failure:
+		return "failure"
+	case Success:
+		return "success"
+	}
+	return ""
+}
+
+// github checks status
+type CheckStatus int
+
+const (
+	Queued CheckStatus = iota
+	InProgress
+	Completed
+)
+
+func (e CheckStatus) String() string {
+	switch e {
+	case Queued:
+		return "queued"
+	case InProgress:
+		return "in_progress"
+	case Completed:
+		return "completed"
+	}
+	return ""
+}
+
 // maxCommentLength is the maximum number of chars allowed in a single comment
 // by GitHub.
 const (
 	maxCommentLength = 65536
+	// Reference: https://github.com/github/docs/issues/3765
+	maxChecksOutputLength = 65535
 )
 
 // allows for custom handling of github 404s
@@ -410,39 +487,161 @@ func (g *GithubClient) GetRepoStatuses(repo models.Repo, pull models.PullRequest
 // UpdateStatus updates the status badge on the pull request.
 // See https://github.com/blog/1227-commit-status-api.
 func (g *GithubClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
-	ghState := "error"
-	switch request.State {
-	case models.PendingCommitStatus:
-		ghState = "pending"
-	case models.SuccessCommitStatus:
-		ghState = "success"
-	case models.FailedCommitStatus:
-		ghState = "failure"
+	// Empty status ID means we create a new check run
+	if request.StatusID == "" {
+		return g.createCheckRun(ctx, request)
 	}
-
-	status := &github.RepoStatus{
-		State:       github.String(ghState),
-		Description: github.String(request.Description),
-		Context:     github.String(request.StatusName),
-		TargetURL:   &request.DetailsURL,
-	}
-	_, _, err := g.client.Repositories.CreateStatus(ctx, request.Repo.Owner, request.Repo.Name, request.Ref, status)
-	return "", err
+	return request.StatusID, g.updateCheckRun(ctx, request, request.StatusID)
 }
 
-// [WENGINES-4643] TODO: Move the checks implementation to UpdateStatus once github checks is stable
-func (g *GithubClient) UpdateCheckRun(ctx context.Context, owner string, repo string, checkRunID int64, request github.UpdateCheckRunOptions) error {
-	_, _, err := g.client.Checks.UpdateCheckRun(ctx, owner, repo, checkRunID, request)
-	return err
-}
+func (g *GithubClient) createCheckRun(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
+	status, conclusion := g.resolveChecksStatus(request.State)
+	createCheckRunOpts := github.CreateCheckRunOptions{
+		Name:    request.StatusName,
+		HeadSHA: request.Ref,
+		Status:  &status,
+		Output:  g.createCheckRunOutput(request),
+	}
 
-func (g *GithubClient) CreateCheckRun(ctx context.Context, owner string, repo string, request github.CreateCheckRunOptions) (string, error) {
-	checkRun, _, err := g.client.Checks.CreateCheckRun(ctx, owner, repo, request)
+	if request.DetailsURL != "" {
+		createCheckRunOpts.DetailsURL = &request.DetailsURL
+	}
+
+	// Conclusion is required if status is Completed
+	if status == Completed.String() {
+		createCheckRunOpts.Conclusion = &conclusion
+	}
+
+	checkRun, _, err := g.client.Checks.CreateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, createCheckRunOpts)
 	if err != nil {
 		return "", err
 	}
 
 	return strconv.FormatInt(*checkRun.ID, 10), nil
+}
+
+func (g *GithubClient) updateCheckRun(ctx context.Context, request types.UpdateStatusRequest, checkRunID string) error {
+	status, conclusion := g.resolveChecksStatus(request.State)
+	updateCheckRunOpts := github.UpdateCheckRunOptions{
+		Name:   request.StatusName,
+		Status: &status,
+		Output: g.createCheckRunOutput(request),
+	}
+
+	if request.DetailsURL != "" {
+		updateCheckRunOpts.DetailsURL = &request.DetailsURL
+	}
+
+	// Conclusion is required if status is Completed
+	if status == Completed.String() {
+		updateCheckRunOpts.Conclusion = &conclusion
+	}
+
+	checkRunIDInt, err := strconv.ParseInt(checkRunID, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	_, _, err = g.client.Checks.UpdateCheckRun(ctx, request.Repo.Owner, request.Repo.Name, checkRunIDInt, updateCheckRunOpts)
+	return err
+}
+
+func (g *GithubClient) resolveState(state models.CommitStatus) string {
+	switch state {
+	case models.PendingCommitStatus:
+		return "In Progress"
+	case models.SuccessCommitStatus:
+		return "Success"
+	case models.FailedCommitStatus:
+		return "Failed"
+	}
+	return "Failed"
+}
+
+func (g *GithubClient) createCheckRunOutput(request types.UpdateStatusRequest) *github.CheckRunOutput {
+
+	var summary string
+
+	// Project command
+	if strings.Contains(request.StatusName, ":") {
+
+		// plan/apply command
+		if request.DetailsURL != "" {
+			summary = fmt.Sprintf(projectCommandTemplateWithLogs,
+				request.CommandName,
+				request.Project,
+				request.Workspace,
+				g.resolveState(request.State),
+				fmt.Sprintf("[Logs](%s)", request.DetailsURL),
+			)
+		} else {
+			summary = fmt.Sprintf(projectCommandTemplate,
+				request.CommandName,
+				request.Project,
+				request.Workspace,
+				g.resolveState(request.State),
+			)
+		}
+	} else {
+		if request.NumSuccess != "" && request.NumTotal != "" {
+			summary = fmt.Sprintf(commandTemplateWithCount,
+				request.CommandName,
+				request.NumTotal,
+				request.NumSuccess,
+				g.resolveState(request.State))
+		} else {
+			summary = fmt.Sprintf(commandTemplate,
+				request.CommandName,
+				g.resolveState(request.State))
+		}
+
+	}
+
+	// Add formatting to summary
+	summary = strings.ReplaceAll(strings.ReplaceAll(summary, "{", "`"), "}", "`")
+
+	checkRunOutput := github.CheckRunOutput{
+		Title:   &request.StatusName,
+		Summary: &summary,
+	}
+
+	if request.Output != "" {
+		checkRunOutput.Text = g.capCheckRunOutput(request.Output)
+	}
+
+	return &checkRunOutput
+}
+
+// Cap the output string if it exceeds the max checks output length
+func (g *GithubClient) capCheckRunOutput(output string) *string {
+	cappedOutput := output
+	if len(output) > maxChecksOutputLength {
+		cappedOutput = output[:maxChecksOutputLength]
+	}
+	return &cappedOutput
+}
+
+// Github Checks uses Status and Conclusion to report status of the check run. Need to map models.CommitStatus to Status and Conclusion
+// Status -> queued, in_progress, completed
+// Conclusion -> failure, neutral, cancelled, timed_out, or action_required. (Optional. Required if you provide a status of "completed".)
+func (g *GithubClient) resolveChecksStatus(state models.CommitStatus) (string, string) {
+	status := Queued
+	conclusion := Neutral
+
+	switch state {
+	case models.SuccessCommitStatus:
+		status = Completed
+		conclusion = Success
+
+	case models.PendingCommitStatus:
+		status = InProgress
+
+	case models.FailedCommitStatus:
+		status = Completed
+		conclusion = Failure
+	}
+
+	return status.String(), conclusion.String()
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.

@@ -924,7 +924,6 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		&policies.CommandOutputGenerator{
 			PrjCommandRunner:  prjCmdRunner,
 			PrjCommandBuilder: projectCommandBuilder,
-			FeatureAllocator:  featureAllocator,
 		},
 	)
 

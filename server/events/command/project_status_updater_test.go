@@ -7,7 +7,6 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/lyft/feature"
 )
 
 type testJobURLGenerator struct {
@@ -52,7 +51,6 @@ func TestProjectStatusUpdater_CloseJobWhenOperationComplete(t *testing.T) {
 
 	prjStatusUpdater := command.ProjectStatusUpdater{
 		ProjectJobURLGenerator:     &jobURLGenerator,
-		FeatureAllocator:           testFeatureAllocator{isChecksEnabled: true},
 		JobCloser:                  &jobCloser,
 		ProjectCommitStatusUpdater: &commitStatusUpdater,
 	}
@@ -88,7 +86,6 @@ func TestProjectStatusUpdater_DoNotCloseJobWhenInProgress(t *testing.T) {
 
 	prjStatusUpdater := command.ProjectStatusUpdater{
 		ProjectJobURLGenerator:     &jobURLGenerator,
-		FeatureAllocator:           testFeatureAllocator{isChecksEnabled: true},
 		JobCloser:                  &jobCloser,
 		ProjectCommitStatusUpdater: &commitStatusUpdater,
 	}
@@ -106,12 +103,4 @@ func TestProjectStatusUpdater_DoNotCloseJobWhenInProgress(t *testing.T) {
 	if jobCloser.called != false {
 		t.FailNow()
 	}
-}
-
-type testFeatureAllocator struct {
-	isChecksEnabled bool
-}
-
-func (t testFeatureAllocator) ShouldAllocate(featureID feature.Name, featureCtx feature.FeatureContext) (bool, error) {
-	return t.isChecksEnabled, nil
 }

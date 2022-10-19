@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/lyft/feature"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_job_closer.go JobCloser
@@ -37,7 +36,6 @@ type StatusUpdater interface {
 type ProjectStatusUpdater struct {
 	ProjectJobURLGenerator     JobURLGenerator
 	JobCloser                  JobCloser
-	FeatureAllocator           feature.Allocator
 	ProjectCommitStatusUpdater CommitStatusUpdater
 }
 

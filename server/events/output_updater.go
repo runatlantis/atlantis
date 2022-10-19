@@ -8,8 +8,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/types"
-	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/vcs/markdown"
 )
 
@@ -29,33 +27,6 @@ type renderer interface {
 
 type checksClient interface {
 	UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error)
-}
-
-// [WENGINES-4643] TODO: Remove PullOutputUpdater and default to checks once github checks is stable
-// defaults to pull comments if checks is turned off
-type FeatureAwareChecksOutputUpdater struct {
-	PullOutputUpdater
-	ChecksOutputUpdater
-
-	FeatureAllocator feature.Allocator
-	Logger           logging.Logger
-}
-
-func (c *FeatureAwareChecksOutputUpdater) UpdateOutput(ctx *command.Context, cmd PullCommand, res command.Result) {
-	shouldAllocate, err := c.FeatureAllocator.ShouldAllocate(feature.GithubChecks, feature.FeatureContext{
-		RepoName:         ctx.HeadRepo.FullName,
-		PullCreationTime: ctx.Pull.CreatedAt,
-	})
-	if err != nil {
-		c.Logger.ErrorContext(ctx.RequestCtx, fmt.Sprintf("unable to allocate for feature: %s, error: %s", feature.GithubChecks, err))
-	}
-
-	// Github Checks turned on and github provider
-	if ctx.HeadRepo.VCSHost.Type == models.Github && shouldAllocate {
-		c.ChecksOutputUpdater.UpdateOutput(ctx, cmd, res)
-		return
-	}
-	c.PullOutputUpdater.UpdateOutput(ctx, cmd, res)
 }
 
 // Used to support checks type output (Github checks for example)

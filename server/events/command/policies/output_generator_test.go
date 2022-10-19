@@ -8,7 +8,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/command/policies"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,7 +34,6 @@ func TestPolicyCheckOutputGenerator(t *testing.T) {
 
 		outputGenerator := policies.CommandOutputGenerator{
 			PrjCommandBuilder: &prjCmdBuilder,
-			FeatureAllocator:  &testFeatureAllocator{isChecksEnabled: true},
 		}
 
 		_, err := outputGenerator.GeneratePolicyCheckOutputStore(&ctx, &comment)
@@ -90,7 +88,6 @@ func TestPolicyCheckOutputGenerator(t *testing.T) {
 		outputGenerator := policies.CommandOutputGenerator{
 			PrjCommandBuilder: &prjCmdBuilder,
 			PrjCommandRunner:  &prjCmdRunner,
-			FeatureAllocator:  &testFeatureAllocator{isChecksEnabled: true},
 		}
 
 		store, err := outputGenerator.GeneratePolicyCheckOutputStore(&ctx, &comment)
@@ -127,14 +124,6 @@ func (t *testPolicyCheckCommandRunner) PolicyCheck(prjCtx command.ProjectContext
 	t.expectedPrjCtx = prjCtx
 	t.called = true
 	return t.result
-}
-
-type testFeatureAllocator struct {
-	isChecksEnabled bool
-}
-
-func (t testFeatureAllocator) ShouldAllocate(featureID feature.Name, featureCtx feature.FeatureContext) (bool, error) {
-	return t.isChecksEnabled, nil
 }
 
 type testPrjCmdBuilder struct {

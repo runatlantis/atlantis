@@ -33,7 +33,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/wrappers"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/assert"
@@ -399,13 +398,10 @@ func TestProjectOutputWrapper(t *testing.T) {
 				},
 			}
 
-			featureAllocator := mockFeatureAllocator{}
-
 			projectUpdater := command.ProjectStatusUpdater{
 				JobCloser:                  mockJobCloser,
 				ProjectJobURLGenerator:     mockJobURLGenerator,
 				ProjectCommitStatusUpdater: &mockCommitStatusUpdater,
-				FeatureAllocator:           &featureAllocator,
 			}
 
 			runner := &events.ProjectOutputWrapper{
@@ -730,12 +726,4 @@ type mockURLGenerator struct{}
 
 func (m mockURLGenerator) GenerateLockURL(lockID string) string {
 	return "https://" + lockID
-}
-
-type mockFeatureAllocator struct {
-	shouldAllocate bool
-}
-
-func (m *mockFeatureAllocator) ShouldAllocate(featureID feature.Name, featureCtx feature.FeatureContext) (bool, error) {
-	return m.shouldAllocate, nil
 }
