@@ -13,7 +13,7 @@ func NewApplyCommandRunner(
 	vcsClient vcs.Client,
 	disableApplyAll bool,
 	applyCommandLocker locking.ApplyLockChecker,
-	commitStatusUpdater CommitStatusUpdater,
+	vcsStatusUpdater VCSStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
 	prjCmdRunner ProjectApplyCommandRunner,
 	outputUpdater OutputUpdater,
@@ -25,7 +25,7 @@ func NewApplyCommandRunner(
 		vcsClient:            vcsClient,
 		DisableApplyAll:      disableApplyAll,
 		locker:               applyCommandLocker,
-		commitStatusUpdater:  commitStatusUpdater,
+		vcsStatusUpdater:     vcsStatusUpdater,
 		prjCmdBuilder:        prjCommandBuilder,
 		prjCmdRunner:         prjCmdRunner,
 		outputUpdater:        outputUpdater,
@@ -39,7 +39,7 @@ type ApplyCommandRunner struct {
 	DisableApplyAll      bool
 	locker               locking.ApplyLockChecker
 	vcsClient            vcs.Client
-	commitStatusUpdater  CommitStatusUpdater
+	vcsStatusUpdater     VCSStatusUpdater
 	prjCmdBuilder        ProjectApplyCommandBuilder
 	prjCmdRunner         ProjectApplyCommandRunner
 	outputUpdater        OutputUpdater
@@ -79,7 +79,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 		return
 	}
 
-	statusID, err := a.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.PendingCommitStatus, cmd.CommandName(), "", "")
+	statusID, err := a.vcsStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.PendingVCSStatus, cmd.CommandName(), "", "")
 	if err != nil {
 		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
@@ -102,7 +102,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 
 	if err != nil {
-		if _, statusErr := a.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName(), statusID, ""); statusErr != nil {
+		if _, statusErr := a.vcsStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.FailedVCSStatus, cmd.CommandName(), statusID, ""); statusErr != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		a.outputUpdater.UpdateOutput(ctx, cmd, command.Result{Error: err})
@@ -129,7 +129,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 		return
 	}
 
-	a.updateCommitStatus(ctx, pullStatus, statusID)
+	a.updateVcsStatus(ctx, pullStatus, statusID)
 }
 
 func (a *ApplyCommandRunner) IsLocked() (bool, error) {
@@ -142,23 +142,23 @@ func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []command.ProjectCont
 	return len(projectCmds) > 0 && projectCmds[0].ParallelApplyEnabled
 }
 
-func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus, statusID string) {
+func (a *ApplyCommandRunner) updateVcsStatus(ctx *command.Context, pullStatus models.PullStatus, statusID string) {
 	var numSuccess int
 	var numErrored int
-	status := models.SuccessCommitStatus
+	status := models.SuccessVCSStatus
 
 	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus)
 	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
 	if numErrored > 0 {
-		status = models.FailedCommitStatus
+		status = models.FailedVCSStatus
 	} else if numSuccess < len(pullStatus.Projects) {
 		// If there are plans that haven't been applied yet, we'll use a pending
 		// status.
-		status = models.PendingCommitStatus
+		status = models.PendingVCSStatus
 	}
 
-	if _, err := a.commitStatusUpdater.UpdateCombinedCount(
+	if _, err := a.vcsStatusUpdater.UpdateCombinedCount(
 		ctx.RequestCtx,
 		ctx.Pull.BaseRepo,
 		ctx.Pull,

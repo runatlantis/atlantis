@@ -2,23 +2,23 @@ package vcs
 
 // Declare all package dependencies here
 
-func NewPullMergeabilityChecker(commitStatusPrefix string) MergeabilityChecker {
-	statusFilters := newValidStatusFilters(commitStatusPrefix)
-	checksFilters := newValidChecksFilters(commitStatusPrefix)
+func NewPullMergeabilityChecker(vcsStatusPrefix string) MergeabilityChecker {
+	statusFilters := newValidStatusFilters(vcsStatusPrefix)
+	checksFilters := newValidChecksFilters(vcsStatusPrefix)
 
 	return &PullMergeabilityChecker{
 		supplementalChecker: newSupplementalMergeabilityChecker(statusFilters, checksFilters),
 	}
 }
 
-func newValidStatusFilters(commitStatusPrefix string) []ValidStatusFilter {
+func newValidStatusFilters(vcsStatusPrefix string) []ValidStatusFilter {
 	return []ValidStatusFilter{
 		SuccessStateFilter,
 	}
 }
 
-func newValidChecksFilters(commitStatusPrefix string) []ValidChecksFilter {
-	titleMatcher := StatusTitleMatcher{TitlePrefix: commitStatusPrefix}
+func newValidChecksFilters(vcsStatusPrefix string) []ValidChecksFilter {
+	titleMatcher := StatusTitleMatcher{TitlePrefix: vcsStatusPrefix}
 	applyChecksFilter := &ApplyChecksFilter{
 		statusTitleMatcher: titleMatcher,
 	}

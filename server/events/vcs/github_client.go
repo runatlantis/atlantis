@@ -546,13 +546,13 @@ func (g *GithubClient) updateCheckRun(ctx context.Context, request types.UpdateS
 	return err
 }
 
-func (g *GithubClient) resolveState(state models.CommitStatus) string {
+func (g *GithubClient) resolveState(state models.VCSStatus) string {
 	switch state {
-	case models.PendingCommitStatus:
+	case models.PendingVCSStatus:
 		return "In Progress"
-	case models.SuccessCommitStatus:
+	case models.SuccessVCSStatus:
 		return "Success"
-	case models.FailedCommitStatus:
+	case models.FailedVCSStatus:
 		return "Failed"
 	}
 	return "Failed"
@@ -621,22 +621,22 @@ func (g *GithubClient) capCheckRunOutput(output string) *string {
 	return &cappedOutput
 }
 
-// Github Checks uses Status and Conclusion to report status of the check run. Need to map models.CommitStatus to Status and Conclusion
+// Github Checks uses Status and Conclusion to report status of the check run. Need to map models.VcsStatus to Status and Conclusion
 // Status -> queued, in_progress, completed
 // Conclusion -> failure, neutral, cancelled, timed_out, or action_required. (Optional. Required if you provide a status of "completed".)
-func (g *GithubClient) resolveChecksStatus(state models.CommitStatus) (string, string) {
+func (g *GithubClient) resolveChecksStatus(state models.VCSStatus) (string, string) {
 	status := Queued
 	conclusion := Neutral
 
 	switch state {
-	case models.SuccessCommitStatus:
+	case models.SuccessVCSStatus:
 		status = Completed
 		conclusion = Success
 
-	case models.PendingCommitStatus:
+	case models.PendingVCSStatus:
 		status = InProgress
 
-	case models.FailedCommitStatus:
+	case models.FailedVCSStatus:
 		status = Completed
 		conclusion = Failure
 	}

@@ -46,10 +46,10 @@ type AsyncTFExec interface {
 	RunCommandAsyncWithInput(ctx context.Context, prjCtx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string, input <-chan string) <-chan helpers.Line
 }
 
-// StatusUpdater brings the interface from CommitStatusUpdater into this package
+// StatusUpdater brings the interface from StatusUpdater into this package
 // without causing circular imports.
 type StatusUpdater interface {
-	UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error)
+	UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.VCSStatus, url string, statusID string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner

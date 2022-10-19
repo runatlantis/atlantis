@@ -784,13 +784,13 @@ locally at this time.
 			terraform := mocks.NewMockClient()
 
 			tfVersion, _ := version.NewVersion("0.11.12")
-			updater := mocks2.NewMockCommitStatusUpdater()
+			updater := mocks2.NewMockVCSStatusUpdater()
 			asyncTf := &remotePlanMock{}
 			s := runtime.PlanStepRunner{
-				TerraformExecutor:   terraform,
-				DefaultTFVersion:    tfVersion,
-				AsyncTFExec:         asyncTf,
-				CommitStatusUpdater: updater,
+				TerraformExecutor: terraform,
+				DefaultTFVersion:  tfVersion,
+				AsyncTFExec:       asyncTf,
+				VCSStatusUpdater:  updater,
 			}
 			absProjectPath, cleanup := TempDir(t)
 			defer cleanup()
@@ -870,8 +870,8 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
 
 			// Ensure that the status was updated with the runURL.
 			runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
-			updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Plan, models.PendingCommitStatus, runURL, "")
-			updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Plan, models.SuccessCommitStatus, runURL, "")
+			updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Plan, models.PendingVCSStatus, runURL, "")
+			updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Plan, models.SuccessVCSStatus, runURL, "")
 		})
 	}
 }

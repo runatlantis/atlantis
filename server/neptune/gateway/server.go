@@ -235,7 +235,7 @@ func NewServer(config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		Drainer:                       drainer,
 		GlobalCfg:                     globalCfg,
-		CommitStatusUpdater:           &command.VCSStatusUpdater{Client: vcsClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: config.GithubStatusName}},
+		VCSStatusUpdater:              &command.VCSStatusUpdater{Client: vcsClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: config.GithubStatusName}},
 		PrjCmdBuilder:                 projectCommandBuilder,
 		OutputUpdater:                 outputUpdater,
 		WorkingDir:                    workingDir,

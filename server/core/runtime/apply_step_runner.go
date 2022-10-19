@@ -18,9 +18,9 @@ import (
 
 // ApplyStepRunner runs `terraform apply`.
 type ApplyStepRunner struct {
-	TerraformExecutor   TerraformExec
-	CommitStatusUpdater StatusUpdater
-	AsyncTFExec         AsyncTFExec
+	TerraformExecutor TerraformExec
+	VCSStatusUpdater  StatusUpdater
+	AsyncTFExec       AsyncTFExec
 }
 
 func (a *ApplyStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
@@ -127,8 +127,8 @@ func (a *ApplyStepRunner) runRemoteApply(
 	}
 
 	// updateStatusF will update the commit status and log any error.
-	updateStatusF := func(status models.CommitStatus, url string, statusID string) {
-		if _, err := a.CommitStatusUpdater.UpdateProject(ctx, prjCtx, command.Apply, status, url, statusID); err != nil {
+	updateStatusF := func(status models.VCSStatus, url string, statusID string) {
+		if _, err := a.VCSStatusUpdater.UpdateProject(ctx, prjCtx, command.Apply, status, url, statusID); err != nil {
 			prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("unable to update status: %s", err))
 		}
 	}
@@ -155,7 +155,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
-			updateStatusF(models.PendingCommitStatus, runURL, prjCtx.StatusID)
+			updateStatusF(models.PendingVCSStatus, runURL, prjCtx.StatusID)
 			nextLineIsRunURL = false
 		}
 
@@ -179,16 +179,16 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	output := strings.Join(lines, "\n")
 	if planChangedErr != nil {
-		updateStatusF(models.FailedCommitStatus, runURL, prjCtx.StatusID)
+		updateStatusF(models.FailedVCSStatus, runURL, prjCtx.StatusID)
 		// The output isn't important if the plans don't match so we just
 		// discard it.
 		return "", planChangedErr
 	}
 
 	if err != nil {
-		updateStatusF(models.FailedCommitStatus, runURL, prjCtx.StatusID)
+		updateStatusF(models.FailedVCSStatus, runURL, prjCtx.StatusID)
 	} else {
-		updateStatusF(models.SuccessCommitStatus, runURL, prjCtx.StatusID)
+		updateStatusF(models.SuccessVCSStatus, runURL, prjCtx.StatusID)
 	}
 	return output, err
 }

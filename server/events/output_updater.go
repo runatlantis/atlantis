@@ -79,7 +79,7 @@ func (c *ChecksOutputUpdater) handleCommandFailure(ctx *command.Context, cmd Pul
 		Ref:              ctx.Pull.HeadCommit,
 		PullNum:          ctx.Pull.Num,
 		PullCreationTime: ctx.Pull.CreatedAt,
-		State:            models.FailedCommitStatus,
+		State:            models.FailedVCSStatus,
 		StatusName:       c.buildStatusName(cmd, vcs.StatusTitleOptions{}),
 		CommandName:      cmd.CommandName().TitleString(),
 		Output:           c.buildOutput(res),
@@ -128,12 +128,12 @@ func (c *ChecksOutputUpdater) buildStatusName(cmd PullCommand, options vcs.Statu
 	return c.TitleBuilder.Build(commandName.String(), options)
 }
 
-func (c *ChecksOutputUpdater) resolveState(result command.ProjectResult) models.CommitStatus {
+func (c *ChecksOutputUpdater) resolveState(result command.ProjectResult) models.VCSStatus {
 	if result.Error != nil || result.Failure != "" {
-		return models.FailedCommitStatus
+		return models.FailedVCSStatus
 	}
 
-	return models.SuccessCommitStatus
+	return models.SuccessVCSStatus
 }
 
 // Default prj output updater which writes to the pull req comment

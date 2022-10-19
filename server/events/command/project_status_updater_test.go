@@ -31,7 +31,7 @@ type testCommitStatusUpdater struct {
 	expectedError    error
 }
 
-func (t *testCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error) {
+func (t *testCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.VCSStatus, url string, statusID string) (string, error) {
 	return t.expectedStatusID, t.expectedError
 }
 
@@ -50,12 +50,12 @@ func TestProjectStatusUpdater_CloseJobWhenOperationComplete(t *testing.T) {
 	}
 
 	prjStatusUpdater := command.ProjectStatusUpdater{
-		ProjectJobURLGenerator:     &jobURLGenerator,
-		JobCloser:                  &jobCloser,
-		ProjectCommitStatusUpdater: &commitStatusUpdater,
+		ProjectJobURLGenerator:  &jobURLGenerator,
+		JobCloser:               &jobCloser,
+		ProjectVCSStatusUpdater: &commitStatusUpdater,
 	}
 
-	statusID, err := prjStatusUpdater.UpdateProjectStatus(command.ProjectContext{}, models.SuccessCommitStatus)
+	statusID, err := prjStatusUpdater.UpdateProjectStatus(command.ProjectContext{}, models.SuccessVCSStatus)
 
 	if err != nil {
 		t.FailNow()
@@ -85,12 +85,12 @@ func TestProjectStatusUpdater_DoNotCloseJobWhenInProgress(t *testing.T) {
 	}
 
 	prjStatusUpdater := command.ProjectStatusUpdater{
-		ProjectJobURLGenerator:     &jobURLGenerator,
-		JobCloser:                  &jobCloser,
-		ProjectCommitStatusUpdater: &commitStatusUpdater,
+		ProjectJobURLGenerator:  &jobURLGenerator,
+		JobCloser:               &jobCloser,
+		ProjectVCSStatusUpdater: &commitStatusUpdater,
 	}
 
-	statusID, err := prjStatusUpdater.UpdateProjectStatus(command.ProjectContext{}, models.PendingCommitStatus)
+	statusID, err := prjStatusUpdater.UpdateProjectStatus(command.ProjectContext{}, models.PendingVCSStatus)
 
 	if err != nil {
 		t.FailNow()

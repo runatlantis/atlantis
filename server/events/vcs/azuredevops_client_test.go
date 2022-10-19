@@ -20,37 +20,37 @@ import (
 
 func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 	cases := []struct {
-		status             models.CommitStatus
+		status             models.VCSStatus
 		expState           string
 		supportsIterations bool
 	}{
 		{
-			models.PendingCommitStatus,
+			models.PendingVCSStatus,
 			"pending",
 			true,
 		},
 		{
-			models.SuccessCommitStatus,
+			models.SuccessVCSStatus,
 			"succeeded",
 			true,
 		},
 		{
-			models.FailedCommitStatus,
+			models.FailedVCSStatus,
 			"failed",
 			true,
 		},
 		{
-			models.PendingCommitStatus,
+			models.PendingVCSStatus,
 			"pending",
 			false,
 		},
 		{
-			models.SuccessCommitStatus,
+			models.SuccessVCSStatus,
 			"succeeded",
 			false,
 		},
 		{
-			models.FailedCommitStatus,
+			models.FailedVCSStatus,
 			"failed",
 			false,
 		},

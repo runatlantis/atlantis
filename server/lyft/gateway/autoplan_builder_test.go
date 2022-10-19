@@ -24,14 +24,14 @@ var autoplanValidator gateway.AutoplanValidator
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var projectCommandBuilder *mocks.MockProjectCommandBuilder
 var drainer *events.Drainer
-var commitStatusUpdater *mocks.MockCommitStatusUpdater
+var vcsStatusUpdater *mocks.MockVCSStatusUpdater
 var workingDir *mocks.MockWorkingDir
 var workingDirLocker *mocks.MockWorkingDirLocker
 
 func setupAutoplan(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
-	commitStatusUpdater = mocks.NewMockCommitStatusUpdater()
+	vcsStatusUpdater = mocks.NewMockVCSStatusUpdater()
 	workingDir = mocks.NewMockWorkingDir()
 	workingDirLocker = mocks.NewMockWorkingDirLocker()
 	vcsClient := vcsmocks.NewMockClient()
@@ -54,7 +54,7 @@ func setupAutoplan(t *testing.T) *vcsmocks.MockClient {
 		GlobalCfg:                     globalCfg,
 		OutputUpdater:                 pullUpdater,
 		PrjCmdBuilder:                 projectCommandBuilder,
-		CommitStatusUpdater:           commitStatusUpdater,
+		VCSStatusUpdater:              vcsStatusUpdater,
 		WorkingDir:                    workingDir,
 		WorkingDirLocker:              workingDirLocker,
 	}
@@ -142,11 +142,11 @@ func TestIsValid_TerraformChanges(t *testing.T) {
 
 	containsTerraformChanges := autoplanValidator.InstrumentedIsValid(context.TODO(), log, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	Assert(t, containsTerraformChanges == true, "should have terraform changes")
-	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+	vcsStatusUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
 		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		matchers.AnyModelsCommitStatus(),
+		matchers.AnyModelsVcsStatus(),
 		matchers.AnyModelsCommandName(),
 		AnyInt(),
 		AnyInt(),
@@ -174,11 +174,11 @@ func TestIsValid_PreworkflowHookError(t *testing.T) {
 
 	containsTerraformChanges := autoplanValidator.InstrumentedIsValid(context.TODO(), log, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	Assert(t, containsTerraformChanges == false, "should not have terraform changes")
-	commitStatusUpdater.VerifyWasCalled(Times(1)).UpdateCombined(
+	vcsStatusUpdater.VerifyWasCalled(Times(1)).UpdateCombined(
 		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		matchers.AnyModelsCommitStatus(),
+		matchers.AnyModelsVcsStatus(),
 		matchers.AnyModelsCommandName(),
 		AnyString(),
 		AnyString(),
@@ -194,11 +194,11 @@ func TestPullRequestHasTerraformChanges_NoTerraformChanges(t *testing.T) {
 	containsTerraformChanges := autoplanValidator.InstrumentedIsValid(context.TODO(), log, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	Assert(t, containsTerraformChanges == false, "should have no terraform changes")
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
-	commitStatusUpdater.VerifyWasCalled(Times(3)).UpdateCombinedCount(
+	vcsStatusUpdater.VerifyWasCalled(Times(3)).UpdateCombinedCount(
 		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		matchers.AnyModelsCommitStatus(),
+		matchers.AnyModelsVcsStatus(),
 		matchers.AnyModelsCommandName(),
 		AnyInt(),
 		AnyInt(),

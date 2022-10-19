@@ -3,10 +3,15 @@ package wrappers
 import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sns"
 	"github.com/runatlantis/atlantis/server/lyft/decorators"
 	"github.com/runatlantis/atlantis/server/sync"
 )
+
+type projectStatusUpdater interface {
+	UpdateProjectStatus(ctx command.ProjectContext, status models.VCSStatus) (string, error)
+}
 
 type projectCommand struct {
 	events.ProjectCommandRunner
@@ -35,7 +40,7 @@ func (d *projectCommand) WithSync(
 // WithJobs adds streaming capabilities to terraform output. With it end user
 // can see their terraform command's execution in real time.
 func (d *projectCommand) WithJobs(
-	projectStatusUpdater command.StatusUpdater,
+	projectStatusUpdater projectStatusUpdater,
 ) *projectCommand {
 	d.ProjectCommandRunner = &events.ProjectOutputWrapper{
 		ProjectCommandRunner: d.ProjectCommandRunner,

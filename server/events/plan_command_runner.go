@@ -12,7 +12,7 @@ func NewPlanCommandRunner(
 	vcsClient vcs.Client,
 	pendingPlanFinder PendingPlanFinder,
 	workingDir WorkingDir,
-	commitStatusUpdater CommitStatusUpdater,
+	vcsStatusUpdater VCSStatusUpdater,
 	projectCommandBuilder ProjectPlanCommandBuilder,
 	projectCommandRunner ProjectPlanCommandRunner,
 	dbUpdater *DBUpdater,
@@ -24,7 +24,7 @@ func NewPlanCommandRunner(
 		vcsClient:                vcsClient,
 		pendingPlanFinder:        pendingPlanFinder,
 		workingDir:               workingDir,
-		commitStatusUpdater:      commitStatusUpdater,
+		vcsStatusUpdater:         vcsStatusUpdater,
 		prjCmdBuilder:            projectCommandBuilder,
 		prjCmdRunner:             projectCommandRunner,
 		dbUpdater:                dbUpdater,
@@ -36,7 +36,7 @@ func NewPlanCommandRunner(
 
 type PlanCommandRunner struct {
 	vcsClient                vcs.Client
-	commitStatusUpdater      CommitStatusUpdater
+	vcsStatusUpdater         VCSStatusUpdater
 	pendingPlanFinder        PendingPlanFinder
 	workingDir               WorkingDir
 	prjCmdBuilder            ProjectPlanCommandBuilder
@@ -53,7 +53,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
-		if _, statusErr := p.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.FailedCommitStatus, command.Plan, "", ""); statusErr != nil {
+		if _, statusErr := p.vcsStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.FailedVCSStatus, command.Plan, "", ""); statusErr != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		p.outputUpdater.UpdateOutput(ctx, AutoplanCommand{}, command.Result{Error: err})
@@ -67,20 +67,20 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		// If there were no projects modified, we set successful commit statuses
 		// with 0/0 projects planned/policy_checked/applied successfully because some users require
 		// the Atlantis status to be passing for all pull requests.
-		if _, err := p.commitStatusUpdater.UpdateCombinedCount(ctx.RequestCtx, baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0, ""); err != nil {
+		if _, err := p.vcsStatusUpdater.UpdateCombinedCount(ctx.RequestCtx, baseRepo, pull, models.SuccessVCSStatus, command.Plan, 0, 0, ""); err != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 		}
-		if _, err := p.commitStatusUpdater.UpdateCombinedCount(ctx.RequestCtx, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0, ""); err != nil {
+		if _, err := p.vcsStatusUpdater.UpdateCombinedCount(ctx.RequestCtx, baseRepo, pull, models.SuccessVCSStatus, command.PolicyCheck, 0, 0, ""); err != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 		}
-		if _, err := p.commitStatusUpdater.UpdateCombinedCount(ctx.RequestCtx, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0, ""); err != nil {
+		if _, err := p.vcsStatusUpdater.UpdateCombinedCount(ctx.RequestCtx, baseRepo, pull, models.SuccessVCSStatus, command.Apply, 0, 0, ""); err != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 		}
 		return
 	}
 
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	statusID, err := p.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan, "", "")
+	statusID, err := p.vcsStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.PendingVCSStatus, command.Plan, "", "")
 	if err != nil {
 		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
@@ -101,7 +101,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("writing results: %s", err))
 	}
 
-	p.updateCommitStatus(ctx, pullStatus, statusID)
+	p.updateVcsStatus(ctx, pullStatus, statusID)
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
 	if len(policyCheckCmds) > 0 && !result.HasErrors() {
@@ -124,14 +124,14 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 	pull := ctx.Pull
 
 	// creating status for the first time
-	statusID, err := p.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.PendingCommitStatus, command.Plan, "", "")
+	statusID, err := p.vcsStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.PendingVCSStatus, command.Plan, "", "")
 	if err != nil {
 		ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", err))
 	}
 
 	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
 	if err != nil {
-		if _, statusErr := p.commitStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan, statusID, ""); statusErr != nil {
+		if _, statusErr := p.vcsStatusUpdater.UpdateCombined(ctx.RequestCtx, ctx.Pull.BaseRepo, ctx.Pull, models.FailedVCSStatus, command.Plan, statusID, ""); statusErr != nil {
 			ctx.Log.WarnContext(ctx.RequestCtx, fmt.Sprintf("unable to update commit status: %s", statusErr))
 		}
 		p.outputUpdater.UpdateOutput(ctx, cmd, command.Result{Error: err})
@@ -160,7 +160,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *command.Comment) {
 		return
 	}
 
-	p.updateCommitStatus(ctx, pullStatus, statusID)
+	p.updateVcsStatus(ctx, pullStatus, statusID)
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
@@ -178,10 +178,10 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	}
 }
 
-func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus, statusID string) {
+func (p *PlanCommandRunner) updateVcsStatus(ctx *command.Context, pullStatus models.PullStatus, statusID string) {
 	var numSuccess int
 	var numErrored int
-	status := models.SuccessCommitStatus
+	status := models.SuccessVCSStatus
 
 	numErrored = pullStatus.StatusCount(models.ErroredPlanStatus)
 	// We consider anything that isn't a plan error as a plan success.
@@ -190,10 +190,10 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 	numSuccess = len(pullStatus.Projects) - numErrored
 
 	if numErrored > 0 {
-		status = models.FailedCommitStatus
+		status = models.FailedVCSStatus
 	}
 
-	if _, err := p.commitStatusUpdater.UpdateCombinedCount(
+	if _, err := p.vcsStatusUpdater.UpdateCombinedCount(
 		ctx.RequestCtx,
 		ctx.Pull.BaseRepo,
 		ctx.Pull,

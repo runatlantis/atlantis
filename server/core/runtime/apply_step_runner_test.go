@@ -259,10 +259,10 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	RegisterMockTestingT(t)
 	tfOut := fmt.Sprintf(preConfirmOutFmt, planFileContents) + postConfirmOut
 	tfExec := &remoteApplyMock{LinesToSend: tfOut, DoneCh: make(chan bool)}
-	updater := mocks2.NewMockCommitStatusUpdater()
+	updater := mocks2.NewMockVCSStatusUpdater()
 	o := runtime.ApplyStepRunner{
-		AsyncTFExec:         tfExec,
-		CommitStatusUpdater: updater,
+		AsyncTFExec:      tfExec,
+		VCSStatusUpdater: updater,
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 	ctx := context.Background()
@@ -293,8 +293,8 @@ Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
 
 	// Check that the status was updated with the run url.
 	runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test-dir2/runs/run-PiDsRYKGcerTttV2"
-	updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Apply, models.PendingCommitStatus, runURL, "")
-	updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Apply, models.SuccessCommitStatus, runURL, "")
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Apply, models.PendingVCSStatus, runURL, "")
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, prjCtx, command.Apply, models.SuccessVCSStatus, runURL, "")
 }
 
 // Test that if the plan is different, we error out.
@@ -324,8 +324,8 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		DoneCh:      make(chan bool),
 	}
 	o := runtime.ApplyStepRunner{
-		AsyncTFExec:         tfExec,
-		CommitStatusUpdater: mocks2.NewMockCommitStatusUpdater(),
+		AsyncTFExec:      tfExec,
+		VCSStatusUpdater: mocks2.NewMockVCSStatusUpdater(),
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 

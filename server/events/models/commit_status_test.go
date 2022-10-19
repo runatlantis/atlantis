@@ -8,10 +8,10 @@ import (
 )
 
 func TestStatus_String(t *testing.T) {
-	cases := map[models.CommitStatus]string{
-		models.PendingCommitStatus: "pending",
-		models.SuccessCommitStatus: "success",
-		models.FailedCommitStatus:  "failed",
+	cases := map[models.VCSStatus]string{
+		models.PendingVCSStatus: "pending",
+		models.SuccessVCSStatus: "success",
+		models.FailedVCSStatus:  "failed",
 	}
 	for k, v := range cases {
 		Equals(t, v, k.String())

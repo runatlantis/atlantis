@@ -7,16 +7,20 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
+type projectStatusUpdater interface {
+	UpdateProjectStatus(ctx command.ProjectContext, status models.VCSStatus) (string, error)
+}
+
 // ProjectOutputWrapper is a decorator that creates a new PR status check per project.
 // The status contains a url that outputs current progress of the terraform plan/apply command.
 type ProjectOutputWrapper struct {
 	ProjectCommandRunner
 
-	ProjectStatusUpdater command.StatusUpdater
+	ProjectStatusUpdater projectStatusUpdater
 }
 
 func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectResult {
-	statusID, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.PendingCommitStatus)
+	statusID, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.PendingVCSStatus)
 	if err != nil {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
@@ -27,21 +31,21 @@ func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectR
 
 	result := p.ProjectCommandRunner.Plan(ctx)
 	if result.Error != nil || result.Failure != "" {
-		if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.FailedCommitStatus); err != nil {
+		if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.FailedVCSStatus); err != nil {
 			ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 		}
 
 		return result
 	}
 
-	if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.SuccessCommitStatus); err != nil {
+	if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.SuccessVCSStatus); err != nil {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
 	return result
 }
 
 func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
-	statusID, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.PendingCommitStatus)
+	statusID, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.PendingVCSStatus)
 	if err != nil {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
@@ -52,14 +56,14 @@ func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.Project
 
 	result := p.ProjectCommandRunner.Apply(ctx)
 	if result.Error != nil || result.Failure != "" {
-		if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.FailedCommitStatus); err != nil {
+		if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.FailedVCSStatus); err != nil {
 			ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 		}
 
 		return result
 	}
 
-	if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.SuccessCommitStatus); err != nil {
+	if _, err := p.ProjectStatusUpdater.UpdateProjectStatus(ctx, models.SuccessVCSStatus); err != nil {
 		ctx.Log.ErrorContext(ctx.RequestCtx, fmt.Sprintf("updating project PR status %v", err))
 	}
 

@@ -232,11 +232,11 @@ func (g *AzureDevopsClient) GetPullRequest(repo models.Repo, num int) (*azuredev
 func (g *AzureDevopsClient) UpdateStatus(ctx context.Context, request types.UpdateStatusRequest) (string, error) {
 	adState := azuredevops.GitError.String()
 	switch request.State {
-	case models.PendingCommitStatus:
+	case models.PendingVCSStatus:
 		adState = azuredevops.GitPending.String()
-	case models.SuccessCommitStatus:
+	case models.SuccessVCSStatus:
 		adState = azuredevops.GitSucceeded.String()
-	case models.FailedCommitStatus:
+	case models.FailedVCSStatus:
 		adState = azuredevops.GitFailed.String()
 	}
 

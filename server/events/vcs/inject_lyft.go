@@ -4,11 +4,11 @@ import "github.com/runatlantis/atlantis/server/events/vcs/lyft"
 
 // Declare all lyft package dependencies here
 
-func NewLyftPullMergeabilityChecker(commitStatusPrefix string) MergeabilityChecker {
-	statusFilters := newValidStatusFilters(commitStatusPrefix)
+func NewLyftPullMergeabilityChecker(vcsStatusPrefix string) MergeabilityChecker {
+	statusFilters := newValidStatusFilters(vcsStatusPrefix)
 	statusFilters = append(statusFilters, lyft.NewSQFilter())
 
-	checksFilters := newValidChecksFilters(commitStatusPrefix)
+	checksFilters := newValidChecksFilters(vcsStatusPrefix)
 	checksFilters = append(checksFilters, lyft.NewSQCheckFilter())
 
 	supplementalChecker := newSupplementalMergeabilityChecker(statusFilters, checksFilters)

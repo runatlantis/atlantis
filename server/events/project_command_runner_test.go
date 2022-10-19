@@ -214,7 +214,7 @@ type strictTestCommitStatusUpdater struct {
 }
 
 // UpdateProject(ctx context.Context, projectCtx ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error)
-func (t *strictTestCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error) {
+func (t *strictTestCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.VCSStatus, url string, statusID string) (string, error) {
 	if t.count > (len(t.statusUpdaters) - 1) {
 		return "", errors.New("more calls than expected")
 	}
@@ -229,7 +229,7 @@ type testCommitStatusUpdater struct {
 	expCtx      context.Context
 	expPrjCtx   command.ProjectContext
 	expCmdName  fmt.Stringer
-	expStatus   models.CommitStatus
+	expStatus   models.VCSStatus
 	expURL      string
 	expStatusID string
 
@@ -237,7 +237,7 @@ type testCommitStatusUpdater struct {
 	err      error
 }
 
-func (t *testCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.CommitStatus, url string, statusID string) (string, error) {
+func (t *testCommitStatusUpdater) UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.VCSStatus, url string, statusID string) (string, error) {
 	assert.Equal(t.t, t.expCtx, ctx)
 	assert.Equal(t.t, t.expPrjCtx, projectCtx)
 	assert.Equal(t.t, t.expCmdName, cmdName)
@@ -340,7 +340,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			var prjResult command.ProjectResult
-			var expCommitStatus models.CommitStatus
+			var expCommitStatus models.VCSStatus
 
 			mockJobURLGenerator := commandMocks.NewMockJobURLGenerator()
 			mockJobCloser := commandMocks.NewMockJobCloser()
@@ -350,17 +350,17 @@ func TestProjectOutputWrapper(t *testing.T) {
 					PlanSuccess:  &models.PlanSuccess{},
 					ApplySuccess: "exists",
 				}
-				expCommitStatus = models.SuccessCommitStatus
+				expCommitStatus = models.SuccessVCSStatus
 			} else if c.Failure {
 				prjResult = command.ProjectResult{
 					Failure: "failure",
 				}
-				expCommitStatus = models.FailedCommitStatus
+				expCommitStatus = models.FailedVCSStatus
 			} else if c.Error {
 				prjResult = command.ProjectResult{
 					Error: errors.New("error"),
 				}
-				expCommitStatus = models.FailedCommitStatus
+				expCommitStatus = models.FailedVCSStatus
 			}
 
 			prjCtx.CommandName = c.CommandName
@@ -378,7 +378,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 						expCtx:      context.TODO(),
 						expPrjCtx:   prjCtx,
 						expCmdName:  c.CommandName,
-						expStatus:   models.PendingCommitStatus,
+						expStatus:   models.PendingVCSStatus,
 						expStatusID: "",
 						expURL:      "",
 						statusID:    "",
@@ -399,9 +399,9 @@ func TestProjectOutputWrapper(t *testing.T) {
 			}
 
 			projectUpdater := command.ProjectStatusUpdater{
-				JobCloser:                  mockJobCloser,
-				ProjectJobURLGenerator:     mockJobURLGenerator,
-				ProjectCommitStatusUpdater: &mockCommitStatusUpdater,
+				JobCloser:               mockJobCloser,
+				ProjectJobURLGenerator:  mockJobURLGenerator,
+				ProjectVCSStatusUpdater: &mockCommitStatusUpdater,
 			}
 
 			runner := &events.ProjectOutputWrapper{

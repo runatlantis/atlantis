@@ -219,11 +219,11 @@ func (b *Client) UpdateStatus(ctx context.Context, request types.UpdateStatusReq
 	bbState := "FAILED"
 
 	switch request.State {
-	case models.PendingCommitStatus:
+	case models.PendingVCSStatus:
 		bbState = "INPROGRESS"
-	case models.SuccessCommitStatus:
+	case models.SuccessVCSStatus:
 		bbState = "SUCCESSFUL"
-	case models.FailedCommitStatus:
+	case models.FailedVCSStatus:
 		bbState = "FAILED"
 	}
 
