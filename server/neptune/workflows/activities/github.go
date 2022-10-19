@@ -3,17 +3,15 @@ package activities
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/url"
-	"path/filepath"
-	"time"
-
 	"github.com/google/go-github/v45/github"
 	"github.com/hashicorp/go-getter"
 	"github.com/pkg/errors"
 	internal "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/temporal"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
+	"net/http"
+	"net/url"
+	"path/filepath"
 )
 
 type ClientContext struct {
@@ -195,7 +193,7 @@ type FetchRootResponse struct {
 // FetchRoot fetches a link to the archive URL using the GH client, processes that URL into a download URL that the
 // go-getter library can use, and then go-getter to download/extract files/subdirs within the root path to the destinationPath.
 func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootRequest) (FetchRootResponse, error) {
-	ctx, cancel := temporal.StartHeartbeat(ctx, 10*time.Second)
+	ctx, cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
 	defer cancel()
 	ref, err := request.Repo.Ref.String()
 	if err != nil {

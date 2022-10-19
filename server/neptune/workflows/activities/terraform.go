@@ -4,14 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"io"
-	"path/filepath"
-	"sync"
-
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/logger"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/temporal"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
+	"io"
+	"path/filepath"
+	"sync"
 )
 
 var DisableInputArg = terraform.Argument{
@@ -55,6 +55,7 @@ func NewTerraformActivities(client TerraformClient, defaultTfVersion *version.Ve
 }
 
 // Terraform Init
+
 type TerraformInitRequest struct {
 	Args      []terraform.Argument
 	Envs      map[string]string
@@ -68,6 +69,8 @@ type TerraformInitResponse struct {
 }
 
 func (t *terraformActivities) TerraformInit(ctx context.Context, request TerraformInitRequest) (TerraformInitResponse, error) {
+	ctx, cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
+	defer cancel()
 	// Resolve the tf version to be used for this operation
 	tfVersion, err := t.resolveVersion(request.TfVersion)
 	if err != nil {
@@ -93,6 +96,7 @@ func (t *terraformActivities) TerraformInit(ctx context.Context, request Terrafo
 }
 
 // Terraform Plan
+
 type TerraformPlanRequest struct {
 	Args      []terraform.Argument
 	Envs      map[string]string
@@ -109,6 +113,8 @@ type TerraformPlanResponse struct {
 }
 
 func (t *terraformActivities) TerraformPlan(ctx context.Context, request TerraformPlanRequest) (TerraformPlanResponse, error) {
+	ctx, cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
+	defer cancel()
 	tfVersion, err := t.resolveVersion(request.TfVersion)
 	if err != nil {
 		return TerraformPlanResponse{}, err
@@ -193,6 +199,8 @@ type TerraformApplyResponse struct {
 }
 
 func (t *terraformActivities) TerraformApply(ctx context.Context, request TerraformApplyRequest) (TerraformApplyResponse, error) {
+	ctx, cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
+	defer cancel()
 	tfVersion, err := t.resolveVersion(request.TfVersion)
 	if err != nil {
 		return TerraformApplyResponse{}, err
