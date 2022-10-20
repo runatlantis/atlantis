@@ -12,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -51,6 +52,9 @@ func Workflow(ctx workflow.Context, request Request) error {
 	options := workflow.ActivityOptions{
 		ScheduleToCloseTimeout: 30 * time.Minute,
 		HeartbeatTimeout:       1 * time.Minute,
+		RetryPolicy: &temporal.RetryPolicy{
+			NonRetryableErrorTypes: []string{"TemporalClientError"},
+		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, options)
 

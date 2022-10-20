@@ -67,7 +67,6 @@ func (r *JobRunner) Plan(ctx workflow.Context, localRoot *terraform.LocalRoot, j
 		case "plan":
 			resp, err = r.plan(jobCtx, localRoot.Root.Plan.Mode, step.ExtraArgs)
 		}
-
 		if err != nil {
 			return resp, errors.Wrapf(err, "running step %s", step.StepName)
 		}
