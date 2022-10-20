@@ -16,7 +16,6 @@ package main
 
 import (
 	"github.com/runatlantis/atlantis/cmd"
-	temporalCmd "github.com/runatlantis/atlantis/server/lyft/temporal/cmd"
 	"github.com/spf13/viper"
 )
 
@@ -34,10 +33,6 @@ func main() {
 	cmd.RootCmd.AddCommand(server.Init())
 	cmd.RootCmd.AddCommand(version.Init())
 	cmd.RootCmd.AddCommand(testdrive.Init())
-
-	// TODO: remove once we've added support for temporal, this exists only for demo purposes rn
-	cmd.RootCmd.AddCommand(temporalCmd.NewWorkerCmd(temporalCmd.WorkerConfig{}))
-	cmd.RootCmd.AddCommand(temporalCmd.NewServerCmd())
 
 	cmd.Execute()
 }
