@@ -15,8 +15,10 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/storage"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/deployment"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/file"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	internal "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github/cli"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github/link"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/uber-go/tally/v4"
@@ -78,10 +80,11 @@ type StreamCloser interface {
 }
 
 type TerraformOptions struct {
-	VersionCache cache.ExecutionVersionCache
+	VersionCache            cache.ExecutionVersionCache
+	GitCredentialsRefresher gitCredentialsRefresher
 }
 
-func NewTerraform(config config.TerraformConfig, dataDir string, serverURL *url.URL, streamHandler StreamCloser, opts ...TerraformOptions) (*Terraform, error) {
+func NewTerraform(config config.TerraformConfig, ghAppConfig githubapp.Config, dataDir string, serverURL *url.URL, streamHandler StreamCloser, opts ...TerraformOptions) (*Terraform, error) {
 	binDir, err := mkSubDir(dataDir, BinDirName)
 	if err != nil {
 		return nil, err
@@ -104,12 +107,21 @@ func NewTerraform(config config.TerraformConfig, dataDir string, serverURL *url.
 	}
 
 	downloader := &legacy_tf.DefaultDownloader{}
-
 	loader := legacy_tf.NewVersionLoader(downloader, config.DownloadURL)
 
+	gitCredentialsFileLock := &file.RWLock{}
+
 	var versionCache cache.ExecutionVersionCache
+	var credentialsRefresher gitCredentialsRefresher
 	for _, o := range opts {
-		versionCache = o.VersionCache
+
+		if o.VersionCache != nil {
+			versionCache = o.VersionCache
+		}
+
+		if credentialsRefresher != nil {
+			credentialsRefresher = o.GitCredentialsRefresher
+		}
 	}
 
 	if versionCache == nil {
@@ -118,6 +130,14 @@ func NewTerraform(config config.TerraformConfig, dataDir string, serverURL *url.
 			binDir,
 			loader.LoadVersion,
 		)
+	}
+
+	if credentialsRefresher == nil {
+		credentialsRefresher, err = cli.NewCredentials(ghAppConfig, gitCredentialsFileLock)
+
+		if err != nil {
+			return nil, errors.Wrap(err, "initializing credentials")
+		}
 	}
 
 	tfClient, err := terraform.NewAsyncClient(
@@ -136,9 +156,11 @@ func NewTerraform(config config.TerraformConfig, dataDir string, serverURL *url.
 			ServerURL: serverURL,
 		},
 		terraformActivities: &terraformActivities{
-			TerraformClient:  tfClient,
-			StreamHandler:    streamHandler,
-			DefaultTFVersion: defaultTfVersion,
+			TerraformClient:        tfClient,
+			StreamHandler:          streamHandler,
+			DefaultTFVersion:       defaultTfVersion,
+			GitCLICredentials:      credentialsRefresher,
+			GitCredentialsFileLock: gitCredentialsFileLock,
 		},
 		jobActivities: &jobActivities{
 			StreamCloser: streamHandler,

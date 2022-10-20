@@ -14,11 +14,11 @@ func Info(ctx context.Context, msg string) {
 	logger.Info(msg, kvs...)
 }
 
-func Warn(ctx context.Context, msg string) {
+func Warn(ctx context.Context, msg string, additionalKVs ...interface{}) {
 	logger := activity.GetLogger(ctx)
 	kvs := internalContext.ExtractFieldsAsList(ctx)
 
-	logger.Warn(msg, kvs...)
+	logger.Warn(msg, append(kvs, additionalKVs)...)
 }
 
 func Error(ctx context.Context, msg string, additionalKVs ...interface{}) {

@@ -163,11 +163,12 @@ func (r *JobRunner) init(ctx *ExecutionContext, localRoot *terraform.LocalRoot, 
 	}
 	var resp activities.TerraformInitResponse
 	err = workflow.ExecuteActivity(ctx.Context, r.Activity.TerraformInit, activities.TerraformInitRequest{
-		Args:      args,
-		Envs:      ctx.Envs,
-		TfVersion: ctx.TfVersion,
-		Path:      ctx.Path,
-		JobID:     ctx.JobID,
+		Args:                 args,
+		Envs:                 ctx.Envs,
+		TfVersion:            ctx.TfVersion,
+		Path:                 ctx.Path,
+		JobID:                ctx.JobID,
+		GithubInstallationID: localRoot.Repo.Credentials.InstallationToken,
 	}).Get(ctx, &resp)
 	if err != nil {
 		return errors.Wrap(err, "running terraform init activity")

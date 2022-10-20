@@ -7,10 +7,23 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/file"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/testsuite"
 )
+
+type testCredsRefresher struct {
+	called                 bool
+	expectedInstallationID int64
+	t                      *testing.T
+}
+
+func (t *testCredsRefresher) Refresh(ctx context.Context, installationID int64) error {
+	assert.Equal(t.t, t.expectedInstallationID, installationID)
+	t.called = true
+	return nil
+}
 
 type testStreamHandler struct {
 	received      []string
@@ -139,20 +152,33 @@ func TestTerraformInit_RequestValidation(t *testing.T) {
 			}
 
 			req := TerraformInitRequest{
-				Envs:      map[string]string{},
-				JobID:     jobID,
-				Path:      path,
-				TfVersion: c.RequestVersion,
-				Args:      c.RequestArgs,
+				Envs:                 map[string]string{},
+				JobID:                jobID,
+				Path:                 path,
+				TfVersion:            c.RequestVersion,
+				Args:                 c.RequestArgs,
+				GithubInstallationID: 1235,
 			}
 
-			tfActivity := NewTerraformActivities(testTfClient, expectedVersion, &testStreamHandler{
-				t: t,
-			})
+			credsRefresher := &testCredsRefresher{
+				expectedInstallationID: 1235,
+				t:                      t,
+			}
+
+			tfActivity := NewTerraformActivities(
+				testTfClient,
+				expectedVersion,
+				&testStreamHandler{
+					t: t,
+				},
+				credsRefresher,
+				&file.RWLock{})
 			env.RegisterActivity(tfActivity)
 
 			_, err = env.ExecuteActivity(tfActivity.TerraformInit, req)
 			assert.NoError(t, err)
+
+			assert.True(t, credsRefresher.called)
 		})
 	}
 }
@@ -189,9 +215,10 @@ func TestTerraformInit_StreamsOutput(t *testing.T) {
 	}
 
 	req := TerraformInitRequest{
-		Envs:  map[string]string{},
-		JobID: jobID,
-		Path:  path,
+		Envs:                 map[string]string{},
+		JobID:                jobID,
+		Path:                 path,
+		GithubInstallationID: 1235,
 	}
 
 	streamHandler := &testStreamHandler{
@@ -200,7 +227,12 @@ func TestTerraformInit_StreamsOutput(t *testing.T) {
 		expectedJobID: jobID,
 	}
 
-	tfActivity := NewTerraformActivities(testTfClient, expectedVersion, streamHandler)
+	credsRefresher := &testCredsRefresher{
+		expectedInstallationID: 1235,
+		t:                      t,
+	}
+
+	tfActivity := NewTerraformActivities(testTfClient, expectedVersion, streamHandler, credsRefresher, &file.RWLock{})
 	env.RegisterActivity(tfActivity)
 
 	_, err = env.ExecuteActivity(tfActivity.TerraformInit, req)
@@ -311,9 +343,11 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 				Mode:      c.PlanMode,
 			}
 
+			credsRefresher := &testCredsRefresher{}
+
 			tfActivity := NewTerraformActivities(&testTfClient, expectedVersion, &testStreamHandler{
 				t: t,
-			})
+			}, credsRefresher, &file.RWLock{})
 			env.RegisterActivity(tfActivity)
 
 			_, err = env.ExecuteActivity(tfActivity.TerraformPlan, req)
@@ -384,7 +418,9 @@ func TestTerraformPlan_ReturnsResponse(t *testing.T) {
 		expectedJobID: jobID,
 	}
 
-	tfActivity := NewTerraformActivities(&testTfClient, expectedVersion, streamHandler)
+	credsRefresher := &testCredsRefresher{}
+
+	tfActivity := NewTerraformActivities(&testTfClient, expectedVersion, streamHandler, credsRefresher, &file.RWLock{})
 
 	env.RegisterActivity(tfActivity)
 
@@ -477,7 +513,7 @@ func TestTerraformApply_RequestValidation(t *testing.T) {
 
 			tfActivity := NewTerraformActivities(testClient, expectedVersion, &testStreamHandler{
 				t: t,
-			})
+			}, &testCredsRefresher{}, &file.RWLock{})
 			env.RegisterActivity(tfActivity)
 
 			_, err = env.ExecuteActivity(tfActivity.TerraformApply, req)
@@ -530,7 +566,7 @@ func TestTerraformApply_StreamsOutput(t *testing.T) {
 		expectedJobID: jobID,
 	}
 
-	tfActivity := NewTerraformActivities(testTfClient, expectedVersion, streamHandler)
+	tfActivity := NewTerraformActivities(testTfClient, expectedVersion, streamHandler, &testCredsRefresher{}, &file.RWLock{})
 	env.RegisterActivity(tfActivity)
 
 	_, err = env.ExecuteActivity(tfActivity.TerraformApply, req)

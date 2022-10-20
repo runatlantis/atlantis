@@ -31,6 +31,13 @@ type a struct {
 	*activities.Deploy
 }
 
+// we don't want to mess up all our gitconfig for testing purposes
+type noopCredentialsRefresher struct{}
+
+func (r noopCredentialsRefresher) Refresh(ctx context.Context, token int64) error {
+	return nil
+}
+
 func TestDeployWorkflow(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
@@ -168,11 +175,13 @@ func initAndRegisterActivities(t *testing.T, env *testsuite.TestWorkflowEnvironm
 
 	terraformActivities, err := activities.NewTerraform(
 		cfg.TerraformCfg,
+		cfg.App,
 		cfg.DataDir,
 		cfg.ServerCfg.URL,
 		streamCloser,
 		activities.TerraformOptions{
-			VersionCache: cache.NewLocalBinaryCache("terraform"),
+			VersionCache:            cache.NewLocalBinaryCache("terraform"),
+			GitCredentialsRefresher: noopCredentialsRefresher{},
 		},
 	)
 

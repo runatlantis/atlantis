@@ -4,14 +4,18 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/neptune/logger"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/temporal"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"io"
 	"path/filepath"
+	"strings"
 	"sync"
+
+	"github.com/hashicorp/go-version"
+	"github.com/palantir/go-githubapp/githubapp"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/neptune/logger"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/file"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/temporal"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 )
 
 // TerraformClientError can be used to assert a non-retryable error type for
@@ -46,28 +50,43 @@ type streamer interface {
 	Stream(jobID string, msg string)
 }
 
-type terraformActivities struct {
-	TerraformClient  TerraformClient
-	DefaultTFVersion *version.Version
-	StreamHandler    streamer
+type gitCredentialsRefresher interface {
+	Refresh(ctx context.Context, token int64) error
 }
 
-func NewTerraformActivities(client TerraformClient, defaultTfVersion *version.Version, streamHandler streamer) *terraformActivities { //nolint:revive // avoiding refactor while adding linter action
+type terraformActivities struct {
+	TerraformClient        TerraformClient
+	DefaultTFVersion       *version.Version
+	StreamHandler          streamer
+	GHAppConfig            githubapp.Config
+	GitCLICredentials      gitCredentialsRefresher
+	GitCredentialsFileLock *file.RWLock
+}
+
+func NewTerraformActivities(
+	client TerraformClient,
+	defaultTfVersion *version.Version,
+	streamHandler streamer,
+	gitCredentialsRefresher gitCredentialsRefresher,
+	gitCredentialsFileLock *file.RWLock,
+) *terraformActivities { //nolint:revive // avoiding refactor while adding linter action
 	return &terraformActivities{
-		TerraformClient:  client,
-		DefaultTFVersion: defaultTfVersion,
-		StreamHandler:    streamHandler,
+		TerraformClient:        client,
+		DefaultTFVersion:       defaultTfVersion,
+		StreamHandler:          streamHandler,
+		GitCLICredentials:      gitCredentialsRefresher,
+		GitCredentialsFileLock: gitCredentialsFileLock,
 	}
 }
 
 // Terraform Init
-
 type TerraformInitRequest struct {
-	Args      []terraform.Argument
-	Envs      map[string]string
-	JobID     string
-	TfVersion string
-	Path      string
+	Args                 []terraform.Argument
+	Envs                 map[string]string
+	JobID                string
+	TfVersion            string
+	Path                 string
+	GithubInstallationID int64
 }
 
 type TerraformInitResponse struct {
@@ -94,8 +113,21 @@ func (t *terraformActivities) TerraformInit(ctx context.Context, request Terrafo
 		AdditionalEnvVars: request.Envs,
 		Version:           tfVersion,
 	}
-	err = t.runCommandWithOutputStream(ctx, request.JobID, r)
+
+	err = t.GitCLICredentials.Refresh(ctx, request.GithubInstallationID)
 	if err != nil {
+		logger.Warn(ctx, "Error refreshing git cli credentials. This is bug and will likely cause fetching of private modules to fail", "err", err)
+	}
+
+	// terraform init clones repos using git cli auth of which we chose git global configs.
+	// let's ensure we are locking access to this file so it's not rewritten to during the duration of our
+	// operation
+	t.GitCredentialsFileLock.RLock()
+	defer t.GitCredentialsFileLock.RUnlock()
+
+	out, err := t.runCommandWithOutputStream(ctx, request.JobID, r)
+	if err != nil {
+		logger.Error(ctx, out)
 		return TerraformInitResponse{}, errors.Wrap(err, "running init command")
 	}
 	return TerraformInitResponse{}, nil
@@ -148,9 +180,10 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 		AdditionalEnvVars: request.Envs,
 		Version:           tfVersion,
 	}
-	err = t.runCommandWithOutputStream(ctx, request.JobID, planRequest)
+	out, err := t.runCommandWithOutputStream(ctx, request.JobID, planRequest)
 
 	if err != nil {
+		logger.Error(ctx, out)
 		return TerraformPlanResponse{}, errors.Wrap(err, "running plan command")
 	}
 
@@ -222,16 +255,17 @@ func (t *terraformActivities) TerraformApply(ctx context.Context, request Terraf
 		AdditionalEnvVars: request.Envs,
 		Version:           tfVersion,
 	}
-	err = t.runCommandWithOutputStream(ctx, request.JobID, applyRequest)
+	out, err := t.runCommandWithOutputStream(ctx, request.JobID, applyRequest)
 
 	if err != nil {
+		logger.Error(ctx, out)
 		return TerraformApplyResponse{}, errors.Wrap(err, "running apply command")
 	}
 
 	return TerraformApplyResponse{}, nil
 }
 
-func (t *terraformActivities) runCommandWithOutputStream(ctx context.Context, jobID string, request *terraform.RunCommandRequest) error {
+func (t *terraformActivities) runCommandWithOutputStream(ctx context.Context, jobID string, request *terraform.RunCommandRequest) (string, error) {
 	reader, writer := io.Pipe()
 
 	var wg sync.WaitGroup
@@ -256,17 +290,22 @@ func (t *terraformActivities) runCommandWithOutputStream(ctx context.Context, jo
 	buf := []byte{}
 	s.Buffer(buf, bufioScannerBufferSize)
 
+	var output strings.Builder
 	for s.Scan() {
+		_, err := output.WriteString(s.Text())
+		if err != nil {
+			logger.Warn(ctx, "unable to write tf output to buffer")
+		}
 		t.StreamHandler.Stream(jobID, s.Text())
 	}
 
 	wg.Wait()
 
 	if err != nil {
-		return TerraformClientError{error: err}
+		return output.String(), TerraformClientError{error: err}
 	}
 
-	return nil
+	return output.String(), nil
 }
 
 func (t *terraformActivities) resolveVersion(v string) (*version.Version, error) {
