@@ -318,7 +318,7 @@ type mockDeploySignaler struct {
 	error error
 }
 
-func (d *mockDeploySignaler) SignalWithStartWorkflow(_ context.Context, _ *valid.MergedProjectCfg, _ models.Repo, _ string, _ int64, _ vcs.Ref, _ workflows.Trigger) (client.WorkflowRun, error) {
+func (d *mockDeploySignaler) SignalWithStartWorkflow(_ context.Context, _ *valid.MergedProjectCfg, _ models.Repo, _ string, _ int64, _ vcs.Ref, _ models.User, _ workflows.Trigger) (client.WorkflowRun, error) {
 	return d.run, d.error
 }
 

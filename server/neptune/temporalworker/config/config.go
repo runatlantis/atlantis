@@ -38,7 +38,8 @@ type Config struct {
 	//TODO: combine this with above
 	StatsNamespace string
 
-	DataDir   string
-	CtxLogger logging.Logger
-	App       githubapp.Config
+	DataDir                  string
+	CtxLogger                logging.Logger
+	App                      githubapp.Config
+	LyftAuditJobsSnsTopicArn string
 }

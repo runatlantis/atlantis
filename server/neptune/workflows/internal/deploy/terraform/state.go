@@ -2,17 +2,26 @@ package terraform
 
 import (
 	"context"
+	"strconv"
 
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/deployment"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github/markdown"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
+type auditActivities interface {
+	AuditJob(ctx context.Context, request activities.AuditJobRequest) error
+}
+
 type receiverActivities interface {
+	auditActivities
 	UpdateCheckRun(ctx context.Context, request activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error)
 }
 
@@ -36,6 +45,19 @@ func (n *StateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel,
 		return
 	}
 
+	// emit audit events when Apply operation is run
+	if workflowState.Apply != nil {
+		if err := n.emitApplyEvents(ctx, workflowState.Apply, deploymentInfo); err != nil {
+			logger.Error(ctx, errors.Wrap(err, "auditing apply job event").Error())
+		}
+	}
+
+	if err := n.updateCheckRun(ctx, workflowState, deploymentInfo); err != nil {
+		logger.Error(ctx, "updating check run", "err", err)
+	}
+}
+
+func (n *StateReceiver) updateCheckRun(ctx workflow.Context, workflowState *state.Workflow, deploymentInfo DeploymentInfo) error {
 	summary := markdown.RenderWorkflowStateTmpl(workflowState)
 	checkRunState := determineCheckRunState(workflowState)
 
@@ -63,12 +85,47 @@ func (n *StateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel,
 	}
 
 	// TODO: should we block here? maybe we can just make this async
-	var resp activities.UpdateCheckRunResponse
-	err := workflow.ExecuteActivity(ctx, n.Activity.UpdateCheckRun, request).Get(ctx, &resp)
+	return workflow.ExecuteActivity(ctx, n.Activity.UpdateCheckRun, request).Get(ctx, nil)
+}
 
-	if err != nil {
-		logger.Error(ctx, "updating check run", "err", err)
+func (n *StateReceiver) emitApplyEvents(ctx workflow.Context, jobState *state.Job, deploymentInfo DeploymentInfo) error {
+	var atlantisJobState activities.AtlantisJobState
+	startTime := strconv.FormatInt(jobState.StartTime.Unix(), 10)
+
+	var endTime string
+	switch jobState.Status {
+	case state.InProgressJobStatus:
+		atlantisJobState = activities.AtlantisJobStateRunning
+	case state.SuccessJobStatus:
+		atlantisJobState = activities.AtlantisJobStateSuccess
+		endTime = strconv.FormatInt(jobState.EndTime.Unix(), 10)
+	case state.FailedJobStatus:
+		atlantisJobState = activities.AtlantisJobStateFailure
+		endTime = strconv.FormatInt(jobState.EndTime.Unix(), 10)
+
+	// no need to emit events on other states
+	default:
+		return nil
 	}
+
+	auditJobReq := activities.AuditJobRequest{
+		DeploymentInfo: deployment.Info{
+			Version:        deployment.InfoSchemaVersion,
+			ID:             deploymentInfo.ID.String(),
+			CheckRunID:     deploymentInfo.CheckRunID,
+			Revision:       deploymentInfo.Revision,
+			InitiatingUser: deploymentInfo.InitiatingUser,
+			Root:           deploymentInfo.Root,
+			Repo:           deploymentInfo.Repo,
+			Tags:           deploymentInfo.Tags,
+		},
+		State:        atlantisJobState,
+		StartTime:    startTime,
+		EndTime:      endTime,
+		IsForceApply: deploymentInfo.Root.Trigger == terraform.ManualTrigger,
+	}
+
+	return workflow.ExecuteActivity(ctx, n.Activity.AuditJob, auditJobReq).Get(ctx, nil)
 }
 
 func determineCheckRunState(workflowState *state.Workflow) github.CheckRunState {

@@ -33,3 +33,7 @@ type Ref struct {
 type AppCredentials struct {
 	InstallationToken int64
 }
+
+type User struct {
+	Name string
+}

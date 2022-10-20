@@ -187,20 +187,26 @@ func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverUR
 		return nil
 	}
 
-	if err := r.Store.UpdateApplyJobWithStatus(state.InProgressJobStatus); err != nil {
+	if err := r.Store.UpdateApplyJobWithStatus(state.InProgressJobStatus, state.UpdateOptions{
+		StartTime: time.Now(),
+	}); err != nil {
 		return errors.Wrap(err, "updating job with in-progress status")
 	}
 
 	err = r.JobRunner.Apply(ctx, root, jobID.String(), planFile)
 	if err != nil {
 
-		if err := r.Store.UpdateApplyJobWithStatus(state.FailedJobStatus); err != nil {
+		if err := r.Store.UpdateApplyJobWithStatus(state.FailedJobStatus, state.UpdateOptions{
+			EndTime: time.Now(),
+		}); err != nil {
 			return errors.Wrap(err, "updating job with failed status")
 		}
 		return errors.Wrap(err, "running job")
 	}
 
-	if err := r.Store.UpdateApplyJobWithStatus(state.SuccessJobStatus); err != nil {
+	if err := r.Store.UpdateApplyJobWithStatus(state.SuccessJobStatus, state.UpdateOptions{
+		EndTime: time.Now(),
+	}); err != nil {
 		return errors.Wrap(err, "updating job with success status")
 	}
 

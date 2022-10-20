@@ -171,7 +171,7 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 	// Mock StoreLatestDeploymentRequest for both requests
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, activities.StoreLatestDeploymentRequest{
 		DeploymentInfo: &deployment.Info{
-			Version:    queue.DeploymentInfoVersion,
+			Version:    deployment.InfoSchemaVersion,
 			ID:         uuid.UUID{}.String(),
 			CheckRunID: deploymentInfoList[0].CheckRunID,
 			Revision:   deploymentInfoList[0].Revision,
@@ -183,7 +183,7 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 	}).Return(nil)
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, activities.StoreLatestDeploymentRequest{
 		DeploymentInfo: &deployment.Info{
-			Version:    queue.DeploymentInfoVersion,
+			Version:    deployment.InfoSchemaVersion,
 			ID:         uuid.UUID{}.String(),
 			CheckRunID: deploymentInfoList[1].CheckRunID,
 			Revision:   deploymentInfoList[1].Revision,
@@ -518,7 +518,7 @@ func getTestArtifacts() (
 
 	storeDeploymentRequest = activities.StoreLatestDeploymentRequest{
 		DeploymentInfo: &deployment.Info{
-			Version:    queue.DeploymentInfoVersion,
+			Version:    deployment.InfoSchemaVersion,
 			ID:         deploymentInfo.ID.String(),
 			CheckRunID: deploymentInfo.CheckRunID,
 			Revision:   deploymentInfo.Revision,

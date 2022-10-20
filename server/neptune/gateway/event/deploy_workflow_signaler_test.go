@@ -3,6 +3,8 @@ package event_test
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -11,7 +13,6 @@ import (
 	"github.com/runatlantis/atlantis/server/vcs"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/client"
-	"testing"
 )
 
 type testRun struct{}
@@ -89,6 +90,10 @@ func TestSignalWithStartWorkflow_Success(t *testing.T) {
 		CloneURL: repoURL,
 	}
 
+	user := models.User{
+		Username: "test-user",
+	}
+
 	version, err := version.NewVersion("1.0.3")
 	assert.NoError(t, err)
 
@@ -120,6 +125,9 @@ func TestSignalWithStartWorkflow_Success(t *testing.T) {
 					PlanMode:  workflows.NormalPlanMode,
 					Trigger:   workflows.MergeTrigger,
 				},
+				InitiatingUser: workflows.User{
+					Name: user.Username,
+				},
 				Repo: workflows.Repo{
 					FullName: repoFullName,
 					Name:     repoName,
@@ -140,7 +148,7 @@ func TestSignalWithStartWorkflow_Success(t *testing.T) {
 		deploySignaler := event.DeployWorkflowSignaler{
 			TemporalClient: testSignaler,
 		}
-		run, err := deploySignaler.SignalWithStartWorkflow(context.Background(), &rootCfg, repo, sha, 0, ref, workflows.MergeTrigger)
+		run, err := deploySignaler.SignalWithStartWorkflow(context.Background(), &rootCfg, repo, sha, 0, ref, user, workflows.MergeTrigger)
 		assert.NoError(t, err)
 		assert.Equal(t, testRun{}, run)
 	})
@@ -176,6 +184,9 @@ func TestSignalWithStartWorkflow_Success(t *testing.T) {
 					PlanMode:  workflows.DestroyPlanMode,
 					Trigger:   workflows.MergeTrigger,
 				},
+				InitiatingUser: workflows.User{
+					Name: user.Username,
+				},
 				Repo: workflows.Repo{
 					FullName: repoFullName,
 					Name:     repoName,
@@ -185,6 +196,9 @@ func TestSignalWithStartWorkflow_Success(t *testing.T) {
 						Name: ref.Name,
 						Type: string(ref.Type),
 					},
+				},
+				Tags: map[string]string{
+					event.Deprecated: event.Destroy,
 				},
 			},
 			expectedWorkflow: workflows.Deploy,
@@ -196,7 +210,7 @@ func TestSignalWithStartWorkflow_Success(t *testing.T) {
 		deploySignaler := event.DeployWorkflowSignaler{
 			TemporalClient: testSignaler,
 		}
-		run, err := deploySignaler.SignalWithStartWorkflow(context.Background(), &rootCfg, repo, sha, 0, ref, workflows.MergeTrigger)
+		run, err := deploySignaler.SignalWithStartWorkflow(context.Background(), &rootCfg, repo, sha, 0, ref, user, workflows.MergeTrigger)
 		assert.NoError(t, err)
 		assert.Equal(t, testRun{}, run)
 	})
@@ -211,6 +225,10 @@ func TestSignalWithStartWorkflow_Failure(t *testing.T) {
 	ref := vcs.Ref{
 		Type: vcs.BranchRef,
 		Name: "main",
+	}
+
+	user := models.User{
+		Username: "test-user",
 	}
 
 	repo := models.Repo{
@@ -249,6 +267,9 @@ func TestSignalWithStartWorkflow_Failure(t *testing.T) {
 				PlanMode:  workflows.NormalPlanMode,
 				Trigger:   workflows.MergeTrigger,
 			},
+			InitiatingUser: workflows.User{
+				Name: user.Username,
+			},
 			Repo: workflows.Repo{
 				FullName: repoFullName,
 				Name:     repoName,
@@ -270,7 +291,7 @@ func TestSignalWithStartWorkflow_Failure(t *testing.T) {
 	deploySignaler := event.DeployWorkflowSignaler{
 		TemporalClient: testSignaler,
 	}
-	run, err := deploySignaler.SignalWithStartWorkflow(context.Background(), &rootCfg, repo, sha, 0, ref, workflows.MergeTrigger)
+	run, err := deploySignaler.SignalWithStartWorkflow(context.Background(), &rootCfg, repo, sha, 0, ref, user, workflows.MergeTrigger)
 	assert.Error(t, err)
 	assert.Equal(t, testRun{}, run)
 }

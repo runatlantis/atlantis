@@ -2,6 +2,7 @@ package state
 
 import (
 	"net/url"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 )
@@ -26,8 +27,10 @@ type JobOutput struct {
 }
 
 type Job struct {
-	Output *JobOutput
-	Status JobStatus
+	Output    *JobOutput
+	Status    JobStatus
+	StartTime time.Time
+	EndTime   time.Time
 }
 
 type Workflow struct {

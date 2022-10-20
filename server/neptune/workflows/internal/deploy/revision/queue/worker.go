@@ -11,8 +11,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-const DeploymentInfoVersion = "1.0.0"
-
 type revisionProcessor interface {
 	Process(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error)
 }

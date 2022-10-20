@@ -13,10 +13,12 @@ import (
 	"syscall"
 	"time"
 
+	awsSns "github.com/aws/aws-sdk-go/service/sns"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/lyft/aws"
 	"github.com/runatlantis/atlantis/server/metrics"
 	neptune_http "github.com/runatlantis/atlantis/server/neptune/http"
 	"github.com/runatlantis/atlantis/server/neptune/temporal"
@@ -25,6 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/aws/sns"
 	"github.com/runatlantis/atlantis/server/static"
 	"github.com/uber-go/tally/v4"
 	"github.com/urfave/cli"
@@ -112,7 +115,16 @@ func NewServer(config *config.Config) (*Server, error) {
 		Logger:      config.CtxLogger,
 	}
 
-	deployActivities, err := activities.NewDeploy(config.DeploymentConfig)
+	session, err := aws.NewSession()
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing new aws session")
+	}
+
+	snsWriter := &sns.Writer{
+		Client:   awsSns.New(session),
+		TopicArn: &config.LyftAuditJobsSnsTopicArn,
+	}
+	deployActivities, err := activities.NewDeploy(config.DeploymentConfig, snsWriter)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing deploy activities")
 	}

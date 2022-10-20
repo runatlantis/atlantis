@@ -3,11 +3,12 @@ package event
 import (
 	"bytes"
 	"context"
+	"time"
+
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	contextInternal "github.com/runatlantis/atlantis/server/neptune/gateway/context"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -112,6 +113,7 @@ func (p *CommentEventWorkerProxy) forceApply(ctx context.Context, event Comment)
 			event.Pull.HeadCommit,
 			event.InstallationToken,
 			event.Pull.HeadRef,
+			event.User,
 			workflows.ManualTrigger)
 		if err != nil {
 			return errors.Wrap(err, "signalling workflow")

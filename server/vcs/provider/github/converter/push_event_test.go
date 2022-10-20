@@ -55,8 +55,8 @@ func TestConvert_PushEvent(t *testing.T) {
 				Name: "main",
 			},
 			Sha: sha,
-			Sender: vcs.User{
-				Login: "nish",
+			Sender: models.User{
+				Username: "nish",
 			},
 			InstallationToken: int64(installationToken),
 			Action:            event.CreatedAction,
@@ -100,8 +100,8 @@ func TestConvert_PushEvent(t *testing.T) {
 				Name: "main",
 			},
 			Sha: sha,
-			Sender: vcs.User{
-				Login: "nish",
+			Sender: models.User{
+				Username: "nish",
 			},
 			InstallationToken: int64(installationToken),
 			Action:            event.DeletedAction,

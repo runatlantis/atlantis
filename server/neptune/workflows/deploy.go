@@ -16,6 +16,7 @@ type Job = request.Job
 type Step = request.Step
 type AppCredentials = request.AppCredentials
 type Ref = request.Ref
+type User = request.User
 type PlanMode = request.PlanMode
 type Trigger = request.Trigger
 

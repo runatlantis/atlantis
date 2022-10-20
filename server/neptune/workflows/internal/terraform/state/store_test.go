@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
@@ -86,6 +87,8 @@ func TestUpdateApplyJob(t *testing.T) {
 	route := &mux.Route{}
 	route.Path("/jobs/{job-id}")
 
+	stTime := time.Now()
+	endTime := stTime.Add(time.Second * 10)
 	exoectedURL, err := url.Parse("www.test.com/jobs/1234")
 	assert.NoError(t, err)
 	notifier := &testNotifier{
@@ -111,9 +114,21 @@ func TestUpdateApplyJob(t *testing.T) {
 	err = subject.InitApplyJob(jobID, baseURL)
 	assert.NoError(t, err)
 
-	notifier.expectedState.Apply.Status = state.FailedJobStatus
+	notifier.expectedState.Apply.Status = state.InProgressJobStatus
+	notifier.expectedState.Apply.StartTime = stTime
 
-	err = subject.UpdateApplyJobWithStatus(state.FailedJobStatus)
+	err = subject.UpdateApplyJobWithStatus(state.InProgressJobStatus, state.UpdateOptions{
+		StartTime: stTime,
+	})
+	assert.NoError(t, err)
+
+	notifier.expectedState.Apply.Status = state.FailedJobStatus
+	notifier.expectedState.Apply.EndTime = endTime
+
+	err = subject.UpdateApplyJobWithStatus(state.FailedJobStatus, state.UpdateOptions{
+		EndTime: endTime,
+	})
+
 	assert.NoError(t, err)
 	assert.True(t, notifier.called)
 }
