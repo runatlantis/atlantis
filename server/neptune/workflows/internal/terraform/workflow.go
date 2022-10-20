@@ -53,7 +53,7 @@ func Workflow(ctx workflow.Context, request Request) error {
 		ScheduleToCloseTimeout: 30 * time.Minute,
 		HeartbeatTimeout:       1 * time.Minute,
 		RetryPolicy: &temporal.RetryPolicy{
-			NonRetryableErrorTypes: []string{"TemporalClientError"},
+			NonRetryableErrorTypes: []string{"TerraformClientError"},
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, options)
