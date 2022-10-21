@@ -240,6 +240,7 @@ func NewServer(config Config) (*Server, error) {
 		OutputUpdater:                 outputUpdater,
 		WorkingDir:                    workingDir,
 		WorkingDirLocker:              workingDirLocker,
+		Allocator:                     featureAllocator,
 	}
 
 	repoConverter := github_converter.RepoConverter{}

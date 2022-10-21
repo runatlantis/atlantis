@@ -12,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/recovery"
 	"github.com/uber-go/tally/v4"
 )
@@ -28,6 +29,7 @@ type AutoplanValidator struct {
 	OutputUpdater                 events.OutputUpdater
 	WorkingDir                    events.WorkingDir
 	WorkingDirLocker              events.WorkingDirLocker
+	Allocator                     feature.Allocator
 }
 
 const DefaultWorkspace = "default"
@@ -98,6 +100,15 @@ func (r *AutoplanValidator) isValid(ctx context.Context, logger logging.Logger, 
 		}
 		return false, nil
 	}
+
+	// WorkflowModeType is per repo so if the first ProjectCommand has PlatformWorkflowMode enabled, it's enabled for all projects in the repo
+	// So, we set atlantis/apply status to success to allow PRs to merge to master
+	// TODO: Remove this after we remove the required atlantis/apply status check
+	if projectCmds[0].WorkflowModeType == valid.PlatformWorkflowMode {
+		if err := r.updateAtlantisApplyChecks(cmdCtx, baseRepo, projectCmds); err != nil {
+			cmdCtx.Log.ErrorContext(cmdCtx.RequestCtx, errors.Wrap(err, "updating atlantis apply status").Error())
+		}
+	}
 	return true, nil
 }
 
@@ -144,4 +155,23 @@ func (r *AutoplanValidator) validateCtxAndComment(cmdCtx *command.Context) bool 
 		return false
 	}
 	return true
+}
+
+func (r *AutoplanValidator) updateAtlantisApplyChecks(cmdCtx *command.Context, repo models.Repo, prjCmds []command.ProjectContext) error {
+	shouldAllocate, err := r.Allocator.ShouldAllocate(feature.PlatformMode, feature.FeatureContext{
+		RepoName: repo.FullName,
+	})
+	if err != nil {
+		return errors.Wrap(err, "allocating platform mode")
+	}
+
+	if !shouldAllocate {
+		return nil
+	}
+
+	if _, statusErr := r.VCSStatusUpdater.UpdateCombined(cmdCtx.RequestCtx, cmdCtx.HeadRepo, cmdCtx.Pull, models.SuccessVCSStatus, command.Apply, "", ""); statusErr != nil {
+		return errors.Wrap(statusErr, "updating atlantis apply to success")
+	}
+
+	return nil
 }
