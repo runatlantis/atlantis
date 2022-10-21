@@ -21,7 +21,19 @@ import (
 // TerraformClientError can be used to assert a non-retryable error type for
 // callers of this activity
 type TerraformClientError struct {
-	error
+	err error
+}
+
+func (e TerraformClientError) Error() string {
+	return e.err.Error()
+
+}
+
+func wrapTerraformError(err error, message string) TerraformClientError {
+	// double wrap here to get specifics + error type for temporal to not retry
+	return TerraformClientError{
+		err: errors.Wrap(err, message),
+	}
 }
 
 var DisableInputArg = terraform.Argument{
@@ -128,7 +140,7 @@ func (t *terraformActivities) TerraformInit(ctx context.Context, request Terrafo
 	out, err := t.runCommandWithOutputStream(ctx, request.JobID, r)
 	if err != nil {
 		logger.Error(ctx, out)
-		return TerraformInitResponse{}, errors.Wrap(err, "running init command")
+		return TerraformInitResponse{}, wrapTerraformError(err, "running init command")
 	}
 	return TerraformInitResponse{}, nil
 }
@@ -184,7 +196,7 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 
 	if err != nil {
 		logger.Error(ctx, out)
-		return TerraformPlanResponse{}, errors.Wrap(err, "running plan command")
+		return TerraformPlanResponse{}, wrapTerraformError(err, "running plan command")
 	}
 
 	// let's run terraform show right after to get the plan as a structured object
@@ -259,7 +271,7 @@ func (t *terraformActivities) TerraformApply(ctx context.Context, request Terraf
 
 	if err != nil {
 		logger.Error(ctx, out)
-		return TerraformApplyResponse{}, errors.Wrap(err, "running apply command")
+		return TerraformApplyResponse{}, wrapTerraformError(err, "running apply command")
 	}
 
 	return TerraformApplyResponse{}, nil
@@ -301,11 +313,7 @@ func (t *terraformActivities) runCommandWithOutputStream(ctx context.Context, jo
 
 	wg.Wait()
 
-	if err != nil {
-		return output.String(), TerraformClientError{error: err}
-	}
-
-	return output.String(), nil
+	return output.String(), err
 }
 
 func (t *terraformActivities) resolveVersion(v string) (*version.Version, error) {

@@ -70,12 +70,15 @@ func TestRefresh(t *testing.T) {
 
 	t.Run("first write", func(t *testing.T) {
 		dir := t.TempDir()
+
+		capturedGitArgs := [][]string{}
 		subject := cli.Credentials{
 			HomeDir:          dir,
 			TransportCreator: transportCreator,
 			FileLock:         &file.RWLock{},
 			Cfg:              cfg,
 			Git: func(s ...string) error {
+				capturedGitArgs = append(capturedGitArgs, s)
 				return nil
 			},
 		}
@@ -95,6 +98,14 @@ func TestRefresh(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, "https://x-access-token:70897098@github.com", string(raw))
+		assert.Equal(t, [][]string{
+			{
+				"config", "--global", "credential.helper", "store",
+			},
+			{
+				"config", "--global", "url.https://x-access-token@github.com.insteadOf", "ssh://git@github.com",
+			},
+		}, capturedGitArgs)
 	})
 
 	t.Run("writes new token", func(t *testing.T) {
@@ -106,12 +117,14 @@ func TestRefresh(t *testing.T) {
 		err := ioutil.WriteFile(credentialsFile, []byte(oldContents), os.ModePerm)
 		assert.NoError(t, err)
 
+		capturedGitArgs := [][]string{}
 		subject := cli.Credentials{
 			HomeDir:          dir,
 			TransportCreator: transportCreator,
 			FileLock:         &file.RWLock{},
 			Cfg:              cfg,
 			Git: func(s ...string) error {
+				capturedGitArgs = append(capturedGitArgs, s)
 				return nil
 			},
 		}
@@ -131,6 +144,14 @@ func TestRefresh(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, "https://x-access-token:70897098@github.com", string(raw))
+		assert.Equal(t, [][]string{
+			{
+				"config", "--global", "credential.helper", "store",
+			},
+			{
+				"config", "--global", "url.https://x-access-token@github.com.insteadOf", "ssh://git@github.com",
+			},
+		}, capturedGitArgs)
 
 	})
 
