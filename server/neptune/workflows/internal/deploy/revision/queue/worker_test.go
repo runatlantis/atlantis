@@ -171,24 +171,28 @@ func TestWorker_FetchLatestDeploymentOnStartupOnly(t *testing.T) {
 	// Mock StoreLatestDeploymentRequest for both requests
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, activities.StoreLatestDeploymentRequest{
 		DeploymentInfo: &deployment.Info{
-			Version:    deployment.InfoSchemaVersion,
-			ID:         uuid.UUID{}.String(),
-			CheckRunID: deploymentInfoList[0].CheckRunID,
-			Revision:   deploymentInfoList[0].Revision,
-			Repo:       repo,
-			Root: terraform.Root{
+			Version:  deployment.InfoSchemaVersion,
+			ID:       uuid.UUID{}.String(),
+			Revision: deploymentInfoList[0].Revision,
+			Repo: deployment.Repo{
+				Owner: "owner",
+				Name:  "test",
+			},
+			Root: deployment.Root{
 				Name: deploymentInfoList[0].Root.Name,
 			},
 		},
 	}).Return(nil)
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, activities.StoreLatestDeploymentRequest{
 		DeploymentInfo: &deployment.Info{
-			Version:    deployment.InfoSchemaVersion,
-			ID:         uuid.UUID{}.String(),
-			CheckRunID: deploymentInfoList[1].CheckRunID,
-			Revision:   deploymentInfoList[1].Revision,
-			Repo:       repo,
-			Root: terraform.Root{
+			Version:  deployment.InfoSchemaVersion,
+			ID:       uuid.UUID{}.String(),
+			Revision: deploymentInfoList[1].Revision,
+			Repo: deployment.Repo{
+				Owner: "owner",
+				Name:  "test",
+			},
+			Root: deployment.Root{
 				Name: deploymentInfoList[1].Root.Name,
 			},
 		},
@@ -506,7 +510,10 @@ func getTestArtifacts() (
 	fetchDeploymentResponse = activities.FetchLatestDeploymentResponse{
 		DeploymentInfo: &deployment.Info{
 			Revision: latestDeployedRevision.Revision,
-			Repo:     repo,
+			Repo: deployment.Repo{
+				Owner: "owner",
+				Name:  "test",
+			},
 		},
 	}
 
@@ -518,12 +525,16 @@ func getTestArtifacts() (
 
 	storeDeploymentRequest = activities.StoreLatestDeploymentRequest{
 		DeploymentInfo: &deployment.Info{
-			Version:    deployment.InfoSchemaVersion,
-			ID:         deploymentInfo.ID.String(),
-			CheckRunID: deploymentInfo.CheckRunID,
-			Revision:   deploymentInfo.Revision,
-			Root:       deploymentInfo.Root,
-			Repo:       repo,
+			Version:  deployment.InfoSchemaVersion,
+			ID:       deploymentInfo.ID.String(),
+			Revision: deploymentInfo.Revision,
+			Root: deployment.Root{
+				Name: deploymentInfo.Root.Name,
+			},
+			Repo: deployment.Repo{
+				Owner: "owner",
+				Name:  "test",
+			},
 		},
 	}
 	return

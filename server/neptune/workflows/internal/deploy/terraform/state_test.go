@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/deployment"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github/markdown"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
@@ -73,14 +72,6 @@ func TestStateReceive(t *testing.T) {
 		ID:         uuid.New(),
 		Root:       terraform.Root{Name: "root"},
 		Repo:       github.Repo{Name: "hello"},
-	}
-
-	deploymentInfo := deployment.Info{
-		ID:         internalDeploymentInfo.ID.String(),
-		Version:    deployment.InfoSchemaVersion,
-		CheckRunID: internalDeploymentInfo.CheckRunID,
-		Root:       internalDeploymentInfo.Root,
-		Repo:       internalDeploymentInfo.Repo,
 	}
 
 	cases := []struct {
@@ -156,10 +147,11 @@ func TestStateReceive(t *testing.T) {
 			},
 			ExpectedCheckRunState: github.CheckRunPending,
 			ExpectedAuditJobRequest: &activities.AuditJobRequest{
-				DeploymentInfo: deploymentInfo,
-				State:          activities.AtlantisJobStateRunning,
-				StartTime:      strconv.FormatInt(stTime.Unix(), 10),
-				IsForceApply:   false,
+				Root:         internalDeploymentInfo.Root,
+				Repo:         internalDeploymentInfo.Repo,
+				State:        activities.AtlantisJobStateRunning,
+				StartTime:    strconv.FormatInt(stTime.Unix(), 10),
+				IsForceApply: false,
 			},
 		},
 		{
@@ -177,11 +169,12 @@ func TestStateReceive(t *testing.T) {
 			},
 			ExpectedCheckRunState: github.CheckRunFailure,
 			ExpectedAuditJobRequest: &activities.AuditJobRequest{
-				DeploymentInfo: deploymentInfo,
-				State:          activities.AtlantisJobStateFailure,
-				StartTime:      strconv.FormatInt(stTime.Unix(), 10),
-				EndTime:        strconv.FormatInt(endTime.Unix(), 10),
-				IsForceApply:   false,
+				Root:         internalDeploymentInfo.Root,
+				Repo:         internalDeploymentInfo.Repo,
+				State:        activities.AtlantisJobStateFailure,
+				StartTime:    strconv.FormatInt(stTime.Unix(), 10),
+				EndTime:      strconv.FormatInt(endTime.Unix(), 10),
+				IsForceApply: false,
 			},
 		},
 		{
@@ -199,11 +192,12 @@ func TestStateReceive(t *testing.T) {
 			},
 			ExpectedCheckRunState: github.CheckRunSuccess,
 			ExpectedAuditJobRequest: &activities.AuditJobRequest{
-				DeploymentInfo: deploymentInfo,
-				State:          activities.AtlantisJobStateSuccess,
-				StartTime:      strconv.FormatInt(stTime.Unix(), 10),
-				EndTime:        strconv.FormatInt(endTime.Unix(), 10),
-				IsForceApply:   false,
+				Root:         internalDeploymentInfo.Root,
+				Repo:         internalDeploymentInfo.Repo,
+				State:        activities.AtlantisJobStateSuccess,
+				StartTime:    strconv.FormatInt(stTime.Unix(), 10),
+				EndTime:      strconv.FormatInt(endTime.Unix(), 10),
+				IsForceApply: false,
 			},
 		},
 	}
@@ -229,11 +223,12 @@ func TestStateReceive(t *testing.T) {
 
 			if c.ExpectedAuditJobRequest != nil {
 				env.OnActivity(a.AuditJob, mock.Anything, activities.AuditJobRequest{
-					DeploymentInfo: c.ExpectedAuditJobRequest.DeploymentInfo,
-					State:          c.ExpectedAuditJobRequest.State,
-					StartTime:      c.ExpectedAuditJobRequest.StartTime,
-					EndTime:        c.ExpectedAuditJobRequest.EndTime,
-					IsForceApply:   c.ExpectedAuditJobRequest.IsForceApply,
+					Root:         c.ExpectedAuditJobRequest.Root,
+					Repo:         c.ExpectedAuditJobRequest.Repo,
+					State:        c.ExpectedAuditJobRequest.State,
+					StartTime:    c.ExpectedAuditJobRequest.StartTime,
+					EndTime:      c.ExpectedAuditJobRequest.EndTime,
+					IsForceApply: c.ExpectedAuditJobRequest.IsForceApply,
 				}).Return(nil)
 			}
 

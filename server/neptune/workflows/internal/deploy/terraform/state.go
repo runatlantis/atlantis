@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/deployment"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github/markdown"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
@@ -109,20 +108,16 @@ func (n *StateReceiver) emitApplyEvents(ctx workflow.Context, jobState *state.Jo
 	}
 
 	auditJobReq := activities.AuditJobRequest{
-		DeploymentInfo: deployment.Info{
-			Version:        deployment.InfoSchemaVersion,
-			ID:             deploymentInfo.ID.String(),
-			CheckRunID:     deploymentInfo.CheckRunID,
-			Revision:       deploymentInfo.Revision,
-			InitiatingUser: deploymentInfo.InitiatingUser,
-			Root:           deploymentInfo.Root,
-			Repo:           deploymentInfo.Repo,
-			Tags:           deploymentInfo.Tags,
-		},
-		State:        atlantisJobState,
-		StartTime:    startTime,
-		EndTime:      endTime,
-		IsForceApply: deploymentInfo.Root.Trigger == terraform.ManualTrigger,
+		Repo:           deploymentInfo.Repo,
+		Root:           deploymentInfo.Root,
+		JobID:          jobState.ID,
+		InitiatingUser: deploymentInfo.InitiatingUser,
+		Tags:           deploymentInfo.Tags,
+		Revision:       deploymentInfo.Revision,
+		State:          atlantisJobState,
+		StartTime:      startTime,
+		EndTime:        endTime,
+		IsForceApply:   deploymentInfo.Root.Trigger == terraform.ManualTrigger,
 	}
 
 	return workflow.ExecuteActivity(ctx, n.Activity.AuditJob, auditJobReq).Get(ctx, nil)

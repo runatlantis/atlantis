@@ -145,12 +145,16 @@ func (p *RevisionProcessor) fetchLatestDeployment(ctx workflow.Context, deployme
 
 func (p *RevisionProcessor) buildLatestDeployment(deployRequest terraformWorkflow.DeploymentInfo) *deployment.Info {
 	return &deployment.Info{
-		Version:    deployment.InfoSchemaVersion,
-		ID:         deployRequest.ID.String(),
-		CheckRunID: deployRequest.CheckRunID,
-		Revision:   deployRequest.Revision,
-		Root:       deployRequest.Root,
-		Repo:       deployRequest.Repo,
+		Version:  deployment.InfoSchemaVersion,
+		ID:       deployRequest.ID.String(),
+		Revision: deployRequest.Revision,
+		Root: deployment.Root{
+			Name: deployRequest.Root.Name,
+		},
+		Repo: deployment.Repo{
+			Name:  deployRequest.Repo.Name,
+			Owner: deployRequest.Repo.Owner,
+		},
 	}
 }
 

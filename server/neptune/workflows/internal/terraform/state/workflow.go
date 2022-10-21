@@ -27,6 +27,7 @@ type JobOutput struct {
 }
 
 type Job struct {
+	ID        string
 	Output    *JobOutput
 	Status    JobStatus
 	StartTime time.Time

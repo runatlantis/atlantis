@@ -53,6 +53,7 @@ func (s *WorkflowStore) InitPlanJob(jobID fmt.Stringer, serverURL fmt.Stringer) 
 		return errors.Wrap(err, "generating url for plan job")
 	}
 	s.state.Plan = &Job{
+		ID: jobID.String(),
 		Output: &JobOutput{
 			URL: outputURL,
 		},
@@ -69,6 +70,7 @@ func (s *WorkflowStore) InitApplyJob(jobID fmt.Stringer, serverURL fmt.Stringer)
 		return errors.Wrap(err, "generating url for apply job")
 	}
 	s.state.Apply = &Job{
+		ID: jobID.String(),
 		Output: &JobOutput{
 			URL: outputURL,
 		},

@@ -28,6 +28,7 @@ func TestInitPlanJob(t *testing.T) {
 	exoectedURL, err := url.Parse("www.test.com/jobs/1234")
 	assert.NoError(t, err)
 
+	jobID := bytes.NewBufferString("1234")
 	notifier := &testNotifier{
 		expectedState: &state.Workflow{
 			Plan: &state.Job{
@@ -35,6 +36,7 @@ func TestInitPlanJob(t *testing.T) {
 				Output: &state.JobOutput{
 					URL: exoectedURL,
 				},
+				ID: jobID.String(),
 			},
 		},
 		t: t,
@@ -44,7 +46,6 @@ func TestInitPlanJob(t *testing.T) {
 		notifier.notify,
 	)
 
-	jobID := bytes.NewBufferString("1234")
 	baseURL := bytes.NewBufferString("www.test.com")
 
 	err = subject.InitPlanJob(jobID, baseURL)
@@ -59,6 +60,7 @@ func TestInitApplyJob(t *testing.T) {
 	exoectedURL, err := url.Parse("www.test.com/jobs/1234")
 	assert.NoError(t, err)
 
+	jobID := bytes.NewBufferString("1234")
 	notifier := &testNotifier{
 		expectedState: &state.Workflow{
 			Apply: &state.Job{
@@ -66,6 +68,7 @@ func TestInitApplyJob(t *testing.T) {
 				Output: &state.JobOutput{
 					URL: exoectedURL,
 				},
+				ID: jobID.String(),
 			},
 		},
 		t: t,
@@ -75,7 +78,6 @@ func TestInitApplyJob(t *testing.T) {
 		notifier.notify,
 	)
 
-	jobID := bytes.NewBufferString("1234")
 	baseURL := bytes.NewBufferString("www.test.com")
 
 	err = subject.InitApplyJob(jobID, baseURL)
@@ -91,6 +93,8 @@ func TestUpdateApplyJob(t *testing.T) {
 	endTime := stTime.Add(time.Second * 10)
 	exoectedURL, err := url.Parse("www.test.com/jobs/1234")
 	assert.NoError(t, err)
+
+	jobID := bytes.NewBufferString("1234")
 	notifier := &testNotifier{
 		expectedState: &state.Workflow{
 			Apply: &state.Job{
@@ -98,6 +102,7 @@ func TestUpdateApplyJob(t *testing.T) {
 				Output: &state.JobOutput{
 					URL: exoectedURL,
 				},
+				ID: jobID.String(),
 			},
 		},
 		t: t,
@@ -107,7 +112,6 @@ func TestUpdateApplyJob(t *testing.T) {
 		notifier.notify,
 	)
 
-	jobID := bytes.NewBufferString("1234")
 	baseURL := bytes.NewBufferString("www.test.com")
 
 	// init and then update
@@ -139,6 +143,8 @@ func TestUpdatePlanJob(t *testing.T) {
 
 	exoectedURL, err := url.Parse("www.test.com/jobs/1234")
 	assert.NoError(t, err)
+
+	jobID := bytes.NewBufferString("1234")
 	notifier := &testNotifier{
 		expectedState: &state.Workflow{
 			Plan: &state.Job{
@@ -146,6 +152,7 @@ func TestUpdatePlanJob(t *testing.T) {
 				Output: &state.JobOutput{
 					URL: exoectedURL,
 				},
+				ID: jobID.String(),
 			},
 		},
 		t: t,
@@ -155,7 +162,6 @@ func TestUpdatePlanJob(t *testing.T) {
 		notifier.notify,
 	)
 
-	jobID := bytes.NewBufferString("1234")
 	baseURL := bytes.NewBufferString("www.test.com")
 
 	// init and then update
