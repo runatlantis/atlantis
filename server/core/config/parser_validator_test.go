@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -1115,6 +1116,7 @@ func TestParseGlobalCfg(t *testing.T) {
 		RunCommand: "custom workflow command",
 	}
 	preWorkflowHooks := []*valid.PreWorkflowHook{preWorkflowHook}
+	defaultCfg.Temporal.TerraformTaskQueue = raw.DefaultTaskqueue
 
 	customWorkflow1 := valid.Workflow{
 		Name: "custom1",
@@ -1239,6 +1241,7 @@ workflows:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 			},
 		},
 		"workflow stages empty": {
@@ -1265,6 +1268,7 @@ workflows:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 			},
 		},
 		"workflow steps empty": {
@@ -1292,6 +1296,7 @@ workflows:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 			},
 		},
 		"all keys specified": {
@@ -1375,6 +1380,7 @@ policies:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 			},
 		},
 		"id regex with trailing slash": {
@@ -1399,6 +1405,7 @@ repos:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 			},
 		},
 		"referencing default workflow": {
@@ -1425,6 +1432,7 @@ repos:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 			},
 		},
 		"redefine default workflow": {
@@ -1508,6 +1516,7 @@ workflows:
 						Apply: valid.DefaultApplyStage,
 					},
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 			},
 		},
 	}
@@ -1717,6 +1726,7 @@ policies:
 					"default": defaultCfg.DeploymentWorkflows["default"],
 					"custom1": customDeploymentWorkflow1,
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 				PolicySets: valid.PolicySets{
 					Version: conftestVersion,
 					PolicySets: []valid.PolicySet{
@@ -1820,6 +1830,7 @@ deployment_workflows:
 						},
 					},
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 			},
 		},
 	}
@@ -1902,6 +1913,8 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
+	gCfg := valid.NewGlobalCfg()
+	gCfg.Temporal.TerraformTaskQueue = raw.DefaultTaskqueue
 
 	cases := map[string]struct {
 		json   string
@@ -1914,7 +1927,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 		},
 		"empty object": {
 			json: "{}",
-			exp:  valid.NewGlobalCfg(),
+			exp:  gCfg,
 		},
 		"setting all keys": {
 			json: `
@@ -1997,6 +2010,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": valid.NewGlobalCfg().DeploymentWorkflows["default"],
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 				PolicySets: valid.PolicySets{
 					Version: conftestVersion,
 					PolicySets: []valid.PolicySet{
@@ -2090,6 +2104,7 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
 	globalCfg := valid.NewGlobalCfg()
+	globalCfg.Temporal.TerraformTaskQueue = raw.DefaultTaskqueue
 
 	cases := map[string]struct {
 		json   string
@@ -2202,6 +2217,7 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 					"default": globalCfg.DeploymentWorkflows["default"],
 					"custom":  customDeploymentWorkflow,
 				},
+				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 				PolicySets: valid.PolicySets{
 					Version: conftestVersion,
 					PolicySets: []valid.PolicySet{

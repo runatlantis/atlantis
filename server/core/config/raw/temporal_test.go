@@ -47,8 +47,9 @@ func TestTemporal_Validate_Success(t *testing.T) {
 		{
 			description: "success",
 			subject: &raw.Temporal{
-				Host: "127.0.0.1",
-				Port: "8125",
+				Host:               "127.0.0.1",
+				Port:               "8125",
+				TerraformTaskQueue: "taskqueue",
 			},
 		},
 	}

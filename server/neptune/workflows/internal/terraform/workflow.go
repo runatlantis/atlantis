@@ -45,28 +45,21 @@ const (
 )
 
 const (
-	PlanReviewSignalName = "planreview"
+	PlanReviewSignalName   = "planreview"
+	ScheduleToCloseTimeout = 30 * time.Minute
+	HeartBeatTimeout       = 1 * time.Minute
+	TerraformClientError   = "TerraformClientError"
 )
 
 func Workflow(ctx workflow.Context, request Request) error {
 	options := workflow.ActivityOptions{
-		ScheduleToCloseTimeout: 30 * time.Minute,
-		HeartbeatTimeout:       1 * time.Minute,
+		ScheduleToCloseTimeout: ScheduleToCloseTimeout,
+		HeartbeatTimeout:       HeartBeatTimeout,
 		RetryPolicy: &temporal.RetryPolicy{
-			NonRetryableErrorTypes: []string{"TerraformClientError"},
+			NonRetryableErrorTypes: []string{TerraformClientError},
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, options)
-
-	sessionOptions := &workflow.SessionOptions{
-		CreationTimeout:  time.Minute,
-		ExecutionTimeout: 30 * time.Minute,
-	}
-	ctx, err := workflow.CreateSession(ctx, sessionOptions)
-	if err != nil {
-		return err
-	}
-	defer workflow.CompleteSession(ctx)
 
 	runner := newRunner(ctx, request)
 
@@ -216,10 +209,19 @@ func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverUR
 func (r *Runner) Run(ctx workflow.Context) error {
 	var response *activities.GetWorkerInfoResponse
 	err := workflow.ExecuteActivity(ctx, r.TerraformActivities.GetWorkerInfo).Get(ctx, &response)
-
 	if err != nil {
 		return errors.Wrap(err, "getting worker info")
 	}
+	//we have to reset all activity options since WithActivityOptions doesn't append
+	options := workflow.ActivityOptions{
+		ScheduleToCloseTimeout: ScheduleToCloseTimeout,
+		HeartbeatTimeout:       HeartBeatTimeout,
+		RetryPolicy: &temporal.RetryPolicy{
+			NonRetryableErrorTypes: []string{TerraformClientError},
+		},
+		TaskQueue: response.TaskQueue,
+	}
+	ctx = workflow.WithActivityOptions(ctx, options)
 
 	root, cleanup, err := r.RootFetcher.Fetch(ctx)
 	if err != nil {

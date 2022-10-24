@@ -84,7 +84,7 @@ type TerraformOptions struct {
 	GitCredentialsRefresher gitCredentialsRefresher
 }
 
-func NewTerraform(config config.TerraformConfig, ghAppConfig githubapp.Config, dataDir string, serverURL *url.URL, streamHandler StreamCloser, opts ...TerraformOptions) (*Terraform, error) {
+func NewTerraform(config config.TerraformConfig, ghAppConfig githubapp.Config, dataDir string, serverURL *url.URL, taskQueue string, streamHandler StreamCloser, opts ...TerraformOptions) (*Terraform, error) {
 	binDir, err := mkSubDir(dataDir, BinDirName)
 	if err != nil {
 		return nil, err
@@ -154,6 +154,7 @@ func NewTerraform(config config.TerraformConfig, ghAppConfig githubapp.Config, d
 		executeCommandActivities: &executeCommandActivities{},
 		workerInfoActivity: &workerInfoActivity{
 			ServerURL: serverURL,
+			TaskQueue: taskQueue,
 		},
 		terraformActivities: &terraformActivities{
 			TerraformClient:        tfClient,

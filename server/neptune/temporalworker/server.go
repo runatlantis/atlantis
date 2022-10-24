@@ -36,8 +36,6 @@ import (
 )
 
 const (
-	AtlantisNamespace        = "atlantis"
-	DeployTaskqueue          = "deploy"
 	ProjectJobsViewRouteName = "project-jobs-detail"
 
 	// Equal to default terraform timeout
@@ -60,6 +58,7 @@ type Server struct {
 	DeployActivities    *activities.Deploy
 	TerraformActivities *activities.Terraform
 	GithubActivities    *activities.Github
+	TerraformTaskQueue  string
 }
 
 func NewServer(config *config.Config) (*Server, error) {
@@ -134,6 +133,7 @@ func NewServer(config *config.Config) (*Server, error) {
 		config.App,
 		config.DataDir,
 		config.ServerCfg.URL,
+		config.TemporalCfg.TerraformTaskQueue,
 		jobStreamHandler,
 	)
 	if err != nil {
@@ -161,6 +161,7 @@ func NewServer(config *config.Config) (*Server, error) {
 		DeployActivities:    deployActivities,
 		TerraformActivities: terraformActivities,
 		GithubActivities:    githubActivities,
+		TerraformTaskQueue:  config.TemporalCfg.TerraformTaskQueue,
 	}
 	return &server, nil
 }
@@ -173,23 +174,22 @@ func (s Server) Start() error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		deployWorker := s.buildDeployWorker()
+		if err := deployWorker.Run(worker.InterruptCh()); err != nil {
+			log.Fatalln("unable to start deploy worker", err)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
 		// Close job stream when temporalworker exits to allow gracefully shutting down the stream handler
 		defer s.JobStreamCloserFn()
 
-		// pass the underlying client otherwise this will panic()
-		w := worker.New(s.TemporalClient.Client, workflows.DeployTaskQueue, worker.Options{
-			EnableSessionWorker: true,
-			WorkerStopTimeout:   TemporalWorkerTimeout,
-		})
-		w.RegisterActivity(s.TerraformActivities)
-		w.RegisterActivity(s.DeployActivities)
-		w.RegisterActivity(s.GithubActivities)
-
-		w.RegisterWorkflow(workflows.Deploy)
-		w.RegisterWorkflow(workflows.Terraform)
-		if err := w.Run(worker.InterruptCh()); err != nil {
-			log.Fatalln("unable to start deploy worker", err)
+		terraformWorker := s.buildTerraformWorker()
+		if err := terraformWorker.Run(worker.InterruptCh()); err != nil {
+			log.Fatalln("unable to start terraform worker", err)
 		}
 	}()
 
@@ -244,6 +244,30 @@ func (s Server) Start() error {
 	s.TemporalClient.Close()
 
 	return nil
+}
+
+func (s Server) buildDeployWorker() worker.Worker {
+	// pass the underlying client otherwise this will panic()
+	deployWorker := worker.New(s.TemporalClient.Client, workflows.DeployTaskQueue, worker.Options{
+		WorkerStopTimeout: TemporalWorkerTimeout,
+	})
+	deployWorker.RegisterActivity(s.DeployActivities)
+	deployWorker.RegisterActivity(s.GithubActivities)
+	deployWorker.RegisterActivity(s.TerraformActivities)
+	deployWorker.RegisterWorkflow(workflows.Deploy)
+	deployWorker.RegisterWorkflow(workflows.Terraform)
+	return deployWorker
+}
+
+func (s Server) buildTerraformWorker() worker.Worker {
+	// pass the underlying client otherwise this will panic()
+	terraformWorker := worker.New(s.TemporalClient.Client, s.TerraformTaskQueue, worker.Options{
+		WorkerStopTimeout: TemporalWorkerTimeout,
+	})
+	terraformWorker.RegisterActivity(s.TerraformActivities)
+	terraformWorker.RegisterActivity(s.GithubActivities)
+	terraformWorker.RegisterWorkflow(workflows.Terraform)
+	return terraformWorker
 }
 
 // Healthz returns the health check response. It always returns a 200 currently.

@@ -77,6 +77,7 @@ func (a *terraformActivities) GetWorkerInfo(ctx context.Context) (*activities.Ge
 	u, err := url.Parse("www.test.com")
 	return &activities.GetWorkerInfoResponse{
 		ServerURL: u,
+		TaskQueue: "taskqueue",
 	}, err
 }
 
