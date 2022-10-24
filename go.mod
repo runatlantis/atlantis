@@ -37,7 +37,7 @@ require (
 	github.com/spf13/cobra v0.0.0-20170905172051-b78744579491
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.13.0
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli v1.22.10
 	github.com/urfave/negroni v1.0.0
 	github.com/xanzy/go-gitlab v0.69.0
