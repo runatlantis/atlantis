@@ -1,36 +1,72 @@
 package queue_test
 
 import (
-	"testing"
-
+	activity "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestQueue(t *testing.T) {
-	q := queue.NewQueue()
+	t.Run("priority", func(t *testing.T) {
+		q := queue.NewQueue()
 
-	assert.True(t, q.IsEmpty())
+		msg1 := wrap("1", activity.MergeTrigger)
+		q.Push(msg1)
+		msg2 := wrap("2", activity.ManualTrigger)
+		q.Push(msg2)
 
-	q.Push(wrap("1"))
-	q.Push(wrap("2"))
-	q.Push(wrap("3"))
+		info, err := q.Pop()
+		assert.NoError(t, err)
+		assert.Equal(t, msg2, info)
 
-	assert.False(t, q.IsEmpty())
+		info, err = q.Pop()
+		assert.NoError(t, err)
+		assert.Equal(t, msg1, info)
+	})
 
-	assert.Equal(t, "1", unwrap(q.Pop()))
-	assert.Equal(t, "2", unwrap(q.Pop()))
-	assert.Equal(t, "3", unwrap(q.Pop()))
+	t.Run("can pop empty queue unlocked", func(t *testing.T) {
+		q := queue.NewQueue()
+		assert.Equal(t, false, q.CanPop())
+	})
 
-	assert.True(t, q.IsEmpty())
+	t.Run("can pop empty queue locked", func(t *testing.T) {
+		q := queue.NewQueue()
+		q.SetLockStatusForMergedTrigger(queue.LockedStatus)
+		assert.Equal(t, false, q.CanPop())
+	})
+	t.Run("can pop manual trigger locked", func(t *testing.T) {
+		q := queue.NewQueue()
+		msg1 := wrap("1", activity.ManualTrigger)
+		q.Push(msg1)
+		q.SetLockStatusForMergedTrigger(queue.LockedStatus)
+		assert.Equal(t, true, q.CanPop())
+	})
+	t.Run("can pop manual trigger unlocked", func(t *testing.T) {
+		q := queue.NewQueue()
+		msg1 := wrap("1", activity.ManualTrigger)
+		q.Push(msg1)
+		assert.Equal(t, true, q.CanPop())
+	})
+	t.Run("can pop merge trigger locked", func(t *testing.T) {
+		q := queue.NewQueue()
+		msg1 := wrap("1", activity.MergeTrigger)
+		q.Push(msg1)
+		q.SetLockStatusForMergedTrigger(queue.LockedStatus)
+		assert.Equal(t, false, q.CanPop())
+	})
+	t.Run("can pop merge trigger unlocked", func(t *testing.T) {
+		q := queue.NewQueue()
+		msg1 := wrap("1", activity.MergeTrigger)
+		q.Push(msg1)
+		assert.Equal(t, true, q.CanPop())
+	})
 }
 
-func wrap(msg string) terraform.DeploymentInfo {
-	return terraform.DeploymentInfo{Revision: msg}
+func wrap(msg string, trigger activity.Trigger) terraform.DeploymentInfo {
+	return terraform.DeploymentInfo{Revision: msg, Root: activity.Root{
+		Trigger: trigger,
+	}}
 
-}
-
-func unwrap(msg terraform.DeploymentInfo) string {
-	return msg.Revision
 }

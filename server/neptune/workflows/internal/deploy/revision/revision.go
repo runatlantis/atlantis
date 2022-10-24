@@ -5,9 +5,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
+	activity "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request/converter"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -25,6 +27,7 @@ type NewRevisionRequest struct {
 
 type Queue interface {
 	Push(terraform.DeploymentInfo)
+	SetLockStatusForMergedTrigger(status queue.LockStatus)
 }
 
 type Activities interface {
@@ -82,6 +85,11 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 	// don't block on error here, we'll just try again later when we have our result.
 	if err != nil {
 		logger.Error(ctx, err.Error())
+	}
+
+	// lock the queue on a manual deployment
+	if root.Trigger == activity.ManualTrigger {
+		n.queue.SetLockStatusForMergedTrigger(queue.LockedStatus)
 	}
 
 	n.queue.Push(terraform.DeploymentInfo{

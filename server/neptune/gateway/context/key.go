@@ -25,6 +25,9 @@ func ExtractFields(ctx context.Context) map[string]interface{} {
 	args := make(map[string]interface{})
 
 	for _, k := range Keys {
+		if ctx.Value(k) == nil {
+			continue
+		}
 		args[k.String()] = ctx.Value(k)
 	}
 

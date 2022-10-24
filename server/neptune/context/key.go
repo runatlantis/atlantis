@@ -40,6 +40,9 @@ func ExtractFieldsAsList(ctx KVStore) []interface{} {
 	var args []interface{}
 
 	for _, k := range Keys {
+		if ctx.Value(k) == nil {
+			continue
+		}
 		args = append(args, k)
 		args = append(args, ctx.Value(k))
 	}
