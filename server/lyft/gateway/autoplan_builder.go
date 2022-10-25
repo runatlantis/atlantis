@@ -17,6 +17,8 @@ import (
 	"github.com/uber-go/tally/v4"
 )
 
+const PlatformModeApplyStatusMessage = "Bypassed for platform mode"
+
 // AutoplanValidator handles setting up repo cloning and checking to verify of any terraform files have changed
 type AutoplanValidator struct {
 	Scope                         tally.Scope
@@ -169,7 +171,7 @@ func (r *AutoplanValidator) updateAtlantisApplyChecks(cmdCtx *command.Context, r
 		return nil
 	}
 
-	if _, statusErr := r.VCSStatusUpdater.UpdateCombined(cmdCtx.RequestCtx, cmdCtx.HeadRepo, cmdCtx.Pull, models.SuccessVCSStatus, command.Apply, "", ""); statusErr != nil {
+	if _, statusErr := r.VCSStatusUpdater.UpdateCombined(cmdCtx.RequestCtx, cmdCtx.HeadRepo, cmdCtx.Pull, models.SuccessVCSStatus, command.Apply, "", PlatformModeApplyStatusMessage); statusErr != nil {
 		return errors.Wrap(statusErr, "updating atlantis apply to success")
 	}
 
