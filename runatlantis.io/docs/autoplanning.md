@@ -8,7 +8,7 @@ The algorithm it uses is as follows:
 1. Get the directories that those files are in
 1. If the directory path doesn't contain `modules/` then try to run `plan` in that directory
 1. If it does contain `modules/` look at the directory one level above `modules/`. If it
-contains a `main.tf` run plan in that directory, otherwise ignore the change (see below for exceptions.)
+contains a `main.tf` run plan in that directory, otherwise ignore the change (see below for exceptions).
 
 ## Example
 Given the directory structure:

@@ -153,7 +153,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 		if projectDir != "" {
 			dirs = append(dirs, projectDir)
 		} else if moduleInfo != nil {
-			downstreamProjects := moduleInfo.DownstreamProjects(path.Dir(modifiedFile))
+			downstreamProjects := moduleInfo.DependentProjects(path.Dir(modifiedFile))
 			log.Debug("found downstream projects for %q: %v", modifiedFile, downstreamProjects)
 			dirs = append(dirs, downstreamProjects...)
 		}

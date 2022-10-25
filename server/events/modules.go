@@ -28,8 +28,8 @@ func (m *module) String() string {
 }
 
 type ModuleProjects interface {
-	// DownstreamProjects returns all projects that depend on the module at moduleDir
-	DownstreamProjects(moduleDir string) []string
+	// DependentProjects returns all projects that depend on the module at moduleDir
+	DependentProjects(moduleDir string) []string
 }
 
 type moduleInfo map[string]*module
@@ -40,7 +40,7 @@ func (m moduleInfo) String() string {
 	return fmt.Sprintf("%+v", map[string]*module(m))
 }
 
-func (m moduleInfo) DownstreamProjects(moduleDir string) (projectPaths []string) {
+func (m moduleInfo) DependentProjects(moduleDir string) (projectPaths []string) {
 	if m == nil || m[moduleDir] == nil {
 		return nil
 	}

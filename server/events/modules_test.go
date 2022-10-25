@@ -62,7 +62,7 @@ func Test_findModuleDependants(t *testing.T) {
 				return
 			}
 			for k, v := range tt.want {
-				projects := got.DownstreamProjects(k)
+				projects := got.DependentProjects(k)
 				sort.Strings(projects)
 				assert.Equalf(t, v, projects, "%v.DownstreamProjects(%v)", got, k)
 			}
