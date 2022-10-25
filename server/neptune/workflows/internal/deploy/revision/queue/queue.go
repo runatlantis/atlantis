@@ -6,9 +6,15 @@ import (
 
 	activity "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	"go.temporal.io/sdk/workflow"
 )
 
 type LockStatus int
+
+type LockState struct {
+	Revision string
+	Status   LockStatus
+}
 
 const (
 	UnlockedStatus LockStatus = iota
@@ -16,29 +22,40 @@ const (
 )
 
 type Deploy struct {
-	queue *priority
+	queue              *priority
+	lockStatusCallback func(workflow.Context, *Deploy)
 
 	// mutable: default is unlocked
-	lock LockStatus
+	lock LockState
 }
 
-func NewQueue() *Deploy {
+func NewQueue(callback func(workflow.Context, *Deploy)) *Deploy {
 	return &Deploy{
-		queue: newPriorityQueue(),
+		queue:              newPriorityQueue(),
+		lockStatusCallback: callback,
 	}
 
 }
 
-func (q *Deploy) SetLockStatusForMergedTrigger(status LockStatus) {
-	q.lock = status
+func (q *Deploy) GetLockState() LockState {
+	return q.lock
+}
+
+func (q *Deploy) SetLockForMergedItems(ctx workflow.Context, state LockState) {
+	q.lock = state
+	q.lockStatusCallback(ctx, q)
 }
 
 func (q *Deploy) CanPop() bool {
-	return q.queue.HasItemsOfPriority(High) || (q.lock == UnlockedStatus && !q.queue.IsEmpty())
+	return q.queue.HasItemsOfPriority(High) || (q.lock.Status == UnlockedStatus && !q.queue.IsEmpty())
 }
 
 func (q *Deploy) Pop() (terraform.DeploymentInfo, error) {
 	return q.queue.Pop()
+}
+
+func (q *Deploy) GetOrderedMergedItems() []terraform.DeploymentInfo {
+	return q.queue.Scan(Low)
 }
 
 func (q *Deploy) IsEmpty() bool {
@@ -83,6 +100,16 @@ func (q *priority) IsEmpty() bool {
 		}
 	}
 	return true
+}
+
+func (q *priority) Scan(priority priorityType) []terraform.DeploymentInfo {
+	var result []terraform.DeploymentInfo
+
+	for e := q.queues[priority].Front(); e != nil; e = e.Next() {
+		result = append(result, e.Value.(terraform.DeploymentInfo))
+	}
+
+	return result
 }
 
 func (q *priority) HasItemsOfPriority(priority priorityType) bool {

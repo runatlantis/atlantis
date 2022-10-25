@@ -16,6 +16,24 @@ func TestPriorityQueue(t *testing.T) {
 		q.Push(wrap("3"), High)
 		q.Push(wrap("4"), Low)
 
+		highQueue := q.Scan(High)
+		assert.Equal(t, []terraform.DeploymentInfo{
+			{
+				Revision: "2",
+			},
+			{
+				Revision: "3",
+			}}, highQueue)
+
+		lowQueue := q.Scan(Low)
+		assert.Equal(t, []terraform.DeploymentInfo{
+			{
+				Revision: "1",
+			},
+			{
+				Revision: "4",
+			}}, lowQueue)
+
 		info, err := q.Pop()
 		assert.NoError(t, err)
 		assert.Equal(t, "2", unwrap(info))

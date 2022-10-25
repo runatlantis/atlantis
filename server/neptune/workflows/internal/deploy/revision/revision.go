@@ -2,9 +2,11 @@ package revision
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	activity "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request"
@@ -27,7 +29,8 @@ type NewRevisionRequest struct {
 
 type Queue interface {
 	Push(terraform.DeploymentInfo)
-	SetLockStatusForMergedTrigger(status queue.LockStatus)
+	GetLockState() queue.LockState
+	SetLockForMergedItems(ctx workflow.Context, state queue.LockState)
 }
 
 type Activities interface {
@@ -74,22 +77,14 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 		logger.Error(ctx, "generating deployment id", "err", err)
 	}
 
-	var resp activities.CreateCheckRunResponse
-	err = workflow.ExecuteActivity(ctx, n.activities.CreateCheckRun, activities.CreateCheckRunRequest{
-		Title:      terraform.BuildCheckRunTitle(root.Name),
-		Sha:        request.Revision,
-		Repo:       repo,
-		ExternalID: id.String(),
-	}).Get(ctx, &resp)
-
-	// don't block on error here, we'll just try again later when we have our result.
-	if err != nil {
-		logger.Error(ctx, err.Error())
-	}
+	resp := n.createCheckRun(ctx, id.String(), request.Revision, root, repo)
 
 	// lock the queue on a manual deployment
 	if root.Trigger == activity.ManualTrigger {
-		n.queue.SetLockStatusForMergedTrigger(queue.LockedStatus)
+		n.queue.SetLockForMergedItems(ctx, queue.LockState{
+			Status:   queue.LockedStatus,
+			Revision: request.Revision,
+		})
 	}
 
 	n.queue.Push(terraform.DeploymentInfo{
@@ -101,4 +96,32 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 		InitiatingUser: initiatingUser,
 		Tags:           request.Tags,
 	})
+}
+
+func (n *Receiver) createCheckRun(ctx workflow.Context, id, revision string, root activity.Root, repo github.Repo) activities.CreateCheckRunResponse {
+	lock := n.queue.GetLockState()
+	var actions []github.CheckRunAction
+	var summary string
+
+	if lock.Status == queue.LockedStatus && (root.Trigger == activity.MergeTrigger) {
+		actions = append(actions, github.CreateUnlockAction())
+		summary = fmt.Sprintf("This deploy is locked from a manual deployment for revision %s.  Unlock to proceed.", lock.Revision)
+	}
+
+	var resp activities.CreateCheckRunResponse
+	err := workflow.ExecuteActivity(ctx, n.activities.CreateCheckRun, activities.CreateCheckRunRequest{
+		Title:      terraform.BuildCheckRunTitle(root.Name),
+		Sha:        revision,
+		Repo:       repo,
+		ExternalID: id,
+		Summary:    summary,
+		Actions:    actions,
+	}).Get(ctx, &resp)
+
+	// don't block on error here, we'll just try again later when we have our result.
+	if err != nil {
+		logger.Error(ctx, err.Error())
+	}
+
+	return resp
 }

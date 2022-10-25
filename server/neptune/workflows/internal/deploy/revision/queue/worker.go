@@ -16,7 +16,7 @@ type queue interface {
 	IsEmpty() bool
 	CanPop() bool
 	Pop() (terraform.DeploymentInfo, error)
-	SetLockStatusForMergedTrigger(status LockStatus)
+	SetLockForMergedItems(ctx workflow.Context, state LockState)
 }
 
 type deployer interface {
@@ -106,7 +106,9 @@ func (w *Worker) Work(ctx workflow.Context) {
 			currentDeployment, err = w.deploy(ctx, previousDeployment)
 		case receive:
 			logger.Info(ctx, "Received unlock signal... ")
-			w.Queue.SetLockStatusForMergedTrigger(UnlockedStatus)
+			w.Queue.SetLockForMergedItems(ctx, LockState{
+				Status: UnlockedStatus,
+			})
 			continue
 		default:
 			logger.Warn(ctx, fmt.Sprintf("%s action not configured. This is probably a bug, skipping for now", currentAction))

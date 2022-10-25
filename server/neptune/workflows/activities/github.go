@@ -56,6 +56,7 @@ type CreateCheckRunRequest struct {
 	Sha        string
 	Repo       internal.Repo
 	State      internal.CheckRunState
+	Actions    []internal.CheckRunAction
 	Summary    string
 	ExternalID string
 }
@@ -135,6 +136,17 @@ func (a *githubActivities) CreateCheckRun(ctx context.Context, request CreateChe
 		Status:     &state,
 		Output:     &output,
 		ExternalID: &request.ExternalID,
+	}
+
+	// update with any actions
+	if len(request.Actions) != 0 {
+		var actions []*github.CheckRunAction
+
+		for _, a := range request.Actions {
+			actions = append(actions, a.ToGithubAction())
+		}
+
+		opts.Actions = actions
 	}
 
 	if conclusion != "" {

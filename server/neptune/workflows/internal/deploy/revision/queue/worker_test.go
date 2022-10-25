@@ -18,8 +18,8 @@ import (
 )
 
 type testQueue struct {
-	Queue      *list.List
-	LockStatus queue.LockStatus
+	Queue *list.List
+	Lock  queue.LockState
 }
 
 func (q *testQueue) IsEmpty() bool {
@@ -41,8 +41,8 @@ func (q *testQueue) Push(msg terraformWorkflow.DeploymentInfo) {
 	q.Queue.PushBack(msg)
 }
 
-func (q *testQueue) SetLockStatusForMergedTrigger(status queue.LockStatus) {
-	q.LockStatus = status
+func (q *testQueue) SetLockForMergedItems(ctx workflow.Context, state queue.LockState) {
+	q.Lock = state
 }
 
 type workerRequest struct {
@@ -60,7 +60,7 @@ type workerResponse struct {
 type queueAndState struct {
 	QueueIsEmpty bool
 	State        queue.WorkerState
-	LockStatus   queue.LockStatus
+	Lock         queue.LockState
 }
 
 type testDeployer struct {
@@ -96,7 +96,7 @@ func testWorkerWorkflow(ctx workflow.Context, r workerRequest) (workerResponse, 
 		Queue: list.New(),
 	}
 
-	q.SetLockStatusForMergedTrigger(r.InitialLockStatus)
+	q.SetLockForMergedItems(ctx, queue.LockState{Status: r.InitialLockStatus})
 
 	var infos []*deployment.Info
 	for _, s := range r.Queue {
@@ -121,7 +121,7 @@ func testWorkerWorkflow(ctx workflow.Context, r workerRequest) (workerResponse, 
 		return queueAndState{
 			QueueIsEmpty: q.IsEmpty(),
 			State:        worker.GetState(),
-			LockStatus:   q.LockStatus,
+			Lock:         q.Lock,
 		}, nil
 	})
 	if err != nil {
@@ -159,7 +159,9 @@ func TestWorker_ReceivesUnlockSignal(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.True(t, q.QueueIsEmpty)
-		assert.Equal(t, queue.UnlockedStatus, q.LockStatus)
+		assert.Equal(t, queue.LockState{
+			Status: queue.UnlockedStatus,
+		}, q.Lock)
 		assert.Equal(t, queue.WaitingWorkerState, q.State)
 
 		env.CancelWorkflow()
