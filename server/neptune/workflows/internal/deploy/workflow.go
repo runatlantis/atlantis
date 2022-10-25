@@ -3,6 +3,7 @@ package deploy
 import (
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
@@ -52,7 +53,11 @@ func Workflow(ctx workflow.Context, request Request, tfWorkflow terraform.Workfl
 	}
 	ctx = workflow.WithActivityOptions(ctx, options)
 
-	runner := newRunner(ctx, request, tfWorkflow)
+	runner, err := newRunner(ctx, request, tfWorkflow)
+
+	if err != nil {
+		return errors.Wrap(err, "initializing workflow runner")
+	}
 
 	// blocking call
 	return runner.Run(ctx)
@@ -64,7 +69,7 @@ type Runner struct {
 	NewRevisionSignalChannel workflow.ReceiveChannel
 }
 
-func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workflow) *Runner {
+func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workflow) (*Runner, error) {
 	// inject dependencies
 
 	// temporal effectively "injects" this, it just cares about the method names,
@@ -78,22 +83,17 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 		lockStateUpdater.UpdateQueuedRevisions(ctx, d)
 	})
 	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, a, sideeffect.GenerateUUID)
-	tfWorkflowRunner := terraform.NewWorkflowRunner(a, tfWorkflow)
-	deployer := &queue.Deployer{
-		Activities:              a,
-		TerraformWorkflowRunner: tfWorkflowRunner,
-	}
 
-	worker := &queue.Worker{
-		Queue:    revisionQueue,
-		Deployer: deployer,
+	worker, err := queue.NewWorker(ctx, revisionQueue, a, tfWorkflow, request.Repo.FullName, request.Root.Name)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Runner{
 		QueueWorker:              worker,
 		RevisionReceiver:         revisionReceiver,
 		NewRevisionSignalChannel: workflow.GetSignalChannel(ctx, NewRevisionSignalID),
-	}
+	}, nil
 }
 
 func (r *Runner) Run(ctx workflow.Context) error {

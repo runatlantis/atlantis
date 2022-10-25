@@ -1,11 +1,14 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
 	internalContext "github.com/runatlantis/atlantis/server/neptune/context"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/deployment"
+	tfModel "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"go.temporal.io/sdk/temporal"
@@ -21,6 +24,11 @@ type queue interface {
 
 type deployer interface {
 	Deploy(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error)
+}
+
+type workerActivities interface {
+	deployerActivities
+	AuditJob(ctx context.Context, request activities.AuditJobRequest) error
 }
 
 type WorkerState string
@@ -42,7 +50,8 @@ type Worker struct {
 	Deployer deployer
 
 	// mutable
-	state WorkerState
+	state            WorkerState
+	latestDeployment *deployment.Info
 }
 
 type actionType string
@@ -53,6 +62,40 @@ const (
 	receive  = "receive"
 )
 
+func NewWorker(
+	ctx workflow.Context,
+	q queue,
+	a workerActivities,
+	tfWorkflow terraform.Workflow,
+	repoName, rootName string,
+) (*Worker, error) {
+	tfWorkflowRunner := terraform.NewWorkflowRunner(a, tfWorkflow)
+	deployer := &Deployer{
+		Activities:              a,
+		TerraformWorkflowRunner: tfWorkflowRunner,
+	}
+
+	latestDeployment, err := deployer.FetchLatestDeployment(ctx, repoName, rootName)
+	if err != nil {
+		return nil, errors.Wrap(err, "fetching current deployment")
+	}
+
+	// we don't persist lock state anywhere so in the case of workflow completion we need to rebuild
+	// the lock state
+	if latestDeployment != nil && latestDeployment.Root.Trigger == string(tfModel.ManualTrigger) {
+		q.SetLockForMergedItems(ctx, LockState{
+			Status:   LockedStatus,
+			Revision: latestDeployment.Revision,
+		})
+	}
+
+	return &Worker{
+		Queue:            q,
+		Deployer:         deployer,
+		latestDeployment: latestDeployment,
+	}, nil
+}
+
 // Work pops work off the queue and if the queue is empty,
 // it waits for the queue to be non-empty or a cancelation signal
 func (w *Worker) Work(ctx workflow.Context) {
@@ -61,7 +104,6 @@ func (w *Worker) Work(ctx workflow.Context) {
 		w.state = CompleteWorkerState
 	}()
 
-	var previousDeployment *deployment.Info
 	var currentAction actionType
 	callback := func(f workflow.Future) {
 		err := f.Get(ctx, nil)
@@ -103,7 +145,7 @@ func (w *Worker) Work(ctx workflow.Context) {
 			return
 		case process:
 			logger.Info(ctx, "Processing... ")
-			currentDeployment, err = w.deploy(ctx, previousDeployment)
+			currentDeployment, err = w.deploy(ctx, w.latestDeployment)
 		case receive:
 			logger.Info(ctx, "Received unlock signal... ")
 			w.Queue.SetLockForMergedItems(ctx, LockState{
@@ -129,7 +171,7 @@ func (w *Worker) Work(ctx workflow.Context) {
 		}
 
 		// we assume that regardless of error we should count this as a deploy
-		previousDeployment = currentDeployment
+		w.latestDeployment = currentDeployment
 		selector.AddFuture(w.awaitWork(ctx), callback)
 	}
 }

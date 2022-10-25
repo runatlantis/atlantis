@@ -7,12 +7,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/deployment"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
-	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	internalTerraform "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 )
@@ -28,16 +31,16 @@ func (q *testQueue) IsEmpty() bool {
 func (q *testQueue) CanPop() bool {
 	return !q.IsEmpty()
 }
-func (q *testQueue) Pop() (terraformWorkflow.DeploymentInfo, error) {
+func (q *testQueue) Pop() (internalTerraform.DeploymentInfo, error) {
 	if q.IsEmpty() {
-		return terraformWorkflow.DeploymentInfo{}, fmt.Errorf("calling pop on empty queue")
+		return internalTerraform.DeploymentInfo{}, fmt.Errorf("calling pop on empty queue")
 	}
 
 	result := q.Queue.Remove(q.Queue.Front())
-	return result.(terraformWorkflow.DeploymentInfo), nil
+	return result.(internalTerraform.DeploymentInfo), nil
 }
 
-func (q *testQueue) Push(msg terraformWorkflow.DeploymentInfo) {
+func (q *testQueue) Push(msg internalTerraform.DeploymentInfo) {
 	q.Queue.PushBack(msg)
 }
 
@@ -46,7 +49,7 @@ func (q *testQueue) SetLockForMergedItems(ctx workflow.Context, state queue.Lock
 }
 
 type workerRequest struct {
-	Queue                   []terraformWorkflow.DeploymentInfo
+	Queue                   []internalTerraform.DeploymentInfo
 	ExpectedValidationError *queue.ValidationError
 	InitialLockStatus       queue.LockStatus
 }
@@ -74,7 +77,7 @@ type testDeployer struct {
 	count int
 }
 
-func (d *testDeployer) Deploy(ctx workflow.Context, requestedDeployment terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
+func (d *testDeployer) Deploy(ctx workflow.Context, requestedDeployment internalTerraform.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
 	d.capturedLatestDeployments = append(d.capturedLatestDeployments, latestDeployment)
 	info := d.expectedRevisions[d.count]
 
@@ -215,7 +218,7 @@ func TestWorker_DeploysItems(t *testing.T) {
 		Name:  "test",
 	}
 
-	deploymentInfoList := []terraformWorkflow.DeploymentInfo{
+	deploymentInfoList := []internalTerraform.DeploymentInfo{
 		{
 			ID:         uuid.UUID{},
 			Revision:   "1",
@@ -284,7 +287,7 @@ func TestWorker_DeploysItems_ValidationError(t *testing.T) {
 		Name:  "test",
 	}
 
-	deploymentInfoList := []terraformWorkflow.DeploymentInfo{
+	deploymentInfoList := []internalTerraform.DeploymentInfo{
 		{
 			ID:         uuid.UUID{},
 			Revision:   "1",
@@ -321,4 +324,112 @@ func TestWorker_DeploysItems_ValidationError(t *testing.T) {
 		nil, nil,
 	}, resp.CapturedArgs)
 	assert.True(t, resp.QueueIsEmpty)
+}
+
+func TestNewWorker(t *testing.T) {
+	emptyWorkflow := func(ctx workflow.Context, request terraformWorkflow.Request) error {
+		return nil
+	}
+
+	type res struct {
+		Lock queue.LockState
+	}
+
+	testWorkflow := func(ctx workflow.Context) (res, error) {
+		ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+			ScheduleToCloseTimeout: 5 * time.Second,
+		})
+		q := queue.NewQueue(noopCallback)
+		_, err := queue.NewWorker(ctx, q, &testDeployActivity{}, emptyWorkflow, "nish/repo", "root")
+		return res{
+			Lock: q.GetLockState(),
+		}, err
+	}
+
+	fetchDeployRequest := activities.FetchLatestDeploymentRequest{
+		FullRepositoryName: "nish/repo",
+		RootName:           "root",
+	}
+
+	t.Run("last deploy was manual", func(t *testing.T) {
+		ts := testsuite.WorkflowTestSuite{}
+		env := ts.NewTestWorkflowEnvironment()
+
+		a := &testDeployActivity{}
+		env.RegisterActivity(a)
+
+		env.OnActivity(a.FetchLatestDeployment, mock.Anything, fetchDeployRequest).Return(activities.FetchLatestDeploymentResponse{
+			DeploymentInfo: &deployment.Info{
+				Root: deployment.Root{
+					Name:    "root",
+					Trigger: "manual",
+				},
+				Revision: "1234",
+			},
+		}, nil)
+
+		env.ExecuteWorkflow(testWorkflow)
+
+		env.AssertExpectations(t)
+
+		var r res
+		err := env.GetWorkflowResult(&r)
+		assert.NoError(t, err)
+
+		assert.Equal(t, queue.LockState{
+			Revision: "1234",
+			Status:   queue.LockedStatus,
+		}, r.Lock)
+
+	})
+
+	t.Run("last deploy was merged", func(t *testing.T) {
+		ts := testsuite.WorkflowTestSuite{}
+		env := ts.NewTestWorkflowEnvironment()
+
+		a := &testDeployActivity{}
+		env.RegisterActivity(a)
+
+		env.OnActivity(a.FetchLatestDeployment, mock.Anything, fetchDeployRequest).Return(activities.FetchLatestDeploymentResponse{
+			DeploymentInfo: &deployment.Info{
+				Root: deployment.Root{
+					Name:    "root",
+					Trigger: "merged",
+				},
+				Revision: "1234",
+			},
+		}, nil)
+
+		env.ExecuteWorkflow(testWorkflow)
+
+		env.AssertExpectations(t)
+
+		var r res
+		err := env.GetWorkflowResult(&r)
+		assert.NoError(t, err)
+
+		assert.Equal(t, queue.LockState{}, r.Lock)
+	})
+
+	t.Run("first deploy", func(t *testing.T) {
+		ts := testsuite.WorkflowTestSuite{}
+		env := ts.NewTestWorkflowEnvironment()
+
+		a := &testDeployActivity{}
+		env.RegisterActivity(a)
+
+		env.OnActivity(a.FetchLatestDeployment, mock.Anything, fetchDeployRequest).Return(activities.FetchLatestDeploymentResponse{
+			DeploymentInfo: nil,
+		}, nil)
+
+		env.ExecuteWorkflow(testWorkflow)
+
+		env.AssertExpectations(t)
+
+		var r res
+		err := env.GetWorkflowResult(&r)
+		assert.NoError(t, err)
+
+		assert.Equal(t, queue.LockState{}, r.Lock)
+	})
 }

@@ -43,6 +43,10 @@ func (t *testDeployActivity) UpdateCheckRun(ctx context.Context, deployerRequest
 	return activities.UpdateCheckRunResponse{}, nil
 }
 
+func (t *testDeployActivity) AuditJob(ctx context.Context, request activities.AuditJobRequest) error {
+	return nil
+}
+
 type deployerRequest struct {
 	Info         terraform.DeploymentInfo
 	LatestDeploy *deployment.Info
@@ -101,15 +105,6 @@ func TestDeployer_FirstDeploy(t *testing.T) {
 		},
 	}
 
-	fetchDeploymentRequest := activities.FetchLatestDeploymentRequest{
-		FullRepositoryName: repo.GetFullName(),
-		RootName:           deploymentInfo.Root.Name,
-	}
-
-	fetchDeploymentResponse := activities.FetchLatestDeploymentResponse{
-		DeploymentInfo: nil,
-	}
-
 	storeDeploymentRequest := activities.StoreLatestDeploymentRequest{
 		DeploymentInfo: &deployment.Info{
 			Version:  deployment.InfoSchemaVersion,
@@ -125,7 +120,6 @@ func TestDeployer_FirstDeploy(t *testing.T) {
 		},
 	}
 
-	env.OnActivity(da.FetchLatestDeployment, mock.Anything, fetchDeploymentRequest).Return(fetchDeploymentResponse, nil)
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, storeDeploymentRequest).Return(nil)
 
 	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
@@ -168,28 +162,13 @@ func TestDeployer_CompareCommit_DeployAhead(t *testing.T) {
 	latestDeployedRevision := &deployment.Info{
 		ID:       deploymentInfo.ID.String(),
 		Version:  1.0,
-		Revision: "3455",
+		Revision: "3255",
 		Root: deployment.Root{
 			Name: deploymentInfo.Root.Name,
 		},
 		Repo: deployment.Repo{
 			Owner: deploymentInfo.Repo.Owner,
 			Name:  deploymentInfo.Repo.Name,
-		},
-	}
-
-	fetchDeploymentRequest := activities.FetchLatestDeploymentRequest{
-		FullRepositoryName: repo.GetFullName(),
-		RootName:           deploymentInfo.Root.Name,
-	}
-
-	fetchDeploymentResponse := activities.FetchLatestDeploymentResponse{
-		DeploymentInfo: &deployment.Info{
-			Revision: latestDeployedRevision.Revision,
-			Repo: deployment.Repo{
-				Owner: deploymentInfo.Repo.Owner,
-				Name:  deploymentInfo.Repo.Name,
-			},
 		},
 	}
 
@@ -218,12 +197,12 @@ func TestDeployer_CompareCommit_DeployAhead(t *testing.T) {
 		CommitComparison: activities.DirectionAhead,
 	}
 
-	env.OnActivity(da.FetchLatestDeployment, mock.Anything, fetchDeploymentRequest).Return(fetchDeploymentResponse, nil)
 	env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, storeDeploymentRequest).Return(nil)
 
 	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
-		Info: deploymentInfo,
+		Info:         deploymentInfo,
+		LatestDeploy: latestDeployedRevision,
 	})
 
 	env.AssertExpectations(t)
@@ -232,7 +211,18 @@ func TestDeployer_CompareCommit_DeployAhead(t *testing.T) {
 	err := env.GetWorkflowResult(&resp)
 	assert.NoError(t, err)
 
-	assert.Equal(t, latestDeployedRevision, resp)
+	assert.Equal(t, &deployment.Info{
+		ID:       deploymentInfo.ID.String(),
+		Version:  1.0,
+		Revision: "3455",
+		Root: deployment.Root{
+			Name: deploymentInfo.Root.Name,
+		},
+		Repo: deployment.Repo{
+			Owner: deploymentInfo.Repo.Owner,
+			Name:  deploymentInfo.Repo.Name,
+		},
+	}, resp)
 }
 
 func TestDeployer_CompareCommit_SkipDeploy(t *testing.T) {
@@ -262,28 +252,13 @@ func TestDeployer_CompareCommit_SkipDeploy(t *testing.T) {
 	latestDeployedRevision := &deployment.Info{
 		ID:       deploymentInfo.ID.String(),
 		Version:  1.0,
-		Revision: "3455",
+		Revision: "3255",
 		Root: deployment.Root{
 			Name: deploymentInfo.Root.Name,
 		},
 		Repo: deployment.Repo{
 			Owner: deploymentInfo.Repo.Owner,
 			Name:  deploymentInfo.Repo.Name,
-		},
-	}
-
-	fetchDeploymentRequest := activities.FetchLatestDeploymentRequest{
-		FullRepositoryName: repo.GetFullName(),
-		RootName:           deploymentInfo.Root.Name,
-	}
-
-	fetchDeploymentResponse := activities.FetchLatestDeploymentResponse{
-		DeploymentInfo: &deployment.Info{
-			Revision: latestDeployedRevision.Revision,
-			Repo: deployment.Repo{
-				Owner: deploymentInfo.Repo.Owner,
-				Name:  deploymentInfo.Repo.Name,
-			},
 		},
 	}
 
@@ -309,12 +284,12 @@ func TestDeployer_CompareCommit_SkipDeploy(t *testing.T) {
 		ID: updateCheckRunRequest.ID,
 	}
 
-	env.OnActivity(da.FetchLatestDeployment, mock.Anything, fetchDeploymentRequest).Return(fetchDeploymentResponse, nil)
 	env.OnActivity(da.UpdateCheckRun, mock.Anything, updateCheckRunRequest).Return(updateCheckRunResponse, nil)
 	env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
 
 	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
-		Info: deploymentInfo,
+		Info:         deploymentInfo,
+		LatestDeploy: latestDeployedRevision,
 	})
 
 	env.AssertExpectations(t)
@@ -354,28 +329,13 @@ func TestDeployer_CompareCommit_DeployDiverged(t *testing.T) {
 	latestDeployedRevision := &deployment.Info{
 		ID:       deploymentInfo.ID.String(),
 		Version:  1.0,
-		Revision: "3455",
+		Revision: "3255",
 		Root: deployment.Root{
 			Name: deploymentInfo.Root.Name,
 		},
 		Repo: deployment.Repo{
 			Owner: deploymentInfo.Repo.Owner,
 			Name:  deploymentInfo.Repo.Name,
-		},
-	}
-
-	fetchDeploymentRequest := activities.FetchLatestDeploymentRequest{
-		FullRepositoryName: repo.GetFullName(),
-		RootName:           deploymentInfo.Root.Name,
-	}
-
-	fetchDeploymentResponse := activities.FetchLatestDeploymentResponse{
-		DeploymentInfo: &deployment.Info{
-			Revision: latestDeployedRevision.Revision,
-			Repo: deployment.Repo{
-				Owner: deploymentInfo.Repo.Owner,
-				Name:  deploymentInfo.Repo.Name,
-			},
 		},
 	}
 
@@ -404,12 +364,12 @@ func TestDeployer_CompareCommit_DeployDiverged(t *testing.T) {
 		CommitComparison: activities.DirectionDiverged,
 	}
 
-	env.OnActivity(da.FetchLatestDeployment, mock.Anything, fetchDeploymentRequest).Return(fetchDeploymentResponse, nil)
 	env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, storeDeploymentRequest).Return(nil)
 
 	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
-		Info: deploymentInfo,
+		Info:         deploymentInfo,
+		LatestDeploy: latestDeployedRevision,
 	})
 
 	env.AssertExpectations(t)
@@ -418,5 +378,16 @@ func TestDeployer_CompareCommit_DeployDiverged(t *testing.T) {
 	err := env.GetWorkflowResult(&resp)
 	assert.NoError(t, err)
 
-	assert.Equal(t, latestDeployedRevision, resp)
+	assert.Equal(t, &deployment.Info{
+		ID:       deploymentInfo.ID.String(),
+		Version:  1.0,
+		Revision: "3455",
+		Root: deployment.Root{
+			Name: deploymentInfo.Root.Name,
+		},
+		Repo: deployment.Repo{
+			Owner: deploymentInfo.Repo.Owner,
+			Name:  deploymentInfo.Repo.Name,
+		},
+	}, resp)
 }

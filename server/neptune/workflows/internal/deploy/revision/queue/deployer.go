@@ -35,13 +35,13 @@ type githubActivities interface {
 	UpdateCheckRun(ctx context.Context, request activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error)
 }
 
-type workerActivities interface {
+type deployerActivities interface {
 	dbActivities
 	githubActivities
 }
 
 type Deployer struct {
-	Activities              workerActivities
+	Activities              deployerActivities
 	TerraformWorkflowRunner terraformWorkflowRunner
 }
 
@@ -53,22 +53,14 @@ const (
 )
 
 func (p *Deployer) Deploy(ctx workflow.Context, requestedDeployment terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
-	latestDeployment, err := p.fetchLatestDeployment(ctx, requestedDeployment, latestDeployment)
+	commitDirection, err := p.getDeployRequestCommitDirection(ctx, requestedDeployment, latestDeployment)
 	if err != nil {
 		return nil, err
-	}
-	commitDirection := activities.DirectionAhead
-	// only fetch if last deployment exists
-	if latestDeployment != nil {
-		commitDirection, err = p.getDeployRequestCommitDirection(ctx, requestedDeployment, latestDeployment)
-		if err != nil {
-			return nil, err
-		}
 	}
 	switch commitDirection {
 	case activities.DirectionBehind:
 		// always returns error for caller to skip revision
-		if err = p.updateCheckRun(ctx, requestedDeployment, github.CheckRunFailure, DirectionBehindSummary, nil); err != nil {
+		if err := p.updateCheckRun(ctx, requestedDeployment, github.CheckRunFailure, DirectionBehindSummary, nil); err != nil {
 			return nil, errors.Wrap(err, "updating check run")
 		}
 
@@ -78,7 +70,7 @@ func (p *Deployer) Deploy(ctx workflow.Context, requestedDeployment terraformWor
 	if err != nil {
 		return nil, errors.Wrap(err, "running terraform workflow")
 	}
-	latestDeployment = p.buildLatestDeployment(requestedDeployment)
+	latestDeployment = requestedDeployment.BuildPersistableInfo()
 
 	// TODO: Persist deployment on shutdown if it fails instead of blocking
 	if err = p.persistLatestDeployment(ctx, latestDeployment); err != nil {
@@ -87,7 +79,23 @@ func (p *Deployer) Deploy(ctx workflow.Context, requestedDeployment terraformWor
 	return latestDeployment, nil
 }
 
+func (p *Deployer) FetchLatestDeployment(ctx workflow.Context, repoName, rootName string) (*deployment.Info, error) {
+	var resp activities.FetchLatestDeploymentResponse
+	err := workflow.ExecuteActivity(ctx, p.Activities.FetchLatestDeployment, activities.FetchLatestDeploymentRequest{
+		FullRepositoryName: repoName,
+		RootName:           rootName,
+	}).Get(ctx, &resp)
+	if err != nil {
+		return nil, errors.Wrap(err, "fetching latest deployment")
+	}
+	return resp.DeploymentInfo, nil
+}
+
 func (p *Deployer) getDeployRequestCommitDirection(ctx workflow.Context, deployRequest terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info) (activities.DiffDirection, error) {
+	// this means we are deploying this root for the first time
+	if latestDeployment == nil {
+		return activities.DirectionAhead, nil
+	}
 	var compareCommitResp activities.CompareCommitResponse
 	err := workflow.ExecuteActivity(ctx, p.Activities.CompareCommit, activities.CompareCommitRequest{
 		DeployRequestRevision:  deployRequest.Revision,
@@ -113,37 +121,6 @@ func (p *Deployer) updateCheckRun(ctx workflow.Context, deployRequest terraformW
 		Summary: summary,
 		Actions: actions,
 	}).Get(ctx, nil)
-}
-
-func (p *Deployer) fetchLatestDeployment(ctx workflow.Context, deploymentInfo terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
-	// Skip fetching latest deployment it it's already in memory
-	if latestDeployment != nil {
-		return latestDeployment, nil
-	}
-	var resp activities.FetchLatestDeploymentResponse
-	err := workflow.ExecuteActivity(ctx, p.Activities.FetchLatestDeployment, activities.FetchLatestDeploymentRequest{
-		FullRepositoryName: deploymentInfo.Repo.GetFullName(),
-		RootName:           deploymentInfo.Root.Name,
-	}).Get(ctx, &resp)
-	if err != nil {
-		return nil, errors.Wrap(err, "fetching latest deployment")
-	}
-	return resp.DeploymentInfo, nil
-}
-
-func (p *Deployer) buildLatestDeployment(deployRequest terraformWorkflow.DeploymentInfo) *deployment.Info {
-	return &deployment.Info{
-		Version:  deployment.InfoSchemaVersion,
-		ID:       deployRequest.ID.String(),
-		Revision: deployRequest.Revision,
-		Root: deployment.Root{
-			Name: deployRequest.Root.Name,
-		},
-		Repo: deployment.Repo{
-			Name:  deployRequest.Repo.Name,
-			Owner: deployRequest.Repo.Owner,
-		},
-	}
 }
 
 func (p *Deployer) persistLatestDeployment(ctx workflow.Context, deploymentInfo *deployment.Info) error {

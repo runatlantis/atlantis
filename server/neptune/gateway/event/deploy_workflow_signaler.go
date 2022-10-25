@@ -82,7 +82,14 @@ func (d *DeployWorkflowSignaler) SignalWithStartWorkflow(
 		},
 		options,
 		workflows.Deploy,
-		workflows.DeployRequest{},
+		workflows.DeployRequest{
+			Repo: workflows.DeployRequestRepo{
+				FullName: repo.FullName,
+			},
+			Root: workflows.DeployRequestRoot{
+				Name: rootCfg.Name,
+			},
+		},
 	)
 	return run, err
 }

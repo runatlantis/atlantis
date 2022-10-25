@@ -50,7 +50,14 @@ func TestDeployWorkflow(t *testing.T) {
 		signalWorkflow(env)
 	}, 5*time.Second)
 
-	env.ExecuteWorkflow(workflows.Deploy, workflows.DeployRequest{})
+	env.ExecuteWorkflow(workflows.Deploy, workflows.DeployRequest{
+		Root: workflows.DeployRequestRoot{
+			Name: "my test root",
+		},
+		Repo: workflows.DeployRequestRepo{
+			FullName: "nish/repo",
+		},
+	})
 	assert.NoError(t, env.GetWorkflowError())
 
 	// for now we just assert the correct number of updates were called.

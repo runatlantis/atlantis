@@ -143,7 +143,14 @@ func TestSignalWithStartWorkflow_Success(t *testing.T) {
 			expectedOptions: client.StartWorkflowOptions{
 				TaskQueue: workflows.DeployTaskQueue,
 			},
-			expectedWorkflowArgs: workflows.DeployRequest{},
+			expectedWorkflowArgs: workflows.DeployRequest{
+				Repo: workflows.DeployRequestRepo{
+					FullName: repoFullName,
+				},
+				Root: workflows.DeployRequestRoot{
+					Name: rootCfg.Name,
+				},
+			},
 		}
 		deploySignaler := event.DeployWorkflowSignaler{
 			TemporalClient: testSignaler,
@@ -205,7 +212,14 @@ func TestSignalWithStartWorkflow_Success(t *testing.T) {
 			expectedOptions: client.StartWorkflowOptions{
 				TaskQueue: workflows.DeployTaskQueue,
 			},
-			expectedWorkflowArgs: workflows.DeployRequest{},
+			expectedWorkflowArgs: workflows.DeployRequest{
+				Repo: workflows.DeployRequestRepo{
+					FullName: repoFullName,
+				},
+				Root: workflows.DeployRequestRoot{
+					Name: rootCfg.Name,
+				},
+			},
 		}
 		deploySignaler := event.DeployWorkflowSignaler{
 			TemporalClient: testSignaler,
@@ -285,8 +299,15 @@ func TestSignalWithStartWorkflow_Failure(t *testing.T) {
 		expectedOptions: client.StartWorkflowOptions{
 			TaskQueue: workflows.DeployTaskQueue,
 		},
-		expectedWorkflowArgs: workflows.DeployRequest{},
-		expectedErr:          expectedErr,
+		expectedWorkflowArgs: workflows.DeployRequest{
+			Repo: workflows.DeployRequestRepo{
+				FullName: repoFullName,
+			},
+			Root: workflows.DeployRequestRoot{
+				Name: rootCfg.Name,
+			},
+		},
+		expectedErr: expectedErr,
 	}
 	deploySignaler := event.DeployWorkflowSignaler{
 		TemporalClient: testSignaler,
