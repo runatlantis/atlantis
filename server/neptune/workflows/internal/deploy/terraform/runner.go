@@ -4,8 +4,17 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
+
+type PlanRejectionError struct {
+	msg string
+}
+
+func (e PlanRejectionError) Error() string {
+	return e.msg
+}
 
 type Workflow func(ctx workflow.Context, request terraform.Request) error
 
@@ -31,6 +40,11 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 	id := deploymentInfo.ID
 	ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 		WorkflowID: id.String(),
+		// we shouldn't ever percolate failures up unless they are user errors (aka. Terraform specific)
+		// retrying indefinitely allows us to fix whatever issue that comes about without involving the user to redeploy
+		RetryPolicy: &temporal.RetryPolicy{
+			NonRetryableErrorTypes: []string{terraform.TerraformClientErrorType, terraform.PlanRejectedErrorType},
+		},
 		SearchAttributes: map[string]interface{}{
 			"Repository": deploymentInfo.Repo.GetFullName(),
 			"Root":       deploymentInfo.Root.Name,
@@ -50,15 +64,14 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 }
 
 func (r *WorkflowRunner) awaitWorkflow(ctx workflow.Context, future workflow.ChildWorkflowFuture, deploymentInfo DeploymentInfo) error {
-	var childWE workflow.Execution
-	if err := future.GetChildWorkflowExecution().Get(ctx, &childWE); err != nil {
-		return errors.Wrap(err, "getting child workflow execution")
-	}
+	selector := workflow.NewNamedSelector(ctx, "TerraformChildWorkflow")
 
-	selector := workflow.NewSelector(ctx)
-
-	// our child workflow will signal us when there is a state change which we will
-	// handle accordingly
+	// our child workflow will signal us when there is a state change which we will handle accordingly.
+	// if for some reason the workflow is orphaned or we are retrying it independently, we have no way
+	// to really update the state since we won't be listening for that signal anymore
+	// we could have moved this to the main selector in the worker however we wouldn't always have this deployment info
+	// which is necessary for knowing which check run id to update.
+	// TODO: figure out how to solve this
 	ch := workflow.GetSignalChannel(ctx, state.WorkflowStateChangeSignal)
 	selector.AddReceive(ch, func(c workflow.ReceiveChannel, _ bool) {
 		r.StateReceiver.Receive(ctx, c, deploymentInfo)
@@ -78,8 +91,17 @@ func (r *WorkflowRunner) awaitWorkflow(ctx workflow.Context, future workflow.Chi
 		}
 	}
 
-	if err != nil {
-		return errors.Wrap(err, "executing terraform workflow")
+	// if we have an app error we should attempt to unwrap it's details into our own
+	// application error and act accordingly
+	var appErr *temporal.ApplicationError
+	if errors.As(err, &appErr) {
+		var underlyingErr terraform.ApplicationError
+		detailsErr := appErr.Details(&underlyingErr)
+
+		if detailsErr == nil && underlyingErr.ErrType == terraform.PlanRejectedErrorType {
+			return PlanRejectionError{msg: underlyingErr.Msg}
+		}
 	}
-	return nil
+
+	return errors.Wrap(err, "executing terraform workflow")
 }

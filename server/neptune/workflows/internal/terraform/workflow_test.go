@@ -2,6 +2,7 @@ package terraform_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 )
@@ -93,10 +95,16 @@ func (r *jobRunner) Plan(ctx workflow.Context, localRoot *terraformModel.LocalRo
 	return activities.TerraformPlanResponse{}, r.expectedError
 }
 
-type request struct{}
+type request struct {
+	// bool since our errors are not serializable using json
+	ShouldErrorDuringJobUpdate bool
+}
 
 type response struct {
-	States []state.Workflow
+	States           []state.Workflow
+	PlanRejected     bool
+	UpdateJobErrored bool
+	ClientErrored    bool
 }
 
 func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error) {
@@ -106,7 +114,11 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 
 	var gAct *githubActivities
 	var tAct *terraformActivities
-	runner := &jobRunner{}
+
+	var expectedError error
+	runner := &jobRunner{
+		expectedError: expectedError,
+	}
 
 	var s []state.Workflow
 
@@ -130,6 +142,10 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 			// add a notifier which just appends to a list which allows us to
 			// test every state change
 			func(st *state.Workflow) error {
+
+				if st.Plan.Status == state.InProgressJobStatus && req.ShouldErrorDuringJobUpdate {
+					return fmt.Errorf("some error")
+				}
 				// need to copy since its a pointer and will get mutated
 				s = append(s, copy(st))
 				return nil
@@ -138,12 +154,37 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 		),
 	}
 
+	var planRejected bool
+	var updateJobErr bool
 	if err := subject.Run(ctx); err != nil {
-		return nil, err
+
+		var appErr *temporal.ApplicationError
+		if errors.As(err, &appErr) {
+			var internalAppErr terraform.ApplicationError
+			e := appErr.Details(&internalAppErr)
+
+			if e != nil {
+				return nil, err
+			}
+
+			switch internalAppErr.ErrType {
+			case terraform.PlanRejectedErrorType:
+				planRejected = true
+			case terraform.UpdateJobErrorType:
+				updateJobErr = true
+			default:
+				return nil, err
+			}
+
+		}
 	}
 
 	return &response{
 		States: s,
+
+		// doing this so that we can still check states when we get this type of error
+		PlanRejected:     planRejected,
+		UpdateJobErrored: updateJobErr,
 	}, nil
 }
 
@@ -279,6 +320,51 @@ func TestSuccess(t *testing.T) {
 	}, resp.States)
 }
 
+func TestUpdateJobError(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	ga := &githubActivities{}
+	ta := &terraformActivities{}
+	env.RegisterActivity(ga)
+	env.RegisterActivity(ta)
+
+	outputURL, err := url.Parse("www.test.com/jobs/1235")
+	assert.NoError(t, err)
+
+	// set activity expectations
+	env.OnActivity(ga.FetchRoot, mock.Anything, activities.FetchRootRequest{
+		Repo:         testGithubRepo,
+		Root:         testLocalRoot.Root,
+		DeploymentID: testDeploymentID,
+	}).Return(activities.FetchRootResponse{
+		LocalRoot: testLocalRoot,
+	}, nil)
+
+	// execute workflow
+	env.ExecuteWorkflow(testTerraformWorkflow, request{
+		ShouldErrorDuringJobUpdate: true,
+	})
+	assert.True(t, env.IsWorkflowCompleted())
+
+	var resp response
+	err = env.GetWorkflowResult(&resp)
+	assert.NoError(t, err)
+
+	// assert results are expected
+	env.AssertExpectations(t)
+	assert.True(t, resp.UpdateJobErrored)
+	assert.Equal(t, []state.Workflow{
+		{
+			Plan: &state.Job{
+				Status: state.WaitingJobStatus,
+				Output: &state.JobOutput{
+					URL: outputURL,
+				},
+			},
+		},
+	}, resp.States)
+}
+
 func TestPlanRejection(t *testing.T) {
 	var suite testsuite.WorkflowTestSuite
 	env := suite.NewTestWorkflowEnvironment()
@@ -316,6 +402,7 @@ func TestPlanRejection(t *testing.T) {
 
 	// assert results are expected
 	env.AssertExpectations(t)
+	assert.True(t, resp.PlanRejected)
 	assert.Equal(t, []state.Workflow{
 		{
 			Plan: &state.Job{

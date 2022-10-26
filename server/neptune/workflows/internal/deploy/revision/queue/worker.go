@@ -157,21 +157,22 @@ func (w *Worker) Work(ctx workflow.Context) {
 			return
 		}
 
-		// from here on we know that we've processed an item so let's ensure we're adding an await future
-		// back to our selector regardless of the outcome
-		// Note: for validation errors we don't want to track this as a deploy
-		if e, ok := err.(*ValidationError); ok {
-			logger.Error(ctx, "deploy validation failed, moving on to next one", "err", e)
+		// since there was no error we can safely count this as our latest deploy
+		if err == nil {
+			w.latestDeployment = currentDeployment
 			selector.AddFuture(w.awaitWork(ctx), callback)
 			continue
 		}
 
-		if err != nil {
-			logger.Error(ctx, "failed to process revision, moving to next one", "err", err)
+		switch e := err.(type) {
+		case *ValidationError:
+			logger.Error(ctx, "deploy validation failed, moving to next one", "err", e)
+		case terraform.PlanRejectionError:
+			logger.Warn(ctx, "Plan rejected")
+		default:
+			logger.Error(ctx, "failed to deploy revision, moving to next one", "err", err)
 		}
 
-		// we assume that regardless of error we should count this as a deploy
-		w.latestDeployment = currentDeployment
 		selector.AddFuture(w.awaitWork(ctx), callback)
 	}
 }
