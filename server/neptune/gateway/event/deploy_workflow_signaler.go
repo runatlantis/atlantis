@@ -36,7 +36,13 @@ func (d *DeployWorkflowSignaler) SignalWithStartWorkflow(
 	sender models.User,
 	trigger workflows.Trigger) (client.WorkflowRun, error) {
 
-	options := client.StartWorkflowOptions{TaskQueue: workflows.DeployTaskQueue}
+	options := client.StartWorkflowOptions{
+		TaskQueue: workflows.DeployTaskQueue,
+		SearchAttributes: map[string]interface{}{
+			"Repository": repo.FullName,
+			"Root":       rootCfg.Name,
+		},
+	}
 
 	var tfVersion string
 	if rootCfg.TerraformVersion != nil {

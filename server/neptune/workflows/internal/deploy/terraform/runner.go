@@ -31,6 +31,12 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 	id := deploymentInfo.ID
 	ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 		WorkflowID: id.String(),
+		SearchAttributes: map[string]interface{}{
+			"Repository": deploymentInfo.Repo.GetFullName(),
+			"Root":       deploymentInfo.Root.Name,
+			"Trigger":    deploymentInfo.Root.Trigger,
+			"Revision":   deploymentInfo.Revision,
+		},
 	})
 	terraformWorkflowRequest := terraform.Request{
 		Root:         deploymentInfo.Root,
