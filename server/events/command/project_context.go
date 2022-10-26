@@ -96,7 +96,12 @@ type ProjectContext struct {
 // SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
 // instead of a pointer since we want scopes to mirror our function stack
 func (p ProjectContext) SetScope(scope string) {
-	p.Scope = p.Scope.SubScope(scope) //nolint
+	p.Scope = p.Scope.SubScope(scope).Tagged(map[string]string{
+		"workspace":         p.Workspace,
+		"terraform_version": p.TerraformVersion.String(),
+		"project":           p.ProjectName,
+		"project_path":      p.RepoRelDir,
+	}) //nolint
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
