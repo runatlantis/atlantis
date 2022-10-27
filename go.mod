@@ -27,7 +27,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.21
 	github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/moby/moby v20.10.19+incompatible
+	github.com/moby/moby v20.10.20+incompatible
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 	github.com/nlopes/slack v0.4.0
 	github.com/petergtz/pegomock v2.9.0+incompatible
