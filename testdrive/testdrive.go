@@ -173,6 +173,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	// will just choose a random API port and we won't be able to get the right
 	// url.
 	ngrokConfig := fmt.Sprintf(`
+version: 1
 web_addr: %s
 tunnels:
   atlantis:
@@ -181,7 +182,7 @@ tunnels:
     proto: http
 `, ngrokAPIURL, atlantisPort)
 
-	ngrokConfigFile, err := os.CreateTemp("", "")
+	ngrokConfigFile, err := os.CreateTemp("", "atlantis-testdrive-ngrok-config")
 	if err != nil {
 		return errors.Wrap(err, "creating ngrok config file")
 	}
