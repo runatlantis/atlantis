@@ -421,6 +421,7 @@ Or a custom command
 
 ::: tip Notes
 * `run` steps in the main `workflow` are executed with the following environment variables:
+*  note: these variables are not available to `pre` or `post` workflows
   * `WORKSPACE` - The Terraform workspace used for this project, ex. `default`.
     * NOTE: if the step is executed before `init` then Atlantis won't have switched to this workspace yet.
   * `ATLANTIS_TERRAFORM_VERSION` - The version of Terraform used for this project, ex. `0.11.0`.
