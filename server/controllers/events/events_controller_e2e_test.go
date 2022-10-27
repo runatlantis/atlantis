@@ -653,6 +653,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		ExpAutomerge bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
 		ExpAutoplan bool
+		// ExpQuietPolicyChecks is true if we expect Atlantis to exclude policy check output
+		// when there's no error
+		ExpQuietPolicyChecks bool
+		// ExpQuietPolicyCheckFailure is true when we expect Atlantis to post back policy check failures
+		// even when QuietPolicyChecks is enabled
+		ExpQuietPolicyCheckFailure bool
 		// ExpParallel is true if we expect Atlantis to run parallel plans or applies.
 		ExpParallel bool
 		// ExpReplies is a list of files containing the expected replies that
@@ -737,6 +743,38 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:          "successful policy checks with quiet flag enabled",
+			RepoDir:              "policy-checks-success-silent",
+			ModifiedFiles:        []string{"main.tf"},
+			ExpAutoplan:          true,
+			ExpQuietPolicyChecks: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:                "failing policy checks with quiet flag enabled",
+			RepoDir:                    "policy-checks",
+			ModifiedFiles:              []string{"main.tf"},
+			ExpAutoplan:                true,
+			ExpQuietPolicyChecks:       true,
+			ExpQuietPolicyCheckFailure: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -746,6 +784,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// reset userConfig
 			userConfig = server.UserConfig{}
 			userConfig.EnablePolicyChecksFlag = true
+			userConfig.QuietPolicyChecks = c.ExpQuietPolicyChecks
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 
@@ -803,6 +842,10 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			if c.ExpAutomerge {
 				expNumReplies++
+			}
+
+			if c.ExpQuietPolicyChecks && !c.ExpQuietPolicyCheckFailure {
+				expNumReplies--
 			}
 
 			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString()).GetAllCapturedArguments()
@@ -1008,6 +1051,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		projectCommandRunner,
 		parallelPoolSize,
 		false,
+		userConfig.QuietPolicyChecks,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(

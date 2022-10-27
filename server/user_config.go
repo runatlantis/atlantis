@@ -55,6 +55,7 @@ type UserConfig struct {
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
 	Port                            int    `mapstructure:"port"`
+	QuietPolicyChecks               bool   `mapstructure:"quiet-policy-checks"`
 	RedisDB                         int    `mapstructure:"redis-db"`
 	RedisHost                       string `mapstructure:"redis-host"`
 	RedisPassword                   string `mapstructure:"redis-password"`

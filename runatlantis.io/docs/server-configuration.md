@@ -468,6 +468,12 @@ Values are chosen in this order:
   ```
   Port to bind to. Defaults to `4141`.
 
+### `--quiet-policy-checks`
+  ```bash
+  atlantis server --quiet-policy-checks
+  ```
+  Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
+
 ### `--redis-host`
   ```bash
   atlantis server --redis-host="localhost"
