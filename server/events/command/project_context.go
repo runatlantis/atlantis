@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -96,11 +97,17 @@ type ProjectContext struct {
 // SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
 // instead of a pointer since we want scopes to mirror our function stack
 func (p ProjectContext) SetScope(scope string) {
+	v := ""
+	if p.TerraformVersion != nil {
+		v = p.TerraformVersion.String()
+	}
 	p.Scope = p.Scope.SubScope(scope).Tagged(map[string]string{
-		"workspace":         p.Workspace,
-		"terraform_version": p.TerraformVersion.String(),
+		"base_repo":         p.BaseRepo.FullName,
+		"pr_number":         strconv.Itoa(p.Pull.Num),
 		"project":           p.ProjectName,
 		"project_path":      p.RepoRelDir,
+		"terraform_version": v,
+		"workspace":         p.Workspace,
 	}) //nolint
 }
 
