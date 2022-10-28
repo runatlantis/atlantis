@@ -101,14 +101,14 @@ func (p ProjectContext) SetScope(scope string) {
 	if p.TerraformVersion != nil {
 		v = p.TerraformVersion.String()
 	}
-	p.Scope = p.Scope.SubScope(scope).Tagged(map[string]string{
+	p.Scope = p.Scope.SubScope(scope).Tagged(map[string]string{ //nolint
 		"base_repo":         p.BaseRepo.FullName,
 		"pr_number":         strconv.Itoa(p.Pull.Num),
 		"project":           p.ProjectName,
 		"project_path":      p.RepoRelDir,
 		"terraform_version": v,
 		"workspace":         p.Workspace,
-	}) //nolint
+	})
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
