@@ -22,7 +22,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-getter v1.6.2
 	github.com/hashicorp/go-version v1.6.0
-	github.com/hashicorp/terraform-config-inspect v0.0.0-20200806211835-c481b8bfa41e
+	github.com/hashicorp/terraform-config-inspect v0.0.0-20221012204812-413b69327090
 	github.com/mcdafydd/go-azuredevops v0.12.1
 	github.com/microcosm-cc/bluemonday v1.0.21
 	github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
