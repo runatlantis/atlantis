@@ -49,11 +49,19 @@ type UserConfig struct {
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
+	LockingDBType                   string `mapstructure:"locking-db-type"`
 	LogLevel                        string `mapstructure:"log-level"`
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
 	Port                            int    `mapstructure:"port"`
+	QuietPolicyChecks               bool   `mapstructure:"quiet-policy-checks"`
+	RedisDB                         int    `mapstructure:"redis-db"`
+	RedisHost                       string `mapstructure:"redis-host"`
+	RedisPassword                   string `mapstructure:"redis-password"`
+	RedisPort                       int    `mapstructure:"redis-port"`
+	RedisTLSEnabled                 bool   `mapstructure:"redis-tls-enabled"`
+	RedisInsecureSkipVerify         bool   `mapstructure:"redis-insecure-skip-verify"`
 	RepoConfig                      string `mapstructure:"repo-config"`
 	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
 	RepoAllowlist                   string `mapstructure:"repo-allowlist"`

@@ -21,8 +21,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/runatlantis/atlantis/server/core/db"
-
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
@@ -54,7 +52,7 @@ type PullClosedExecutor struct {
 	VCSClient                vcs.Client
 	WorkingDir               WorkingDir
 	Logger                   logging.SimpleLogging
-	DB                       *db.BoltDB
+	Backend                  locking.Backend
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
 }
@@ -81,7 +79,7 @@ func (t *PullClosedEventTemplate) Execute(wr io.Writer, data interface{}) error 
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
-	pullStatus, err := p.DB.GetPullStatus(pull)
+	pullStatus, err := p.Backend.GetPullStatus(pull)
 	if err != nil {
 		// Log and continue to clean up other resources.
 		p.Logger.Err("retrieving pull status: %s", err)
@@ -112,7 +110,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	}
 
 	// Delete pull from DB.
-	if err := p.DB.DeletePullStatus(pull); err != nil {
+	if err := p.Backend.DeletePullStatus(pull); err != nil {
 		p.Logger.Err("deleting pull from db: %s", err)
 	}
 

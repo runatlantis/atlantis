@@ -114,6 +114,10 @@ the Atlantis user needs to be part of that list in order for it to consider
 a pull request mergeable.
 :::
 
+::: warning
+If you set `atlantis/apply` to the mergeable requirement, use the `--gh-allow-mergeable-bypass-apply` flag or set the `ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY=true` environment variable. This flag and environment variable allow the mergeable check before executing `atlantis apply` to skip checking the status of `atlantis/apply`.
+:::
+
 #### GitLab
 For GitLab, a merge request will be merged if there are no conflicts, no unresolved discussions if it is a project requirement and if all necessary approvers have approved the pull request.
 

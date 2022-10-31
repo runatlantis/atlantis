@@ -134,6 +134,12 @@ Values are chosen in this order:
   * Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
     * `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
 
+### `--azuredevops-hostname`
+  ```bash
+  atlantis server --azuredevops-hostname="dev.azure.com"
+  ```
+  Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
+
 ### `--azuredevops-webhook-password`
   ```bash
   atlantis server --azuredevops-webhook-password="password123"
@@ -253,6 +259,12 @@ Values are chosen in this order:
   ```
   Disable atlantis auto planning
 
+### `--disable-markdown-folding`
+  ```bash
+  atlantis server --disable-markdown-folding
+  ```
+  Disable folding in markdown output.
+
 ### `--disable-repo-locking`
   ```bash
   atlantis server --disable-repo-locking
@@ -283,13 +295,13 @@ Values are chosen in this order:
   ```
   Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 
-  Useful to enable for use with Github.
+  Useful to enable for use with GitHub.
 
 ### `--gh-hostname`
   ```bash
   atlantis server --gh-hostname="my.github.enterprise.com"
   ```
-  Hostname of your GitHub Enterprise installation. If using [Github.com](https://github.com),
+  Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
   don't set. Defaults to `github.com`.
 
 ### `--gh-token`
@@ -323,7 +335,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-org="myorgname"
   ```
-  GitHub organization name. Set to enable creating a private Github app for this organization.
+  GitHub organization name. Set to enable creating a private GitHub app for this organization.
 
 ### `--gh-app-id`
   ```bash
@@ -347,6 +359,12 @@ Values are chosen in this order:
   After which Atlantis will display your new app's credentials: your app's ID, its generated `--gh-webhook-secret` and the contents of the file for `--gh-app-key-file`. Update your Atlantis config accordingly, and restart the server.
   :::
 
+### `--gh-app-slug`
+  ```bash
+  atlantis server --gh-app-slug="myappslug"
+  ```
+  A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`.
+
 ### `--gh-app-key-file`
   ```bash
   atlantis server --gh-app-key-file="path/to/app-key.pem"
@@ -369,7 +387,7 @@ Values are chosen in this order:
   ```
   Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
 
-- ### `--gh-allow-mergeable-bypass-apply`
+### `--gh-allow-mergeable-bypass-apply`
   ```bash
   atlantis server --gh-allow-mergeable-bypass-apply
   ```
@@ -422,6 +440,16 @@ Values are chosen in this order:
   Hide previous plan comments to declutter PRs. This is only supported in
   GitHub currently.
 
+### `--locking-db-type`
+  ```bash
+  atlantis server --locking-db-type="<boltdb|redis>"
+  ```
+  The locking database type to use for storing plan and apply locks. Defaults to `boltdb`.
+
+  Notes:
+  * If set to `boltdb`, only one process may have access to the boltdb instance.
+  * If set to `redis`, then `--redis-host`, `--redis-port`, and `--redis-password` must be set.
+
 ### `--log-level`
   ```bash
   atlantis server --log-level="<debug|info|warn|error>"
@@ -439,6 +467,52 @@ Values are chosen in this order:
   atlantis server --port=8080
   ```
   Port to bind to. Defaults to `4141`.
+
+### `--quiet-policy-checks`
+  ```bash
+  atlantis server --quiet-policy-checks
+  ```
+  Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
+
+### `--redis-host`
+  ```bash
+  atlantis server --redis-host="localhost"
+  ```
+  The Redis Hostname for when using a Locking DB type of `redis`.
+
+### `--redis-password`
+  ```bash
+  atlantis server --redis-password="password123"
+  ```
+  The Redis Password for when using a Locking DB type of `redis`.
+
+### `--redis-port`
+  ```bash
+  atlantis server --redis-port=6379
+  ```
+  The Redis Port for when using a Locking DB type of `redis`. Defaults to `6379`.
+
+### `--redis-db`
+  ```bash
+  atlantis server --redis-db=0
+  ```
+  The Redis Database to use when using a Locking DB type of `redis`. Defaults to `0`.
+
+### `--redis-tls-enabled`
+  ```bash
+  atlantis server --redis-tls-enabled=false
+  ```
+  Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
+
+### `--redis-insecure-skip-verify`
+  ```bash
+  atlantis server --redis-insecure-skip-verify=false
+  ```
+  Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate. Defaults to `false`.
+
+  ::: warning SECURITY WARNING
+  If this is enabled, TLS is susceptible to machine-in-the-middle attacks unless custom verification is used.
+  :::
 
 ### `--repo-config`
   ```bash
@@ -555,6 +629,7 @@ Values are chosen in this order:
 ### `--silence-whitelist-errors`
   <Badge text="Deprecated" type="warn"/>
   Deprecated for `--silence-allowlist-errors`.
+
 ### `--silence-allowlist-errors`
   ```bash
   atlantis server --silence-allowlist-errors
@@ -674,3 +749,21 @@ Values are chosen in this order:
   ::: warning SECURITY WARNING
   This does write secrets to disk and should only be enabled in a secure environment.
   :::
+
+### `--web-basic-auth`
+  ```bash
+  atlantis server --web-basic-auth
+  ```
+  Enable Basic Authentication on the Atlantis web service.
+
+### `--web-username`
+  ```bash
+  atlantis server --web-username="atlantis"
+  ```
+  Username used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--web-password`
+  ```bash
+  atlantis server --web-password="atlantis"
+  ```
+  Password used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.

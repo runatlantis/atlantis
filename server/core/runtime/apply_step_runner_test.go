@@ -2,7 +2,6 @@ package runtime_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,7 +52,7 @@ func TestRun_Success(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
-	err := ioutil.WriteFile(planPath, nil, 0600)
+	err := os.WriteFile(planPath, nil, 0600)
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
 		Log:                logger,
@@ -84,7 +83,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "projectname-default.tfplan")
-	err := ioutil.WriteFile(planPath, nil, 0600)
+	err := os.WriteFile(planPath, nil, 0600)
 
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{

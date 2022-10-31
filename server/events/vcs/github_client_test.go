@@ -268,11 +268,6 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 				w.Write([]byte(issueResp)) // nolint: errcheck
 				return
 			case "POST /api/graphql":
-				if accept, has := r.Header["Accept"]; !has || accept[0] != "application/vnd.github.queen-beryl-preview+json" {
-					t.Error("missing preview header")
-					http.Error(w, "bad request", http.StatusBadRequest)
-					return
-				}
 				defer r.Body.Close() // nolint: errcheck
 				body, err := io.ReadAll(r.Body)
 				if err != nil {
@@ -569,6 +564,157 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{}, logging.NewNoopLogger(t))
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			actMergeable, err := client.PullIsMergeable(models.Repo{
+				FullName:          "owner/repo",
+				Owner:             "owner",
+				Name:              "repo",
+				CloneURL:          "",
+				SanitizedCloneURL: "",
+				VCSHost: models.VCSHost{
+					Type:     models.Github,
+					Hostname: "github.com",
+				},
+			}, models.PullRequest{
+				Num: 1,
+			}, vcsStatusName)
+			Ok(t, err)
+			Equals(t, c.expMergeable, actMergeable)
+		})
+	}
+}
+
+func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
+	vcsStatusName := "atlantis"
+	cases := []struct {
+		state          string
+		reviewDecision string
+		expMergeable   bool
+	}{
+		{
+			"dirty",
+			`"REVIEW_REQUIRED"`,
+			false,
+		},
+		{
+			"unknown",
+			`"REVIEW_REQUIRED"`,
+			false,
+		},
+		{
+			"blocked",
+			`"REVIEW_REQUIRED"`,
+			false,
+		},
+		{
+			"blocked",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"null",
+			true,
+		},
+		{
+			"behind",
+			`"REVIEW_REQUIRED"`,
+			false,
+		},
+		{
+			"random",
+			`"REVIEW_REQUIRED"`,
+			false,
+		},
+		{
+			"unstable",
+			`"REVIEW_REQUIRED"`,
+			true,
+		},
+		{
+			"has_hooks",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"clean",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"",
+			`"APPROVED"`,
+			false,
+		},
+	}
+
+	// Use a real GitHub json response and edit the mergeable_state field.
+	jsBytes, err := os.ReadFile("fixtures/github-pull-request.json")
+	Ok(t, err)
+	prJSON := string(jsBytes)
+
+	// Status Check Response
+	jsBytes, err = os.ReadFile("fixtures/github-commit-status-full.json")
+	Ok(t, err)
+	commitJSON := string(jsBytes)
+
+	// Branch protection Response
+	jsBytes, err = os.ReadFile("fixtures/github-branch-protection-required-checks.json")
+	Ok(t, err)
+	branchProtectionJSON := string(jsBytes)
+
+	// List check suites Response
+	jsBytes, err = os.ReadFile("fixtures/github-commit-check-suites.json")
+	Ok(t, err)
+	checkSuites := string(jsBytes)
+
+	for _, c := range cases {
+		t.Run(c.state, func(t *testing.T) {
+			response := strings.Replace(prJSON,
+				`"mergeable_state": "clean"`,
+				fmt.Sprintf(`"mergeable_state": "%s"`, c.state),
+				1,
+			)
+
+			// reviewDecision Response
+			reviewDecision := fmt.Sprintf(`{
+				"data": {
+					"repository": {
+						"pullRequest": {
+							"reviewDecision": %s
+						}
+					}
+				}
+			}`, c.reviewDecision)
+
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v3/repos/owner/repo/pulls/1":
+						w.Write([]byte(response)) // nolint: errcheck
+						return
+					case "/api/v3/repos/owner/repo/pulls/1/reviews?per_page=300":
+						w.Write([]byte("[]")) // nolint: errcheck
+						return
+					case "/api/v3/repos/owner/repo/commits/new-topic/status":
+						w.Write([]byte(commitJSON)) // nolint: errcheck
+					case "/api/graphql":
+						w.Write([]byte(reviewDecision)) // nolint: errcheck
+					case "/api/v3/repos/owner/repo/branches/master/protection":
+						w.Write([]byte(branchProtectionJSON)) // nolint: errcheck
+					case "/api/v3/repos/owner/repo/commits/new-topic/check-suites":
+						w.Write([]byte(checkSuites)) // nolint: errcheck
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{AllowMergeableBypassApply: true}, logging.NewNoopLogger(t))
 			Ok(t, err)
 			defer disableSSLVerification()()
 

@@ -35,6 +35,7 @@ import (
 	cfg "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/redis"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
@@ -397,18 +398,33 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		EnableDiffMarkdownFormat: userConfig.EnableDiffMarkdownFormat,
 	}
 
-	boltdb, err := db.New(userConfig.DataDir)
-	if err != nil {
-		return nil, err
-	}
 	var lockingClient locking.Locker
 	var applyLockingClient locking.ApplyLocker
+	var backend locking.Backend
+
+	switch dbtype := userConfig.LockingDBType; dbtype {
+	case "redis":
+		logger.Info("Utilizing Redis DB")
+		backend, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
+		if err != nil {
+			return nil, err
+		}
+	case "boltdb":
+		logger.Info("Utilizing BoltDB")
+		backend, err = db.New(userConfig.DataDir)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if userConfig.DisableRepoLocking {
+		logger.Info("Repo Locking is disabled")
 		lockingClient = locking.NewNoOpLocker()
 	} else {
-		lockingClient = locking.NewClient(boltdb)
+		lockingClient = locking.NewClient(backend)
 	}
-	applyLockingClient = locking.NewApplyClient(boltdb, userConfig.DisableApply)
+
+	applyLockingClient = locking.NewApplyClient(backend, userConfig.DisableApply)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
@@ -437,7 +453,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:           logger,
 		WorkingDir:       workingDir,
 		WorkingDirLocker: workingDirLocker,
-		DB:               boltdb,
+		Backend:          backend,
 	}
 
 	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
@@ -447,7 +463,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
 			Logger:                   logger,
-			DB:                       boltdb,
+			Backend:                  backend,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 			VCSClient:                vcsClient,
@@ -575,7 +591,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	dbUpdater := &events.DBUpdater{
-		DB: boltdb,
+		Backend: backend,
 	}
 
 	pullUpdater := &events.PullUpdater{
@@ -605,6 +621,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		instrumentedProjectCmdRunner,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceVCSStatusNoProjects,
+		userConfig.QuietPolicyChecks,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
@@ -622,7 +639,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		autoMerger,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
-		boltdb,
+		backend,
+		lockingClient,
 	)
 
 	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
@@ -636,7 +654,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		boltdb,
+		backend,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
@@ -703,7 +721,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              boltdb,
+		PullStatusFetcher:              backend,
 		TeamAllowlistChecker:           githubTeamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 	}
@@ -721,7 +739,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockDetailTemplate: templates.LockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
-		DB:                 boltdb,
+		Backend:            backend,
 		DeleteLockCommand:  deleteLockCommand,
 	}
 
@@ -737,7 +755,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		ProjectJobsTemplate:      templates.ProjectJobsTemplate,
 		ProjectJobsErrorTemplate: templates.ProjectJobsErrorTemplate,
-		Db:                       boltdb,
+		Backend:                  backend,
 		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
