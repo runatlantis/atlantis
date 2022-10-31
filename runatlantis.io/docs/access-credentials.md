@@ -70,6 +70,8 @@ Only a single installation per GitHub App is supported at the moment.
 - Give the token **Read** Project permissions and **Write** Pull request permissions
 - Click **Create** and record the access token
 
+  NOTE: Atlantis will send the token as a [Bearer Auth to the Bitbucket API](https://confluence.atlassian.com/bitbucketserver/http-access-tokens-939515499.html#HTTPaccesstokens-UsingHTTPaccesstokens) instead of using Basic Auth.
+
 ### Azure DevOps
 - Create a Personal access token by following [https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops)
 - Label the password "atlantis"
