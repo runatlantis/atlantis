@@ -45,12 +45,6 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 		RetryPolicy: &temporal.RetryPolicy{
 			NonRetryableErrorTypes: []string{terraform.TerraformClientErrorType, terraform.PlanRejectedErrorType},
 		},
-		SearchAttributes: map[string]interface{}{
-			"Repository": deploymentInfo.Repo.GetFullName(),
-			"Root":       deploymentInfo.Root.Name,
-			"Trigger":    deploymentInfo.Root.Trigger,
-			"Revision":   deploymentInfo.Revision,
-		},
 	})
 	terraformWorkflowRequest := terraform.Request{
 		Root:         deploymentInfo.Root,

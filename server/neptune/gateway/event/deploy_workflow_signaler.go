@@ -38,10 +38,6 @@ func (d *DeployWorkflowSignaler) SignalWithStartWorkflow(
 
 	options := client.StartWorkflowOptions{
 		TaskQueue: workflows.DeployTaskQueue,
-		SearchAttributes: map[string]interface{}{
-			"Repository": repo.FullName,
-			"Root":       rootCfg.Name,
-		},
 	}
 
 	var tfVersion string
