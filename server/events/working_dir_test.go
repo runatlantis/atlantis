@@ -38,7 +38,7 @@ func TestClone_NoneExisting(t *testing.T) {
 
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
-		GlobalCfg:                   valid.NewGlobalCfg(),
+		GlobalCfg:                   valid.NewGlobalCfg("somedir"),
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 
@@ -86,7 +86,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg("somedir")
 	globalCfg.Repos[0].CheckoutStrategy = "merge"
 
 	wd := &events.FileWorkspace{
@@ -139,7 +139,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	defer cleanup2()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg("somedir")
 	globalCfg.Repos[0].CheckoutStrategy = "merge"
 
 	baseRepo := NewBaseRepo()
@@ -195,7 +195,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	defer cleanup2()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg("somedir")
 	globalCfg.Repos[0].CheckoutStrategy = "merge"
 
 	wd := &events.FileWorkspace{
@@ -256,7 +256,7 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 	defer cleanup2()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg("somedir")
 	globalCfg.Repos[0].CheckoutStrategy = "merge"
 
 	wd := &events.FileWorkspace{
@@ -300,7 +300,7 @@ func TestClone_NoReclone(t *testing.T) {
 
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
-		GlobalCfg:                   valid.NewGlobalCfg(),
+		GlobalCfg:                   valid.NewGlobalCfg("somedir"),
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 
@@ -337,7 +337,7 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
-		GlobalCfg:                   valid.NewGlobalCfg(),
+		GlobalCfg:                   valid.NewGlobalCfg("somedir"),
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 	cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopCtxLogger(t), models.Repo{}, models.PullRequest{
@@ -404,7 +404,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	runCmd(t, repoDir, "mkdir", "-p", repoPath)
 	runCmd(t, repoDir, "cp", "-R", secondPRDir, repoPath+"default")
 
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg("somedir")
 	globalCfg.Repos[0].CheckoutStrategy = "merge"
 
 	// Run the clone.
@@ -483,7 +483,7 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	// "git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
 	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
 
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg("somedir")
 	globalCfg.Repos[0].CheckoutStrategy = "merge"
 
 	// Run the clone.

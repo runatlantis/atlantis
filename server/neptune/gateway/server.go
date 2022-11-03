@@ -98,7 +98,7 @@ func NewServer(config Config) (*Server, error) {
 		return nil, err
 	}
 
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg(config.DataDir)
 	validator := &cfgParser.ParserValidator{}
 	if config.RepoConfig != "" {
 		globalCfg, err = validator.ParseGlobalCfg(config.RepoConfig, globalCfg)

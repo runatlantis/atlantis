@@ -32,35 +32,49 @@ func NewClient(storeConfig valid.StoreConfig) (*Client, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "intializing stow client")
 	}
+	container, err := getContainer(location, storeConfig.ContainerName, storeConfig.BackendType)
 
+	if err != nil {
+		return nil, errors.Wrap(err, "getting container from location")
+	}
 	return &Client{
-		Location:      location,
-		ContainerName: storeConfig.ContainerName,
-		Prefix:        storeConfig.Prefix,
+		Container: container,
+		Prefix:    storeConfig.Prefix,
 	}, nil
 }
 
-type containerResolver interface {
-	Container(id string) (stow.Container, error)
+func getContainer(location stow.Location, name string, backendType valid.BackendType) (stow.Container, error) {
+	// for local backends, we might need to create the container
+	switch backendType {
+	case valid.LocalBackend:
+		return createLocalContainer(location, name)
+	default:
+		return location.Container(name)
+	}
+}
+
+func createLocalContainer(location stow.Location, name string) (stow.Container, error) {
+	c, err := location.Container(name)
+
+	if err != nil {
+		c, err = location.CreateContainer(name)
+		if err != nil {
+			return nil, errors.Wrap(err, "creating local container")
+		}
+	}
+
+	return c, nil
 }
 
 type Client struct {
-	Location      containerResolver
-	ContainerName string
-	Prefix        string
+	Container stow.Container
+	Prefix    string
 }
 
 // Return custom errors for the caller to be able to distinguish when container is not found vs item is not found
 func (c *Client) Get(ctx context.Context, key string) (io.ReadCloser, error) {
-	container, err := c.Location.Container(c.ContainerName)
-	if err != nil {
-		return nil, &ContainerNotFoundError{
-			Err: err,
-		}
-	}
-
 	key = c.addPrefix(key)
-	item, err := container.Item(key)
+	item, err := c.Container.Item(key)
 	if err != nil {
 		if errors.Is(err, stow.ErrNotFound) {
 			return nil, &ItemNotFoundError{
@@ -79,13 +93,8 @@ func (c *Client) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 }
 
 func (c *Client) Set(ctx context.Context, key string, object []byte) error {
-	container, err := c.Location.Container(c.ContainerName)
-	if err != nil {
-		return errors.Wrap(err, "resolving container")
-	}
-
 	key = c.addPrefix(key)
-	_, err = container.Put(key, bytes.NewReader(object), int64(len(object)), nil)
+	_, err := c.Container.Put(key, bytes.NewReader(object), int64(len(object)), nil)
 	if err != nil {
 		return errors.Wrap(err, "writing to container")
 	}

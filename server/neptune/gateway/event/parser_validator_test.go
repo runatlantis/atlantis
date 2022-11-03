@@ -1059,7 +1059,7 @@ workflows:
 	assert.NoError(t, err)
 
 	r := event.ParserValidator{
-		GlobalCfg: valid.NewGlobalCfg(),
+		GlobalCfg: valid.NewGlobalCfg("somedir"),
 	}
 
 	_, err = r.ParseRepoCfg(tmpDir, "repo_id")

@@ -19,6 +19,7 @@ services:
         volumes:
             - ~/.ssh:/.ssh
             - ./:/atlantis/src
+            - /tmp:/tmp
         # Contains the flags that atlantis uses in env var form
         env_file:
             - ~/.atlantis-gateway.env
@@ -31,6 +32,7 @@ services:
         volumes:
             - ~/.ssh:/.ssh
             - ./:/atlantis/src
+            - /tmp:/tmp
         # Contains the flags that atlantis uses in env var form
         env_file:
             - ~/.atlantis-temporalworker.env

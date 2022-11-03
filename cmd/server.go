@@ -490,7 +490,7 @@ func (t *TemporalWorker) NewServer(userConfig server.UserConfig, config server.C
 		return nil, errors.Wrap(err, "failed to build context logger")
 	}
 
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg(userConfig.DataDir)
 	validator := &cfgParser.ParserValidator{}
 	if userConfig.RepoConfig != "" {
 		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
@@ -548,6 +548,10 @@ type ServerCreatorProxy struct {
 }
 
 func (d *ServerCreatorProxy) NewServer(userConfig server.UserConfig, config server.Config) (ServerStarter, error) {
+	// maybe there's somewhere better to do this
+	if err := os.MkdirAll(userConfig.DataDir, 0700); err != nil {
+		return nil, err
+	}
 	if userConfig.ToLyftMode() == server.Gateway {
 		return d.GatewayCreator.NewServer(userConfig, config)
 	}

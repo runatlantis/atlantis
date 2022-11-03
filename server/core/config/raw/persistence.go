@@ -20,20 +20,21 @@ func (p Persistence) Validate() error {
 	)
 }
 
-func (p Persistence) ToValid() valid.PersistenceConfig {
+func (p Persistence) ToValid(defaultCfg valid.GlobalCfg) valid.PersistenceConfig {
+	deployments := buildValidStore(p.DefaultStore, p.DeploymentStorePrefix, defaultCfg.PersistenceConfig.Deployments)
+	jobs := buildValidStore(p.DefaultStore, p.JobStorePrefix, defaultCfg.PersistenceConfig.Jobs)
+
 	return valid.PersistenceConfig{
-		Deployments: buildValidStore(p.DefaultStore, p.DeploymentStorePrefix),
-		Jobs:        buildValidStore(p.DefaultStore, p.JobStorePrefix),
+		Deployments: deployments,
+		Jobs:        jobs,
 	}
 }
 
-func buildValidStore(dataStore DataStore, prefix string) valid.StoreConfig {
-	var validStore valid.StoreConfig
-
+func buildValidStore(dataStore DataStore, prefix string, defaultCfg valid.StoreConfig) valid.StoreConfig {
 	// Serially checks for non-nil supported backends
 	switch {
 	case dataStore.S3 != nil:
-		validStore = valid.StoreConfig{
+		return valid.StoreConfig{
 			ContainerName: dataStore.S3.BucketName,
 			BackendType:   valid.S3Backend,
 			Prefix:        prefix,
@@ -42,14 +43,13 @@ func buildValidStore(dataStore DataStore, prefix string) valid.StoreConfig {
 				stow_s3.ConfigAuthType: "iam",
 			},
 		}
+	default:
+		return defaultCfg
 	}
-	return validStore
 }
 
 type DataStore struct {
 	S3 *S3 `yaml:"s3" json:"s3"`
-
-	// Add other supported data stores in the future
 }
 
 func (ds DataStore) Validate() error {

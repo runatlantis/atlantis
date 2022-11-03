@@ -18,7 +18,7 @@ var globalCfg valid.GlobalCfg
 var expectedErr = errors.New("some error") //nolint:revive // error name is fine for testing purposes
 
 func setupTesting(t *testing.T) {
-	globalCfg = valid.NewGlobalCfg()
+	globalCfg = valid.NewGlobalCfg("somedir")
 	repo := models.Repo{
 		FullName:      "nish/repo",
 		DefaultBranch: "",

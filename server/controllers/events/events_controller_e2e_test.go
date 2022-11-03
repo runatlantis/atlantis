@@ -729,7 +729,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		VCSClient: vcsClient,
 	}
 
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg(dataDir)
 
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,

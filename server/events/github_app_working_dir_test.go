@@ -28,7 +28,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
-		GlobalCfg:                   valid.NewGlobalCfg(),
+		GlobalCfg:                   valid.NewGlobalCfg("somedir"),
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 

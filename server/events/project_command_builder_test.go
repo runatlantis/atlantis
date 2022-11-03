@@ -149,7 +149,7 @@ projects:
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(),
+				valid.NewGlobalCfg("somedir"),
 				&events.DefaultPendingPlanFinder{},
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
@@ -402,7 +402,7 @@ projects:
 					Ok(t, err)
 				}
 
-				globalCfg := valid.NewGlobalCfg()
+				globalCfg := valid.NewGlobalCfg("somedir")
 				globalCfg.Repos[0].AllowedOverrides = []string{"apply_requirements"}
 
 				builder := events.NewProjectCommandBuilder(
@@ -559,7 +559,7 @@ projects:
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(),
+				valid.NewGlobalCfg("somedir"),
 				&events.DefaultPendingPlanFinder{},
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
@@ -642,7 +642,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		nil,
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfg(),
+		valid.NewGlobalCfg("somedir"),
 		&events.DefaultPendingPlanFinder{},
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
@@ -719,7 +719,7 @@ projects:
 		nil,
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfg(),
+		valid.NewGlobalCfg("somedir"),
 		&events.DefaultPendingPlanFinder{},
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
@@ -789,7 +789,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(),
+				valid.NewGlobalCfg("somedir"),
 				&events.DefaultPendingPlanFinder{},
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
@@ -963,7 +963,7 @@ projects:
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(),
+				valid.NewGlobalCfg("somedir"),
 				&events.DefaultPendingPlanFinder{},
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
@@ -1012,7 +1012,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg("somedir")
 	commentParser := &events.CommentParser{}
 	contextBuilder := wrappers.
 		WrapProjectContext(events.NewProjectCommandContextBuilder(commentParser)).
@@ -1099,7 +1099,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		nil,
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfg(),
+		valid.NewGlobalCfg("somedir"),
 		&events.DefaultPendingPlanFinder{},
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",

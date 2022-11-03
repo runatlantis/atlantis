@@ -111,7 +111,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 			r := config.ParserValidator{}
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "")
 			ErrContains(t, c.expErr, err)
-			_, err = r.ParseGlobalCfg(confPath, valid.NewGlobalCfg())
+			_, err = r.ParseGlobalCfg(confPath, valid.NewGlobalCfg("somedir"))
 			ErrContains(t, c.expErr, err)
 		})
 	}
@@ -1098,19 +1098,18 @@ workflows:
 
 	r := config.ParserValidator{}
 
-	_, err = r.ParseRepoCfg(tmpDir, valid.NewGlobalCfg(), "repo_id")
+	_, err = r.ParseRepoCfg(tmpDir, valid.NewGlobalCfg("somedir"), "repo_id")
 	ErrEquals(t, "repo config not allowed to set 'workflow' key: server-side config needs 'allowed_overrides: [workflow]'", err)
 }
 
 func TestParseGlobalCfg_NotExist(t *testing.T) {
 	r := config.ParserValidator{}
-	_, err := r.ParseGlobalCfg("/not/exist", valid.NewGlobalCfg())
+	_, err := r.ParseGlobalCfg("/not/exist", valid.NewGlobalCfg("somedir"))
 	ErrEquals(t, "unable to read /not/exist file: open /not/exist: no such file or directory", err)
 }
 
 func TestParseGlobalCfg(t *testing.T) {
-
-	defaultCfg := valid.NewGlobalCfg()
+	defaultCfg := valid.NewGlobalCfg("somedir")
 	preWorkflowHook := &valid.PreWorkflowHook{
 		StepName:   "run",
 		RunCommand: "custom workflow command",
@@ -1241,7 +1240,8 @@ workflows:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
-				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				Temporal:          valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				PersistenceConfig: defaultCfg.PersistenceConfig,
 			},
 		},
 		"workflow stages empty": {
@@ -1268,7 +1268,8 @@ workflows:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
-				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				Temporal:          valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				PersistenceConfig: defaultCfg.PersistenceConfig,
 			},
 		},
 		"workflow steps empty": {
@@ -1296,7 +1297,8 @@ workflows:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
-				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				Temporal:          valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				PersistenceConfig: defaultCfg.PersistenceConfig,
 			},
 		},
 		"all keys specified": {
@@ -1380,7 +1382,8 @@ policies:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
-				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				Temporal:          valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				PersistenceConfig: defaultCfg.PersistenceConfig,
 			},
 		},
 		"id regex with trailing slash": {
@@ -1405,7 +1408,8 @@ repos:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
-				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				Temporal:          valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				PersistenceConfig: defaultCfg.PersistenceConfig,
 			},
 		},
 		"referencing default workflow": {
@@ -1432,7 +1436,8 @@ repos:
 				DeploymentWorkflows: map[string]valid.Workflow{
 					"default": defaultCfg.DeploymentWorkflows["default"],
 				},
-				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				Temporal:          valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				PersistenceConfig: defaultCfg.PersistenceConfig,
 			},
 		},
 		"redefine default workflow": {
@@ -1516,7 +1521,8 @@ workflows:
 						Apply: valid.DefaultApplyStage,
 					},
 				},
-				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				Temporal:          valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				PersistenceConfig: defaultCfg.PersistenceConfig,
 			},
 		},
 	}
@@ -1529,7 +1535,7 @@ workflows:
 			path := filepath.Join(tmp, "conf.yaml")
 			Ok(t, ioutil.WriteFile(path, []byte(c.input), 0600))
 
-			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfg())
+			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfg("somedir"))
 
 			if c.expErr != "" {
 				expErr := strings.Replace(c.expErr, "<tmp>", path, -1)
@@ -1560,7 +1566,7 @@ workflows:
 }
 
 func TestParseGlobalCfg_PlatformMode(t *testing.T) {
-	defaultCfg := valid.NewGlobalCfg()
+	defaultCfg := valid.NewGlobalCfg("somedir")
 	preWorkflowHook := &valid.PreWorkflowHook{
 		StepName:   "run",
 		RunCommand: "custom workflow command",
@@ -1737,6 +1743,7 @@ policies:
 						},
 					},
 				},
+				PersistenceConfig: defaultCfg.PersistenceConfig,
 			},
 		},
 		"redefine default platform workflows": {
@@ -1830,7 +1837,8 @@ deployment_workflows:
 						},
 					},
 				},
-				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				Temporal:          valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
+				PersistenceConfig: defaultCfg.PersistenceConfig,
 			},
 		},
 	}
@@ -1842,7 +1850,7 @@ deployment_workflows:
 			path := filepath.Join(tmp, "conf.yaml")
 			Ok(t, ioutil.WriteFile(path, []byte(c.input), 0600))
 
-			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfg())
+			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfg("somedir"))
 
 			if c.expErr != "" {
 				expErr := strings.Replace(c.expErr, "<tmp>", path, -1)
@@ -1913,7 +1921,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
-	gCfg := valid.NewGlobalCfg()
+	gCfg := valid.NewGlobalCfg("somedir")
 	gCfg.Temporal.TerraformTaskQueue = raw.DefaultTaskqueue
 
 	cases := map[string]struct {
@@ -1981,7 +1989,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 `,
 			exp: valid.GlobalCfg{
 				Repos: []valid.Repo{
-					valid.NewGlobalCfg().Repos[0],
+					valid.NewGlobalCfg("somedir").Repos[0],
 					{
 						IDRegex:              regexp.MustCompile(".*"),
 						ApplyRequirements:    []string{"mergeable", "approved", "policies_passed"},
@@ -2001,14 +2009,14 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"default": valid.NewGlobalCfg().Workflows["default"],
+					"default": valid.NewGlobalCfg("somedir").Workflows["default"],
 					"custom":  customWorkflow,
 				},
 				PullRequestWorkflows: map[string]valid.Workflow{
-					"default": valid.NewGlobalCfg().PullRequestWorkflows["default"],
+					"default": valid.NewGlobalCfg("somedir").PullRequestWorkflows["default"],
 				},
 				DeploymentWorkflows: map[string]valid.Workflow{
-					"default": valid.NewGlobalCfg().DeploymentWorkflows["default"],
+					"default": valid.NewGlobalCfg("somedir").DeploymentWorkflows["default"],
 				},
 				Temporal: valid.Temporal{TerraformTaskQueue: raw.DefaultTaskqueue},
 				PolicySets: valid.PolicySets{
@@ -2021,13 +2029,14 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 						},
 					},
 				},
+				PersistenceConfig: gCfg.PersistenceConfig,
 			},
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			pv := &config.ParserValidator{}
-			cfg, err := pv.ParseGlobalCfgJSON(c.json, valid.NewGlobalCfg())
+			cfg, err := pv.ParseGlobalCfgJSON(c.json, valid.NewGlobalCfg("somedir"))
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
@@ -2103,7 +2112,7 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
-	globalCfg := valid.NewGlobalCfg()
+	globalCfg := valid.NewGlobalCfg("somedir")
 	globalCfg.Temporal.TerraformTaskQueue = raw.DefaultTaskqueue
 
 	cases := map[string]struct {
@@ -2228,6 +2237,7 @@ func TestParserValidator_ParseGlobalCfgV2JSON(t *testing.T) {
 						},
 					},
 				},
+				PersistenceConfig: globalCfg.PersistenceConfig,
 			},
 		},
 	}

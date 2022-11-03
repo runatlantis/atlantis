@@ -5,9 +5,16 @@ import (
 	"regexp"
 
 	"github.com/graymeta/stow"
+	"github.com/graymeta/stow/local"
 	stow_s3 "github.com/graymeta/stow/s3"
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
+)
+
+const (
+	LocalStore               = "artifact-store"
+	DefaultJobsPrefix        = "jobs"
+	DefaultDeploymentsPrefix = "deployments"
 )
 
 const MergeableApplyReq = "mergeable"
@@ -200,7 +207,7 @@ var DefaultLocklessPlanStage = Stage{
 	},
 }
 
-func NewGlobalCfg() GlobalCfg {
+func NewGlobalCfg(dataDir string) GlobalCfg {
 	defaultWorkflow := Workflow{
 		Name:        DefaultWorkflowName,
 		Apply:       DefaultApplyStage,
@@ -245,6 +252,25 @@ func NewGlobalCfg() GlobalCfg {
 		},
 		PullRequestWorkflows: map[string]Workflow{
 			DefaultWorkflowName: pullRequestWorkflow,
+		},
+	}
+
+	globalCfg.PersistenceConfig = PersistenceConfig{
+		Deployments: StoreConfig{
+			BackendType: LocalBackend,
+			Prefix:      DefaultDeploymentsPrefix,
+			Config: stow.ConfigMap{
+				local.ConfigKeyPath: dataDir,
+			},
+			ContainerName: LocalStore,
+		},
+		Jobs: StoreConfig{
+			BackendType: LocalBackend,
+			Prefix:      DefaultJobsPrefix,
+			Config: stow.ConfigMap{
+				local.ConfigKeyPath: dataDir,
+			},
+			ContainerName: LocalStore,
 		},
 	}
 
