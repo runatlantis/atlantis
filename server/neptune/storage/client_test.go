@@ -46,18 +46,6 @@ func (t *testContainer) RemoveItem(id string) error {
 	return nil
 }
 
-type testContainerResolver struct {
-	t         *testing.T
-	name      string
-	container stow.Container
-	err       error
-}
-
-func (t *testContainerResolver) Container(name string) (stow.Container, error) {
-	assert.Equal(t.t, t.name, name)
-	return t.container, t.err
-}
-
 func TestClient_Get(t *testing.T) {
 	id := "1234"
 	prefix := "prefix"

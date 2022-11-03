@@ -30,7 +30,7 @@ func (r *RootFetcher) Fetch(ctx workflow.Context) (*terraform.LocalRoot, func() 
 	return fetchRootResponse.LocalRoot, func() error {
 		var cleanupResponse activities.CleanupResponse
 		err = workflow.ExecuteActivity(ctx, r.Ta.Cleanup, activities.CleanupRequest{ //nolint:gosimple // unnecessary to add a method to convert reponses
-			LocalRoot: fetchRootResponse.LocalRoot,
+			DeployDirectory: fetchRootResponse.DeployDirectory,
 		}).Get(ctx, &cleanupResponse)
 		if err != nil {
 			return errors.Wrap(err, "cleaning up")

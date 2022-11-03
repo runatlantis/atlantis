@@ -52,7 +52,7 @@ func TestDeployWorkflow(t *testing.T) {
 
 	env.ExecuteWorkflow(workflows.Deploy, workflows.DeployRequest{
 		Root: workflows.DeployRequestRoot{
-			Name: "my test root",
+			Name: "mytestroot",
 		},
 		Repo: workflows.DeployRequestRepo{
 			FullName: "nish/repo",
@@ -77,7 +77,7 @@ func signalWorkflow(env *testsuite.TestWorkflowEnvironment) {
 	env.SignalWorkflow(workflows.DeployNewRevisionSignalID, workflows.DeployNewRevisionSignalRequest{
 		Revision: "12345",
 		Root: workflows.Root{
-			Name: "my test root",
+			Name: "mytestroot",
 			Plan: workflows.Job{
 				Steps: []workflows.Step{
 					{
@@ -244,6 +244,8 @@ var fileContents = ` resource "null_resource" "null" {}
 `
 
 func GetLocalTestRoot(ctx context.Context, dst, src string) error {
+	// dst will be the repo path here but we also need to create the root itself
+	dst = filepath.Join(dst, "terraform", "mytestroot")
 	err := os.MkdirAll(dst, os.ModePerm)
 
 	if err != nil {

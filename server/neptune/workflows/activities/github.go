@@ -3,15 +3,18 @@ package activities
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+
 	"github.com/google/go-github/v45/github"
 	"github.com/hashicorp/go-getter"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/neptune/logger"
 	internal "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/temporal"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
-	"net/http"
-	"net/url"
-	"path/filepath"
 )
 
 type ClientContext struct {
@@ -200,6 +203,9 @@ type FetchRootRequest struct {
 
 type FetchRootResponse struct {
 	LocalRoot *terraform.LocalRoot
+
+	// if we do more with this, we can consider moving generation into it's own activity
+	DeployDirectory string
 }
 
 // FetchRoot fetches a link to the archive URL using the GH client, processes that URL into a download URL that the
@@ -211,7 +217,8 @@ func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootReque
 	if err != nil {
 		return FetchRootResponse{}, errors.Wrap(err, "processing request ref")
 	}
-	destinationPath := filepath.Join(a.DataDir, deploymentsDirName, request.DeploymentID)
+	deployBasePath := filepath.Join(a.DataDir, deploymentsDirName, request.DeploymentID)
+	repositoryPath := filepath.Join(deployBasePath, "repo")
 	opts := &github.RepositoryContentGetOptions{
 		Ref: ref,
 	}
@@ -225,13 +232,23 @@ func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootReque
 		return FetchRootResponse{}, errors.Errorf("getting repo archive link returns non-302 status %d", resp.StatusCode)
 	}
 	downloadLink := a.LinkBuilder.BuildDownloadLinkFromArchive(archiveLink, request.Root, request.Repo, request.Revision)
-	err = a.Getter(ctx, destinationPath, downloadLink)
+	err = a.Getter(ctx, repositoryPath, downloadLink)
 	if err != nil {
 		return FetchRootResponse{}, errors.Wrap(err, "fetching and extracting zip")
 	}
-	localRoot := terraform.BuildLocalRoot(request.Root, request.Repo, destinationPath)
+	rootPath := filepath.Join(repositoryPath, request.Root.Path)
+
+	// let's drop a symlink to the root in the deploy base path to make navigation easier
+	rootSymlink := filepath.Join(deployBasePath, "root")
+	err = os.Symlink(rootPath, rootSymlink)
+	if err != nil {
+		logger.Warn(ctx, "unable to symlink to terraform root", "err", err)
+	}
+
+	localRoot := terraform.BuildLocalRoot(request.Root, request.Repo, rootPath)
 	return FetchRootResponse{
-		LocalRoot: localRoot,
+		LocalRoot:       localRoot,
+		DeployDirectory: deployBasePath,
 	}, nil
 }
 

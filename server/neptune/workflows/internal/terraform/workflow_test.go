@@ -26,6 +26,7 @@ const (
 	testRootName     = "testroot"
 	testDeploymentID = "123"
 	testPath         = "rel/path"
+	DeployDir        = "deployments/123"
 )
 
 var testGithubRepo = github.Repo{
@@ -66,7 +67,8 @@ type githubActivities struct{}
 
 func (a *githubActivities) FetchRoot(_ context.Context, _ activities.FetchRootRequest) (activities.FetchRootResponse, error) {
 	return activities.FetchRootResponse{
-		LocalRoot: testLocalRoot,
+		LocalRoot:       testLocalRoot,
+		DeployDirectory: DeployDir,
 	}, nil
 }
 
@@ -227,10 +229,11 @@ func TestSuccess(t *testing.T) {
 		Root:         testLocalRoot.Root,
 		DeploymentID: testDeploymentID,
 	}).Return(activities.FetchRootResponse{
-		LocalRoot: testLocalRoot,
+		LocalRoot:       testLocalRoot,
+		DeployDirectory: DeployDir,
 	}, nil)
 	env.OnActivity(ta.Cleanup, mock.Anything, activities.CleanupRequest{
-		LocalRoot: testLocalRoot,
+		DeployDirectory: DeployDir,
 	}).Return(activities.CleanupResponse{}, nil)
 
 	// send approval of plan
@@ -337,7 +340,8 @@ func TestUpdateJobError(t *testing.T) {
 		Root:         testLocalRoot.Root,
 		DeploymentID: testDeploymentID,
 	}).Return(activities.FetchRootResponse{
-		LocalRoot: testLocalRoot,
+		DeployDirectory: DeployDir,
+		LocalRoot:       testLocalRoot,
 	}, nil)
 
 	// execute workflow
@@ -382,7 +386,8 @@ func TestPlanRejection(t *testing.T) {
 		Root:         testLocalRoot.Root,
 		DeploymentID: testDeploymentID,
 	}).Return(activities.FetchRootResponse{
-		LocalRoot: testLocalRoot,
+		DeployDirectory: DeployDir,
+		LocalRoot:       testLocalRoot,
 	}, nil)
 
 	// send rejection of plan
@@ -473,7 +478,8 @@ func TestFetchRootError(t *testing.T) {
 		Root:         testLocalRoot.Root,
 		DeploymentID: testDeploymentID,
 	}).Return(activities.FetchRootResponse{
-		LocalRoot: testLocalRoot,
+		DeployDirectory: DeployDir,
+		LocalRoot:       testLocalRoot,
 	}, assert.AnError)
 
 	// execute workflow
@@ -498,7 +504,7 @@ func TestCleanupErrorReturnsNoError(t *testing.T) {
 
 	// set activity expectations
 	env.OnActivity(ta.Cleanup, mock.Anything, activities.CleanupRequest{
-		LocalRoot: testLocalRoot,
+		DeployDirectory: DeployDir,
 	}).Return(activities.CleanupResponse{}, assert.AnError)
 
 	// send approval of plan

@@ -11,7 +11,7 @@ import (
 )
 
 func Test_BuildDownloadLinkFromArchive(t *testing.T) {
-	expectedURL := "https://github.com/testowner/testrepo/legacy.zip/refs/heads/main//testowner-testrepo-a1b2c3d/test/path?archive=zip&token=testtoken123"
+	expectedURL := "https://github.com/testowner/testrepo/legacy.zip/refs/heads/main//testowner-testrepo-a1b2c3d?archive=zip&token=testtoken123"
 	testRoot := terraform.Root{
 		Path: "test/path",
 	}
@@ -28,7 +28,7 @@ func Test_BuildDownloadLinkFromArchive(t *testing.T) {
 }
 
 func Test_BuildDownloadLinkFromArchive_NoToken(t *testing.T) {
-	expectedURL := "https://github.com/testowner/testrepo/legacy.zip/refs/heads/main//testowner-testrepo-a1b2c3d/test/path?archive=zip"
+	expectedURL := "https://github.com/testowner/testrepo/legacy.zip/refs/heads/main//testowner-testrepo-a1b2c3d?archive=zip"
 	testRoot := terraform.Root{
 		Path: "/test/path",
 	}

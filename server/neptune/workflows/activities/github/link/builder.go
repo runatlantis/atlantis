@@ -3,7 +3,6 @@ package link
 import (
 	"fmt"
 	"net/url"
-	"path"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
@@ -24,8 +23,7 @@ func (b Builder) BuildDownloadLinkFromArchive(archiveURL *url.URL, root terrafor
 
 	// Append root subdirectory to path to trigger go-getter pkg to only copy the relevant files
 	archiveName := fmt.Sprintf("%s-%s-%s", repo.Owner, repo.Name, revision)
-	subDirPath := path.Join(archiveName, root.Path)
 
-	archiveURL.Path = fmt.Sprintf("%s//%s", archiveURL.Path, subDirPath)
+	archiveURL.Path = fmt.Sprintf("%s//%s", archiveURL.Path, archiveName)
 	return archiveURL.String()
 }
