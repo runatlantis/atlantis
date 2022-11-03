@@ -88,9 +88,15 @@ func (p *PushHandler) handle(ctx context.Context, event Push) error {
 		return errors.Wrap(err, "generating roots")
 	}
 	for _, rootCfg := range rootCfgs {
-		ctx = context.WithValue(ctx, contextInternal.ProjectKey, rootCfg.Name)
+		c := context.WithValue(ctx, contextInternal.ProjectKey, rootCfg.Name)
+
+		if rootCfg.WorkflowMode != valid.PlatformWorkflowMode {
+			p.Logger.DebugContext(c, "root is not configured for platform mode, skipping...")
+			continue
+		}
+
 		run, err := p.DeploySignaler.SignalWithStartWorkflow(
-			ctx,
+			c,
 			rootCfg,
 			event.Repo,
 			event.Sha,
@@ -102,7 +108,7 @@ func (p *PushHandler) handle(ctx context.Context, event Push) error {
 			return errors.Wrap(err, "signalling workflow")
 		}
 
-		p.Logger.InfoContext(ctx, "Signaled workflow.", map[string]interface{}{
+		p.Logger.InfoContext(c, "Signaled workflow.", map[string]interface{}{
 			"workflow-id": run.GetID(), "run-id": run.GetRunID(),
 		})
 	}

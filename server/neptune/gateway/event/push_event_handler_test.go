@@ -225,6 +225,43 @@ func TestHandlePushEvent(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("not platform mode", func(t *testing.T) {
+		allocator := &testAllocator{
+			expectedAllocation: true,
+			expectedFeatureID:  feature.PlatformMode,
+			expectedFeatureCtx: feature.FeatureContext{
+				RepoName: repoFullName,
+			},
+			t: t,
+		}
+		ctx := context.Background()
+		rootCfg := valid.MergedProjectCfg{
+			Name: testRoot,
+			DeploymentWorkflow: valid.Workflow{
+				Plan:  valid.DefaultPlanStage,
+				Apply: valid.DefaultApplyStage,
+			},
+			TerraformVersion: version,
+			WorkflowMode:     valid.DefaultWorkflowMode,
+		}
+		rootCfgs := []*valid.MergedProjectCfg{
+			&rootCfg,
+		}
+		rootConfigBuilder := &mockRootConfigBuilder{
+			rootConfigs: rootCfgs,
+		}
+		handler := event.PushHandler{
+			Allocator:         allocator,
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler:    &mockDeploySignaler{},
+			Logger:            logger,
+			RootConfigBuilder: rootConfigBuilder,
+		}
+
+		err := handler.Handle(ctx, e)
+		assert.NoError(t, err)
+	})
+
 	t.Run("signal success", func(t *testing.T) {
 		allocator := &testAllocator{
 			expectedAllocation: true,
@@ -242,6 +279,7 @@ func TestHandlePushEvent(t *testing.T) {
 				Apply: valid.DefaultApplyStage,
 			},
 			TerraformVersion: version,
+			WorkflowMode:     valid.PlatformWorkflowMode,
 		}
 		rootCfgs := []*valid.MergedProjectCfg{
 			&rootCfg,
@@ -279,6 +317,7 @@ func TestHandlePushEvent(t *testing.T) {
 				Apply: valid.DefaultApplyStage,
 			},
 			TerraformVersion: version,
+			WorkflowMode:     valid.PlatformWorkflowMode,
 		}
 		rootCfgs := []*valid.MergedProjectCfg{
 			&rootCfg,
