@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/terraform/filter"
+	"github.com/stretchr/testify/assert"
 
 	. "github.com/petergtz/pegomock"
-	"github.com/stretchr/testify/assert"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -169,31 +169,27 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 	})
 
 	t.Run("clean up all jobs when PR is closed", func(t *testing.T) {
-		var wg sync.WaitGroup
 		projectOutputHandler, jobStore := createProjectCommandOutputHandler(t)
 		When(jobStore.Get(matchers.AnyContextContext(), AnyString())).ThenReturn(&jobs.Job{}, nil)
 
 		ch := make(chan string)
+
+		// read from channel
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			<-ch
+			wg.Done()
+		}()
 
 		// register channel and backfill from buffer
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
 		projectOutputHandler.Register(ctx.RequestCtx, ctx.JobID, ch)
-
-		wg.Add(1)
-
-		// read from channel
-		go func() {
-			for msg := range ch {
-				if msg == "Complete" {
-					wg.Done()
-				}
-			}
-		}()
-
 		projectOutputHandler.Send(ctx, Msg)
-		projectOutputHandler.Send(ctx, "Complete")
+
+		wg.Wait()
 
 		pullContext := jobs.PullInfo{
 			PullNum:     ctx.Pull.Num,
@@ -201,6 +197,8 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 			ProjectName: ctx.ProjectName,
 			Workspace:   ctx.Workspace,
 		}
+
+		// Cleanup is called when a PR is closed
 		projectOutputHandler.CleanUp(pullContext)
 
 		// Check all the resources are cleaned up.
