@@ -116,6 +116,7 @@ func (n *Receiver) createCheckRun(ctx workflow.Context, id, revision string, roo
 		ExternalID: id,
 		Summary:    summary,
 		Actions:    actions,
+		State:      github.CheckRunQueued,
 	}).Get(ctx, &resp)
 
 	// don't block on error here, we'll just try again later when we have our result.

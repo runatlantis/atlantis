@@ -114,6 +114,7 @@ func TestEnqueue(t *testing.T) {
 		Sha:        rev,
 		Repo:       github.Repo{Name: "nish"},
 		ExternalID: id.String(),
+		State:      github.CheckRunQueued,
 	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
 	env.ExecuteWorkflow(testWorkflow, req{
@@ -169,6 +170,7 @@ func TestEnqueue_ManualTrigger(t *testing.T) {
 		Sha:        rev,
 		Repo:       github.Repo{Name: "nish"},
 		ExternalID: id.String(),
+		State:      github.CheckRunQueued,
 	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
 	env.ExecuteWorkflow(testWorkflow, req{
@@ -225,6 +227,7 @@ func TestEnqueue_ManualTrigger_queueAlreadyLocked(t *testing.T) {
 		Sha:        rev,
 		Repo:       github.Repo{Name: "nish"},
 		ExternalID: id.String(),
+		State:      github.CheckRunQueued,
 	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
 	env.ExecuteWorkflow(testWorkflow, req{
@@ -288,6 +291,7 @@ func TestEnqueue_MergeTrigger_queueAlreadyLocked(t *testing.T) {
 		ExternalID: id.String(),
 		Summary:    "This deploy is locked from a manual deployment for revision 123334444555.  Unlock to proceed.",
 		Actions:    []github.CheckRunAction{github.CreateUnlockAction()},
+		State:      github.CheckRunQueued,
 	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
 	env.ExecuteWorkflow(testWorkflow, req{
