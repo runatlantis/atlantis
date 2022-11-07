@@ -38,17 +38,16 @@ var (
 	//go:embed templates/*
 	templatesFS embed.FS
 	templates   *template.Template
-)
-
-func markdown_renderer() {
-	func (){
+	// Initialize templates using a var instead of init()
+	_ = func() struct{} {
 		templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
 		if overrides, err := templates.ParseFiles("templates/*"); err == nil {
-		// doesn't override if templates directory doesn't exist
-		templates = overrides
+			// doesn't override if templates directory doesn't exist
+			templates = overrides
 		}
+		return struct{}{}
 	}()
-}
+)
 
 // MarkdownRenderer renders responses as markdown.
 type MarkdownRenderer struct {
