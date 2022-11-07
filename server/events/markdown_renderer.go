@@ -40,12 +40,14 @@ var (
 	templates   *template.Template
 )
 
-func init() {
-	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
-	if overrides, err := templates.ParseFiles("templates/*"); err == nil {
+func markdown_renderer() {
+	func (){
+		templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
+		if overrides, err := templates.ParseFiles("templates/*"); err == nil {
 		// doesn't override if templates directory doesn't exist
 		templates = overrides
-	}
+		}
+	}()
 }
 
 // MarkdownRenderer renders responses as markdown.
