@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.temporal.io/sdk/client"
 	"net/url"
 	"testing"
 	"time"
@@ -139,7 +140,8 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 			Ta:      tAct,
 			Ga:      gAct,
 		},
-		JobRunner: runner,
+		JobRunner:      runner,
+		MetricsHandler: client.MetricsNopHandler,
 		Store: state.NewWorkflowStoreWithGenerator(
 			// add a notifier which just appends to a list which allows us to
 			// test every state change

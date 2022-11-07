@@ -3,6 +3,7 @@ package event_test
 import (
 	"context"
 	"errors"
+	"github.com/uber-go/tally/v4"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -36,6 +37,7 @@ func setupTesting(t *testing.T) {
 		FileFetcher:     &mockFileFetcher{},
 		GlobalCfg:       globalCfg,
 		Logger:          logging.NewNoopCtxLogger(t),
+		Scope:           tally.NewTestScope("test", map[string]string{}),
 	}
 }
 

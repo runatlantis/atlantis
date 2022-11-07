@@ -1,6 +1,7 @@
 package deploy_test
 
 import (
+	"go.temporal.io/sdk/client"
 	"testing"
 	"time"
 
@@ -63,6 +64,7 @@ func testWorkflow(ctx workflow.Context, r request) (response, error) {
 		QueueWorker:              worker,
 		RevisionReceiver:         receiver,
 		NewRevisionSignalChannel: workflow.GetSignalChannel(ctx, testSignalID),
+		MetricsHandler:           client.MetricsNopHandler,
 	}
 
 	err := runner.Run(ctx)

@@ -34,7 +34,7 @@ func TestCheckRunHandler(t *testing.T) {
 		}
 		e := event.CheckRun{
 			Action: event.WrappedCheckRunAction("test"),
-			Name:   "atlantis/deploy",
+			Name:   "atlantis/deploy: testroot",
 		}
 		err := subject.Handle(context.Background(), e)
 		assert.NoError(t, err)
@@ -49,7 +49,7 @@ func TestCheckRunHandler(t *testing.T) {
 		}
 		e := event.CheckRun{
 			Action: event.WrappedCheckRunAction("requested_action"),
-			Name:   "atlantis/deploy",
+			Name:   "atlantis/deploy: testroot",
 		}
 		err := subject.Handle(context.Background(), e)
 		assert.Error(t, err)
@@ -66,7 +66,7 @@ func TestCheckRunHandler(t *testing.T) {
 			Action: event.RequestedActionChecksAction{
 				Identifier: "some random thing",
 			},
-			Name: "atlantis/deploy",
+			Name: "atlantis/deploy: testroot",
 		}
 		err := subject.Handle(context.Background(), e)
 		assert.Error(t, err)
@@ -95,7 +95,7 @@ func TestCheckRunHandler(t *testing.T) {
 			},
 			ExternalID: workflowID,
 			User:       user,
-			Name:       "atlantis/deploy",
+			Name:       "atlantis/deploy: testroot",
 		}
 		err := subject.Handle(context.Background(), e)
 		assert.NoError(t, err)
@@ -173,7 +173,7 @@ func TestCheckRunHandler(t *testing.T) {
 			},
 			ExternalID: workflowID,
 			User:       user,
-			Name:       "atlantis/deploy",
+			Name:       "atlantis/deploy: testroot",
 		}
 		err := subject.Handle(context.Background(), e)
 		assert.Error(t, err)

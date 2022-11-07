@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"fmt"
+	contextInternal "github.com/runatlantis/atlantis/server/neptune/gateway/context"
 	"regexp"
 	"strings"
 
@@ -76,6 +77,12 @@ func (h *CheckRunHandler) Handle(ctx context.Context, event CheckRun) error {
 }
 
 func (h *CheckRunHandler) signalPlanReviewWorkflowChannel(ctx context.Context, event CheckRun, status workflows.TerraformPlanReviewStatus) error {
+	matches := checkRunRegex.FindStringSubmatch(event.Name)
+	if len(matches) != 2 {
+		return fmt.Errorf("unable to determine root name")
+	}
+	rootName := matches[checkRunRegex.SubexpIndex("name")]
+	ctx = context.WithValue(ctx, contextInternal.ProjectKey, rootName)
 	err := h.TemporalClient.SignalWorkflow(
 		ctx,
 		// assumed that we're using the check run external id as our workflow id
@@ -101,7 +108,7 @@ func (h *CheckRunHandler) signalUnlockWorkflowChannel(ctx context.Context, event
 		return fmt.Errorf("unable to determine root name")
 	}
 	rootName := matches[checkRunRegex.SubexpIndex("name")]
-
+	ctx = context.WithValue(ctx, contextInternal.ProjectKey, rootName)
 	err := h.TemporalClient.SignalWorkflow(
 		ctx,
 		// deploy workflow id is repo||root (the name of the check run is the root)

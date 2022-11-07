@@ -160,17 +160,25 @@ func (h *Handler) Handle(r *http.BufferedRequest) error {
 
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
-		err = h.handleCommentEvent(ctx, event, r)
 		scope = scope.SubScope(fmt.Sprintf("comment.%s", *event.Action))
+		timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+		defer timer.Stop()
+		err = h.handleCommentEvent(ctx, event, r)
 	case *github.PullRequestEvent:
-		err = h.handlePullRequestEvent(ctx, event, r)
 		scope = scope.SubScope(fmt.Sprintf("pr.%s", *event.Action))
+		timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+		defer timer.Stop()
+		err = h.handlePullRequestEvent(ctx, event, r)
 	case *github.PushEvent:
-		err = h.handlePushEvent(ctx, event)
 		scope = scope.SubScope("push")
+		timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+		defer timer.Stop()
+		err = h.handlePushEvent(ctx, event)
 	case *github.CheckRunEvent:
-		err = h.handleCheckRunEvent(ctx, event)
 		scope = scope.SubScope("checkrun")
+		timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+		defer timer.Stop()
+		err = h.handleCheckRunEvent(ctx, event)
 	default:
 		h.logger.WarnContext(ctx, "Ignoring unsupported event")
 	}

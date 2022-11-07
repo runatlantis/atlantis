@@ -1,6 +1,7 @@
 package queue_test
 
 import (
+	"go.temporal.io/sdk/client"
 	"testing"
 	"time"
 
@@ -126,7 +127,7 @@ func testUpdaterWorkflow(ctx workflow.Context, r updaterReq) error {
 		Activities: a,
 	}
 
-	q := queue.NewQueue(noopCallback)
+	q := queue.NewQueue(noopCallback, client.MetricsNopHandler)
 	for _, i := range r.Queue {
 		q.Push(i)
 	}

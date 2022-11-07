@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"go.temporal.io/sdk/client"
 
 	"github.com/pkg/errors"
 	internalContext "github.com/runatlantis/atlantis/server/neptune/context"
@@ -39,6 +40,9 @@ const (
 	CompleteWorkerState WorkerState = "complete"
 
 	UnlockSignalName = "unlock"
+
+	ManualDeployWorkflowStat = "workflow.deploy.trigger.manual"
+	MergeDeployWorkflowStat  = "workflow.deploy.trigger.merge"
 )
 
 type UnlockSignalRequest struct {
@@ -46,8 +50,9 @@ type UnlockSignalRequest struct {
 }
 
 type Worker struct {
-	Queue    queue
-	Deployer deployer
+	Queue          queue
+	Deployer       deployer
+	MetricsHandler client.MetricsHandler
 
 	// mutable
 	state            WorkerState
@@ -65,6 +70,7 @@ const (
 func NewWorker(
 	ctx workflow.Context,
 	q queue,
+	metricsHandler client.MetricsHandler,
 	a workerActivities,
 	tfWorkflow terraform.Workflow,
 	repoName, rootName string,
@@ -93,6 +99,7 @@ func NewWorker(
 		Queue:            q,
 		Deployer:         deployer,
 		latestDeployment: latestDeployment,
+		MetricsHandler:   metricsHandler,
 	}, nil
 }
 
@@ -193,17 +200,21 @@ func (w *Worker) awaitWork(ctx workflow.Context) workflow.Future {
 
 func (w *Worker) deploy(ctx workflow.Context, latestDeployment *deployment.Info) (*deployment.Info, error) {
 	w.state = WorkingWorkerState
-
 	msg, err := w.Queue.Pop()
-
 	if err != nil {
 		return nil, errors.Wrap(err, "popping off queue")
 	}
 
 	ctx = workflow.WithValue(ctx, internalContext.SHAKey, msg.Revision)
 	ctx = workflow.WithValue(ctx, internalContext.DeploymentIDKey, msg.ID)
-	return w.Deployer.Deploy(ctx, msg, latestDeployment)
 
+	if msg.Root.Trigger == tfModel.ManualTrigger {
+		w.MetricsHandler.Counter(ManualDeployWorkflowStat).Inc(1)
+	} else {
+		w.MetricsHandler.Counter(MergeDeployWorkflowStat).Inc(1)
+	}
+
+	return w.Deployer.Deploy(ctx, msg, latestDeployment)
 }
 
 func (w *Worker) GetState() WorkerState {

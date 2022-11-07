@@ -3,6 +3,7 @@ package queue
 import (
 	"container/list"
 	"fmt"
+	"go.temporal.io/sdk/client"
 
 	activity "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
@@ -19,20 +20,24 @@ type LockState struct {
 const (
 	UnlockedStatus LockStatus = iota
 	LockedStatus
+
+	QueueDepthStat = "queue.depth"
 )
 
 type Deploy struct {
 	queue              *priority
 	lockStatusCallback func(workflow.Context, *Deploy)
+	metricsHandler     client.MetricsHandler
 
 	// mutable: default is unlocked
 	lock LockState
 }
 
-func NewQueue(callback func(workflow.Context, *Deploy)) *Deploy {
+func NewQueue(callback func(workflow.Context, *Deploy), metricsHandler client.MetricsHandler) *Deploy {
 	return &Deploy{
 		queue:              newPriorityQueue(),
 		lockStatusCallback: callback,
+		metricsHandler:     metricsHandler,
 	}
 
 }
@@ -51,6 +56,7 @@ func (q *Deploy) CanPop() bool {
 }
 
 func (q *Deploy) Pop() (terraform.DeploymentInfo, error) {
+	defer q.metricsHandler.Gauge(QueueDepthStat).Update(float64(q.queue.Size()))
 	return q.queue.Pop()
 }
 
@@ -63,6 +69,7 @@ func (q *Deploy) IsEmpty() bool {
 }
 
 func (q *Deploy) Push(msg terraform.DeploymentInfo) {
+	defer q.metricsHandler.Gauge(QueueDepthStat).Update(float64(q.queue.Size()))
 	if msg.Root.Trigger == activity.ManualTrigger {
 		q.queue.Push(msg, High)
 		return
@@ -100,6 +107,14 @@ func (q *priority) IsEmpty() bool {
 		}
 	}
 	return true
+}
+
+func (q *priority) Size() int {
+	size := 0
+	for _, queue := range q.queues {
+		size += queue.Len()
+	}
+	return size
 }
 
 func (q *priority) Scan(priority priorityType) []terraform.DeploymentInfo {

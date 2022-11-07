@@ -1,6 +1,8 @@
 package deploy
 
 import (
+	"github.com/runatlantis/atlantis/server/events/metrics"
+	"go.temporal.io/sdk/client"
 	"time"
 
 	"github.com/pkg/errors"
@@ -21,7 +23,8 @@ const (
 	// signals
 	NewRevisionSignalID = "new-revision"
 
-	RevisionReceiveTimeout = 60 * time.Minute
+	RevisionReceiveTimeout   = 60 * time.Minute
+	ActiveDeployWorkflowStat = "workflow.deploy.active"
 )
 
 type workerActivities struct {
@@ -67,6 +70,7 @@ type Runner struct {
 	QueueWorker              QueueWorker
 	RevisionReceiver         SignalReceiver
 	NewRevisionSignalChannel workflow.ReceiveChannel
+	MetricsHandler           client.MetricsHandler
 }
 
 func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workflow) (*Runner, error) {
@@ -76,15 +80,20 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 	// so we're modeling our own DI around this.
 	var a *workerActivities
 
+	metricsHandler := workflow.GetMetricsHandler(ctx).WithTags(map[string]string{
+		metrics.RepoTag: request.Repo.FullName,
+		metrics.RootTag: request.Root.Name,
+	})
+
 	lockStateUpdater := queue.LockStateUpdater{
 		Activities: a,
 	}
 	revisionQueue := queue.NewQueue(func(ctx workflow.Context, d *queue.Deploy) {
 		lockStateUpdater.UpdateQueuedRevisions(ctx, d)
-	})
+	}, metricsHandler)
 	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, a, sideeffect.GenerateUUID)
 
-	worker, err := queue.NewWorker(ctx, revisionQueue, a, tfWorkflow, request.Repo.FullName, request.Root.Name)
+	worker, err := queue.NewWorker(ctx, revisionQueue, metricsHandler, a, tfWorkflow, request.Repo.FullName, request.Root.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -93,10 +102,13 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 		QueueWorker:              worker,
 		RevisionReceiver:         revisionReceiver,
 		NewRevisionSignalChannel: workflow.GetSignalChannel(ctx, NewRevisionSignalID),
+		MetricsHandler:           metricsHandler,
 	}, nil
 }
 
 func (r *Runner) Run(ctx workflow.Context) error {
+	r.MetricsHandler.Gauge(ActiveDeployWorkflowStat).Update(1)
+	defer r.MetricsHandler.Gauge(ActiveDeployWorkflowStat).Update(0)
 	var action RunnerAction
 	workerCtx, shutdownWorker := workflow.WithCancel(ctx)
 

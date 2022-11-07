@@ -6,8 +6,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally/v4"
 )
 
 // repoFetcher manages a cloned repo's workspace on disk for running commands.
@@ -45,9 +47,24 @@ type RootConfigBuilder struct {
 	FileFetcher     fileFetcher
 	GlobalCfg       valid.GlobalCfg
 	Logger          logging.Logger
+	Scope           tally.Scope
 }
 
 func (b *RootConfigBuilder) Build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64) ([]*valid.MergedProjectCfg, error) {
+	mergedRootCfgs, err := b.build(ctx, repo, branch, sha, installationToken)
+	if err != nil {
+		b.Scope.Counter(metrics.FilterErrorMetric).Inc(1)
+		return nil, err
+	}
+	if len(mergedRootCfgs) == 0 {
+		b.Scope.Counter(metrics.FilterAbsentMetric).Inc(1)
+		return mergedRootCfgs, nil
+	}
+	b.Scope.Counter(metrics.FilterPresentMetric)
+	return mergedRootCfgs, nil
+}
+
+func (b *RootConfigBuilder) build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64) ([]*valid.MergedProjectCfg, error) {
 	// Generate a new filepath location and clone repo into it
 	repoDir, cleanup, err := b.RepoFetcher.Fetch(ctx, repo, branch, sha)
 	if err != nil {

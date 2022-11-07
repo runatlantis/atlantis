@@ -286,6 +286,7 @@ func NewServer(config Config) (*Server, error) {
 		FileFetcher:     &github.RemoteFileFetcher{ClientCreator: clientCreator},
 		GlobalCfg:       globalCfg,
 		Logger:          ctxLogger,
+		Scope:           statsScope.SubScope("event.filters.root"),
 	}
 
 	gatewayEventsController := lyft_gateway.NewVCSEventsController(
