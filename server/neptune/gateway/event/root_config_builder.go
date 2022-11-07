@@ -60,7 +60,7 @@ func (b *RootConfigBuilder) Build(ctx context.Context, repo models.Repo, branch 
 		b.Scope.Counter(metrics.FilterAbsentMetric).Inc(1)
 		return mergedRootCfgs, nil
 	}
-	b.Scope.Counter(metrics.FilterPresentMetric)
+	b.Scope.Counter(metrics.FilterPresentMetric).Inc(1)
 	return mergedRootCfgs, nil
 }
 
