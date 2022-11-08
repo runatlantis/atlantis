@@ -37,16 +37,6 @@ var (
 
 	//go:embed templates/*
 	templatesFS embed.FS
-	templates   *template.Template
-	// Initialize templates using a var instead of init()
-	_ = func() struct{} {
-		templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
-		if overrides, err := templates.ParseFiles("templates/*"); err == nil {
-			// doesn't override if templates directory doesn't exist
-			templates = overrides
-		}
-		return struct{}{}
-	}()
 )
 
 // MarkdownRenderer renders responses as markdown.
@@ -60,6 +50,7 @@ type MarkdownRenderer struct {
 	DisableMarkdownFolding   bool
 	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
+	MarkdownTemplates        *template.Template
 }
 
 // commonData is data that all responses have.
@@ -112,6 +103,33 @@ type projectResultTmplData struct {
 	Rendered    string
 }
 
+// Initialize templates
+func GetMarkdownRenderer(
+	GitlabSupportsCommonMark bool,
+	DisableApplyAll bool,
+	DisableApply bool,
+	DisableMarkdownFolding bool,
+	DisableRepoLocking bool,
+	EnableDiffMarkdownFormat bool,
+	MarkdownTemplateOverridesDir string,
+) *MarkdownRenderer {
+	var templates *template.Template
+	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
+	if overrides, err := templates.ParseGlob(fmt.Sprintf("%s/*.tmpl", MarkdownTemplateOverridesDir)); err == nil {
+		// doesn't override if templates directory doesn't exist
+		templates = overrides
+	}
+	return &MarkdownRenderer{
+		GitlabSupportsCommonMark: GitlabSupportsCommonMark,
+		DisableApplyAll:          DisableApplyAll,
+		DisableMarkdownFolding:   DisableMarkdownFolding,
+		DisableApply:             DisableApply,
+		DisableRepoLocking:       DisableRepoLocking,
+		EnableDiffMarkdownFormat: EnableDiffMarkdownFormat,
+		MarkdownTemplates:        templates,
+	}
+}
+
 // Render formats the data into a markdown string.
 // nolint: interfacer
 func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType) string {
@@ -126,6 +144,9 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log 
 		DisableRepoLocking:       m.DisableRepoLocking,
 		EnableDiffMarkdownFormat: m.EnableDiffMarkdownFormat,
 	}
+
+	templates := m.MarkdownTemplates
+
 	if res.Error != nil {
 		return m.renderTemplate(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), common})
 	}
@@ -140,6 +161,8 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 	numPlanSuccesses := 0
 	numPolicyCheckSuccesses := 0
 	numVersionSuccesses := 0
+
+	templates := m.MarkdownTemplates
 
 	for _, result := range results {
 		resultData := projectResultTmplData{
