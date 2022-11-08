@@ -62,9 +62,10 @@ type workerResponse struct {
 }
 
 type queueAndState struct {
-	QueueIsEmpty bool
-	State        queue.WorkerState
-	Lock         queue.LockState
+	QueueIsEmpty      bool
+	State             queue.WorkerState
+	Lock              queue.LockState
+	CurrentDeployment queue.CurrentDeployment
 }
 
 type testDeployer struct {
@@ -124,9 +125,10 @@ func testWorkerWorkflow(ctx workflow.Context, r workerRequest) (workerResponse, 
 	err := workflow.SetQueryHandler(ctx, "queue", func() (queueAndState, error) {
 
 		return queueAndState{
-			QueueIsEmpty: q.IsEmpty(),
-			State:        worker.GetState(),
-			Lock:         q.Lock,
+			QueueIsEmpty:      q.IsEmpty(),
+			State:             worker.GetState(),
+			Lock:              q.Lock,
+			CurrentDeployment: worker.GetCurrentDeploymentState(),
 		}, nil
 	})
 	if err != nil {
@@ -195,26 +197,6 @@ func TestWorker_DeploysItems(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 
-	// we set this callback so we can query the state of the queue
-	// after all processing has complete to determine whether we should
-	// shutdown the worker
-	env.RegisterDelayedCallback(func() {
-		encoded, err := env.QueryWorkflow("queue")
-
-		assert.NoError(t, err)
-
-		var q queueAndState
-		err = encoded.Get(&q)
-
-		assert.NoError(t, err)
-
-		assert.True(t, q.QueueIsEmpty)
-		assert.Equal(t, queue.WaitingWorkerState, q.State)
-
-		env.CancelWorkflow()
-
-	}, 10*time.Second)
-
 	repo := github.Repo{
 		Owner: "owner",
 		Name:  "test",
@@ -240,6 +222,30 @@ func TestWorker_DeploysItems(t *testing.T) {
 			Repo: repo,
 		},
 	}
+
+	// we set this callback so we can query the state of the queue
+	// after all processing has complete to determine whether we should
+	// shutdown the worker
+	env.RegisterDelayedCallback(func() {
+		encoded, err := env.QueryWorkflow("queue")
+
+		assert.NoError(t, err)
+
+		var q queueAndState
+		err = encoded.Get(&q)
+
+		assert.NoError(t, err)
+
+		assert.True(t, q.QueueIsEmpty)
+		assert.Equal(t, queue.WaitingWorkerState, q.State)
+		assert.Equal(t, q.CurrentDeployment, queue.CurrentDeployment{
+			Deployment: deploymentInfoList[len(deploymentInfoList)-1],
+			Status:     queue.CompleteStatus,
+		})
+
+		env.CancelWorkflow()
+
+	}, 10*time.Second)
 
 	env.ExecuteWorkflow(testWorkerWorkflow, workerRequest{
 		Queue: deploymentInfoList,

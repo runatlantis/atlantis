@@ -60,6 +60,10 @@ func (q *Deploy) Pop() (terraform.DeploymentInfo, error) {
 	return q.queue.Pop()
 }
 
+func (q *Deploy) Scan() []terraform.DeploymentInfo {
+	return append(q.queue.Scan(High), q.queue.Scan(Low)...)
+}
+
 func (q *Deploy) GetOrderedMergedItems() []terraform.DeploymentInfo {
 	return q.queue.Scan(Low)
 }
@@ -74,7 +78,6 @@ func (q *Deploy) Push(msg terraform.DeploymentInfo) {
 		q.queue.Push(msg, High)
 		return
 	}
-
 	q.queue.Push(msg, Low)
 }
 

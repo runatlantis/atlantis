@@ -49,14 +49,27 @@ type UnlockSignalRequest struct {
 	User string
 }
 
+type CurrentDeploymentStatus int
+
+type CurrentDeployment struct {
+	Deployment terraform.DeploymentInfo
+	Status     CurrentDeploymentStatus
+}
+
+const (
+	InProgressStatus CurrentDeploymentStatus = iota
+	CompleteStatus
+)
+
 type Worker struct {
 	Queue          queue
 	Deployer       deployer
 	MetricsHandler client.MetricsHandler
 
 	// mutable
-	state            WorkerState
-	latestDeployment *deployment.Info
+	state             WorkerState
+	latestDeployment  *deployment.Info
+	currentDeployment CurrentDeployment
 }
 
 type actionType string
@@ -184,6 +197,14 @@ func (w *Worker) Work(ctx workflow.Context) {
 	}
 }
 
+func (w *Worker) setCurrentDeploymentState(state CurrentDeployment) {
+	w.currentDeployment = state
+}
+
+func (w *Worker) GetCurrentDeploymentState() CurrentDeployment {
+	return w.currentDeployment
+}
+
 func (w *Worker) awaitWork(ctx workflow.Context) workflow.Future {
 	future, settable := workflow.NewFuture(ctx)
 
@@ -204,6 +225,14 @@ func (w *Worker) deploy(ctx workflow.Context, latestDeployment *deployment.Info)
 	if err != nil {
 		return nil, errors.Wrap(err, "popping off queue")
 	}
+	w.setCurrentDeploymentState(CurrentDeployment{
+		Deployment: msg,
+		Status:     InProgressStatus,
+	})
+	defer w.setCurrentDeploymentState(CurrentDeployment{
+		Deployment: msg,
+		Status:     CompleteStatus,
+	})
 
 	ctx = workflow.WithValue(ctx, internalContext.SHAKey, msg.Revision)
 	ctx = workflow.WithValue(ctx, internalContext.DeploymentIDKey, msg.ID)

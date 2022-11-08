@@ -31,18 +31,24 @@ type Queue interface {
 	Push(terraform.DeploymentInfo)
 	GetLockState() queue.LockState
 	SetLockForMergedItems(ctx workflow.Context, state queue.LockState)
+	Scan() []terraform.DeploymentInfo
+}
+
+type DeploymentStore interface {
+	GetCurrentDeploymentState() queue.CurrentDeployment
 }
 
 type Activities interface {
 	CreateCheckRun(ctx context.Context, request activities.CreateCheckRunRequest) (activities.CreateCheckRunResponse, error)
 }
 
-func NewReceiver(ctx workflow.Context, queue Queue, activities Activities, generator idGenerator) *Receiver {
+func NewReceiver(ctx workflow.Context, queue Queue, activities Activities, generator idGenerator, worker DeploymentStore) *Receiver {
 	return &Receiver{
 		queue:       queue,
 		ctx:         ctx,
 		activities:  activities,
 		idGenerator: generator,
+		worker:      worker,
 	}
 }
 
@@ -51,6 +57,7 @@ type Receiver struct {
 	ctx         workflow.Context
 	activities  Activities
 	idGenerator idGenerator
+	worker      DeploymentStore
 }
 
 func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
@@ -77,16 +84,23 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 		logger.Error(ctx, "generating deployment id", "err", err)
 	}
 
+	// Do not push a duplicate/in-progress manual deployment to the queue
+	if root.Trigger == activity.ManualTrigger && (n.queueContainsRevision(request.Revision) || n.isInProgress(request.Revision)) {
+		//TODO: consider executing a comment activity to notify user
+		logger.Warn(ctx, "attempted to perform duplicate manual deploy", "revision", request.Revision)
+		return
+	}
+
 	resp := n.createCheckRun(ctx, id.String(), request.Revision, root, repo)
 
 	// lock the queue on a manual deployment
 	if root.Trigger == activity.ManualTrigger {
+		// Lock the queue on a manual deployment
 		n.queue.SetLockForMergedItems(ctx, queue.LockState{
 			Status:   queue.LockedStatus,
 			Revision: request.Revision,
 		})
 	}
-
 	n.queue.Push(terraform.DeploymentInfo{
 		ID:             id,
 		Root:           root,
@@ -125,4 +139,18 @@ func (n *Receiver) createCheckRun(ctx workflow.Context, id, revision string, roo
 	}
 
 	return resp
+}
+
+func (n *Receiver) isInProgress(revision string) bool {
+	current := n.worker.GetCurrentDeploymentState()
+	return revision == current.Deployment.Revision && current.Status == queue.InProgressStatus
+}
+
+func (n *Receiver) queueContainsRevision(revision string) bool {
+	for _, deployment := range n.queue.Scan() {
+		if deployment.Root.Trigger == activity.ManualTrigger && revision == deployment.Revision {
+			return true
+		}
+	}
+	return false
 }
