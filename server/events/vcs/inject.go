@@ -23,7 +23,7 @@ func newValidChecksFilters(vcsStatusPrefix string) []ValidChecksFilter {
 		statusTitleMatcher: titleMatcher,
 	}
 	return []ValidChecksFilter{
-		SuccessConclusionFilter, applyChecksFilter,
+		SuccessConclusionFilter, SkippedConclusionFilter, applyChecksFilter,
 	}
 }
 

@@ -85,6 +85,7 @@ func (c ConclusionFilter) Filter(checks []*github.CheckRun) []*github.CheckRun {
 }
 
 var SuccessConclusionFilter ConclusionFilter = "success"
+var SkippedConclusionFilter ConclusionFilter = "skipped"
 
 type MergeabilityChecker interface {
 	Check(pull *github.PullRequest, statuses []*github.RepoStatus, checks []*github.CheckRun) bool
