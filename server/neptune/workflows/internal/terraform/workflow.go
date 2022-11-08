@@ -48,7 +48,7 @@ const (
 
 const (
 	PlanReviewSignalName   = "planreview"
-	ScheduleToCloseTimeout = 30 * time.Minute
+	ScheduleToCloseTimeout = 24 * time.Hour
 	HeartBeatTimeout       = 1 * time.Minute
 
 	ActiveTerraformWorkflowStat  = "workflow.terraform.active"
