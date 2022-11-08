@@ -2,3 +2,15 @@
 | - | - | - |
 | Plan | {{ if .PlanStatus }}`{{.PlanStatus}}`{{else}}N/A{{end}} |{{ if .PlanLogURL }}[Click Here]({{.PlanLogURL}}){{else}}N/A{{end}} |
 | Apply | {{ if .ApplyStatus }}`{{.ApplyStatus}}`{{else}}N/A{{end}} |{{ if .ApplyLogURL }}[Click Here]({{.ApplyLogURL}}){{else}}N/A{{end}} |
+
+{{if .InternalError }}
+## Deployment Error :boom:
+:point_right: An error has been encountered from either of the following:
+* A Terraform operation failed
+* A Terraform apply was rejected by a user
+* There was a platform issue
+
+If a specific terraform operation has failed, check the logs (linked above) to determine if this is a terraform error or not.  If it is, you'll likely need to make some configuration fixes and try again.
+
+**Note: If the terraform operations do not indicate any failure, there is a likely a platform issue. Contact service owners for additional debugging.**
+{{end}}

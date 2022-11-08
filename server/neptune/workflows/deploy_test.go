@@ -64,13 +64,14 @@ func TestDeployWorkflow(t *testing.T) {
 	// asserting the output itself is a bit overkill tbh.
 
 	// there should be 6 state changes that are reflected in our checks (3 state changes for plan and apply)
-	assert.Len(t, s.githubClient.Updates, 6)
+	assert.Len(t, s.githubClient.Updates, 7)
 
 	// we should have output for 2 different jobs
 	assert.Len(t, s.streamCloser.CapturedJobOutput, 2)
 
-	// we should emit 2 events: IN_PROGRESS and SUCCESS
-	assert.Len(t, s.snsWriter.writes, 2)
+	// we should emit 3 events: IN_PROGRESS, SUCCESS, SUCCESS
+	// two success events are emitted since one happens on completion of the workflow.
+	assert.Len(t, s.snsWriter.writes, 3)
 }
 
 func signalWorkflow(env *testsuite.TestWorkflowEnvironment) {

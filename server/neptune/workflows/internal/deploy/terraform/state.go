@@ -38,12 +38,6 @@ func (n *StateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel,
 		return
 	}
 
-	// this shouldn't be possible
-	if workflowState.Plan == nil {
-		logger.Error(ctx, "Plan job state is nil, This is likely a bug. Unable to update checks")
-		return
-	}
-
 	// emit audit events when Apply operation is run
 	if workflowState.Apply != nil {
 		if err := n.emitApplyEvents(ctx, workflowState.Apply, deploymentInfo); err != nil {
@@ -68,7 +62,7 @@ func (n *StateReceiver) updateCheckRun(ctx workflow.Context, workflowState *stat
 		Summary: summary,
 	}
 
-	if workflowState.Plan.Status == state.SuccessJobStatus &&
+	if workflowState.Plan != nil && workflowState.Plan.Status == state.SuccessJobStatus &&
 		workflowState.Apply != nil && workflowState.Apply.Status == state.WaitingJobStatus {
 		request.Actions = []github.CheckRunAction{
 			github.CreatePlanReviewAction(github.Approve),
@@ -124,22 +118,13 @@ func (n *StateReceiver) emitApplyEvents(ctx workflow.Context, jobState *state.Jo
 }
 
 func determineCheckRunState(workflowState *state.Workflow) github.CheckRunState {
-	if workflowState.Apply == nil {
-		switch workflowState.Plan.Status {
-		case state.InProgressJobStatus, state.SuccessJobStatus, state.WaitingJobStatus:
-			return github.CheckRunPending
-		case state.FailedJobStatus:
-			return github.CheckRunFailure
-		}
+	if workflowState.Result.Status != state.CompleteWorkflowStatus {
+		return github.CheckRunPending
 	}
 
-	switch workflowState.Apply.Status {
-	case state.InProgressJobStatus, state.WaitingJobStatus:
-		return github.CheckRunPending
-	case state.SuccessJobStatus:
+	if workflowState.Result.Reason == state.SuccessfulCompletionReason {
 		return github.CheckRunSuccess
 	}
 
-	// this is a failure or rejection at this point
 	return github.CheckRunFailure
 }

@@ -105,6 +105,19 @@ func TestStateReceive(t *testing.T) {
 					Status: state.FailedJobStatus,
 				},
 			},
+			ExpectedCheckRunState: github.CheckRunPending,
+		},
+		{
+			State: &state.Workflow{
+				Plan: &state.Job{
+					Output: jobOutput,
+					Status: state.FailedJobStatus,
+				},
+				Result: state.WorkflowResult{
+					Status: state.CompleteWorkflowStatus,
+					Reason: state.InternalServiceError,
+				},
+			},
 			ExpectedCheckRunState: github.CheckRunFailure,
 		},
 		{
@@ -167,6 +180,33 @@ func TestStateReceive(t *testing.T) {
 					EndTime:   endTime,
 				},
 			},
+			ExpectedCheckRunState: github.CheckRunPending,
+			ExpectedAuditJobRequest: &activities.AuditJobRequest{
+				Root:         internalDeploymentInfo.Root,
+				Repo:         internalDeploymentInfo.Repo,
+				State:        activities.AtlantisJobStateFailure,
+				StartTime:    strconv.FormatInt(stTime.Unix(), 10),
+				EndTime:      strconv.FormatInt(endTime.Unix(), 10),
+				IsForceApply: false,
+			},
+		},
+		{
+			State: &state.Workflow{
+				Plan: &state.Job{
+					Output: jobOutput,
+					Status: state.SuccessJobStatus,
+				},
+				Apply: &state.Job{
+					Output:    jobOutput,
+					Status:    state.FailedJobStatus,
+					StartTime: stTime,
+					EndTime:   endTime,
+				},
+				Result: state.WorkflowResult{
+					Status: state.CompleteWorkflowStatus,
+					Reason: state.InternalServiceError,
+				},
+			},
 			ExpectedCheckRunState: github.CheckRunFailure,
 			ExpectedAuditJobRequest: &activities.AuditJobRequest{
 				Root:         internalDeploymentInfo.Root,
@@ -188,6 +228,10 @@ func TestStateReceive(t *testing.T) {
 					Status:    state.SuccessJobStatus,
 					StartTime: stTime,
 					EndTime:   endTime,
+				},
+				Result: state.WorkflowResult{
+					Status: state.CompleteWorkflowStatus,
+					Reason: state.SuccessfulCompletionReason,
 				},
 			},
 			ExpectedCheckRunState: github.CheckRunSuccess,

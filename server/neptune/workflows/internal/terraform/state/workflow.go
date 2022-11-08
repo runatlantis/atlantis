@@ -19,6 +19,20 @@ const (
 	SuccessJobStatus    JobStatus = "success"
 )
 
+type WorkflowStatus int
+type WorkflowCompletionReason int
+
+const (
+	InProgressWorkflowStatus WorkflowStatus = iota
+	CompleteWorkflowStatus
+)
+
+const (
+	UnknownCompletionReason WorkflowCompletionReason = iota
+	SuccessfulCompletionReason
+	InternalServiceError
+)
+
 type JobOutput struct {
 	URL *url.URL
 
@@ -34,7 +48,13 @@ type Job struct {
 	EndTime   time.Time
 }
 
+type WorkflowResult struct {
+	Status WorkflowStatus
+	Reason WorkflowCompletionReason
+}
+
 type Workflow struct {
-	Plan  *Job
-	Apply *Job
+	Plan   *Job
+	Apply  *Job
+	Result WorkflowResult
 }

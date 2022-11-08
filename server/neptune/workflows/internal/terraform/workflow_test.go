@@ -211,6 +211,7 @@ func copy(s *state.Workflow) state.Workflow {
 			},
 		}
 	}
+	copy.Result = s.Result
 	return copy
 }
 
@@ -320,6 +321,24 @@ func TestSuccess(t *testing.T) {
 				Output: &state.JobOutput{
 					URL: outputURL,
 				},
+			},
+		},
+		{
+			Plan: &state.Job{
+				Status: state.SuccessJobStatus,
+				Output: &state.JobOutput{
+					URL: outputURL,
+				},
+			},
+			Apply: &state.Job{
+				Status: state.SuccessJobStatus,
+				Output: &state.JobOutput{
+					URL: outputURL,
+				},
+			},
+			Result: state.WorkflowResult{
+				Reason: state.SuccessfulCompletionReason,
+				Status: state.CompleteWorkflowStatus,
 			},
 		},
 	}, resp.States)
@@ -461,6 +480,24 @@ func TestPlanRejection(t *testing.T) {
 				Output: &state.JobOutput{
 					URL: outputURL,
 				},
+			},
+		},
+		{
+			Plan: &state.Job{
+				Status: state.SuccessJobStatus,
+				Output: &state.JobOutput{
+					URL: outputURL,
+				},
+			},
+			Apply: &state.Job{
+				Status: state.RejectedJobStatus,
+				Output: &state.JobOutput{
+					URL: outputURL,
+				},
+			},
+			Result: state.WorkflowResult{
+				Reason: state.InternalServiceError,
+				Status: state.CompleteWorkflowStatus,
 			},
 		},
 	}, resp.States)

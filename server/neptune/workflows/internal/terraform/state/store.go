@@ -101,6 +101,11 @@ func (s *WorkflowStore) UpdateApplyJobWithStatus(status JobStatus, options ...Up
 	return s.notifier(s.state)
 }
 
+func (s *WorkflowStore) UpdateCompletion(result WorkflowResult) error {
+	s.state.Result = result
+	return s.notifier(s.state)
+}
+
 func getStartTimeFromOpts(options ...UpdateOptions) time.Time {
 	for _, o := range options {
 		if !o.StartTime.IsZero() {

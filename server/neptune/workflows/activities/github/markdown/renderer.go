@@ -16,21 +16,25 @@ var checkrunTemplateStr string
 var checkrunTemplate = template.Must(template.New("").Parse(checkrunTemplateStr))
 
 type checkrunTemplateData struct {
-	PlanStatus  string
-	PlanLogURL  string
-	ApplyStatus string
-	ApplyLogURL string
+	PlanStatus    string
+	PlanLogURL    string
+	ApplyStatus   string
+	ApplyLogURL   string
+	InternalError bool
 }
 
 func RenderWorkflowStateTmpl(workflowState *state.Workflow) string {
 	planStatus, planLogURL := getJobStatusAndOutput(workflowState.Plan)
 	applyStatus, applyLogURL := getJobStatusAndOutput(workflowState.Apply)
 
+	internalError := workflowState.Result.Reason == state.InternalServiceError
+
 	return renderTemplate(checkrunTemplate, checkrunTemplateData{
-		PlanStatus:  planStatus,
-		PlanLogURL:  planLogURL,
-		ApplyStatus: applyStatus,
-		ApplyLogURL: applyLogURL,
+		PlanStatus:    planStatus,
+		PlanLogURL:    planLogURL,
+		ApplyStatus:   applyStatus,
+		ApplyLogURL:   applyLogURL,
+		InternalError: internalError,
 	})
 }
 
