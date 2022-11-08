@@ -7,7 +7,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
-	contextInternal "github.com/runatlantis/atlantis/server/neptune/gateway/context"
+	contextInternal "github.com/runatlantis/atlantis/server/neptune/context"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
 
 	"github.com/pkg/errors"

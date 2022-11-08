@@ -5,10 +5,11 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/metrics"
-	contextInternal "github.com/runatlantis/atlantis/server/neptune/gateway/context"
 	"io"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/events/metrics"
+	contextInternal "github.com/runatlantis/atlantis/server/neptune/context"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/uber-go/tally/v4"

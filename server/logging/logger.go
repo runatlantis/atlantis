@@ -15,10 +15,11 @@
 package logging
 
 import (
+	"context"
 	"testing"
 
 	"github.com/pkg/errors"
-	context "github.com/runatlantis/atlantis/server/neptune/gateway/context"
+	ctxInternal "github.com/runatlantis/atlantis/server/neptune/context"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
@@ -54,7 +55,9 @@ func NewLoggerFromLevel(lvl LogLevel) (*logger, error) { //nolint:revive // avoi
 
 	ctxLogger := logur.WithContextExtractor(
 		structuredLogger,
-		context.ExtractFields,
+		func(ctx context.Context) map[string]interface{} {
+			return ctxInternal.ExtractFields(ctx)
+		},
 	)
 
 	return &logger{
@@ -194,7 +197,9 @@ func NewNoopCtxLogger(t *testing.T) Logger {
 	return &logger{
 		LoggerFacade: logur.WithContextExtractor(
 			sLogger,
-			context.ExtractFields,
+			func(ctx context.Context) map[string]interface{} {
+				return ctxInternal.ExtractFields(ctx)
+			},
 		),
 	}
 }

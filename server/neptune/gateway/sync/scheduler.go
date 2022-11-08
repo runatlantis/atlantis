@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/logging"
-	contextUtils "github.com/runatlantis/atlantis/server/neptune/gateway/context"
+	contextUtils "github.com/runatlantis/atlantis/server/neptune/context"
 	"github.com/runatlantis/atlantis/server/recovery"
 )
 

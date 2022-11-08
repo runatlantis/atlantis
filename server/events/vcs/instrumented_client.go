@@ -11,7 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/types"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/logging/fields"
-	keys "github.com/runatlantis/atlantis/server/neptune/gateway/context"
+	keys "github.com/runatlantis/atlantis/server/neptune/context"
 	"github.com/uber-go/tally/v4"
 )
 

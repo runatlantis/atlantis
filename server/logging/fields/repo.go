@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/neptune/gateway/context"
+	"github.com/runatlantis/atlantis/server/neptune/context"
 )
 
 func Repo(repo models.Repo) map[string]interface{} {

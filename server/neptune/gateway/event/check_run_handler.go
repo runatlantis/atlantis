@@ -3,9 +3,10 @@ package event
 import (
 	"context"
 	"fmt"
-	contextInternal "github.com/runatlantis/atlantis/server/neptune/gateway/context"
 	"regexp"
 	"strings"
+
+	contextInternal "github.com/runatlantis/atlantis/server/neptune/context"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"

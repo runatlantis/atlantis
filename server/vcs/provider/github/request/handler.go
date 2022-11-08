@@ -8,7 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/http"
 
 	"github.com/runatlantis/atlantis/server/controllers/events/handlers"
-	contextInternal "github.com/runatlantis/atlantis/server/neptune/gateway/context"
+	contextInternal "github.com/runatlantis/atlantis/server/neptune/context"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 
 	"github.com/google/go-github/v45/github"
