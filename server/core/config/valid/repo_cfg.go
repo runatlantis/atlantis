@@ -119,6 +119,7 @@ func (r RepoCfg) ValidateWorkspaceAllowed(repoRelDir string, workspace string) e
 
 type Project struct {
 	Dir                       string
+	BranchRegex               *regexp.Regexp
 	Workspace                 string
 	Name                      *string
 	WorkflowName              *string
