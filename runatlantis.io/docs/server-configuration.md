@@ -456,6 +456,21 @@ Values are chosen in this order:
   ```
   Log level. Defaults to `info`.
 
+### `--markdown-template-overrides-dir`
+  ```bash
+  atlantis server --markdown-template-overrides-dir="path/to/templates/"
+  ```
+  Directory where Atlantis will read in overrides for markdown templates used to render comments on pull requests.
+  Markdown template overrides may be specified either in individual files, or all together in a single file. All template
+  override files _must_ have the `.tmpl` extension, otherwise they will not be parsed.
+
+  Markdown templates which may have overrides can be found [here](../../server/events/templates)
+
+  Please be mindful that settings like `--enable-diff-markdown-format` depend on logic defined in the templates. It is
+  possible to diverge from expected behavior, if care is not taken when overriding default templates.
+
+  Defaults to `~/.markdown_templates/`
+
 ### `--parallel-pool-size`
   ```bash
   atlantis server --parallel-pool-size=100
