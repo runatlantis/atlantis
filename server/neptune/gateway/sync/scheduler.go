@@ -79,7 +79,7 @@ func (s *SynchronousScheduler) Schedule(ctx context.Context, f Executor) error {
 	}()
 	err := f(ctx)
 	if err != nil {
-		s.Logger.ErrorContext(context.WithValue(ctx, contextUtils.Err, err), "error running handle")
+		s.Logger.ErrorContext(context.WithValue(ctx, contextUtils.ErrKey, err), "error running handle")
 	}
 	return err
 }

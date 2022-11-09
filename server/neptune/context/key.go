@@ -15,11 +15,11 @@ const (
 	SHAKey            = Key("sha")
 	PullNumKey        = Key("pull-num")
 	ProjectKey        = Key("project")
-	Err               = Key("err")
+	ErrKey            = Key("err")
 	DeploymentIDKey   = Key("deployment-id")
 )
 
-var Keys = []Key{RequestIDKey, RepositoryKey, PullNumKey, ProjectKey, SHAKey, InstallationIDKey, DeploymentIDKey}
+var Keys = []Key{RequestIDKey, RepositoryKey, PullNumKey, ProjectKey, SHAKey, InstallationIDKey, DeploymentIDKey, ErrKey}
 
 type KVStore interface {
 	Value(key interface{}) interface{}

@@ -27,6 +27,6 @@ func PullRequest(pull models.PullRequest) map[string]interface{} {
 
 func PullRequestWithErr(pull models.PullRequest, err error) map[string]interface{} {
 	kv := PullRequest(pull)
-	kv[context.Err.String()] = err
+	kv[context.ErrKey.String()] = err
 	return kv
 }
