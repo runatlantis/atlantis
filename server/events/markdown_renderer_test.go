@@ -2222,7 +2222,41 @@ Terraform will perform the following actions:
       ]
     }
 
-Plan: 1 to add, 1 to change, 1 to destroy.
+# aws_api_gateway_rest_api.rest_api will be updated in-place
+~ resource "aws_api_gateway_rest_api" "rest_api" {
+    ~ body                         = <<-EOT
+          openapi: 3.0.0
+          security:
+            - SomeAuth: []
+          paths:
+            /someEndpoint:
+              get:
+        -       operationId: someOperation
+        +       operationId: someOperation2
+                responses:
+                  204:
+                    description: Empty response.
+          components:
+            schemas:
+              SomeEnum:
+                type: string
+                enum:
+                  - value1
+                  - value2
+            securitySchemes:
+              SomeAuth:
+                type: apiKey
+                in: header
+                name: Authorization
+      EOT
+      id                           = "4i5suz5c4l"
+      name                         = "test"
+      tags                         = {}
+      # (9 unchanged attributes hidden)
+      # (1 unchanged block hidden)
+  }
+
+Plan: 1 to add, 2 to change, 1 to destroy.
 `
 	cases := []struct {
 		Description    string
@@ -2399,7 +2433,41 @@ Terraform will perform the following actions:
       ]
     }
 
-Plan: 1 to add, 1 to change, 1 to destroy.
+# aws_api_gateway_rest_api.rest_api will be updated in-place
+! resource "aws_api_gateway_rest_api" "rest_api" {
+!     body                         = <<-EOT
+          openapi: 3.0.0
+          security:
+            - SomeAuth: []
+          paths:
+            /someEndpoint:
+              get:
+-               operationId: someOperation
++               operationId: someOperation2
+                responses:
+                  204:
+                    description: Empty response.
+          components:
+            schemas:
+              SomeEnum:
+                type: string
+                enum:
+                  - value1
+                  - value2
+            securitySchemes:
+              SomeAuth:
+                type: apiKey
+                in: header
+                name: Authorization
+      EOT
+      id                           = "4i5suz5c4l"
+      name                         = "test"
+      tags                         = {}
+      # (9 unchanged attributes hidden)
+      # (1 unchanged block hidden)
+  }
+
+Plan: 1 to add, 2 to change, 1 to destroy.
 
 $$$
 
@@ -2407,7 +2475,7 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 </details>
-Plan: 1 to add, 1 to change, 1 to destroy.
+Plan: 1 to add, 2 to change, 1 to destroy.
 
 
 `,
