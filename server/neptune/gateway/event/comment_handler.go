@@ -3,6 +3,7 @@ package event
 import (
 	"bytes"
 	"context"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -100,7 +101,10 @@ func (p *CommentEventWorkerProxy) forwardToSns(ctx context.Context, request *htt
 }
 
 func (p *CommentEventWorkerProxy) forceApply(ctx context.Context, event Comment) error {
-	rootCfgs, err := p.rootConfigBuilder.Build(ctx, event.HeadRepo, event.Pull.HeadBranch, event.Pull.HeadCommit, event.InstallationToken)
+	fileFetcherOptions := github.FileFetcherOptions{
+		PRNum: event.PullNum,
+	}
+	rootCfgs, err := p.rootConfigBuilder.Build(ctx, event.HeadRepo, event.Pull.HeadBranch, event.Pull.HeadCommit, fileFetcherOptions, event.InstallationToken)
 	if err != nil {
 		return errors.Wrap(err, "generating roots")
 	}

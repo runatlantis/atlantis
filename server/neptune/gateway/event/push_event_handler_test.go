@@ -2,6 +2,7 @@ package event_test
 
 import (
 	"context"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -366,6 +367,6 @@ type mockRootConfigBuilder struct {
 	error       error
 }
 
-func (r *mockRootConfigBuilder) Build(_ context.Context, _ models.Repo, _ string, _ string, _ int64) ([]*valid.MergedProjectCfg, error) {
+func (r *mockRootConfigBuilder) Build(_ context.Context, _ models.Repo, _ string, _ string, _ github.FileFetcherOptions, _ int64) ([]*valid.MergedProjectCfg, error) {
 	return r.rootConfigs, r.error
 }

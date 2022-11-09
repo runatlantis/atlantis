@@ -9,6 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	"github.com/uber-go/tally/v4"
 )
 
@@ -24,7 +25,7 @@ type hooksRunner interface {
 
 // fileFetcher handles being able to identify and fetch the changed files per individual commit
 type fileFetcher interface {
-	GetModifiedFilesFromCommit(ctx context.Context, repo models.Repo, sha string, installationToken int64) ([]string, error)
+	GetModifiedFiles(ctx context.Context, repo models.Repo, installationToken int64, fileFetcherOptions github.FileFetcherOptions) ([]string, error)
 }
 
 // rootFinder determines which roots were modified in a given event.
@@ -50,8 +51,8 @@ type RootConfigBuilder struct {
 	Scope           tally.Scope
 }
 
-func (b *RootConfigBuilder) Build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64) ([]*valid.MergedProjectCfg, error) {
-	mergedRootCfgs, err := b.build(ctx, repo, branch, sha, installationToken)
+func (b *RootConfigBuilder) Build(ctx context.Context, repo models.Repo, branch string, sha string, fileFetcherOptions github.FileFetcherOptions, installationToken int64) ([]*valid.MergedProjectCfg, error) {
+	mergedRootCfgs, err := b.build(ctx, repo, branch, sha, fileFetcherOptions, installationToken)
 	if err != nil {
 		b.Scope.Counter(metrics.FilterErrorMetric).Inc(1)
 		return nil, err
@@ -64,7 +65,7 @@ func (b *RootConfigBuilder) Build(ctx context.Context, repo models.Repo, branch 
 	return mergedRootCfgs, nil
 }
 
-func (b *RootConfigBuilder) build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64) ([]*valid.MergedProjectCfg, error) {
+func (b *RootConfigBuilder) build(ctx context.Context, repo models.Repo, branch string, sha string, fileFetcherOptions github.FileFetcherOptions, installationToken int64) ([]*valid.MergedProjectCfg, error) {
 	// Generate a new filepath location and clone repo into it
 	repoDir, cleanup, err := b.RepoFetcher.Fetch(ctx, repo, branch, sha)
 	if err != nil {
@@ -79,7 +80,7 @@ func (b *RootConfigBuilder) build(ctx context.Context, repo models.Repo, branch 
 	}
 
 	// Fetch files modified in commit
-	modifiedFiles, err := b.FileFetcher.GetModifiedFilesFromCommit(ctx, repo, sha, installationToken)
+	modifiedFiles, err := b.FileFetcher.GetModifiedFiles(ctx, repo, installationToken, fileFetcherOptions)
 	if err != nil {
 		return nil, errors.Wrapf(err, "finding modified files: %s", modifiedFiles)
 	}

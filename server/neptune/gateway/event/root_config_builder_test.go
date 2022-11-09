@@ -3,6 +3,7 @@ package event_test
 import (
 	"context"
 	"errors"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	"github.com/uber-go/tally/v4"
 	"testing"
 
@@ -55,7 +56,8 @@ func TestRootConfigBuilder_Success(t *testing.T) {
 	expProjectConfigs := []*valid.MergedProjectCfg{
 		&projCfg,
 	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
+	options := github.FileFetcherOptions{Sha: pushEvent.Sha}
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, options, pushEvent.InstallationToken)
 	assert.NoError(t, err)
 	assert.Equal(t, expProjectConfigs, projectConfigs)
 }
@@ -66,7 +68,8 @@ func TestRootConfigBuilder_DetermineRootsError(t *testing.T) {
 		error: expectedErr,
 	}
 	rcb.RootFinder = mockRootFinder
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
+	options := github.FileFetcherOptions{Sha: pushEvent.Sha}
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, options, pushEvent.InstallationToken)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -78,7 +81,8 @@ func TestRootConfigBuilder_ParserValidatorParseError(t *testing.T) {
 		error: expectedErr,
 	}
 	rcb.ParserValidator = mockParserValidator
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
+	options := github.FileFetcherOptions{Sha: pushEvent.Sha}
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, options, pushEvent.InstallationToken)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -89,7 +93,8 @@ func TestRootConfigBuilder_GetModifiedFilesError(t *testing.T) {
 	rcb.FileFetcher = &mockFileFetcher{
 		error: expectedErr,
 	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
+	options := github.FileFetcherOptions{Sha: pushEvent.Sha}
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, options, pushEvent.InstallationToken)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 }
@@ -99,7 +104,8 @@ func TestRootConfigBuilder_CloneError(t *testing.T) {
 	rcb.RepoFetcher = &mockRepoFetcher{
 		cloneError: expectedErr,
 	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
+	options := github.FileFetcherOptions{Sha: pushEvent.Sha}
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, options, pushEvent.InstallationToken)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -111,7 +117,8 @@ func TestRootConfigBuilder_HooksRunnerError(t *testing.T) {
 		error: expectedErr,
 	}
 	rcb.HooksRunner = mockHooksRunner
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken)
+	options := github.FileFetcherOptions{Sha: pushEvent.Sha}
+	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, options, pushEvent.InstallationToken)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -139,7 +146,7 @@ type mockFileFetcher struct {
 	error error
 }
 
-func (f *mockFileFetcher) GetModifiedFilesFromCommit(_ context.Context, _ models.Repo, _ string, _ int64) ([]string, error) {
+func (f *mockFileFetcher) GetModifiedFiles(_ context.Context, _ models.Repo, _ int64, _ github.FileFetcherOptions) ([]string, error) {
 	return nil, f.error
 }
 

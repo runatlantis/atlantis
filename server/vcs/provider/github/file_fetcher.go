@@ -15,28 +15,44 @@ type RemoteFileFetcher struct {
 	ClientCreator githubapp.ClientCreator
 }
 
-func (r *RemoteFileFetcher) GetModifiedFilesFromCommit(ctx context.Context, repo models.Repo, sha string, installationToken int64) ([]string, error) {
+type FileFetcherOptions struct {
+	Sha   string
+	PRNum int
+}
+
+func (r *RemoteFileFetcher) GetModifiedFiles(ctx context.Context, repo models.Repo, installationToken int64, fileFetcherOptions FileFetcherOptions) ([]string, error) {
+	client, err := r.ClientCreator.NewInstallationClient(installationToken)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating installation client")
+	}
+
+	var fileFetcher func(ctx context.Context, client *gh.Client, repo models.Repo, fileFetcherOptions FileFetcherOptions, listOptions gh.ListOptions) ([]*gh.CommitFile, *gh.Response, error)
+	if fileFetcherOptions.Sha != "" {
+		fileFetcher = GetCommit
+	} else if fileFetcherOptions.PRNum != 0 {
+		fileFetcher = ListFiles
+	} else {
+		return nil, errors.New("invalid fileFetcherOptions")
+	}
+
 	var files []string
 	nextPage := 0
 	for {
-		opts := gh.ListOptions{
+		listOptions := gh.ListOptions{
 			PerPage: 300,
 		}
 		if nextPage != 0 {
-			opts.Page = nextPage
+			listOptions.Page = nextPage
 		}
-		client, err := r.ClientCreator.NewInstallationClient(installationToken)
+
+		pageFiles, resp, err := fileFetcher(ctx, client, repo, fileFetcherOptions, listOptions)
 		if err != nil {
-			return files, errors.Wrap(err, "creating installation client")
-		}
-		repositoryCommit, resp, err := client.Repositories.GetCommit(ctx, repo.Owner, repo.Name, sha, &opts)
-		if err != nil {
-			return nil, errors.Wrap(err, "error fetching repository commit")
+			return nil, errors.Wrap(err, "error fetching files")
 		}
 		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("not ok status fetching repository commit: %s", resp.Status)
+			return nil, fmt.Errorf("not ok status fetching files: %s", resp.Status)
 		}
-		for _, f := range repositoryCommit.Files {
+		for _, f := range pageFiles {
 			files = append(files, f.GetFilename())
 
 			// If the file was renamed, we'll want to run plan in the directory
@@ -51,4 +67,16 @@ func (r *RemoteFileFetcher) GetModifiedFilesFromCommit(ctx context.Context, repo
 		nextPage = resp.NextPage
 	}
 	return files, nil
+}
+
+func GetCommit(ctx context.Context, client *gh.Client, repo models.Repo, fileFetcherOptions FileFetcherOptions, listOptions gh.ListOptions) ([]*gh.CommitFile, *gh.Response, error) {
+	repositoryCommit, resp, err := client.Repositories.GetCommit(ctx, repo.Owner, repo.Name, fileFetcherOptions.Sha, &listOptions)
+	if repositoryCommit != nil {
+		return repositoryCommit.Files, resp, err
+	}
+	return nil, nil, errors.New("unable to retrieve commit files from GH commit")
+}
+
+func ListFiles(ctx context.Context, client *gh.Client, repo models.Repo, fileFetcherOptions FileFetcherOptions, listOptions gh.ListOptions) ([]*gh.CommitFile, *gh.Response, error) {
+	return client.PullRequests.ListFiles(ctx, repo.Owner, repo.Name, fileFetcherOptions.PRNum, &listOptions)
 }

@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -41,7 +42,7 @@ type deploySignaler interface {
 }
 
 type rootConfigBuilder interface {
-	Build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64) ([]*valid.MergedProjectCfg, error)
+	Build(ctx context.Context, repo models.Repo, branch string, sha string, fileFetcherOptions github.FileFetcherOptions, installationToken int64) ([]*valid.MergedProjectCfg, error)
 }
 
 type PushHandler struct {
@@ -83,7 +84,10 @@ func (p *PushHandler) Handle(ctx context.Context, event Push) error {
 }
 
 func (p *PushHandler) handle(ctx context.Context, event Push) error {
-	rootCfgs, err := p.RootConfigBuilder.Build(ctx, event.Repo, event.Ref.Name, event.Sha, event.InstallationToken)
+	fileFetcherOptions := github.FileFetcherOptions{
+		Sha: event.Sha,
+	}
+	rootCfgs, err := p.RootConfigBuilder.Build(ctx, event.Repo, event.Ref.Name, event.Sha, fileFetcherOptions, event.InstallationToken)
 	if err != nil {
 		return errors.Wrap(err, "generating roots")
 	}
