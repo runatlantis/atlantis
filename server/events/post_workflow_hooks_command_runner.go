@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -10,7 +11,7 @@ import (
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_post_workflows_hooks_command_runner.go PostWorkflowHooksCommandRunner
 
 type PostWorkflowHooksCommandRunner interface {
-	RunPostHooks(ctx *CommandContext) error
+	RunPostHooks(ctx *command.Context, cmd *CommentCommand) error
 }
 
 // DefaultPostWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
@@ -24,7 +25,7 @@ type DefaultPostWorkflowHooksCommandRunner struct {
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
 func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
-	ctx *CommandContext,
+	ctx *command.Context, cmd *CommentCommand,
 ) error {
 	pull := ctx.Pull
 	baseRepo := pull.BaseRepo
@@ -46,7 +47,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 
 	log.Debug("post-hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
+	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace, DefaultRepoRelDir)
 	if err != nil {
 		return err
 	}
@@ -58,14 +59,20 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 		return err
 	}
 
+	var escapedArgs []string
+	if cmd != nil {
+		escapedArgs = escapeArgs(cmd.Flags)
+	}
+
 	err = w.runHooks(
 		models.WorkflowHookCommandContext{
-			BaseRepo: baseRepo,
-			HeadRepo: headRepo,
-			Log:      log,
-			Pull:     pull,
-			User:     user,
-			Verbose:  false,
+			BaseRepo:           baseRepo,
+			HeadRepo:           headRepo,
+			Log:                log,
+			Pull:               pull,
+			User:               user,
+			Verbose:            false,
+			EscapedCommentArgs: escapedArgs,
 		},
 		postWorkflowHooks, repoDir)
 

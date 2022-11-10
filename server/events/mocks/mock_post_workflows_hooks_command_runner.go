@@ -4,10 +4,12 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	events "github.com/runatlantis/atlantis/server/events"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	events "github.com/runatlantis/atlantis/server/events"
+	command "github.com/runatlantis/atlantis/server/events/command"
 )
 
 type MockPostWorkflowHooksCommandRunner struct {
@@ -27,11 +29,11 @@ func (mock *MockPostWorkflowHooksCommandRunner) SetFailHandler(fh pegomock.FailH
 }
 func (mock *MockPostWorkflowHooksCommandRunner) FailHandler() pegomock.FailHandler { return mock.fail }
 
-func (mock *MockPostWorkflowHooksCommandRunner) RunPostHooks(ctx *events.CommandContext) error {
+func (mock *MockPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Context, cmd *events.CommentCommand) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPostWorkflowHooksCommandRunner().")
 	}
-	params := []pegomock.Param{ctx}
+	params := []pegomock.Param{ctx, cmd}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("RunPostHooks", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -79,8 +81,8 @@ type VerifierMockPostWorkflowHooksCommandRunner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockPostWorkflowHooksCommandRunner) RunPostHooks(ctx *events.CommandContext) *MockPostWorkflowHooksCommandRunner_RunPostHooks_OngoingVerification {
-	params := []pegomock.Param{ctx}
+func (verifier *VerifierMockPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Context, cmd *events.CommentCommand) *MockPostWorkflowHooksCommandRunner_RunPostHooks_OngoingVerification {
+	params := []pegomock.Param{ctx, cmd}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunPostHooks", params, verifier.timeout)
 	return &MockPostWorkflowHooksCommandRunner_RunPostHooks_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -90,17 +92,21 @@ type MockPostWorkflowHooksCommandRunner_RunPostHooks_OngoingVerification struct 
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockPostWorkflowHooksCommandRunner_RunPostHooks_OngoingVerification) GetCapturedArguments() *events.CommandContext {
-	ctx := c.GetAllCapturedArguments()
-	return ctx[len(ctx)-1]
+func (c *MockPostWorkflowHooksCommandRunner_RunPostHooks_OngoingVerification) GetCapturedArguments() (*command.Context, *events.CommentCommand) {
+	ctx, cmd := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], cmd[len(cmd)-1]
 }
 
-func (c *MockPostWorkflowHooksCommandRunner_RunPostHooks_OngoingVerification) GetAllCapturedArguments() (_param0 []*events.CommandContext) {
+func (c *MockPostWorkflowHooksCommandRunner_RunPostHooks_OngoingVerification) GetAllCapturedArguments() (_param0 []*command.Context, _param1 []*events.CommentCommand) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*events.CommandContext, len(c.methodInvocations))
+		_param0 = make([]*command.Context, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(*events.CommandContext)
+			_param0[u] = param.(*command.Context)
+		}
+		_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(*events.CommentCommand)
 		}
 	}
 	return

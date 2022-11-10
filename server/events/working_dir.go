@@ -14,19 +14,24 @@
 package events
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"golang.org/x/sync/semaphore"
 )
 
 const workingDirPrefix = "repos"
+
+var cloneLocks sync.Map
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_working_dir.go WorkingDir
 //go:generate pegomock generate -m --use-experimental-model-gen --package events WorkingDir
@@ -62,13 +67,19 @@ type FileWorkspace struct {
 	// TestingOverrideBaseCloneURL can be used during testing to override the
 	// URL of the base repo to be cloned. If it's empty then we clone normally.
 	TestingOverrideBaseCloneURL string
+	// GithubAppEnabled is true if we should fetch the ref "pull/PR_NUMBER/head"
+	// from the "origin" remote. If this is false, we fetch "+refs/heads/$HEAD_BRANCH"
+	// from the "head" remote.
+	GithubAppEnabled bool
+	// use the global setting without overriding
+	GpgNoSigningEnabled bool
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
 // path to the root of the cloned repo. It also returns
 // a boolean indicating if we should warn users that the branch we're
 // merging into has been updated since we cloned it.
-//If the repo already exists and is at
+// If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(
@@ -193,6 +204,18 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	headRepo models.Repo,
 	p models.PullRequest) error {
 
+	value, _ := cloneLocks.LoadOrStore(cloneDir, semaphore.NewWeighted(1))
+	sem := value.(*semaphore.Weighted)
+
+	defer sem.Release(1)
+	if acquired := sem.TryAcquire(1); !acquired {
+		err := sem.Acquire(context.TODO(), 1)
+		if err != nil {
+			return errors.Wrap(err, "waiting for repository to be cloned")
+		}
+		return nil
+	}
+
 	err := os.RemoveAll(cloneDir)
 	if err != nil {
 		return errors.Wrapf(err, "deleting dir %q before cloning", cloneDir)
@@ -220,6 +243,12 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 		// get merge conflicts if our clone doesn't have the commits that the
 		// branch we're merging branched off at.
 		// See https://groups.google.com/forum/#!topic/git-users/v3MkuuiDJ98.
+		fetchRef := fmt.Sprintf("+refs/heads/%s:", p.HeadBranch)
+		fetchRemote := "head"
+		if w.GithubAppEnabled {
+			fetchRef = fmt.Sprintf("pull/%d/head:", p.Num)
+			fetchRemote = "origin"
+		}
 		cmds = [][]string{
 			{
 				"git", "clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir,
@@ -228,18 +257,23 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 				"git", "remote", "add", "head", headCloneURL,
 			},
 			{
-				"git", "fetch", "head", fmt.Sprintf("+refs/heads/%s:", p.HeadBranch),
-			},
-			// We use --no-ff because we always want there to be a merge commit.
-			// This way, our branch will look the same regardless if the merge
-			// could be fast forwarded. This is useful later when we run
-			// git rev-parse HEAD^2 to get the head commit because it will
-			// always succeed whereas without --no-ff, if the merge was fast
-			// forwarded then git rev-parse HEAD^2 would fail.
-			{
-				"git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD",
+				"git", "fetch", fetchRemote, fetchRef,
 			},
 		}
+		if w.GpgNoSigningEnabled {
+			cmds = append(cmds, []string{
+				"git", "config", "--local", "commit.gpgsign", "false",
+			})
+		}
+		// We use --no-ff because we always want there to be a merge commit.
+		// This way, our branch will look the same regardless if the merge
+		// could be fast forwarded. This is useful later when we run
+		// git rev-parse HEAD^2 to get the head commit because it will
+		// always succeed whereas without --no-ff, if the merge was fast
+		// forwarded then git rev-parse HEAD^2 would fail.
+		cmds = append(cmds, []string{
+			"git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD",
+		})
 	} else {
 		cmds = [][]string{
 			{

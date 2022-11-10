@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -23,10 +24,14 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/yourbasic/graph"
 
-	"github.com/docker/docker/pkg/fileutils"
+	"github.com/moby/moby/pkg/fileutils"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/hashicorp/hcl/v2/hclparse"
 )
 
 // ProjectFinder determines which projects were modified in a given pull
@@ -40,6 +45,88 @@ type ProjectFinder interface {
 	// based on modifiedFiles and the repo's config.
 	// absRepoDir is the path to the cloned repo on disk.
 	DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
+
+	DetermineWorkspaceFromHCL(log logging.SimpleLogging, absRepoDir string) (string, error)
+}
+
+var rootBlockSchema = &hcl.BodySchema{
+	Blocks: []hcl.BlockHeaderSchema{
+		{
+			Type:       "terraform",
+			LabelNames: nil,
+		},
+	},
+}
+
+var terraformBlockSchema = &hcl.BodySchema{
+	Blocks: []hcl.BlockHeaderSchema{
+		{
+			Type: "cloud",
+		},
+	},
+}
+
+var cloudBlockSchema = &hcl.BodySchema{
+	Blocks: []hcl.BlockHeaderSchema{
+		{
+			Type: "workspaces",
+		},
+	},
+}
+
+func (p *DefaultProjectFinder) DetermineWorkspaceFromHCL(log logging.SimpleLogging, absRepoDir string) (string, error) {
+	log.Info("looking for Terraform Cloud workspace from configuration in %q", absRepoDir)
+	infos, err := ioutil.ReadDir(absRepoDir)
+	if err != nil {
+		return "", err
+	}
+	parser := hclparse.NewParser()
+	for _, info := range infos {
+		if info.IsDir() {
+			continue
+		}
+
+		name := info.Name()
+		if strings.HasSuffix(name, ".tf") {
+			fullPath := filepath.Join(absRepoDir, name)
+			file, _ := parser.ParseHCLFile(fullPath)
+			workspace, err := findTFCloudWorkspaceFromFile(file)
+			if err != nil {
+				log.Warn(err.Error())
+				return DefaultWorkspace, nil
+			}
+
+			if len(workspace) > 0 {
+				log.Debug("found configured Terraform Cloud workspace with name %q", workspace)
+				return workspace, nil
+			}
+		}
+	}
+
+	log.Debug("no Terraform Cloud workspace explicitly configured in Terraform codes. Use default workspace (%q)", DefaultWorkspace)
+	return DefaultWorkspace, nil
+}
+
+func findTFCloudWorkspaceFromFile(file *hcl.File) (string, error) {
+	content, _, _ := file.Body.PartialContent(rootBlockSchema)
+	workspace := ""
+
+	if len(content.Blocks) == 1 {
+		content, _, _ = content.Blocks[0].Body.PartialContent(terraformBlockSchema)
+		if len(content.Blocks) == 1 {
+			content, _, _ = content.Blocks[0].Body.PartialContent(cloudBlockSchema)
+			if len(content.Blocks) == 1 {
+				attrs, _ := content.Blocks[0].Body.JustAttributes()
+				if nameAttr, defined := attrs["name"]; defined {
+					diags := gohcl.DecodeExpression(nameAttr.Expr, nil, &workspace)
+					if diags.HasErrors() {
+						return "", fmt.Errorf("unable to parse workspace configuration: %q", diags.Error())
+					}
+				}
+			}
+		}
+	}
+	return workspace, nil
 }
 
 // ignoredFilenameFragments contains filename fragments to ignore while looking at changes

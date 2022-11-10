@@ -8,12 +8,13 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/events/command"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 
 	. "github.com/petergtz/pegomock"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
@@ -32,7 +33,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 
 	workspace := "default"
 	logger := logging.NewNoopLogger(t)
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,
@@ -119,7 +120,7 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 
 	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
-	_, err := s.Run(models.ProjectCommandContext{
+	_, err := s.Run(command.ProjectContext{
 		Log:        logger,
 		Workspace:  workspace,
 		RepoRelDir: ".",
@@ -159,7 +160,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger(t)
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				Log:                logger,
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
@@ -253,7 +254,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			terraform := mocks.NewMockClient()
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger(t)
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				Log:                logger,
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
@@ -319,7 +320,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger(t)
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
@@ -415,7 +416,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 		"-var-file",
 		envVarsFile,
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
@@ -452,7 +453,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -551,7 +552,7 @@ Terraform will perform the following actions:
 				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 			}
 		})
-	actOutput, err := s.Run(models.ProjectCommandContext{Workspace: "default"}, nil, "", map[string]string(nil))
+	actOutput, err := s.Run(command.ProjectContext{Workspace: "default"}, nil, "", map[string]string(nil))
 	Ok(t, err)
 	Equals(t, `
 An execution plan has been generated and is shown below.
@@ -605,7 +606,7 @@ func TestRun_OutputOnErr(t *testing.T) {
 				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 			}
 		})
-	actOutput, actErr := s.Run(models.ProjectCommandContext{Workspace: "default"}, nil, "", map[string]string(nil))
+	actOutput, actErr := s.Run(command.ProjectContext{Workspace: "default"}, nil, "", map[string]string(nil))
 	ErrEquals(t, expErrMsg, actErr)
 	Equals(t, expOutput, actOutput)
 }
@@ -658,7 +659,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				Workspace:          "default",
 				RepoRelDir:         ".",
 				User:               models.User{Username: "username"},
@@ -704,7 +705,7 @@ locally at this time.
 
 			logger := logging.NewNoopLogger(t)
 			// Now that mocking is set up, we're ready to run the plan.
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				Log:                logger,
 				Workspace:          "default",
 				RepoRelDir:         ".",
@@ -806,8 +807,8 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
 
 			// Ensure that the status was updated with the runURL.
 			runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
-			updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, runURL)
-			updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.SuccessCommitStatus, runURL)
+			updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.PendingCommitStatus, runURL)
+			updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.SuccessCommitStatus, runURL)
 		})
 	}
 }
@@ -884,13 +885,13 @@ type remotePlanMock struct {
 	CalledArgs []string
 }
 
-func (r *remotePlanMock) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+func (r *remotePlanMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line) {
 	r.CalledArgs = args
 	in := make(chan string)
-	out := make(chan terraform.Line)
+	out := make(chan runtimemodels.Line)
 	go func() {
 		for _, line := range strings.Split(r.LinesToSend, "\n") {
-			out <- terraform.Line{Line: line}
+			out <- runtimemodels.Line{Line: line}
 		}
 		close(out)
 		close(in)

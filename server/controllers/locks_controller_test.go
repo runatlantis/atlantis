@@ -22,6 +22,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
+	"github.com/runatlantis/atlantis/server/events/command"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -297,14 +298,15 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			RepoFullName: repoName,
 		},
 	}, nil)
+	var backend locking.Backend
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	db, err := db.New(tmp)
+	backend, err := db.New(tmp)
 	Ok(t, err)
 	// Seed the DB with a successful plan for that project (that is later discarded).
-	_, err = db.UpdatePullWithResults(pull, []models.ProjectResult{
+	_, err = backend.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
-			Command:    models.PlanCommand,
+			Command:    command.Plan,
 			RepoRelDir: projectPath,
 			Workspace:  workspaceName,
 			PlanSuccess: &models.PlanSuccess{
@@ -320,14 +322,14 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 		VCSClient:         cp,
 		WorkingDirLocker:  workingDirLocker,
 		WorkingDir:        workingDir,
-		DB:                db,
+		Backend:           backend,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
 	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
-	status, err := db.GetPullStatus(pull)
+	status, err := backend.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, status.Projects != nil, "status projects was nil")
 	Equals(t, []models.ProjectStatus{
@@ -351,18 +353,19 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())).ThenReturn(errors.New("err"))
+	var backend locking.Backend
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	db, err := db.New(tmp)
+	backend, err := db.New(tmp)
 	Ok(t, err)
+	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())).ThenReturn(errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,
 		WorkingDir:        workingDir,
 		WorkingDirLocker:  workingDirLocker,
-		DB:                db,
+		Backend:           backend,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -378,6 +381,11 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	dlc := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	var backend locking.Backend
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	backend, err := db.New(tmp)
+	Ok(t, err)
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
@@ -389,15 +397,11 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 			RepoFullName: "owner/repo",
 		},
 	}, nil)
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
-	db, err := db.New(tmp)
-	Ok(t, err)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,
-		DB:                db,
+		Backend:           backend,
 		WorkingDir:        workingDir,
 		WorkingDirLocker:  workingDirLocker,
 	}

@@ -25,6 +25,7 @@ import (
 
 	"github.com/flynn-archive/go-shlex"
 	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/spf13/pflag"
 )
@@ -95,12 +96,12 @@ type CommentParseResult struct {
 // Parse parses the comment as an Atlantis command.
 //
 // Valid commands contain:
-// - The initial "executable" name, 'run' or 'atlantis' or '@GithubUser'
-//   where GithubUser is the API user Atlantis is running as.
-// - Then a command: 'plan', 'apply', 'unlock', 'version, 'approve_policies',
-//   or 'help'.
-// - Then optional flags, then an optional separator '--' followed by optional
-//   extra flags to be appended to the terraform plan/apply command.
+//   - The initial "executable" name, 'run' or 'atlantis' or '@GithubUser'
+//     where GithubUser is the API user Atlantis is running as.
+//   - Then a command: 'plan', 'apply', 'unlock', 'version, 'approve_policies',
+//     or 'help'.
+//   - Then optional flags, then an optional separator '--' followed by optional
+//     extra flags to be appended to the terraform plan/apply command.
 //
 // Examples:
 // - atlantis help
@@ -111,8 +112,9 @@ type CommentParseResult struct {
 // - atlantis unlock
 // - atlantis version
 // - atlantis approve_policies
-//
-func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) CommentParseResult {
+func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) CommentParseResult {
+	comment := strings.TrimSpace(rawComment)
+
 	if multiLineRegex.MatchString(comment) {
 		return CommentParseResult{Ignore: true}
 	}
@@ -162,16 +164,16 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	if len(args) == 1 {
 		return CommentParseResult{CommentResponse: e.HelpComment(e.ApplyDisabled)}
 	}
-	command := args[1]
+	cmd := args[1]
 
 	// Help output.
-	if e.stringInSlice(command, []string{"help", "-h", "--help"}) {
+	if e.stringInSlice(cmd, []string{"help", "-h", "--help"}) {
 		return CommentParseResult{CommentResponse: e.HelpComment(e.ApplyDisabled)}
 	}
 
-	// Need plan, apply, unlock, approve_policies, or version at this point.
-	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.UnlockCommand.String(), models.ApprovePoliciesCommand.String(), models.VersionCommand.String()}) {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
+	// Need to have a plan, apply, approve_policy or unlock at this point.
+	if !e.stringInSlice(cmd, []string{command.Plan.String(), command.Apply.String(), command.Unlock.String(), command.ApprovePolicies.String(), command.Version.String()}) {
+		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", cmd)}
 	}
 
 	var workspace string
@@ -179,58 +181,58 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	var project string
 	var verbose, autoMergeDisabled bool
 	var flagSet *pflag.FlagSet
-	var name models.CommandName
+	var name command.Name
 
 	// Set up the flag parsing depending on the command.
-	switch command {
-	case models.PlanCommand.String():
-		name = models.PlanCommand
-		flagSet = pflag.NewFlagSet(models.PlanCommand.String(), pflag.ContinueOnError)
+	switch cmd {
+	case command.Plan.String():
+		name = command.Plan
+		flagSet = pflag.NewFlagSet(command.Plan.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Which project to run plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", config.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
-	case models.ApplyCommand.String():
-		name = models.ApplyCommand
-		flagSet = pflag.NewFlagSet(models.ApplyCommand.String(), pflag.ContinueOnError)
+	case command.Apply.String():
+		name = command.Apply
+		flagSet = pflag.NewFlagSet(command.Apply.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Apply the plan for this Terraform workspace.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", config.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
-	case models.ApprovePoliciesCommand.String():
-		name = models.ApprovePoliciesCommand
-		flagSet = pflag.NewFlagSet(models.ApprovePoliciesCommand.String(), pflag.ContinueOnError)
+	case command.ApprovePolicies.String():
+		name = command.ApprovePolicies
+		flagSet = pflag.NewFlagSet(command.ApprovePolicies.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
-	case models.UnlockCommand.String():
-		name = models.UnlockCommand
-		flagSet = pflag.NewFlagSet(models.UnlockCommand.String(), pflag.ContinueOnError)
+	case command.Unlock.String():
+		name = command.Unlock
+		flagSet = pflag.NewFlagSet(command.Unlock.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
-	case models.VersionCommand.String():
-		name = models.VersionCommand
-		flagSet = pflag.NewFlagSet(models.VersionCommand.String(), pflag.ContinueOnError)
+	case command.Version.String():
+		name = command.Version
+		flagSet = pflag.NewFlagSet(command.Version.String(), pflag.ContinueOnError)
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before running version.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run version in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Print the version for this project. Refers to the name of the project configured in %s.", config.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	default:
-		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}
+		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", cmd)}
 	}
 
 	// Now parse the flags.
 	// It's safe to use [2:] because we know there's at least 2 elements in args.
 	err = flagSet.Parse(args[2:])
 	if err == pflag.ErrHelp {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", command, flagSet.FlagUsagesWrapped(usagesCols))}
+		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", cmd, flagSet.FlagUsagesWrapped(usagesCols))}
 	}
 	if err != nil {
-		if command == models.UnlockCommand.String() {
+		if cmd == command.Unlock.String() {
 			return CommentParseResult{CommentResponse: UnlockUsage}
 		}
-		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), command, flagSet)}
+		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
 
 	var unusedArgs []string
@@ -240,7 +242,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		unusedArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
 	}
 	if len(unusedArgs) > 0 {
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(unusedArgs, " ")), command, flagSet)}
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(unusedArgs, " ")), cmd, flagSet)}
 	}
 
 	var extraArgs []string
@@ -250,14 +252,14 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 
 	dir, err = e.validateDir(dir)
 	if err != nil {
-		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), command, flagSet)}
+		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
 
 	// Use the same validation that Terraform uses: https://git.io/vxGhU. Plus
 	// we also don't allow '..'. We don't want the workspace to contain a path
 	// since we create files based on the name.
 	if workspace != url.PathEscape(workspace) || strings.Contains(workspace, "..") {
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace: %q", workspace), command, flagSet)}
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace: %q", workspace), cmd, flagSet)}
 	}
 
 	// If project is specified, dir or workspace should not be set. Since we
@@ -267,7 +269,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	// an error.
 	if project != "" && (workspace != "" || dir != "") {
 		err := fmt.Sprintf("cannot use -%s/--%s at same time as -%s/--%s or -%s/--%s", projectFlagShort, projectFlagLong, dirFlagShort, dirFlagLong, workspaceFlagShort, workspaceFlagLong)
-		return CommentParseResult{CommentResponse: e.errMarkdown(err, command, flagSet)}
+		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 	}
 
 	return CommentParseResult{
@@ -288,19 +290,19 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 		}
 		commentFlags = fmt.Sprintf(" -- %s", strings.Join(flagsWithoutQuotes, " "))
 	}
-	return fmt.Sprintf("%s %s%s%s", atlantisExecutable, models.PlanCommand.String(), flags, commentFlags)
+	return fmt.Sprintf("%s %s%s%s", atlantisExecutable, command.Plan.String(), flags, commentFlags)
 }
 
 // BuildApplyComment builds an apply comment for the specified args.
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
 	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled)
-	return fmt.Sprintf("%s %s%s", atlantisExecutable, models.ApplyCommand.String(), flags)
+	return fmt.Sprintf("%s %s%s", atlantisExecutable, command.Apply.String(), flags)
 }
 
 // BuildVersionComment builds a version comment for the specified args.
 func (e *CommentParser) BuildVersionComment(repoRelDir string, workspace string, project string) string {
 	flags := e.buildFlags(repoRelDir, workspace, project, false)
-	return fmt.Sprintf("%s %s%s", atlantisExecutable, models.VersionCommand.String(), flags)
+	return fmt.Sprintf("%s %s%s", atlantisExecutable, command.Version.String(), flags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
@@ -361,8 +363,8 @@ func (e *CommentParser) stringInSlice(a string, list []string) bool {
 	return false
 }
 
-func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pflag.FlagSet) string {
-	return fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s```", errMsg, command, flagSet.FlagUsagesWrapped(usagesCols))
+func (e *CommentParser) errMarkdown(errMsg string, cmd string, flagSet *pflag.FlagSet) string {
+	return fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s```", errMsg, cmd, flagSet.FlagUsagesWrapped(usagesCols))
 }
 
 func (e *CommentParser) HelpComment(applyDisabled bool) string {
@@ -426,7 +428,7 @@ var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terr
 // `atlantis unlock` with flags.
 
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
-	`atlantis unlock	
+	`atlantis unlock
 
   Unlocks the entire PR and discards all plans in this PR.
   Arguments or flags are not supported at the moment.

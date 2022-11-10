@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
+	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -93,7 +95,7 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -102,11 +104,6 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		ProjectName:        "projectname",
 		Pull: models.PullRequest{
 			Num: 2,
-		},
-		BaseRepo: models.Repo{
-			FullName: "owner/repo",
-			Owner:    "owner",
-			Name:     "repo",
 		},
 	}
 	defer cleanup()
@@ -140,7 +137,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -183,7 +180,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -230,7 +227,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -278,7 +275,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -315,7 +312,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -353,7 +350,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
@@ -385,7 +382,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	Equals(t, "echo me", out)
 }
 
-func waitCh(ch <-chan Line) (string, error) {
+func waitCh(ch <-chan runtimemodels.Line) (string, error) {
 	var ls []string
 	for line := range ch {
 		if line.Err != nil {

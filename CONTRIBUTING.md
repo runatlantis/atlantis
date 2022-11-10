@@ -130,6 +130,8 @@ We use [pegomock](https://github.com/petergtz/pegomock) for mocking. If you're
 modifying any interfaces that are mocked, you'll need to regen the mocks for that
 interface.
 
+Install using `go get github.com/petergtz/pegomock/pegomock`
+
 If you see errors like:
 ```
 # github.com/runatlantis/atlantis/server/events [github.com/runatlantis/atlantis/server/events.test]
@@ -144,7 +146,7 @@ Each interface that is mocked has a `go:generate` command above it, e.g.
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
 type ProjectCommandBuilder interface {
-	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
+	BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error)
 }
 ```
 

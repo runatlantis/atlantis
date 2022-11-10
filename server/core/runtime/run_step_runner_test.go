@@ -11,8 +11,10 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -37,11 +39,15 @@ func TestRunStepRunner_Run(t *testing.T) {
 		},
 		{
 			Command: `printf \'your main.tf file does not provide default region.\\ncheck\'`,
-			ExpOut:  `'your`,
+			ExpOut:  "'your\n",
 		},
 		{
 			Command: `printf 'your main.tf file does not provide default region.\ncheck'`,
-			ExpOut:  "your main.tf file does not provide default region.\ncheck",
+			ExpOut:  "your main.tf file does not provide default region.\ncheck\n",
+		},
+		{
+			Command: `printf '\e[32mgreen'`,
+			ExpOut:  "green\n",
 		},
 		{
 			Command: "echo 'a",
@@ -103,16 +109,18 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ThenReturn(nil)
 
 		logger := logging.NewNoopLogger(t)
+		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 		r := runtime.RunStepRunner{
-			TerraformExecutor: terraform,
-			DefaultTFVersion:  defaultVersion,
-			TerraformBinDir:   "/bin/dir",
+			TerraformExecutor:       terraform,
+			DefaultTFVersion:        defaultVersion,
+			TerraformBinDir:         "/bin/dir",
+			ProjectCmdOutputHandler: projectCmdOutputHandler,
 		}
 		t.Run(c.Command, func(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				BaseRepo: models.Repo{
 					Name:  "basename",
 					Owner: "baseowner",
@@ -138,7 +146,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				ProjectName:        c.ProjectName,
 				EscapedCommentArgs: []string{"-target=resource1", "-target=resource2"},
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"})
+			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"}, true)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

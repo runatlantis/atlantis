@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -81,57 +82,57 @@ func TestParse_HelpResponseWithApplyDisabled(t *testing.T) {
 func TestParse_UnusedArguments(t *testing.T) {
 	t.Log("if there are unused flags we return an error")
 	cases := []struct {
-		Command models.CommandName
+		Command command.Name
 		Args    string
 		Unused  string
 	}{
 		{
-			models.PlanCommand,
+			command.Plan,
 			"-d . arg",
 			"arg",
 		},
 		{
-			models.PlanCommand,
+			command.Plan,
 			"arg -d .",
 			"arg",
 		},
 		{
-			models.PlanCommand,
+			command.Plan,
 			"arg",
 			"arg",
 		},
 		{
-			models.PlanCommand,
+			command.Plan,
 			"arg arg2",
 			"arg arg2",
 		},
 		{
-			models.PlanCommand,
+			command.Plan,
 			"-d . arg -w kjj arg2",
 			"arg arg2",
 		},
 		{
-			models.ApplyCommand,
+			command.Apply,
 			"-d . arg",
 			"arg",
 		},
 		{
-			models.ApplyCommand,
+			command.Apply,
 			"arg arg2",
 			"arg arg2",
 		},
 		{
-			models.ApplyCommand,
+			command.Apply,
 			"arg arg2 -- useful",
 			"arg arg2",
 		},
 		{
-			models.ApplyCommand,
+			command.Apply,
 			"arg arg2 --",
 			"arg arg2",
 		},
 		{
-			models.ApprovePoliciesCommand,
+			command.ApprovePolicies,
 			"arg arg2 --",
 			"arg arg2",
 		},
@@ -142,11 +143,11 @@ func TestParse_UnusedArguments(t *testing.T) {
 			r := commentParser.Parse(comment, models.Github)
 			var usage string
 			switch c.Command {
-			case models.PlanCommand:
+			case command.Plan:
 				usage = PlanUsage
-			case models.ApplyCommand:
+			case command.Apply:
 				usage = ApplyUsage
-			case models.ApprovePoliciesCommand:
+			case command.ApprovePolicies:
 				usage = ApprovePolicyUsage
 			}
 			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s.\n%s```", c.Unused, usage), r.CommentResponse)
@@ -279,6 +280,10 @@ func TestParse_Multiline(t *testing.T) {
 		"atlantis plan\n\n",
 		"atlantis plan\r\n",
 		"atlantis plan\r\n\r\n",
+		"\natlantis plan",
+		"\r\natlantis plan",
+		"\natlantis plan\n",
+		"\r\natlantis plan\r\n",
 	}
 	for _, comment := range comments {
 		t.Run(comment, func(t *testing.T) {
@@ -287,7 +292,7 @@ func TestParse_Multiline(t *testing.T) {
 			Equals(t, &events.CommentCommand{
 				RepoRelDir:  "",
 				Flags:       nil,
-				Name:        models.PlanCommand,
+				Name:        command.Plan,
 				Verbose:     false,
 				Workspace:   "",
 				ProjectName: "",
@@ -563,13 +568,13 @@ func TestParse_Parsing(t *testing.T) {
 				actExtraArgs := strings.Join(r.Command.Flags, " ")
 				Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 				if cmdName == "plan" {
-					Assert(t, r.Command.Name == models.PlanCommand, "did not parse comment %q as plan command", comment)
+					Assert(t, r.Command.Name == command.Plan, "did not parse comment %q as plan command", comment)
 				}
 				if cmdName == "apply" {
-					Assert(t, r.Command.Name == models.ApplyCommand, "did not parse comment %q as apply command", comment)
+					Assert(t, r.Command.Name == command.Apply, "did not parse comment %q as apply command", comment)
 				}
 				if cmdName == "approve_policies" {
-					Assert(t, r.Command.Name == models.ApprovePoliciesCommand, "did not parse comment %q as approve_policies command", comment)
+					Assert(t, r.Command.Name == command.ApprovePolicies, "did not parse comment %q as approve_policies command", comment)
 				}
 			})
 		}
@@ -681,15 +686,15 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.expPlanFlags, func(t *testing.T) {
-			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand, models.VersionCommand} {
+			for _, cmd := range []command.Name{command.Plan, command.Apply, command.Version} {
 				switch cmd {
-				case models.PlanCommand:
+				case command.Plan:
 					actComment := commentParser.BuildPlanComment(c.repoRelDir, c.workspace, c.project, c.commentArgs)
 					Equals(t, fmt.Sprintf("atlantis plan %s", c.expPlanFlags), actComment)
-				case models.ApplyCommand:
+				case command.Apply:
 					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled)
 					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
-				case models.VersionCommand:
+				case command.Version:
 					actComment := commentParser.BuildVersionComment(c.repoRelDir, c.workspace, c.project)
 					Equals(t, fmt.Sprintf("atlantis version %s", c.expVersionFlags), actComment)
 				}
@@ -844,7 +849,7 @@ var ApprovePolicyUsage = `Usage of approve_policies:
       --verbose   Append Atlantis log to comment.
 `
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
-	`atlantis unlock	
+	`atlantis unlock
 
   Unlocks the entire PR and discards all plans in this PR.
   Arguments or flags are not supported at the moment.

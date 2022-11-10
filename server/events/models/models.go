@@ -3,7 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the License);
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an AS IS BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,15 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
-)
-
-const (
-	planfileSlashReplace = "::"
 )
 
 type PullReqStatus struct {
@@ -74,7 +70,8 @@ func (r Repo) ID() string {
 // NewRepo constructs a Repo object. repoFullName is the owner/repo form,
 // cloneURL can be with or without .git at the end
 // ex. https://github.com/runatlantis/atlantis.git OR
-//     https://github.com/runatlantis/atlantis
+//
+//	https://github.com/runatlantis/atlantis
 func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
@@ -225,27 +222,6 @@ type User struct {
 	Username string
 }
 
-// LockMetadata contains additional data provided to the lock
-type LockMetadata struct {
-	UnixTime int64
-}
-
-// CommandLock represents a global lock for an atlantis command (plan, apply, policy_check).
-// It is used to prevent commands from being executed
-type CommandLock struct {
-	// Time is the time at which the lock was first created.
-	LockMetadata LockMetadata
-	CommandName  CommandName
-}
-
-func (l *CommandLock) LockTime() time.Time {
-	return time.Unix(l.LockMetadata.UnixTime, 0)
-}
-
-func (l *CommandLock) IsLocked() bool {
-	return !l.LockTime().IsZero()
-}
-
 // ProjectLock represents a lock on a project.
 type ProjectLock struct {
 	// Project is the project that is being locked.
@@ -341,119 +317,30 @@ func (h VCSHostType) String() string {
 	return "<missing String() implementation>"
 }
 
-// ProjectCommandContext defines the context for a plan or apply stage that will
-// be executed for a project.
-type ProjectCommandContext struct {
-	CommandName CommandName
-	// ApplyCmd is the command that users should run to apply this plan. If
-	// this is an apply then this will be empty.
-	ApplyCmd string
-	// ApplyRequirements is the list of requirements that must be satisfied
-	// before we will run the apply stage.
-	ApplyRequirements []string
-	// AutomergeEnabled is true if automerge is enabled for the repo that this
-	// project is in.
-	AutomergeEnabled bool
-	// ParallelApplyEnabled is true if parallel apply is enabled for this project.
-	ParallelApplyEnabled bool
-	// ParallelPlanEnabled is true if parallel plan is enabled for this project.
-	ParallelPlanEnabled bool
-	// ParallelPolicyCheckEnabled is true if parallel policy_check is enabled for this project.
-	ParallelPolicyCheckEnabled bool
-	// AutoplanEnabled is true if autoplanning is enabled for this project.
-	AutoplanEnabled bool
-	// BaseRepo is the repository that the pull request will be merged into.
-	BaseRepo Repo
-	// EscapedCommentArgs are the extra arguments that were added to the atlantis
-	// command, ex. atlantis plan -- -target=resource. We then escape them
-	// by adding a \ before each character so that they can be used within
-	// sh -c safely, i.e. sh -c "terraform plan $(touch bad)".
-	EscapedCommentArgs []string
-	// HeadRepo is the repository that is getting merged into the BaseRepo.
-	// If the pull request branch is from the same repository then HeadRepo will
-	// be the same as BaseRepo.
-	HeadRepo Repo
-	// Log is a logger that's been set up for this context.
-	Log logging.SimpleLogging
-	// PullReqStatus holds state about the PR that requires additional computation outside models.PullRequest
-	PullReqStatus PullReqStatus
-	// CurrentProjectPlanStatus is the status of the current project prior to this command.
-	ProjectPlanStatus ProjectPlanStatus
-	// Pull is the pull request we're responding to.
-	Pull PullRequest
-	// ProjectName is the name of the project set in atlantis.yaml. If there was
-	// no name this will be an empty string.
-	ProjectName string
-	// RepoConfigVersion is the version of the repo's atlantis.yaml file. If
-	// there was no file, this will be 0.
-	RepoConfigVersion int
-	// RePlanCmd is the command that users should run to re-plan this project.
-	// If this is an apply then this will be empty.
-	RePlanCmd string
-	// RepoRelDir is the directory of this project relative to the repo root.
-	RepoRelDir string
-	// Steps are the sequence of commands we need to run for this project and this
-	// stage.
-	Steps []valid.Step
-	// TerraformVersion is the version of terraform we should use when executing
-	// commands for this project. This can be set to nil in which case we will
-	// use the default Atlantis terraform version.
-	TerraformVersion *version.Version
-	// User is the user that triggered this command.
-	User User
-	// Verbose is true when the user would like verbose output.
-	Verbose bool
-	// Workspace is the Terraform workspace this project is in. It will always
-	// be set.
-	Workspace string
-	// PolicySets represent the policies that are run on the plan as part of the
-	// policy check stage
-	PolicySets valid.PolicySets
-	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
-	DeleteSourceBranchOnMerge bool
-	// UUID for atlantis logs
-	JobID string
-}
-
-// GetShowResultFileName returns the filename (not the path) to store the tf show result
-func (p ProjectCommandContext) GetShowResultFileName() string {
-	if p.ProjectName == "" {
-		return fmt.Sprintf("%s.json", p.Workspace)
+func NewVCSHostType(t string) (VCSHostType, error) {
+	switch t {
+	case "Github":
+		return Github, nil
+	case "Gitlab":
+		return Gitlab, nil
+	case "BitbucketCloud":
+		return BitbucketCloud, nil
+	case "BitbucketServer":
+		return BitbucketServer, nil
+	case "AzureDevops":
+		return AzureDevops, nil
 	}
-	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
-	return fmt.Sprintf("%s-%s.json", projName, p.Workspace)
-}
 
-// Gets a unique identifier for the current pull request as a single string
-func (p ProjectCommandContext) PullInfo() string {
-	normalizedOwner := strings.ReplaceAll(p.BaseRepo.Owner, "/", "-")
-	normalizedName := strings.ReplaceAll(p.BaseRepo.Name, "/", "-")
-	projectRepo := fmt.Sprintf("%s/%s", normalizedOwner, normalizedName)
-
-	return BuildPullInfo(projectRepo, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
-}
-
-func BuildPullInfo(repoName string, pullNum int, projectName string, relDir string, workspace string) string {
-	projectIdentifier := GetProjectIdentifier(relDir, projectName)
-	return fmt.Sprintf("%s/%d/%s/%s", repoName, pullNum, projectIdentifier, workspace)
-}
-
-func GetProjectIdentifier(relRepoDir string, projectName string) string {
-	if projectName != "" {
-		return projectName
-	}
-	// Replace directory separator / with -
-	// Replace . with _ to ensure projects with no project name and root dir set to "." have a valid URL
-	replacer := strings.NewReplacer("/", "-", ".", "_")
-	return replacer.Replace(relRepoDir)
+	return -1, fmt.Errorf("%q is not a valid type", t)
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo
 // name segments. If the repoFullName is malformed, may return empty
 // strings for owner or repo.
 // Ex. runatlantis/atlantis => (runatlantis, atlantis)
-//     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
-//     azuredevops/project/atlantis => (azuredevops/project, atlantis)
+//
+//	gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
+//	azuredevops/project/atlantis => (azuredevops/project, atlantis)
 func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 	lastSlashIdx := strings.LastIndex(repoFullName, "/")
 	if lastSlashIdx == -1 || lastSlashIdx == len(repoFullName)-1 {
@@ -461,66 +348,6 @@ func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 	}
 
 	return repoFullName[:lastSlashIdx], repoFullName[lastSlashIdx+1:]
-}
-
-// ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
-type ProjectResult struct {
-	Command            CommandName
-	RepoRelDir         string
-	Workspace          string
-	Error              error
-	Failure            string
-	PlanSuccess        *PlanSuccess
-	PolicyCheckSuccess *PolicyCheckSuccess
-	ApplySuccess       string
-	VersionSuccess     string
-	ProjectName        string
-}
-
-// CommitStatus returns the vcs commit status of this project result.
-func (p ProjectResult) CommitStatus() CommitStatus {
-	if p.Error != nil {
-		return FailedCommitStatus
-	}
-	if p.Failure != "" {
-		return FailedCommitStatus
-	}
-	return SuccessCommitStatus
-}
-
-// PlanStatus returns the plan status.
-func (p ProjectResult) PlanStatus() ProjectPlanStatus {
-	switch p.Command {
-
-	case PlanCommand:
-		if p.Error != nil {
-			return ErroredPlanStatus
-		} else if p.Failure != "" {
-			return ErroredPlanStatus
-		}
-		return PlannedPlanStatus
-	case PolicyCheckCommand, ApprovePoliciesCommand:
-		if p.Error != nil {
-			return ErroredPolicyCheckStatus
-		} else if p.Failure != "" {
-			return ErroredPolicyCheckStatus
-		}
-		return PassedPolicyCheckStatus
-	case ApplyCommand:
-		if p.Error != nil {
-			return ErroredApplyStatus
-		} else if p.Failure != "" {
-			return ErroredApplyStatus
-		}
-		return AppliedPlanStatus
-	}
-
-	panic("PlanStatus() missing a combination")
-}
-
-// IsSuccessful returns true if this project result had no errors.
-func (p ProjectResult) IsSuccessful() bool {
-	return p.PlanSuccess != nil || p.PolicyCheckSuccess != nil || p.ApplySuccess != ""
 }
 
 // PlanSuccess is the result of a successful plan.
@@ -557,10 +384,12 @@ func (p *PlanSuccess) Summary() string {
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
-	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~])`)
+	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s=\s|\s->\s|<<|\{|\(known after apply\)| {2,}[^ ]+:.*)(.*)`)
+	diffListRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
 	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
 
-	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1")
+	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5")
+	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
 
 	return formattedTerraformOutput
@@ -664,52 +493,6 @@ func (p ProjectPlanStatus) String() string {
 	}
 }
 
-// CommandName is which command to run.
-type CommandName int
-
-const (
-	// ApplyCommand is a command to run terraform apply.
-	ApplyCommand CommandName = iota
-	// PlanCommand is a command to run terraform plan.
-	PlanCommand
-	// UnlockCommand is a command to discard previous plans as well as the atlantis locks.
-	UnlockCommand
-	// PolicyCheckCommand is a command to run conftest test.
-	PolicyCheckCommand
-	// ApprovePoliciesCommand is a command to approve policies with owner check
-	ApprovePoliciesCommand
-	// AutoplanCommand is a command to run terrafor plan on PR open/update if autoplan is enabled
-	AutoplanCommand
-	// VersionCommand is a command to run terraform version.
-	VersionCommand
-	// Adding more? Don't forget to update String() below
-)
-
-// TitleString returns the string representation in title form.
-// ie. policy_check becomes Policy Check
-func (c CommandName) TitleString() string {
-	return strings.Title(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
-}
-
-// String returns the string representation of c.
-func (c CommandName) String() string {
-	switch c {
-	case ApplyCommand:
-		return "apply"
-	case PlanCommand, AutoplanCommand:
-		return "plan"
-	case UnlockCommand:
-		return "unlock"
-	case PolicyCheckCommand:
-		return "policy_check"
-	case ApprovePoliciesCommand:
-		return "approve_policies"
-	case VersionCommand:
-		return "version"
-	}
-	return ""
-}
-
 // WorkflowHookCommandContext defines the context for a pre and post worklfow_hooks that will
 // be executed before workflows.
 type WorkflowHookCommandContext struct {
@@ -727,4 +510,9 @@ type WorkflowHookCommandContext struct {
 	User User
 	// Verbose is true when the user would like verbose output.
 	Verbose bool
+	// EscapedCommentArgs are the extra arguments that were added to the atlantis
+	// command, ex. atlantis plan -- -target=resource. We then escape them
+	// by adding a \ before each character so that they can be used within
+	// sh -c safely, i.e. sh -c "terraform plan $(touch bad)".
+	EscapedCommentArgs []string
 }

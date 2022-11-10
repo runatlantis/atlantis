@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 const minimumShowTfVersion string = "0.12.0"
@@ -29,7 +29,7 @@ type ShowStepRunner struct {
 	DefaultTFVersion  *version.Version
 }
 
-func (p *ShowStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (p *ShowStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	tfVersion := p.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion

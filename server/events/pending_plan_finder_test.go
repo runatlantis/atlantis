@@ -226,7 +226,8 @@ func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
 	runCmd(t, repoDir, "git", "add", ".")
 	runCmd(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
-	runCmd(t, repoDir, "git", "commit", "--no-gpg-sign", "-m", "initial commit")
+	runCmd(t, repoDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 
 	pf := &events.DefaultPendingPlanFinder{}
 	actPlans, err := pf.Find(tmpDir)

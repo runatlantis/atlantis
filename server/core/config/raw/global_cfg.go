@@ -15,6 +15,7 @@ type GlobalCfg struct {
 	Repos      []Repo              `yaml:"repos" json:"repos"`
 	Workflows  map[string]Workflow `yaml:"workflows" json:"workflows"`
 	PolicySets PolicySets          `yaml:"policies" json:"policies"`
+	Metrics    Metrics             `yaml:"metrics" json:"metrics"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
@@ -34,7 +35,9 @@ type Repo struct {
 func (g GlobalCfg) Validate() error {
 	err := validation.ValidateStruct(&g,
 		validation.Field(&g.Repos),
-		validation.Field(&g.Workflows))
+		validation.Field(&g.Workflows),
+		validation.Field(&g.Metrics),
+	)
 	if err != nil {
 		return err
 	}
@@ -129,6 +132,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 		Repos:      repos,
 		Workflows:  workflows,
 		PolicySets: g.PolicySets.ToValid(),
+		Metrics:    g.Metrics.ToValid(),
 	}
 }
 
@@ -155,10 +159,14 @@ func (r Repo) Validate() error {
 
 	branchValid := func(value interface{}) error {
 		branch := value.(string)
-		if !r.HasRegexBranch() {
+		if branch == "" {
 			return nil
 		}
-		_, err := regexp.Compile(branch[1 : len(branch)-1])
+		if !strings.HasPrefix(branch, "/") || !strings.HasSuffix(branch, "/") {
+			return errors.New("regex must begin and end with a slash '/'")
+		}
+		withoutSlashes := branch[1 : len(branch)-1]
+		_, err := regexp.Compile(withoutSlashes)
 		return errors.Wrapf(err, "parsing: %s", branch)
 	}
 

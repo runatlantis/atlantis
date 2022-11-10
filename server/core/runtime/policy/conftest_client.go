@@ -13,7 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime/cache"
 	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -69,8 +69,9 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 	return commandArgs, nil
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_conftest_client.go SourceResolver
 // SourceResolver resolves the policy set to a local fs path
+//
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_conftest_client.go SourceResolver
 type SourceResolver interface {
 	Resolve(policySet valid.PolicySet) (string, error)
 }
@@ -159,7 +160,7 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 	}
 }
 
-func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
+func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
 	policyArgs := []Arg{}
 	policySetNames := []string{}
 	ctx.Log.Debug("policy sets, %s ", ctx.PolicySets)

@@ -14,8 +14,8 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
-	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -49,7 +49,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			terraform := mocks.NewMockClient()
 
 			logger := logging.NewNoopLogger(t)
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
 				Log:        logger,
@@ -92,7 +92,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 		DefaultTFVersion:  tfVersion,
 	}
 
-	output, err := iso.Run(models.ProjectCommandContext{
+	output, err := iso.Run(command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
@@ -114,7 +114,7 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "add .terraform.lock.hcl")
 
 	logger := logging.NewNoopLogger(t)
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
@@ -147,7 +147,7 @@ func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
@@ -181,7 +181,7 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 	terraform := mocks.NewMockClient()
 
 	logger := logging.NewNoopLogger(t)
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
@@ -248,7 +248,7 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 			terraform := mocks.NewMockClient()
 
 			logger := logging.NewNoopLogger(t)
-			ctx := models.ProjectCommandContext{
+			ctx := command.ProjectContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
 				Log:        logger,
@@ -287,6 +287,7 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	tfVersion, _ := version.NewVersion("0.14.0")
+
 	iso := runtime.InitStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
@@ -294,7 +295,7 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
@@ -324,6 +325,7 @@ func initRepo(t *testing.T) (string, func()) {
 	runCmd(t, repoDir, "git", "add", ".gitkeep")
 	runCmd(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, repoDir, "git", "config", "--local", "commit.gpgsign", "false")
 	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, repoDir, "git", "branch", "branch")
 	return repoDir, cleanup

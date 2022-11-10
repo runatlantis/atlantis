@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -21,7 +21,7 @@ func TestShowStepRunnner(t *testing.T) {
 	resultPath := filepath.Join(path, "test-default.json")
 	envs := map[string]string{"key": "val"}
 	tfVersion, _ := version.NewVersion("0.12")
-	context := models.ProjectCommandContext{
+	context := command.ProjectContext{
 		Workspace:   "default",
 		ProjectName: "test",
 		Log:         logger,
@@ -58,7 +58,7 @@ func TestShowStepRunnner(t *testing.T) {
 
 		v, _ := version.NewVersion("0.13.0")
 
-		contextWithVersionOverride := models.ProjectCommandContext{
+		contextWithVersionOverride := command.ProjectContext{
 			Workspace:        "default",
 			ProjectName:      "test",
 			Log:              logger,

@@ -20,8 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/docker/pkg/fileutils"
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/moby/moby/pkg/fileutils"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -37,53 +37,63 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
-	ADWebhookPasswordFlag      = "azuredevops-webhook-password" // nolint: gosec
-	ADWebhookUserFlag          = "azuredevops-webhook-user"
-	ADTokenFlag                = "azuredevops-token" // nolint: gosec
-	ADUserFlag                 = "azuredevops-user"
-	ADHostnameFlag             = "azuredevops-hostname"
-	AllowForkPRsFlag           = "allow-fork-prs"
-	AllowRepoConfigFlag        = "allow-repo-config"
-	AtlantisURLFlag            = "atlantis-url"
-	AutomergeFlag              = "automerge"
-	AutoplanFileListFlag       = "autoplan-file-list"
-	BitbucketBaseURLFlag       = "bitbucket-base-url"
-	BitbucketTokenFlag         = "bitbucket-token"
-	BitbucketUserFlag          = "bitbucket-user"
-	BitbucketWebhookSecretFlag = "bitbucket-webhook-secret"
-	ConfigFlag                 = "config"
-	CheckoutStrategyFlag       = "checkout-strategy"
-	DataDirFlag                = "data-dir"
-	DefaultTFVersionFlag       = "default-tf-version"
-	DisableApplyAllFlag        = "disable-apply-all"
-	DisableApplyFlag           = "disable-apply"
-	DisableAutoplanFlag        = "disable-autoplan"
-	DisableMarkdownFoldingFlag = "disable-markdown-folding"
-	DisableRepoLockingFlag     = "disable-repo-locking"
-	EnablePolicyChecksFlag     = "enable-policy-checks"
-	EnableRegExpCmdFlag        = "enable-regexp-cmd"
-	EnableDiffMarkdownFormat   = "enable-diff-markdown-format"
-	GHHostnameFlag             = "gh-hostname"
-	GHTeamAllowlistFlag        = "gh-team-allowlist"
-	GHTokenFlag                = "gh-token"
-	GHUserFlag                 = "gh-user"
-	GHAppIDFlag                = "gh-app-id"
-	GHAppKeyFlag               = "gh-app-key"
-	GHAppKeyFileFlag           = "gh-app-key-file"
-	GHAppSlugFlag              = "gh-app-slug"
-	GHOrganizationFlag         = "gh-org"
-	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
-	GitlabHostnameFlag         = "gitlab-hostname"
-	GitlabTokenFlag            = "gitlab-token"
-	GitlabUserFlag             = "gitlab-user"
-	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
-	HidePrevPlanComments       = "hide-prev-plan-comments"
-	LogLevelFlag               = "log-level"
-	ParallelPoolSize           = "parallel-pool-size"
-	AllowDraftPRs              = "allow-draft-prs"
-	PortFlag                   = "port"
-	RepoConfigFlag             = "repo-config"
-	RepoConfigJSONFlag         = "repo-config-json"
+	ADWebhookPasswordFlag       = "azuredevops-webhook-password" // nolint: gosec
+	ADWebhookUserFlag           = "azuredevops-webhook-user"
+	ADTokenFlag                 = "azuredevops-token" // nolint: gosec
+	ADUserFlag                  = "azuredevops-user"
+	ADHostnameFlag              = "azuredevops-hostname"
+	AllowForkPRsFlag            = "allow-fork-prs"
+	AllowRepoConfigFlag         = "allow-repo-config"
+	AtlantisURLFlag             = "atlantis-url"
+	AutomergeFlag               = "automerge"
+	AutoplanFileListFlag        = "autoplan-file-list"
+	BitbucketBaseURLFlag        = "bitbucket-base-url"
+	BitbucketTokenFlag          = "bitbucket-token"
+	BitbucketUserFlag           = "bitbucket-user"
+	BitbucketWebhookSecretFlag  = "bitbucket-webhook-secret"
+	ConfigFlag                  = "config"
+	CheckoutStrategyFlag        = "checkout-strategy"
+	DataDirFlag                 = "data-dir"
+	DefaultTFVersionFlag        = "default-tf-version"
+	DisableApplyAllFlag         = "disable-apply-all"
+	DisableApplyFlag            = "disable-apply"
+	DisableAutoplanFlag         = "disable-autoplan"
+	DisableMarkdownFoldingFlag  = "disable-markdown-folding"
+	DisableRepoLockingFlag      = "disable-repo-locking"
+	EnablePolicyChecksFlag      = "enable-policy-checks"
+	EnableRegExpCmdFlag         = "enable-regexp-cmd"
+	EnableDiffMarkdownFormat    = "enable-diff-markdown-format"
+	GHHostnameFlag              = "gh-hostname"
+	GHTeamAllowlistFlag         = "gh-team-allowlist"
+	GHTokenFlag                 = "gh-token"
+	GHUserFlag                  = "gh-user"
+	GHAppIDFlag                 = "gh-app-id"
+	GHAppKeyFlag                = "gh-app-key"
+	GHAppKeyFileFlag            = "gh-app-key-file"
+	GHAppSlugFlag               = "gh-app-slug"
+	GHOrganizationFlag          = "gh-org"
+	GHWebhookSecretFlag         = "gh-webhook-secret"               // nolint: gosec
+	GHAllowMergeableBypassApply = "gh-allow-mergeable-bypass-apply" // nolint: gosec
+	GitlabHostnameFlag          = "gitlab-hostname"
+	GitlabTokenFlag             = "gitlab-token"
+	GitlabUserFlag              = "gitlab-user"
+	GitlabWebhookSecretFlag     = "gitlab-webhook-secret" // nolint: gosec
+	APISecretFlag               = "api-secret"
+	HidePrevPlanComments        = "hide-prev-plan-comments"
+	LockingDBType               = "locking-db-type"
+	LogLevelFlag                = "log-level"
+	ParallelPoolSize            = "parallel-pool-size"
+	StatsNamespace              = "stats-namespace"
+	AllowDraftPRs               = "allow-draft-prs"
+	PortFlag                    = "port"
+	RedisDB                     = "redis-db"
+	RedisHost                   = "redis-host"
+	RedisPassword               = "redis-password"
+	RedisPort                   = "redis-port"
+	RedisTLSEnabled             = "redis-tls-enabled"
+	RedisInsecureSkipVerify     = "redis-insecure-skip-verify"
+	RepoConfigFlag              = "repo-config"
+	RepoConfigJSONFlag          = "repo-config-json"
 	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
 	RepoWhitelistFlag          = "repo-whitelist"
 	RepoAllowlistFlag          = "repo-allowlist"
@@ -100,8 +110,10 @@ const (
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
 	TFDownloadURLFlag          = "tf-download-url"
+	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
+	TFELocalExecutionModeFlag  = "tfe-local-execution-mode"
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
 	WebBasicAuthFlag           = "web-basic-auth"
@@ -109,24 +121,30 @@ const (
 	WebPasswordFlag            = "web-password"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
-	DefaultADBasicUser      = ""
-	DefaultADBasicPassword  = ""
-	DefaultADHostname       = "dev.azure.com"
-	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultCheckoutStrategy = "branch"
-	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
-	DefaultDataDir          = "~/.atlantis"
-	DefaultGHHostname       = "github.com"
-	DefaultGitlabHostname   = "gitlab.com"
-	DefaultLogLevel         = "info"
-	DefaultParallelPoolSize = 15
-	DefaultPort             = 4141
-	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
-	DefaultTFEHostname      = "app.terraform.io"
-	DefaultVCSStatusName    = "atlantis"
-	DefaultWebBasicAuth     = false
-	DefaultWebUsername      = "atlantis"
-	DefaultWebPassword      = "atlantis"
+	DefaultADBasicUser             = ""
+	DefaultADBasicPassword         = ""
+	DefaultADHostname              = "dev.azure.com"
+	DefaultAutoplanFileList        = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultCheckoutStrategy        = "branch"
+	DefaultBitbucketBaseURL        = bitbucketcloud.BaseURL
+	DefaultDataDir                 = "~/.atlantis"
+	DefaultGHHostname              = "github.com"
+	DefaultGitlabHostname          = "gitlab.com"
+	DefaultLockingDBType           = "boltdb"
+	DefaultLogLevel                = "info"
+	DefaultParallelPoolSize        = 15
+	DefaultStatsNamespace          = "atlantis"
+	DefaultPort                    = 4141
+	DefaultRedisDB                 = 0
+	DefaultRedisPort               = 6379
+	DefaultRedisTLSEnabled         = false
+	DefaultRedisInsecureSkipVerify = false
+	DefaultTFDownloadURL           = "https://releases.hashicorp.com"
+	DefaultTFEHostname             = "app.terraform.io"
+	DefaultVCSStatusName           = "atlantis"
+	DefaultWebBasicAuth            = false
+	DefaultWebUsername             = "atlantis"
+	DefaultWebPassword             = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -255,9 +273,26 @@ var stringFlags = map[string]stringFlag{
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
 	},
+	APISecretFlag: {
+		description: "Secret to validate requests made to the API",
+	},
+	LockingDBType: {
+		description:  "The locking database type to use for storing plan and apply locks.",
+		defaultValue: DefaultLockingDBType,
+	},
 	LogLevelFlag: {
 		description:  "Log level. Either debug, info, warn, or error.",
 		defaultValue: DefaultLogLevel,
+	},
+	StatsNamespace: {
+		description:  "Namespace for aggregating stats.",
+		defaultValue: DefaultStatsNamespace,
+	},
+	RedisHost: {
+		description: "The Redis Hostname for when using a Locking DB type of 'redis'.",
+	},
+	RedisPassword: {
+		description: "The Redis Password for when using a Locking DB type of 'redis'.",
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
@@ -300,6 +335,10 @@ var stringFlags = map[string]stringFlag{
 	DefaultTFVersionFlag: {
 		description: "Terraform version to default to (ex. v0.12.0). Will download if not yet on disk." +
 			" If not set, Atlantis uses the terraform binary in its PATH.",
+	},
+	VarFileAllowlistFlag: {
+		description: "Comma-separated list of additional paths where variable definition files can be read from." +
+			" If this argument is not provided, it defaults to Atlantis' data directory, determined by the --data-dir argument.",
 	},
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
@@ -358,6 +397,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
 		defaultValue: false,
 	},
+	GHAllowMergeableBypassApply: {
+		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
+		defaultValue: false,
+	},
 	AllowDraftPRs: {
 		description:  "Enable autoplan for Github Draft Pull Requests",
 		defaultValue: false,
@@ -366,6 +409,14 @@ var boolFlags = map[string]boolFlag{
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
 		defaultValue: false,
+	},
+	RedisTLSEnabled: {
+		description:  "Enable TLS on the connection to Redis with a min TLS version of 1.2",
+		defaultValue: DefaultRedisTLSEnabled,
+	},
+	RedisInsecureSkipVerify: {
+		description:  "Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate.",
+		defaultValue: DefaultRedisInsecureSkipVerify,
 	},
 	RequireApprovalFlag: {
 		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
@@ -411,6 +462,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
 		defaultValue: false,
 	},
+	TFELocalExecutionModeFlag: {
+		description:  "Enable if you're using local execution mode (instead of TFE/C's remote execution mode).",
+		defaultValue: false,
+	},
 	WebBasicAuthFlag: {
 		description:  "Switches on or off the Basic Authentication on the HTTP Middleware interface",
 		defaultValue: DefaultWebBasicAuth,
@@ -424,6 +479,14 @@ var intFlags = map[string]intFlag{
 	PortFlag: {
 		description:  "Port to bind to.",
 		defaultValue: DefaultPort,
+	},
+	RedisDB: {
+		description:  "The Redis Database to use when using a Locking DB type of 'redis'.",
+		defaultValue: DefaultRedisDB,
+	},
+	RedisPort: {
+		description:  "The Redis Port for when using a Locking DB type of 'redis'.",
+		defaultValue: DefaultRedisPort,
 	},
 }
 
@@ -603,6 +666,7 @@ func (s *ServerCmd) run() error {
 	if err := s.setDataDir(&userConfig); err != nil {
 		return err
 	}
+	s.setVarFileAllowlist(&userConfig)
 	if err := s.deprecationWarnings(&userConfig); err != nil {
 		return err
 	}
@@ -646,14 +710,26 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.BitbucketBaseURL == "" {
 		c.BitbucketBaseURL = DefaultBitbucketBaseURL
 	}
+	if c.LockingDBType == "" {
+		c.LockingDBType = DefaultLockingDBType
+	}
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
 	}
 	if c.ParallelPoolSize == 0 {
 		c.ParallelPoolSize = DefaultParallelPoolSize
 	}
+	if c.StatsNamespace == "" {
+		c.StatsNamespace = DefaultStatsNamespace
+	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
+	}
+	if c.RedisDB == 0 {
+		c.RedisDB = DefaultRedisDB
+	}
+	if c.RedisPort == 0 {
+		c.RedisPort = DefaultRedisPort
 	}
 	if c.TFDownloadURL == "" {
 		c.TFDownloadURL = DefaultTFDownloadURL
@@ -803,6 +879,14 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 	}
 	userConfig.DataDir = finalPath
 	return nil
+}
+
+// setVarFileAllowlist checks if var-file-allowlist is unassigned and makes it default to data-dir for better backward
+// compatibility.
+func (s *ServerCmd) setVarFileAllowlist(userConfig *server.UserConfig) {
+	if userConfig.VarFileAllowlist == "" {
+		userConfig.VarFileAllowlist = userConfig.DataDir
+	}
 }
 
 // trimAtSymbolFromUsers trims @ from the front of the github and gitlab usernames

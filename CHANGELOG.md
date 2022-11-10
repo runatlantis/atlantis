@@ -1,3 +1,74 @@
+# v0.20.1
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.20.1
+
+# v0.20.0
+
+Broken build due to github action issues
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.20.0
+
+# v0.19.8
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.8
+
+# v0.19.7
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.7
+
+# v0.19.6
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.6
+
+
+# v0.19.5
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.5
+
+## Backwards Incompatibilities / Notes:
+* `--var-file-allowlist` flag has been added to restrict the access of files on Atlantis install from pull request
+  comments. Set the flag if you want to explicitly grant the access to files outside the default data directory.
+  
+  Previously, any file could be passed to `-var-file`. Now only files under the directories in the allowlist are permitted.
+
+# v0.19.4
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.4
+
+# v0.19.3
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.3
+
 # v0.19.2
 
 Bug fix release for github and update docs to reflect the docker registry support change.

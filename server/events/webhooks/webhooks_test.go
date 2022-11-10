@@ -46,7 +46,6 @@ func TestNewWebhooksManager_InvalidRegex(t *testing.T) {
 	t.Log("When given an invalid regex in a config, an error is returned")
 	RegisterMockTestingT(t)
 	client := mocks.NewMockSlackClient()
-	When(client.ChannelExists(validChannel)).ThenReturn(true, nil)
 
 	invalidRegex := "("
 	configs := validConfigs()
@@ -71,7 +70,6 @@ func TestNewWebhooksManager_UnsupportedEvent(t *testing.T) {
 	t.Log("When given an unsupported event in a config, an error is returned")
 	RegisterMockTestingT(t)
 	client := mocks.NewMockSlackClient()
-	When(client.ChannelExists(validChannel)).ThenReturn(true, nil)
 
 	unsupportedEvent := "badevent"
 	configs := validConfigs()
@@ -96,7 +94,6 @@ func TestNewWebhooksManager_UnsupportedKind(t *testing.T) {
 	t.Log("When given an unsupported kind in a config, an error is returned")
 	RegisterMockTestingT(t)
 	client := mocks.NewMockSlackClient()
-	When(client.ChannelExists(validChannel)).ThenReturn(true, nil)
 
 	unsupportedKind := "badkind"
 	configs := validConfigs()
@@ -125,7 +122,6 @@ func TestNewWebhooksManager_SingleConfigSuccess(t *testing.T) {
 	RegisterMockTestingT(t)
 	client := mocks.NewMockSlackClient()
 	When(client.TokenIsSet()).ThenReturn(true)
-	When(client.ChannelExists(validChannel)).ThenReturn(true, nil)
 
 	configs := validConfigs()
 	m, err := webhooks.NewMultiWebhookSender(configs, client)
@@ -138,7 +134,6 @@ func TestNewWebhooksManager_MultipleConfigSuccess(t *testing.T) {
 	RegisterMockTestingT(t)
 	client := mocks.NewMockSlackClient()
 	When(client.TokenIsSet()).ThenReturn(true)
-	When(client.ChannelExists(validChannel)).ThenReturn(true, nil)
 
 	var configs []webhooks.Config
 	nConfigs := 5

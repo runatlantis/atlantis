@@ -8,10 +8,12 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/uber-go/tally"
 )
 
-func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder) ProjectCommandContextBuilder {
+func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope tally.Scope) ProjectCommandContextBuilder {
 	projectCommandContextBuilder := &DefaultProjectCommandContextBuilder{
 		CommentBuilder: commentBuilder,
 	}
@@ -23,19 +25,59 @@ func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder Com
 		}
 	}
 
-	return projectCommandContextBuilder
+	return &CommandScopedStatsProjectCommandContextBuilder{
+		ProjectCommandContextBuilder: projectCommandContextBuilder,
+		ProjectCounter:               scope.Counter("projects"),
+	}
 }
 
 type ProjectCommandContextBuilder interface {
 	// BuildProjectContext builds project command contexts for atlantis commands
 	BuildProjectContext(
-		ctx *CommandContext,
-		cmdName models.CommandName,
+		ctx *command.Context,
+		cmdName command.Name,
 		prjCfg valid.MergedProjectCfg,
 		commentFlags []string,
 		repoDir string,
 		automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
-	) []models.ProjectCommandContext
+	) []command.ProjectContext
+}
+
+// CommandScopedStatsProjectCommandContextBuilder ensures that project command context contains a scoped stats
+// object relevant to the command it applies to.
+type CommandScopedStatsProjectCommandContextBuilder struct {
+	ProjectCommandContextBuilder
+	// Conciously making this global since it gets flushed periodically anyways
+	ProjectCounter tally.Counter
+}
+
+// BuildProjectContext builds the context and injects the appropriate command level scope after the fact.
+func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
+	ctx *command.Context,
+	cmdName command.Name,
+	prjCfg valid.MergedProjectCfg,
+	commentFlags []string,
+	repoDir string,
+	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
+) (projectCmds []command.ProjectContext) {
+	cb.ProjectCounter.Inc(1)
+
+	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
+		ctx, cmdName, prjCfg, commentFlags, repoDir, automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose,
+	)
+
+	projectCmds = []command.ProjectContext{}
+
+	for _, cmd := range cmds {
+
+		// specifically use the command name in the context instead of the arg
+		// since we can return multiple commands worth of contexts for a given command name arg
+		// to effectively pipeline them.
+		cmd.SetScope(cmd.CommandName.String())
+		projectCmds = append(projectCmds, cmd)
+	}
+
+	return
 }
 
 type DefaultProjectCommandContextBuilder struct {
@@ -43,22 +85,22 @@ type DefaultProjectCommandContextBuilder struct {
 }
 
 func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
-	ctx *CommandContext,
-	cmdName models.CommandName,
+	ctx *command.Context,
+	cmdName command.Name,
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
 	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
-) (projectCmds []models.ProjectCommandContext) {
+) (projectCmds []command.ProjectContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
 
 	var steps []valid.Step
 	switch cmdName {
-	case models.PlanCommand:
+	case command.Plan:
 		steps = prjCfg.Workflow.Plan.Steps
-	case models.ApplyCommand:
+	case command.Apply:
 		steps = prjCfg.Workflow.Apply.Steps
-	case models.VersionCommand:
+	case command.Version:
 		// Setting statically since there will only be one step
 		steps = []valid.Step{{
 			StepName: "version",
@@ -86,6 +128,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		parallelApply,
 		parallelPlan,
 		verbose,
+		ctx.Scope,
 		ctx.PullRequestStatus,
 	)
 
@@ -100,13 +143,13 @@ type PolicyCheckProjectCommandContextBuilder struct {
 }
 
 func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
-	ctx *CommandContext,
-	cmdName models.CommandName,
+	ctx *command.Context,
+	cmdName command.Name,
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
 	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
-) (projectCmds []models.ProjectCommandContext) {
+) (projectCmds []command.ProjectContext) {
 	ctx.Log.Debug("PolicyChecks are enabled")
 
 	// If TerraformVersion not defined in config file look for a
@@ -128,13 +171,13 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		verbose,
 	)
 
-	if cmdName == models.PlanCommand {
-		ctx.Log.Debug("Building project command context for %s", models.PolicyCheckCommand)
+	if cmdName == command.Plan {
+		ctx.Log.Debug("Building project command context for %s", command.PolicyCheck)
 		steps := prjCfg.Workflow.PolicyCheck.Steps
 
 		projectCmds = append(projectCmds, newProjectCommandContext(
 			ctx,
-			models.PolicyCheckCommand,
+			command.PolicyCheck,
 			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 			cb.CommentBuilder.BuildVersionComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
@@ -147,6 +190,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			parallelApply,
 			parallelPlan,
 			verbose,
+			ctx.Scope,
 			ctx.PullRequestStatus,
 		))
 	}
@@ -156,8 +200,8 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 
 // newProjectCommandContext is a initializer method that handles constructing the
 // ProjectCommandContext.
-func newProjectCommandContext(ctx *CommandContext,
-	cmd models.CommandName,
+func newProjectCommandContext(ctx *command.Context,
+	cmd command.Name,
 	applyCmd string,
 	planCmd string,
 	versionCmd string,
@@ -170,8 +214,9 @@ func newProjectCommandContext(ctx *CommandContext,
 	parallelApplyEnabled bool,
 	parallelPlanEnabled bool,
 	verbose bool,
+	scope tally.Scope,
 	pullStatus models.PullReqStatus,
-) models.ProjectCommandContext {
+) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
 
@@ -191,7 +236,7 @@ func newProjectCommandContext(ctx *CommandContext,
 		}
 	}
 
-	return models.ProjectCommandContext{
+	return command.ProjectContext{
 		CommandName:                cmd,
 		ApplyCmd:                   applyCmd,
 		BaseRepo:                   ctx.Pull.BaseRepo,
@@ -205,6 +250,7 @@ func newProjectCommandContext(ctx *CommandContext,
 		Steps:                      steps,
 		HeadRepo:                   ctx.HeadRepo,
 		Log:                        ctx.Log,
+		Scope:                      scope,
 		ProjectPlanStatus:          projectPlanStatus,
 		Pull:                       ctx.Pull,
 		ProjectName:                projCfg.Name,
@@ -219,6 +265,7 @@ func newProjectCommandContext(ctx *CommandContext,
 		PolicySets:                 policySets,
 		PullReqStatus:              pullStatus,
 		JobID:                      uuid.New().String(),
+		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 	}
 }
 
@@ -236,7 +283,7 @@ func escapeArgs(args []string) []string {
 
 // Extracts required_version from Terraform configuration.
 // Returns nil if unable to determine version from configuration.
-func getTfVersion(ctx *CommandContext, absProjDir string) *version.Version {
+func getTfVersion(ctx *command.Context, absProjDir string) *version.Version {
 	module, diags := tfconfig.LoadModule(absProjDir)
 	if diags.HasErrors() {
 		ctx.Log.Err("trying to detect required version: %s", diags.Error())

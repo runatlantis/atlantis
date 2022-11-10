@@ -8,8 +8,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/uber-go/tally"
 )
 
 type JobIDKeyGenerator struct{}
@@ -29,17 +31,18 @@ type JobsController struct {
 	Logger                   logging.SimpleLogging
 	ProjectJobsTemplate      templates.TemplateWriter
 	ProjectJobsErrorTemplate templates.TemplateWriter
-	Db                       *db.BoltDB
+	Backend                  locking.Backend
 	WsMux                    *websocket.Multiplexor
 	KeyGenerator             JobIDKeyGenerator
+	StatsScope               tally.Scope
 }
 
-func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) {
+func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) error {
 	jobID, err := j.KeyGenerator.Generate(r)
 
 	if err != nil {
 		j.respond(w, logging.Error, http.StatusBadRequest, err.Error())
-		return
+		return err
 	}
 
 	viewData := templates.ProjectJobData{
@@ -48,17 +51,39 @@ func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) 
 		CleanedBasePath: j.AtlantisURL.Path,
 	}
 
-	if err = j.ProjectJobsTemplate.Execute(w, viewData); err != nil {
+	return j.ProjectJobsTemplate.Execute(w, viewData)
+}
+
+func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) {
+	errorCounter := j.StatsScope.SubScope("getprojectjobs").Counter(metrics.ExecutionErrorMetric)
+	err := j.getProjectJobs(w, r)
+	if err != nil {
 		j.Logger.Err(err.Error())
+		errorCounter.Inc(1)
 	}
 }
 
-func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request) {
+func (j *JobsController) getProjectJobsWS(w http.ResponseWriter, r *http.Request) error {
 	err := j.WsMux.Handle(w, r)
 
 	if err != nil {
-		j.respond(w, logging.Error, http.StatusBadRequest, err.Error())
-		return
+		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request) {
+	jobsMetric := j.StatsScope.SubScope("getprojectjobs")
+	errorCounter := jobsMetric.Counter(metrics.ExecutionErrorMetric)
+	executionTime := jobsMetric.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
+
+	err := j.getProjectJobsWS(w, r)
+
+	if err != nil {
+		errorCounter.Inc(1)
 	}
 }
 

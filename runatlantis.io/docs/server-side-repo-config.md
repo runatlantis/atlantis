@@ -1,16 +1,18 @@
-# Server Side Repo Config
-A Server-Side Repo Config file is used to control per-repo behaviour
+# Server Side Config
+A Server-Side Config file is used for more groups of server config that can't reasonably be expressed through flags.
+
+One such usecase is to control per-repo behaviour
 and what users can do in repo-level `atlantis.yaml` files.
 
 [[toc]]
 
-## Do I Need A Server-Side Repo Config File?
+## Do I Need A Server-Side Config File?
 You do not need a server-side repo config file unless you want to customize
 some aspect of Atlantis on a per-repo basis.
 
 Read through the [use-cases](#use-cases) to determine if you need it.
 
-## Enabling Server Side Repo Config
+## Enabling Server Side Config
 To use server side repo config create a config file, ex. `repos.yaml`, and pass it to
 the `atlantis server` command via the `--repo-config` flag, ex. `--repo-config=path/to/repos.yaml`.
 
@@ -453,3 +455,24 @@ If you set a workflow with the key `default`, it will override this.
 | name   | string | none    | yes      | unique name for the policy set         |
 | path   | string | none    | yes      | path to the rego policies directory    |
 | source | string | none    | yes      | only `local` is supported at this time |
+
+
+### Metrics
+
+| Key                    | Type                      | Default | Required  | Description                              |
+|------------------------|---------------------------|---------|-----------|------------------------------------------|
+| statsd                 | [Statsd](#statsd)         | none    | no        | Statsd metrics provider                  |
+| prometheus             | [Prometheus](#prometheus) | none    | no        | Statsd metrics provider                  |
+
+### Statsd
+
+| Key    | Type   | Default | Required | Description                            |
+| ------ | ------ | ------- | -------- | -------------------------------------- |
+| host   | string | none    | yes      | statsd host ip address                 |
+| port   | string | none    | yes      | statsd port                            |
+
+### Prometheus
+
+| Key      | Type   | Default | Required | Description                            |
+| -------- | ------ | ------- | -------- | -------------------------------------- |
+| endpoint | string | none    | yes      | path to metrics endpoint               |

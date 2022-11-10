@@ -1,7 +1,7 @@
 package events
 
 import (
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
@@ -26,7 +26,7 @@ type UnlockCommandRunner struct {
 }
 
 func (u *UnlockCommandRunner) Run(
-	ctx *CommandContext,
+	ctx *command.Context,
 	cmd *CommentCommand,
 ) {
 	baseRepo := ctx.Pull.BaseRepo
@@ -44,7 +44,7 @@ func (u *UnlockCommandRunner) Run(
 		return
 	}
 
-	if commentErr := u.vcsClient.CreateComment(baseRepo, pullNum, vcsMessage, models.UnlockCommand.String()); commentErr != nil {
+	if commentErr := u.vcsClient.CreateComment(baseRepo, pullNum, vcsMessage, command.Unlock.String()); commentErr != nil {
 		ctx.Log.Err("unable to comment: %s", commentErr)
 	}
 }

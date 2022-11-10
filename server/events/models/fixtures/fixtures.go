@@ -15,6 +15,7 @@ package fixtures
 
 import (
 	"fmt"
+
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 )

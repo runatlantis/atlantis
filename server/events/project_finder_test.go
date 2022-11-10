@@ -105,6 +105,44 @@ func setupTmpRepos(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestDetermineWorkspaceFromHCL(t *testing.T) {
+	noopLogger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description       string
+		repoDir           string
+		expectedWorkspace string
+	}{
+		{
+			"Should use configured Terraform Cloud workspace",
+			"workspace-configured",
+			"test-workspace",
+		},
+		{
+			"If no 'cloud' block was configured, it should use 'default' workspace",
+			"no-cloud-block",
+			"default",
+		},
+		{
+			"If 'cloud' was specify but without `name` attribute, it should use 'default' workspace",
+			"cloud-block-without-workspace-name",
+			"default",
+		},
+	}
+
+	for _, c := range cases {
+		fullPath := filepath.Join("testdata/test-repos", c.repoDir)
+		got, err := m.DetermineWorkspaceFromHCL(noopLogger, fullPath)
+		if err != nil {
+			t.Error("got error:", err)
+			break
+		}
+		if got != c.expectedWorkspace {
+			t.Fatalf("Expected %s but got %s", c.expectedWorkspace, got)
+		}
+	}
+
+}
+
 func TestDetermineProjects(t *testing.T) {
 	noopLogger := logging.NewNoopLogger(t)
 	setupTmpRepos(t)

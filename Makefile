@@ -64,7 +64,7 @@ lint: ## Run linter locally
 	golangci-lint run
 
 check-lint: ## Run linter in CI/CD. If running locally use 'lint'
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b ./bin v1.39.0
+	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin v1.39.0
 	./bin/golangci-lint run -j 4 --timeout 5m
 
 check-fmt: ## Fail if not formatted

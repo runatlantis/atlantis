@@ -28,12 +28,14 @@ func TestProject_UnmarshalYAML(t *testing.T) {
 				Autoplan:          nil,
 				ApplyRequirements: nil,
 				Name:              nil,
+				Branch:            nil,
 			},
 		},
 		{
 			description: "all fields set including mergeable apply requirement",
 			input: `
 name: myname
+branch: mybranch
 dir: mydir
 workspace: workspace
 workflow: workflow
@@ -42,9 +44,11 @@ autoplan:
   when_modified: []
   enabled: false
 apply_requirements:
-- mergeable`,
+- mergeable
+execution_order_group: 10`,
 			exp: raw.Project{
 				Name:             String("myname"),
+				Branch:           String("mybranch"),
 				Dir:              String("mydir"),
 				Workspace:        String("workspace"),
 				Workflow:         String("workflow"),
@@ -53,7 +57,8 @@ apply_requirements:
 					WhenModified: []string{},
 					Enabled:      Bool(false),
 				},
-				ApplyRequirements: []string{"mergeable"},
+				ApplyRequirements:   []string{"mergeable"},
+				ExecutionOrderGroup: Int(10),
 			},
 		},
 	}
@@ -94,6 +99,22 @@ func TestProject_Validate(t *testing.T) {
 				Dir: String("../mydir"),
 			},
 			expErr: "dir: cannot contain '..'.",
+		},
+		{
+			description: "not a regexp for branch",
+			input: raw.Project{
+				Branch: String("text"),
+				Dir:    String("."),
+			},
+			expErr: "branch: regex must begin and end with a slash '/'.",
+		},
+		{
+			description: "invalid regexp for branch",
+			input: raw.Project{
+				Branch: String("/(text/"),
+				Dir:    String("."),
+			},
+			expErr: "branch: parsing: /(text/: error parsing regexp: missing closing ): `(text`.",
 		},
 		{
 			description: "apply reqs with unsupported",
@@ -259,6 +280,7 @@ func TestProject_ToValid(t *testing.T) {
 			},
 			exp: valid.Project{
 				Dir:              ".",
+				BranchRegex:      nil,
 				Workspace:        "default",
 				WorkflowName:     nil,
 				TerraformVersion: nil,
@@ -281,8 +303,9 @@ func TestProject_ToValid(t *testing.T) {
 					WhenModified: []string{"hi"},
 					Enabled:      Bool(false),
 				},
-				ApplyRequirements: []string{"approved"},
-				Name:              String("myname"),
+				ApplyRequirements:   []string{"approved"},
+				Name:                String("myname"),
+				ExecutionOrderGroup: Int(10),
 			},
 			exp: valid.Project{
 				Dir:              ".",
@@ -293,8 +316,9 @@ func TestProject_ToValid(t *testing.T) {
 					WhenModified: []string{"hi"},
 					Enabled:      false,
 				},
-				ApplyRequirements: []string{"approved"},
-				Name:              String("myname"),
+				ApplyRequirements:   []string{"approved"},
+				Name:                String("myname"),
+				ExecutionOrderGroup: 10,
 			},
 		},
 		{

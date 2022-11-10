@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -12,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createTestProjectCmdContext(t *testing.T) models.ProjectCommandContext {
+func createTestProjectCmdContext(t *testing.T) command.ProjectContext {
 	logger := logging.NewNoopLogger(t)
-	return models.ProjectCommandContext{
+	return command.ProjectContext{
 		BaseRepo: models.Repo{
 			Name:  "test-repo",
 			Owner: "test-org",

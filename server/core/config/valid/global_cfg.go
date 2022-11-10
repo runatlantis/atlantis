@@ -35,6 +35,21 @@ type GlobalCfg struct {
 	Repos      []Repo
 	Workflows  map[string]Workflow
 	PolicySets PolicySets
+	Metrics    Metrics
+}
+
+type Metrics struct {
+	Statsd     *Statsd
+	Prometheus *Prometheus
+}
+
+type Statsd struct {
+	Port string
+	Host string
+}
+
+type Prometheus struct {
+	Endpoint string
 }
 
 // Repo is the final parsed version of server-side repo config.
@@ -69,6 +84,7 @@ type MergedProjectCfg struct {
 	RepoCfgVersion            int
 	PolicySets                PolicySets
 	DeleteSourceBranchOnMerge bool
+	ExecutionOrderGroup       int
 }
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.
@@ -293,6 +309,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		RepoCfgVersion:            rCfg.Version,
 		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
+		ExecutionOrderGroup:       proj.ExecutionOrderGroup,
 	}
 }
 

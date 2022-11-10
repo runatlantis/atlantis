@@ -2,9 +2,10 @@
 package matchers
 
 import (
+	"reflect"
+
 	"github.com/petergtz/pegomock"
 	locking "github.com/runatlantis/atlantis/server/core/locking"
-	"reflect"
 )
 
 func AnyLockingApplyCommandLockResponse() locking.ApplyCommandLock {

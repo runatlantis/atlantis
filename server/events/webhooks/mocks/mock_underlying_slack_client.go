@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	slack "github.com/nlopes/slack"
-	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 	"time"
+
+	slack "github.com/nlopes/slack"
+	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockUnderlyingSlackClient struct {

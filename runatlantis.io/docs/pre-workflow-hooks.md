@@ -8,6 +8,7 @@ workflows](custom-workflows.html#custom-run-command) in several ways.
    present. This be utilized to [dynamically generate repo configs](pre-workflow-hooks.html#dynamic-repo-config-generation).
 2. Pre workflow hooks are run outside of Atlantis commands. Which means
    they do not surface their output back to the PR as a comment.
+3. Pre workflow hooks only allow `run` commands.
 
 [[toc]]
 
@@ -55,5 +56,7 @@ command](custom-workflows.html#custom-run-command).
   * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
   * `DIR` - The absolute path to the root of the cloned repository. 
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
+  * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
+      every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
 :::
 

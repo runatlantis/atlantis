@@ -132,7 +132,7 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (appr
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
 	// We'll only loop 1000 times as a safety measure.
 	maxLoops := 1000
@@ -265,4 +265,8 @@ func (b *Client) SupportsSingleFileDownload(models.Repo) bool {
 // if BaseRepo had one repo config file, its content will placed on the second return value
 func (b *Client) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("Not Implemented")
+}
+
+func (b *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
 }

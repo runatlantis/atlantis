@@ -119,6 +119,7 @@ func (r RepoCfg) ValidateWorkspaceAllowed(repoRelDir string, workspace string) e
 
 type Project struct {
 	Dir                       string
+	BranchRegex               *regexp.Regexp
 	Workspace                 string
 	Name                      *string
 	WorkflowName              *string
@@ -126,6 +127,7 @@ type Project struct {
 	Autoplan                  Autoplan
 	ApplyRequirements         []string
 	DeleteSourceBranchOnMerge *bool
+	ExecutionOrderGroup       int
 }
 
 // GetName returns the name of the project or an empty string if there is no

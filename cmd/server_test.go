@@ -84,7 +84,9 @@ var testFlags = map[string]interface{}{
 	GitlabTokenFlag:            "gitlab-token",
 	GitlabUserFlag:             "gitlab-user",
 	GitlabWebhookSecretFlag:    "gitlab-secret",
+	LockingDBType:              "boltdb",
 	LogLevelFlag:               "debug",
+	StatsNamespace:             "atlantis",
 	AllowDraftPRs:              true,
 	PortFlag:                   8181,
 	ParallelPoolSize:           100,
@@ -101,6 +103,7 @@ var testFlags = map[string]interface{}{
 	SSLKeyFileFlag:             "key-file",
 	TFDownloadURLFlag:          "https://my-hostname.com",
 	TFEHostnameFlag:            "my-hostname",
+	TFELocalExecutionModeFlag:  true,
 	TFETokenFlag:               "my-token",
 	VCSStatusName:              "my-status",
 	WriteGitCredsFlag:          true,
@@ -130,11 +133,12 @@ func TestExecute_Defaults(t *testing.T) {
 	Ok(t, err)
 
 	strExceptions := map[string]string{
-		GHUserFlag:        "user",
-		GHTokenFlag:       "token",
-		DataDirFlag:       dataDir,
-		AtlantisURLFlag:   "http://" + hostname + ":4141",
-		RepoAllowlistFlag: "*",
+		GHUserFlag:           "user",
+		GHTokenFlag:          "token",
+		DataDirFlag:          dataDir,
+		AtlantisURLFlag:      "http://" + hostname + ":4141",
+		RepoAllowlistFlag:    "*",
+		VarFileAllowlistFlag: dataDir,
 	}
 	strIgnore := map[string]bool{
 		"config": true,

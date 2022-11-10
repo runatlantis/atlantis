@@ -68,8 +68,8 @@ func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) 
 	return d.clients[repo.VCSHost.Type].PullIsApproved(repo, pull)
 }
 
-func (d *ClientProxy) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
-	return d.clients[repo.VCSHost.Type].PullIsMergeable(repo, pull)
+func (d *ClientProxy) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+	return d.clients[repo.VCSHost.Type].PullIsMergeable(repo, pull, vcsstatusname)
 }
 
 func (d *ClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
@@ -94,4 +94,8 @@ func (d *ClientProxy) DownloadRepoConfigFile(pull models.PullRequest) (bool, []b
 
 func (d *ClientProxy) SupportsSingleFileDownload(repo models.Repo) bool {
 	return d.clients[repo.VCSHost.Type].SupportsSingleFileDownload(repo)
+}
+
+func (d *ClientProxy) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return d.clients[VCSHostType].GetCloneURL(VCSHostType, repo)
 }

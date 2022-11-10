@@ -3,7 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the License);
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an AS IS BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -97,7 +99,7 @@ To continue, we need you to create a GitHub personal access token
 with [green]"repo" [reset]scope so we can fork an example terraform project.
 
 Follow these instructions to create a token (we don't store any tokens):
-[green]https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token[reset]
+[green]https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-fine-grained-personal-access-token[reset]
 - use "atlantis" for the token description
 - add "repo" scope
 - copy the access token
@@ -124,7 +126,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	colorstring.Println("[green]=> fork completed![reset]")
 
 	// Detect terraform and install it if not installed.
-	_, err := exec.LookPath("terraform")
+	terraformPath, err := exec.LookPath("terraform")
 	if err != nil {
 		colorstring.Println("[yellow]=> terraform not found in $PATH.[reset]")
 		colorstring.Println("=> downloading terraform ")
@@ -142,18 +144,25 @@ Follow these instructions to create a token (we don't store any tokens):
 		}
 		colorstring.Println("[green]=> installed terraform successfully at /usr/local/bin[reset]")
 	} else {
-		colorstring.Println("[green]=> terraform found in $PATH![reset]")
+		colorstring.Printf("[green]=> terraform found in $PATH at %s\n[reset]", terraformPath)
 	}
 
-	// Download ngrok.
-	colorstring.Println("=> downloading ngrok  ")
-	s.Start()
-	ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
-	if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
-		return errors.Wrapf(err, "downloading and unzipping ngrok")
+	// Detect ngrok and install it if not installed
+	ngrokPath, ngrokErr := exec.LookPath("ngrok")
+	if ngrokErr != nil {
+		colorstring.Println("[yellow]=> ngrok not found in $PATH.[reset]")
+		colorstring.Println("=> downloading ngrok")
+		s.Start()
+		ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
+		if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
+			return errors.Wrapf(err, "downloading and unzipping ngrok")
+		}
+		s.Stop()
+		colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
+		ngrokPath = "/tmp/ngrok"
+	} else {
+		colorstring.Printf("[green]=> ngrok found in $PATH at %s\n[reset]", ngrokPath)
 	}
-	s.Stop()
-	colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
 
 	// Create ngrok tunnel.
 	colorstring.Println("=> creating secure tunnel")
@@ -164,6 +173,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	// will just choose a random API port and we won't be able to get the right
 	// url.
 	ngrokConfig := fmt.Sprintf(`
+version: 1
 web_addr: %s
 tunnels:
   atlantis:
@@ -172,7 +182,7 @@ tunnels:
     proto: http
 `, ngrokAPIURL, atlantisPort)
 
-	ngrokConfigFile, err := os.CreateTemp("", "")
+	ngrokConfigFile, err := os.CreateTemp("", "atlantis-testdrive-ngrok-config")
 	if err != nil {
 		return errors.Wrap(err, "creating ngrok config file")
 	}
@@ -188,7 +198,7 @@ tunnels:
 	tunnelReadyLog := regexp.MustCompile("client session established")
 	tunnelTimeout := 20 * time.Second
 	cancelNgrok, ngrokErrors, err := execAndWaitForStderr(&wg, tunnelReadyLog, tunnelTimeout,
-		"/tmp/ngrok", "start", "atlantis", "--config", ngrokConfigFile.Name(), "--log", "stderr", "--log-format", "term")
+		ngrokPath, "start", "atlantis", "--config", ngrokConfigFile.Name(), "--log", "stderr", "--log-format", "term")
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	if err != nil {
 		s.Stop()

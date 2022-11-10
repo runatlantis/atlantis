@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	models "github.com/runatlantis/atlantis/server/core/runtime/models"
 )
 
 type MockFilePath struct {

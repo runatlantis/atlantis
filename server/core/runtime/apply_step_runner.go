@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -21,7 +22,7 @@ type ApplyStepRunner struct {
 	AsyncTFExec         AsyncTFExec
 }
 
-func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	if a.hasTargetFlag(ctx, extraArgs) {
 		return "", errors.New("cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan")
 	}
@@ -62,7 +63,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 	return out, err
 }
 
-func (a *ApplyStepRunner) hasTargetFlag(ctx models.ProjectCommandContext, extraArgs []string) bool {
+func (a *ApplyStepRunner) hasTargetFlag(ctx command.ProjectContext, extraArgs []string) bool {
 	isTargetFlag := func(s string) bool {
 		if s == "-target" {
 			return true
@@ -109,7 +110,7 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 // manual diff.
 // It also writes "yes" or "no" to the process to confirm the apply.
 func (a *ApplyStepRunner) runRemoteApply(
-	ctx models.ProjectCommandContext,
+	ctx command.ProjectContext,
 	applyArgs []string,
 	path string,
 	absPlanPath string,
@@ -125,7 +126,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	// updateStatusF will update the commit status and log any error.
 	updateStatusF := func(status models.CommitStatus, url string) {
-		if err := a.CommitStatusUpdater.UpdateProject(ctx, models.ApplyCommand, status, url); err != nil {
+		if err := a.CommitStatusUpdater.UpdateProject(ctx, command.Apply, status, url); err != nil {
 			ctx.Log.Err("unable to update status: %s", err)
 		}
 	}

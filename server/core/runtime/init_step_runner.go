@@ -6,7 +6,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/runtime/common"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 // InitStep runs `terraform init`.
@@ -15,7 +15,7 @@ type InitStepRunner struct {
 	DefaultTFVersion  *version.Version
 }
 
-func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	lockFileName := ".terraform.lock.hcl"
 	terraformLockfilePath := filepath.Join(path, lockFileName)
 	terraformLockFileTracked, err := common.IsFileTracked(path, lockFileName)

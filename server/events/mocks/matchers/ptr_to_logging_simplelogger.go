@@ -2,9 +2,10 @@
 package matchers
 
 import (
+	"reflect"
+
 	"github.com/petergtz/pegomock"
 	logging "github.com/runatlantis/atlantis/server/logging"
-	"reflect"
 )
 
 func AnyPtrToLoggingSimpleLogger() logging.SimpleLogging {

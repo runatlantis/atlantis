@@ -14,7 +14,6 @@
 package webhooks_test
 
 import (
-	"encoding/json"
 	"errors"
 	"testing"
 
@@ -56,41 +55,6 @@ func TestTokenIsSet(t *testing.T) {
 	t.Log("When the Token is not an empty string, function should return true")
 	c.Token = "random"
 	Equals(t, true, c.TokenIsSet())
-}
-
-func TestChannelExists_False(t *testing.T) {
-	t.Log("When the slack channel doesn't exist, function should return false")
-	setup(t)
-	When(underlying.GetConversations(new(slack.GetConversationsParameters))).ThenReturn(nil, "xyz", nil)
-	When(underlying.GetConversations(&slack.GetConversationsParameters{Cursor: "xyz"})).ThenReturn(nil, "", nil)
-	exists, err := client.ChannelExists("somechannel")
-	Ok(t, err)
-	Equals(t, false, exists)
-}
-
-func TestChannelExists_True(t *testing.T) {
-	t.Log("When the slack channel exists, function should return true")
-	setup(t)
-	channelJSON := `{"name":"existingchannel"}`
-	var channel slack.Channel
-	err := json.Unmarshal([]byte(channelJSON), &channel)
-	Ok(t, err)
-	When(underlying.GetConversations(new(slack.GetConversationsParameters))).ThenReturn(nil, "xyz", nil)
-	When(underlying.GetConversations(&slack.GetConversationsParameters{Cursor: "xyz"})).ThenReturn([]slack.Channel{channel}, "", nil)
-
-	exists, err := client.ChannelExists("existingchannel")
-	Ok(t, err)
-	Equals(t, true, exists)
-}
-
-func TestChannelExists_Error(t *testing.T) {
-	t.Log("When the underlying slack client errors, an error should be returned")
-	setup(t)
-	When(underlying.GetConversations(new(slack.GetConversationsParameters))).ThenReturn(nil, "xyz", nil)
-	When(underlying.GetConversations(&slack.GetConversationsParameters{Cursor: "xyz"})).ThenReturn(nil, "", errors.New(""))
-
-	_, err := client.ChannelExists("anychannel")
-	Assert(t, err != nil, "expected error")
 }
 
 func TestPostMessage_Success(t *testing.T) {

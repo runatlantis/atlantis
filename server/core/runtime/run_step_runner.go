@@ -3,12 +3,13 @@ package runtime
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/core/runtime/models"
+	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/jobs"
 )
 
 // RunStepRunner runs custom commands.
@@ -16,10 +17,11 @@ type RunStepRunner struct {
 	TerraformExecutor TerraformExec
 	DefaultTFVersion  *version.Version
 	// TerraformBinDir is the directory where Atlantis downloads Terraform binaries.
-	TerraformBinDir string
+	TerraformBinDir         string
+	ProjectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
 
-func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, path string, envs map[string]string) (string, error) {
+func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, streamOutput bool) (string, error) {
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -31,9 +33,6 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
-
-	cmd := exec.Command("sh", "-c", command) // #nosec
-	cmd.Dir = path
 
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
@@ -65,14 +64,14 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 	for key, val := range envs {
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
-	cmd.Env = finalEnvVars
-	out, err := cmd.CombinedOutput()
+
+	runner := models.NewShellCommandRunner(command, finalEnvVars, path, streamOutput, r.ProjectCmdOutputHandler)
+	output, err := runner.Run(ctx)
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
+		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output)
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
-	ctx.Log.Info("successfully ran %q in %q", command, path)
-	return string(out), nil
+	return output, nil
 }
