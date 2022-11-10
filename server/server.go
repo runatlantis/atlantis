@@ -17,6 +17,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
@@ -112,6 +113,9 @@ type Server struct {
 	ProjectJobsErrorTemplate       templates.TemplateWriter
 	SSLCertFile                    string
 	SSLKeyFile                     string
+	CertLastRefreshTime            time.Time
+	KeyLastRefreshTime             time.Time
+	SSLCert                        *tls.Certificate
 	Drainer                        *events.Drainer
 	WebAuthentication              bool
 	WebUsername                    string
@@ -888,13 +892,15 @@ func (s *Server) Start() error {
 		s.ProjectCmdOutputHandler.Handle()
 	}()
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
+	tlsConfig := &tls.Config{GetCertificate: s.GetSSLCertificate}
+
+	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n, TLSConfig: tlsConfig}
 	go func() {
 		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
 
 		var err error
 		if s.SSLCertFile != "" && s.SSLKeyFile != "" {
-			err = server.ListenAndServeTLS(s.SSLCertFile, s.SSLKeyFile)
+			err = server.ListenAndServeTLS("", "")
 		} else {
 			err = server.ListenAndServe()
 		}
@@ -1009,6 +1015,30 @@ func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 var healthzData = []byte(`{
   "status": "ok"
 }`)
+
+func (s *Server) GetSSLCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	certStat, err := os.Stat(s.SSLCertFile)
+	if err != nil {
+		return nil, fmt.Errorf("while getting cert file modification time: %w", err)
+	}
+
+	keyStat, err := os.Stat(s.SSLKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("while getting key file modification time: %w", err)
+	}
+
+	if s.SSLCert == nil || certStat.ModTime() != s.CertLastRefreshTime || keyStat.ModTime() != s.KeyLastRefreshTime {
+		cert, err := tls.LoadX509KeyPair(s.SSLCertFile, s.SSLKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("while loading tls cert: %w", err)
+		}
+
+		s.SSLCert = &cert
+		s.CertLastRefreshTime = certStat.ModTime()
+		s.KeyLastRefreshTime = keyStat.ModTime()
+	}
+	return s.SSLCert, nil
+}
 
 // ParseAtlantisURL parses the user-passed atlantis URL to ensure it is valid
 // and we can use it in our templates.
