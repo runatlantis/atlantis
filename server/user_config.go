@@ -105,6 +105,7 @@ type UserConfig struct {
 	WebUsername            string          `mapstructure:"web-username"`
 	WebPassword            string          `mapstructure:"web-password"`
 	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
+	WebsocketCheckOrigin   bool            `mapstructure:"websocket-check-origin"`
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed
