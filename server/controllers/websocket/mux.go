@@ -34,10 +34,9 @@ type Multiplexor struct {
 func checkOriginFunc(checkOrigin bool) func(r *http.Request) bool {
 	if checkOrigin {
 		return nil // use Gorilla websocket's checkSameOrigin
-	} else {
-		return func(r *http.Request) bool {
-			return true
-		}
+	}
+	return func(r *http.Request) bool {
+		return true
 	}
 }
 
