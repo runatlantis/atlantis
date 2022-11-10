@@ -464,12 +464,12 @@ Values are chosen in this order:
   Markdown template overrides may be specified either in individual files, or all together in a single file. All template
   override files _must_ have the `.tmpl` extension, otherwise they will not be parsed.
 
-  Markdown templates which may have overrides can be found [here](../../server/events/templates)
+  Markdown templates which may have overrides can be found [here](https://github.com/runatlantis/atlantis/tree/master/server/events/templates)
 
   Please be mindful that settings like `--enable-diff-markdown-format` depend on logic defined in the templates. It is
   possible to diverge from expected behavior, if care is not taken when overriding default templates.
 
-  Defaults to `~/.markdown_templates/`
+  Defaults to the atlantis home directory `/home/atlantis/.markdown_templates/` in `/$HOME/.markdown_templates`.
 
 ### `--parallel-pool-size`
   ```bash
