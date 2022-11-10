@@ -38,6 +38,10 @@ func (d *DeployWorkflowSignaler) SignalWithStartWorkflow(
 
 	options := client.StartWorkflowOptions{
 		TaskQueue: workflows.DeployTaskQueue,
+		SearchAttributes: map[string]interface{}{
+			"atlantis_repository": repo.FullName,
+			"atlantis_root":       rootCfg.Name,
+		},
 	}
 
 	var tfVersion string

@@ -40,6 +40,12 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 	id := deploymentInfo.ID
 	ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 		WorkflowID: id.String(),
+		SearchAttributes: map[string]interface{}{
+			"atlantis_repository": deploymentInfo.Repo.GetFullName(),
+			"atlantis_root":       deploymentInfo.Root.Name,
+			"atlantis_trigger":    deploymentInfo.Root.Trigger,
+			"atlantis_revision":   deploymentInfo.Revision,
+		},
 	})
 	terraformWorkflowRequest := terraform.Request{
 		Root:         deploymentInfo.Root,

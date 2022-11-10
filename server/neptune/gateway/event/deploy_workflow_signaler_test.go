@@ -142,6 +142,10 @@ func TestSignalWithStartWorkflow_Success(t *testing.T) {
 			expectedWorkflow: workflows.Deploy,
 			expectedOptions: client.StartWorkflowOptions{
 				TaskQueue: workflows.DeployTaskQueue,
+				SearchAttributes: map[string]interface{}{
+					"atlantis_repository": repo.FullName,
+					"atlantis_root":       rootCfg.Name,
+				},
 			},
 			expectedWorkflowArgs: workflows.DeployRequest{
 				Repo: workflows.DeployRequestRepo{
@@ -211,6 +215,10 @@ func TestSignalWithStartWorkflow_Success(t *testing.T) {
 			expectedWorkflow: workflows.Deploy,
 			expectedOptions: client.StartWorkflowOptions{
 				TaskQueue: workflows.DeployTaskQueue,
+				SearchAttributes: map[string]interface{}{
+					"atlantis_repository": repo.FullName,
+					"atlantis_root":       rootCfg.Name,
+				},
 			},
 			expectedWorkflowArgs: workflows.DeployRequest{
 				Repo: workflows.DeployRequestRepo{
@@ -298,6 +306,10 @@ func TestSignalWithStartWorkflow_Failure(t *testing.T) {
 		expectedWorkflow: workflows.Deploy,
 		expectedOptions: client.StartWorkflowOptions{
 			TaskQueue: workflows.DeployTaskQueue,
+			SearchAttributes: map[string]interface{}{
+				"atlantis_repository": repo.FullName,
+				"atlantis_root":       rootCfg.Name,
+			},
 		},
 		expectedWorkflowArgs: workflows.DeployRequest{
 			Repo: workflows.DeployRequestRepo{
