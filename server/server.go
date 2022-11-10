@@ -892,7 +892,7 @@ func (s *Server) Start() error {
 		s.ProjectCmdOutputHandler.Handle()
 	}()
 
-	tlsConfig := &tls.Config{GetCertificate: s.GetSSLCertificate}
+	tlsConfig := &tls.Config{GetCertificate: s.GetSSLCertificate, MinVersion: 1.2}
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n, TLSConfig: tlsConfig}
 	go func() {
