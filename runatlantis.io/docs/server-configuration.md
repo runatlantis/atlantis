@@ -383,9 +383,14 @@ Values are chosen in this order:
 
 ### `--gh-team-allowlist`
   ```bash
-  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply"
+  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply"
   ```
   Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
+  
+  ::: warning NOTE
+  You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
+  i.e., "Engineering Team:plan, Infrastructure Team:apply"
+  :::
 
 ### `--gh-allow-mergeable-bypass-apply`
   ```bash
