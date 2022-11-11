@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -313,6 +314,7 @@ func NewServer(config Config) (*Server, error) {
 	router.HandleFunc("/healthz", Healthz).Methods("GET")
 	router.HandleFunc("/status", statusController.Get).Methods("GET")
 	router.HandleFunc("/events", gatewayEventsController.Post).Methods("POST")
+	router.HandleFunc("/debug/pprof/profile", pprof.Profile)
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
