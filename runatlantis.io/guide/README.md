@@ -29,7 +29,7 @@ Check out the video below to see it in action:
 ### Increased visibility
 When everyone is executing Terraform on their own computers, it's hard to know the
 current state of your infrastructure:
-* Is what's in `master` deployed?
+* Is what's in `main` branch deployed?
 * Did someone forget to create a pull request for that latest change?
 * What was the output from that last `terraform apply`?
 

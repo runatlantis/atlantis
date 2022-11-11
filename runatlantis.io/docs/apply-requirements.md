@@ -103,7 +103,7 @@ If you set up Protected Branches then you can enforce:
 * Requiring certain status checks to be passing
 * Requiring certain people to have reviewed and approved the pull request
 * Requiring `CODEOWNERS` to have reviewed and approved the pull request
-* Requiring that the branch is up to date with `master`
+* Requiring that the branch is up to date with `main`
 
 See [https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches)
 for more details.
@@ -176,7 +176,7 @@ You can set the `undiverged` requirement by:
 #### Meaning
 The `merge` checkout strategy creates a temporary merge commit and runs the `plan` on the Atlantis local version of the PR
 source and destination branch. The local destination branch can become out of date since changes to the destination branch are not fetched
-if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of master is up to date
+if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of main is up to date
 with remote so that the state of the source during the `apply` is identical to that if you were to merge the PR at that
 time.
 

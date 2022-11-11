@@ -1238,7 +1238,7 @@ func GitHubPullRequestParsed(headSHA string) *github.PullRequest {
 				FullName: github.String("runatlantis/atlantis-tests"),
 				CloneURL: github.String("https://github.com/runatlantis/atlantis-tests.git"),
 			},
-			Ref: github.String("master"),
+			Ref: github.String("main"),
 		},
 		User: &github.User{
 			Login: github.String("atlantisbot"),

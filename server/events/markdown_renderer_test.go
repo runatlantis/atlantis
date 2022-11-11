@@ -180,7 +180,7 @@ $$$
 `,
 		},
 		{
-			"single successful plan with master ahead",
+			"single successful plan with main ahead",
 			command.Plan,
 			[]command.ProjectResult{
 				{
@@ -1651,7 +1651,7 @@ $$$
 `,
 		},
 		{
-			"single successful plan with master ahead",
+			"single successful plan with main ahead",
 			command.Plan,
 			[]command.ProjectResult{
 				{
