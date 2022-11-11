@@ -1036,7 +1036,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	pullUpdater := &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            e2eVCSClient,
-		MarkdownRenderer:     &events.MarkdownRenderer{},
+		MarkdownRenderer:     events.GetMarkdownRenderer(false, false, false, false, false, false, ""),
 	}
 
 	autoMerger := &events.AutoMerger{

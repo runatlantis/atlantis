@@ -456,6 +456,21 @@ Values are chosen in this order:
   ```
   Log level. Defaults to `info`.
 
+### `--markdown-template-overrides-dir`
+  ```bash
+  atlantis server --markdown-template-overrides-dir="path/to/templates/"
+  ```
+  Directory where Atlantis will read in overrides for markdown templates used to render comments on pull requests.
+  Markdown template overrides may be specified either in individual files, or all together in a single file. All template
+  override files _must_ have the `.tmpl` extension, otherwise they will not be parsed.
+
+  Markdown templates which may have overrides can be found [here](https://github.com/runatlantis/atlantis/tree/master/server/events/templates)
+
+  Please be mindful that settings like `--enable-diff-markdown-format` depend on logic defined in the templates. It is
+  possible to diverge from expected behavior, if care is not taken when overriding default templates.
+
+  Defaults to the atlantis home directory `/home/atlantis/.markdown_templates/` in `/$HOME/.markdown_templates`.
+
 ### `--parallel-pool-size`
   ```bash
   atlantis server --parallel-pool-size=100
@@ -767,3 +782,9 @@ Values are chosen in this order:
   atlantis server --web-password="atlantis"
   ```
   Password used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--websocket-check-origin`
+  ```bash
+  atlantis server --websocket-check-origin
+  ```
+  Only allow websockets connection when they originate from the running Atlantis web server

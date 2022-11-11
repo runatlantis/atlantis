@@ -8,8 +8,10 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-func NewWriter(log logging.SimpleLogging) *Writer {
-	upgrader := websocket.Upgrader{}
+func NewWriter(log logging.SimpleLogging, checkOrigin bool) *Writer {
+	upgrader := websocket.Upgrader{
+		CheckOrigin: checkOriginFunc(checkOrigin),
+	}
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	return &Writer{
 		upgrader: upgrader,
