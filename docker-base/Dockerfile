@@ -27,8 +27,8 @@ ARG TARGETPLATFORM
 # Install packages needed for running Atlantis.
 RUN apk add --no-cache \
         ca-certificates=20220614-r0 \
-        curl=7.83.1-r3 \
-        git=2.36.2-r0 \
+        curl=7.83.1-r4 \
+        git=2.36.3-r0 \
         unzip=6.0-r9 \
         bash=5.1.16-r2 \
         openssh=9.0_p1-r2 \
@@ -38,10 +38,9 @@ RUN apk add --no-cache \
     # Install packages needed for building dependencies.
     apk add --no-cache --virtual .build-deps \
         gnupg=2.2.35-r4 \
-        openssl=1.1.1q-r0 && \
+        openssl=1.1.1s-r0 && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
-
     # git-lfs
     case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
@@ -53,7 +52,6 @@ RUN apk add --no-cache \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
     git-lfs --version && \
-
     # gosu
     case ${TARGETPLATFORM} in \
         "linux/amd64") GOSU_ARCH=amd64 ;; \
@@ -73,7 +71,6 @@ RUN apk add --no-cache \
     chmod +x gosu && \
     cp gosu /bin && \
     gosu --version && \
-
     # Cleanup
     cd /tmp && \
     rm -rf /tmp/build && \
