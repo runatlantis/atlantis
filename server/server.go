@@ -894,7 +894,7 @@ func (s *Server) Start() error {
 
 	tlsConfig := &tls.Config{GetCertificate: s.GetSSLCertificate, MinVersion: tls.VersionTLS12}
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n, TLSConfig: tlsConfig}
+	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n, TLSConfig: tlsConfig, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
 
