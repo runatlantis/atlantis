@@ -99,7 +99,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	pullUpdater = &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            vcsClient,
-		MarkdownRenderer:     &events.MarkdownRenderer{},
+		MarkdownRenderer:     events.GetMarkdownRenderer(false, false, false, false, false, false, ""),
 	}
 
 	autoMerger = &events.AutoMerger{
