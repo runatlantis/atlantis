@@ -31,9 +31,19 @@ type Multiplexor struct {
 	registry     PartitionRegistry
 }
 
-func NewMultiplexor(log logging.SimpleLogging, keyGenerator PartitionKeyGenerator, registry PartitionRegistry) *Multiplexor {
-	upgrader := websocket.Upgrader{}
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+func checkOriginFunc(checkOrigin bool) func(r *http.Request) bool {
+	if checkOrigin {
+		return nil // use Gorilla websocket's checkSameOrigin
+	}
+	return func(r *http.Request) bool {
+		return true
+	}
+}
+
+func NewMultiplexor(log logging.SimpleLogging, keyGenerator PartitionKeyGenerator, registry PartitionRegistry, checkOrigin bool) *Multiplexor {
+	upgrader := websocket.Upgrader{
+		CheckOrigin: checkOriginFunc(checkOrigin),
+	}
 	return &Multiplexor{
 		writer: &Writer{
 			upgrader: upgrader,

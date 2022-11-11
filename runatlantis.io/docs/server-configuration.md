@@ -767,3 +767,9 @@ Values are chosen in this order:
   atlantis server --web-password="atlantis"
   ```
   Password used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--websocket-check-origin`
+  ```bash
+  atlantis server --websocket-check-origin
+  ```
+  Only allow websockets connection when they originate from the running Atlantis web server

@@ -119,6 +119,7 @@ const (
 	WebBasicAuthFlag           = "web-basic-auth"
 	WebUsernameFlag            = "web-username"
 	WebPasswordFlag            = "web-password"
+	WebsocketCheckOrigin       = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser             = ""
@@ -470,6 +471,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Switches on or off the Basic Authentication on the HTTP Middleware interface",
 		defaultValue: DefaultWebBasicAuth,
 	},
+	WebsocketCheckOrigin: {
+		description:  "Enable websocket origin check",
+		defaultValue: false,
+	},
 }
 var intFlags = map[string]intFlag{
 	ParallelPoolSize: {
@@ -682,6 +687,7 @@ func (s *ServerCmd) run() error {
 		RepoConfigJSONFlag:      RepoConfigJSONFlag,
 		SilenceForkPRErrorsFlag: SilenceForkPRErrorsFlag,
 	})
+
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
 	}
