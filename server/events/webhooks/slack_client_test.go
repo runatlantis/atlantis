@@ -17,10 +17,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/nlopes/slack"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/webhooks/mocks"
+	"github.com/slack-go/slack"
 
 	. "github.com/petergtz/pegomock"
 	. "github.com/runatlantis/atlantis/testing"
@@ -61,8 +61,7 @@ func TestPostMessage_Success(t *testing.T) {
 	t.Log("When apply succeeds, function should succeed and indicate success")
 	setup(t)
 
-	expParams := slack.NewPostMessageParameters()
-	expParams.Attachments = []slack.Attachment{{
+	attachments := []slack.Attachment{{
 		Color: "good",
 		Text:  "Apply succeeded for <url|runatlantis/atlantis>",
 		Fields: []slack.AttachmentField{
@@ -83,30 +82,37 @@ func TestPostMessage_Success(t *testing.T) {
 			},
 		},
 	}}
-	expParams.AsUser = true
-	expParams.EscapeText = false
 
 	channel := "somechannel"
 	err := client.PostMessage(channel, result)
 	Ok(t, err)
-	underlying.VerifyWasCalledOnce().PostMessage(channel, "", expParams)
+	underlying.VerifyWasCalledOnce().PostMessage(
+		channel,
+		slack.MsgOptionAsUser(true),
+		slack.MsgOptionText("", false),
+		slack.MsgOptionAttachments(attachments[0]),
+	)
 
 	t.Log("When apply fails, function should succeed and indicate failure")
 	result.Success = false
-	expParams.Attachments[0].Color = "danger"
-	expParams.Attachments[0].Text = "Apply failed for <url|runatlantis/atlantis>"
+	attachments[0].Color = "danger"
+	attachments[0].Text = "Apply failed for <url|runatlantis/atlantis>"
 
 	err = client.PostMessage(channel, result)
 	Ok(t, err)
-	underlying.VerifyWasCalledOnce().PostMessage(channel, "", expParams)
+	underlying.VerifyWasCalledOnce().PostMessage(
+		channel,
+		slack.MsgOptionAsUser(true),
+		slack.MsgOptionText("", false),
+		slack.MsgOptionAttachments(attachments[0]),
+	)
 }
 
 func TestPostMessage_Error(t *testing.T) {
 	t.Log("When the underlying slack client errors, an error should be returned")
 	setup(t)
 
-	expParams := slack.NewPostMessageParameters()
-	expParams.Attachments = []slack.Attachment{{
+	attachments := []slack.Attachment{{
 		Color: "good",
 		Text:  "Apply succeeded for <url|runatlantis/atlantis>",
 		Fields: []slack.AttachmentField{
@@ -127,11 +133,14 @@ func TestPostMessage_Error(t *testing.T) {
 			},
 		},
 	}}
-	expParams.AsUser = true
-	expParams.EscapeText = false
 
 	channel := "somechannel"
-	When(underlying.PostMessage(channel, "", expParams)).ThenReturn("", "", errors.New(""))
+	When(underlying.PostMessage(
+		channel,
+		slack.MsgOptionAsUser(true),
+		slack.MsgOptionText("", false),
+		slack.MsgOptionAttachments(attachments[0]),
+	)).ThenReturn("", "", errors.New(""))
 
 	err := client.PostMessage(channel, result)
 	Assert(t, err != nil, "expected error")
