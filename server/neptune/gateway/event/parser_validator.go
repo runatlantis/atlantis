@@ -2,7 +2,6 @@ package event
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -33,7 +32,7 @@ func (p *ParserValidator) ParseRepoCfg(absRepoDir string, repoID string) (valid.
 		return valid.RepoCfg{}, os.ErrNotExist
 	}
 	configFile := p.repoCfgPath(absRepoDir, AtlantisYAMLFilename)
-	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
+	configData, err := os.ReadFile(configFile) // nolint: gosec
 	if err != nil {
 		return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
 

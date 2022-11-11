@@ -3,7 +3,6 @@ package runtime_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,7 +55,7 @@ func TestRun_Success(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
-	err := ioutil.WriteFile(planPath, nil, 0600)
+	err := os.WriteFile(planPath, nil, 0600)
 	logger := logging.NewNoopCtxLogger(t)
 	ctx := context.Background()
 	prjCtx := command.ProjectContext{
@@ -89,7 +88,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "projectname-default.tfplan")
-	err := ioutil.WriteFile(planPath, nil, 0600)
+	err := os.WriteFile(planPath, nil, 0600)
 
 	logger := logging.NewNoopCtxLogger(t)
 	ctx := context.Background()
@@ -123,7 +122,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
-	err := ioutil.WriteFile(planPath, nil, 0600)
+	err := os.WriteFile(planPath, nil, 0600)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)
@@ -212,7 +211,7 @@ func TestRun_UsingTarget(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
 			planPath := filepath.Join(tmpDir, "workspace.tfplan")
-			err := ioutil.WriteFile(planPath, nil, 0600)
+			err := os.WriteFile(planPath, nil, 0600)
 			Ok(t, err)
 			terraform := mocks.NewMockClient()
 			step := runtime.ApplyStepRunner{
@@ -253,7 +252,7 @@ Terraform will perform the following actions:
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`
-	err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
+	err := os.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -313,7 +312,7 @@ Terraform will perform the following actions:
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`
-	err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
+	err := os.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)

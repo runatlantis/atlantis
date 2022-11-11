@@ -15,7 +15,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -78,7 +77,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	randomData := []byte(testFileData)
 	filePath := fmt.Sprintf("%s/%s/%s", cloneDir, t.projectType.Name, testFileName)
 	log.Printf("creating file to commit %q", filePath)
-	err := ioutil.WriteFile(filePath, randomData, 0644)
+	err := os.WriteFile(filePath, randomData, 0644)
 	if err != nil {
 		return e2eResult, fmt.Errorf("couldn't write file %s: %v", filePath, err)
 	}

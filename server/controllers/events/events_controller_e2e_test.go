@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1071,7 +1070,7 @@ var (
 func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
 	readCommentJSON.Do(
 		func() {
-			jsonBytes, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent.json"))
+			jsonBytes, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent.json"))
 			Ok(t, err)
 
 			commentJSON = string(jsonBytes)
@@ -1088,7 +1087,7 @@ func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
 func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
 	readPullRequestOpenedJSON.Do(
 		func() {
-			jsonBytes, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubPullRequestOpenedEvent.json"))
+			jsonBytes, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestOpenedEvent.json"))
 			Ok(t, err)
 
 			pullRequestOpenedJSON = string(jsonBytes)
@@ -1106,7 +1105,7 @@ func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
 func GitHubPullRequestClosedEvent(t *testing.T) *http.Request {
 	readPullRequestClosedJSON.Do(
 		func() {
-			jsonBytes, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubPullRequestClosedEvent.json"))
+			jsonBytes, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestClosedEvent.json"))
 			Ok(t, err)
 
 			pullRequestClosedJSON = string(jsonBytes)
@@ -1223,7 +1222,7 @@ func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir 
 	}
 
 	for _, expFile := range expReplies {
-		exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
+		exp, err := os.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
 		Ok(t, err)
 		expStr := string(exp)
 		// My editor adds a newline to all the files, so if the actual comment
@@ -1317,11 +1316,12 @@ func ensureRunning014(t *testing.T) {
 }
 
 // versionRegex extracts the version from `terraform version` output.
-//     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
-//	   => 0.12.0-alpha4
 //
-//     Terraform v0.11.10
-//	   => 0.11.10
+//	    Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
+//		   => 0.12.0-alpha4
+//
+//	    Terraform v0.11.10
+//		   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
 var versionConftestRegex = regexp.MustCompile("Version: (.*?)(\\s.*)?\n")

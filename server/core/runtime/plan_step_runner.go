@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -93,7 +92,7 @@ func (p *PlanStepRunner) remotePlan(ctx context.Context, prjCtx command.ProjectC
 
 	// We also prepend our own remote ops header to the file so during apply we
 	// know this is a remote apply.
-	err = ioutil.WriteFile(planFile, []byte(remoteOpsHeader+planOutput), 0600)
+	err = os.WriteFile(planFile, []byte(remoteOpsHeader+planOutput), 0600)
 	if err != nil {
 		return output, errors.Wrap(err, "unable to create planfile for remote ops")
 	}

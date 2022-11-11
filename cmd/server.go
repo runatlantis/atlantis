@@ -15,7 +15,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -959,7 +958,7 @@ func isValidLogLevel(level string) bool {
 }
 
 func createGHAppConfig(userConfig server.UserConfig) (githubapp.Config, error) {
-	privateKey, err := ioutil.ReadFile(userConfig.GithubAppKeyFile)
+	privateKey, err := os.ReadFile(userConfig.GithubAppKeyFile)
 	if err != nil {
 		return githubapp.Config{}, err
 	}

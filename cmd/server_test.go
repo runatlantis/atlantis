@@ -15,7 +15,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -797,12 +796,12 @@ func setupWithDefaults(flags map[string]interface{}, t *testing.T) *cobra.Comman
 }
 
 func tempFile(t *testing.T, contents string) string {
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	Ok(t, err)
 	newName := f.Name() + ".yaml"
 	err = os.Rename(f.Name(), newName)
 	Ok(t, err)
-	ioutil.WriteFile(newName, []byte(contents), 0600) // nolint: errcheck
+	os.WriteFile(newName, []byte(contents), 0600) // nolint: errcheck
 	return newName
 }
 

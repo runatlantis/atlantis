@@ -16,7 +16,7 @@ package request
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 
 	"github.com/runatlantis/atlantis/server/http"
 
@@ -58,7 +58,7 @@ func (d validator) validateWithoutSecret(r *http.BufferedRequest) ([]byte, error
 		if err != nil {
 			return []byte{}, err
 		}
-		payload, err := ioutil.ReadAll(body)
+		payload, err := io.ReadAll(body)
 		if err != nil {
 			return nil, fmt.Errorf("could not read body: %s", err)
 		}

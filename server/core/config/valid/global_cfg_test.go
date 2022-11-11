@@ -1,7 +1,7 @@
 package valid_test
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"testing"
@@ -650,7 +650,7 @@ policies:
 			var global valid.GlobalCfg
 			if c.gCfg != "" {
 				path := filepath.Join(tmp, "config.yaml")
-				Ok(t, ioutil.WriteFile(path, []byte(c.gCfg), 0600))
+				Ok(t, os.WriteFile(path, []byte(c.gCfg), 0600))
 				var err error
 				global, err = (&config.ParserValidator{}).ParseGlobalCfg(path, valid.NewGlobalCfg("somedir"))
 				Ok(t, err)
@@ -947,7 +947,7 @@ repos:
 
 			if c.gCfg != "" {
 				path := filepath.Join(tmp, "config.yaml")
-				Ok(t, ioutil.WriteFile(path, []byte(c.gCfg), 0600))
+				Ok(t, os.WriteFile(path, []byte(c.gCfg), 0600))
 				var err error
 				global, err = (&config.ParserValidator{}).ParseGlobalCfg(path, global)
 				Ok(t, err)

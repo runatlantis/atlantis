@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -578,7 +577,7 @@ projects:
 			Ok(t, err)
 
 			if c.repoCfg != "" {
-				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
 			builder := &DefaultProjectCommandBuilder{
@@ -747,7 +746,7 @@ workflows:
 			Ok(t, err)
 
 			if c.repoCfg != "" {
-				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
 			builder := &DefaultProjectCommandBuilder{
@@ -942,13 +941,13 @@ projects:
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
-			Ok(t, ioutil.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
+			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg("somedir"))
 			Ok(t, err)
 
 			if c.repoCfg != "" {
-				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
 			builder := &DefaultProjectCommandBuilder{
@@ -1162,7 +1161,7 @@ workflows:
 			Ok(t, err)
 
 			if c.repoCfg != "" {
-				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 			contextBuilder := NewProjectCommandContextBuilder(&CommentParser{})
 			contextBuilder = &PolicyCheckProjectContextBuilder{

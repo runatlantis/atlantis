@@ -56,6 +56,7 @@ func (c *CustomGithubRetriever) Retrieve(ctx context.Context) ([]byte, error) {
 // for all operations on that given repository regardless of the PR/Operation
 
 // Additionally, implementations are assumed to provide deterministic results.
+//
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_allocator.go Allocator
 type Allocator interface {
 	ShouldAllocate(featureID Name, featureCtx FeatureContext) (bool, error)

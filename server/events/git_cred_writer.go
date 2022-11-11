@@ -2,7 +2,6 @@ package events
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +23,7 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 
 	// If the file doesn't exist, write it.
 	if _, err := os.Stat(credsFile); err != nil {
-		if err := ioutil.WriteFile(credsFile, []byte(config), 0600); err != nil {
+		if err := os.WriteFile(credsFile, []byte(config), 0600); err != nil {
 			return errors.Wrapf(err, "writing generated %s file with user, token and hostname to %s", credsFilename, credsFile)
 		}
 		logger.Info(fmt.Sprintf("wrote git credentials to %s", credsFile))
@@ -67,7 +66,7 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 }
 
 func fileHasLine(line string, filename string) (bool, error) {
-	currContents, err := ioutil.ReadFile(filename) // nolint: gosec
+	currContents, err := os.ReadFile(filename) // nolint: gosec
 	if err != nil {
 		return false, errors.Wrapf(err, "reading %s", filename)
 	}
@@ -80,18 +79,18 @@ func fileHasLine(line string, filename string) (bool, error) {
 }
 
 func fileAppend(line string, filename string) error {
-	currContents, err := ioutil.ReadFile(filename) // nolint: gosec
+	currContents, err := os.ReadFile(filename) // nolint: gosec
 	if err != nil {
 		return err
 	}
 	if len(currContents) > 0 && !strings.HasSuffix(string(currContents), "\n") {
 		line = "\n" + line
 	}
-	return ioutil.WriteFile(filename, []byte(string(currContents)+line), 0600)
+	return os.WriteFile(filename, []byte(string(currContents)+line), 0600)
 }
 
 func fileLineReplace(line, user, host, filename string) error {
-	currContents, err := ioutil.ReadFile(filename) // nolint: gosec
+	currContents, err := os.ReadFile(filename) // nolint: gosec
 	if err != nil {
 		return err
 	}
@@ -111,5 +110,5 @@ func fileLineReplace(line, user, host, filename string) error {
 		return fileAppend(line, filename)
 	}
 
-	return ioutil.WriteFile(filename, []byte(toWrite), 0600)
+	return os.WriteFile(filename, []byte(toWrite), 0600)
 }

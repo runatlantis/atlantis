@@ -70,7 +70,7 @@ type FileWorkspace struct {
 // path to the root of the cloned repo. It also returns
 // a boolean indicating if we should warn users that the branch we're
 // merging into has been updated since we cloned it.
-//If the repo already exists and is at
+// If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(

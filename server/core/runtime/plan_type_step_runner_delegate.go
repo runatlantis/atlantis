@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -37,7 +37,7 @@ type PlanTypeStepRunnerDelegate struct {
 }
 
 func (p *PlanTypeStepRunnerDelegate) isRemotePlan(planFile string) (bool, error) {
-	data, err := ioutil.ReadFile(planFile)
+	data, err := os.ReadFile(planFile)
 
 	if err != nil {
 		return false, errors.Wrapf(err, "unable to read %s", planFile)

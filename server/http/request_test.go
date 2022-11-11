@@ -3,7 +3,6 @@ package http_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -23,14 +22,14 @@ func TestGetBody(t *testing.T) {
 	body, err := subject.GetBody()
 	assert.NoError(t, err)
 
-	payload1, err := ioutil.ReadAll(body)
+	payload1, err := io.ReadAll(body)
 	assert.NoError(t, err)
 
 	// read second time
 	body, err = subject.GetBody()
 	assert.NoError(t, err)
 
-	payload2, err := ioutil.ReadAll(body)
+	payload2, err := io.ReadAll(body)
 	assert.NoError(t, err)
 
 	assert.Equal(t, payload1, payload2)
@@ -46,14 +45,14 @@ func TestGetRequest(t *testing.T) {
 
 	// read from raw request first
 	body := subject1.GetRequest().Body
-	payload1, err := ioutil.ReadAll(body)
+	payload1, err := io.ReadAll(body)
 	assert.NoError(t, err)
 
 	// read from wrapper next
 	body, err = subject1.GetBody()
 	assert.NoError(t, err)
 
-	payload2, err := ioutil.ReadAll(body)
+	payload2, err := io.ReadAll(body)
 	assert.NoError(t, err)
 
 	assert.Equal(t, payload1, payload2)

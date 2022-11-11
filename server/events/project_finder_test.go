@@ -15,7 +15,6 @@ package events_test
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -47,7 +46,7 @@ func setupTmpRepos(t *testing.T) {
 	//   modules/
 	//     main.tf
 	var err error
-	nestedModules1, err = ioutil.TempDir("", "")
+	nestedModules1 = t.TempDir()
 	Ok(t, err)
 	err = os.MkdirAll(filepath.Join(nestedModules1, "project1/modules"), 0700)
 	Ok(t, err)
@@ -79,7 +78,7 @@ func setupTmpRepos(t *testing.T) {
 	//    main.tf
 	//  project2/
 	//    main.tf
-	topLevelModules, err = ioutil.TempDir("", "")
+	topLevelModules = t.TempDir()
 	Ok(t, err)
 	for _, path := range []string{"modules", "project1", "project2"} {
 		err = os.MkdirAll(filepath.Join(topLevelModules, path), 0700)
@@ -94,7 +93,7 @@ func setupTmpRepos(t *testing.T) {
 	//   staging.tfvars
 	//   production.tfvars
 	//   global-env-config.auto.tfvars.json
-	envDir, err = ioutil.TempDir("", "")
+	envDir = t.TempDir()
 	Ok(t, err)
 	err = os.MkdirAll(filepath.Join(envDir, "env"), 0700)
 	Ok(t, err)

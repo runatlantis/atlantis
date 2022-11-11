@@ -2,7 +2,7 @@ package runtime_test
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -112,7 +112,7 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 	defer cleanup()
 
 	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
-	err := ioutil.WriteFile(lockFilePath, nil, 0600)
+	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
 	// commit lock file
 	runCmd(t, repoDir, "git", "add", ".terraform.lock.hcl")
@@ -186,7 +186,7 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	lockFilePath := filepath.Join(tmpDir, ".terraform.lock.hcl")
-	err := ioutil.WriteFile(lockFilePath, nil, 0600)
+	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -294,7 +294,7 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	defer cleanup()
 
 	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
-	err := ioutil.WriteFile(lockFilePath, nil, 0600)
+	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)

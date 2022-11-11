@@ -18,9 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -228,7 +228,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			}
 
 			// Build HTTP request.
-			requestBytes, err := ioutil.ReadFile(filepath.Join("testfixtures", "bb-server-pull-deleted-event.json"))
+			requestBytes, err := os.ReadFile(filepath.Join("testfixtures", "bb-server-pull-deleted-event.json"))
 			// Replace the eventKey field with our event type.
 			requestJSON := strings.Replace(string(requestBytes), `"eventKey":"pr:deleted",`, fmt.Sprintf(`"eventKey":"%s",`, c.header), -1)
 			Ok(t, err)

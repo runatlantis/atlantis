@@ -14,7 +14,7 @@ import (
 // PreWorkflowHook represents a single action/command to perform. In YAML,
 // it can be set as
 // A map for a custom run commands:
-//    - run: my custom command
+//   - run: my custom command
 type PreWorkflowHook struct {
 	StringVal map[string]string
 }

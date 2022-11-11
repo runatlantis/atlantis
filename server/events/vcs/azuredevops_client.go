@@ -306,8 +306,9 @@ func (g *AzureDevopsClient) MarkdownPullLink(pull models.PullRequest) (string, e
 // repoFullName format owner/project/repo.
 //
 // Ex. runatlantis/atlantis => (runatlantis, atlantis)
-//     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
-//     azuredevops/project/atlantis => (azuredevops, project, atlantis)
+//
+//	gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
+//	azuredevops/project/atlantis => (azuredevops, project, atlantis)
 func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project string, repo string) {
 	firstSlashIdx := strings.Index(repoFullName, "/")
 	lastSlashIdx := strings.LastIndex(repoFullName, "/")

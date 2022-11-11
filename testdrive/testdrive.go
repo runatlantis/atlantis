@@ -3,7 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the License);
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an AS IS BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,10 +20,10 @@ package testdrive
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -173,11 +175,11 @@ tunnels:
     proto: http
 `, ngrokAPIURL, atlantisPort)
 
-	ngrokConfigFile, err := ioutil.TempFile("", "")
+	ngrokConfigFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "creating ngrok config file")
 	}
-	err = ioutil.WriteFile(ngrokConfigFile.Name(), []byte(ngrokConfig), 0600)
+	err = os.WriteFile(ngrokConfigFile.Name(), []byte(ngrokConfig), 0600)
 	if err != nil {
 		return errors.Wrap(err, "writing ngrok config file")
 	}
@@ -211,10 +213,8 @@ tunnels:
 	// Start atlantis server.
 	colorstring.Println("=> starting atlantis server")
 	s.Start()
-	tmpDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		return errors.Wrap(err, "creating a temporary data directory for Atlantis")
-	}
+	tmpDir := os.TempDir()
+	tmpDir = filepath.Join(tmpDir, "testdrive")
 	defer os.RemoveAll(tmpDir)
 	serverReadyLog := regexp.MustCompile("Atlantis started - listening on port 4141")
 	serverReadyTimeout := 5 * time.Second

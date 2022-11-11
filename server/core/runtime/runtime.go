@@ -52,21 +52,24 @@ type StatusUpdater interface {
 	UpdateProject(ctx context.Context, projectCtx command.ProjectContext, cmdName fmt.Stringer, status models.VCSStatus, url string, statusID string) (string, error)
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 // Runner mirrors events.StepRunner as a way to bring it into this package
+//
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 type Runner interface {
 	Run(ctx context.Context, prjCtx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_runner.go CustomRunner
 // CustomRunner runs custom run steps.
+//
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_runner.go CustomRunner
 type CustomRunner interface {
 	// Run cmd in path.
 	Run(ctx context.Context, prjCtx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_runner.go EnvRunner
 // EnvRunner runs env steps.
+//
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_runner.go EnvRunner
 type EnvRunner interface {
 	Run(ctx context.Context, prjCtx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error)
 }

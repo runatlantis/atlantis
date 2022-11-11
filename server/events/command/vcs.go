@@ -9,6 +9,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/types"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // VCSStatusUpdater updates the status of a commit with the VCS host. We set
@@ -21,7 +23,7 @@ type VCSStatusUpdater struct {
 
 func (d *VCSStatusUpdater) UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.VCSStatus, cmdName fmt.Stringer, statusID string, output string) (string, error) {
 	src := d.TitleBuilder.Build(cmdName.String())
-	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
+	descrip := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), d.statusDescription(status))
 
 	request := types.UpdateStatusRequest{
 		Repo:             repo,
@@ -81,7 +83,7 @@ func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx Project
 		ProjectName: projectID,
 	})
 
-	description := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), d.statusDescription(status))
+	description := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), d.statusDescription(status))
 	request := types.UpdateStatusRequest{
 		Repo:             projectCtx.BaseRepo,
 		PullNum:          projectCtx.Pull.Num,
@@ -117,5 +119,5 @@ func (d *VCSStatusUpdater) statusDescription(status models.VCSStatus) string {
 }
 
 func titleString(cmdName fmt.Stringer) string {
-	return strings.Title(strings.ReplaceAll(strings.ToLower(cmdName.String()), "_", " "))
+	return cases.Title(language.English).String(strings.ReplaceAll(strings.ToLower(cmdName.String()), "_", " "))
 }

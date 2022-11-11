@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -123,7 +122,7 @@ func getTunnelAddr() (string, error) {
 
 	var t tunnels
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", errors.Wrap(err, "reading ngrok api")
 	}

@@ -2,10 +2,10 @@ package vcs_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -47,7 +47,7 @@ func TestLyftGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 	  }`
 
 	// Use a real GitHub json response and edit the mergeable_state field.
-	jsBytes, err := ioutil.ReadFile("fixtures/github-pull-request.json")
+	jsBytes, err := os.ReadFile("fixtures/github-pull-request.json")
 	assert.NoError(t, err)
 	json := string(jsBytes)
 

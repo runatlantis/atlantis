@@ -1,7 +1,6 @@
 package testing
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,11 +8,11 @@ import (
 
 // TempDir creates a temporary directory and returns its path along
 // with a cleanup function to be called via defer, ex:
-//   dir, cleanup := TempDir()
-//   defer cleanup()
+//
+//	dir, cleanup := TempDir()
+//	defer cleanup()
 func TempDir(t *testing.T) (string, func()) {
-	tmpDir, err := ioutil.TempDir("", "")
-	Ok(t, err)
+	tmpDir := t.TempDir()
 	return tmpDir, func() {
 		os.RemoveAll(tmpDir) // nolint: errcheck
 	}
@@ -26,23 +25,23 @@ func TempDir(t *testing.T) (string, func()) {
 // It returns the path to the temp directory containing the defined
 // structure and a cleanup function to delete the directory.
 // Example usage:
-// 	versionConfig := `
-//  terraform {
-// 	  required_version = "= 0.12.8"
-//  }
-//  `
-//	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
-//		"pulldir": map[string]interface{}{
-//			"project1": map[string]interface{}{
-//				"main.tf": nil,
-//			},
-//			"project2": map[string]interface{}{,
-//				"main.tf": versionConfig,
-//			},
-//		},
-//	})
-//  defer cleanup()
 //
+//		versionConfig := `
+//	 terraform {
+//		  required_version = "= 0.12.8"
+//	 }
+//	 `
+//		tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+//			"pulldir": map[string]interface{}{
+//				"project1": map[string]interface{}{
+//					"main.tf": nil,
+//				},
+//				"project2": map[string]interface{}{,
+//					"main.tf": versionConfig,
+//				},
+//			},
+//		})
+//	 defer cleanup()
 func DirStructure(t *testing.T, structure map[string]interface{}) (string, func()) {
 	tmpDir, cleanup := TempDir(t)
 	dirStructureGo(t, tmpDir, structure)
@@ -65,7 +64,7 @@ func dirStructureGo(t *testing.T, parentDir string, structure map[string]interfa
 			dirStructureGo(t, subDir, dirContents)
 		} else if fileContent, ok := val.(string); ok {
 			// If val is a string then key is a file name and val is the file's content
-			err := ioutil.WriteFile(filepath.Join(parentDir, key), []byte(fileContent), 0600)
+			err := os.WriteFile(filepath.Join(parentDir, key), []byte(fileContent), 0600)
 			Ok(t, err)
 		}
 	}

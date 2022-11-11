@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,7 +45,7 @@ func (p *ParserValidator) HasRepoCfg(absRepoDir string) (bool, error) {
 // If there was no config file, it will return an os.IsNotExist(error).
 func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
 	configFile := p.repoCfgPath(absRepoDir, AtlantisYAMLFilename)
-	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
+	configData, err := os.ReadFile(configFile) // nolint: gosec
 
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -94,7 +93,7 @@ func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.G
 // configFile. defaultCfg will be merged into the parsed config.
 // If there is no file at configFile it will return an error.
 func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.GlobalCfg) (valid.GlobalCfg, error) {
-	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
+	configData, err := os.ReadFile(configFile) // nolint: gosec
 	if err != nil {
 		return valid.GlobalCfg{}, errors.Wrapf(err, "unable to read %s file", configFile)
 	}

@@ -1,7 +1,7 @@
 package markdown
 
 import (
-	"io/ioutil"
+	"os"
 	"strings"
 	"text/template"
 
@@ -222,7 +222,7 @@ func (t *TemplateResolver) shouldUseWrappedTmpl(vcsHost models.VCSHostType, outp
 
 func (t *TemplateResolver) getPlanTmpl(common commonData, baseRepo models.Repo, templateOverrides map[string]string, numPrjResults int, numPlanSuccesses int, numPolicyCheckSuccesses int) *template.Template {
 	if fileName, ok := templateOverrides["plan"]; ok {
-		if content, err := ioutil.ReadFile(fileName); err == nil {
+		if content, err := os.ReadFile(fileName); err == nil {
 			return template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(string(content)))
 		}
 	}
@@ -242,7 +242,7 @@ func (t *TemplateResolver) getPlanTmpl(common commonData, baseRepo models.Repo, 
 
 func (t *TemplateResolver) getApplyTmpl(templateOverrides map[string]string, numPrjResults int) *template.Template {
 	if fileName, ok := templateOverrides["apply"]; ok {
-		if content, err := ioutil.ReadFile(fileName); err == nil {
+		if content, err := os.ReadFile(fileName); err == nil {
 			return template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(string(content)))
 		}
 	}
@@ -254,7 +254,7 @@ func (t *TemplateResolver) getApplyTmpl(templateOverrides map[string]string, num
 
 func (t *TemplateResolver) getVersionTmpl(templateOverrides map[string]string, common commonData, numPrjResults int, numVersionSuccesses int) *template.Template {
 	if fileName, ok := templateOverrides["version"]; ok {
-		if content, err := ioutil.ReadFile(fileName); err == nil {
+		if content, err := os.ReadFile(fileName); err == nil {
 			return template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(string(content)))
 		}
 	}

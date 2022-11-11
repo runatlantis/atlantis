@@ -12,9 +12,9 @@ import (
 
 // AtlantisJobState represent current state of the job
 // Job can be in 3 states:
-//   * RUNNING - when the job is initiated
-//   * FAILURE - when the job fails the execution
-//   * SUCCESS - when the job runs successfully
+//   - RUNNING - when the job is initiated
+//   - FAILURE - when the job fails the execution
+//   - SUCCESS - when the job runs successfully
 type AtlantisJobState string
 
 // AtlantisJobType represent the type of the job

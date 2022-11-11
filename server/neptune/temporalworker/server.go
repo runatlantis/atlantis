@@ -110,7 +110,7 @@ func NewServer(config *config.Config) (*Server, error) {
 	httpServerProxy := &neptune_http.ServerProxy{
 		SSLCertFile: config.AuthCfg.SslCertFile,
 		SSLKeyFile:  config.AuthCfg.SslKeyFile,
-		Server:      &http.Server{Addr: fmt.Sprintf(":%d", config.ServerCfg.Port), Handler: n},
+		Server:      &http.Server{Addr: fmt.Sprintf(":%d", config.ServerCfg.Port), Handler: n, ReadHeaderTimeout: time.Second * 10},
 		Logger:      config.CtxLogger,
 	}
 

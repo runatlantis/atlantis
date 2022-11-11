@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -91,7 +90,7 @@ func (c *Credentials) safeWriteFile(file string, contents []byte, perm os.FileMo
 	defer c.FileLock.Unlock()
 
 	return errors.Wrap(
-		ioutil.WriteFile(file, contents, perm),
+		os.WriteFile(file, contents, perm),
 		"writing file",
 	)
 }
@@ -100,7 +99,7 @@ func (c *Credentials) safeReadFile(file string) (string, error) {
 	c.FileLock.RLock()
 	defer c.FileLock.RUnlock()
 
-	contents, err := ioutil.ReadFile(file)
+	contents, err := os.ReadFile(file)
 	if err != nil {
 		return "", errors.Wrap(err, "reading file")
 	}

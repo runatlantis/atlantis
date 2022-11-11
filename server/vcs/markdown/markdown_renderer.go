@@ -23,6 +23,8 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Renderer renders responses as markdown.
@@ -70,7 +72,7 @@ type projectResultTmplData struct {
 // Render formats the data into a markdown string for a command.
 // nolint: interfacer
 func (m *Renderer) Render(res command.Result, cmdName command.Name, baseRepo models.Repo) string {
-	commandStr := strings.Title(strings.ReplaceAll(cmdName.String(), "_", " "))
+	commandStr := cases.Title(language.English).String(strings.ReplaceAll(cmdName.String(), "_", " "))
 	common := commonData{
 		Command:                  commandStr,
 		DisableApplyAll:          m.DisableApplyAll || m.DisableApply,
@@ -89,7 +91,7 @@ func (m *Renderer) Render(res command.Result, cmdName command.Name, baseRepo mod
 
 // RenderProject formats the data into a markdown string for a project
 func (m *Renderer) RenderProject(prjRes command.ProjectResult, cmdName fmt.Stringer, baseRepo models.Repo) string {
-	commandStr := strings.Title(strings.ReplaceAll(cmdName.String(), "_", " "))
+	commandStr := cases.Title(language.English).String(strings.ReplaceAll(cmdName.String(), "_", " "))
 	common := commonData{
 		Command:                  commandStr,
 		DisableApply:             m.DisableApply,

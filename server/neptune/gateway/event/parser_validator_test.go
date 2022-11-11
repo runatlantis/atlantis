@@ -1,16 +1,16 @@
 package event_test
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
+	"testing"
+
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"regexp"
-	"testing"
 )
 
 var globalConfig = valid.GlobalCfg{
@@ -58,7 +58,7 @@ func TestHasRepoCfg_InvalidFileExtension(t *testing.T) {
 func TestParseRepoCfg_BadPermissions(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
-	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), nil, 0000)
+	err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), nil, 0000)
 	assert.NoError(t, err)
 
 	r := event.ParserValidator{
@@ -95,7 +95,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			confPath := filepath.Join(tmpDir, "atlantis.yaml")
-			err := ioutil.WriteFile(confPath, []byte(c.input), 0600)
+			err := os.WriteFile(confPath, []byte(c.input), 0600)
 			assert.NoError(t, err)
 			r := event.ParserValidator{
 				GlobalCfg: globalConfig,
@@ -1025,7 +1025,7 @@ workflows:
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
+			err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
 			assert.NoError(t, err)
 
 			r := event.ParserValidator{
@@ -1055,7 +1055,7 @@ projects:
   workflow: custom
 workflows:
   custom: ~`
-	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(repoCfg), 0600)
+	err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(repoCfg), 0600)
 	assert.NoError(t, err)
 
 	r := event.ParserValidator{

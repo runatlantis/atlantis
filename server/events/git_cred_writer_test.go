@@ -2,7 +2,7 @@ package events_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -25,7 +25,7 @@ func TestWriteGitCreds_WriteFile(t *testing.T) {
 
 	expContents := `https://user:token@hostname`
 
-	actContents, err := ioutil.ReadFile(filepath.Join(tmp, ".git-credentials"))
+	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
 	Equals(t, expContents, string(actContents))
 }
@@ -37,7 +37,7 @@ func TestWriteGitCreds_Appends(t *testing.T) {
 	defer cleanup()
 
 	file := filepath.Join(tmp, ".git-credentials")
-	err := ioutil.WriteFile(file, []byte("contents"), 0600)
+	err := os.WriteFile(file, []byte("contents"), 0600)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)
@@ -45,7 +45,7 @@ func TestWriteGitCreds_Appends(t *testing.T) {
 	Ok(t, err)
 
 	expContents := "contents\nhttps://user:token@hostname"
-	actContents, err := ioutil.ReadFile(filepath.Join(tmp, ".git-credentials"))
+	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
 	Equals(t, expContents, string(actContents))
 }
@@ -58,13 +58,13 @@ func TestWriteGitCreds_NoModification(t *testing.T) {
 
 	file := filepath.Join(tmp, ".git-credentials")
 	contents := "line1\nhttps://user:token@hostname\nline2"
-	err := ioutil.WriteFile(file, []byte(contents), 0600)
+	err := os.WriteFile(file, []byte(contents), 0600)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)
 	err = events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
-	actContents, err := ioutil.ReadFile(filepath.Join(tmp, ".git-credentials"))
+	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
 	Equals(t, contents, string(actContents))
 }
@@ -76,14 +76,14 @@ func TestWriteGitCreds_ReplaceApp(t *testing.T) {
 
 	file := filepath.Join(tmp, ".git-credentials")
 	contents := "line1\nhttps://x-access-token:v1.87dddddddddddddddd@github.com\nline2"
-	err := ioutil.WriteFile(file, []byte(contents), 0600)
+	err := os.WriteFile(file, []byte(contents), 0600)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)
 	err = events.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
 	expContets := "line1\nhttps://x-access-token:token@github.com\nline2"
-	actContents, err := ioutil.ReadFile(filepath.Join(tmp, ".git-credentials"))
+	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
 	Equals(t, expContets, string(actContents))
 }
@@ -95,14 +95,14 @@ func TestWriteGitCreds_AppendApp(t *testing.T) {
 
 	file := filepath.Join(tmp, ".git-credentials")
 	contents := ""
-	err := ioutil.WriteFile(file, []byte(contents), 0600)
+	err := os.WriteFile(file, []byte(contents), 0600)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)
 	err = events.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
 	expContets := "https://x-access-token:token@github.com"
-	actContents, err := ioutil.ReadFile(filepath.Join(tmp, ".git-credentials"))
+	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
 	Equals(t, expContets, string(actContents))
 }
@@ -114,7 +114,7 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 	defer cleanup()
 
 	file := filepath.Join(tmp, ".git-credentials")
-	err := ioutil.WriteFile(file, []byte("can't see me!"), 0000)
+	err := os.WriteFile(file, []byte("can't see me!"), 0000)
 	Ok(t, err)
 
 	logger := logging.NewNoopCtxLogger(t)

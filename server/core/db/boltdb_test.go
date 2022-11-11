@@ -14,7 +14,6 @@
 package db_test
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -780,7 +779,7 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 // newTestDB returns a TestDB using a temporary path.
 func newTestDB() (*bolt.DB, *db.BoltDB) {
 	// Retrieve a temporary path.
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create temp file"))
 	}

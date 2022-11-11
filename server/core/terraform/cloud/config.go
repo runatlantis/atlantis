@@ -2,7 +2,6 @@ package cloud
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -29,7 +28,7 @@ func GenerateConfigFile(tfeToken string, tfeHostname string, home string) error 
 	// what we would have written to it, then we error out because we don't
 	// want to overwrite anything.
 	if _, err := os.Stat(rcFile); err == nil {
-		currContents, err := ioutil.ReadFile(rcFile) // nolint: gosec
+		currContents, err := os.ReadFile(rcFile) // nolint: gosec
 		if err != nil {
 			return errors.Wrapf(err, "trying to read %s to ensure we're not overwriting it", rcFile)
 		}
@@ -41,7 +40,7 @@ func GenerateConfigFile(tfeToken string, tfeHostname string, home string) error 
 		return nil
 	}
 
-	if err := ioutil.WriteFile(rcFile, []byte(config), 0600); err != nil {
+	if err := os.WriteFile(rcFile, []byte(config), 0600); err != nil {
 		return errors.Wrapf(err, "writing generated %s file with TFE token to %s", rcFilename, rcFile)
 	}
 	return nil

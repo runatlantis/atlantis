@@ -20,9 +20,10 @@ import (
 // Since this is a server request we do not need to close the original Body as per the documentation:
 //
 // " For server requests, the Request Body is always non-nil
-//   but will return EOF immediately when no body is present.
-//   The Server will close the request body. The ServeHTTP
-//   Handler does not need to. "
+//
+//	but will return EOF immediately when no body is present.
+//	The Server will close the request body. The ServeHTTP
+//	Handler does not need to. "
 //
 // Note: This should not be used for client requests at this time.
 type BufferedRequest struct {

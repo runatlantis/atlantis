@@ -16,7 +16,7 @@ package events
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -354,7 +354,7 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
 	reqID := r.Header.Get(bitbucketCloudRequestIDHeader)
 	defer r.Body.Close() // nolint: errcheck
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
@@ -376,7 +376,7 @@ func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r
 	reqID := r.Header.Get(bitbucketServerRequestIDHeader)
 	sig := r.Header.Get(bitbucketServerSignatureHeader)
 	defer r.Body.Close() // nolint: errcheck
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketServerRequestIDHeader, reqID)
 		return

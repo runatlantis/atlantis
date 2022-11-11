@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -54,7 +53,7 @@ func (p *ShowStepRunner) Run(ctx context.Context, prjCtx command.ProjectContext,
 		return output, errors.Wrap(err, "running terraform show")
 	}
 
-	if err := ioutil.WriteFile(showResultFile, []byte(output), os.ModePerm); err != nil {
+	if err := os.WriteFile(showResultFile, []byte(output), os.ModePerm); err != nil {
 		return "", errors.Wrap(err, "writing terraform show result")
 	}
 

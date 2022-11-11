@@ -2,9 +2,9 @@ package bitbucketcloud_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -181,7 +181,7 @@ func TestClient_PullIsApproved(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			json, err := ioutil.ReadFile(filepath.Join("testdata", c.testdata))
+			json, err := os.ReadFile(filepath.Join("testdata", c.testdata))
 			Ok(t, err)
 			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.RequestURI {

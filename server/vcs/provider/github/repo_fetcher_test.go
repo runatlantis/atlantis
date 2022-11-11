@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -271,8 +270,7 @@ func runCmd(t *testing.T, dir string, name string, args ...string) string {
 }
 
 func tempDir(t *testing.T) (string, func()) {
-	tmpDir, err := ioutil.TempDir("", "")
-	assert.NoError(t, err)
+	tmpDir := t.TempDir()
 	return tmpDir, func() {
 		os.RemoveAll(tmpDir) // nolint: errcheck
 	}

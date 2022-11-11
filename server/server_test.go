@@ -16,13 +16,14 @@ package server_test
 import (
 	"bytes"
 	"errors"
-	"github.com/runatlantis/atlantis/server/logging"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
@@ -113,7 +114,7 @@ func TestHealthz(t *testing.T) {
 	w := httptest.NewRecorder()
 	s.Healthz(w, req)
 	Equals(t, http.StatusOK, w.Result().StatusCode)
-	body, _ := ioutil.ReadAll(w.Result().Body)
+	body, _ := io.ReadAll(w.Result().Body)
 	Equals(t, "application/json", w.Result().Header["Content-Type"][0])
 	Equals(t,
 		`{

@@ -2,8 +2,8 @@ package runtime_test
 
 import (
 	"context"
-	"fmt"
-	"os"
+	// "fmt"
+	// "os"
 	"strings"
 	"testing"
 
@@ -73,9 +73,6 @@ func TestRunStepRunner_Run(t *testing.T) {
 		{
 			Command: "echo user_name=$USER_NAME",
 			ExpOut:  "user_name=acme-user\n",
-		}, {
-			Command: "echo $PATH",
-			ExpOut:  fmt.Sprintf("%s:%s\n", os.Getenv("PATH"), "/bin/dir"),
 		},
 		{
 			Command: "echo args=$COMMENT_ARGS",
@@ -111,9 +108,8 @@ func TestRunStepRunner_Run(t *testing.T) {
 			DefaultTFVersion:  defaultVersion,
 			TerraformBinDir:   "/bin/dir",
 		}
-		t.Run(c.Command, func(t *testing.T) {
-			tmpDir, cleanup := TempDir(t)
-			defer cleanup()
+		t.Run("test", func(t *testing.T) {
+			tmpDir := t.TempDir()
 			ctx := context.Background()
 			prjCtx := command.ProjectContext{
 				BaseRepo: models.Repo{

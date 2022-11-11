@@ -2,7 +2,6 @@ package events_test
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +25,7 @@ func TestListCurrentWorkingDirPulls(t *testing.T) {
 
 	t.Run("repos subdir not exist", func(t *testing.T) {
 
-		baseDir, _ := ioutil.TempDir("", "atlantis-data")
+		baseDir := t.TempDir()
 
 		subject := &events.FileWorkDirIterator{
 			Log:          log,
@@ -43,7 +42,7 @@ func TestListCurrentWorkingDirPulls(t *testing.T) {
 
 	t.Run("pull not found", func(t *testing.T) {
 
-		baseDir, _ := ioutil.TempDir("", "atlantis-data")
+		baseDir := t.TempDir()
 
 		_ = os.MkdirAll(filepath.Join(baseDir, "repos", "nish", "repo1", "1", "default"), os.ModePerm)
 
@@ -75,7 +74,7 @@ func TestListCurrentWorkingDirPulls(t *testing.T) {
 			Num: pullNum,
 		}
 
-		baseDir, _ := ioutil.TempDir("", "atlantis-data")
+		baseDir := t.TempDir()
 
 		_ = os.MkdirAll(filepath.Join(baseDir, "repos", "nish", "repo1", "1", "default"), os.ModePerm)
 
@@ -116,7 +115,7 @@ func TestListCurrentWorkingDirPulls(t *testing.T) {
 			Num: pullNum2,
 		}
 
-		baseDir, _ := ioutil.TempDir("", "atlantis-data")
+		baseDir := t.TempDir()
 
 		_ = os.MkdirAll(filepath.Join(baseDir, "repos", "nish", "repo1", "1", "default"), os.ModePerm)
 		_ = os.MkdirAll(filepath.Join(baseDir, "repos", "nish", "repo1", "2", "default"), os.ModePerm)
@@ -161,7 +160,7 @@ func TestListCurrentWorkingDirPulls(t *testing.T) {
 			Num: pullNum2,
 		}
 
-		baseDir, _ := ioutil.TempDir("", "atlantis-data")
+		baseDir := t.TempDir()
 
 		_ = os.MkdirAll(filepath.Join(baseDir, "repos", "nish", "repo1", "1", "default"), os.ModePerm)
 		_ = os.MkdirAll(filepath.Join(baseDir, "repos", "nish", "repo2", "2", "default"), os.ModePerm)

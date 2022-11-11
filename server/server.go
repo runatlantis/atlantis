@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -214,7 +213,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				Token: userConfig.GithubToken,
 			}
 		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKeyFile != "" {
-			privateKey, err := ioutil.ReadFile(userConfig.GithubAppKeyFile)
+			privateKey, err := os.ReadFile(userConfig.GithubAppKeyFile)
 			if err != nil {
 				return nil, err
 			}
@@ -1011,7 +1010,7 @@ func (s *Server) Start() error {
 		s.ProjectCmdOutputHandler.Handle()
 	}()
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
+	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n, ReadHeaderTimeout: time.Second * 10}
 	go func() {
 		s.CtxLogger.Info(fmt.Sprintf("Atlantis started - listening on port %v", s.Port))
 
