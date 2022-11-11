@@ -10,17 +10,10 @@ const HeartbeatTimeout = 10 * time.Second
 
 // Adapted from dynajoe/temporal-terraform-demo:
 // https://github.com/dynajoe/temporal-terraform-demo/blob/b468ac13cd9400ec0ffeb1b96eb8135e4b36d8ee/heartbeat/heartbeat.go#L10
-func StartHeartbeat(ctx context.Context, frequency time.Duration) (context.Context, func()) {
+func StartHeartbeat(ctx context.Context, frequency time.Duration) func() {
 	ctx, cancel := context.WithCancel(ctx)
-	go func() {
-		select {
-		case <-activity.GetWorkerStopChannel(ctx):
-		case <-ctx.Done():
-		}
-		cancel()
-	}()
 	go startHeartbeatTicks(ctx, frequency)
-	return ctx, cancel
+	return cancel
 }
 
 func startHeartbeatTicks(ctx context.Context, duration time.Duration) {

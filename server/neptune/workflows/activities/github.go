@@ -211,7 +211,7 @@ type FetchRootResponse struct {
 // FetchRoot fetches a link to the archive URL using the GH client, processes that URL into a download URL that the
 // go-getter library can use, and then go-getter to download/extract files/subdirs within the root path to the destinationPath.
 func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootRequest) (FetchRootResponse, error) {
-	ctx, cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
+	cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
 	defer cancel()
 
 	deployBasePath := filepath.Join(a.DataDir, deploymentsDirName, request.DeploymentID)

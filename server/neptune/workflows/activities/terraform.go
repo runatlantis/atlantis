@@ -106,7 +106,7 @@ type TerraformInitResponse struct {
 }
 
 func (t *terraformActivities) TerraformInit(ctx context.Context, request TerraformInitRequest) (TerraformInitResponse, error) {
-	ctx, cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
+	cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
 	defer cancel()
 	// Resolve the tf version to be used for this operation
 	tfVersion, err := t.resolveVersion(request.TfVersion)
@@ -163,7 +163,7 @@ type TerraformPlanResponse struct {
 }
 
 func (t *terraformActivities) TerraformPlan(ctx context.Context, request TerraformPlanRequest) (TerraformPlanResponse, error) {
-	ctx, cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
+	cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
 	defer cancel()
 	tfVersion, err := t.resolveVersion(request.TfVersion)
 	if err != nil {
@@ -250,7 +250,7 @@ type TerraformApplyResponse struct {
 }
 
 func (t *terraformActivities) TerraformApply(ctx context.Context, request TerraformApplyRequest) (TerraformApplyResponse, error) {
-	ctx, cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
+	cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
 	defer cancel()
 	tfVersion, err := t.resolveVersion(request.TfVersion)
 	if err != nil {
