@@ -13,7 +13,7 @@ cd e2e/
 curl -LOk https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 chmod +x terraform
-cp terraform /go/bin/
+cp terraform /usr/local/go/bin
 # Download ngrok to create a tunnel to expose atlantis server
 wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
 unzip ngrok-stable-linux-amd64.zip 
