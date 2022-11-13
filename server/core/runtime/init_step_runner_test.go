@@ -103,8 +103,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 
 func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
 	err := os.WriteFile(lockFilePath, nil, 0600)
@@ -141,8 +140,7 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 }
 
 func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
@@ -171,8 +169,7 @@ func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 }
 
 func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 	lockFilePath := filepath.Join(tmpDir, ".terraform.lock.hcl")
 	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
@@ -274,8 +271,7 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 
 func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
 	err := os.WriteFile(lockFilePath, nil, 0600)
@@ -318,8 +314,8 @@ func runCmd(t *testing.T, dir string, name string, args ...string) string {
 	return string(cpOut)
 }
 
-func initRepo(t *testing.T) (string, func()) {
-	repoDir, cleanup := TempDir(t)
+func initRepo(t *testing.T) string {
+	repoDir := t.TempDir()
 	runCmd(t, repoDir, "git", "init")
 	runCmd(t, repoDir, "touch", ".gitkeep")
 	runCmd(t, repoDir, "git", "add", ".gitkeep")
@@ -328,5 +324,5 @@ func initRepo(t *testing.T) (string, func()) {
 	runCmd(t, repoDir, "git", "config", "--local", "commit.gpgsign", "false")
 	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, repoDir, "git", "branch", "branch")
-	return repoDir, cleanup
+	return repoDir
 }

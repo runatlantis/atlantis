@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"testing"
 	"time"
 
@@ -37,9 +36,8 @@ import (
 
 func TestNewServer(t *testing.T) {
 	t.Log("Run through NewServer constructor")
-	tmpDir, err := os.MkdirTemp("", "")
-	Ok(t, err)
-	_, err = server.NewServer(server.UserConfig{
+	tmpDir := t.TempDir()
+	_, err := server.NewServer(server.UserConfig{
 		DataDir:     tmpDir,
 		AtlantisURL: "http://example.com",
 	}, server.Config{})
@@ -49,9 +47,8 @@ func TestNewServer(t *testing.T) {
 // todo: test what happens if we set different flags. The generated config should be different.
 
 func TestNewServer_InvalidAtlantisURL(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "")
-	Ok(t, err)
-	_, err = server.NewServer(server.UserConfig{
+	tmpDir := t.TempDir()
+	_, err := server.NewServer(server.UserConfig{
 		DataDir:     tmpDir,
 		AtlantisURL: "example.com",
 	}, server.Config{
