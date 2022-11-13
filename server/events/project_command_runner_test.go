@@ -62,8 +62,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		AggregateApplyRequirements: mockApplyReqHandler,
 	}
 
-	repoDir, cleanup := TempDir(t)
-	defer cleanup()
+	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		matchers.AnyModelsRepo(),
@@ -269,8 +268,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	ctx := command.ProjectContext{
 		ApplyRequirements: []string{"approved"},
 	}
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
@@ -294,8 +292,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 		},
 		ApplyRequirements: []string{"mergeable"},
 	}
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
@@ -316,8 +313,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	ctx := command.ProjectContext{
 		ApplyRequirements: []string{"undiverged"},
 	}
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
@@ -431,8 +427,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
 				AggregateApplyRequirements: applyReqHandler,
 			}
-			repoDir, cleanup := TempDir(t)
-			defer cleanup()
+			repoDir := t.TempDir()
 			When(mockWorkingDir.GetWorkingDir(
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
@@ -503,8 +498,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		AggregateApplyRequirements: applyReqHandler,
 		Webhooks:                   mockSender,
 	}
-	repoDir, cleanup := TempDir(t)
-	defer cleanup()
+	repoDir := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
@@ -560,8 +554,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 	}
 
-	repoDir, cleanup := TempDir(t)
-	defer cleanup()
+	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		matchers.AnyModelsRepo(),
