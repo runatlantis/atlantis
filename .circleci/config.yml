@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-    - image: ghcr.io/runatlantis/testing-env:2021.08.31
+    - image: ghcr.io/runatlantis/testing-env:2022.11.13
     steps:
     - checkout
     - run: make test-all
@@ -10,7 +10,6 @@ jobs:
     - run: make check-lint
   e2e:
     docker:
-    # TODO: use image: cimg/go:1.19
     - image: cimg/go:1.19 # If you update this, update it in the Makefile too
       environment:
         # This version of TF will be downloaded before Atlantis is started.
