@@ -20,7 +20,7 @@ func NewInstrumentedPullClosedExecutor(
 ) PullCleaner {
 
 	return &InstrumentedPullClosedExecutor{
-		scope:   scope.SubScope("pullclosed.cleanup"),
+		scope:   scope.SubScope("pullclosed_cleanup"),
 		log:     log,
 		cleaner: cleaner,
 	}

@@ -24,7 +24,7 @@ generate an access token. Read on for the instructions for your specific Git hos
 * [Azure DevOps](#azure-devops)
 
 ### GitHub user
-- Create a Personal Access Token by following: [https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token)
+- Create a [Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-fine-grained-personal-access-token)
 - Create the token with **repo** scope
 - Record the access token
 ::: warning
@@ -40,7 +40,7 @@ Available in Atlantis versions **newer** than 0.13.0.
 
 
 - Start Atlantis with fake github username and token (`atlantis server --gh-user fake --gh-token fake --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`). If installing as an **Organization**, remember to add `--gh-org your-github-org` to this command.
-- Visit `https://$ATLANTIS_HOST/github-app/setup` and click on **Setup** to create the app on Github. You'll be redirected back to Atlantis
+- Visit `https://$ATLANTIS_HOST/github-app/setup` and click on **Setup** to create the app on GitHub. You'll be redirected back to Atlantis
 - A link to install your app, along with its secrets, will be shown on the screen. Record your app's credentials and install your app for your user/org by following said link.
 - Create a file with the contents of the GitHub App Key, e.g. `atlantis-app-key.pem`
 - Restart Atlantis with new flags: `atlantis server --gh-app-id <your id> --gh-app-key-file atlantis-app-key.pem --gh-webhook-secret <your secret> --write-git-creds --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`.
@@ -50,6 +50,25 @@ Available in Atlantis versions **newer** than 0.13.0.
 ::: warning
 Only a single installation per GitHub App is supported at the moment.
 :::
+
+#### Permissions
+
+GitHub App needs these permissions. These are automatically set when a GitHub app is created.
+
+::: tip NOTE
+Since v0.19.7, a new permission for `Administration` has been added. If you have already created a GitHub app, updating Atlantis to v0.19.7 will not automatically add this permission, so you will need to set it manually.
+:::
+
+| Type            | Access              | 
+| --------------- | ------------------- | 
+| Administration  | Read-only           | 
+| Checks          | Read and write      | 
+| Commit statuses | Read and write      | 
+| Contents        | Read and write      | 
+| Issues          | Read and write      | 
+| Metadata        | Read-only (default) | 
+| Pull requests   | Read and write      | 
+| Webhooks        | Read and write      | 
 
 ### GitLab
 - Follow: [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
@@ -69,6 +88,8 @@ Only a single installation per GitHub App is supported at the moment.
 - Name the token **atlantis**
 - Give the token **Read** Project permissions and **Write** Pull request permissions
 - Click **Create** and record the access token
+
+  NOTE: Atlantis will send the token as a [Bearer Auth to the Bitbucket API](https://confluence.atlassian.com/bitbucketserver/http-access-tokens-939515499.html#HTTPaccesstokens-UsingHTTPaccesstokens) instead of using Basic Auth.
 
 ### Azure DevOps
 - Create a Personal access token by following [https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops)

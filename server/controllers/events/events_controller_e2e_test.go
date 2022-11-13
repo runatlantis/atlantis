@@ -653,6 +653,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		ExpAutomerge bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
 		ExpAutoplan bool
+		// ExpQuietPolicyChecks is true if we expect Atlantis to exclude policy check output
+		// when there's no error
+		ExpQuietPolicyChecks bool
+		// ExpQuietPolicyCheckFailure is true when we expect Atlantis to post back policy check failures
+		// even when QuietPolicyChecks is enabled
+		ExpQuietPolicyCheckFailure bool
 		// ExpParallel is true if we expect Atlantis to run parallel plans or applies.
 		ExpParallel bool
 		// ExpReplies is a list of files containing the expected replies that
@@ -737,6 +743,38 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:          "successful policy checks with quiet flag enabled",
+			RepoDir:              "policy-checks-success-silent",
+			ModifiedFiles:        []string{"main.tf"},
+			ExpAutoplan:          true,
+			ExpQuietPolicyChecks: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:                "failing policy checks with quiet flag enabled",
+			RepoDir:                    "policy-checks",
+			ModifiedFiles:              []string{"main.tf"},
+			ExpAutoplan:                true,
+			ExpQuietPolicyChecks:       true,
+			ExpQuietPolicyCheckFailure: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -746,6 +784,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// reset userConfig
 			userConfig = server.UserConfig{}
 			userConfig.EnablePolicyChecksFlag = true
+			userConfig.QuietPolicyChecks = c.ExpQuietPolicyChecks
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 
@@ -805,6 +844,10 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				expNumReplies++
 			}
 
+			if c.ExpQuietPolicyChecks && !c.ExpQuietPolicyCheckFailure {
+				expNumReplies--
+			}
+
 			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
@@ -857,6 +900,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
+	backend := boltdb
 	lockingClient := locking.NewClient(boltdb)
 	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	projectLocker := &events.DefaultProjectLocker{
@@ -986,13 +1030,13 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	}
 
 	dbUpdater := &events.DBUpdater{
-		DB: boltdb,
+		Backend: backend,
 	}
 
 	pullUpdater := &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            e2eVCSClient,
-		MarkdownRenderer:     &events.MarkdownRenderer{},
+		MarkdownRenderer:     events.GetMarkdownRenderer(false, false, false, false, false, false, ""),
 	}
 
 	autoMerger := &events.AutoMerger{
@@ -1007,6 +1051,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		projectCommandRunner,
 		parallelPoolSize,
 		false,
+		userConfig.QuietPolicyChecks,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
@@ -1025,6 +1070,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		boltdb,
+		lockingClient,
 	)
 
 	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
@@ -1093,7 +1139,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              boltdb,
+		PullStatusFetcher:              backend,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
@@ -1106,7 +1152,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 			Locker:                   lockingClient,
 			VCSClient:                e2eVCSClient,
 			WorkingDir:               workingDir,
-			DB:                       boltdb,
+			Backend:                  backend,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 		},
@@ -1372,11 +1418,12 @@ func ensureRunning014(t *testing.T) {
 }
 
 // versionRegex extracts the version from `terraform version` output.
-//     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
-//	   => 0.12.0-alpha4
 //
-//     Terraform v0.11.10
-//	   => 0.11.10
+//	    Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
+//		   => 0.12.0-alpha4
+//
+//	    Terraform v0.11.10
+//		   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
 var versionConftestRegex = regexp.MustCompile("Version: (.*?)(\\s.*)?\n")

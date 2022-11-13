@@ -15,7 +15,7 @@ func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 	Ok(t, err)
 
 	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, logging.NewNoopLogger(t))
+	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode("good-code")
 	Ok(t, err)
@@ -39,7 +39,7 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 	Ok(t, err)
 
 	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, logging.NewNoopLogger(t))
+	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode("good-code")
 	Ok(t, err)
@@ -49,7 +49,7 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 		Key:      []byte(fixtures.GithubPrivateKey),
 		Hostname: testServer,
 	}
-	_, err = vcs.NewGithubClient(testServer, appCreds, logging.NewNoopLogger(t))
+	_, err = vcs.NewGithubClient(testServer, appCreds, vcs.GithubConfig{}, logging.NewNoopLogger(t))
 	Ok(t, err)
 
 	token, err := appCreds.GetToken()

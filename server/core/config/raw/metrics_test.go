@@ -36,7 +36,7 @@ prometheus:
 	"prometheus": {
 		"endpoint": "/metrics"
 	}
-}		
+}
 `
 
 		var result raw.Metrics
@@ -56,6 +56,15 @@ func TestMetrics_Validate_Success(t *testing.T) {
 			subject: raw.Metrics{
 				Statsd: &raw.Statsd{
 					Host: "127.0.0.1",
+					Port: "8125",
+				},
+			},
+		},
+		{
+			description: "success with stats config using hostname",
+			subject: raw.Metrics{
+				Statsd: &raw.Statsd{
+					Host: "localhost",
 					Port: "8125",
 				},
 			},
@@ -119,15 +128,6 @@ func TestMetrics_Validate_Error(t *testing.T) {
 				Statsd: &raw.Statsd{
 					Host: "127.0.0.1",
 					Port: "string",
-				},
-			},
-		},
-		{
-			description: "invalid host",
-			subject: raw.Metrics{
-				Statsd: &raw.Statsd{
-					Host: "127.0.1",
-					Port: "8125",
 				},
 			},
 		},
