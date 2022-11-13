@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Exit immediately if a command returns a non-zero code
+set -e
+
 echo "Preparing to run e2e tests"
 if [ ! -f atlantis ]; then
     echo "atlantis binary not found. exiting...."
