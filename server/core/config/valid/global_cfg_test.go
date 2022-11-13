@@ -656,8 +656,7 @@ policies:
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp, cleanup := TempDir(t)
-			defer cleanup()
+			tmp := t.TempDir()
 			var global valid.GlobalCfg
 			if c.gCfg != "" {
 				path := filepath.Join(tmp, "config.yaml")
@@ -857,8 +856,7 @@ repos:
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp, cleanup := TempDir(t)
-			defer cleanup()
+			tmp := t.TempDir()
 			var global valid.GlobalCfg
 			if c.gCfg != "" {
 				path := filepath.Join(tmp, "config.yaml")

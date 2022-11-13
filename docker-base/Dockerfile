@@ -1,7 +1,7 @@
 # This Dockerfile builds our base image with gosu, dumb-init and the atlantis
 # user. We split this from the main Dockerfile because this base doesn't change
 # and also because it kept breaking the build due to flakiness.
-FROM alpine:3.16.2
+FROM alpine:3.16.3
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # We use gosu to step down from root and run as the atlantis user so we need
@@ -78,7 +78,3 @@ RUN apk add --no-cache \
     gpgconf --kill gpg-agent && \
     apk del .build-deps && \
     rm -rf /root/.gnupg
-
-# Set up nsswitch.conf for Go's "netgo" implementation
-# - https://github.com/golang/go/blob/go1.9.1/src/net/conf.go#L194-L275
-RUN [ ! -e /etc/nsswitch.conf ] && echo 'hosts: files dns' > /etc/nsswitch.conf

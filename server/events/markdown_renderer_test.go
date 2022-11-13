@@ -1085,13 +1085,12 @@ $$$
 
 // Run policy check with a custom template to validate custom template rendering.
 func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
+	tmpDir := t.TempDir()
 	filePath := fmt.Sprintf("%s/templates.tmpl", tmpDir)
 	_, err := os.Create(filePath)
 	Ok(t, err)
 	err = os.WriteFile(filePath, []byte("{{ define \"policyCheckSuccessUnwrapped\" -}}somecustometext{{- end}}\n"), 0600)
 	Ok(t, err)
-	defer cleanup()
 	r := events.GetMarkdownRenderer(
 		false,  // GitlabSupportsCommonMark
 		true,   // DisableApplyAll

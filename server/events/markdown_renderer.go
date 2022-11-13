@@ -94,6 +94,7 @@ type planSuccessData struct {
 
 type policyCheckSuccessData struct {
 	models.PolicyCheckSuccess
+	PolicyCheckSummary string
 }
 
 type projectResultTmplData struct {
@@ -199,7 +200,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckSuccess.PolicyCheckOutput) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
+				resultData.Rendered = m.renderTemplate(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
 			} else {
 				resultData.Rendered = m.renderTemplate(templates.Lookup("policyCheckSuccessUnwrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
 			}

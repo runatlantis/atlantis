@@ -28,12 +28,10 @@ func disableSSLVerification() func() {
 // Test that if we don't have any existing files, we check out the repo.
 func TestClone_NoneExisting(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
 
-	dataDir, cleanup2 := TempDir(t)
-	defer cleanup2()
+	dataDir := t.TempDir()
 
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
@@ -57,8 +55,7 @@ func TestClone_NoneExisting(t *testing.T) {
 // successfully when we're using the merge method.
 func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	// Add a commit to branch 'branch' that's not on main.
 	runCmd(t, repoDir, "git", "checkout", "branch")
@@ -81,8 +78,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	runCmd(t, repoDir, "git", "merge", "-m", "atlantis-merge", "branch")
 	expLsOutput := runCmd(t, repoDir, "ls")
 
-	dataDir, cleanup2 := TempDir(t)
-	defer cleanup2()
+	dataDir := t.TempDir()
 
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 	wd := &events.FileWorkspace{
@@ -116,8 +112,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 // the right commit, then we don't reclone.
 func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	// Add a commit to branch 'branch' that's not on main.
 	runCmd(t, repoDir, "git", "checkout", "branch")
@@ -132,8 +127,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "main-commit")
 
 	// Run the clone for the first time.
-	dataDir, cleanup2 := TempDir(t)
-	defer cleanup2()
+	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
@@ -172,8 +166,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 // merged is a fast-forward merge. See #584.
 func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	// Add a commit to branch 'branch' that's not on main.
 	// This will result in a fast-forwardable merge.
@@ -183,8 +176,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
 
 	// Run the clone for the first time.
-	dataDir, cleanup2 := TempDir(t)
-	defer cleanup2()
+	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
@@ -222,8 +214,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 // Test that if there's a conflict when merging we return a good error.
 func TestClone_CheckoutMergeConflict(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	// Add a commit to branch 'branch' that's not on main.
 	runCmd(t, repoDir, "git", "checkout", "branch")
@@ -239,8 +230,7 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "commit")
 
 	// We're set up, now trigger the Atlantis clone.
-	dataDir, cleanup2 := TempDir(t)
-	defer cleanup2()
+	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
@@ -267,9 +257,8 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 // Test that if the repo is already cloned and is at the right commit, we
 // don't reclone.
 func TestClone_NoReclone(t *testing.T) {
-	repoDir, _ := initRepo(t)
-	dataDir, cleanup2 := TempDir(t)
-	defer cleanup2()
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
 
 	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
 	runCmd(t, dataDir, "mv", repoDir, "repos/0/default")
@@ -297,10 +286,8 @@ func TestClone_NoReclone(t *testing.T) {
 // Test that if the repo is already cloned but is at the wrong commit, we
 // reclone.
 func TestClone_RecloneWrongCommit(t *testing.T) {
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
-	dataDir, cleanup2 := TempDir(t)
-	defer cleanup2()
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
 
 	// Copy the repo to our data dir.
 	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
@@ -336,8 +323,7 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 // checkout-strategy=merge, we warn the user (see #804).
 func TestClone_MasterHasDiverged(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	// Simulate first PR.
 	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
@@ -410,8 +396,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 
 func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	// Simulate first PR.
 	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
@@ -475,8 +460,8 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	Equals(t, hasDiverged, false)
 }
 
-func initRepo(t *testing.T) (string, func()) {
-	repoDir, cleanup := TempDir(t)
+func initRepo(t *testing.T) string {
+	repoDir := t.TempDir()
 	runCmd(t, repoDir, "git", "init", "--initial-branch=main")
 	runCmd(t, repoDir, "touch", ".gitkeep")
 	runCmd(t, repoDir, "git", "add", ".gitkeep")
@@ -485,5 +470,5 @@ func initRepo(t *testing.T) (string, func()) {
 	runCmd(t, repoDir, "git", "config", "--local", "commit.gpgsign", "false")
 	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, repoDir, "git", "branch", "branch")
-	return repoDir, cleanup
+	return repoDir
 }

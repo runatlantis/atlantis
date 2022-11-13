@@ -110,6 +110,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 
 		logger := logging.NewNoopLogger(t)
 		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+		tmpDir := t.TempDir()
 
 		r := runtime.RunStepRunner{
 			TerraformExecutor:       terraform,
@@ -118,8 +119,6 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ProjectCmdOutputHandler: projectCmdOutputHandler,
 		}
 		t.Run(c.Command, func(t *testing.T) {
-			tmpDir, cleanup := TempDir(t)
-			defer cleanup()
 			ctx := command.ProjectContext{
 				BaseRepo: models.Repo{
 					Name:  "basename",
