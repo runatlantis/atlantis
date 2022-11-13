@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/uber-go/tally"
@@ -31,7 +31,7 @@ type JobsController struct {
 	Logger                   logging.SimpleLogging
 	ProjectJobsTemplate      templates.TemplateWriter
 	ProjectJobsErrorTemplate templates.TemplateWriter
-	Db                       *db.BoltDB
+	Backend                  locking.Backend
 	WsMux                    *websocket.Multiplexor
 	KeyGenerator             JobIDKeyGenerator
 	StatsScope               tally.Scope

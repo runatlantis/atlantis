@@ -185,8 +185,7 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 	pf := &events.DefaultPendingPlanFinder{}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			tmpDir, cleanup := DirStructure(t, c.files)
-			defer cleanup()
+			tmpDir := DirStructure(t, c.files)
 
 			// Create a git repo in each workspace directory.
 			for dirname, contents := range c.files {
@@ -212,12 +211,11 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 
 // If a planfile is checked in to git, we shouldn't use it.
 func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]interface{}{
 		"default": map[string]interface{}{
 			"default.tfplan": nil,
 		},
 	})
-	defer cleanup()
 
 	// Add that file to git.
 	repoDir := filepath.Join(tmpDir, "default")
@@ -247,9 +245,7 @@ func TestPendingPlanFinder_DeletePlans(t *testing.T) {
 			},
 		},
 	}
-	tmp, cleanup := DirStructure(t,
-		files)
-	defer cleanup()
+	tmp := DirStructure(t, files)
 
 	// Create a git repo in each workspace directory.
 	for dirname, contents := range files {

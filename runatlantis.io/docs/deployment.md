@@ -104,7 +104,7 @@ If you're using Bitbucket Cloud then there is no webhook secret since it's not s
 :::
 
 Next, edit the manifests below as follows:
-1. Replace `<VERSION>` in `image: runatlantis/atlantis:<VERSION>` with the most recent version from [https://github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest).
+1. Replace `<VERSION>` in `image: ghcr.io/runatlantis/atlantis:<VERSION>` with the most recent version from [https://github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest).
     * NOTE: You never want to run with `:latest` because if your Pod moves to a new node, Kubernetes will pull the latest image and you might end
 up upgrading Atlantis by accident!
 2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_ALLOWLIST` with the allowlist pattern
@@ -150,7 +150,7 @@ spec:
         fsGroup: 1000 # Atlantis group (1000) read/write access to volumes.
       containers:
       - name: atlantis
-        image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
+        image: ghcr.io/runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
         - name: ATLANTIS_REPO_ALLOWLIST
           value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
@@ -298,7 +298,7 @@ spec:
     spec:
       containers:
       - name: atlantis
-        image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
+        image: ghcr.io/runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
         - name: ATLANTIS_REPO_ALLOWLIST
           value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.

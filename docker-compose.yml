@@ -12,7 +12,17 @@ services:
             NGROK_PORT: atlantis:4141
         depends_on:
         - atlantis
+    redis:
+        image: redis:6.2-alpine
+        restart: always
+        ports:
+        - '6379:6379'
+        command: redis-server --save 20 1 --loglevel warning --requirepass test123
+        volumes: 
+        - redis:/data
     atlantis:
+        depends_on:
+        - redis
         build:
             context: .
             dockerfile: Dockerfile.dev
@@ -24,3 +34,7 @@ services:
         # Contains the flags that atlantis uses in env var form
         env_file:
             - ./atlantis.env
+
+volumes:
+    redis:
+        driver: local

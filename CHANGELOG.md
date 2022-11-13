@@ -1,3 +1,27 @@
+# v0.20.1
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.20.1
+
+# v0.20.0
+
+Broken build due to github action issues
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.20.0
+
+# v0.19.8
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.8
+
 # v0.19.7
 
 Bugfixes and new Features

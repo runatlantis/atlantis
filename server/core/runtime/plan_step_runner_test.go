@@ -378,8 +378,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	terraform := mocks.NewMockClient()
 
 	// Create the env/workspace.tfvars file.
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 	err := os.MkdirAll(filepath.Join(tmpDir, "env"), 0700)
 	Ok(t, err)
 	envVarsFile := filepath.Join(tmpDir, "env/workspace.tfvars")
@@ -732,8 +731,7 @@ locally at this time.
 				AsyncTFExec:         asyncTf,
 				CommitStatusUpdater: updater,
 			}
-			absProjectPath, cleanup := TempDir(t)
-			defer cleanup()
+			absProjectPath := t.TempDir()
 
 			// First, terraform workspace gets run.
 			When(terraform.RunCommandWithVersion(
