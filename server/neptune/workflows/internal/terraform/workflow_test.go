@@ -88,6 +88,7 @@ func (a *terraformActivities) GetWorkerInfo(ctx context.Context) (*activities.Ge
 
 type jobRunner struct {
 	expectedError error
+	planSummary   terraformModel.PlanSummary
 }
 
 func (r *jobRunner) Apply(ctx workflow.Context, localRoot *terraformModel.LocalRoot, jobID string, planFile string) error {
@@ -95,12 +96,15 @@ func (r *jobRunner) Apply(ctx workflow.Context, localRoot *terraformModel.LocalR
 }
 
 func (r *jobRunner) Plan(ctx workflow.Context, localRoot *terraformModel.LocalRoot, jobID string) (activities.TerraformPlanResponse, error) {
-	return activities.TerraformPlanResponse{}, r.expectedError
+	return activities.TerraformPlanResponse{
+		Summary: r.planSummary,
+	}, r.expectedError
 }
 
 type request struct {
 	// bool since our errors are not serializable using json
 	ShouldErrorDuringJobUpdate bool
+	EmptyPlan                  bool
 }
 
 type response struct {
@@ -121,6 +125,16 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 	var expectedError error
 	runner := &jobRunner{
 		expectedError: expectedError,
+	}
+
+	if !req.EmptyPlan {
+		runner.planSummary = terraformModel.PlanSummary{
+			Creations: []terraformModel.ResourceSummary{
+				{
+					Address: "someaddress",
+				},
+			},
+		}
 	}
 
 	var s []state.Workflow
@@ -342,6 +356,39 @@ func TestSuccess(t *testing.T) {
 			},
 		},
 	}, resp.States)
+}
+
+func TestSuccess_emptyPlan(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	ga := &githubActivities{}
+	ta := &terraformActivities{}
+	env.RegisterActivity(ga)
+	env.RegisterActivity(ta)
+
+	// set activity expectations
+	env.OnActivity(ga.FetchRoot, mock.Anything, activities.FetchRootRequest{
+		Repo:         testGithubRepo,
+		Root:         testLocalRoot.Root,
+		DeploymentID: testDeploymentID,
+	}).Return(activities.FetchRootResponse{
+		LocalRoot:       testLocalRoot,
+		DeployDirectory: DeployDir,
+	}, nil)
+	env.OnActivity(ta.Cleanup, mock.Anything, activities.CleanupRequest{
+		DeployDirectory: DeployDir,
+	}).Return(activities.CleanupResponse{}, nil)
+
+	// execute workflow
+	env.ExecuteWorkflow(testTerraformWorkflow, request{EmptyPlan: true})
+	assert.True(t, env.IsWorkflowCompleted())
+
+	var resp response
+	err := env.GetWorkflowResult(&resp)
+	assert.NoError(t, err)
+
+	// assert results are expected
+	env.AssertExpectations(t)
 }
 
 func TestUpdateJobError(t *testing.T) {

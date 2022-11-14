@@ -153,11 +153,11 @@ func (r *Runner) Plan(ctx workflow.Context, root *terraform.LocalRoot, serverURL
 	return response, nil
 }
 
-func (r *Runner) waitForPlanReview(ctx workflow.Context, root *terraform.LocalRoot) PlanStatus {
+func (r *Runner) waitForPlanReview(ctx workflow.Context, root *terraform.LocalRoot, planSummary terraform.PlanSummary) PlanStatus {
 	// Wait for plan review signal
 	var planReview PlanReviewSignalRequest
 
-	if root.Root.Plan.Approval == terraform.AutoApproval {
+	if root.Root.Plan.Approval == terraform.AutoApproval || planSummary.IsEmpty() {
 		return Approved
 	}
 
@@ -172,7 +172,7 @@ func (r *Runner) waitForPlanReview(ctx workflow.Context, root *terraform.LocalRo
 	return planReview.Status
 }
 
-func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverURL fmt.Stringer, planFile string) error {
+func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverURL fmt.Stringer, planResponse activities.TerraformPlanResponse) error {
 	jobID, err := sideeffect.GenerateUUID(ctx)
 
 	if err != nil {
@@ -184,7 +184,7 @@ func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverUR
 		return errors.Wrap(err, "initializing job")
 	}
 
-	planStatus := r.waitForPlanReview(ctx, root)
+	planStatus := r.waitForPlanReview(ctx, root, planResponse.Summary)
 
 	if planStatus == Rejected {
 		if err := r.Store.UpdateApplyJobWithStatus(state.RejectedJobStatus); err != nil {
@@ -199,7 +199,7 @@ func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverUR
 		return newUpdateJobError(err, "unable to update job with success status")
 	}
 
-	err = r.JobRunner.Apply(ctx, root, jobID.String(), planFile)
+	err = r.JobRunner.Apply(ctx, root, jobID.String(), planResponse.PlanFile)
 	if err != nil {
 
 		if err := r.Store.UpdateApplyJobWithStatus(state.FailedJobStatus, state.UpdateOptions{
@@ -273,7 +273,7 @@ func (r *Runner) run(ctx workflow.Context) error {
 		return r.toExternalError(err, "running plan job")
 	}
 
-	if err := r.Apply(ctx, root, response.ServerURL, planResponse.PlanFile); err != nil {
+	if err := r.Apply(ctx, root, response.ServerURL, planResponse); err != nil {
 		return r.toExternalError(err, "running apply job")
 	}
 	r.MetricsHandler.Counter(SuccessTerraformWorkflowStat).Inc(1)

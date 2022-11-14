@@ -17,6 +17,10 @@ type PlanSummary struct {
 	Updates   []ResourceSummary
 }
 
+func (s PlanSummary) IsEmpty() bool {
+	return len(s.Creations) == 0 && len(s.Deletions) == 0 && len(s.Updates) == 0
+}
+
 // Generates a super simple plan summary with changes grouped by action
 // creation, deletion, update.
 // changes are only represented using addresses for now.
