@@ -15,6 +15,7 @@ type GlobalCfg struct {
 	Repos      []Repo              `yaml:"repos" json:"repos"`
 	Workflows  map[string]Workflow `yaml:"workflows" json:"workflows"`
 	PolicySets PolicySets          `yaml:"policies" json:"policies"`
+	PolicyCheckIncludeTfFiles bool `yaml:"policy_check_include_tf_files" json:"policy_check_include_tf_files"`
 	Metrics    Metrics             `yaml:"metrics" json:"metrics"`
 }
 

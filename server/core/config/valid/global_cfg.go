@@ -35,6 +35,7 @@ type GlobalCfg struct {
 	Repos      []Repo
 	Workflows  map[string]Workflow
 	PolicySets PolicySets
+	PolicyCheckIncludeTfFiles bool
 	Metrics    Metrics
 }
 
@@ -83,6 +84,7 @@ type MergedProjectCfg struct {
 	TerraformVersion          *version.Version
 	RepoCfgVersion            int
 	PolicySets                PolicySets
+	PolicyCheckIncludeTfFiles bool
 	DeleteSourceBranchOnMerge bool
 	ExecutionOrderGroup       int
 }
@@ -308,6 +310,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		TerraformVersion:          proj.TerraformVersion,
 		RepoCfgVersion:            rCfg.Version,
 		PolicySets:                g.PolicySets,
+		PolicyCheckIncludeTfFiles: g.PolicyCheckIncludeTfFiles,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
 		ExecutionOrderGroup:       proj.ExecutionOrderGroup,
 	}
@@ -327,6 +330,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		AutoplanEnabled:           DefaultAutoPlanEnabled,
 		TerraformVersion:          nil,
 		PolicySets:                g.PolicySets,
+		PolicyCheckIncludeTfFiles: false,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
 	}
 }
