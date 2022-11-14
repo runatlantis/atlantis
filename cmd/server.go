@@ -116,7 +116,7 @@ const (
 	TFEHostnameFlag            = "tfe-hostname"
 	TFELocalExecutionModeFlag  = "tfe-local-execution-mode"
 	TFETokenFlag               = "tfe-token"
-	WriteGitCredsFlag          = "write-git-creds"
+	WriteGitCredsFlag          = "write-git-creds" // nolint: gosec
 	WebBasicAuthFlag           = "web-basic-auth"
 	WebUsernameFlag            = "web-username"
 	WebPasswordFlag            = "web-password"

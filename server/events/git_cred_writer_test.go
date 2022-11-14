@@ -113,7 +113,7 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 
 // Test that if we can't write, we error out.
 func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
-	credsFile := "/this/dir/does/not/exist/.git-credentials"
+	credsFile := "/this/dir/does/not/exist/.git-credentials" // nolint: gosec
 	expErr := fmt.Sprintf("writing generated .git-credentials file with user, token and hostname to %s: open %s: no such file or directory", credsFile, credsFile)
 	actErr := events.WriteGitCreds("user", "token", "hostname", "/this/dir/does/not/exist", logger, false)
 	ErrEquals(t, expErr, actErr)
