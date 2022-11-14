@@ -3,6 +3,8 @@ package queue
 import (
 	"fmt"
 
+	key "github.com/runatlantis/atlantis/server/neptune/context"
+
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
@@ -36,7 +38,7 @@ func (u *LockStateUpdater) UpdateQueuedRevisions(ctx workflow.Context, queue *De
 		}).Get(ctx, nil)
 
 		if err != nil {
-			logger.Error(ctx, fmt.Sprintf("updating check run for revision %s", i.Revision), "err", err)
+			logger.Error(ctx, fmt.Sprintf("updating check run for revision %s", i.Revision), key.ErrKey, err)
 		}
 	}
 }

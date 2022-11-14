@@ -14,7 +14,7 @@ type RootFetcher struct {
 }
 
 // Fetch returns a local root and a cleanup function
-func (r *RootFetcher) Fetch(ctx workflow.Context) (*terraform.LocalRoot, func() error, error) {
+func (r *RootFetcher) Fetch(ctx workflow.Context) (*terraform.LocalRoot, func(workflow.Context) error, error) {
 	var fetchRootResponse activities.FetchRootResponse
 	err := workflow.ExecuteActivity(ctx, r.Ga.FetchRoot, activities.FetchRootRequest{
 		Repo:         r.Request.Repo,
@@ -24,12 +24,12 @@ func (r *RootFetcher) Fetch(ctx workflow.Context) (*terraform.LocalRoot, func() 
 	}).Get(ctx, &fetchRootResponse)
 
 	if err != nil {
-		return nil, func() error { return nil }, err
+		return nil, func(_ workflow.Context) error { return nil }, err
 	}
 
-	return fetchRootResponse.LocalRoot, func() error {
+	return fetchRootResponse.LocalRoot, func(c workflow.Context) error {
 		var cleanupResponse activities.CleanupResponse
-		err = workflow.ExecuteActivity(ctx, r.Ta.Cleanup, activities.CleanupRequest{ //nolint:gosimple // unnecessary to add a method to convert reponses
+		err = workflow.ExecuteActivity(c, r.Ta.Cleanup, activities.CleanupRequest{ //nolint:gosimple // unnecessary to add a method to convert reponses
 			DeployDirectory: fetchRootResponse.DeployDirectory,
 		}).Get(ctx, &cleanupResponse)
 		if err != nil {

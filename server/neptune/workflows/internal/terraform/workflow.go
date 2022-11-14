@@ -3,9 +3,11 @@ package terraform
 import (
 	"context"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/metrics"
-	"go.temporal.io/sdk/client"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/events/metrics"
+	key "github.com/runatlantis/atlantis/server/neptune/context"
+	"go.temporal.io/sdk/client"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
@@ -138,7 +140,7 @@ func (r *Runner) Plan(ctx workflow.Context, root *terraform.LocalRoot, serverURL
 	if err != nil {
 		if e := r.Store.UpdatePlanJobWithStatus(state.FailedJobStatus); e != nil {
 			// not returning UpdateJobError here since we want to surface the job failure itself
-			logger.Error(ctx, "unable to update job with failed status, job failed with error. ", "err", err)
+			logger.Error(ctx, "unable to update job with failed status, job failed with error. ", key.ErrKey, err)
 		}
 		return response, errors.Wrap(err, "running job")
 	}
@@ -186,7 +188,7 @@ func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverUR
 
 	if planStatus == Rejected {
 		if err := r.Store.UpdateApplyJobWithStatus(state.RejectedJobStatus); err != nil {
-			logger.Error(ctx, "unable to update job with rejected status.", "err", err)
+			logger.Error(ctx, "unable to update job with rejected status.", key.ErrKey, err)
 		}
 		return newPlanRejectedError()
 	}
@@ -204,7 +206,7 @@ func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverUR
 			EndTime: time.Now(),
 		}); err != nil {
 			// not returning UpdateJobError here since we want to surface the job failure itself
-			logger.Error(ctx, "unable to update job with failed status, job failed with error. ", "err", err)
+			logger.Error(ctx, "unable to update job with failed status, job failed with error. ", key.ErrKey, err)
 		}
 		return errors.Wrap(err, "running job")
 	}
@@ -233,7 +235,7 @@ func (r *Runner) Run(ctx workflow.Context) error {
 			Reason: reason,
 		})
 		if updateErr != nil {
-			logger.Warn(ctx, "error updating completion status", "err", err)
+			logger.Warn(ctx, "error updating completion status", key.ErrKey, err)
 		}
 	}()
 	err = r.run(ctx)
@@ -263,11 +265,7 @@ func (r *Runner) run(ctx workflow.Context) error {
 		return r.toExternalError(err, "fetching root")
 	}
 	defer func() {
-		cleanupErr := cleanup()
-
-		if cleanupErr != nil {
-			logger.Warn(ctx, "error cleaning up local root", "err", cleanupErr)
-		}
+		r.executeCleanup(ctx, cleanup)
 	}()
 
 	planResponse, err := r.Plan(ctx, root, response.ServerURL)
@@ -280,6 +278,24 @@ func (r *Runner) run(ctx workflow.Context) error {
 	}
 	r.MetricsHandler.Counter(SuccessTerraformWorkflowStat).Inc(1)
 	return nil
+}
+
+func (r *Runner) executeCleanup(ctx workflow.Context, handlers ...func(workflow.Context) error) {
+	// create a new disconnected ctx since we want this run even in the event of
+	// cancellation
+	if temporal.IsCanceledError(ctx.Err()) {
+		var cancel workflow.CancelFunc
+		ctx, cancel = workflow.NewDisconnectedContext(ctx)
+		defer cancel()
+	}
+
+	for _, h := range handlers {
+		cleanupErr := h(ctx)
+
+		if cleanupErr != nil {
+			logger.Warn(ctx, "error cleaning up local root", key.ErrKey, cleanupErr)
+		}
+	}
 }
 
 type ApplicationError struct {

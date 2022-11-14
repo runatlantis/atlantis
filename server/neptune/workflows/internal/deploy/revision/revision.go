@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	key "github.com/runatlantis/atlantis/server/neptune/context"
+
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
@@ -81,7 +83,7 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 	id, err := n.idGenerator(ctx)
 
 	if err != nil {
-		logger.Error(ctx, "generating deployment id", "err", err)
+		logger.Error(ctx, "generating deployment id", key.ErrKey, err)
 	}
 
 	// Do not push a duplicate/in-progress manual deployment to the queue

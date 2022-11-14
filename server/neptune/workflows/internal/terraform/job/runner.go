@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	key "github.com/runatlantis/atlantis/server/neptune/context"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
@@ -197,6 +198,6 @@ func (r *JobRunner) closeTerraformJob(ctx *ExecutionContext) {
 	}).Get(ctx, nil)
 
 	if err != nil {
-		logger.Error(ctx, "Error closing job", "err", err)
+		logger.Error(ctx, "Error closing job", key.ErrKey, err)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	key "github.com/runatlantis/atlantis/server/neptune/context"
 	"io"
 	"path/filepath"
 	"strings"
@@ -128,7 +129,7 @@ func (t *terraformActivities) TerraformInit(ctx context.Context, request Terrafo
 
 	err = t.GitCLICredentials.Refresh(ctx, request.GithubInstallationID)
 	if err != nil {
-		logger.Warn(ctx, "Error refreshing git cli credentials. This is bug and will likely cause fetching of private modules to fail", "err", err)
+		logger.Warn(ctx, "Error refreshing git cli credentials. This is bug and will likely cause fetching of private modules to fail", key.ErrKey, err)
 	}
 
 	// terraform init clones repos using git cli auth of which we chose git global configs.
@@ -219,13 +220,13 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 
 	// we shouldn't fail our activity just because show failed. Summaries aren't that critical.
 	if err != nil {
-		logger.Error(ctx, "error with terraform show", "err", err)
+		logger.Error(ctx, "error with terraform show", key.ErrKey, err)
 	}
 
 	summary, err := terraform.NewPlanSummaryFromJSON(showResultBuffer.Bytes())
 
 	if err != nil {
-		logger.Error(ctx, "error building plan summary", "err", err)
+		logger.Error(ctx, "error building plan summary", key.ErrKey, err)
 	}
 
 	return TerraformPlanResponse{
@@ -288,7 +289,7 @@ func (t *terraformActivities) runCommandWithOutputStream(ctx context.Context, jo
 		defer wg.Done()
 		defer func() {
 			if e := writer.Close(); e != nil {
-				logger.Error(ctx, "closing pipe writer", "err", e)
+				logger.Error(ctx, "closing pipe writer", key.ErrKey, e)
 			}
 		}()
 		err = t.TerraformClient.RunCommand(ctx, request, terraform.RunOptions{

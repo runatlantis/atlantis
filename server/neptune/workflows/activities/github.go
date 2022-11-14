@@ -3,6 +3,7 @@ package activities
 import (
 	"context"
 	"fmt"
+	key "github.com/runatlantis/atlantis/server/neptune/context"
 	"net/http"
 	"net/url"
 	"os"
@@ -239,7 +240,7 @@ func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootReque
 	rootSymlink := filepath.Join(deployBasePath, "root")
 	err = os.Symlink(rootPath, rootSymlink)
 	if err != nil {
-		logger.Warn(ctx, "unable to symlink to terraform root", "err", err)
+		logger.Warn(ctx, "unable to symlink to terraform root", key.ErrKey, err)
 	}
 
 	localRoot := terraform.BuildLocalRoot(request.Root, request.Repo, rootPath)

@@ -166,6 +166,7 @@ func (r *Runner) Run(ctx workflow.Context) error {
 		// check state here since if we timed out, we're probably not susceptible to the queue
 		// worker being in a waiting state right before it's about to start working on an item.
 		if !s.HasPending() && r.QueueWorker.GetState() != queue.WorkingWorkerState {
+			logger.Info(ctx, "initiating worker shutdown")
 			shutdownWorker()
 			break
 		}

@@ -40,6 +40,9 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 	id := deploymentInfo.ID
 	ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 		WorkflowID: id.String(),
+
+		// allows all signals to be received even in a cancellation state
+		WaitForCancellation: true,
 		SearchAttributes: map[string]interface{}{
 			"atlantis_repository": deploymentInfo.Repo.GetFullName(),
 			"atlantis_root":       deploymentInfo.Root.Name,

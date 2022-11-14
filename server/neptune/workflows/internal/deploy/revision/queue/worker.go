@@ -3,6 +3,8 @@ package queue
 import (
 	"context"
 	"fmt"
+
+	key "github.com/runatlantis/atlantis/server/neptune/context"
 	"go.temporal.io/sdk/client"
 
 	"github.com/pkg/errors"
@@ -188,11 +190,11 @@ func (w *Worker) Work(ctx workflow.Context) {
 
 		switch e := err.(type) {
 		case *ValidationError:
-			logger.Error(ctx, "deploy validation failed, moving to next one", "err", e)
+			logger.Error(ctx, "deploy validation failed, moving to next one", key.ErrKey, e)
 		case terraform.PlanRejectionError:
 			logger.Warn(ctx, "Plan rejected")
 		default:
-			logger.Error(ctx, "failed to deploy revision, moving to next one", "err", err)
+			logger.Error(ctx, "failed to deploy revision, moving to next one", key.ErrKey, err)
 		}
 
 		selector.AddFuture(w.awaitWork(ctx), callback)

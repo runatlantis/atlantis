@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 
+	key "github.com/runatlantis/atlantis/server/neptune/context"
+
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
@@ -46,7 +48,7 @@ func (n *StateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel,
 	}
 
 	if err := n.updateCheckRun(ctx, workflowState, deploymentInfo); err != nil {
-		logger.Error(ctx, "updating check run", "err", err)
+		logger.Error(ctx, "updating check run", key.ErrKey, err)
 	}
 }
 
