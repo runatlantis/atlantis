@@ -26,7 +26,7 @@ const (
 	pullKeySeparator = "::"
 )
 
-func New(hostname string, port int, password string, tlsEnabled bool, insecureSkipVerify bool) (*RedisDB, error) {
+func New(hostname string, port int, password string, tlsEnabled bool, insecureSkipVerify bool, db int) (*RedisDB, error) {
 	var rdb *redis.Client
 
 	var tlsConfig *tls.Config
@@ -40,7 +40,7 @@ func New(hostname string, port int, password string, tlsEnabled bool, insecureSk
 	rdb = redis.NewClient(&redis.Options{
 		Addr:      fmt.Sprintf("%s:%d", hostname, port),
 		Password:  password,
-		DB:        0, // use default DB
+		DB:        db,
 		TLSConfig: tlsConfig,
 	})
 

@@ -803,7 +803,7 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 }
 
 func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {
-	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", false, false)
+	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", false, false, 0)
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create test redis client"))
 	}
@@ -811,7 +811,7 @@ func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {
 }
 
 func newTestRedisTLS(mr *miniredis.Miniredis) *redis.RedisDB {
-	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", true, true)
+	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", true, true, 0)
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create test redis client"))
 	}

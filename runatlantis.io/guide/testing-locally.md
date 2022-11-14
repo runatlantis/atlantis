@@ -147,7 +147,7 @@ you can use your own user. Here we'll create the access token that Atlantis uses
 set commit statuses.
 
 ### GitHub or GitHub Enterprise Access Token
-- follow [https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token)
+- Create a [Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-fine-grained-personal-access-token)
 - create a token with **repo** scope
 - set the token as an environment variable
 ```

@@ -99,7 +99,7 @@ To continue, we need you to create a GitHub personal access token
 with [green]"repo" [reset]scope so we can fork an example terraform project.
 
 Follow these instructions to create a token (we don't store any tokens):
-[green]https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token[reset]
+[green]https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-fine-grained-personal-access-token[reset]
 - use "atlantis" for the token description
 - add "repo" scope
 - copy the access token
@@ -173,6 +173,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	// will just choose a random API port and we won't be able to get the right
 	// url.
 	ngrokConfig := fmt.Sprintf(`
+version: 1
 web_addr: %s
 tunnels:
   atlantis:
@@ -181,7 +182,7 @@ tunnels:
     proto: http
 `, ngrokAPIURL, atlantisPort)
 
-	ngrokConfigFile, err := os.CreateTemp("", "")
+	ngrokConfigFile, err := os.CreateTemp("", "atlantis-testdrive-ngrok-config")
 	if err != nil {
 		return errors.Wrap(err, "creating ngrok config file")
 	}
