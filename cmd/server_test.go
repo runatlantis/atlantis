@@ -102,7 +102,7 @@ var testFlags = map[string]interface{}{
 	SlackTokenFlag:                   "slack-token",
 	SSLCertFileFlag:                  "cert-file",
 	SSLKeyFileFlag:                   "key-file",
-  StrictPlanFileList:               false,
+        StrictPlanFileList:               false,
 	TFDownloadURLFlag:                "https://my-hostname.com",
 	TFEHostnameFlag:                  "my-hostname",
 	TFELocalExecutionModeFlag:        true,
