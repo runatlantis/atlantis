@@ -11,7 +11,7 @@
 * When sending lengthy log-files, consider posting them as a gist (https://gist.github.com). Don't forget to remove sensitive data from your logfiles before posting (you can replace those parts with "REDACTED").
 
 # Reporting Security Issues
-We take security issues seriously. Please email us directly at security [at] runatlantis.io instead of opening an issue.
+We take security issues seriously. Please report a security vulnerability to the maintainers using [private vulnerability reporting](https://github.com/runatlantis/atlantis/security/advisories/new).
 
 # Updating The Website
 * To view the generated website locally, run `yarn website:dev` and then
