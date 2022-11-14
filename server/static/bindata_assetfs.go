@@ -17,7 +17,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -356,11 +355,13 @@ var _bindata = map[string]func() (*asset, error){
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"}
 // AssetDir("data/img") would return []string{"a.png", "b.png"}
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error
@@ -393,22 +394,22 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"static": &bintree{nil, map[string]*bintree{
-		"css": &bintree{nil, map[string]*bintree{
-			"custom.css":    &bintree{staticCssCustomCss, map[string]*bintree{}},
-			"normalize.css": &bintree{staticCssNormalizeCss, map[string]*bintree{}},
-			"skeleton.css":  &bintree{staticCssSkeletonCss, map[string]*bintree{}},
-			"xterm.css":     &bintree{staticCssXtermCss, map[string]*bintree{}},
+	"static": {nil, map[string]*bintree{
+		"css": {nil, map[string]*bintree{
+			"custom.css":    {staticCssCustomCss, map[string]*bintree{}},
+			"normalize.css": {staticCssNormalizeCss, map[string]*bintree{}},
+			"skeleton.css":  {staticCssSkeletonCss, map[string]*bintree{}},
+			"xterm.css":     {staticCssXtermCss, map[string]*bintree{}},
 		}},
-		"images": &bintree{nil, map[string]*bintree{
-			"atlantis-icon.png":     &bintree{staticImagesAtlantisIconPng, map[string]*bintree{}},
-			"atlantis-icon_512.png": &bintree{staticImagesAtlantisIcon_512Png, map[string]*bintree{}},
+		"images": {nil, map[string]*bintree{
+			"atlantis-icon.png":     {staticImagesAtlantisIconPng, map[string]*bintree{}},
+			"atlantis-icon_512.png": {staticImagesAtlantisIcon_512Png, map[string]*bintree{}},
 		}},
-		"js": &bintree{nil, map[string]*bintree{
-			"jquery-3.5.1.min.js":         &bintree{staticJsJquery351MinJs, map[string]*bintree{}},
-			"xterm-4.9.0.js":              &bintree{staticJsXterm490Js, map[string]*bintree{}},
-			"xterm-addon-attach-0.6.0.js": &bintree{staticJsXtermAddonAttach060Js, map[string]*bintree{}},
-			"xterm-addon-fit-0.4.0.js":    &bintree{staticJsXtermAddonFit040Js, map[string]*bintree{}},
+		"js": {nil, map[string]*bintree{
+			"jquery-3.5.1.min.js":         {staticJsJquery351MinJs, map[string]*bintree{}},
+			"xterm-4.9.0.js":              {staticJsXterm490Js, map[string]*bintree{}},
+			"xterm-addon-attach-0.6.0.js": {staticJsXtermAddonAttach060Js, map[string]*bintree{}},
+			"xterm-addon-fit-0.4.0.js":    {staticJsXtermAddonFit040Js, map[string]*bintree{}},
 		}},
 	}},
 }}
@@ -427,7 +428,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

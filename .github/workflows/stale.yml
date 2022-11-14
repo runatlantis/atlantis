@@ -4,12 +4,15 @@ on:
     - cron: '30 1 * * *'
 jobs:
   stale:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/stale@v5
+      - uses: actions/stale@v6
         with:
-          stale-pr-message: 'This issue is stale because it has been open 30 days with no activity. Remove stale label or comment or this will be closed in 5 days.'
-          days-before-stale: 30
-          days-before-close: 5
+          stale-pr-message: 'This issue is stale because it has been open for 6 months with no activity. Remove stale label or comment or this will be closed in 1 month.'
+          stale-issue-message: This issue is stale because it has been open for 6 months with no activity. Remove stale label or comment or this will be closed in 1 month.'
+          remove-stale-when-updated: true
+          # 6 months
+          days-before-stale: 183
+          # 1 month
+          days-before-close: 31
           only-labels: 'waiting-on-response'
-  

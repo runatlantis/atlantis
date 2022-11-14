@@ -3,9 +3,9 @@
 Atlantis exposes a set of metrics for each of its operations including errors, successes, and latencies.
 
 ::: warning NOTE
-Only statsd is supported currently, but it should be relatively straightforward to add other providers such as prometheus.
+Currently Statsd and Prometheus is supported. See configuration below for details.
 :::
 
 ## Configuration
 
-Metrics are configured through the (server-side-repo-config.html#Metrics). 
+Metrics are configured through the [Server Side Config](server-side-repo-config.html#metrics).

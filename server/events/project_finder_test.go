@@ -44,10 +44,8 @@ func setupTmpRepos(t *testing.T) {
 	//   terraform.tfstate.backup
 	//   modules/
 	//     main.tf
-	var err error
-	nestedModules1, err = os.MkdirTemp("", "")
-	Ok(t, err)
-	err = os.MkdirAll(filepath.Join(nestedModules1, "project1/modules"), 0700)
+	nestedModules1 = t.TempDir()
+	err := os.MkdirAll(filepath.Join(nestedModules1, "project1/modules"), 0700)
 	Ok(t, err)
 	files := []string{
 		"non-tf",
@@ -77,8 +75,7 @@ func setupTmpRepos(t *testing.T) {
 	//    main.tf
 	//  project2/
 	//    main.tf
-	topLevelModules, err = os.MkdirTemp("", "")
-	Ok(t, err)
+	topLevelModules = t.TempDir()
 	for _, path := range []string{"modules", "project1", "project2"} {
 		err = os.MkdirAll(filepath.Join(topLevelModules, path), 0700)
 		Ok(t, err)
@@ -92,14 +89,51 @@ func setupTmpRepos(t *testing.T) {
 	//   staging.tfvars
 	//   production.tfvars
 	//   global-env-config.auto.tfvars.json
-	envDir, err = os.MkdirTemp("", "")
-	Ok(t, err)
+	envDir = t.TempDir()
 	err = os.MkdirAll(filepath.Join(envDir, "env"), 0700)
 	Ok(t, err)
 	_, err = os.Create(filepath.Join(envDir, "env/staging.tfvars"))
 	Ok(t, err)
 	_, err = os.Create(filepath.Join(envDir, "env/production.tfvars"))
 	Ok(t, err)
+}
+
+func TestDetermineWorkspaceFromHCL(t *testing.T) {
+	noopLogger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description       string
+		repoDir           string
+		expectedWorkspace string
+	}{
+		{
+			"Should use configured Terraform Cloud workspace",
+			"workspace-configured",
+			"test-workspace",
+		},
+		{
+			"If no 'cloud' block was configured, it should use 'default' workspace",
+			"no-cloud-block",
+			"default",
+		},
+		{
+			"If 'cloud' was specify but without `name` attribute, it should use 'default' workspace",
+			"cloud-block-without-workspace-name",
+			"default",
+		},
+	}
+
+	for _, c := range cases {
+		fullPath := filepath.Join("testdata/test-repos", c.repoDir)
+		got, err := m.DetermineWorkspaceFromHCL(noopLogger, fullPath)
+		if err != nil {
+			t.Error("got error:", err)
+			break
+		}
+		if got != c.expectedWorkspace {
+			t.Fatalf("Expected %s but got %s", c.expectedWorkspace, got)
+		}
+	}
+
 }
 
 func TestDetermineProjects(t *testing.T) {
@@ -299,7 +333,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	// modules/
 	//   module/
 	//	  main.tf
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]interface{}{
 		"main.tf": nil,
 		"project1": map[string]interface{}{
 			"main.tf":               nil,
@@ -315,7 +349,6 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 			},
 		},
 	})
-	defer cleanup()
 
 	cases := []struct {
 		description  string

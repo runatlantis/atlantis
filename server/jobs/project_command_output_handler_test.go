@@ -26,8 +26,8 @@ func createTestProjectCmdContext(t *testing.T) command.ProjectContext {
 		},
 		Pull: models.PullRequest{
 			Num:        1,
-			HeadBranch: "master",
-			BaseBranch: "master",
+			HeadBranch: "main",
+			BaseBranch: "main",
 			Author:     "test-user",
 			HeadCommit: "234r232432",
 		},

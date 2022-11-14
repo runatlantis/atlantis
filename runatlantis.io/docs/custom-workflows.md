@@ -143,6 +143,76 @@ workflows:
       - run: terraform apply $PLANFILE
 ```
 
+### cdktf
+Here are the requirements to enable [cdktf](https://www.terraform.io/cdktf)
+
+- A custom image with `cdktf` installed
+- The autoplan file updated to trigger off of `**/cdk.tf.json`
+- The output of `cdktf synth` has to be committed to the pull request
+- Optional: Use `pre_workflow_hooks` to run `cdktf synth` as a double check
+- Optional: There isn't a requirement to use a repo `atlantis.yaml` but one can be leveraged if needed.
+
+#### custom image
+
+```dockerfile
+# Dockerfile
+FROM ghcr.io/runatlantis/atlantis:v0.19.7
+
+RUN apk add npm && npm i -g cdktf-cli
+```
+
+#### server config
+
+```bash
+# env variables
+ATLANTIS_AUTOPLAN_FILE_LIST="**/*.tf,**/*.tfvars,**/*.tfvars.json,**/cdk.tf.json"
+```
+
+OR
+
+`atlantis server --config config.yaml`
+```yaml
+# config.yaml
+autoplan-file-list: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/cdk.tf.json"
+```
+
+#### server repo config
+
+Use `pre_workflow_hooks`
+
+`atlantis server --repo-config="repos.yaml"`
+```yaml
+# repos.yaml
+repos:
+  - id: /.*cdktf.*/
+    pre_workflow_hooks:
+      - run: npm i && cdktf get && cdktf synth
+```
+
+#### repo structure
+
+This is the git repo structure after running `cdktf synth`. The `cdk.tf.json` files contain the HCL that atlantis can run.
+
+```bash
+$ tree --gitignore
+.
+├── cdktf.json
+├── cdktf.out
+│   ├── manifest.json
+│   └── stacks
+│       └── eks
+│           └── cdk.tf.json
+```
+
+#### workflow
+
+1. Container orchestrator (k8s/fargate/ecs/etc) uses the custom docker image of atlantis with `cdktf` installed with the `--autoplan-file-list` to trigger on json files
+1. PR branch is pushed up containing `cdktf` changes and generated hcl json
+1. Atlantis checks out the branch in the repo
+1. Atlantis runs the `npm i && cdktf get && cdktf synth` command in the repo root as a step in `pre_workflow_hooks` (as a double check described above)
+1. Atlantis detects the change to the generated hcl json files in a number of `dir`s
+1. Atlantis then runs `terraform` workflows in the respective `dir`s as usual
+
 ### Terragrunt
 Atlantis supports running custom commands in place of the default Atlantis
 commands. We can use this functionality to enable
@@ -350,7 +420,8 @@ Or a custom command
 | run | string | none    | no       | Run a custom command |
 
 ::: tip Notes
-* `run` steps are executed with the following environment variables:
+* `run` steps in the main `workflow` are executed with the following environment variables:
+*  note: these variables are not available to `pre` or `post` workflows
   * `WORKSPACE` - The Terraform workspace used for this project, ex. `default`.
     * NOTE: if the step is executed before `init` then Atlantis won't have switched to this workspace yet.
   * `ATLANTIS_TERRAFORM_VERSION` - The version of Terraform used for this project, ex. `0.11.0`.
@@ -427,4 +498,3 @@ The name-value pairs in the result are added as environment variables if success
 * `multienv` `command`'s can use any of the built-in environment variables available
   to `run` commands. 
 :::
-

@@ -3,7 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the License);
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an AS IS BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -68,7 +70,8 @@ func (r Repo) ID() string {
 // NewRepo constructs a Repo object. repoFullName is the owner/repo form,
 // cloneURL can be with or without .git at the end
 // ex. https://github.com/runatlantis/atlantis.git OR
-//     https://github.com/runatlantis/atlantis
+//
+//	https://github.com/runatlantis/atlantis
 func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
@@ -335,8 +338,9 @@ func NewVCSHostType(t string) (VCSHostType, error) {
 // name segments. If the repoFullName is malformed, may return empty
 // strings for owner or repo.
 // Ex. runatlantis/atlantis => (runatlantis, atlantis)
-//     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
-//     azuredevops/project/atlantis => (azuredevops/project, atlantis)
+//
+//	gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
+//	azuredevops/project/atlantis => (azuredevops/project, atlantis)
 func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 	lastSlashIdx := strings.LastIndex(repoFullName, "/")
 	if lastSlashIdx == -1 || lastSlashIdx == len(repoFullName)-1 {
@@ -380,7 +384,7 @@ func (p *PlanSuccess) Summary() string {
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
-	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s->\s|<<|\{|\(known after apply\)|\[)(.*)`)
+	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s=\s|\s->\s|<<|\{|\(known after apply\)| {2,}[^ ]+:.*)(.*)`)
 	diffListRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
 	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
 
@@ -405,6 +409,17 @@ type PolicyCheckSuccess struct {
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
 	HasDiverged bool
+}
+
+// Summary extracts one line summary of policy check.
+func (p *PolicyCheckSuccess) Summary() string {
+	note := ""
+
+	r := regexp.MustCompile(`\d+ tests, \d+ passed, \d+ warnings, \d+ failures, \d+ exceptions`)
+	if match := r.FindString(p.PolicyCheckOutput); match != "" {
+		return note + match
+	}
+	return note
 }
 
 type VersionSuccess struct {
@@ -506,4 +521,9 @@ type WorkflowHookCommandContext struct {
 	User User
 	// Verbose is true when the user would like verbose output.
 	Verbose bool
+	// EscapedCommentArgs are the extra arguments that were added to the atlantis
+	// command, ex. atlantis plan -- -target=resource. We then escape them
+	// by adding a \ before each character so that they can be used within
+	// sh -c safely, i.e. sh -c "terraform plan $(touch bad)".
+	EscapedCommentArgs []string
 }

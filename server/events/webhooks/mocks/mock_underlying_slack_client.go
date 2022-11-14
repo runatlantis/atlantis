@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	slack "github.com/nlopes/slack"
+	slack "github.com/slack-go/slack"
 	pegomock "github.com/petergtz/pegomock"
 )
 
@@ -68,11 +68,14 @@ func (mock *MockUnderlyingSlackClient) GetConversations(conversationParams *slac
 	return ret0, ret1, ret2
 }
 
-func (mock *MockUnderlyingSlackClient) PostMessage(channel string, text string, parameters slack.PostMessageParameters) (string, string, error) {
+func (mock *MockUnderlyingSlackClient) PostMessage(channelID string, options ...slack.MsgOption) (string, string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockUnderlyingSlackClient().")
 	}
-	params := []pegomock.Param{channel, text, parameters}
+	params := []pegomock.Param{channelID}
+	for _, param := range options {
+		params = append(params, param)
+	}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("PostMessage", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 string
@@ -172,8 +175,11 @@ func (c *MockUnderlyingSlackClient_GetConversations_OngoingVerification) GetAllC
 	return
 }
 
-func (verifier *VerifierMockUnderlyingSlackClient) PostMessage(channel string, text string, parameters slack.PostMessageParameters) *MockUnderlyingSlackClient_PostMessage_OngoingVerification {
-	params := []pegomock.Param{channel, text, parameters}
+func (verifier *VerifierMockUnderlyingSlackClient) PostMessage(channelID string, options ...slack.MsgOption) *MockUnderlyingSlackClient_PostMessage_OngoingVerification {
+	params := []pegomock.Param{channelID}
+	for _, param := range options {
+		params = append(params, param)
+	}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "PostMessage", params, verifier.timeout)
 	return &MockUnderlyingSlackClient_PostMessage_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -183,25 +189,26 @@ type MockUnderlyingSlackClient_PostMessage_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockUnderlyingSlackClient_PostMessage_OngoingVerification) GetCapturedArguments() (string, string, slack.PostMessageParameters) {
-	channel, text, parameters := c.GetAllCapturedArguments()
-	return channel[len(channel)-1], text[len(text)-1], parameters[len(parameters)-1]
+func (c *MockUnderlyingSlackClient_PostMessage_OngoingVerification) GetCapturedArguments() (string, []slack.MsgOption) {
+	channelID, options := c.GetAllCapturedArguments()
+	return channelID[len(channelID)-1], options[len(options)-1]
 }
 
-func (c *MockUnderlyingSlackClient_PostMessage_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 []slack.PostMessageParameters) {
+func (c *MockUnderlyingSlackClient_PostMessage_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]slack.MsgOption) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]string, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(string)
-		}
-		_param2 = make([]slack.PostMessageParameters, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.(slack.PostMessageParameters)
+		_param1 = make([][]slack.MsgOption, len(c.methodInvocations))
+		for u := 0; u < len(c.methodInvocations); u++ {
+			_param1[u] = make([]slack.MsgOption, len(params)-1)
+			for x := 1; x < len(params); x++ {
+				if params[x][u] != nil {
+					_param1[u][x-1] = params[x][u].(slack.MsgOption)
+				}
+			}
 		}
 	}
 	return

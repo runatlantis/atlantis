@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation"
@@ -21,6 +22,7 @@ const (
 
 type Project struct {
 	Name                      *string   `yaml:"name,omitempty"`
+	Branch                    *string   `yaml:"branch,omitempty"`
 	Dir                       *string   `yaml:"dir,omitempty"`
 	Workspace                 *string   `yaml:"workspace,omitempty"`
 	Workflow                  *string   `yaml:"workflow,omitempty"`
@@ -52,11 +54,27 @@ func (p Project) Validate() error {
 		}
 		return nil
 	}
+
+	branchValid := func(value interface{}) error {
+		strPtr := value.(*string)
+		if strPtr == nil {
+			return nil
+		}
+		branch := *strPtr
+		if !strings.HasPrefix(branch, "/") || !strings.HasSuffix(branch, "/") {
+			return errors.New("regex must begin and end with a slash '/'")
+		}
+		withoutSlashes := branch[1 : len(branch)-1]
+		_, err := regexp.Compile(withoutSlashes)
+		return errors.Wrapf(err, "parsing: %s", branch)
+	}
+
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Dir, validation.Required, validation.By(hasDotDot)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&p.TerraformVersion, validation.By(VersionValidator)),
 		validation.Field(&p.Name, validation.By(validName)),
+		validation.Field(&p.Branch, validation.By(branchValid)),
 	)
 }
 
@@ -67,6 +85,13 @@ func (p Project) ToValid() valid.Project {
 	// in DefaultProjectFinder.
 	cleanedDir := filepath.Clean("./" + *p.Dir)
 	v.Dir = cleanedDir
+
+	if p.Branch != nil {
+		branch := *p.Branch
+		withoutSlashes := branch[1 : len(branch)-1]
+		// Safe to use MustCompile because we test it in Validate().
+		v.BranchRegex = regexp.MustCompile(withoutSlashes)
+	}
 
 	if p.Workspace == nil || *p.Workspace == "" {
 		v.Workspace = DefaultWorkspace

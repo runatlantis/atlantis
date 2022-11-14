@@ -16,7 +16,6 @@ package events_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -164,11 +163,19 @@ func TestParseGithubPullEvent(t *testing.T) {
 }
 
 func TestParseGithubPullEventFromDraft(t *testing.T) {
+	// verify that close event treated as 'close' events by default
+	closeEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	closeEvent.Action = github.String("closed")
+	closeEvent.PullRequest.Draft = github.Bool(true)
+
+	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&closeEvent)
+	Ok(t, err)
+	Equals(t, models.ClosedPullEvent, evType)
+
 	// verify that draft PRs are treated as 'other' events by default
 	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	draftPR := true
-	testEvent.PullRequest.Draft = &draftPR
-	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&testEvent)
+	testEvent.PullRequest.Draft = github.Bool(true)
+	_, evType, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	Ok(t, err)
 	Equals(t, models.OtherPullEvent, evType)
 	// verify that drafts are planned if requested
@@ -353,7 +360,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 		Num:        12,
 		HeadCommit: "d2eae324ca26242abca45d7b49d582cddb2a4f15",
 		HeadBranch: "patch-1",
-		BaseBranch: "master",
+		BaseBranch: "main",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -378,6 +385,29 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	pull, _, _, _, _, err = parser.ParseGitlabMergeRequestEvent(*event)
 	Ok(t, err)
 	Equals(t, models.ClosedPullState, pull.State)
+}
+
+func TestParseGitlabMergeEventFromDraft(t *testing.T) {
+	path := filepath.Join("testdata", "gitlab-merge-request-event.json")
+	bytes, err := os.ReadFile(path)
+	Ok(t, err)
+
+	var event gitlab.MergeEvent
+	err = json.Unmarshal(bytes, &event)
+	Ok(t, err)
+
+	testEvent := deepcopy.Copy(event).(gitlab.MergeEvent)
+	testEvent.ObjectAttributes.WorkInProgress = true
+
+	_, evType, _, _, _, err := parser.ParseGitlabMergeRequestEvent(testEvent)
+	Ok(t, err)
+	Equals(t, models.OtherPullEvent, evType)
+
+	parser.AllowDraftPRs = true
+	defer func() { parser.AllowDraftPRs = false }()
+	_, evType, _, _, _, err = parser.ParseGitlabMergeRequestEvent(testEvent)
+	Ok(t, err)
+	Equals(t, models.OpenedPullEvent, evType)
 }
 
 // Should be able to parse a merge event from a repo that is in a subgroup,
@@ -410,7 +440,7 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 		Num:        2,
 		HeadCommit: "901d9770ef1a6862e2a73ec1bacc73590abb9aff",
 		HeadBranch: "patch",
-		BaseBranch: "master",
+		BaseBranch: "main",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -469,7 +499,7 @@ func TestParseGitlabMergeEvent_Update_ActionType(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.filename, func(t *testing.T) {
 			path := filepath.Join("testdata", c.filename)
-			bytes, err := ioutil.ReadFile(path)
+			bytes, err := os.ReadFile(path)
 			Ok(t, err)
 
 			var event *gitlab.MergeEvent
@@ -553,7 +583,7 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 		Num:        8,
 		HeadCommit: "0b4ac85ea3063ad5f2974d10cd68dd1f937aaac2",
 		HeadBranch: "abc",
-		BaseBranch: "master",
+		BaseBranch: "main",
 		State:      models.OpenPullState,
 		BaseRepo:   repo,
 	}, pull)
@@ -592,7 +622,7 @@ func TestParseGitlabMergeRequest_Subgroup(t *testing.T) {
 		Num:        2,
 		HeadCommit: "901d9770ef1a6862e2a73ec1bacc73590abb9aff",
 		HeadBranch: "patch",
-		BaseBranch: "master",
+		BaseBranch: "main",
 		State:      models.OpenPullState,
 		BaseRepo:   repo,
 	}, pull)
@@ -817,7 +847,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		HeadCommit: "e0624da46d3a",
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
 		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
-		BaseBranch: "master",
+		BaseBranch: "main",
 		Author:     "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
@@ -903,7 +933,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		HeadCommit: "1e69a602caef",
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/16",
 		HeadBranch: "Luke/maintf-edited-online-with-bitbucket-1560433073473",
-		BaseBranch: "master",
+		BaseBranch: "main",
 		Author:     "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
@@ -1033,7 +1063,7 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 		HeadCommit: "bfb1af1ba9c2a2fa84cd61af67e6e1b60a22e060",
 		URL:        "http://mycorp.com:7490/projects/AT/repos/atlantis-example/pull-requests/1",
 		HeadBranch: "branch",
-		BaseBranch: "master",
+		BaseBranch: "main",
 		Author:     "lkysow",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
@@ -1115,7 +1145,7 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 		HeadCommit: "86a574157f5a2dadaf595b9f06c70fdfdd039912",
 		URL:        "http://mycorp.com:7490/projects/AT/repos/atlantis-example/pull-requests/2",
 		HeadBranch: "branch",
-		BaseBranch: "master",
+		BaseBranch: "main",
 		Author:     "lkysow",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,

@@ -697,7 +697,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 				HeadCommit: "2d9fb6b9a46eafb1dcef7b008d1a429d45ca742c",
 				URL:        "https://bbserver.com/projects/PROJ/repos/repository/pull-requests/10",
 				HeadBranch: "decline-me",
-				BaseBranch: "master",
+				BaseBranch: "main",
 				Author:     "admin",
 				State:      models.OpenPullState,
 				BaseRepo:   expRepo,

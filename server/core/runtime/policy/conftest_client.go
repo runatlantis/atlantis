@@ -69,8 +69,9 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 	return commandArgs, nil
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_conftest_client.go SourceResolver
 // SourceResolver resolves the policy set to a local fs path
+//
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_conftest_client.go SourceResolver
 type SourceResolver interface {
 	Resolve(policySet valid.PolicySet) (string, error)
 }

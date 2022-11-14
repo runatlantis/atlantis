@@ -16,7 +16,7 @@ We take security issues seriously. Please email us directly at security [at] run
 # Updating The Website
 * To view the generated website locally, run `yarn website:dev` and then
 open your browser to http://localhost:8080.
-* The website will be regenerated when your pull request is merged to master.
+* The website will be regenerated when your pull request is merged to main.
 
 # Developing
 
@@ -78,7 +78,7 @@ docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/git
 
 ## Calling Your Local Atlantis From GitHub
 - Create a test terraform repository in your GitHub.
-- Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/runatlantis/atlantis/tree/master/runatlantis.io/docs/access-credentials.md#generating-an-access-token).
+- Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/runatlantis/atlantis/tree/main/runatlantis.io/docs/access-credentials.md#generating-an-access-token).
 - Start Atlantis in server mode using that token:
 ```
 atlantis server --gh-user <your username> --gh-token <your token> --repo-allowlist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
@@ -88,7 +88,7 @@ atlantis server --gh-user <your username> --gh-token <your token> --repo-allowli
 ```
 ngrok http 4141
 ```
-- Create a Webhook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/runatlantis/atlantis/blob/master/runatlantis.io/docs/configuring-webhooks.md#configuring-webhooks).
+- Create a Webhook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/runatlantis/atlantis/blob/main/runatlantis.io/docs/configuring-webhooks.md#configuring-webhooks).
 - Create a pull request and type `atlantis help`. You should see the request in the `ngrok` and Atlantis logs and you should also see Atlantis comment back.
 
 ## Code Style
@@ -130,6 +130,8 @@ We use [pegomock](https://github.com/petergtz/pegomock) for mocking. If you're
 modifying any interfaces that are mocked, you'll need to regen the mocks for that
 interface.
 
+Install using `go get github.com/petergtz/pegomock/pegomock`
+
 If you see errors like:
 ```
 # github.com/runatlantis/atlantis/server/events [github.com/runatlantis/atlantis/server/events.test]
@@ -161,9 +163,9 @@ go get github.com/petergtz/pegomock/...
 # Creating a New Release
 1. Update version number in `main.go`.
 1. Update image tag version in the [kustomize/bundle.yaml](kustomize/bundle.yaml).
-1. Update `CHANGELOG.md` with latest release number and information (this URL might be useful: https://github.com/runatlantis/atlantis/compare/v0.3.5...master)
-1. Create a pull request and merge to master
-1. Check out master and fetch latest
+1. Update `CHANGELOG.md` with latest release number and information (this URL might be useful: https://github.com/runatlantis/atlantis/compare/v0.3.5...main)
+1. Create a pull request and merge to main
+1. Check out main and fetch latest
 1. Run `make release`
     1. If you get `signal: killed` errors, bump up your Docker resources to have more memory, e.g. 6 G.B.
 1. Go to https://github.com/runatlantis/atlantis/releases and click "Draft a new release"
@@ -171,5 +173,5 @@ go get github.com/petergtz/pegomock/...
     1. The title of the release is the same as the tag (ex. v0.2.2)
     1. Fill in description by copying from the CHANGELOG just without the Downloads section
     1. Drag in binaries made with `make release`
-1. Re-run master branch build to ensure tag gets pushed to Github: https://github.com/runatlantis/atlantis/pkgs/container/atlantis
+1. Re-run main branch build to ensure tag gets pushed to Github: https://github.com/runatlantis/atlantis/pkgs/container/atlantis
 1. Update the default version in `Chart.yaml` in [the official Helm chart](https://github.com/runatlantis/helm-charts/blob/main/charts/atlantis/values.yaml).
