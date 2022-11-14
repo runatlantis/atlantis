@@ -890,7 +890,7 @@ func (s *Server) Start() error {
 		s.ProjectCmdOutputHandler.Handle()
 	}()
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
+	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n} // nolint: gosec
 	go func() {
 		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
 
