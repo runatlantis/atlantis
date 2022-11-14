@@ -2,7 +2,6 @@ package events
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -62,14 +61,10 @@ projects:
         - "**/*"
 `
 
-	tmp, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	defer func() {
-		os.RemoveAll(tmp)
-	}()
+	tmp := t.TempDir()
 
 	globalYAMLPath := filepath.Join(tmp, "config.yaml")
-	err = ioutil.WriteFile(globalYAMLPath, []byte(globalYAML), 0600)
+	err := ioutil.WriteFile(globalYAMLPath, []byte(globalYAML), 0600)
 	require.NoError(t, err)
 
 	globalCfgArgs := valid.GlobalCfgArgs{

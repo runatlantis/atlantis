@@ -6,7 +6,7 @@ on:
       - 'docker-base/**'
       - '.github/workflows/atlantis-base.yml'
     branches:
-      - "master"
+      - "main"
   pull_request:
     paths:
       - 'docker-base/**'

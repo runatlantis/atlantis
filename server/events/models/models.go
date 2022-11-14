@@ -411,6 +411,17 @@ type PolicyCheckSuccess struct {
 	HasDiverged bool
 }
 
+// Summary extracts one line summary of policy check.
+func (p *PolicyCheckSuccess) Summary() string {
+	note := ""
+
+	r := regexp.MustCompile(`\d+ tests, \d+ passed, \d+ warnings, \d+ failures, \d+ exceptions`)
+	if match := r.FindString(p.PolicyCheckOutput); match != "" {
+		return note + match
+	}
+	return note
+}
+
 type VersionSuccess struct {
 	VersionOutput string
 }

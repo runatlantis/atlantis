@@ -19,7 +19,7 @@ assignees: ''
 
 ---
 
-- [ ] I'd be willing to implement this feature ([contributing guide](https://github.com/runatlantis/atlantis/blob/master/CONTRIBUTING.md))
+- [ ] I'd be willing to implement this feature ([contributing guide](https://github.com/runatlantis/atlantis/blob/main/CONTRIBUTING.md))
 
 **Describe the user story**
 <!--

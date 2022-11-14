@@ -79,6 +79,22 @@ allowed_regexp_prefixes:
 - staging/
 ```
 
+## Auto generate projects
+
+This is useful if you have many projects in a repository. This assumes the `default` workspace (or no workspace).
+
+Run this in the root of your repository. This will use gnu `grep` to search terraform files for an S3 backend (terraform dir), retrieve the directory path, retrieve the unique entries, and then use `yq` to return the YAML of a simple project dir setup which can then be modified to your liking.
+
+```sh
+grep -P 'backend[\s]+"s3"' **/*.tf |
+  rev | cut -d'/' -f2- | rev |
+  sort |
+  uniq |
+  while read d; do \
+    echo '[ {"dir": "'"$d"'", "autoplan": {"when_modified": ["**/*.tf.*"] }} ]' | yq -PM; \
+  done
+```
+
 ## Use Cases
 ### Disabling Autoplanning
 ```yaml

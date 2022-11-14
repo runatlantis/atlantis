@@ -432,8 +432,7 @@ func TestGetLock(t *testing.T) {
 
 // Test we can create a status and then getCommandLock it.
 func TestPullStatus_UpdateGet(t *testing.T) {
-	b, cleanup := newTestDB2(t)
-	defer cleanup()
+	b := newTestDB2(t)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -483,8 +482,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 // Test we can create a status, delete it, and then we shouldn't be able to getCommandLock
 // it.
 func TestPullStatus_UpdateDeleteGet(t *testing.T) {
-	b, cleanup := newTestDB2(t)
-	defer cleanup()
+	b := newTestDB2(t)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -529,8 +527,7 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 // pull status, and when we getCommandLock all the project statuses, that specific project
 // should be updated.
 func TestPullStatus_UpdateProject(t *testing.T) {
-	b, cleanup := newTestDB2(t)
-	defer cleanup()
+	b := newTestDB2(t)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -593,8 +590,7 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 // Test that if we update an existing pull status and our new status is for a
 // different HeadSHA, that we just overwrite the old status.
 func TestPullStatus_UpdateNewCommit(t *testing.T) {
-	b, cleanup := newTestDB2(t)
-	defer cleanup()
+	b := newTestDB2(t)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -656,8 +652,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 // Test that if we update an existing pull status and our new status is for a
 // the same commit, that we merge the statuses.
 func TestPullStatus_UpdateMerge(t *testing.T) {
-	b, cleanup := newTestDB2(t)
-	defer cleanup()
+	b := newTestDB2(t)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -796,13 +791,11 @@ func newTestDB() (*bolt.DB, *db.BoltDB) {
 	return boltDB, b
 }
 
-func newTestDB2(t *testing.T) (*db.BoltDB, func()) {
-	tmp, cleanup := TempDir(t)
+func newTestDB2(t *testing.T) *db.BoltDB {
+	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	return boltDB, func() {
-		cleanup()
-	}
+	return boltDB
 }
 
 func cleanupDB(db *bolt.DB) {

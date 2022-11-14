@@ -15,7 +15,7 @@ Atlantis could be exploited by
       }
     }
     ```
-* Running malicious custom build commands specified in an `atlantis.yaml` file. Atlantis uses the `atlantis.yaml` file from the pull request branch, **not** `master`.
+* Running malicious custom build commands specified in an `atlantis.yaml` file. Atlantis uses the `atlantis.yaml` file from the pull request branch, **not** `main`.
 * Someone adding `atlantis plan/apply` comments on your valid pull requests causing terraform to run when you don't want it to.
 
 ## Bitbucket Cloud (bitbucket.org)

@@ -6,25 +6,12 @@ import (
 	"testing"
 )
 
-// TempDir creates a temporary directory and returns its path along
-// with a cleanup function to be called via defer, ex:
-//
-//	dir, cleanup := TempDir()
-//	defer cleanup()
-func TempDir(t *testing.T) (string, func()) {
-	tmpDir, err := os.MkdirTemp("", "")
-	Ok(t, err)
-	return tmpDir, func() {
-		os.RemoveAll(tmpDir) // nolint: errcheck
-	}
-}
-
 // DirStructure creates a directory structure in a temporary directory.
 // structure describes the dir structure. If the value is another map, then the
 // key is the name of a directory. If the value is nil, then the key is the name
 // of a file. If val is a string then key is a file name and val is the file's content.
 // It returns the path to the temp directory containing the defined
-// structure and a cleanup function to delete the directory.
+// structure.
 // Example usage:
 //
 //		versionConfig := `
@@ -32,7 +19,7 @@ func TempDir(t *testing.T) (string, func()) {
 //		  required_version = "= 0.12.8"
 //	 }
 //	 `
-//		tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+//		tmpDir := DirStructure(t, map[string]interface{}{
 //			"pulldir": map[string]interface{}{
 //				"project1": map[string]interface{}{
 //					"main.tf": nil,
@@ -42,11 +29,10 @@ func TempDir(t *testing.T) (string, func()) {
 //				},
 //			},
 //		})
-//	 defer cleanup()
-func DirStructure(t *testing.T, structure map[string]interface{}) (string, func()) {
-	tmpDir, cleanup := TempDir(t)
+func DirStructure(t *testing.T, structure map[string]interface{}) string {
+	tmpDir := t.TempDir()
 	dirStructureGo(t, tmpDir, structure)
-	return tmpDir, cleanup
+	return tmpDir
 }
 
 func dirStructureGo(t *testing.T, parentDir string, structure map[string]interface{}) {
