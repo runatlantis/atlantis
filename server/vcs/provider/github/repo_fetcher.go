@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,9 +29,14 @@ type RepoFetcher struct {
 	GithubHostname    string
 	Logger            logging.Logger
 	GithubCredentials tokenGetter
+	GlobalCfg         valid.GlobalCfg
 }
 
-func (g *RepoFetcher) Fetch(ctx context.Context, repo models.Repo, branch string, sha string) (string, func(ctx context.Context, filePath string), error) {
+type RepoFetcherOptions struct {
+	ShallowClone bool
+}
+
+func (g *RepoFetcher) Fetch(ctx context.Context, repo models.Repo, branch string, sha string, options RepoFetcherOptions) (string, func(ctx context.Context, filePath string), error) {
 	home, err := homedir.Dir()
 	if err != nil {
 		return "", nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
@@ -51,10 +57,10 @@ func (g *RepoFetcher) Fetch(ctx context.Context, repo models.Repo, branch string
 	authURL := fmt.Sprintf("://x-access-token:%s", ghToken)
 	repo.CloneURL = strings.Replace(repo.CloneURL, "://:", authURL, 1)
 	repo.SanitizedCloneURL = strings.Replace(repo.SanitizedCloneURL, "://:", "://x-access-token:", 1)
-	return g.clone(ctx, repo, branch, sha)
+	return g.clone(ctx, repo, branch, sha, options)
 }
 
-func (g *RepoFetcher) clone(ctx context.Context, repo models.Repo, branch string, sha string) (string, func(ctx context.Context, filePath string), error) {
+func (g *RepoFetcher) clone(ctx context.Context, repo models.Repo, branch string, sha string, options RepoFetcherOptions) (string, func(ctx context.Context, filePath string), error) {
 	destinationPath := g.generateDirPath(repo.Name)
 	// Create the directory and parents if necessary.
 	if err := os.MkdirAll(destinationPath, 0700); err != nil {
@@ -63,6 +69,9 @@ func (g *RepoFetcher) clone(ctx context.Context, repo models.Repo, branch string
 
 	// Fetch default branch into clone directory
 	cloneCmd := []string{"git", "clone", "--branch", branch, "--single-branch", repo.CloneURL, destinationPath}
+	if options.ShallowClone {
+		cloneCmd = append(cloneCmd, "--depth=1")
+	}
 	_, err := g.run(cloneCmd, destinationPath)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to clone directory")

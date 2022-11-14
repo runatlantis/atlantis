@@ -130,7 +130,7 @@ type mockRepoFetcher struct {
 	cloneError error
 }
 
-func (r *mockRepoFetcher) Fetch(_ context.Context, _ models.Repo, _ string, _ string) (string, func(ctx context.Context, filePath string), error) {
+func (r *mockRepoFetcher) Fetch(_ context.Context, _ models.Repo, _ string, _ string, _ github.RepoFetcherOptions) (string, func(ctx context.Context, filePath string), error) {
 	return "", func(ctx context.Context, filePath string) {}, r.cloneError
 }
 

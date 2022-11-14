@@ -15,7 +15,7 @@ import (
 
 // repoFetcher manages a cloned repo's workspace on disk for running commands.
 type repoFetcher interface {
-	Fetch(ctx context.Context, baseRepo models.Repo, branch string, sha string) (string, func(ctx context.Context, filePath string), error)
+	Fetch(ctx context.Context, baseRepo models.Repo, branch string, sha string, options github.RepoFetcherOptions) (string, func(ctx context.Context, filePath string), error)
 }
 
 // hooksRunner runs preworkflow hooks for a given repository/commit
@@ -67,7 +67,11 @@ func (b *RootConfigBuilder) Build(ctx context.Context, repo models.Repo, branch 
 
 func (b *RootConfigBuilder) build(ctx context.Context, repo models.Repo, branch string, sha string, fileFetcherOptions github.FileFetcherOptions, installationToken int64) ([]*valid.MergedProjectCfg, error) {
 	// Generate a new filepath location and clone repo into it
-	repoDir, cleanup, err := b.RepoFetcher.Fetch(ctx, repo, branch, sha)
+	// TODO: consider supporting shallow cloning for comment based events too
+	repoFetcherOptions := github.RepoFetcherOptions{
+		ShallowClone: fileFetcherOptions.Sha != "",
+	}
+	repoDir, cleanup, err := b.RepoFetcher.Fetch(ctx, repo, branch, sha, repoFetcherOptions)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("creating temporary clone at path: %s", repoDir))
 	}
