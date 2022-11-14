@@ -86,6 +86,8 @@ type ProjectContext struct {
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
 	PolicySets valid.PolicySets
+	// PolicyCheckIncludeTfFiles will include all *.tf files as inputs when running conftest
+	PolicyCheckIncludeTfFiles bool
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
 	// UUID for atlantis logs

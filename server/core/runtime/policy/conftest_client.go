@@ -43,7 +43,7 @@ func NewPolicyArg(parameter string) Arg {
 type ConftestTestCommandArgs struct {
 	PolicyArgs []Arg
 	ExtraArgs  []string
-	InputFile  string
+	InputFiles []string
 	Command    string
 }
 
@@ -60,8 +60,13 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 		commandArgs = append(commandArgs, a.build()...)
 	}
 
+
+	for _, inputFile := range c.InputFiles {
+		commandArgs = append(commandArgs, inputFile)	
+	}
+
 	// add hardcoded options
-	commandArgs = append(commandArgs, c.InputFile, "--no-color")
+	commandArgs = append(commandArgs, "--no-color")
 
 	// add extra args provided through server config
 	commandArgs = append(commandArgs, c.ExtraArgs...)
@@ -179,12 +184,16 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		policySetNames = append(policySetNames, policySet.Name)
 	}
 
-	inputFile := filepath.Join(workdir, ctx.GetShowResultFileName())
+	inputFiles := []string{filepath.Join(workdir, ctx.GetShowResultFileName())}
+
+	if ctx.PolicyCheckIncludeTfFiles {
+		inputFiles = append(inputFiles, filepath.Join(workdir, "*.tf"))
+	}
 
 	args := ConftestTestCommandArgs{
 		PolicyArgs: policyArgs,
 		ExtraArgs:  extraArgs,
-		InputFile:  inputFile,
+		InputFiles: inputFiles,
 		Command:    executablePath,
 	}
 
