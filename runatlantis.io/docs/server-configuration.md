@@ -707,6 +707,8 @@ Values are chosen in this order:
 ### `--strict-plan-file-list`
   ```bash
   atlantis server --strict-plan-file-list
+  # or (recommended)
+  ATLANTIS_STRICT_PLAN_FILE_LIST=true
   ```
   `--strict-plan-file-list` will block plan requests from projects outside the files modified in the pull request.
 
