@@ -65,7 +65,7 @@ func TestEnvStepRunner_Run(t *testing.T) {
 				Pull: models.PullRequest{
 					Num:        2,
 					HeadBranch: "add-feat",
-					BaseBranch: "master",
+					BaseBranch: "main",
 					Author:     "acme",
 				},
 				User: models.User{

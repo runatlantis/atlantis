@@ -6,7 +6,7 @@ on:
       - "testing/**"
       - ".github/workflows/testing-env-image.yml"
     branches:
-      - "master"
+      - "main"
   pull_request:
     paths:
       - 'testing/**'

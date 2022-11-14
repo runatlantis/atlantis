@@ -702,7 +702,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 						w.Write([]byte(commitJSON)) // nolint: errcheck
 					case "/api/graphql":
 						w.Write([]byte(reviewDecision)) // nolint: errcheck
-					case "/api/v3/repos/owner/repo/branches/master/protection":
+					case "/api/v3/repos/owner/repo/branches/main/protection":
 						w.Write([]byte(branchProtectionJSON)) // nolint: errcheck
 					case "/api/v3/repos/owner/repo/commits/new-topic/check-suites":
 						w.Write([]byte(checkSuites)) // nolint: errcheck

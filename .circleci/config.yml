@@ -43,7 +43,7 @@ jobs:
     - run: |
         dockerize -wait tcp://localhost:8080 -- \
           muffet \
-            -e 'https://github\.com/runatlantis/atlantis/edit/master/.*' \
+            -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \

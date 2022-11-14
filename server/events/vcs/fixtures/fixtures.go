@@ -113,7 +113,7 @@ var ADPullCompleted = azuredevops.GitPullRequest{
 }
 
 var ADRepo = azuredevops.GitRepository{
-	DefaultBranch: azuredevops.String("refs/heads/master"),
+	DefaultBranch: azuredevops.String("refs/heads/main"),
 	Name:          azuredevops.String("repo"),
 	ParentRepository: &azuredevops.GitRepositoryRef{
 		Name: azuredevops.String("owner"),
@@ -279,7 +279,7 @@ var ADSelfPullCompleted = azuredevops.GitPullRequest{
 }
 
 var ADSelfRepo = azuredevops.GitRepository{
-	DefaultBranch: azuredevops.String("refs/heads/master"),
+	DefaultBranch: azuredevops.String("refs/heads/main"),
 	Name:          azuredevops.String("repo"),
 	ParentRepository: &azuredevops.GitRepositoryRef{
 		Name: azuredevops.String("owner"),
@@ -582,7 +582,7 @@ var githubAppTokenJSON = `{
 			"stargazers_count":  80,
 			"watchers_count":    80,
 			"size":              108,
-			"default_branch":    "master",
+			"default_branch":    "main",
 			"open_issues_count": 0,
 			"is_template":       true,
 			"topics": [

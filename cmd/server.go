@@ -204,7 +204,7 @@ var stringFlags = map[string]stringFlag{
 	CheckoutStrategyFlag: {
 		description: "How to check out pull requests. Accepts either 'branch' (default) or 'merge'." +
 			" If set to branch, Atlantis will check out the source branch of the pull request." +
-			" If set to merge, Atlantis will check out the destination branch of the pull request (ex. master)" +
+			" If set to merge, Atlantis will check out the destination branch of the pull request (ex. main, master)" +
 			" and then locally perform a git merge of the source branch." +
 			" This effectively means Atlantis operates on the repo as it will look" +
 			" after the pull request is merged.",
