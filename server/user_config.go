@@ -53,6 +53,7 @@ type UserConfig struct {
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
 	LockingDBType                   string `mapstructure:"locking-db-type"`
 	LogLevel                        string `mapstructure:"log-level"`
+	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
@@ -107,6 +108,7 @@ type UserConfig struct {
 	WebUsername            string          `mapstructure:"web-username"`
 	WebPassword            string          `mapstructure:"web-password"`
 	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
+	WebsocketCheckOrigin   bool            `mapstructure:"websocket-check-origin"`
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed

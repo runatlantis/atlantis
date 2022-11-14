@@ -16,6 +16,7 @@ package events_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -56,7 +57,7 @@ func TestRenderErr(t *testing.T) {
 		},
 	}
 
-	r := events.MarkdownRenderer{}
+	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
 	for _, c := range cases {
 		res := command.Result{
 			Error: c.Error,
@@ -101,7 +102,7 @@ func TestRenderFailure(t *testing.T) {
 		},
 	}
 
-	r := events.MarkdownRenderer{}
+	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
 	for _, c := range cases {
 		res := command.Result{
 			Failure: c.Failure,
@@ -120,7 +121,7 @@ func TestRenderFailure(t *testing.T) {
 }
 
 func TestRenderErrAndFailure(t *testing.T) {
-	r := events.MarkdownRenderer{}
+	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
 	res := command.Result{
 		Error:   errors.New("error"),
 		Failure: "failure",
@@ -750,7 +751,7 @@ $$$
 		},
 	}
 
-	r := events.MarkdownRenderer{}
+	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -901,9 +902,15 @@ $$$
 `,
 		},
 	}
-	r := events.MarkdownRenderer{
-		DisableApplyAll: true,
-	}
+	r := events.GetMarkdownRenderer(
+		false, // GitlabSupportsCommonMark
+		true,  // DisableApplyAll
+		false, // DisableApply
+		false, // DisableMarkdownFolding
+		false, // DisableRepoLocking
+		false, // EnableDiffMarkdownFormat
+		"",    // MarkdownTemplateOverridesDir
+	)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -1046,10 +1053,16 @@ $$$
 `,
 		},
 	}
-	r := events.MarkdownRenderer{
-		DisableApplyAll: true,
-		DisableApply:    true,
-	}
+
+	r := events.GetMarkdownRenderer(
+		false, // GitlabSupportsCommonMark
+		true,  // DisableApplyAll
+		true,  // DisableApply
+		false, // DisableMarkdownFolding
+		false, // DisableRepoLocking
+		false, // EnableDiffMarkdownFormat
+		"",    // MarkdownTemplateOverridesDir
+	)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -1070,11 +1083,54 @@ $$$
 	}
 }
 
+// Run policy check with a custom template to validate custom template rendering.
+func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := fmt.Sprintf("%s/templates.tmpl", tmpDir)
+	_, err := os.Create(filePath)
+	Ok(t, err)
+	err = os.WriteFile(filePath, []byte("{{ define \"policyCheckSuccessUnwrapped\" -}}somecustometext{{- end}}\n"), 0600)
+	Ok(t, err)
+	r := events.GetMarkdownRenderer(
+		false,  // GitlabSupportsCommonMark
+		true,   // DisableApplyAll
+		true,   // DisableApply
+		false,  // DisableMarkdownFolding
+		false,  // DisableRepoLocking
+		false,  // EnableDiffMarkdownFormat
+		tmpDir, // MarkdownTemplateOverridesDir
+	)
+
+	rendered := r.Render(command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+				PolicyCheckSuccess: &models.PolicyCheckSuccess{
+					PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+					LockURL:           "lock-url",
+					ApplyCmd:          "atlantis apply -d path -w workspace",
+					RePlanCmd:         "atlantis plan -d path -w workspace",
+				},
+			},
+		},
+	}, command.PolicyCheck, "log", false, models.Github)
+	fmt.Println(rendered)
+	Equals(t, rendered, "Ran Policy Check for dir: `path` workspace: `workspace`\n\nsomecustometext\n\n\n")
+
+}
+
 // Test that if folding is disabled that it's not used.
 func TestRenderProjectResults_DisableFolding(t *testing.T) {
-	mr := events.MarkdownRenderer{
-		DisableMarkdownFolding: true,
-	}
+	mr := events.GetMarkdownRenderer(
+		false, // GitlabSupportsCommonMark
+		false, // DisableApplyAll
+		false, // DisableApply
+		true,  // DisableMarkdownFolding
+		false, // DisableRepoLocking
+		false, // EnableDiffMarkdownFormat
+		"",    // MarkdownTemplateOverridesDir
+	)
 
 	rendered := mr.Render(command.Result{
 		ProjectResults: []command.ProjectResult{
@@ -1156,9 +1212,15 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("%s_%v", c.VCSHost.String(), c.ShouldWrap),
 			func(t *testing.T) {
-				mr := events.MarkdownRenderer{
-					GitlabSupportsCommonMark: c.GitlabCommonMarkSupport,
-				}
+				mr := events.GetMarkdownRenderer(
+					c.GitlabCommonMarkSupport, // GitlabSupportsCommonMark
+					false,                     // DisableApplyAll
+					false,                     // DisableApply
+					false,                     // DisableMarkdownFolding
+					false,                     // DisableRepoLocking
+					false,                     // EnableDiffMarkdownFormat
+					"",                        // MarkdownTemplateOverridesDir
+				)
 
 				rendered := mr.Render(command.Result{
 					ProjectResults: []command.ProjectResult{
@@ -1268,9 +1330,15 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 		for _, cmd := range []command.Name{command.Plan, command.Apply} {
 			t.Run(fmt.Sprintf("%s_%s_%v", c.VCSHost.String(), cmd.String(), c.ShouldWrap),
 				func(t *testing.T) {
-					mr := events.MarkdownRenderer{
-						GitlabSupportsCommonMark: c.GitlabCommonMarkSupport,
-					}
+					mr := events.GetMarkdownRenderer(
+						c.GitlabCommonMarkSupport, // GitlabSupportsCommonMark
+						false,                     // DisableApplyAll
+						false,                     // DisableApply
+						false,                     // DisableMarkdownFolding
+						false,                     // DisableRepoLocking
+						false,                     // EnableDiffMarkdownFormat
+						"",                        // MarkdownTemplateOverridesDir
+					)
 					var pr command.ProjectResult
 					switch cmd {
 					case command.Plan:
@@ -1373,7 +1441,15 @@ $$$
 }
 
 func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
-	mr := events.MarkdownRenderer{}
+	mr := events.GetMarkdownRenderer(
+		false, // GitlabSupportsCommonMark
+		false, // DisableApplyAll
+		false, // DisableApply
+		false, // DisableMarkdownFolding
+		false, // DisableRepoLocking
+		false, // EnableDiffMarkdownFormat
+		"",    // MarkdownTemplateOverridesDir
+	)
 	tfOut := strings.Repeat("line\n", 13)
 	rendered := mr.Render(command.Result{
 		ProjectResults: []command.ProjectResult{
@@ -1419,7 +1495,15 @@ $$$
 }
 
 func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
-	mr := events.MarkdownRenderer{}
+	mr := events.GetMarkdownRenderer(
+		false, // GitlabSupportsCommonMark
+		false, // DisableApplyAll
+		false, // DisableApply
+		false, // DisableMarkdownFolding
+		false, // DisableRepoLocking
+		false, // EnableDiffMarkdownFormat
+		"",    // MarkdownTemplateOverridesDir
+	)
 	tfOut := strings.Repeat("line\n", 13) + "Plan: 1 to add, 0 to change, 0 to destroy."
 	rendered := mr.Render(command.Result{
 		ProjectResults: []command.ProjectResult{
@@ -1592,7 +1676,15 @@ This plan was not saved because one or more projects failed and automerge requir
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			mr := events.MarkdownRenderer{}
+			mr := events.GetMarkdownRenderer(
+				false, // GitlabSupportsCommonMark
+				false, // DisableApplyAll
+				false, // DisableApply
+				false, // DisableMarkdownFolding
+				false, // DisableRepoLocking
+				false, // EnableDiffMarkdownFormat
+				"",    // MarkdownTemplateOverridesDir
+			)
 			rendered := mr.Render(c.cr, command.Plan, "log", false, models.Github)
 			expWithBackticks := strings.Replace(c.exp, "$", "`", -1)
 			Equals(t, expWithBackticks, rendered)
@@ -2052,7 +2144,15 @@ $$$
 		},
 	}
 
-	r := events.MarkdownRenderer{}
+	r := events.GetMarkdownRenderer(
+		false, // GitlabSupportsCommonMark
+		false, // DisableApplyAll
+		false, // DisableApply
+		false, // DisableMarkdownFolding
+		false, // DisableRepoLocking
+		false, // EnableDiffMarkdownFormat
+		"",    // MarkdownTemplateOverridesDir
+	)
 	r.DisableRepoLocking = true
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -2481,11 +2581,16 @@ Plan: 1 to add, 2 to change, 1 to destroy.
 `,
 		},
 	}
-	r := events.MarkdownRenderer{
-		DisableApplyAll:          true,
-		DisableApply:             true,
-		EnableDiffMarkdownFormat: true,
-	}
+	r := events.GetMarkdownRenderer(
+		false, // GitlabSupportsCommonMark
+		true,  // DisableApplyAll
+		true,  // DisableApply
+		false, // DisableMarkdownFolding
+		false, // DisableRepoLocking
+		true,  // EnableDiffMarkdownFormat
+		"",    // MarkdownTemplateOverridesDir
+	)
+
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{

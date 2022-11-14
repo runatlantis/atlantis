@@ -395,8 +395,7 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
-			defer cleanup()
+			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
 
 			// Setup test dependencies.
@@ -545,8 +544,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
-			defer cleanup()
+			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 
 			oldLockFilePath, err := filepath.Abs(filepath.Join("testfixtures", "null_provider_lockfile_old_version"))
 			Ok(t, err)
@@ -790,8 +788,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
-			defer cleanup()
+			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
 
 			// Setup test dependencies.
@@ -867,8 +864,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
-	dataDir, binDir, cacheDir, cleanup := mkSubDirs(t)
-	defer cleanup()
+	dataDir, binDir, cacheDir := mkSubDirs(t)
 
 	//env vars
 
@@ -1038,7 +1034,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	pullUpdater := &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            e2eVCSClient,
-		MarkdownRenderer:     &events.MarkdownRenderer{},
+		MarkdownRenderer:     events.GetMarkdownRenderer(false, false, false, false, false, false, ""),
 	}
 
 	autoMerger := &events.AutoMerger{
@@ -1261,11 +1257,11 @@ func absRepoPath(t *testing.T, repoDir string) string {
 // The purpose of this function is to create a real git repository with a branch
 // called 'branch' from the files under repoDir. This is so we can check in
 // those files normally to this repo without needing a .git directory.
-func initializeRepo(t *testing.T, repoDir string) (string, string, func()) {
+func initializeRepo(t *testing.T, repoDir string) (string, string) {
 	originRepo := absRepoPath(t, repoDir)
 
 	// Copy the files to the temp dir.
-	destDir, cleanup := TempDir(t)
+	destDir := t.TempDir()
 	runCmd(t, "", "cp", "-r", fmt.Sprintf("%s/.", originRepo), destDir)
 
 	// Initialize the git repo.
@@ -1281,7 +1277,7 @@ func initializeRepo(t *testing.T, repoDir string) (string, string, func()) {
 	headSHA := runCmd(t, destDir, "git", "rev-parse", "HEAD")
 	headSHA = strings.Trim(headSHA, "\n")
 
-	return destDir, headSHA, cleanup
+	return destDir, headSHA
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {
@@ -1350,8 +1346,8 @@ func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir 
 }
 
 // returns parent, bindir, cachedir, cleanup func
-func mkSubDirs(t *testing.T) (string, string, string, func()) {
-	tmp, cleanup := TempDir(t)
+func mkSubDirs(t *testing.T) (string, string, string) {
+	tmp := t.TempDir()
 	binDir := filepath.Join(tmp, "bin")
 	err := os.MkdirAll(binDir, 0700)
 	Ok(t, err)
@@ -1360,7 +1356,7 @@ func mkSubDirs(t *testing.T) (string, string, string, func()) {
 	err = os.MkdirAll(cachedir, 0700)
 	Ok(t, err)
 
-	return tmp, binDir, cachedir, cleanup
+	return tmp, binDir, cachedir
 }
 
 // Will fail test if conftest isn't in path and isn't version >= 0.25.0

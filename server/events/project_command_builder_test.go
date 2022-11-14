@@ -126,10 +126,9 @@ projects:
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
-			tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+			tmpDir := DirStructure(t, map[string]interface{}{
 				"main.tf": nil,
 			})
-			defer cleanup()
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
@@ -394,10 +393,9 @@ projects:
 		for _, cmdName := range []command.Name{command.Plan, command.Apply} {
 			t.Run(c.Description+"_"+cmdName.String(), func(t *testing.T) {
 				RegisterMockTestingT(t)
-				tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+				tmpDir := DirStructure(t, map[string]interface{}{
 					"main.tf": nil,
 				})
-				defer cleanup()
 
 				workingDir := mocks.NewMockWorkingDir()
 				When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
@@ -552,8 +550,7 @@ projects:
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
-			tmpDir, cleanup := DirStructure(t, c.DirStructure)
-			defer cleanup()
+			tmpDir := DirStructure(t, c.DirStructure)
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
@@ -620,7 +617,7 @@ projects:
 // In this case we should apply all outstanding plans.
 func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	RegisterMockTestingT(t)
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]interface{}{
 		"workspace1": map[string]interface{}{
 			"project1": map[string]interface{}{
 				"main.tf":          nil,
@@ -642,7 +639,6 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 			},
 		},
 	})
-	defer cleanup()
 	// Initialize git repos in each workspace so that the .tfplan files get
 	// picked up.
 	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
@@ -713,12 +709,11 @@ func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
 	RegisterMockTestingT(t)
 	workingDir := mocks.NewMockWorkingDir()
 
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]interface{}{
 		"pulldir": map[string]interface{}{
 			"notconfigured": map[string]interface{}{},
 		},
 	})
-	defer cleanup()
 	repoDir := filepath.Join(tmpDir, "pulldir/notconfigured")
 
 	yamlCfg := `version: 3
@@ -812,10 +807,9 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 	for _, c := range cases {
 		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
 			RegisterMockTestingT(t)
-			tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+			tmpDir := DirStructure(t, map[string]interface{}{
 				"main.tf": nil,
 			})
-			defer cleanup()
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
@@ -989,9 +983,8 @@ projects:
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
 
-			tmpDir, cleanup := DirStructure(t, testCase.DirStructure)
+			tmpDir := DirStructure(t, testCase.DirStructure)
 
-			defer cleanup()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(testCase.ModifiedFiles, nil)
 
@@ -1119,10 +1112,9 @@ projects:
 
 func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanCommand(t *testing.T) {
 	RegisterMockTestingT(t)
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]interface{}{
 		"main.tf": nil,
 	})
-	defer cleanup()
 
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
@@ -1180,7 +1172,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 // Test building version command for multiple projects
 func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	RegisterMockTestingT(t)
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]interface{}{
 		"workspace1": map[string]interface{}{
 			"project1": map[string]interface{}{
 				"main.tf":          nil,
@@ -1202,7 +1194,6 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 			},
 		},
 	})
-	defer cleanup()
 	// Initialize git repos in each workspace so that the .tfplan files get
 	// picked up.
 	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")

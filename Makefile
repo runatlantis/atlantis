@@ -55,7 +55,7 @@ dist: ## Package up everything in static/ using go-bindata-assetfs so it can be 
 	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -o bindata_assetfs.go -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static
 
 release: ## Create packages for a release
-	docker run -v $$(pwd):/go/src/github.com/runatlantis/atlantis circleci/golang:1.17 sh -c 'cd /go/src/github.com/runatlantis/atlantis && scripts/binary-release.sh'
+	docker run -v $$(pwd):/go/src/github.com/runatlantis/atlantis cimg/go:1.19 sh -c 'cd /go/src/github.com/runatlantis/atlantis && scripts/binary-release.sh'
 
 fmt: ## Run goimports (which also formats)
 	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
@@ -64,7 +64,7 @@ lint: ## Run linter locally
 	golangci-lint run
 
 check-lint: ## Run linter in CI/CD. If running locally use 'lint'
-	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin v1.39.0
+	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin v1.49.0
 	./bin/golangci-lint run -j 4 --timeout 5m
 
 check-fmt: ## Fail if not formatted

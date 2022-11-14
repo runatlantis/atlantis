@@ -580,7 +580,7 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp, cleanup := DirStructure(t, map[string]interface{}{
+			tmp := DirStructure(t, map[string]interface{}{
 				"project1": map[string]interface{}{
 					"main.tf": nil,
 				},
@@ -590,7 +590,6 @@ projects:
 					},
 				},
 			})
-			defer cleanup()
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
@@ -786,7 +785,7 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp, cleanup := DirStructure(t, map[string]interface{}{
+			tmp := DirStructure(t, map[string]interface{}{
 				"project1": map[string]interface{}{
 					"main.tf": nil,
 				},
@@ -796,7 +795,6 @@ projects:
 					},
 				},
 			})
-			defer cleanup()
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(logging_matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
@@ -1012,7 +1010,7 @@ workflows:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp, cleanup := DirStructure(t, map[string]interface{}{
+			tmp := DirStructure(t, map[string]interface{}{
 				"project1": map[string]interface{}{
 					"main.tf": nil,
 				},
@@ -1022,7 +1020,6 @@ workflows:
 					},
 				},
 			})
-			defer cleanup()
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)

@@ -397,14 +397,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil && flag.Lookup("test.v") == nil {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
-	markdownRenderer := &events.MarkdownRenderer{
-		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
-		DisableApplyAll:          userConfig.DisableApplyAll,
-		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
-		DisableApply:             userConfig.DisableApply,
-		DisableRepoLocking:       userConfig.DisableRepoLocking,
-		EnableDiffMarkdownFormat: userConfig.EnableDiffMarkdownFormat,
-	}
+	markdownRenderer := events.GetMarkdownRenderer(
+		gitlabClient.SupportsCommonMark(),
+		userConfig.DisableApplyAll,
+		userConfig.DisableMarkdownFolding,
+		userConfig.DisableApply,
+		userConfig.DisableRepoLocking,
+		userConfig.EnableDiffMarkdownFormat,
+		userConfig.MarkdownTemplateOverridesDir,
+	)
 
 	var lockingClient locking.Locker
 	var applyLockingClient locking.ApplyLocker
@@ -756,6 +757,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		logger,
 		controllers.JobIDKeyGenerator{},
 		projectCmdOutputHandler,
+		userConfig.WebsocketCheckOrigin,
 	)
 
 	jobsController := &controllers.JobsController{
@@ -897,7 +899,7 @@ func (s *Server) Start() error {
 		s.ProjectCmdOutputHandler.Handle()
 	}()
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
+	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n} // nolint: gosec
 	go func() {
 		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
 

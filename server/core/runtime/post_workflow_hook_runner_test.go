@@ -69,11 +69,10 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			ThenReturn(nil)
 
 		logger := logging.NewNoopLogger(t)
+		tmpDir := t.TempDir()
 
 		r := runtime.DefaultPostWorkflowHookRunner{}
 		t.Run(c.Command, func(t *testing.T) {
-			tmpDir, cleanup := TempDir(t)
-			defer cleanup()
 			ctx := models.WorkflowHookCommandContext{
 				BaseRepo: models.Repo{
 					Name:  "basename",
