@@ -14,7 +14,11 @@
 package event_test
 
 import (
+	"context"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -22,7 +26,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestDefaultProjectFinder_DetermineRoots(t *testing.T) {
+func TestDefaultProjectFinder_FindRoots(t *testing.T) {
 	// Create dir structure:
 	// main.tf
 	// project1/
@@ -57,6 +61,7 @@ func TestDefaultProjectFinder_DetermineRoots(t *testing.T) {
 		config       valid.RepoCfg
 		modified     []string
 		expProjPaths []string
+		skipMkDir    bool
 	}{
 		{
 			// When autoplan is disabled, we still return the modified project.
@@ -219,12 +224,37 @@ func TestDefaultProjectFinder_DetermineRoots(t *testing.T) {
 			modified:     []string{"project1/subdir1/main.tf", "project1/subdir2/main.tf"},
 			expProjPaths: nil,
 		},
+		{
+			description: "skip temp dir",
+			config: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir: "project2",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"*.tf*"},
+						},
+					},
+				},
+			},
+			modified:     []string{"project2/terraform.tfvars"},
+			expProjPaths: nil,
+			skipMkDir:    true,
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			rf := event.RepoRootFinder{}
-			projects, err := rf.FindRoots(c.modified, c.config)
+			rf := event.RepoRootFinder{
+				Logger: logging.NewNoopCtxLogger(t),
+			}
+			tempDir := t.TempDir()
+			if !c.skipMkDir {
+				for _, proj := range c.config.Projects {
+					assert.NoError(t, os.MkdirAll(filepath.Join(tempDir, proj.Dir), 0700))
+				}
+			}
+			projects, err := rf.FindRoots(context.Background(), c.config, tempDir, c.modified)
 			assert.NoError(t, err)
 			assert.Equal(t, len(c.expProjPaths), len(projects))
 			for i, proj := range projects {

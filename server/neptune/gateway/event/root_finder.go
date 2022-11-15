@@ -14,6 +14,9 @@
 package event
 
 import (
+	"context"
+	"github.com/runatlantis/atlantis/server/logging"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -24,12 +27,26 @@ import (
 )
 
 // RepoRootFinder implements rootFinder.
-type RepoRootFinder struct{}
+type RepoRootFinder struct {
+	Logger logging.Logger
+}
 
-func (f *RepoRootFinder) FindRoots(modifiedFiles []string, config valid.RepoCfg) ([]valid.Project, error) {
+func (f *RepoRootFinder) FindRoots(ctx context.Context, config valid.RepoCfg, absRepoDir string, modifiedFiles []string) ([]valid.Project, error) {
 	// TODO: rename struct roots
 	var roots []valid.Project
 	for _, root := range config.Projects {
+
+		// Check if root's directory exists
+		rootAbsDirectory := filepath.Join(absRepoDir, root.Dir)
+		_, err := os.Stat(rootAbsDirectory)
+		if err != nil {
+			f.Logger.WarnContext(ctx, "unable to find directory for root", map[string]interface{}{
+				"err": err,
+				"dir": rootAbsDirectory,
+			})
+			continue
+		}
+
 		var whenModifiedRelToRepoRoot []string
 		for _, wm := range root.Autoplan.WhenModified {
 			wm = strings.TrimSpace(wm)

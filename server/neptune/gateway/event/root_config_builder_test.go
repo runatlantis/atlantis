@@ -185,7 +185,7 @@ type mockRootFinder struct {
 	error          error
 }
 
-func (m *mockRootFinder) FindRoots(_ []string, _ valid.RepoCfg) ([]valid.Project, error) {
+func (m *mockRootFinder) FindRoots(_ context.Context, _ valid.RepoCfg, _ string, _ []string) ([]valid.Project, error) {
 	return m.ConfigProjects, m.error
 }
 

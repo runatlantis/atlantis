@@ -32,7 +32,7 @@ type fileFetcher interface {
 type rootFinder interface {
 	// FindRoots returns the list of roots that were modified
 	// based on modifiedFiles and the repo's config.
-	FindRoots(modifiedFiles []string, config valid.RepoCfg) ([]valid.Project, error)
+	FindRoots(ctx context.Context, config valid.RepoCfg, absRepoDir string, modifiedFiles []string) ([]valid.Project, error)
 }
 
 // parserValidator config builds repo specific configurations
@@ -97,7 +97,7 @@ func (b *RootConfigBuilder) build(ctx context.Context, repo models.Repo, branch 
 	if err != nil {
 		return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 	}
-	matchingRoots, err := b.RootFinder.FindRoots(modifiedFiles, repoCfg)
+	matchingRoots, err := b.RootFinder.FindRoots(ctx, repoCfg, repoDir, modifiedFiles)
 	if err != nil {
 		return nil, errors.Wrap(err, "determining roots")
 	}
