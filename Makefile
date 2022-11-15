@@ -4,8 +4,6 @@ PKG := $(shell go list ./... | grep -v e2e | grep -v static | grep -v mocks | gr
 PKG_COMMAS := $(shell go list ./... | grep -v e2e | grep -v static | grep -v mocks | grep -v testing | tr '\n' ',')
 IMAGE_NAME := runatlantis/atlantis
 
-.PHONY: test
-
 .DEFAULT_GOAL := help
 help: ## List targets & descriptions
 	@cat Makefile* | grep -E '^[a-zA-Z_-]+:.*?## .*$$' | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -32,11 +30,20 @@ regen-mocks: ## Delete all mocks and matchers and then run go generate to regen 
 	@# been made empty, causing go generate to fail.
 	./scripts/go-generate.sh
 
+.PHONY: test
 test: ## Run tests
 	@go test -short $(PKG)
 
+.PHONY: docker/test
+docker/test: ## Run tests in docker
+	docker run -it -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:2022.11.13 sh -c "cd /atlantis && make test"
+
 test-all: ## Run tests including integration
 	@go test  $(PKG)
+
+.PHONY: docker/test-all
+docker/test-all: ## Run tests in docker
+	docker run -it -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:2022.11.13 sh -c "cd /atlantis && make test-all"
 
 test-coverage:
 	@mkdir -p .cover

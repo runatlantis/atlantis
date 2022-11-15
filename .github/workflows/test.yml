@@ -15,7 +15,7 @@ jobs:
   test:
     name: runner / gotest
     runs-on: ubuntu-22.04
-    container: ghcr.io/runatlantis/testing-env:2021.08.31
+    container: ghcr.io/runatlantis/testing-env:2021.11.13
     steps:
       # user in image needs write access to do anything
       - name: setup
