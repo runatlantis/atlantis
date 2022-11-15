@@ -51,8 +51,13 @@ type RootConfigBuilder struct {
 	Scope           tally.Scope
 }
 
-func (b *RootConfigBuilder) Build(ctx context.Context, repo models.Repo, branch string, sha string, fileFetcherOptions github.FileFetcherOptions, installationToken int64) ([]*valid.MergedProjectCfg, error) {
-	mergedRootCfgs, err := b.build(ctx, repo, branch, sha, fileFetcherOptions, installationToken)
+type BuilderOptions struct {
+	RepoFetcherOptions github.RepoFetcherOptions
+	FileFetcherOptions github.FileFetcherOptions
+}
+
+func (b *RootConfigBuilder) Build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64, builderOptions BuilderOptions) ([]*valid.MergedProjectCfg, error) {
+	mergedRootCfgs, err := b.build(ctx, repo, branch, sha, installationToken, builderOptions)
 	if err != nil {
 		b.Scope.Counter(metrics.FilterErrorMetric).Inc(1)
 		return nil, err
@@ -65,13 +70,9 @@ func (b *RootConfigBuilder) Build(ctx context.Context, repo models.Repo, branch 
 	return mergedRootCfgs, nil
 }
 
-func (b *RootConfigBuilder) build(ctx context.Context, repo models.Repo, branch string, sha string, fileFetcherOptions github.FileFetcherOptions, installationToken int64) ([]*valid.MergedProjectCfg, error) {
+func (b *RootConfigBuilder) build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64, builderOptions BuilderOptions) ([]*valid.MergedProjectCfg, error) {
 	// Generate a new filepath location and clone repo into it
-	// TODO: consider supporting shallow cloning for comment based events too
-	repoFetcherOptions := github.RepoFetcherOptions{
-		ShallowClone: fileFetcherOptions.Sha != "",
-	}
-	repoDir, cleanup, err := b.RepoFetcher.Fetch(ctx, repo, branch, sha, repoFetcherOptions)
+	repoDir, cleanup, err := b.RepoFetcher.Fetch(ctx, repo, branch, sha, builderOptions.RepoFetcherOptions)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("creating temporary clone at path: %s", repoDir))
 	}
@@ -84,7 +85,7 @@ func (b *RootConfigBuilder) build(ctx context.Context, repo models.Repo, branch 
 	}
 
 	// Fetch files modified in commit
-	modifiedFiles, err := b.FileFetcher.GetModifiedFiles(ctx, repo, installationToken, fileFetcherOptions)
+	modifiedFiles, err := b.FileFetcher.GetModifiedFiles(ctx, repo, installationToken, builderOptions.FileFetcherOptions)
 	if err != nil {
 		return nil, errors.Wrapf(err, "finding modified files: %s", modifiedFiles)
 	}

@@ -42,7 +42,7 @@ type deploySignaler interface {
 }
 
 type rootConfigBuilder interface {
-	Build(ctx context.Context, repo models.Repo, branch string, sha string, fileFetcherOptions github.FileFetcherOptions, installationToken int64) ([]*valid.MergedProjectCfg, error)
+	Build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64, builderOptions BuilderOptions) ([]*valid.MergedProjectCfg, error)
 }
 
 type PushHandler struct {
@@ -84,10 +84,15 @@ func (p *PushHandler) Handle(ctx context.Context, event Push) error {
 }
 
 func (p *PushHandler) handle(ctx context.Context, event Push) error {
-	fileFetcherOptions := github.FileFetcherOptions{
-		Sha: event.Sha,
+	builderOptions := BuilderOptions{
+		RepoFetcherOptions: github.RepoFetcherOptions{
+			ShallowClone: true,
+		},
+		FileFetcherOptions: github.FileFetcherOptions{
+			Sha: event.Sha,
+		},
 	}
-	rootCfgs, err := p.RootConfigBuilder.Build(ctx, event.Repo, event.Ref.Name, event.Sha, fileFetcherOptions, event.InstallationToken)
+	rootCfgs, err := p.RootConfigBuilder.Build(ctx, event.Repo, event.Ref.Name, event.Sha, event.InstallationToken, builderOptions)
 	if err != nil {
 		return errors.Wrap(err, "generating roots")
 	}
