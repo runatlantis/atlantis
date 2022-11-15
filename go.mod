@@ -128,7 +128,7 @@ require (
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/yuin/gopher-lua v0.0.0-20220504180219-658193537a64 // indirect
-	github.com/zclconf/go-cty v1.12.1 // indirect
+	github.com/zclconf/go-cty v1.11.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/crypto v0.2.0 // indirect
