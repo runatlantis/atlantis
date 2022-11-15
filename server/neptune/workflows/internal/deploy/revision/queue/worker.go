@@ -155,8 +155,6 @@ func (w *Worker) Work(ctx workflow.Context) {
 	for {
 		if w.Queue.IsEmpty() {
 			w.state = WaitingWorkerState
-		} else {
-			w.state = WorkingWorkerState
 		}
 
 		selector.Select(ctx)
@@ -224,6 +222,7 @@ func (w *Worker) awaitWork(ctx workflow.Context) workflow.Future {
 }
 
 func (w *Worker) deploy(ctx workflow.Context, latestDeployment *deployment.Info) (*deployment.Info, error) {
+	w.state = WorkingWorkerState
 	msg, err := w.Queue.Pop()
 	if err != nil {
 		return nil, errors.Wrap(err, "popping off queue")

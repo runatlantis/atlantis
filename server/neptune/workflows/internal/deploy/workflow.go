@@ -40,6 +40,10 @@ const (
 	OnReceive
 )
 
+type container interface {
+	IsEmpty() bool
+}
+
 type SignalReceiver interface {
 	Receive(c workflow.ReceiveChannel, more bool)
 }
@@ -67,6 +71,8 @@ func Workflow(ctx workflow.Context, request Request, tfWorkflow terraform.Workfl
 }
 
 type Runner struct {
+	Timeout                  time.Duration
+	Queue                    container
 	QueueWorker              QueueWorker
 	RevisionReceiver         SignalReceiver
 	NewRevisionSignalChannel workflow.ReceiveChannel
@@ -100,6 +106,8 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, a, sideeffect.GenerateUUID, worker)
 
 	return &Runner{
+		Queue:                    revisionQueue,
+		Timeout:                  RevisionReceiveTimeout,
 		QueueWorker:              worker,
 		RevisionReceiver:         revisionReceiver,
 		NewRevisionSignalChannel: workflow.GetSignalChannel(ctx, NewRevisionSignalID),
@@ -144,7 +152,7 @@ func (r *Runner) Run(ctx workflow.Context) error {
 		action = OnReceive
 
 	})
-	cancelTimer, _ := s.AddTimeout(ctx, RevisionReceiveTimeout, onTimeout)
+	cancelTimer, _ := s.AddTimeout(ctx, r.Timeout, onTimeout)
 
 	// main loop which handles external signals
 	// and in turn signals the queue worker
@@ -157,15 +165,17 @@ func (r *Runner) Run(ctx workflow.Context) error {
 			continue
 		case OnReceive:
 			cancelTimer()
-			cancelTimer, _ = s.AddTimeout(ctx, RevisionReceiveTimeout, onTimeout)
+			cancelTimer, _ = s.AddTimeout(ctx, r.Timeout, onTimeout)
 			continue
 		}
 
 		logger.Info(ctx, "revision receiver timeout")
 
-		// check state here since if we timed out, we're probably not susceptible to the queue
-		// worker being in a waiting state right before it's about to start working on an item.
-		if !s.HasPending() && r.QueueWorker.GetState() != queue.WorkingWorkerState {
+		// Since we timed out, let's determine whether we can shutdown our worker.
+		// If we have no incoming revisions and the worker is just waiting, thats the first sign.
+		// We also need to ensure that we're also checking whether the queue is empty since the worker can be in a waiting state
+		// if the queue is locked (ie. if the workflow has just started up with prior deploy state)
+		if !s.HasPending() && r.QueueWorker.GetState() != queue.WorkingWorkerState && r.Queue.IsEmpty() {
 			logger.Info(ctx, "initiating worker shutdown")
 			shutdownWorker()
 			break
@@ -173,7 +183,7 @@ func (r *Runner) Run(ctx workflow.Context) error {
 
 		// basically keep on adding timeouts until we can either break this loop or get another signal
 		// we need to use the timeoutCtx to ensure that this gets cancelled when when the receive is ready
-		cancelTimer, _ = s.AddTimeout(ctx, RevisionReceiveTimeout, onTimeout)
+		cancelTimer, _ = s.AddTimeout(ctx, r.Timeout, onTimeout)
 	}
 	// wait on cancellation so we can gracefully terminate, unsure if temporal handles this for us,
 	// but just being safe.
