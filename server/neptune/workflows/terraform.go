@@ -2,20 +2,21 @@ package workflows
 
 import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/gate"
 	"go.temporal.io/sdk/workflow"
 )
 
 // Export anything that callers need such as requests, signals, etc.
 type TerraformRequest = terraform.Request
 
-type TerraformPlanReviewSignalRequest = terraform.PlanReviewSignalRequest
+type TerraformPlanReviewSignalRequest = gate.PlanReviewSignalRequest
 
-type TerraformPlanReviewStatus = terraform.PlanStatus
+type TerraformPlanReviewStatus = gate.PlanStatus
 
-const ApprovedPlanReviewStatus = terraform.Approved
-const RejectedPlanReviewStatus = terraform.Rejected
+const ApprovedPlanReviewStatus = gate.Approved
+const RejectedPlanReviewStatus = gate.Rejected
 
-const TerraformPlanReviewSignalName = terraform.PlanReviewSignalName
+const TerraformPlanReviewSignalName = gate.PlanReviewSignalName
 
 func Terraform(ctx workflow.Context, request TerraformRequest) error {
 	return terraform.Workflow(ctx, request)

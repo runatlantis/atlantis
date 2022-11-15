@@ -4,16 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.temporal.io/sdk/client"
 	"net/url"
 	"testing"
 	"time"
+
+	"go.temporal.io/sdk/client"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	terraformModel "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/gate"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -88,7 +90,6 @@ func (a *terraformActivities) GetWorkerInfo(ctx context.Context) (*activities.Ge
 
 type jobRunner struct {
 	expectedError error
-	planSummary   terraformModel.PlanSummary
 }
 
 func (r *jobRunner) Apply(ctx workflow.Context, localRoot *terraformModel.LocalRoot, jobID string, planFile string) error {
@@ -97,14 +98,19 @@ func (r *jobRunner) Apply(ctx workflow.Context, localRoot *terraformModel.LocalR
 
 func (r *jobRunner) Plan(ctx workflow.Context, localRoot *terraformModel.LocalRoot, jobID string) (activities.TerraformPlanResponse, error) {
 	return activities.TerraformPlanResponse{
-		Summary: r.planSummary,
+		Summary: terraformModel.PlanSummary{
+			Updates: []terraformModel.ResourceSummary{
+				{
+					Address: "addr",
+				},
+			},
+		},
 	}, r.expectedError
 }
 
 type request struct {
 	// bool since our errors are not serializable using json
 	ShouldErrorDuringJobUpdate bool
-	EmptyPlan                  bool
 }
 
 type response struct {
@@ -127,16 +133,6 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 		expectedError: expectedError,
 	}
 
-	if !req.EmptyPlan {
-		runner.planSummary = terraformModel.PlanSummary{
-			Creations: []terraformModel.ResourceSummary{
-				{
-					Address: "someaddress",
-				},
-			},
-		}
-	}
-
 	var s []state.Workflow
 
 	runnerReq := terraform.Request{
@@ -146,6 +142,10 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 	}
 
 	subject := &terraform.Runner{
+		ReviewGate: &gate.Review{
+			Timeout:        30 * time.Second,
+			MetricsHandler: client.MetricsNopHandler,
+		},
 		GithubActivities:    gAct,
 		TerraformActivities: tAct,
 		Request:             runnerReq,
@@ -255,8 +255,8 @@ func TestSuccess(t *testing.T) {
 
 	// send approval of plan
 	env.RegisterDelayedCallback(func() {
-		env.SignalWorkflow("planreview", terraform.PlanReviewSignalRequest{
-			Status: terraform.Approved,
+		env.SignalWorkflow("planreview", gate.PlanReviewSignalRequest{
+			Status: gate.Approved,
 		})
 	}, 5*time.Second)
 
@@ -358,39 +358,6 @@ func TestSuccess(t *testing.T) {
 	}, resp.States)
 }
 
-func TestSuccess_emptyPlan(t *testing.T) {
-	var suite testsuite.WorkflowTestSuite
-	env := suite.NewTestWorkflowEnvironment()
-	ga := &githubActivities{}
-	ta := &terraformActivities{}
-	env.RegisterActivity(ga)
-	env.RegisterActivity(ta)
-
-	// set activity expectations
-	env.OnActivity(ga.FetchRoot, mock.Anything, activities.FetchRootRequest{
-		Repo:         testGithubRepo,
-		Root:         testLocalRoot.Root,
-		DeploymentID: testDeploymentID,
-	}).Return(activities.FetchRootResponse{
-		LocalRoot:       testLocalRoot,
-		DeployDirectory: DeployDir,
-	}, nil)
-	env.OnActivity(ta.Cleanup, mock.Anything, activities.CleanupRequest{
-		DeployDirectory: DeployDir,
-	}).Return(activities.CleanupResponse{}, nil)
-
-	// execute workflow
-	env.ExecuteWorkflow(testTerraformWorkflow, request{EmptyPlan: true})
-	assert.True(t, env.IsWorkflowCompleted())
-
-	var resp response
-	err := env.GetWorkflowResult(&resp)
-	assert.NoError(t, err)
-
-	// assert results are expected
-	env.AssertExpectations(t)
-}
-
 func TestUpdateJobError(t *testing.T) {
 	var suite testsuite.WorkflowTestSuite
 	env := suite.NewTestWorkflowEnvironment()
@@ -460,8 +427,8 @@ func TestPlanRejection(t *testing.T) {
 
 	// send rejection of plan
 	env.RegisterDelayedCallback(func() {
-		env.SignalWorkflow("planreview", terraform.PlanReviewSignalRequest{
-			Status: terraform.Rejected,
+		env.SignalWorkflow("planreview", gate.PlanReviewSignalRequest{
+			Status: gate.Rejected,
 		})
 	}, 5*time.Second)
 
@@ -595,8 +562,8 @@ func TestCleanupErrorReturnsNoError(t *testing.T) {
 
 	// send approval of plan
 	env.RegisterDelayedCallback(func() {
-		env.SignalWorkflow("planreview", terraform.PlanReviewSignalRequest{
-			Status: terraform.Approved,
+		env.SignalWorkflow("planreview", gate.PlanReviewSignalRequest{
+			Status: gate.Approved,
 		})
 	}, 5*time.Second)
 

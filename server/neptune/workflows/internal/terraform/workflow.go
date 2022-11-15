@@ -14,6 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/gate"
 	runner "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/job"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"go.temporal.io/sdk/temporal"
@@ -35,29 +36,16 @@ type jobRunner interface {
 	Apply(ctx workflow.Context, localRoot *terraform.LocalRoot, jobID string, planFile string) error
 }
 
-type PlanStatus int
-type PlanReviewSignalRequest struct {
-	Status PlanStatus
-
-	// TODO: Output this info to the checks UI
-	User string
-}
-
 const (
-	Approved PlanStatus = iota
-	Rejected
-)
-
-const (
-	PlanReviewSignalName   = "planreview"
 	ScheduleToCloseTimeout = 24 * time.Hour
 	HeartBeatTimeout       = 1 * time.Minute
+
+	// 1 week timeout for review gate
+	ReviewGateTimeout = 24 * time.Hour * 7
 
 	ActiveTerraformWorkflowStat  = "workflow.terraform.active"
 	SuccessTerraformWorkflowStat = "workflow.terraform.success"
 	FailureTerraformWorkflowStat = "workflow.terraform.failure"
-
-	PlanReviewTimerStat = "workflow.terraform.planreview"
 )
 
 func Workflow(ctx workflow.Context, request Request) error {
@@ -75,6 +63,7 @@ type Runner struct {
 	Store               *state.WorkflowStore
 	RootFetcher         *RootFetcher
 	MetricsHandler      client.MetricsHandler
+	ReviewGate          *gate.Review
 }
 
 func newRunner(ctx workflow.Context, request Request) *Runner {
@@ -88,7 +77,17 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 
 	parent := workflow.GetInfo(ctx).ParentWorkflowExecution
 
+	metricsHandler := workflow.GetMetricsHandler(ctx).WithTags(
+		map[string]string{
+			metrics.RepoTag: request.Repo.GetFullName(),
+			metrics.RootTag: request.Root.Name,
+		})
+
 	return &Runner{
+		ReviewGate: &gate.Review{
+			MetricsHandler: metricsHandler,
+			Timeout:        ReviewGateTimeout,
+		},
 		GithubActivities:    ga,
 		TerraformActivities: ta,
 		Request:             request,
@@ -104,11 +103,7 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 			Ga:      ga,
 			Ta:      ta,
 		},
-		MetricsHandler: workflow.GetMetricsHandler(ctx).WithTags(
-			map[string]string{
-				metrics.RepoTag: request.Repo.GetFullName(),
-				metrics.RootTag: request.Root.Name,
-			}),
+		MetricsHandler: metricsHandler,
 		// We have critical things relying on this notification so this workflow provides guarantees around this. (ie. compliance auditing)  There should
 		// be no situation where we are deploying while this is failing.
 		Store: state.NewWorkflowStore(
@@ -153,25 +148,6 @@ func (r *Runner) Plan(ctx workflow.Context, root *terraform.LocalRoot, serverURL
 	return response, nil
 }
 
-func (r *Runner) waitForPlanReview(ctx workflow.Context, root *terraform.LocalRoot, planSummary terraform.PlanSummary) PlanStatus {
-	// Wait for plan review signal
-	var planReview PlanReviewSignalRequest
-
-	if root.Root.Plan.Approval == terraform.AutoApproval || planSummary.IsEmpty() {
-		return Approved
-	}
-
-	// if this root is configured for manual approval we block until we receive a signal
-	waitStartTime := time.Now()
-	defer func() {
-		r.MetricsHandler.Timer(PlanReviewTimerStat).Record(time.Since(waitStartTime))
-	}()
-	signalChan := workflow.GetSignalChannel(ctx, PlanReviewSignalName)
-	_ = signalChan.Receive(ctx, &planReview)
-
-	return planReview.Status
-}
-
 func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverURL fmt.Stringer, planResponse activities.TerraformPlanResponse) error {
 	jobID, err := sideeffect.GenerateUUID(ctx)
 
@@ -184,9 +160,9 @@ func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverUR
 		return errors.Wrap(err, "initializing job")
 	}
 
-	planStatus := r.waitForPlanReview(ctx, root, planResponse.Summary)
+	planStatus := r.ReviewGate.Await(ctx, root.Root, planResponse.Summary)
 
-	if planStatus == Rejected {
+	if planStatus == gate.Rejected {
 		if err := r.Store.UpdateApplyJobWithStatus(state.RejectedJobStatus); err != nil {
 			logger.Error(ctx, "unable to update job with rejected status.", key.ErrKey, err)
 		}
