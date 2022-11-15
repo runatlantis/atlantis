@@ -3,7 +3,7 @@ jobs:
   test:
     docker:
     # TODO: fix tests to use ghcr.io/runatlantis/testing-env:2022.11.13
-    - image: ghcr.io/runatlantis/testing-env:2021.08.31
+    - image: ghcr.io/runatlantis/testing-env:2022.11.13
     steps:
     - checkout
     - run: make test-all
