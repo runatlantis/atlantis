@@ -23,7 +23,7 @@ build-service: ## Build the main Go service
 go-generate: ## Run go generate in all packages
 	./scripts/go-generate.sh
 
-regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them.
+regen-mocks: ## Delete and regenerate all mocks
 	find . -type f | grep mocks/mock_ | xargs rm
 	find . -type f | grep mocks/matchers | xargs rm
 	@# not using $(PKG) here because that includes directories that have now
@@ -42,7 +42,7 @@ test-all: ## Run tests including integration
 	@go test  $(PKG)
 
 .PHONY: docker/test-all
-docker/test-all: ## Run tests in docker
+docker/test-all: ## Run all tests in docker
 	docker run -it -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:2022.11.13 sh -c "cd /atlantis && make test-all"
 
 test-coverage:
@@ -58,7 +58,7 @@ dev-docker:
 	GOOS=linux GOARCH=amd64 go build -o atlantis .
 	docker build -f Dockerfile.dev -t atlantis-dev .
 
-dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
+dist: ## Package static/ using go-bindata-assetfs into a single binary
 	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -o bindata_assetfs.go -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static
 
 release: ## Create packages for a release
