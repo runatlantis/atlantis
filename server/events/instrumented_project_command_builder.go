@@ -1,6 +1,8 @@
 package events
 
 import (
+	"strconv"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -12,7 +14,10 @@ type InstrumentedProjectCommandBuilder struct {
 }
 
 func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
-	scope := ctx.Scope.SubScope("builder")
+	scope := ctx.Scope.SubScope("builder").Tagged(map[string]string{
+		"base_repo": ctx.HeadRepo.FullName,
+		"pr_number": strconv.Itoa(ctx.Pull.Num),
+	})
 
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
@@ -33,7 +38,10 @@ func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Cont
 
 }
 func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
-	scope := ctx.Scope.SubScope("builder")
+	scope := ctx.Scope.SubScope("builder").Tagged(map[string]string{
+		"base_repo": ctx.HeadRepo.FullName,
+		"pr_number": strconv.Itoa(ctx.Pull.Num),
+	})
 
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
@@ -54,7 +62,10 @@ func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.C
 
 }
 func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
-	scope := ctx.Scope.SubScope("builder")
+	scope := ctx.Scope.SubScope("builder").Tagged(map[string]string{
+		"base_repo": ctx.HeadRepo.FullName,
+		"pr_number": strconv.Itoa(ctx.Pull.Num),
+	})
 
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()

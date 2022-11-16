@@ -101,7 +101,7 @@ func (p ProjectContext) SetScope(scope string) {
 	if p.TerraformVersion != nil {
 		v = p.TerraformVersion.String()
 	}
-	p.Scope = p.Scope.SubScope(scope).Tagged(map[string]string{ //nolint
+	p.Scope.SubScope(scope).Tagged(map[string]string{
 		"base_repo":         p.BaseRepo.FullName,
 		"pr_number":         strconv.Itoa(p.Pull.Num),
 		"project":           p.ProjectName,
