@@ -22,18 +22,19 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
-		"BASE_BRANCH_NAME": ctx.Pull.BaseBranch,
-		"BASE_REPO_NAME":   ctx.BaseRepo.Name,
-		"BASE_REPO_OWNER":  ctx.BaseRepo.Owner,
-		"COMMENT_ARGS":     strings.Join(ctx.EscapedCommentArgs, ","),
-		"DIR":              path,
-		"HEAD_BRANCH_NAME": ctx.Pull.HeadBranch,
-		"HEAD_COMMIT":      ctx.Pull.HeadCommit,
-		"HEAD_REPO_NAME":   ctx.HeadRepo.Name,
-		"HEAD_REPO_OWNER":  ctx.HeadRepo.Owner,
-		"PULL_AUTHOR":      ctx.Pull.Author,
-		"PULL_NUM":         fmt.Sprintf("%d", ctx.Pull.Num),
-		"USER_NAME":        ctx.User.Username,
+		"BASE_BRANCH_NAME":     ctx.Pull.BaseBranch,
+		"BASE_REPO_NAME":       ctx.BaseRepo.Name,
+		"BASE_REPO_OWNER":      ctx.BaseRepo.Owner,
+		"COMMENT_ARGS":         strings.Join(ctx.EscapedCommentArgs, ","),
+		"DIR":                  path,
+		"HEAD_BRANCH_NAME":     ctx.Pull.HeadBranch,
+		"HEAD_COMMIT":          ctx.Pull.HeadCommit,
+		"HEAD_REPO_NAME":       ctx.HeadRepo.Name,
+		"HEAD_REPO_OWNER":      ctx.HeadRepo.Owner,
+		"PULL_AUTHOR":          ctx.Pull.Author,
+		"PULL_NUM":             fmt.Sprintf("%d", ctx.Pull.Num),
+		"TF_APPEND_USER_AGENT": fmt.Sprintf("Atlantis (+%s; %s; %s)", ctx.Pull.URL, ctx.Pull.HeadCommit, ctx.User.Username),
+		"USER_NAME":            ctx.User.Username,
 	}
 
 	finalEnvVars := baseEnvVars
