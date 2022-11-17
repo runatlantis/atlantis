@@ -15,3 +15,8 @@ If a specific terraform operation has failed, check the logs (linked above) to d
 
 **Note: If the terraform operations do not indicate any failure, there is a likely a platform issue. Contact service owners for additional debugging.**
 {{end}}
+{{if .TimedOut }}
+## Timeout :clock1:
+:point_right: One or more operations has timed out. It's possible that a terraform operation is still making progress, this can be confirmed by checking the logs above. However,
+this deployment will need to be retried for this check to go green.
+{{end}}

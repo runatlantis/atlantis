@@ -128,5 +128,9 @@ func determineCheckRunState(workflowState *state.Workflow) github.CheckRunState 
 		return github.CheckRunSuccess
 	}
 
+	if workflowState.Result.Reason == state.TimedOutError {
+		return github.CheckRunTimeout
+	}
+
 	return github.CheckRunFailure
 }

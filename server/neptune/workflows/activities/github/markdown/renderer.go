@@ -21,13 +21,17 @@ type checkrunTemplateData struct {
 	ApplyStatus   string
 	ApplyLogURL   string
 	InternalError bool
+	TimedOut      bool
 }
 
 func RenderWorkflowStateTmpl(workflowState *state.Workflow) string {
 	planStatus, planLogURL := getJobStatusAndOutput(workflowState.Plan)
 	applyStatus, applyLogURL := getJobStatusAndOutput(workflowState.Apply)
 
+	// we can probably pass in the completion reason but i like doing all the boolean
+	// checking here if we can instead of in the template.
 	internalError := workflowState.Result.Reason == state.InternalServiceError
+	timedOut := workflowState.Result.Reason == state.TimedOutError
 
 	return renderTemplate(checkrunTemplate, checkrunTemplateData{
 		PlanStatus:    planStatus,
@@ -35,6 +39,7 @@ func RenderWorkflowStateTmpl(workflowState *state.Workflow) string {
 		ApplyStatus:   applyStatus,
 		ApplyLogURL:   applyLogURL,
 		InternalError: internalError,
+		TimedOut:      timedOut,
 	})
 }
 

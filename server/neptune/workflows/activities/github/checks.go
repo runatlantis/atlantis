@@ -49,6 +49,7 @@ type PlanReviewActionType string
 const (
 	CheckRunSuccess CheckRunState = "success"
 	CheckRunFailure CheckRunState = "failure"
+	CheckRunTimeout CheckRunState = "timed_out"
 	CheckRunPending CheckRunState = "in_progress"
 	CheckRunQueued  CheckRunState = "queued"
 	CheckRunUnknown CheckRunState = ""

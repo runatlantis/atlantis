@@ -31,6 +31,7 @@ const (
 	UnknownCompletionReason WorkflowCompletionReason = iota
 	SuccessfulCompletionReason
 	InternalServiceError
+	TimedOutError
 )
 
 type JobOutput struct {

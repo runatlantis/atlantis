@@ -14,6 +14,11 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
+const (
+	TimeoutErrorType         = "TimeoutError"
+	TerraformClientErrorType = "TerraformClientError"
+)
+
 // ExecutionContext wraps the workflow context with other info needed to execute a step
 type ExecutionContext struct {
 	Path      string
@@ -50,6 +55,9 @@ func NewRunner(runStepRunner stepRunner, envStepRunner stepRunner, tfActivities 
 }
 
 func (r *JobRunner) Plan(ctx workflow.Context, localRoot *terraform.LocalRoot, jobID string) (activities.TerraformPlanResponse, error) {
+	ctx = workflow.WithRetryPolicy(ctx, temporal.RetryPolicy{
+		NonRetryableErrorTypes: []string{TerraformClientErrorType},
+	})
 	// Execution ctx for a job that handles setting up the env vars from the previous steps
 	jobCtx := &ExecutionContext{
 		Context:   ctx,
@@ -86,6 +94,9 @@ func (r *JobRunner) Plan(ctx workflow.Context, localRoot *terraform.LocalRoot, j
 }
 
 func (r *JobRunner) Apply(ctx workflow.Context, localRoot *terraform.LocalRoot, jobID string, planFile string) error {
+	ctx = workflow.WithRetryPolicy(ctx, temporal.RetryPolicy{
+		NonRetryableErrorTypes: []string{TerraformClientErrorType, TimeoutErrorType},
+	})
 	// Execution ctx for a job that handles setting up the env vars from the previous steps
 	jobCtx := &ExecutionContext{
 		Context:   ctx,

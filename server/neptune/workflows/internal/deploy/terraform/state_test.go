@@ -225,6 +225,33 @@ func TestStateReceive(t *testing.T) {
 				},
 				Apply: &state.Job{
 					Output:    jobOutput,
+					Status:    state.FailedJobStatus,
+					StartTime: stTime,
+					EndTime:   endTime,
+				},
+				Result: state.WorkflowResult{
+					Status: state.CompleteWorkflowStatus,
+					Reason: state.TimedOutError,
+				},
+			},
+			ExpectedCheckRunState: github.CheckRunTimeout,
+			ExpectedAuditJobRequest: &activities.AuditJobRequest{
+				Root:         internalDeploymentInfo.Root,
+				Repo:         internalDeploymentInfo.Repo,
+				State:        activities.AtlantisJobStateFailure,
+				StartTime:    strconv.FormatInt(stTime.Unix(), 10),
+				EndTime:      strconv.FormatInt(endTime.Unix(), 10),
+				IsForceApply: false,
+			},
+		},
+		{
+			State: &state.Workflow{
+				Plan: &state.Job{
+					Output: jobOutput,
+					Status: state.SuccessJobStatus,
+				},
+				Apply: &state.Job{
+					Output:    jobOutput,
 					Status:    state.SuccessJobStatus,
 					StartTime: stTime,
 					EndTime:   endTime,

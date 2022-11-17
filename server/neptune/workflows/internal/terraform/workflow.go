@@ -7,6 +7,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	key "github.com/runatlantis/atlantis/server/neptune/context"
+	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/client"
 
 	"github.com/pkg/errors"
@@ -203,9 +204,20 @@ func (r *Runner) Run(ctx workflow.Context) error {
 	// make sure we are updating state on completion.
 	defer func() {
 		reason := state.SuccessfulCompletionReason
+
 		if r := recover(); r != nil || err != nil {
 			reason = state.InternalServiceError
 		}
+
+		// check for any timeouts that percolated up
+		var timeoutErr *temporal.TimeoutError
+		if errors.As(err, &timeoutErr) {
+			switch timeoutErr.TimeoutType() {
+			case enums.TIMEOUT_TYPE_HEARTBEAT, enums.TIMEOUT_TYPE_START_TO_CLOSE:
+				reason = state.TimedOutError
+			}
+		}
+
 		updateErr := r.Store.UpdateCompletion(state.WorkflowResult{
 			Status: state.CompleteWorkflowStatus,
 			Reason: reason,
@@ -222,9 +234,6 @@ func (r *Runner) run(ctx workflow.Context) error {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		ScheduleToCloseTimeout: ScheduleToCloseTimeout,
 		HeartbeatTimeout:       HeartBeatTimeout,
-		RetryPolicy: &temporal.RetryPolicy{
-			NonRetryableErrorTypes: []string{TerraformClientErrorType},
-		},
 	})
 	var response *activities.GetWorkerInfoResponse
 	err := workflow.ExecuteActivity(ctx, r.TerraformActivities.GetWorkerInfo).Get(ctx, &response)
