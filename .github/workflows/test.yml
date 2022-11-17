@@ -17,8 +17,5 @@ jobs:
     runs-on: ubuntu-22.04
     container: ghcr.io/runatlantis/testing-env:2022.11.17
     steps:
-      # user in image needs write access to do anything
-      - name: setup
-        run: sudo chmod -R 777 $GITHUB_WORKSPACE /github /__w/_temp
       - uses: actions/checkout@v3.0.2
       - run: make test-all
