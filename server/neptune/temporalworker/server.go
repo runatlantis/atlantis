@@ -74,7 +74,7 @@ func NewServer(config *config.Config) (*Server, error) {
 	}
 
 	// Build dependencies required for output handler and jobs controller
-	jobStore, err := job.NewStorageBackedStore(config.JobConfig, config.CtxLogger)
+	jobStore, err := job.NewStorageBackendStore(config.JobConfig, scope.SubScope("job.store"), config.CtxLogger)
 	if err != nil {
 		return nil, errors.Wrapf(err, "initializing job store")
 	}

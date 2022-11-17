@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/neptune/storage"
+	"github.com/uber-go/tally/v4"
 )
 
 const PageSize = 100
@@ -18,10 +20,13 @@ type StorageBackend interface {
 	Write(ctx context.Context, key string, logs []string) (bool, error)
 }
 
-func NewStorageBackend(stowClient *storage.Client, logger logging.Logger) (StorageBackend, error) {
-	return &storageBackend{
-		client: stowClient,
-		logger: logger,
+func NewStorageBackend(stowClient *storage.Client, scope tally.Scope, logger logging.Logger) (StorageBackend, error) {
+	return &InstrumentedStorageBackend{
+		StorageBackend: &storageBackend{
+			client: stowClient,
+			logger: logger,
+		},
+		scope: scope.SubScope("backend_storage"),
 	}, nil
 }
 
@@ -60,6 +65,39 @@ func (s storageBackend) Write(ctx context.Context, key string, logs []string) (b
 
 	s.logger.Info(fmt.Sprintf("successfully uploaded object for job: %s", key))
 	return true, nil
+}
+
+type InstrumentedStorageBackend struct {
+	StorageBackend
+	scope tally.Scope
+}
+
+func (s *InstrumentedStorageBackend) Read(ctx context.Context, key string) ([]string, error) {
+	readScope := s.scope.SubScope("read")
+	failureCount := readScope.Counter(metrics.ExecutionFailureMetric)
+	latency := readScope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer latency.Stop()
+
+	logs, err := s.StorageBackend.Read(ctx, key)
+	if err != nil {
+		failureCount.Inc(1)
+		return []string{}, err
+	}
+
+	return logs, err
+}
+
+func (s *InstrumentedStorageBackend) Write(ctx context.Context, key string, logs []string) (bool, error) {
+	writeScope := s.scope.SubScope("write")
+	failureCount := writeScope.Counter(metrics.ExecutionFailureMetric)
+	latency := writeScope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer latency.Stop()
+
+	ok, err := s.StorageBackend.Write(ctx, key, logs)
+	if err != nil {
+		failureCount.Inc(1)
+	}
+	return ok, err
 }
 
 // Used when log persistence is not configured
