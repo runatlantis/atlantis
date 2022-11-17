@@ -41,7 +41,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-const ConftestVersion = "0.45.0"
+const ConftestVersion = "0.35.0"
 
 var applyLocker locking.ApplyLocker
 var userConfig server.UserConfig
