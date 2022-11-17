@@ -223,7 +223,7 @@ func (s Server) Start() error {
 
 	s.Logger.Info("Cleaning up stream handler")
 
-	// On cleanup, stream handler closes all active receivers and persists jobs in memory
+	// On cleanup, stream handler closes all active receivers and persists in memory jobs to storage
 	ctx, cancel := context.WithTimeout(context.Background(), StreamHandlerTimeout)
 	defer cancel()
 	if err := s.JobStreamHandler.CleanUp(ctx); err != nil {

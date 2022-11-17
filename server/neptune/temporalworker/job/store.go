@@ -82,7 +82,7 @@ func (m *InMemoryStore) Get(ctx context.Context, jobID string) (*Job, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	if m.jobs[jobID] == nil {
+	if _, ok := m.jobs[jobID]; !ok {
 		return nil, nil
 	}
 	return m.jobs[jobID], nil
@@ -111,9 +111,10 @@ func (m *InMemoryStore) Close(ctx context.Context, jobID string, status JobStatu
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	// Error out when job dne
-	if m.jobs[jobID] == nil {
-		return fmt.Errorf("job: %s does not exist", jobID)
+	// No need to close job if it DNE
+	// It is possible a job DNE in memory since we call CloseJob() in a separate activity which can be executed after a worker restart
+	if _, ok := m.jobs[jobID]; !ok {
+		return nil
 	}
 
 	// Error when job is already set to complete
@@ -176,9 +177,15 @@ func (s *StorageBackendJobStore) Close(ctx context.Context, jobID string, status
 	}
 
 	job, err := s.InMemoryStore.Get(ctx, jobID)
-	if err != nil || job == nil {
+	if err != nil {
 		return errors.Wrapf(err, "retrieving job: %s from memory store", jobID)
+	}
 
+	// Since we close the job in a different activity than when it's created, it is possible that we try closing a non existent job
+	// after the worker has been restarted. So, instead of hard failing, let's return since we close all in progress jobs  during shutdown
+	if job == nil {
+		s.logger.WarnContext(ctx, fmt.Sprintf("job: %s does not exist in memory", jobID))
+		return nil
 	}
 
 	ok, err := s.storageBackend.Write(ctx, jobID, job.Output)

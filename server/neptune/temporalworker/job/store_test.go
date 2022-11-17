@@ -270,14 +270,12 @@ func TestJobStore_Close(t *testing.T) {
 		assert.Empty(t, gotJob.Output)
 	})
 
-	t.Run("error when job does not exist", func(t *testing.T) {
+	t.Run("no error when job does not exist", func(t *testing.T) {
 		storageBackend := &testStorageBackend{}
 		jobStore := job.NewTestStorageBackedStore(logging.NewNoopCtxLogger(t), storageBackend, map[string]*job.Job{})
-		expectedErrString := fmt.Sprintf("job: %s does not exist", jobID)
 
 		err := jobStore.Close(context.TODO(), jobID, job.Complete)
-		assert.EqualError(t, err, expectedErrString)
-
+		assert.Nil(t, err)
 	})
 }
 
