@@ -252,7 +252,7 @@ tunnels:
 	// Create a new pr in the example repo.
 	colorstring.Println("=> creating a new pull request")
 	s.Start()
-	pullRequestURL, err := githubClient.CreatePullRequest(githubUsername, terraformExampleRepo, "example", "master")
+	pullRequestURL, err := githubClient.CreatePullRequest(githubUsername, terraformExampleRepo, "example", "main")
 	if err != nil {
 		return errors.Wrapf(err, "creating new pull request for repo %s/%s", githubUsername, terraformExampleRepo)
 	}

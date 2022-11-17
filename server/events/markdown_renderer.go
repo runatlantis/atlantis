@@ -23,6 +23,8 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var (
@@ -134,7 +136,7 @@ func GetMarkdownRenderer(
 // Render formats the data into a markdown string.
 // nolint: interfacer
 func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType) string {
-	commandStr := strings.Title(strings.Replace(cmdName.String(), "_", " ", -1))
+	commandStr := cases.Title(language.English).String(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{
 		Command:                  commandStr,
 		Verbose:                  verbose,

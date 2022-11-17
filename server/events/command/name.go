@@ -1,6 +1,11 @@
 package command
 
-import "strings"
+import (
+	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+)
 
 // Name is which command to run.
 type Name int
@@ -26,7 +31,7 @@ const (
 // TitleString returns the string representation in title form.
 // ie. policy_check becomes Policy Check
 func (c Name) TitleString() string {
-	return strings.Title(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
+	return cases.Title(language.English).String(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
 }
 
 // String returns the string representation of c.

@@ -128,15 +128,15 @@ func (w *FileWorkspace) Clone(
 // warnDiverged returns true if we should warn the user that the branch we're
 // merging into has diverged from what we currently have checked out.
 // This matters in the case of the merge checkout strategy because after
-// cloning the repo and doing the merge, it's possible master was updated.
+// cloning the repo and doing the merge, it's possible main was updated.
 // Then users won't be getting the merge functionality they expected.
 // If there are any errors we return false since we prefer things to succeed
 // vs. stopping the plan/apply.
 func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
-		// It only makes sense to warn that master has diverged if we're using
+		// It only makes sense to warn that main has diverged if we're using
 		// the checkout merge strategy. If we're just checking out the branch,
-		// then it doesn't matter what's going on with master because we've
+		// then it doesn't matter what's going on with main because we've
 		// decided to always run off the branch.
 		return false
 	}
@@ -172,9 +172,9 @@ func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullReq
 
 	hasDiverged := w.HasDiverged(log, cloneDir)
 	if hasDiverged {
-		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
+		log.Info("remote main branch is ahead and thereby has new commits, it is recommended to pull new commits")
 	} else {
-		log.Debug("remote master branch has no new commits")
+		log.Debug("remote main branch has no new commits")
 	}
 	return hasDiverged
 }
@@ -185,7 +185,7 @@ func (w *FileWorkspace) HasDiverged(log logging.SimpleLogging, cloneDir string) 
 		// we assume false here for 'branch' strategy.
 		return false
 	}
-	// Check if remote master branch has diverged.
+	// Check if remote main branch has diverged.
 	statusUnoCmd := exec.Command("git", "status", "--untracked-files=no")
 	statusUnoCmd.Dir = cloneDir
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()

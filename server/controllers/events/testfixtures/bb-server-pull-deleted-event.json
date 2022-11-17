@@ -42,8 +42,8 @@
       }
     },
     "toRef":{
-      "id":"refs/heads/master",
-      "displayId":"master",
+      "id":"refs/heads/main",
+      "displayId":"main",
       "latestCommit":"7e48f426f0a6e47c5b5e862c31be6ca965f82c9c",
       "repository":{
         "slug":"repository",
