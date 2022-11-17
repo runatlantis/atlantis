@@ -268,8 +268,8 @@ github.com/hashicorp/hcl v0.0.0-20170504190234-a4b07c25de5f/go.mod h1:oZtUIOe8dh
 github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
 github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
 github.com/hashicorp/hcl/v2 v2.0.0/go.mod h1:oVVDG71tEinNGYCxinCYadcmKU9bglqW9pV3txagJ90=
-github.com/hashicorp/hcl/v2 v2.14.1 h1:x0BpjfZ+CYdbiz+8yZTQ+gdLO7IXvOut7Da+XJayx34=
-github.com/hashicorp/hcl/v2 v2.14.1/go.mod h1:e4z5nxYlWNPdDSNYX+ph14EvWYMFm3eP0zIUqPc2jr0=
+github.com/hashicorp/hcl/v2 v2.15.0 h1:CPDXO6+uORPjKflkWCCwoWc9uRp+zSIPcCQ+BrxV7m8=
+github.com/hashicorp/hcl/v2 v2.15.0/go.mod h1:JRmR89jycNkrrqnMmvPDMd56n1rQJ2Q6KocSLCMCXng=
 github.com/hashicorp/terraform-config-inspect v0.0.0-20221012204812-413b69327090 h1:UnVTr6jkguxyA4OfL9kJOoe4hoWyicC+LRiS4e3EJl0=
 github.com/hashicorp/terraform-config-inspect v0.0.0-20221012204812-413b69327090/go.mod h1:Z0Nnk4+3Cy89smEbrq+sl1bxc9198gIP4I7wcQF6Kqs=
 github.com/huandu/xstrings v1.3.1/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
