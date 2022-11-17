@@ -25,3 +25,7 @@ RUN case $(uname -m) in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64|armv7l) ARC
     ln -s /usr/local/bin/cft/versions/${CONFTEST_VERSION}/conftest /usr/local/bin/conftest${CONFTEST_VERSION} && \
     rm conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
     rm checksums.txt
+
+RUN useradd -u 1001 -m atlantis
+
+USER atlantis
