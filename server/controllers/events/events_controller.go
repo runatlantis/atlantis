@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/google/go-github/v31/github"
@@ -171,16 +170,12 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
 		resp = e.HandleGithubCommentEvent(event, githubReqID, logger)
-		scope = scope.SubScope(fmt.Sprintf("comment_%s", *event.Action)).Tagged(map[string]string{
-			"base_repo": event.GetRepo().GetFullName(),
-			"pr_number": strconv.Itoa(event.GetIssue().GetNumber()),
-		})
+		scope = scope.SubScope(fmt.Sprintf("comment_%s", *event.Action))
+		scope = vcs.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetIssue().GetNumber())
 	case *github.PullRequestEvent:
 		resp = e.HandleGithubPullRequestEvent(logger, event, githubReqID)
-		scope = scope.SubScope(fmt.Sprintf("pr_%s", *event.Action)).Tagged(map[string]string{
-			"base_repo": event.GetRepo().GetFullName(),
-			"pr_number": strconv.Itoa(event.GetNumber()),
-		})
+		scope = scope.SubScope(fmt.Sprintf("pr_%s", *event.Action))
+		scope = vcs.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetNumber())
 	default:
 		resp = HTTPResponse{
 			body: fmt.Sprintf("Ignoring unsupported event %s", githubReqID),
