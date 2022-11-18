@@ -171,7 +171,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		verbose,
 	)
 
-	if cmdName == command.Plan {
+	if cmdName == command.Plan || cmdName == command.PlanAll {
 		ctx.Log.Debug("Building project command context for %s", command.PolicyCheck)
 		steps := prjCfg.Workflow.PolicyCheck.Steps
 

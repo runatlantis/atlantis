@@ -10,6 +10,8 @@ const (
 	Apply Name = iota
 	// Plan is a command to run terraform plan.
 	Plan
+	// PlanAll is a command to run terraform plan for all projects ignoring when_modified.
+	PlanAll
 	// Unlock is a command to discard previous plans as well as the atlantis locks.
 	Unlock
 	// PolicyCheck is a command to run conftest test.
@@ -36,6 +38,8 @@ func (c Name) String() string {
 		return "apply"
 	case Plan, Autoplan:
 		return "plan"
+	case PlanAll:
+		return "plan-all"
 	case Unlock:
 		return "unlock"
 	case PolicyCheck:

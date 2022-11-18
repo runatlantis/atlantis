@@ -608,6 +608,160 @@ projects:
 	}
 }
 
+func TestDefaultProjectCommandBuilder_BuildPlanAllCommands(t *testing.T) {
+	// expCtxFields define the ctx fields we're going to assert on.
+	// Since we're focused on autoplanning here, we don't validate all the
+	// fields so the tests are more obvious and targeted.
+	type expCtxFields struct {
+		ProjectName string
+		RepoRelDir  string
+		Workspace   string
+	}
+	cases := map[string]struct {
+		DirStructure  map[string]interface{}
+		AtlantisYAML  string
+		ModifiedFiles []string
+		Exp           []expCtxFields
+	}{
+		"no atlantis.yaml": {
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			Exp: []expCtxFields{
+				{
+					ProjectName: "",
+					RepoRelDir:  "project1",
+					Workspace:   "default",
+				},
+				{
+					ProjectName: "",
+					RepoRelDir:  "project2",
+					Workspace:   "default",
+				},
+			},
+		},
+		"no modified files and no atlantis.yaml": {
+			DirStructure: map[string]interface{}{
+				"main.tf": nil,
+			},
+			ModifiedFiles: []string{},
+			Exp:           []expCtxFields{},
+		},
+		"ignores when_modified config": {
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project3": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `version: 3
+projects:
+- dir: project1 # project1 uses the defaults
+- dir: project2 # project2 has autoplan disabled but should use default when_modified
+  autoplan:
+    enabled: false
+- dir: project3 # project3 has an empty when_modified
+  autoplan:
+    enabled: false
+    when_modified: []`,
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			Exp: []expCtxFields{
+				{
+					ProjectName: "",
+					RepoRelDir:  "project1",
+					Workspace:   "default",
+				},
+				{
+					ProjectName: "",
+					RepoRelDir:  "project2",
+					Workspace:   "default",
+				},
+				{
+					ProjectName: "",
+					RepoRelDir:  "project3",
+					Workspace:   "default",
+				},
+			},
+		},
+	}
+
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir := DirStructure(t, c.DirStructure)
+
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
+			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			if c.AtlantisYAML != "" {
+				err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				Ok(t, err)
+			}
+
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{},
+				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				scope,
+				logger,
+			)
+
+			ctxs, err := builder.BuildPlanCommands(
+				&command.Context{
+					Log:   logger,
+					Scope: scope,
+				},
+				&events.CommentCommand{
+					RepoRelDir:  "",
+					Flags:       nil,
+					Name:        command.PlanAll,
+					Verbose:     false,
+					Workspace:   "",
+					ProjectName: "",
+				})
+			Ok(t, err)
+			Equals(t, len(c.Exp), len(ctxs))
+			for i, actCtx := range ctxs {
+				expCtx := c.Exp[i]
+				Equals(t, expCtx.ProjectName, actCtx.ProjectName)
+				Equals(t, expCtx.RepoRelDir, actCtx.RepoRelDir)
+				Equals(t, expCtx.Workspace, actCtx.Workspace)
+			}
+		})
+	}
+}
+
 // Test building apply command for multiple projects when the comment
 // isn't for a specific project, i.e. atlantis apply.
 // In this case we should apply all outstanding plans.

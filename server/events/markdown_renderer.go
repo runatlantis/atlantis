@@ -27,6 +27,7 @@ import (
 
 var (
 	planCommandTitle            = command.Plan.TitleString()
+	planAllCommandTitle         = command.PlanAll.TitleString()
 	applyCommandTitle           = command.Apply.TitleString()
 	policyCheckCommandTitle     = command.PolicyCheck.TitleString()
 	approvePoliciesCommandTitle = command.ApprovePolicies.TitleString()
@@ -224,11 +225,13 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		resultsTmplData = append(resultsTmplData, resultData)
 	}
 
+	isPlanCommandTitle := common.Command == planCommandTitle || common.Command == planAllCommandTitle
+
 	var tmpl *template.Template
 	switch {
-	case len(resultsTmplData) == 1 && common.Command == planCommandTitle && numPlanSuccesses > 0:
+	case len(resultsTmplData) == 1 && isPlanCommandTitle && numPlanSuccesses > 0:
 		tmpl = templates.Lookup("singleProjectPlanSuccess")
-	case len(resultsTmplData) == 1 && common.Command == planCommandTitle && numPlanSuccesses == 0:
+	case len(resultsTmplData) == 1 && isPlanCommandTitle && numPlanSuccesses == 0:
 		tmpl = templates.Lookup("singleProjectPlanUnsuccessful")
 	case len(resultsTmplData) == 1 && common.Command == policyCheckCommandTitle && numPolicyCheckSuccesses > 0:
 		tmpl = templates.Lookup("singleProjectPlanSuccess")
@@ -240,7 +243,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		tmpl = templates.Lookup("singleProjectVersionUnsuccessful")
 	case len(resultsTmplData) == 1 && common.Command == applyCommandTitle:
 		tmpl = templates.Lookup("singleProjectApply")
-	case common.Command == planCommandTitle,
+	case isPlanCommandTitle,
 		common.Command == policyCheckCommandTitle:
 		tmpl = templates.Lookup("multiProjectPlan")
 	case common.Command == approvePoliciesCommandTitle:

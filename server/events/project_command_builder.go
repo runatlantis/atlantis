@@ -163,7 +163,7 @@ type DefaultProjectCommandBuilder struct {
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
-	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false)
+	projCtxs, err := p.buildPlanAllCommands(ctx, &CommentCommand{})
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 // See ProjectCommandBuilder.BuildPlanCommands.
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
-		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose)
+		return p.buildPlanAllCommands(ctx, cmd)
 	}
 	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
 	return pcc, err
@@ -208,16 +208,7 @@ func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context
 	return pac, err
 }
 
-// buildPlanAllCommands builds plan contexts for all projects we determine were
-// modified in this ctx.
-func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context, commentFlags []string, verbose bool) ([]command.ProjectContext, error) {
-	// We'll need the list of modified files.
-	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
-	if err != nil {
-		return nil, err
-	}
-	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
-
+func (p *DefaultProjectCommandBuilder) shouldUpdateRepo(ctx *command.Context, modifiedFiles []string) ([]command.ProjectContext, error) {
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
 		hasRepoCfg, repoCfgData, err := p.VCSClient.DownloadRepoConfigFile(ctx.Pull)
 		if err != nil {
@@ -242,6 +233,30 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			// NOTE: We discard this work here and end up doing it again after
 			// cloning to ensure all the return values are set properly with
 			// the actual clone directory.
+		}
+	}
+	return nil, nil
+}
+
+// buildPlanAllCommands builds plan contexts for all projects we determine were
+// modified in this ctx.
+func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+	commentFlags := cmd.Flags
+	verbose := cmd.Verbose
+	isPlanAll := cmd.CommandName() == command.PlanAll
+
+	// We'll need the list of modified files.
+	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		return nil, err
+	}
+	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
+
+	if !isPlanAll {
+		// we do not need to pre-check if we will do all projects anyway
+		projectCtx, err := p.shouldUpdateRepo(ctx, modifiedFiles)
+		if projectCtx != nil || err != nil {
+			return projectCtx, err
 		}
 	}
 
@@ -277,9 +292,13 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 		}
 		ctx.Log.Info("successfully parsed %s file", config.AtlantisYAMLFilename)
-		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
-		if err != nil {
-			return nil, err
+
+		matchingProjects := repoCfg.Projects
+		if !isPlanAll {
+			matchingProjects, err = p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
+			if err != nil {
+				return nil, err
+			}
 		}
 		ctx.Log.Info("%d projects are to be planned based on their when_modified config", len(matchingProjects))
 
