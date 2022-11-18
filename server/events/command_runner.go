@@ -143,10 +143,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		log.Err("Unable to fetch pull status, this is likely a bug.", err)
 	}
 
-	scope := c.StatsScope.SubScope("autoplan").Tagged(map[string]string{
-		"base_repo": baseRepo.FullName,
-		"pr_number": strconv.Itoa(pull.Num),
-	})
+	scope := c.StatsScope.SubScope("autoplan")
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
@@ -238,15 +235,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	scope := c.StatsScope.SubScope("comment")
 
 	if cmd != nil {
-		scope = scope.SubScope(cmd.Name.String()).Tagged(map[string]string{
-			"base_repo":    baseRepo.FullName,
-			"pr_number":    strconv.Itoa(pullNum),
-			"project":      cmd.ProjectName,
-			"project_path": cmd.RepoRelDir,
-			"workspace":    cmd.Workspace,
-		})
+		scope = scope.SubScope(cmd.Name.String())
 	}
-
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
