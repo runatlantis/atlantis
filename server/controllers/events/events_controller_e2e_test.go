@@ -66,6 +66,12 @@ func (h noopCheckRunEventHandler) Handle(ctx context.Context, event event_types.
 	return nil
 }
 
+type noopCheckSuiteEventHandler struct{}
+
+func (h noopCheckSuiteEventHandler) Handle(ctx context.Context, event event_types.CheckSuite) error {
+	return nil
+}
+
 type NoopTFDownloader struct{}
 
 func (m *NoopTFDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
@@ -1033,6 +1039,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 				prHandler,
 				noopPushEventHandler{},
 				noopCheckRunEventHandler{},
+				noopCheckSuiteEventHandler{},
 				false,
 				repoConverter,
 				pullConverter,

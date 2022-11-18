@@ -26,6 +26,7 @@ func TestConvert_CheckRunEvent(t *testing.T) {
 	externalID := "external id"
 	checkRunName := "some name"
 	login := "nish"
+	user := models.User{Username: login}
 
 	repo := &github.Repository{
 		FullName:      github.String(repoFullName),
@@ -54,7 +55,7 @@ func TestConvert_CheckRunEvent(t *testing.T) {
 				},
 				DefaultBranch: "main",
 			},
-			User: login,
+			User: user,
 		}
 
 		result, err := subject.Convert(
@@ -95,7 +96,7 @@ func TestConvert_CheckRunEvent(t *testing.T) {
 				},
 				DefaultBranch: "main",
 			},
-			User: login,
+			User: user,
 		}
 
 		result, err := subject.Convert(

@@ -59,25 +59,37 @@ func NewVCSEventsController(
 	deploySignaler := &gateway_handlers.DeployWorkflowSignaler{
 		TemporalClient: temporalClient,
 	}
+	rootDeployer := &gateway_handlers.RootDeployer{
+		Logger:            logger,
+		RootConfigBuilder: rootConfigBuilder,
+		DeploySignaler:    deploySignaler,
+	}
 	commentHandler := handlers.NewCommentEventWithCommandHandler(
 		commentParser,
 		repoAllowlistChecker,
 		vcsClient,
-		gateway_handlers.NewCommentEventWorkerProxy(logger, snsWriter, featureAllocator, rootConfigBuilder, scheduler, deploySignaler, vcsClient),
+		gateway_handlers.NewCommentEventWorkerProxy(logger, snsWriter, featureAllocator, scheduler, rootDeployer, vcsClient),
 		logger,
 	)
 
 	pushHandler := &gateway_handlers.PushHandler{
-		Allocator:         featureAllocator,
-		Scheduler:         scheduler,
-		Logger:            logger,
-		DeploySignaler:    deploySignaler,
-		RootConfigBuilder: rootConfigBuilder,
+		Allocator:    featureAllocator,
+		Scheduler:    scheduler,
+		Logger:       logger,
+		RootDeployer: rootDeployer,
 	}
 
 	checkRunHandler := &gateway_handlers.CheckRunHandler{
-		Logger:         logger,
-		TemporalClient: temporalClient,
+		Logger:            logger,
+		RootConfigBuilder: rootConfigBuilder,
+		Scheduler:         scheduler,
+		DeploySignaler:    deploySignaler,
+	}
+
+	checkSuiteHandler := &gateway_handlers.CheckSuiteHandler{
+		Logger:       logger,
+		Scheduler:    scheduler,
+		RootDeployer: rootDeployer,
 	}
 
 	// lazy map of resolver providers to their resolver
@@ -92,6 +104,7 @@ func NewVCSEventsController(
 				prHandler,
 				pushHandler,
 				checkRunHandler,
+				checkSuiteHandler,
 				allowDraftPRs,
 				repoConverter,
 				pullConverter,

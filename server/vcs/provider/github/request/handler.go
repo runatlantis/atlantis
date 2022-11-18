@@ -43,6 +43,10 @@ type checkRunEventHandler interface {
 	Handle(ctx context.Context, e event.CheckRun) error
 }
 
+type checkSuiteEventHandler interface {
+	Handle(ctx context.Context, e event.CheckSuite) error
+}
+
 // converter interfaces
 type pullEventConverter interface {
 	Convert(event *github.PullRequestEvent) (event.PullRequest, error)
@@ -60,6 +64,10 @@ type checkRunEventConverter interface {
 	Convert(event *github.CheckRunEvent) (event.CheckRun, error)
 }
 
+type checkSuiteEventConverter interface {
+	Convert(event *github.CheckSuiteEvent) (event.CheckSuite, error)
+}
+
 // Matcher matches a provided request against some condition
 type Matcher struct{}
 
@@ -75,6 +83,7 @@ func NewHandler(
 	prHandler *handlers.PullRequestEvent,
 	pushHandler pushEventHandler,
 	checkRunHandler checkRunEventHandler,
+	checkSuiteHandler checkSuiteEventHandler,
 	allowDraftPRs bool,
 	repoConverter converter.RepoConverter,
 	pullConverter converter.PullConverter,
@@ -99,29 +108,33 @@ func NewHandler(
 		pushEventConverter: converter.PushEvent{
 			RepoConverter: repoConverter,
 		},
-		checkRunEventConverter: converter.CheckRunEvent{},
-		pushHandler:            pushHandler,
-		checkRunHandler:        checkRunHandler,
-		webhookSecret:          webhookSecret,
-		logger:                 logger,
-		scope:                  scope,
+		checkRunEventConverter:   converter.CheckRunEvent{},
+		checkSuiteEventConverter: converter.CheckSuiteEvent{RepoConverter: repoConverter},
+		pushHandler:              pushHandler,
+		checkRunHandler:          checkRunHandler,
+		checkSuiteHandler:        checkSuiteHandler,
+		webhookSecret:            webhookSecret,
+		logger:                   logger,
+		scope:                    scope,
 	}
 }
 
 type Handler struct {
-	validator              requestValidator
-	commentHandler         commentEventHandler
-	prHandler              prEventHandler
-	pushHandler            pushEventHandler
-	checkRunHandler        checkRunEventHandler
-	parser                 webhookParser
-	pullEventConverter     pullEventConverter
-	commentEventConverter  commentEventConverter
-	pushEventConverter     pushEventConverter
-	checkRunEventConverter checkRunEventConverter
-	webhookSecret          []byte
-	logger                 logging.Logger
-	scope                  tally.Scope
+	validator                requestValidator
+	commentHandler           commentEventHandler
+	prHandler                prEventHandler
+	pushHandler              pushEventHandler
+	checkRunHandler          checkRunEventHandler
+	checkSuiteHandler        checkSuiteEventHandler
+	parser                   webhookParser
+	pullEventConverter       pullEventConverter
+	commentEventConverter    commentEventConverter
+	pushEventConverter       pushEventConverter
+	checkRunEventConverter   checkRunEventConverter
+	checkSuiteEventConverter checkSuiteEventConverter
+	webhookSecret            []byte
+	logger                   logging.Logger
+	scope                    tally.Scope
 
 	Matcher
 }
@@ -174,6 +187,11 @@ func (h *Handler) Handle(r *http.BufferedRequest) error {
 		timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 		defer timer.Stop()
 		err = h.handlePushEvent(ctx, event)
+	case *github.CheckSuiteEvent:
+		scope = scope.SubScope("checksuite")
+		timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+		defer timer.Stop()
+		err = h.handleCheckSuiteEvent(ctx, event)
 	case *github.CheckRunEvent:
 		scope = scope.SubScope("checkrun")
 		timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
@@ -243,4 +261,15 @@ func (h *Handler) handleCheckRunEvent(ctx context.Context, e *github.CheckRunEve
 	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, checkRunEvent.Repo.FullName)
 
 	return h.checkRunHandler.Handle(ctx, checkRunEvent)
+}
+
+func (h *Handler) handleCheckSuiteEvent(ctx context.Context, e *github.CheckSuiteEvent) error {
+	checkSuiteEvent, err := h.checkSuiteEventConverter.Convert(e)
+
+	if err != nil {
+		return &errors.EventParsingError{Err: err}
+	}
+	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, checkSuiteEvent.Repo.FullName)
+	ctx = context.WithValue(ctx, contextInternal.SHAKey, checkSuiteEvent.HeadSha)
+	return h.checkSuiteHandler.Handle(ctx, checkSuiteEvent)
 }

@@ -107,10 +107,6 @@ func signalWorkflow(env *testsuite.TestWorkflowEnvironment) {
 			FullName: "nish/repo",
 			Owner:    "nish",
 			Name:     "nish/repo",
-			Ref: workflows.Ref{
-				Type: "branch",
-				Name: "main",
-			},
 		},
 	})
 }

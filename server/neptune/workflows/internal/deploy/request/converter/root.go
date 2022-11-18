@@ -21,6 +21,7 @@ func Root(external request.Root) terraform.Root {
 		Path:      external.RepoRelPath,
 		TfVersion: external.TfVersion,
 		Trigger:   terraform.Trigger(external.Trigger),
+		Rerun:     external.Rerun,
 	}
 
 }

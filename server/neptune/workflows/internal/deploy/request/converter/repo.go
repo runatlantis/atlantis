@@ -13,10 +13,6 @@ func Repo(external request.Repo) github.Repo {
 		Credentials: github.AppCredentials{
 			InstallationToken: external.Credentials.InstallationToken,
 		},
-		Ref: github.Ref{
-			Name: external.Ref.Name,
-			Type: external.Ref.Type,
-		},
 	}
 }
 

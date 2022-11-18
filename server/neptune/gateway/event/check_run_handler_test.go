@@ -2,21 +2,26 @@ package event_test
 
 import (
 	"context"
+	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/sync"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
-	"github.com/runatlantis/atlantis/server/neptune/workflows"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCheckRunHandler(t *testing.T) {
 	t.Run("unrelated check run", func(t *testing.T) {
 		signaler := &testSignaler{}
+		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:         logging.NewNoopCtxLogger(t),
-			TemporalClient: signaler,
+			Logger:            logging.NewNoopCtxLogger(t),
+			RootConfigBuilder: &mockRootConfigBuilder{},
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler:    &mockDeploySignaler{},
 		}
 		e := event.CheckRun{
 			Name: "something",
@@ -27,10 +32,13 @@ func TestCheckRunHandler(t *testing.T) {
 	})
 
 	t.Run("unsupported action", func(t *testing.T) {
-		signaler := &testSignaler{}
+		signaler := &mockDeploySignaler{}
+		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:         logging.NewNoopCtxLogger(t),
-			TemporalClient: signaler,
+			Logger:            logging.NewNoopCtxLogger(t),
+			RootConfigBuilder: &mockRootConfigBuilder{},
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler:    signaler,
 		}
 		e := event.CheckRun{
 			Action: event.WrappedCheckRunAction("test"),
@@ -41,11 +49,71 @@ func TestCheckRunHandler(t *testing.T) {
 		assert.False(t, signaler.called)
 	})
 
-	t.Run("wrong requested actions object", func(t *testing.T) {
-		signaler := &testSignaler{}
+	t.Run("invalid rerequested branch", func(t *testing.T) {
+		version, err := version.NewVersion("1.0.3")
+		assert.NoError(t, err)
+		signaler := &mockDeploySignaler{}
+		logger := logging.NewNoopCtxLogger(t)
+		rootCfg := valid.MergedProjectCfg{
+			Name: testRoot,
+			DeploymentWorkflow: valid.Workflow{
+				Plan:  valid.DefaultPlanStage,
+				Apply: valid.DefaultApplyStage,
+			},
+			TerraformVersion: version,
+			WorkflowMode:     valid.DefaultWorkflowMode,
+		}
+		rootCfgs := []*valid.MergedProjectCfg{
+			&rootCfg,
+		}
+		rootConfigBuilder := &mockRootConfigBuilder{
+			rootConfigs: rootCfgs,
+		}
 		subject := event.CheckRunHandler{
-			Logger:         logging.NewNoopCtxLogger(t),
-			TemporalClient: signaler,
+			Logger:            logging.NewNoopCtxLogger(t),
+			RootConfigBuilder: rootConfigBuilder,
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler:    signaler,
+		}
+		e := event.CheckRun{
+			Action: event.WrappedCheckRunAction("test"),
+			Name:   "atlantis/deploy: testroot",
+			Repo:   models.Repo{DefaultBranch: "main"},
+			Branch: "something",
+		}
+		err = subject.Handle(context.Background(), e)
+		assert.NoError(t, err)
+		assert.False(t, signaler.called)
+	})
+
+	t.Run("invalid rerequested branch", func(t *testing.T) {
+		signaler := &mockDeploySignaler{}
+		logger := logging.NewNoopCtxLogger(t)
+		subject := event.CheckRunHandler{
+			Logger:            logging.NewNoopCtxLogger(t),
+			RootConfigBuilder: &mockRootConfigBuilder{},
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler:    signaler,
+		}
+		e := event.CheckRun{
+			Action: event.WrappedCheckRunAction("test"),
+			Name:   "atlantis/deploy: testroot",
+			Repo:   models.Repo{DefaultBranch: "main"},
+			Branch: "something",
+		}
+		err := subject.Handle(context.Background(), e)
+		assert.NoError(t, err)
+		assert.False(t, signaler.called)
+	})
+
+	t.Run("wrong requested actions object", func(t *testing.T) {
+		signaler := &mockDeploySignaler{}
+		logger := logging.NewNoopCtxLogger(t)
+		subject := event.CheckRunHandler{
+			Logger:            logging.NewNoopCtxLogger(t),
+			RootConfigBuilder: &mockRootConfigBuilder{},
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler:    signaler,
 		}
 		e := event.CheckRun{
 			Action: event.WrappedCheckRunAction("requested_action"),
@@ -57,10 +125,13 @@ func TestCheckRunHandler(t *testing.T) {
 	})
 
 	t.Run("unsupported action id", func(t *testing.T) {
-		signaler := &testSignaler{}
+		signaler := &mockDeploySignaler{}
+		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:         logging.NewNoopCtxLogger(t),
-			TemporalClient: signaler,
+			Logger:            logging.NewNoopCtxLogger(t),
+			RootConfigBuilder: &mockRootConfigBuilder{},
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler:    signaler,
 		}
 		e := event.CheckRun{
 			Action: event.RequestedActionChecksAction{
@@ -74,20 +145,15 @@ func TestCheckRunHandler(t *testing.T) {
 	})
 
 	t.Run("plan signal success", func(t *testing.T) {
-		user := "nish"
+		signaler := &mockDeploySignaler{}
+		user := models.User{Username: "nish"}
 		workflowID := "wfid"
-		signaler := &testSignaler{
-			t:                  t,
-			expectedWorkflowID: workflowID,
-			expectedSignalName: workflows.TerraformPlanReviewSignalName,
-			expectedSignalArg: workflows.TerraformPlanReviewSignalRequest{
-				Status: workflows.ApprovedPlanReviewStatus,
-				User:   user,
-			},
-		}
+		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:         logging.NewNoopCtxLogger(t),
-			TemporalClient: signaler,
+			Logger:            logging.NewNoopCtxLogger(t),
+			RootConfigBuilder: &mockRootConfigBuilder{},
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler:    signaler,
 		}
 		e := event.CheckRun{
 			Action: event.RequestedActionChecksAction{
@@ -103,19 +169,15 @@ func TestCheckRunHandler(t *testing.T) {
 	})
 
 	t.Run("unlock signal success", func(t *testing.T) {
-		user := "nish"
+		user := models.User{Username: "nish"}
 		workflowID := "testrepo||testroot"
-		signaler := &testSignaler{
-			t:                  t,
-			expectedWorkflowID: workflowID,
-			expectedSignalName: workflows.DeployUnlockSignalName,
-			expectedSignalArg: workflows.DeployUnlockSignalRequest{
-				User: user,
-			},
-		}
+		signaler := &mockDeploySignaler{}
+		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:         logging.NewNoopCtxLogger(t),
-			TemporalClient: signaler,
+			Logger:            logging.NewNoopCtxLogger(t),
+			RootConfigBuilder: &mockRootConfigBuilder{},
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler:    signaler,
 		}
 		e := event.CheckRun{
 			Action: event.RequestedActionChecksAction{
@@ -132,7 +194,7 @@ func TestCheckRunHandler(t *testing.T) {
 	})
 
 	t.Run("invalid root name", func(t *testing.T) {
-		user := "nish"
+		user := models.User{Username: "nish"}
 		workflowID := "testrepo||testroot"
 		subject := event.CheckRunHandler{
 			Logger: logging.NewNoopCtxLogger(t),
@@ -151,21 +213,15 @@ func TestCheckRunHandler(t *testing.T) {
 	})
 
 	t.Run("signal error", func(t *testing.T) {
-		user := "nish"
+		signaler := &mockDeploySignaler{error: assert.AnError}
+		user := models.User{Username: "nish"}
 		workflowID := "wfid"
-		signaler := &testSignaler{
-			t:                  t,
-			expectedWorkflowID: workflowID,
-			expectedSignalName: workflows.TerraformPlanReviewSignalName,
-			expectedSignalArg: workflows.TerraformPlanReviewSignalRequest{
-				Status: workflows.ApprovedPlanReviewStatus,
-				User:   user,
-			},
-			expectedErr: assert.AnError,
-		}
+		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:         logging.NewNoopCtxLogger(t),
-			TemporalClient: signaler,
+			Logger:            logging.NewNoopCtxLogger(t),
+			RootConfigBuilder: &mockRootConfigBuilder{},
+			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler:    signaler,
 		}
 		e := event.CheckRun{
 			Action: event.RequestedActionChecksAction{

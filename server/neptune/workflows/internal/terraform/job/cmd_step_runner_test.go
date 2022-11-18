@@ -40,10 +40,6 @@ func testCmdWorkflow(ctx workflow.Context, r request) (string, error) {
 	var a *testCmdExecuteActivity
 	cmdStepRunner := runner.CmdStepRunner{
 		Activity: a,
-		Ref: github.Ref{
-			Name: RefName,
-			Type: RefType,
-		},
 	}
 
 	return cmdStepRunner.Run(jobExecutionCtx, &r.LocalRoot, r.Step)
@@ -58,7 +54,6 @@ func TestRunRunner_ShouldSetupEnvVars(t *testing.T) {
 		"BASE_REPO_NAME":  RepoName,
 		"BASE_REPO_OWNER": RepoOwner,
 		"DIR":             ProjectPath,
-		"HEAD_COMMIT":     "refs/heads/main",
 		"PROJECT_NAME":    ProjectName,
 		"REPO_REL_DIR":    "project",
 	}

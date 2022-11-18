@@ -15,6 +15,7 @@ type Root struct {
 	Apply     execute.Job
 	Plan      PlanJob
 	Trigger   Trigger
+	Rerun     bool
 }
 
 type Trigger string

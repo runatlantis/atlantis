@@ -10,7 +10,6 @@ type Repo struct {
 	URL string
 
 	Credentials AppCredentials
-	Ref         Ref
 }
 
 func (r Repo) GetFullName() string {

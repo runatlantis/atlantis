@@ -25,6 +25,7 @@ type Root struct {
 	PlanMode         PlanMode
 	PlanApprovalType string
 	Trigger          Trigger
+	Rerun            bool
 }
 
 type Job struct {

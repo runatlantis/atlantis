@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -14,7 +13,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
 	"github.com/runatlantis/atlantis/server/vcs"
 	"github.com/stretchr/testify/assert"
-	"go.temporal.io/sdk/client"
 )
 
 const testRoot = "testroot"
@@ -66,11 +64,10 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 		}
 
 		handler := event.PushHandler{
-			Allocator:         allocator,
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    &mockDeploySignaler{},
-			Logger:            logger,
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Allocator:    allocator,
+			Scheduler:    &sync.SynchronousScheduler{Logger: logger},
+			Logger:       logger,
+			RootDeployer: &mockRootDeployer{},
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -103,11 +100,10 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 		}
 
 		handler := event.PushHandler{
-			Allocator:         allocator,
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    &mockDeploySignaler{},
-			Logger:            logger,
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Allocator:    allocator,
+			Scheduler:    &sync.SynchronousScheduler{Logger: logger},
+			Logger:       logger,
+			RootDeployer: &mockRootDeployer{},
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -140,11 +136,10 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 		}
 
 		handler := event.PushHandler{
-			Allocator:         allocator,
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    &mockDeploySignaler{},
-			Logger:            logger,
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Allocator:    allocator,
+			Scheduler:    &sync.SynchronousScheduler{Logger: logger},
+			Logger:       logger,
+			RootDeployer: &mockRootDeployer{},
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -154,9 +149,6 @@ func TestHandlePushEvent_FiltersEvents(t *testing.T) {
 }
 
 func TestHandlePushEvent(t *testing.T) {
-	version, err := version.NewVersion("1.0.3")
-	assert.NoError(t, err)
-
 	logger := logging.NewNoopCtxLogger(t)
 
 	repoFullName := "nish/repo"
@@ -192,11 +184,10 @@ func TestHandlePushEvent(t *testing.T) {
 		}
 
 		handler := event.PushHandler{
-			Allocator:         allocator,
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    &mockDeploySignaler{},
-			Logger:            logger,
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Allocator:    allocator,
+			Scheduler:    &sync.SynchronousScheduler{Logger: logger},
+			Logger:       logger,
+			RootDeployer: &mockRootDeployer{},
 		}
 
 		err := handler.Handle(context.Background(), e)
@@ -214,18 +205,17 @@ func TestHandlePushEvent(t *testing.T) {
 		}
 
 		handler := event.PushHandler{
-			Allocator:         allocator,
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    &mockDeploySignaler{},
-			Logger:            logger,
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Allocator:    allocator,
+			Scheduler:    &sync.SynchronousScheduler{Logger: logger},
+			Logger:       logger,
+			RootDeployer: &mockRootDeployer{},
 		}
 
 		err := handler.Handle(context.Background(), e)
 		assert.NoError(t, err)
 	})
 
-	t.Run("not platform mode", func(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
 		allocator := &testAllocator{
 			expectedAllocation: true,
 			expectedFeatureID:  feature.PlatformMode,
@@ -235,71 +225,18 @@ func TestHandlePushEvent(t *testing.T) {
 			t: t,
 		}
 		ctx := context.Background()
-		rootCfg := valid.MergedProjectCfg{
-			Name: testRoot,
-			DeploymentWorkflow: valid.Workflow{
-				Plan:  valid.DefaultPlanStage,
-				Apply: valid.DefaultApplyStage,
-			},
-			TerraformVersion: version,
-			WorkflowMode:     valid.DefaultWorkflowMode,
-		}
-		rootCfgs := []*valid.MergedProjectCfg{
-			&rootCfg,
-		}
-		rootConfigBuilder := &mockRootConfigBuilder{
-			rootConfigs: rootCfgs,
-		}
 		handler := event.PushHandler{
-			Allocator:         allocator,
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    &mockDeploySignaler{},
-			Logger:            logger,
-			RootConfigBuilder: rootConfigBuilder,
+			Allocator:    allocator,
+			Scheduler:    &sync.SynchronousScheduler{Logger: logger},
+			Logger:       logger,
+			RootDeployer: &mockRootDeployer{},
 		}
 
 		err := handler.Handle(ctx, e)
 		assert.NoError(t, err)
 	})
 
-	t.Run("signal success", func(t *testing.T) {
-		allocator := &testAllocator{
-			expectedAllocation: true,
-			expectedFeatureID:  feature.PlatformMode,
-			expectedFeatureCtx: feature.FeatureContext{
-				RepoName: repoFullName,
-			},
-			t: t,
-		}
-		ctx := context.Background()
-		rootCfg := valid.MergedProjectCfg{
-			Name: testRoot,
-			DeploymentWorkflow: valid.Workflow{
-				Plan:  valid.DefaultPlanStage,
-				Apply: valid.DefaultApplyStage,
-			},
-			TerraformVersion: version,
-			WorkflowMode:     valid.PlatformWorkflowMode,
-		}
-		rootCfgs := []*valid.MergedProjectCfg{
-			&rootCfg,
-		}
-		rootConfigBuilder := &mockRootConfigBuilder{
-			rootConfigs: rootCfgs,
-		}
-		handler := event.PushHandler{
-			Allocator:         allocator,
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    &mockDeploySignaler{run: &testRun{}},
-			Logger:            logger,
-			RootConfigBuilder: rootConfigBuilder,
-		}
-
-		err := handler.Handle(ctx, e)
-		assert.NoError(t, err)
-	})
-
-	t.Run("signal error", func(t *testing.T) {
+	t.Run("root deployer error", func(t *testing.T) {
 		allocator := &testAllocator{
 			expectedAllocation: true,
 			expectedFeatureID:  feature.PlatformMode,
@@ -310,27 +247,11 @@ func TestHandlePushEvent(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		rootCfg := valid.MergedProjectCfg{
-			Name: testRoot,
-			DeploymentWorkflow: valid.Workflow{
-				Plan:  valid.DefaultPlanStage,
-				Apply: valid.DefaultApplyStage,
-			},
-			TerraformVersion: version,
-			WorkflowMode:     valid.PlatformWorkflowMode,
-		}
-		rootCfgs := []*valid.MergedProjectCfg{
-			&rootCfg,
-		}
-		rootConfigBuilder := &mockRootConfigBuilder{
-			rootConfigs: rootCfgs,
-		}
 		handler := event.PushHandler{
-			Allocator:         allocator,
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    &mockDeploySignaler{error: assert.AnError},
-			Logger:            logger,
-			RootConfigBuilder: rootConfigBuilder,
+			Allocator:    allocator,
+			Scheduler:    &sync.SynchronousScheduler{Logger: logger},
+			Logger:       logger,
+			RootDeployer: &mockRootDeployer{error: assert.AnError},
 		}
 
 		err := handler.Handle(ctx, e)
@@ -352,20 +273,10 @@ func convertTestSteps(steps []valid.Step) []workflows.Step {
 	return convertedSteps
 }
 
-type mockDeploySignaler struct {
-	run   client.WorkflowRun
+type mockRootDeployer struct {
 	error error
 }
 
-func (d *mockDeploySignaler) SignalWithStartWorkflow(_ context.Context, _ *valid.MergedProjectCfg, _ models.Repo, _ string, _ int64, _ vcs.Ref, _ models.User, _ workflows.Trigger) (client.WorkflowRun, error) {
-	return d.run, d.error
-}
-
-type mockRootConfigBuilder struct {
-	rootConfigs []*valid.MergedProjectCfg
-	error       error
-}
-
-func (r *mockRootConfigBuilder) Build(_ context.Context, _ models.Repo, _ string, _ string, _ int64, _ event.BuilderOptions) ([]*valid.MergedProjectCfg, error) {
-	return r.rootConfigs, r.error
+func (m *mockRootDeployer) Deploy(_ context.Context, _ event.RootDeployOptions) error {
+	return m.error
 }

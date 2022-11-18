@@ -4,16 +4,12 @@ import (
 	"context"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
-	contextInternal "github.com/runatlantis/atlantis/server/neptune/context"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/sync"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
 	"github.com/runatlantis/atlantis/server/vcs"
-	"go.temporal.io/sdk/client"
 )
 
 type PushAction string
@@ -37,20 +33,15 @@ type scheduler interface {
 	Schedule(ctx context.Context, f sync.Executor) error
 }
 
-type deploySignaler interface {
-	SignalWithStartWorkflow(ctx context.Context, rootCfg *valid.MergedProjectCfg, repo models.Repo, revision string, installationToken int64, ref vcs.Ref, sender models.User, trigger workflows.Trigger) (client.WorkflowRun, error)
-}
-
-type rootConfigBuilder interface {
-	Build(ctx context.Context, repo models.Repo, branch string, sha string, installationToken int64, builderOptions BuilderOptions) ([]*valid.MergedProjectCfg, error)
+type rootDeployer interface {
+	Deploy(ctx context.Context, deployOptions RootDeployOptions) error
 }
 
 type PushHandler struct {
-	Allocator         feature.Allocator
-	Scheduler         scheduler
-	DeploySignaler    deploySignaler
-	Logger            logging.Logger
-	RootConfigBuilder rootConfigBuilder
+	Allocator    feature.Allocator
+	Scheduler    scheduler
+	Logger       logging.Logger
+	RootDeployer rootDeployer
 }
 
 func (p *PushHandler) Handle(ctx context.Context, event Push) error {
@@ -92,34 +83,14 @@ func (p *PushHandler) handle(ctx context.Context, event Push) error {
 			Sha: event.Sha,
 		},
 	}
-	rootCfgs, err := p.RootConfigBuilder.Build(ctx, event.Repo, event.Ref.Name, event.Sha, event.InstallationToken, builderOptions)
-	if err != nil {
-		return errors.Wrap(err, "generating roots")
+	rootDeployOptions := RootDeployOptions{
+		Repo:              event.Repo,
+		Branch:            event.Ref.Name,
+		Revision:          event.Sha,
+		Sender:            event.Sender,
+		InstallationToken: event.InstallationToken,
+		BuilderOptions:    builderOptions,
+		Trigger:           workflows.MergeTrigger,
 	}
-	for _, rootCfg := range rootCfgs {
-		c := context.WithValue(ctx, contextInternal.ProjectKey, rootCfg.Name)
-
-		if rootCfg.WorkflowMode != valid.PlatformWorkflowMode {
-			p.Logger.DebugContext(c, "root is not configured for platform mode, skipping...")
-			continue
-		}
-
-		run, err := p.DeploySignaler.SignalWithStartWorkflow(
-			c,
-			rootCfg,
-			event.Repo,
-			event.Sha,
-			event.InstallationToken,
-			event.Ref,
-			event.Sender,
-			workflows.MergeTrigger)
-		if err != nil {
-			return errors.Wrap(err, "signalling workflow")
-		}
-
-		p.Logger.InfoContext(c, "Signaled workflow.", map[string]interface{}{
-			"workflow-id": run.GetID(), "run-id": run.GetRunID(),
-		})
-	}
-	return nil
+	return p.RootDeployer.Deploy(ctx, rootDeployOptions)
 }

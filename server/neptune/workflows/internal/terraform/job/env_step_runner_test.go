@@ -18,8 +18,6 @@ const (
 	RepoOwner   = "test-owner"
 	ProjectName = "test-project"
 	ProjectPath = "test/repo/project"
-	RefName     = "main"
-	RefType     = "branch"
 )
 
 type request struct {
@@ -45,7 +43,6 @@ func TestEnvRunner_EnvVarValueNotSet(t *testing.T) {
 			"BASE_REPO_NAME":  RepoName,
 			"BASE_REPO_OWNER": RepoOwner,
 			"DIR":             ProjectPath,
-			"HEAD_COMMIT":     "refs/heads/main",
 			"PROJECT_NAME":    ProjectName,
 			"REPO_REL_DIR":    "project",
 		},
