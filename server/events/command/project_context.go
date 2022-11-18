@@ -94,8 +94,7 @@ type ProjectContext struct {
 	ExecutionOrderGroup int
 }
 
-// SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
-// instead of a pointer since we want scopes to mirror our function stack
+// SetScopeTags adds ProjectContext tags to a new returned scope.
 func (p ProjectContext) SetScopeTags(scope tally.Scope) tally.Scope {
 	v := ""
 	if p.TerraformVersion != nil {
