@@ -73,7 +73,7 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 		// specifically use the command name in the context instead of the arg
 		// since we can return multiple commands worth of contexts for a given command name arg
 		// to effectively pipeline them.
-		cmd.SetScope(cmd.CommandName.String())
+		cmd.Scope = cmd.SetScopeTags(cmd.Scope)
 		projectCmds = append(projectCmds, cmd)
 	}
 
