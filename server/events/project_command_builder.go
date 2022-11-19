@@ -277,7 +277,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 	if hasRepoCfg {
 		// If there's a repo cfg with projects then we'll use it to figure out which projects
 		// should be planed.
-		repoCfg, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+		repoCfg, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 		}
