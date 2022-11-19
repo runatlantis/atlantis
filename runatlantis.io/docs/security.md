@@ -15,7 +15,7 @@ Atlantis could be exploited by
       }
     }
     ```
-* Running malicious custom build commands specified in an `atlantis.yaml` file. Atlantis uses the `atlantis.yaml` file from the pull request branch, **not** `master`.
+* Running malicious custom build commands specified in an `atlantis.yaml` file. Atlantis uses the `atlantis.yaml` file from the pull request branch, **not** `main`.
 * Someone adding `atlantis plan/apply` comments on your valid pull requests causing terraform to run when you don't want it to.
 
 ## Bitbucket Cloud (bitbucket.org)
@@ -62,6 +62,13 @@ To prevent this, you could:
 1. Modify your [server-side repo configuration](https://www.runatlantis.io/docs/server-side-repo-config.html)'s `plan` step to validate against the
    use of disallowed providers or data sources or PRs from not allowed users. You could also add in extra validation at this point, e.g.
    requiring a "thumbs-up" on the PR before allowing the `plan` to continue. Conftest could be of use here.
+
+### `--var-file-allowlist`
+The files on your Atlantis install may be accessible as [variable definition files](https://www.terraform.io/language/values/variables#variable-definitions-tfvars-files)
+from pull requests by adding  
+`atlantis plan -- -var-file=/path/to/file` comments. To mitigate this security risk, Atlantis has limited such access
+only to the files allowlisted by the `--var-file-allowlist` flag. If this argument is not provided, it defaults to
+Atlantis' data directory.
 
 ### Webhook Secrets
 Atlantis should be run with Webhook secrets set via the `$ATLANTIS_GH_WEBHOOK_SECRET`/`$ATLANTIS_GITLAB_WEBHOOK_SECRET` environment variables.

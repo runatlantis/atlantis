@@ -1,3 +1,58 @@
+# v0.20.1
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.20.1
+
+# v0.20.0
+
+Broken build due to github action issues
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.20.0
+
+# v0.19.8
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.8
+
+# v0.19.7
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.7
+
+# v0.19.6
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.6
+
+
+# v0.19.5
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.19.5
+
+## Backwards Incompatibilities / Notes:
+* `--var-file-allowlist` flag has been added to restrict the access of files on Atlantis install from pull request
+  comments. Set the flag if you want to explicitly grant the access to files outside the default data directory.
+  
+  Previously, any file could be passed to `-var-file`. Now only files under the directories in the allowlist are permitted.
+
 # v0.19.4
 
 Bugfixes and new Features
@@ -1668,7 +1723,7 @@ These are the changes in detail:
     ```
 
     The `w` group permission was added so that in OpenShift, the random uid can write
-    their own login entry (https://github.com/runatlantis/atlantis/blob/master/docker-entrypoint.sh#L28)
+    their own login entry (https://github.com/runatlantis/atlantis/blob/main/docker-entrypoint.sh#L28)
     which is required because `terraform` expects the running user to have an entry
     in `/etc/passwd`.
 
@@ -2411,7 +2466,7 @@ None
 assume role session with the GitHub username of the user running the Atlantis command
 use the `atlantis_user` terraform variable alongside Terraform's
 [built-in support](https://www.terraform.io/docs/providers/aws/#assume-role) for assume role
-(see https://github.com/runatlantis/atlantis/blob/master/README.md#assume-role-session-names)
+(see https://github.com/runatlantis/atlantis/blob/main/README.md#assume-role-session-names)
 * Atlantis has a docker image now ([#123](https://github.com/hootsuite/atlantis/pull/123)). Here is how you can try it out:
 
 ```bash

@@ -122,6 +122,7 @@ type DefaultCommandRunner struct {
 	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
 	PullStatusFetcher              PullStatusFetcher
 	TeamAllowlistChecker           *TeamAllowlistChecker
+	VarFileAllowlistChecker        *VarFileAllowlistChecker
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -162,7 +163,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx)
+	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, nil)
 
 	if err != nil {
 		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
@@ -172,7 +173,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	autoPlanRunner.Run(ctx, nil)
 
-	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx)
+	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, nil)
 
 	if err != nil {
 		ctx.Log.Err("Error running post-workflow hooks %s.", err)
@@ -203,6 +204,15 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 		return false, nil
 	}
 	return true, nil
+}
+
+// checkVarFilesInPlanCommandAllowlisted checks if paths in a 'plan' command are allowlisted.
+func (c *DefaultCommandRunner) checkVarFilesInPlanCommandAllowlisted(cmd *CommentCommand) error {
+	if cmd == nil || cmd.CommandName() != command.Plan {
+		return nil
+	}
+
+	return c.VarFileAllowlistChecker.Check(cmd.Flags)
 }
 
 // RunCommentCommand executes the command.
@@ -241,6 +251,15 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	// Check if the provided var files in a 'plan' command are allowlisted
+	if err := c.checkVarFilesInPlanCommandAllowlisted(cmd); err != nil {
+		errMsg := fmt.Sprintf("```\n%s\n```", err.Error())
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); commentErr != nil {
+			c.Logger.Err("unable to comment on pull request: %s", commentErr)
+		}
+		return
+	}
+
 	headRepo, pull, err := c.ensureValidRepoMetadata(baseRepo, maybeHeadRepo, maybePull, user, pullNum, log)
 	if err != nil {
 		return
@@ -266,7 +285,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx)
+	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
 		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, cmd.Name.String())
@@ -276,7 +295,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	cmdRunner.Run(ctx, cmd)
 
-	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx)
+	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd)
 
 	if err != nil {
 		ctx.Log.Err("Error running post-workflow hooks %s.", err)

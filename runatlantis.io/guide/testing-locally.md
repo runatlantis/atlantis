@@ -147,7 +147,7 @@ you can use your own user. Here we'll create the access token that Atlantis uses
 set commit statuses.
 
 ### GitHub or GitHub Enterprise Access Token
-- follow [https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-token)
+- Create a [Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-fine-grained-personal-access-token)
 - create a token with **repo** scope
 - set the token as an environment variable
 ```
@@ -163,7 +163,7 @@ TOKEN="{YOUR_TOKEN}"
 ```
 
 ### Bitbucket Cloud (bitbucket.org) Access Token
-- follow [https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/#Create-an-app-password](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/#Create-an-app-password)
+- follow [https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 - Label the password "atlantis"
 - Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - set the token as an environment variable

@@ -166,7 +166,7 @@ func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRe
 	return approved, err
 
 }
-func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	scope := c.StatsScope.SubScope("pull_is_mergeable")
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
@@ -176,7 +176,7 @@ func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullR
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	mergeable, err := c.Client.PullIsMergeable(repo, pull)
+	mergeable, err := c.Client.PullIsMergeable(repo, pull, vcsstatusname)
 
 	if err != nil {
 		executionError.Inc(1)

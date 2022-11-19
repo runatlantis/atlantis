@@ -30,6 +30,7 @@ import (
 	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -61,8 +62,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		AggregateApplyRequirements: mockApplyReqHandler,
 	}
 
-	repoDir, cleanup := TempDir(t)
-	defer cleanup()
+	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		matchers.AnyModelsRepo(),
@@ -111,7 +111,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 	When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-	When(mockRun.Run(ctx, "", repoDir, expEnvs)).ThenReturn("run", nil)
+	When(mockRun.Run(ctx, "", repoDir, expEnvs, true)).ThenReturn("run", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
@@ -127,7 +127,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		case "apply":
 			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 		case "run":
-			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs)
+			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs, true)
 		}
 	}
 }
@@ -268,8 +268,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	ctx := command.ProjectContext{
 		ApplyRequirements: []string{"approved"},
 	}
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
@@ -293,8 +292,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 		},
 		ApplyRequirements: []string{"mergeable"},
 	}
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
@@ -315,8 +313,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	ctx := command.ProjectContext{
 		ApplyRequirements: []string{"undiverged"},
 	}
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
@@ -430,8 +427,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
 				AggregateApplyRequirements: applyReqHandler,
 			}
-			repoDir, cleanup := TempDir(t)
-			defer cleanup()
+			repoDir := t.TempDir()
 			When(mockWorkingDir.GetWorkingDir(
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
@@ -457,7 +453,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 			When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, "", repoDir, expEnvs)).ThenReturn("run", nil)
+			When(mockRun.Run(ctx, "", repoDir, expEnvs, true)).ThenReturn("run", nil)
 			When(mockEnv.Run(ctx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
 
 			res := runner.Apply(ctx)
@@ -473,7 +469,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				case "apply":
 					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs)
+					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs, true)
 				case "env":
 					mockEnv.VerifyWasCalledOnce().Run(ctx, "", "value", repoDir, expEnvs)
 				}
@@ -502,8 +498,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		AggregateApplyRequirements: applyReqHandler,
 		Webhooks:                   mockSender,
 	}
-	repoDir, cleanup := TempDir(t)
-	defer cleanup()
+	repoDir := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
@@ -537,9 +532,11 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	tfClient := tmocks.NewMockClient()
 	tfVersion, err := version.NewVersion("0.12.0")
 	Ok(t, err)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	run := runtime.RunStepRunner{
-		TerraformExecutor: tfClient,
-		DefaultTFVersion:  tfVersion,
+		TerraformExecutor:       tfClient,
+		DefaultTFVersion:        tfVersion,
+		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	env := runtime.EnvStepRunner{
 		RunStepRunner: &run,
@@ -557,8 +554,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 	}
 
-	repoDir, cleanup := TempDir(t)
-	defer cleanup()
+	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		matchers.AnyModelsRepo(),

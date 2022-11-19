@@ -167,7 +167,7 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
@@ -306,7 +306,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest, pullOptions model
 		return fmt.Errorf("the user %s is not found in the organization %s", g.UserName, owner)
 	}
 
-	imageURL := "https://github.com/runatlantis/atlantis/raw/master/runatlantis.io/.vuepress/public/hero.png"
+	imageURL := "https://github.com/runatlantis/atlantis/raw/main/runatlantis.io/.vuepress/public/hero.png"
 	id := azuredevops.IdentityRef{
 		Descriptor: &descriptor,
 		ID:         userID,
@@ -362,8 +362,9 @@ func (g *AzureDevopsClient) MarkdownPullLink(pull models.PullRequest) (string, e
 // repoFullName format owner/project/repo.
 //
 // Ex. runatlantis/atlantis => (runatlantis, atlantis)
-//     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
-//     azuredevops/project/atlantis => (azuredevops, project, atlantis)
+//
+//	gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
+//	azuredevops/project/atlantis => (azuredevops, project, atlantis)
 func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project string, repo string) {
 	firstSlashIdx := strings.Index(repoFullName, "/")
 	lastSlashIdx := strings.LastIndex(repoFullName, "/")
@@ -409,4 +410,8 @@ func GitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
 		Name:  &name,
 		Genre: &genre,
 	}
+}
+
+func (g *AzureDevopsClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
 }

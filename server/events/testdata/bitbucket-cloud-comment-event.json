@@ -99,7 +99,7 @@
         }
       },
       "branch": {
-        "name": "master"
+        "name": "main"
       },
       "repository": {
         "full_name": "lkysow/atlantis-example",

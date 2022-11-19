@@ -1,7 +1,6 @@
 package events
 
 import (
-	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -18,10 +17,11 @@ func NewApplyCommandRunner(
 	autoMerger *AutoMerger,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
-	db *db.BoltDB,
+	backend locking.Backend,
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
+	VCSStatusName string,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
@@ -34,17 +34,18 @@ func NewApplyCommandRunner(
 		autoMerger:                 autoMerger,
 		pullUpdater:                pullUpdater,
 		dbUpdater:                  dbUpdater,
-		DB:                         db,
+		Backend:                    backend,
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		VCSStatusName:              VCSStatusName,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 	}
 }
 
 type ApplyCommandRunner struct {
 	DisableApplyAll      bool
-	DB                   *db.BoltDB
+	Backend              locking.Backend
 	locker               locking.ApplyLockChecker
 	vcsClient            vcs.Client
 	commitStatusUpdater  CommitStatusUpdater
@@ -60,6 +61,7 @@ type ApplyCommandRunner struct {
 	SilenceNoProjects bool
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
+	VCSStatusName              string
 	silenceVCSStatusNoProjects bool
 }
 
@@ -103,7 +105,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	// required the Atlantis status checks to pass, then we've now changed
 	// the mergeability status of the pull request.
 	// This sets the approved, mergeable, and sqlocked status in the context.
-	ctx.PullRequestStatus, err = a.pullReqStatusFetcher.FetchPullStatus(baseRepo, pull)
+	ctx.PullRequestStatus, err = a.pullReqStatusFetcher.FetchPullStatus(baseRepo, pull, a.VCSStatusName)
 	if err != nil {
 		// On error we continue the request with mergeable assumed false.
 		// We want to continue because not all apply's will need this status,
@@ -142,7 +144,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	var result command.Result
 	if a.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running applies in parallel")
-		result = runProjectCmdsParallel(projectCmds, a.prjCmdRunner.Apply, a.parallelPoolSize)
+		result = runProjectCmdsParallelGroups(projectCmds, a.prjCmdRunner.Apply, a.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, a.prjCmdRunner.Apply)
 	}

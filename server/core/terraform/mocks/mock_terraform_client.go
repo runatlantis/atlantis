@@ -4,14 +4,12 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	go_version "github.com/hashicorp/go-version"
 	pegomock "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/core/terraform"
-	"github.com/runatlantis/atlantis/server/events/command"
+	command "github.com/runatlantis/atlantis/server/events/command"
 	logging "github.com/runatlantis/atlantis/server/logging"
+	"reflect"
+	"time"
 )
 
 type MockClient struct {
@@ -46,16 +44,6 @@ func (mock *MockClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 		}
 	}
 	return ret0, ret1
-}
-
-func (mock *MockClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockClient().")
-	}
-	outCh := make(chan terraform.Line)
-	inCh := make(chan string)
-
-	return inCh, outCh
 }
 
 func (mock *MockClient) EnsureVersion(log logging.SimpleLogging, v *go_version.Version) error {
@@ -121,17 +109,17 @@ type MockClient_RunCommandWithVersion_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string, []string, map[string]string, *go_version.Version, string) {
-	log, path, args, envs, v, workspace := c.GetAllCapturedArguments()
-	return log[len(log)-1], path[len(path)-1], args[len(args)-1], envs[len(envs)-1], v[len(v)-1], workspace[len(workspace)-1]
+func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetCapturedArguments() (command.ProjectContext, string, []string, map[string]string, *go_version.Version, string) {
+	ctx, path, args, envs, v, workspace := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], path[len(path)-1], args[len(args)-1], envs[len(envs)-1], v[len(v)-1], workspace[len(workspace)-1]
 }
 
-func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string, _param2 [][]string, _param3 []map[string]string, _param4 []*go_version.Version, _param5 []string) {
+func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 [][]string, _param3 []map[string]string, _param4 []*go_version.Version, _param5 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(logging.SimpleLogging)
+			_param0[u] = param.(command.ProjectContext)
 		}
 		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {

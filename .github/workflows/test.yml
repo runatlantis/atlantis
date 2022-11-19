@@ -3,11 +3,10 @@ name: tester
 on:
   push:
     branches:
-      - "master"
+      - "main"
   pull_request:
     branches:
-      - "master"
-
+      - "main"
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
@@ -15,11 +14,8 @@ concurrency:
 jobs:
   test:
     name: runner / gotest
-    runs-on: ubuntu-latest
-    container: ghcr.io/runatlantis/testing-env:2021.08.31
+    runs-on: ubuntu-22.04
+    container: ghcr.io/runatlantis/testing-env:2022.11.17
     steps:
-      # user in image needs write access to do anything
-      - name: setup
-        run: sudo chmod -R 777 $GITHUB_WORKSPACE /github /__w/_temp
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3.0.2
       - run: make test-all

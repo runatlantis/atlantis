@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
+	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -17,8 +18,7 @@ import (
 
 // Test that we write the file as expected
 func TestGenerateRCFile_WritesFile(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	err := generateRCFile("token", "hostname", tmp)
 	Ok(t, err)
@@ -34,8 +34,7 @@ func TestGenerateRCFile_WritesFile(t *testing.T) {
 // Test that if the file already exists and its contents will be modified if
 // we write our config that we error out.
 func TestGenerateRCFile_WillNotOverwrite(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	rcFile := filepath.Join(tmp, ".terraformrc")
 	err := os.WriteFile(rcFile, []byte("contents"), 0600)
@@ -49,8 +48,7 @@ func TestGenerateRCFile_WillNotOverwrite(t *testing.T) {
 // Test that if the file already exists and its contents will NOT be modified if
 // we write our config that we don't error.
 func TestGenerateRCFile_NoErrIfContentsSame(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	rcFile := filepath.Join(tmp, ".terraformrc")
 	contents := `credentials "app.terraform.io" {
@@ -66,8 +64,7 @@ func TestGenerateRCFile_NoErrIfContentsSame(t *testing.T) {
 // Test that if we can't read the existing file to see if the contents will be
 // the same that we just error out.
 func TestGenerateRCFile_ErrIfCannotRead(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	rcFile := filepath.Join(tmp, ".terraformrc")
 	err := os.WriteFile(rcFile, []byte("can't see me!"), 0000)
@@ -90,7 +87,7 @@ func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
 func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
-	tmp, cleanup := TempDir(t)
+	tmp := t.TempDir()
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
@@ -105,7 +102,6 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 			Num: 2,
 		},
 	}
-	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
@@ -132,7 +128,7 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
-	tmp, cleanup := TempDir(t)
+	tmp := t.TempDir()
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
@@ -152,7 +148,6 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 			Name:     "repo",
 		},
 	}
-	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
@@ -175,7 +170,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
-	tmp, cleanup := TempDir(t)
+	tmp := t.TempDir()
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
@@ -195,7 +190,6 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 			Name:     "repo",
 		},
 	}
-	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
@@ -222,7 +216,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
-	tmp, cleanup := TempDir(t)
+	tmp := t.TempDir()
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
@@ -242,7 +236,6 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 			Name:     "repo",
 		},
 	}
-	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
@@ -270,7 +263,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
-	tmp, cleanup := TempDir(t)
+	tmp := t.TempDir()
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
@@ -290,7 +283,6 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 			Name:     "repo",
 		},
 	}
-	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
@@ -307,7 +299,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
-	tmp, cleanup := TempDir(t)
+	tmp := t.TempDir()
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
@@ -327,7 +319,6 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 			Name:     "repo",
 		},
 	}
-	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
@@ -345,7 +336,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
-	tmp, cleanup := TempDir(t)
+	tmp := t.TempDir()
 	logger := logging.NewNoopLogger(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
@@ -365,7 +356,6 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 			Name:     "repo",
 		},
 	}
-	defer cleanup()
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
@@ -381,7 +371,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	Equals(t, "echo me", out)
 }
 
-func waitCh(ch <-chan Line) (string, error) {
+func waitCh(ch <-chan runtimemodels.Line) (string, error) {
 	var ls []string
 	for line := range ch {
 		if line.Err != nil {

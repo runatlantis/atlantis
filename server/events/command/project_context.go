@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -89,12 +90,25 @@ type ProjectContext struct {
 	DeleteSourceBranchOnMerge bool
 	// UUID for atlantis logs
 	JobID string
+	// The index of order group. Before planning/applying it will use to sort projects. Default is 0.
+	ExecutionOrderGroup int
 }
 
 // SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
 // instead of a pointer since we want scopes to mirror our function stack
 func (p ProjectContext) SetScope(scope string) {
-	p.Scope = p.Scope.SubScope(scope) //nolint
+	v := ""
+	if p.TerraformVersion != nil {
+		v = p.TerraformVersion.String()
+	}
+	p.Scope = p.Scope.SubScope(scope).Tagged(map[string]string{ //nolint
+		"base_repo":         p.BaseRepo.FullName,
+		"pr_number":         strconv.Itoa(p.Pull.Num),
+		"project":           p.ProjectName,
+		"project_path":      p.RepoRelDir,
+		"terraform_version": v,
+		"workspace":         p.Workspace,
+	})
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result

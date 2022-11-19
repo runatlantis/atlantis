@@ -179,7 +179,7 @@ func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string)
 	p.receiverBuffersLock.Unlock()
 }
 
-//Add log line to buffer and send to all current channels
+// Add log line to buffer and send to all current channels
 func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line string) {
 	p.receiverBuffersLock.Lock()
 	for ch := range p.receiverBuffers[jobID] {
@@ -205,7 +205,7 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line strin
 	p.projectOutputBuffersLock.Unlock()
 }
 
-//Remove channel, so client no longer receives Terraform output
+// Remove channel, so client no longer receives Terraform output
 func (p *AsyncProjectCommandOutputHandler) Deregister(jobID string, ch chan string) {
 	p.logger.Debug("Removing channel for %s", jobID)
 	p.receiverBuffersLock.Lock()

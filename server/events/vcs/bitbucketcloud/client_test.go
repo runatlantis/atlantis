@@ -337,7 +337,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				},
 			}, models.PullRequest{
 				Num: 1,
-			})
+			}, "atlantis-test")
 			Ok(t, err)
 			Equals(t, c.ExpMergeable, actMergeable)
 		})

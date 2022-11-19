@@ -16,8 +16,7 @@ var logger logging.SimpleLogging
 
 // Test that we write the file as expected
 func TestWriteGitCreds_WriteFile(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
@@ -32,8 +31,7 @@ func TestWriteGitCreds_WriteFile(t *testing.T) {
 // Test that if the file already exists and it doesn't have the line we would
 // have written, we write it.
 func TestWriteGitCreds_Appends(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	credsFile := filepath.Join(tmp, ".git-credentials")
 	err := os.WriteFile(credsFile, []byte("contents"), 0600)
@@ -51,8 +49,7 @@ func TestWriteGitCreds_Appends(t *testing.T) {
 // Test that if the file already exists and it already has the line expected
 // we do nothing.
 func TestWriteGitCreds_NoModification(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	credsFile := filepath.Join(tmp, ".git-credentials")
 	contents := "line1\nhttps://user:token@hostname\nline2"
@@ -68,8 +65,7 @@ func TestWriteGitCreds_NoModification(t *testing.T) {
 
 // Test that the github app credentials get replaced.
 func TestWriteGitCreds_ReplaceApp(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	credsFile := filepath.Join(tmp, ".git-credentials")
 	contents := "line1\nhttps://x-access-token:v1.87dddddddddddddddd@github.com\nline2"
@@ -86,8 +82,7 @@ func TestWriteGitCreds_ReplaceApp(t *testing.T) {
 
 // Test that the github app credentials get updated when cred file is empty.
 func TestWriteGitCreds_AppendApp(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	credsFile := filepath.Join(tmp, ".git-credentials")
 	contents := ""
@@ -105,8 +100,7 @@ func TestWriteGitCreds_AppendApp(t *testing.T) {
 // Test that if we can't read the existing file to see if the contents will be
 // the same that we just error out.
 func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	credsFile := filepath.Join(tmp, ".git-credentials")
 	err := os.WriteFile(credsFile, []byte("can't see me!"), 0000)
@@ -119,7 +113,7 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 
 // Test that if we can't write, we error out.
 func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
-	credsFile := "/this/dir/does/not/exist/.git-credentials"
+	credsFile := "/this/dir/does/not/exist/.git-credentials" // nolint: gosec
 	expErr := fmt.Sprintf("writing generated .git-credentials file with user, token and hostname to %s: open %s: no such file or directory", credsFile, credsFile)
 	actErr := events.WriteGitCreds("user", "token", "hostname", "/this/dir/does/not/exist", logger, false)
 	ErrEquals(t, expErr, actErr)
@@ -127,8 +121,7 @@ func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
 
 // Test that git is actually configured to use the credentials
 func TestWriteGitCreds_ConfigureGitCredentialHelper(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
@@ -141,8 +134,7 @@ func TestWriteGitCreds_ConfigureGitCredentialHelper(t *testing.T) {
 
 // Test that git is configured to use https instead of ssh
 func TestWriteGitCreds_ConfigureGitUrlOverride(t *testing.T) {
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 
 	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)

@@ -35,8 +35,7 @@ func TestRunVersionStep(t *testing.T) {
 
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.15.0")
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 
 	s := &VersionStepRunner{
 		TerraformExecutor: terraform,

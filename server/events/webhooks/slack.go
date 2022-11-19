@@ -18,7 +18,6 @@ import (
 
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -32,14 +31,6 @@ type SlackWebhook struct {
 func NewSlack(r *regexp.Regexp, channel string, client SlackClient) (*SlackWebhook, error) {
 	if err := client.AuthTest(); err != nil {
 		return nil, fmt.Errorf("testing slack authentication: %s. Verify your slack-token is valid", err)
-	}
-
-	channelExists, err := client.ChannelExists(channel)
-	if err != nil {
-		return nil, err
-	}
-	if !channelExists {
-		return nil, errors.Errorf("slack channel %q doesn't exist", channel)
 	}
 
 	return &SlackWebhook{

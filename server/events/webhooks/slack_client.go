@@ -16,7 +16,7 @@ package webhooks
 import (
 	"fmt"
 
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 )
 
 const (
@@ -30,7 +30,6 @@ const (
 type SlackClient interface {
 	AuthTest() error
 	TokenIsSet() bool
-	ChannelExists(channelName string) (bool, error)
 	PostMessage(channel string, applyResult ApplyResult) error
 }
 
@@ -41,7 +40,7 @@ type SlackClient interface {
 type UnderlyingSlackClient interface {
 	AuthTest() (response *slack.AuthTestResponse, error error)
 	GetConversations(conversationParams *slack.GetConversationsParameters) (channels []slack.Channel, nextCursor string, err error)
-	PostMessage(channel, text string, parameters slack.PostMessageParameters) (string, string, error)
+	PostMessage(channelID string, options ...slack.MsgOption) (string, string, error)
 }
 
 type DefaultSlackClient struct {
@@ -65,37 +64,14 @@ func (d *DefaultSlackClient) TokenIsSet() bool {
 	return d.Token != ""
 }
 
-func (d *DefaultSlackClient) ChannelExists(channelName string) (bool, error) {
-	var (
-		cursor   string
-		channels []slack.Channel
-		err      error
-	)
-
-	for {
-		channels, cursor, err = d.Slack.GetConversations(&slack.GetConversationsParameters{Cursor: cursor})
-		if err != nil {
-			return false, err
-		}
-		for _, channel := range channels {
-			if channel.Name == channelName {
-				return true, nil
-			}
-		}
-		if cursor == "" {
-			break
-		}
-	}
-
-	return false, nil
-}
-
 func (d *DefaultSlackClient) PostMessage(channel string, applyResult ApplyResult) error {
-	params := slack.NewPostMessageParameters()
-	params.Attachments = d.createAttachments(applyResult)
-	params.AsUser = true
-	params.EscapeText = false
-	_, _, err := d.Slack.PostMessage(channel, "", params)
+	attachments := d.createAttachments(applyResult)
+	_, _, err := d.Slack.PostMessage(
+		channel,
+		slack.MsgOptionAsUser(true),
+		slack.MsgOptionText("", false),
+		slack.MsgOptionAttachments(attachments[0]),
+	)
 	return err
 }
 

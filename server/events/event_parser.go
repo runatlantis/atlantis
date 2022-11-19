@@ -198,6 +198,12 @@ type EventParsing interface {
 		pull models.PullRequest, pullEventType models.PullRequestEventType,
 		baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 
+	// ParseGitlabMergeRequestUpdateEvent dives deeper into Gitlab merge request update events to check
+	// if Atlantis should handle events or not. Atlantis should ignore events which dont change the MR content
+	// We assume that 1 event carries multiple events, so firstly need to check for events triggering Atlantis planning
+	// Default 'unknown' event to 'models.UpdatedPullEvent'
+	ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent) models.PullRequestEventType
+
 	// ParseGitlabMergeRequestCommentEvent parses GitLab merge request comment
 	// events.
 	// baseRepo is the repo the merge request will be merged into.
@@ -209,6 +215,8 @@ type EventParsing interface {
 	// ParseGitlabMergeRequest parses the response from the GitLab API endpoint
 	// that returns a merge request.
 	ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest
+
+	ParseAPIPlanRequest(vcsHostType models.VCSHostType, path string, cloneURL string) (baseRepo models.Repo, err error)
 
 	// ParseBitbucketCloudPullEvent parses a pull request event from Bitbucket
 	// Cloud (bitbucket.org).
@@ -295,6 +303,16 @@ type EventParser struct {
 	BitbucketServerURL string
 	AzureDevopsToken   string
 	AzureDevopsUser    string
+}
+
+func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFullName string, cloneURL string) (models.Repo, error) {
+	switch vcsHostType {
+	case models.Github:
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, e.GithubToken)
+	case models.Gitlab:
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
+	}
+	return models.Repo{}, fmt.Errorf("not implemented")
 }
 
 // GetBitbucketCloudPullEventType returns the type of the pull request
@@ -538,6 +556,36 @@ func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, e
 	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
 }
 
+// ParseGitlabMergeRequestUpdateEvent dives deeper into Gitlab merge request update events
+func (e *EventParser) ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent) models.PullRequestEventType {
+	// New commit to opened MR
+	if len(event.ObjectAttributes.OldRev) > 0 {
+		return models.UpdatedPullEvent
+	}
+
+	// Update Assignee
+	if len(event.Changes.Assignees.Previous) > 0 || len(event.Changes.Assignees.Current) > 0 {
+		return models.OtherPullEvent
+	}
+
+	// Update Description
+	if len(event.Changes.Description.Previous) > 0 || len(event.Changes.Description.Current) > 0 {
+		return models.OtherPullEvent
+	}
+
+	// Update Labels
+	if len(event.Changes.Labels.Previous) > 0 || len(event.Changes.Labels.Current) > 0 {
+		return models.OtherPullEvent
+	}
+
+	//Update Title
+	if len(event.Changes.Title.Previous) > 0 || len(event.Changes.Title.Current) > 0 {
+		return models.OtherPullEvent
+	}
+
+	return models.UpdatedPullEvent
+}
+
 // ParseGitlabMergeRequestEvent parses GitLab merge request events.
 // pull is the parsed merge request.
 // See EventParsing for return value docs.
@@ -569,15 +617,23 @@ func (e *EventParser) ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (pul
 		BaseRepo:   baseRepo,
 	}
 
-	switch event.ObjectAttributes.Action {
-	case "open":
-		eventType = models.OpenedPullEvent
-	case "update":
-		eventType = models.UpdatedPullEvent
-	case "merge", "close":
-		eventType = models.ClosedPullEvent
-	default:
+	// If it's a draft PR we ignore it for auto-planning if configured to do so
+	// however it's still possible for users to run plan on it manually via a
+	// comment so if any draft PR is closed we still need to check if we need
+	// to delete its locks.
+	if event.ObjectAttributes.WorkInProgress && event.ObjectAttributes.Action != "close" && !e.AllowDraftPRs {
 		eventType = models.OtherPullEvent
+	} else {
+		switch event.ObjectAttributes.Action {
+		case "open":
+			eventType = models.OpenedPullEvent
+		case "update":
+			eventType = e.ParseGitlabMergeRequestUpdateEvent(event)
+		case "merge", "close":
+			eventType = models.ClosedPullEvent
+		default:
+			eventType = models.OtherPullEvent
+		}
 	}
 
 	user = models.User{
@@ -867,10 +923,8 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 
 		if strings.Contains(uri.Host, "visualstudio.com") {
 			owner = strings.Split(uri.Host, ".")[0]
-		} else if strings.Contains(uri.Host, "dev.azure.com") {
-			owner = strings.Split(uri.Path, "/")[1]
 		} else {
-			owner = strings.Split(uri.Path, "/")[1] // to support owner for self hosted
+			owner = strings.Split(uri.Path, "/")[1]
 		}
 	}
 

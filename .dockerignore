@@ -6,3 +6,4 @@
 !go.mod
 !go.sum
 !docker-entrypoint.sh
+!atlantis

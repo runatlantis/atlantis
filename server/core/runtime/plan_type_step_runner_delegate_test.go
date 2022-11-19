@@ -41,8 +41,7 @@ func TestRunDelegate(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.12.0")
 
 	t.Run("Remote Runner Success", func(t *testing.T) {
-		tmpDir, cleanup := TempDir(t)
-		defer cleanup()
+		tmpDir := t.TempDir()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
 		err := os.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 		Ok(t, err)
@@ -70,8 +69,7 @@ func TestRunDelegate(t *testing.T) {
 	})
 
 	t.Run("Remote Runner Failure", func(t *testing.T) {
-		tmpDir, cleanup := TempDir(t)
-		defer cleanup()
+		tmpDir := t.TempDir()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
 		err := os.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 		Ok(t, err)
@@ -99,8 +97,7 @@ func TestRunDelegate(t *testing.T) {
 	})
 
 	t.Run("Local Runner Success", func(t *testing.T) {
-		tmpDir, cleanup := TempDir(t)
-		defer cleanup()
+		tmpDir := t.TempDir()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
 		err := os.WriteFile(planPath, []byte(planFileContents), 0600)
 		Ok(t, err)
@@ -128,8 +125,7 @@ func TestRunDelegate(t *testing.T) {
 	})
 
 	t.Run("Local Runner Failure", func(t *testing.T) {
-		tmpDir, cleanup := TempDir(t)
-		defer cleanup()
+		tmpDir := t.TempDir()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
 		err := os.WriteFile(planPath, []byte(planFileContents), 0600)
 		Ok(t, err)

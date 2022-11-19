@@ -7,7 +7,16 @@ import (
 )
 
 type Metrics struct {
-	Statsd *Statsd `yaml:"statsd" json:"statsd"`
+	Statsd     *Statsd     `yaml:"statsd" json:"statsd"`
+	Prometheus *Prometheus `yaml:"prometheus" json:"prometheus"`
+}
+
+type Prometheus struct {
+	Endpoint string `yaml:"endpoint" json:"endpoint"`
+}
+
+func (p *Prometheus) Validate() error {
+	return validation.ValidateStruct(p, validation.Field(&p.Endpoint, validation.Required))
 }
 
 type Statsd struct {
@@ -19,14 +28,16 @@ func (s *Statsd) Validate() error {
 	return validation.ValidateStruct(s,
 		validation.Field(&s.Host, validation.Required),
 		validation.Field(&s.Port, validation.Required),
-		validation.Field(&s.Host, is.IP),
+		validation.Field(&s.Host, is.Host),
 		validation.Field(&s.Port, is.Int))
 }
 
 func (m Metrics) Validate() error {
-	return validation.ValidateStruct(&m,
-		validation.Field(&m.Statsd),
+	res := validation.ValidateStruct(&m,
+		validation.Field(&m.Statsd, validation.NilOrNotEmpty),
+		validation.Field(&m.Prometheus, validation.NilOrNotEmpty),
 	)
+	return res
 }
 
 func (m Metrics) ToValid() valid.Metrics {
@@ -39,6 +50,12 @@ func (m Metrics) ToValid() valid.Metrics {
 			},
 		}
 	}
-
+	if m.Prometheus != nil {
+		return valid.Metrics{
+			Prometheus: &valid.Prometheus{
+				Endpoint: m.Prometheus.Endpoint,
+			},
+		}
+	}
 	return valid.Metrics{}
 }

@@ -2,4 +2,4 @@
 
 ## Reporting a Vulnerability
 
-We take security issues seriously. Please email us directly at security [at] runatlantis.io instead of opening an issue.
+We take security issues seriously. Please report a security vulnerability to the maintainers using [private vulnerability reporting](https://github.com/runatlantis/atlantis/security/advisories/new).
