@@ -35,6 +35,11 @@ import (
 // by GitHub.
 const maxCommentLength = 65536
 
+var (
+	clientMutationID            = githubv4.NewString("atlantis")
+	pullRequestDismissalMessage = *githubv4.NewString("Dismissing reviews because of plan changes")
+)
+
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
 	user     string
@@ -271,6 +276,100 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 		nextPage = resp.NextPage
 	}
 	return approvalStatus, nil
+}
+
+func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+	// TODO pagination
+
+	// {
+	//  repository(owner: "secustor", name: "renovate_terraform_lock_in_subdirectory") {
+	//    pullRequest(number: 13) {
+	//      reviewDecision
+	//      reviews(first: 10, states: APPROVED) {
+	//        pageInfo {
+	//          endCursor
+	//          hasNextPage
+	//        }
+	//        nodes {
+	//          id
+	//          submittedAt
+	//          author {
+	//            login
+	//          }
+	//        }
+	//      }
+	//    }
+	//  }
+	//}
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				ReviewDecision githubv4.String
+				Reviews        struct {
+					Nodes []struct {
+						Id          githubv4.ID
+						SubmittedAt githubv4.DateTime
+						Author      struct {
+							Login githubv4.String
+						}
+					}
+					// contains pagination information
+					PageInfo struct {
+						EndCursor   githubv4.String
+						HasNextPage githubv4.Boolean
+					}
+				} `graphql:"reviews(first: $entries, states: $reviewState)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":       githubv4.String(repo.Owner),
+		"name":        githubv4.String(repo.Name),
+		"number":      githubv4.Int(pull.Num),
+		"entries":     githubv4.Int(10),
+		"reviewState": []githubv4.PullRequestReviewState{githubv4.PullRequestReviewStateApproved},
+	}
+
+	err := g.v4Client.Query(g.ctx, &query, variables)
+	if err != nil {
+		return errors.Wrap(err, "getting reviewDecision")
+	}
+
+	// mutation ($input: DismissPullRequestReviewInput!) {
+	//  dismissPullRequestReview(input: $input) {
+	//
+	//    pullRequestReview {
+	//      id
+	//    }
+	//  }
+	//}
+	var mutation struct {
+		DismissPullRequestReview struct {
+			PullRequestReview struct {
+				Id githubv4.ID
+			}
+		} `graphql:"dismissPullRequestReview(input: $input)"`
+	}
+	for _, review := range query.Repository.PullRequest.Reviews.Nodes {
+		// {
+		//  "input": {
+		//    "message": "This is a test",
+		//    "pullRequestReviewId": "PRR_kwDOFxULt85GwUSw"
+		//  }
+		//}
+		input := githubv4.DismissPullRequestReviewInput{
+			PullRequestReviewID: review.Id,
+			Message:             pullRequestDismissalMessage,
+			ClientMutationID:    clientMutationID,
+		}
+		mutationResult := &mutation
+		err = g.v4Client.Mutate(g.ctx, mutationResult, input, nil)
+		if err != nil {
+			return errors.Wrap(err, "dismissing reviewDecision")
+		}
+	}
+	return nil
 }
 
 // isRequiredCheck is a helper function to determine if a check is required or not

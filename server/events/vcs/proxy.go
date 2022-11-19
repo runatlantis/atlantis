@@ -68,6 +68,10 @@ func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) 
 	return d.clients[repo.VCSHost.Type].PullIsApproved(repo, pull)
 }
 
+func (d *ClientProxy) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+	return d.clients[repo.VCSHost.Type].DiscardReviews(repo, pull)
+}
+
 func (d *ClientProxy) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	return d.clients[repo.VCSHost.Type].PullIsMergeable(repo, pull, vcsstatusname)
 }
