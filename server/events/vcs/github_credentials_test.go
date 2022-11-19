@@ -30,7 +30,7 @@ func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 	user, err := appCreds.GetUser()
 	Ok(t, err)
 
-	Assert(t, user == "Octocat App[bot]", "user should not empty")
+	Assert(t, user == "octoapp[bot]", "user should not empty")
 }
 
 func TestGithubClient_AppAuthentication(t *testing.T) {
