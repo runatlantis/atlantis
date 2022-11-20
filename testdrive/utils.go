@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -31,17 +30,17 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 const hashicorpReleasesURL = "https://releases.hashicorp.com"
-const terraformVersion = "0.10.8"
+const terraformVersion = "1.3.5"
 const ngrokDownloadURL = "https://bin.equinox.io/c/4VmDzA7iaHb"
 const ngrokAPIURL = "localhost:41414" // We hope this isn't used.
 const atlantisPort = 4141
 
 func readPassword() (string, error) {
-	password, err := terminal.ReadPassword(int(syscall.Stdin)) // nolint: unconvert
+	password, err := term.ReadPassword(int(syscall.Stdin)) // nolint: unconvert
 	return string(password), err
 }
 
@@ -123,7 +122,7 @@ func getTunnelAddr() (string, error) {
 
 	var t tunnels
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", errors.Wrap(err, "reading ngrok api")
 	}
@@ -214,7 +213,7 @@ func execAndWaitForStderr(wg *sync.WaitGroup, stderrMatch *regexp.Regexp, timeou
 		cancel()
 		// We still need to wait for the command to finish.
 		command.Wait()                                                  // nolint: errcheck
-		return cancel, errChan, fmt.Errorf("timeout, logs:\n%s\n", log) // nolint: staticcheck, golint
+		return cancel, errChan, fmt.Errorf("timeout, logs:\n%s\n", log) // nolint: staticcheck, revive
 	}
 
 	// Increment the wait group so callers can wait for the command to finish.

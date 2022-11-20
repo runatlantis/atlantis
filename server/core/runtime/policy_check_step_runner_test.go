@@ -6,9 +6,10 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime/mocks"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -21,7 +22,7 @@ func TestRun(t *testing.T) {
 	workdir := "/path"
 	executablePath := "some/path/conftest"
 
-	context := models.ProjectCommandContext{
+	context := command.ProjectContext{
 		Log:                logger,
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,

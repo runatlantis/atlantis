@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-github/v31/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
@@ -36,7 +37,7 @@ const usagesCols = 90
 // PullCommand is a command to run on a pull request.
 type PullCommand interface {
 	// CommandName is the name of the command we're running.
-	CommandName() models.CommandName
+	CommandName() command.Name
 	// IsVerbose is true if the output of this command should be verbose.
 	IsVerbose() bool
 	// IsAutoplan is true if this is an autoplan command vs. a comment command.
@@ -48,8 +49,8 @@ type PullCommand interface {
 type PolicyCheckCommand struct{}
 
 // CommandName is policy_check.
-func (c PolicyCheckCommand) CommandName() models.CommandName {
-	return models.PolicyCheckCommand
+func (c PolicyCheckCommand) CommandName() command.Name {
+	return command.PolicyCheck
 }
 
 // IsVerbose is false for policy_check commands.
@@ -67,8 +68,8 @@ func (c PolicyCheckCommand) IsAutoplan() bool {
 type AutoplanCommand struct{}
 
 // CommandName is plan.
-func (c AutoplanCommand) CommandName() models.CommandName {
-	return models.PlanCommand
+func (c AutoplanCommand) CommandName() command.Name {
+	return command.Plan
 }
 
 // IsVerbose is false for autoplan commands.
@@ -90,7 +91,7 @@ type CommentCommand struct {
 	// ex. atlantis plan -- -target=resource
 	Flags []string
 	// Name is the name of the command the comment specified.
-	Name models.CommandName
+	Name command.Name
 	// AutoMergeDisabled is true if the command should not automerge after apply.
 	AutoMergeDisabled bool
 	// Verbose is true if the command should output verbosely.
@@ -112,7 +113,7 @@ func (c CommentCommand) IsForSpecificProject() bool {
 }
 
 // CommandName returns the name of this command.
-func (c CommentCommand) CommandName() models.CommandName {
+func (c CommentCommand) CommandName() command.Name {
 	return c.Name
 }
 
@@ -132,7 +133,7 @@ func (c CommentCommand) String() string {
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name models.CommandName, verbose, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, verbose, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -197,6 +198,12 @@ type EventParsing interface {
 		pull models.PullRequest, pullEventType models.PullRequestEventType,
 		baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 
+	// ParseGitlabMergeRequestUpdateEvent dives deeper into Gitlab merge request update events to check
+	// if Atlantis should handle events or not. Atlantis should ignore events which dont change the MR content
+	// We assume that 1 event carries multiple events, so firstly need to check for events triggering Atlantis planning
+	// Default 'unknown' event to 'models.UpdatedPullEvent'
+	ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent) models.PullRequestEventType
+
 	// ParseGitlabMergeRequestCommentEvent parses GitLab merge request comment
 	// events.
 	// baseRepo is the repo the merge request will be merged into.
@@ -208,6 +215,8 @@ type EventParsing interface {
 	// ParseGitlabMergeRequest parses the response from the GitLab API endpoint
 	// that returns a merge request.
 	ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest
+
+	ParseAPIPlanRequest(vcsHostType models.VCSHostType, path string, cloneURL string) (baseRepo models.Repo, err error)
 
 	// ParseBitbucketCloudPullEvent parses a pull request event from Bitbucket
 	// Cloud (bitbucket.org).
@@ -296,6 +305,16 @@ type EventParser struct {
 	AzureDevopsUser    string
 }
 
+func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFullName string, cloneURL string) (models.Repo, error) {
+	switch vcsHostType {
+	case models.Github:
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, e.GithubToken)
+	case models.Gitlab:
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
+	}
+	return models.Repo{}, fmt.Errorf("not implemented")
+}
+
 // GetBitbucketCloudPullEventType returns the type of the pull request
 // event given the Bitbucket Cloud header.
 func (e *EventParser) GetBitbucketCloudPullEventType(eventTypeHeader string) models.PullRequestEventType {
@@ -369,12 +388,12 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		URL:        *event.PullRequest.Links.HTML.HREF,
 		HeadBranch: *event.PullRequest.Source.Branch.Name,
 		BaseBranch: *event.PullRequest.Destination.Branch.Name,
-		Author:     *event.Actor.Nickname,
+		Author:     *event.Actor.AccountID,
 		State:      prState,
 		BaseRepo:   baseRepo,
 	}
 	user = models.User{
-		Username: *event.Actor.Nickname,
+		Username: *event.Actor.AccountID,
 	}
 	return
 }
@@ -537,6 +556,36 @@ func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, e
 	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
 }
 
+// ParseGitlabMergeRequestUpdateEvent dives deeper into Gitlab merge request update events
+func (e *EventParser) ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent) models.PullRequestEventType {
+	// New commit to opened MR
+	if len(event.ObjectAttributes.OldRev) > 0 {
+		return models.UpdatedPullEvent
+	}
+
+	// Update Assignee
+	if len(event.Changes.Assignees.Previous) > 0 || len(event.Changes.Assignees.Current) > 0 {
+		return models.OtherPullEvent
+	}
+
+	// Update Description
+	if len(event.Changes.Description.Previous) > 0 || len(event.Changes.Description.Current) > 0 {
+		return models.OtherPullEvent
+	}
+
+	// Update Labels
+	if len(event.Changes.Labels.Previous) > 0 || len(event.Changes.Labels.Current) > 0 {
+		return models.OtherPullEvent
+	}
+
+	//Update Title
+	if len(event.Changes.Title.Previous) > 0 || len(event.Changes.Title.Current) > 0 {
+		return models.OtherPullEvent
+	}
+
+	return models.UpdatedPullEvent
+}
+
 // ParseGitlabMergeRequestEvent parses GitLab merge request events.
 // pull is the parsed merge request.
 // See EventParsing for return value docs.
@@ -568,15 +617,23 @@ func (e *EventParser) ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (pul
 		BaseRepo:   baseRepo,
 	}
 
-	switch event.ObjectAttributes.Action {
-	case "open":
-		eventType = models.OpenedPullEvent
-	case "update":
-		eventType = models.UpdatedPullEvent
-	case "merge", "close":
-		eventType = models.ClosedPullEvent
-	default:
+	// If it's a draft PR we ignore it for auto-planning if configured to do so
+	// however it's still possible for users to run plan on it manually via a
+	// comment so if any draft PR is closed we still need to check if we need
+	// to delete its locks.
+	if event.ObjectAttributes.WorkInProgress && event.ObjectAttributes.Action != "close" && !e.AllowDraftPRs {
 		eventType = models.OtherPullEvent
+	} else {
+		switch event.ObjectAttributes.Action {
+		case "open":
+			eventType = models.OpenedPullEvent
+		case "update":
+			eventType = e.ParseGitlabMergeRequestUpdateEvent(event)
+		case "merge", "close":
+			eventType = models.ClosedPullEvent
+		default:
+			eventType = models.OtherPullEvent
+		}
 	}
 
 	user = models.User{
@@ -636,7 +693,9 @@ func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo 
 // event given the Bitbucket Server header.
 func (e *EventParser) GetBitbucketServerPullEventType(eventTypeHeader string) models.PullRequestEventType {
 	switch eventTypeHeader {
-	case bitbucketserver.PullCreatedHeader:
+	// PullFromRefUpdatedHeader event occurs on OPEN state pull request
+	// so no additional checks are needed.
+	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullFromRefUpdatedHeader:
 		return models.OpenedPullEvent
 	case bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader, bitbucketserver.PullDeletedHeader:
 		return models.ClosedPullEvent
@@ -786,6 +845,7 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 		err = errors.New("url is null")
 		return
 	}
+
 	headBranch := pull.GetSourceRefName()
 	if headBranch == "" {
 		err = errors.New("sourceRefName (branch name) is null")
@@ -851,19 +911,20 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	teamProject := adRepo.GetProject()
 	parent := adRepo.GetParentRepository()
 	owner := ""
+
+	uri, err := url.Parse(adRepo.GetWebURL())
+	if err != nil {
+		return models.Repo{}, err
+	}
+
 	if parent != nil {
 		owner = parent.GetName()
 	} else {
-		uri, err := url.Parse(adRepo.GetWebURL())
-		if err != nil {
-			return models.Repo{}, err
-		}
+
 		if strings.Contains(uri.Host, "visualstudio.com") {
 			owner = strings.Split(uri.Host, ".")[0]
-		} else if strings.Contains(uri.Host, "dev.azure.com") {
-			owner = strings.Split(uri.Path, "/")[1]
 		} else {
-			owner = ""
+			owner = strings.Split(uri.Path, "/")[1]
 		}
 	}
 
@@ -872,7 +933,14 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	// https://docs.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#switch-existing-organizations-to-use-the-new-domain-name-url
 	project := teamProject.GetName()
 	repo := adRepo.GetName()
-	cloneURL := fmt.Sprintf("https://dev.azure.com/%s/%s/_git/%s", owner, project, repo)
+
+	host := uri.Host
+	if host == "" {
+		host = "dev.azure.com"
+	}
+
+	cloneURL := fmt.Sprintf("https://%s/%s/%s/_git/%s", host, owner, project, repo)
+	fmt.Println("%", cloneURL)
 	fullName := fmt.Sprintf("%s/%s/%s", owner, project, repo)
 	return models.NewRepo(models.AzureDevops, fullName, cloneURL, e.AzureDevopsUser, e.AzureDevopsToken)
 }

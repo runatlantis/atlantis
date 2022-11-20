@@ -2,9 +2,9 @@ package bitbucketcloud_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -181,7 +181,7 @@ func TestClient_PullIsApproved(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			json, err := ioutil.ReadFile(filepath.Join("testdata", c.testdata))
+			json, err := os.ReadFile(filepath.Join("testdata", c.testdata))
 			Ok(t, err)
 			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.RequestURI {
@@ -202,14 +202,14 @@ func TestClient_PullIsApproved(t *testing.T) {
 
 			repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "https://bitbucket.org/owner/repo.git", "user", "token")
 			Ok(t, err)
-			approved, err := client.PullIsApproved(repo, models.PullRequest{
+			approvalStatus, err := client.PullIsApproved(repo, models.PullRequest{
 				Num:        1,
 				HeadBranch: "branch",
 				Author:     "author",
 				BaseRepo:   repo,
 			})
 			Ok(t, err)
-			Equals(t, c.exp, approved)
+			Equals(t, c.exp, approvalStatus.IsApproved)
 		})
 	}
 }
@@ -337,7 +337,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				},
 			}, models.PullRequest{
 				Num: 1,
-			})
+			}, "atlantis-test")
 			Ok(t, err)
 			Equals(t, c.ExpMergeable, actMergeable)
 		})

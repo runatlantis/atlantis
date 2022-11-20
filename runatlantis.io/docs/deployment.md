@@ -12,7 +12,7 @@ This page covers getting Atlantis up and running in your infrastructure.
 ### Runtime
 Atlantis is a simple [Go](https://golang.org/) app. It receives webhooks from
 your Git host and executes Terraform commands locally. There is an official
-Atlantis [Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
+Atlantis [Docker image](https://ghcr.io/runatlantis/atlantis).
 
 ### Routing
 Atlantis and your Git host need to be able to route and communicate with one another. Your Git host needs to be able to send webhooks to Atlantis and Atlantis needs to be able to make API calls to your Git host.
@@ -63,17 +63,18 @@ To install:
       token: bar
       secret: baz
     ```
-1. Edit `values.yaml` and set your `orgWhitelist` (see [Repo Whitelist](server-configuration.html#repo-whitelist) for more information)
+1. Edit `values.yaml` and set your `orgAllowlist` (see [Repo Allowlist](server-configuration.md#repo-allowlist) for more information)
     ```yaml
-    orgWhitelist: github.com/runatlantis/*
+    orgAllowlist: github.com/runatlantis/*
     ```
-1. Configure any other variables (see [https://github.com/helm/charts/tree/master/stable/atlantis#customization](https://github.com/helm/charts/tree/master/stable/atlantis#customization)
+    **Note**: For helm chart version < `4.0.2`, `orgWhitelist` must be used instead. 
+1. Configure any other variables (see [https://github.com/runatlantis/helm-charts#customization](https://github.com/runatlantis/helm-charts#customization)
     for documentation)
 1. Run
     ```sh
     helm install atlantis runatlantis/atlantis -f values.yaml
     ```
-    
+
     If you are using helm v2, run:
     ```sh
     helm install -f values.yaml runatlantis/atlantis
@@ -103,7 +104,7 @@ If you're using Bitbucket Cloud then there is no webhook secret since it's not s
 :::
 
 Next, edit the manifests below as follows:
-1. Replace `<VERSION>` in `image: runatlantis/atlantis:<VERSION>` with the most recent version from [https://github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest).
+1. Replace `<VERSION>` in `image: ghcr.io/runatlantis/atlantis:<VERSION>` with the most recent version from [https://github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest).
     * NOTE: You never want to run with `:latest` because if your Pod moves to a new node, Kubernetes will pull the latest image and you might end
 up upgrading Atlantis by accident!
 2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_ALLOWLIST` with the allowlist pattern
@@ -149,7 +150,7 @@ spec:
         fsGroup: 1000 # Atlantis group (1000) read/write access to volumes.
       containers:
       - name: atlantis
-        image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
+        image: ghcr.io/runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
         - name: ATLANTIS_REPO_ALLOWLIST
           value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
@@ -297,7 +298,7 @@ spec:
     spec:
       containers:
       - name: atlantis
-        image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
+        image: ghcr.io/runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
         - name: ATLANTIS_REPO_ALLOWLIST
           value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
@@ -524,7 +525,7 @@ OpenShift runs Docker images with random user id's that use `/` as their home di
 
 ### AWS Fargate
 If you'd like to run Atlantis on [AWS Fargate](https://aws.amazon.com/fargate/)
- check out the Atlantis module on the [Terraform Module Registry](https://tf-registry.herokuapp.com/modules/terraform-aws-modules/atlantis/aws/latest)
+ check out the Atlantis module on the [Terraform Module Registry](https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws/latest)
  and then check out the [Next Steps](#next-steps).
 
 ### Google Kubernetes Engine (GKE)
@@ -536,14 +537,14 @@ Cloud Storage Backend and TLS certs: [https://github.com/sethvargo/atlantis-on-g
 Once you're done, see [Next Steps](#next-steps).
 
 ### Docker
-Atlantis has an [official](https://hub.docker.com/r/runatlantis/atlantis/) Docker image: `runatlantis/atlantis`.
+Atlantis has an [official](https://ghcr.io/runatlantis/atlantis) Docker image: `ghcr.io/runatlantis/atlantis`.
 
 #### Customization
 If you need to modify the Docker image that we provide, for instance to add the terragrunt binary, you can do something like this:
 
 1. Create a custom docker file
     ```dockerfile
-    FROM runatlantis/atlantis:{latest version}
+    FROM ghcr.io/runatlantis/atlantis:{latest version}
 
     # copy a terraform binary of the version you need
     COPY terragrunt /usr/local/bin/terragrunt
@@ -567,7 +568,7 @@ Another option is [Azure Container Instances](https://docs.microsoft.com/en-us/a
 ### Roll Your Own
 If you want to roll your own Atlantis installation, you can get the `atlantis`
 binary from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
-or use the [official Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
+or use the [official Docker image](https://ghcr.io/runatlantis/atlantis).
 
 #### Startup Command
 The exact flags to `atlantis server` depends on your Git host:

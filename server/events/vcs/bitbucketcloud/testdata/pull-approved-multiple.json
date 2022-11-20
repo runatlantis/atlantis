@@ -82,7 +82,7 @@
       "uuid": "{94189367-116b-436a-9f77-2314b97a6067}"
     },
     "branch": {
-      "name": "master"
+      "name": "main"
     }
   },
   "created_on": "2019-02-12T16:48:04.251028+00:00",
@@ -136,7 +136,6 @@
       "type": "participant",
       "approved": false,
       "user": {
-        "username": "lkysow",
         "display_name": "Luke",
         "uuid": "{bf34a99b-8a11-452c-8fbc-bdffc340e584}",
         "links": {
@@ -161,7 +160,6 @@
       "type": "participant",
       "approved": true,
       "user": {
-        "username": "atlantis-bot",
         "display_name": "Atlantisbot",
         "uuid": "{73686412-4495-426f-89a7-c69ff1c8d7b8}",
         "links": {
@@ -186,7 +184,6 @@
       "type": "participant",
       "approved": true,
       "user": {
-        "username": "atlantis-bot2",
         "display_name": "Atlantisbot2",
         "uuid": "{73686412-4495-426f-89a7-c69ff1c8d7b2}",
         "links": {
@@ -209,7 +206,6 @@
   "reason": "",
   "updated_on": "2019-06-03T13:55:17.639190+00:00",
   "author": {
-    "username": "lkysow",
     "display_name": "Luke",
     "uuid": "{bf34a99b-8a11-452c-8fbc-bdffc340e584}",
     "links": {

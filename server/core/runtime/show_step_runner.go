@@ -1,13 +1,12 @@
 package runtime
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 const minimumShowTfVersion string = "0.12.0"
@@ -30,7 +29,7 @@ type ShowStepRunner struct {
 	DefaultTFVersion  *version.Version
 }
 
-func (p *ShowStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (p *ShowStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	tfVersion := p.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -40,9 +39,9 @@ func (p *ShowStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 	showResultFile := filepath.Join(path, ctx.GetShowResultFileName())
 
 	output, err := p.TerraformExecutor.RunCommandWithVersion(
-		ctx.Log,
+		ctx,
 		path,
-		[]string{"show", "-no-color", "-json", filepath.Clean(planFile)},
+		[]string{"show", "-json", filepath.Clean(planFile)},
 		envs,
 		tfVersion,
 		ctx.Workspace,
@@ -52,7 +51,7 @@ func (p *ShowStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		return "", errors.Wrap(err, "running terraform show")
 	}
 
-	if err := ioutil.WriteFile(showResultFile, []byte(output), os.ModePerm); err != nil {
+	if err := os.WriteFile(showResultFile, []byte(output), os.ModePerm); err != nil {
 		return "", errors.Wrap(err, "writing terraform show result")
 	}
 

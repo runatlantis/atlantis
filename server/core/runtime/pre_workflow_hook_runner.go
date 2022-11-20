@@ -4,18 +4,19 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
 type PreWorkflowHookRunner interface {
-	Run(ctx models.PreWorkflowHookCommandContext, command string, path string) (string, error)
+	Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, error)
 }
 
 type DefaultPreWorkflowHookRunner struct{}
 
-func (wh DefaultPreWorkflowHookRunner) Run(ctx models.PreWorkflowHookCommandContext, command string, path string) (string, error) {
+func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, error) {
 	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
 
@@ -24,6 +25,7 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.PreWorkflowHookCommandCont
 		"BASE_BRANCH_NAME": ctx.Pull.BaseBranch,
 		"BASE_REPO_NAME":   ctx.BaseRepo.Name,
 		"BASE_REPO_OWNER":  ctx.BaseRepo.Owner,
+		"COMMENT_ARGS":     strings.Join(ctx.EscapedCommentArgs, ","),
 		"DIR":              path,
 		"HEAD_BRANCH_NAME": ctx.Pull.HeadBranch,
 		"HEAD_COMMIT":      ctx.Pull.HeadCommit,

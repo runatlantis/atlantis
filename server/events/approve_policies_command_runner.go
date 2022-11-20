@@ -3,6 +3,7 @@ package events
 import (
 	"fmt"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -38,20 +39,20 @@ type ApprovePoliciesCommandRunner struct {
 	silenceVCSStatusNoProjects bool
 }
 
-func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
+func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	if err := a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, models.PolicyCheckCommand); err != nil {
+	if err := a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
 	projectCmds, err := a.prjCmdBuilder.BuildApprovePoliciesCommands(ctx, cmd)
 	if err != nil {
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PolicyCheckCommand); statusErr != nil {
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
+		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
 		return
 	}
 
@@ -62,7 +63,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentComm
 			// with 0/0 projects approve_policies successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, models.PolicyCheckCommand, 0, 0); err != nil {
+			if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		}
@@ -86,7 +87,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentComm
 	a.updateCommitStatus(ctx, pullStatus)
 }
 
-func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *CommandContext, prjCmds []models.ProjectCommandContext) (result CommandResult) {
+func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *command.Context, prjCmds []command.ProjectContext) (result command.Result) {
 	// Check if vcs user is in the owner list of the PolicySets. All projects
 	// share the same Owners list at this time so no reason to iterate over each
 	// project.
@@ -95,7 +96,7 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *Com
 		return
 	}
 
-	var prjResults []models.ProjectResult
+	var prjResults []command.ProjectResult
 
 	for _, prjCmd := range prjCmds {
 		prjResult := a.prjCmdRunner.ApprovePolicies(prjCmd)
@@ -105,7 +106,7 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *Com
 	return
 }
 
-func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus models.PullStatus) {
+func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus
@@ -117,7 +118,7 @@ func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *CommandContext, p
 		status = models.FailedCommitStatus
 	}
 
-	if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, status, models.PolicyCheckCommand, numSuccess, len(pullStatus.Projects)); err != nil {
+	if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, numSuccess, len(pullStatus.Projects)); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 }

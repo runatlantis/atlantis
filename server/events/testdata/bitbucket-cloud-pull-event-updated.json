@@ -48,7 +48,7 @@
         }
       },
       "branch": {
-        "name": "master"
+        "name": "main"
       },
       "repository": {
         "full_name": "lkysow/atlantis-example",
@@ -107,7 +107,6 @@
     },
     "state": "OPEN",
     "author": {
-      "username": "lkysow",
       "display_name": "Luke",
       "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
       "links": {
@@ -129,7 +128,6 @@
       {
         "type": "participant",
         "user": {
-          "username": "lkysow",
           "display_name": "Luke",
           "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
           "links": {
@@ -158,7 +156,6 @@
     "task_count": 0
   },
   "actor": {
-    "username": "lkysow",
     "display_name": "Luke",
     "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
     "links": {
@@ -192,7 +189,6 @@
     },
     "full_name": "lkysow/atlantis-example",
     "owner": {
-      "username": "lkysow",
       "display_name": "Luke",
       "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
       "links": {

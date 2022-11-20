@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,23 +10,25 @@ import (
 	"github.com/pkg/errors"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // ApplyStepRunner runs `terraform apply`.
 type ApplyStepRunner struct {
 	TerraformExecutor   TerraformExec
+	DefaultTFVersion    *version.Version
 	CommitStatusUpdater StatusUpdater
 	AsyncTFExec         AsyncTFExec
 }
 
-func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	if a.hasTargetFlag(ctx, extraArgs) {
 		return "", errors.New("cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan")
 	}
 
 	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
-	contents, err := ioutil.ReadFile(planPath)
+	contents, err := os.ReadFile(planPath)
 	if os.IsNotExist(err) {
 		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelDir, ctx.Workspace)
 	}
@@ -40,7 +41,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
-		args := append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...)
+		args := append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...)
 		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion, envs)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
@@ -48,8 +49,8 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 	} else {
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
-		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
-		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, args, envs, ctx.TerraformVersion, ctx.Workspace)
+		args := append(append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
+		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, ctx.TerraformVersion, ctx.Workspace)
 	}
 
 	// If the apply was successful, delete the plan.
@@ -62,7 +63,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 	return out, err
 }
 
-func (a *ApplyStepRunner) hasTargetFlag(ctx models.ProjectCommandContext, extraArgs []string) bool {
+func (a *ApplyStepRunner) hasTargetFlag(ctx command.ProjectContext, extraArgs []string) bool {
 	isTargetFlag := func(s string) bool {
 		if s == "-target" {
 			return true
@@ -109,7 +110,7 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 // manual diff.
 // It also writes "yes" or "no" to the process to confirm the apply.
 func (a *ApplyStepRunner) runRemoteApply(
-	ctx models.ProjectCommandContext,
+	ctx command.ProjectContext,
 	applyArgs []string,
 	path string,
 	absPlanPath string,
@@ -118,21 +119,21 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	// The planfile contents are needed to ensure that the plan didn't change
 	// between plan and apply phases.
-	planfileBytes, err := ioutil.ReadFile(absPlanPath)
+	planfileBytes, err := os.ReadFile(absPlanPath)
 	if err != nil {
 		return "", errors.Wrap(err, "reading planfile")
 	}
 
 	// updateStatusF will update the commit status and log any error.
 	updateStatusF := func(status models.CommitStatus, url string) {
-		if err := a.CommitStatusUpdater.UpdateProject(ctx, models.ApplyCommand, status, url); err != nil {
+		if err := a.CommitStatusUpdater.UpdateProject(ctx, command.Apply, status, url); err != nil {
 			ctx.Log.Err("unable to update status: %s", err)
 		}
 	}
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx.Log, filepath.Clean(path), applyArgs, envs, tfVersion, ctx.Workspace)
+	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), applyArgs, envs, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string

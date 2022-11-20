@@ -1,16 +1,17 @@
 package events
 
 import (
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
 
 type PreWorkflowHooksCommandRunner interface {
-	RunPreHooks(ctx *CommandContext) error
+	RunPreHooks(ctx *command.Context, cmd *CommentCommand) error
 }
 
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
@@ -23,16 +24,14 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 }
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
-func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
-	ctx *CommandContext,
-) error {
+func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context, cmd *CommentCommand) error {
 	pull := ctx.Pull
 	baseRepo := pull.BaseRepo
 	headRepo := ctx.HeadRepo
 	user := ctx.User
 	log := ctx.Log
 
-	preWorkflowHooks := make([]*valid.PreWorkflowHook, 0)
+	preWorkflowHooks := make([]*valid.WorkflowHook, 0)
 	for _, repo := range w.GlobalCfg.Repos {
 		if repo.IDMatches(baseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
 			preWorkflowHooks = append(preWorkflowHooks, repo.PreWorkflowHooks...)
@@ -46,7 +45,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 
 	log.Debug("pre-hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
+	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace, DefaultRepoRelDir)
 	if err != nil {
 		return err
 	}
@@ -58,14 +57,20 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 		return err
 	}
 
+	var escapedArgs []string
+	if cmd != nil {
+		escapedArgs = escapeArgs(cmd.Flags)
+	}
+
 	err = w.runHooks(
-		models.PreWorkflowHookCommandContext{
-			BaseRepo: baseRepo,
-			HeadRepo: headRepo,
-			Log:      log,
-			Pull:     pull,
-			User:     user,
-			Verbose:  false,
+		models.WorkflowHookCommandContext{
+			BaseRepo:           baseRepo,
+			HeadRepo:           headRepo,
+			Log:                log,
+			Pull:               pull,
+			User:               user,
+			Verbose:            false,
+			EscapedCommentArgs: escapedArgs,
 		},
 		preWorkflowHooks, repoDir)
 
@@ -77,8 +82,8 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 }
 
 func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
-	ctx models.PreWorkflowHookCommandContext,
-	preWorkflowHooks []*valid.PreWorkflowHook,
+	ctx models.WorkflowHookCommandContext,
+	preWorkflowHooks []*valid.WorkflowHook,
 	repoDir string,
 ) error {
 

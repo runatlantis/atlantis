@@ -26,6 +26,8 @@ module.exports = {
         ['meta', {name: 'google-site-verification', content: 'kTnsDBpHqtTNY8oscYxrQeeiNml2d2z-03Ct9wqeCeE' }]
     ],
     themeConfig: {
+        docsBranch: "main",
+        activeHeaderLinks: false,
         algolia: {
           apiKey: '3b733dff1539ca3a210775860301fa86',
           indexName: 'runatlantis'
@@ -65,6 +67,7 @@ module.exports = {
                         'server-configuration',
                         'server-side-repo-config',
                         'pre-workflow-hooks',
+                        'post-workflow-hooks',
                         'policy-checking',
                         'custom-workflows',
                         'repo-level-atlantis-yaml',
@@ -72,7 +75,8 @@ module.exports = {
                         'apply-requirements',
                         'checkout-strategy',
                         'terraform-versions',
-                        'terraform-cloud'
+                        'terraform-cloud',
+                        'using-slack-hooks'
                     ]
                 },
                 {
@@ -91,6 +95,13 @@ module.exports = {
                         'autoplanning',
                         'automerging',
                         'security'
+                    ]
+                },
+                {
+                    title: 'Real-time Terraform Logs',
+                    collapsable: true,
+                    children: [
+                        'streaming-logs'
                     ]
                 },
                 {

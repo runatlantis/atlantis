@@ -2,10 +2,11 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
 	"reflect"
 
-	valid "github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/petergtz/pegomock"
+
+	valid "github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
 func AnyValidPolicySet() valid.PolicySet {

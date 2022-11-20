@@ -3,33 +3,49 @@ name: testing-env-image
 on:
   push:
     paths:
+      - "testing/**"
+      - ".github/workflows/testing-env-image.yml"
+    branches:
+      - "main"
+  pull_request:
+    paths:
       - 'testing/**'
       - '.github/workflows/testing-env-image.yml'
-    branches:
-      - 'master'
   workflow_dispatch:
 
-defaults:
-  run:
-    working-directory: testing
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      with:
+        image: tonistiigi/binfmt:latest
+        platforms: arm64,arm
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
     - name: Login to Packages Container registry
-      uses: docker/login-action@v1
+      uses: docker/login-action@v2
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+
     - run: echo "TODAY=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
-    - name: build testing-env:${{env.TODAY}} image
-      run: |
-        docker build -t ghcr.io/runatlantis/testing-env:${{env.TODAY}} .
-    - name: publish testing-env:${{env.TODAY}} image
-      run: |
-        docker push ghcr.io/runatlantis/testing-env:${{env.TODAY}}
-        docker tag ghcr.io/runatlantis/testing-env:${{env.TODAY}} ghcr.io/runatlantis/testing-env:latest
-        docker push ghcr.io/runatlantis/testing-env:latest
+    - name: Build and push testing-env:${{env.TODAY}} image
+      uses: docker/build-push-action@v3
+      with:
+        context: testing
+        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: |
+           ghcr.io/runatlantis/testing-env:${{env.TODAY}}
+           ghcr.io/runatlantis/testing-env:latest

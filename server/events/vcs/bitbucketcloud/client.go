@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"unicode/utf8"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -105,32 +105,34 @@ func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command 
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d", b.BaseURL, repo.FullName, pull.Num)
 	resp, err := b.makeRequest("GET", path, nil)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		return approvalStatus, errors.Wrapf(err, "Could not parse response %q", string(resp))
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		return approvalStatus, errors.Wrapf(err, "API response %q was missing fields", string(resp))
 	}
 	authorUUID := *pullResp.Author.UUID
 	for _, participant := range pullResp.Participants {
 		// Bitbucket allows the author to approve their own pull request. This
 		// defeats the purpose of approvals so we don't count that approval.
 		if *participant.Approved && *participant.User.UUID != authorUUID {
-			return true, nil
+			return models.ApprovalStatus{
+				IsApproved: true,
+			}, nil
 		}
 	}
-	return false, nil
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
 	// We'll only loop 1000 times as a safety measure.
 	maxLoops := 1000
@@ -176,6 +178,11 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 	// Atlantis server's URL.
 	if url == "" {
 		url = b.AtlantisURL
+	}
+
+	// Ensure key has at most 40 characters
+	if utf8.RuneCountInString(src) > 40 {
+		src = fmt.Sprintf("%.37s...", src)
 	}
 
 	bodyBytes, err := json.Marshal(map[string]string{
@@ -234,14 +241,19 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	requestStr := fmt.Sprintf("%s %s", method, path)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		respBody, _ := ioutil.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("making request %q unexpected status code: %d, body: %s", requestStr, resp.StatusCode, string(respBody))
 	}
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrapf(err, "reading response from request %q", requestStr)
 	}
 	return respBody, nil
+}
+
+// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
+func (b *Client) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	return nil, nil
 }
 
 func (b *Client) SupportsSingleFileDownload(models.Repo) bool {
@@ -253,4 +265,8 @@ func (b *Client) SupportsSingleFileDownload(models.Repo) bool {
 // if BaseRepo had one repo config file, its content will placed on the second return value
 func (b *Client) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("Not Implemented")
+}
+
+func (b *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
 }

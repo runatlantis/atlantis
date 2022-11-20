@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/runtime/mocks"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -32,7 +32,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			delegate:         mockDelegate,
 		}
 
-		ctx := models.ProjectCommandContext{}
+		ctx := command.ProjectContext{}
 
 		When(mockDelegate.Run(ctx, extraArgs, path, envs)).ThenReturn(expectedOut, nil)
 
@@ -54,7 +54,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			delegate:         mockDelegate,
 		}
 
-		ctx := models.ProjectCommandContext{
+		ctx := command.ProjectContext{
 			TerraformVersion: tfVersion12,
 		}
 
@@ -78,7 +78,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			delegate:         mockDelegate,
 		}
 
-		ctx := models.ProjectCommandContext{}
+		ctx := command.ProjectContext{}
 
 		output, err := subject.Run(
 			ctx,
@@ -100,7 +100,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			delegate:         mockDelegate,
 		}
 
-		ctx := models.ProjectCommandContext{
+		ctx := command.ProjectContext{
 			TerraformVersion: tfVersion11,
 		}
 

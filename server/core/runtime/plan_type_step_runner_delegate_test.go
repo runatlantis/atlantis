@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"errors"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -11,7 +11,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 
 	"github.com/runatlantis/atlantis/server/core/runtime/mocks"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 var planFileContents = `
@@ -41,13 +41,12 @@ func TestRunDelegate(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.12.0")
 
 	t.Run("Remote Runner Success", func(t *testing.T) {
-		tmpDir, cleanup := TempDir(t)
-		defer cleanup()
+		tmpDir := t.TempDir()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
-		err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
+		err := os.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 		Ok(t, err)
 
-		ctx := models.ProjectCommandContext{
+		ctx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
 			EscapedCommentArgs: []string{"comment", "args"},
@@ -70,13 +69,12 @@ func TestRunDelegate(t *testing.T) {
 	})
 
 	t.Run("Remote Runner Failure", func(t *testing.T) {
-		tmpDir, cleanup := TempDir(t)
-		defer cleanup()
+		tmpDir := t.TempDir()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
-		err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
+		err := os.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 		Ok(t, err)
 
-		ctx := models.ProjectCommandContext{
+		ctx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
 			EscapedCommentArgs: []string{"comment", "args"},
@@ -99,13 +97,12 @@ func TestRunDelegate(t *testing.T) {
 	})
 
 	t.Run("Local Runner Success", func(t *testing.T) {
-		tmpDir, cleanup := TempDir(t)
-		defer cleanup()
+		tmpDir := t.TempDir()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
-		err := ioutil.WriteFile(planPath, []byte(planFileContents), 0600)
+		err := os.WriteFile(planPath, []byte(planFileContents), 0600)
 		Ok(t, err)
 
-		ctx := models.ProjectCommandContext{
+		ctx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
 			EscapedCommentArgs: []string{"comment", "args"},
@@ -128,13 +125,12 @@ func TestRunDelegate(t *testing.T) {
 	})
 
 	t.Run("Local Runner Failure", func(t *testing.T) {
-		tmpDir, cleanup := TempDir(t)
-		defer cleanup()
+		tmpDir := t.TempDir()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
-		err := ioutil.WriteFile(planPath, []byte(planFileContents), 0600)
+		err := os.WriteFile(planPath, []byte(planFileContents), 0600)
 		Ok(t, err)
 
-		ctx := models.ProjectCommandContext{
+		ctx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
 			EscapedCommentArgs: []string{"comment", "args"},

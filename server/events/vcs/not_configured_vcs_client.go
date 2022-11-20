@@ -35,10 +35,10 @@ func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, co
 func (a *NotConfiguredVCSClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	return nil
 }
-func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
-	return false, a.err()
+func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
+	return models.ApprovalStatus{}, a.err()
 }
-func (a *NotConfiguredVCSClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (a *NotConfiguredVCSClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	return false, a.err()
 }
 func (a *NotConfiguredVCSClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
@@ -53,6 +53,9 @@ func (a *NotConfiguredVCSClient) MarkdownPullLink(pull models.PullRequest) (stri
 func (a *NotConfiguredVCSClient) err() error {
 	return fmt.Errorf("atlantis was not configured to support repos from %s", a.Host.String())
 }
+func (a *NotConfiguredVCSClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	return nil, a.err()
+}
 
 func (a *NotConfiguredVCSClient) SupportsSingleFileDownload(repo models.Repo) bool {
 	return false
@@ -60,4 +63,7 @@ func (a *NotConfiguredVCSClient) SupportsSingleFileDownload(repo models.Repo) bo
 
 func (a *NotConfiguredVCSClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	return true, []byte{}, a.err()
+}
+func (a *NotConfiguredVCSClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return "", a.err()
 }

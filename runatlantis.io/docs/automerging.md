@@ -21,6 +21,10 @@ Automerging can be enabled either by:
     to be configured under the `projects` key.
     :::
 
+## How to Disable
+If automerge is enabled, you can disable it for a single `atlantis apply`
+command with the `--auto-merge-disabled` option.
+
 ## All Plans Must Succeed
 When automerge is enabled, **all plans** in a pull request **must succeed** before
 **any** plans can be applied.

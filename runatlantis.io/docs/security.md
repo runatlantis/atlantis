@@ -15,7 +15,7 @@ Atlantis could be exploited by
       }
     }
     ```
-* Running malicious custom build commands specified in an `atlantis.yaml` file. Atlantis uses the `atlantis.yaml` file from the pull request branch, **not** `master`.
+* Running malicious custom build commands specified in an `atlantis.yaml` file. Atlantis uses the `atlantis.yaml` file from the pull request branch, **not** `main`.
 * Someone adding `atlantis plan/apply` comments on your valid pull requests causing terraform to run when you don't want it to.
 
 ## Bitbucket Cloud (bitbucket.org)
@@ -34,7 +34,7 @@ To prevent this, allowlist [Bitbucket's IP addresses](https://confluence.atlassi
 
 ## Mitigations
 ### Don't Use On Public Repos
-Because anyone can comment on public pull requests, even with all the security mitigations available, it's still dangerous to run Atlantis on public repos until Atlantis gets an authentication system.
+Because anyone can comment on public pull requests, even with all the security mitigations available, it's still dangerous to run Atlantis on public repos without proper configuration of the security settings.
 
 ### Don't Use `--allow-fork-prs`
 If you're running on a public repo (which isn't recommended, see above) you shouldn't set `--allow-fork-prs` (defaults to false)
@@ -63,6 +63,13 @@ To prevent this, you could:
    use of disallowed providers or data sources or PRs from not allowed users. You could also add in extra validation at this point, e.g.
    requiring a "thumbs-up" on the PR before allowing the `plan` to continue. Conftest could be of use here.
 
+### `--var-file-allowlist`
+The files on your Atlantis install may be accessible as [variable definition files](https://www.terraform.io/language/values/variables#variable-definitions-tfvars-files)
+from pull requests by adding  
+`atlantis plan -- -var-file=/path/to/file` comments. To mitigate this security risk, Atlantis has limited such access
+only to the files allowlisted by the `--var-file-allowlist` flag. If this argument is not provided, it defaults to
+Atlantis' data directory.
+
 ### Webhook Secrets
 Atlantis should be run with Webhook secrets set via the `$ATLANTIS_GH_WEBHOOK_SECRET`/`$ATLANTIS_GITLAB_WEBHOOK_SECRET` environment variables.
 Even with the `--repo-allowlist` flag set, without a webhook secret, attackers could make requests to Atlantis posing as a repository that is allowlisted.
@@ -79,3 +86,12 @@ Azure DevOps supports sending a basic authentication header in all webhook event
 If you're using webhook secrets but your traffic is over HTTP then the webhook secrets
 could be stolen. Enable SSL/HTTPS using the `--ssl-cert-file` and `--ssl-key-file`
 flags.
+
+### Enable Authentication on Atlantis Web Server
+It is very recommended to enable authentication in the web service. Enable BasicAuth using the `--web-basic-auth=true` and setup a username and a password using `--web-username=yourUsername` and `--web-password=yourPassword` flags.
+
+You can also pass these as environment variables `ATLANTIS_WEB_BASIC_AUTH=true` `ATLANTIS_WEB_USERNAME=yourUsername` and `ATLANTIS_WEB_PASSWORD=yourPassword`. 
+
+:::tip Tip
+We do encourage the usage of complex passwords in order to prevent basic bruteforcing attacks.
+:::

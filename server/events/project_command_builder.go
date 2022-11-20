@@ -3,13 +3,16 @@ package events
 import (
 	"fmt"
 	"os"
+	"sort"
 
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/yaml"
 )
 
 const (
@@ -29,9 +32,9 @@ const (
 	DefaultDeleteSourceBranchOnMerge = false
 )
 
-func NewProjectCommandBuilder(
+func NewInstrumentedProjectCommandBuilder(
 	policyChecksSupported bool,
-	parserValidator *yaml.ParserValidator,
+	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
 	vcsClient vcs.Client,
 	workingDir WorkingDir,
@@ -42,8 +45,47 @@ func NewProjectCommandBuilder(
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	AutoplanFileList string,
+	scope tally.Scope,
+	logger logging.SimpleLogging,
+) *InstrumentedProjectCommandBuilder {
+	return &InstrumentedProjectCommandBuilder{
+		ProjectCommandBuilder: NewProjectCommandBuilder(
+			policyChecksSupported,
+			parserValidator,
+			projectFinder,
+			vcsClient,
+			workingDir,
+			workingDirLocker,
+			globalCfg,
+			pendingPlanFinder,
+			commentBuilder,
+			skipCloneNoChanges,
+			EnableRegExpCmd,
+			AutoplanFileList,
+			scope,
+			logger,
+		),
+		Logger: logger,
+	}
+}
+
+func NewProjectCommandBuilder(
+	policyChecksSupported bool,
+	parserValidator *config.ParserValidator,
+	projectFinder ProjectFinder,
+	vcsClient vcs.Client,
+	workingDir WorkingDir,
+	workingDirLocker WorkingDirLocker,
+	globalCfg valid.GlobalCfg,
+	pendingPlanFinder *DefaultPendingPlanFinder,
+	commentBuilder CommentBuilder,
+	skipCloneNoChanges bool,
+	EnableRegExpCmd bool,
+	AutoplanFileList string,
+	scope tally.Scope,
+	logger logging.SimpleLogging,
 ) *DefaultProjectCommandBuilder {
-	projectCommandBuilder := &DefaultProjectCommandBuilder{
+	return &DefaultProjectCommandBuilder{
 		ParserValidator:    parserValidator,
 		ProjectFinder:      projectFinder,
 		VCSClient:          vcsClient,
@@ -54,42 +96,41 @@ func NewProjectCommandBuilder(
 		SkipCloneNoChanges: skipCloneNoChanges,
 		EnableRegExpCmd:    EnableRegExpCmd,
 		AutoplanFileList:   AutoplanFileList,
-		ProjectCommandContextBuilder: NewProjectCommandContextBulder(
+		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
+			scope,
 		),
 	}
-
-	return projectCommandBuilder
 }
 
 type ProjectPlanCommandBuilder interface {
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
-	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
+	BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error)
 	// BuildPlanCommands builds project plan commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildPlanCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
 type ProjectApplyCommandBuilder interface {
 	// BuildApplyCommands builds project Apply commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildApplyCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	BuildApplyCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
 type ProjectApprovePoliciesCommandBuilder interface {
 	// BuildApprovePoliciesCommands builds project PolicyCheck commands for this ctx and comment.
-	BuildApprovePoliciesCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	BuildApprovePoliciesCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
 type ProjectVersionCommandBuilder interface {
 	// BuildVersionCommands builds project Version commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildVersionCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	BuildVersionCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
@@ -106,7 +147,7 @@ type ProjectCommandBuilder interface {
 // This class combines the data from the comment and any atlantis.yaml file or
 // Atlantis server config and then generates a set of contexts.
 type DefaultProjectCommandBuilder struct {
-	ParserValidator              *yaml.ParserValidator
+	ParserValidator              *config.ParserValidator
 	ProjectFinder                ProjectFinder
 	VCSClient                    vcs.Client
 	WorkingDir                   WorkingDir
@@ -121,12 +162,12 @@ type DefaultProjectCommandBuilder struct {
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
-func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
 	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false)
 	if err != nil {
 		return nil, err
 	}
-	var autoplanEnabled []models.ProjectCommandContext
+	var autoplanEnabled []command.ProjectContext
 	for _, projCtx := range projCtxs {
 		if !projCtx.AutoplanEnabled {
 			ctx.Log.Debug("ignoring project at dir %q, workspace: %q because autoplan is disabled", projCtx.RepoRelDir, projCtx.Workspace)
@@ -138,7 +179,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 }
 
 // See ProjectCommandBuilder.BuildPlanCommands.
-func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose)
 	}
@@ -147,7 +188,7 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cm
 }
 
 // See ProjectCommandBuilder.BuildApplyCommands.
-func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommands(ctx, cmd)
 	}
@@ -155,11 +196,11 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 	return pac, err
 }
 
-func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	return p.buildAllProjectCommands(ctx, cmd)
 }
 
-func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommands(ctx, cmd)
 	}
@@ -169,7 +210,7 @@ func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *CommandContext,
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
 // modified in this ctx.
-func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context, commentFlags []string, verbose bool) ([]command.ProjectContext, error) {
 	// We'll need the list of modified files.
 	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
@@ -180,15 +221,15 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
 		hasRepoCfg, repoCfgData, err := p.VCSClient.DownloadRepoConfigFile(ctx.Pull)
 		if err != nil {
-			return nil, errors.Wrapf(err, "downloading %s", yaml.AtlantisYAMLFilename)
+			return nil, errors.Wrapf(err, "downloading %s", config.AtlantisYAMLFilename)
 		}
 
 		if hasRepoCfg {
-			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID())
+			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
 			if err != nil {
-				return nil, errors.Wrapf(err, "parsing %s", yaml.AtlantisYAMLFilename)
+				return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 			}
-			ctx.Log.Info("successfully parsed remote %s file", yaml.AtlantisYAMLFilename)
+			ctx.Log.Info("successfully parsed remote %s file", config.AtlantisYAMLFilename)
 			matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "")
 			if err != nil {
 				return nil, err
@@ -196,7 +237,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 			ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
 			if len(matchingProjects) == 0 {
 				ctx.Log.Info("skipping repo clone since no project was modified")
-				return []models.ProjectCommandContext{}, nil
+				return []command.ProjectContext{}, nil
 			}
 			// NOTE: We discard this work here and end up doing it again after
 			// cloning to ensure all the return values are set properly with
@@ -207,7 +248,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
 
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
 		return nil, err
@@ -223,19 +264,19 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	// Parse config file if it exists.
 	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {
-		return nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
+		return nil, errors.Wrapf(err, "looking for %s file in %q", config.AtlantisYAMLFilename, repoDir)
 	}
 
-	var projCtxs []models.ProjectCommandContext
+	var projCtxs []command.ProjectContext
 
 	if hasRepoCfg {
 		// If there's a repo cfg then we'll use it to figure out which projects
 		// should be planed.
-		repoCfg, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID())
+		repoCfg, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing %s", yaml.AtlantisYAMLFilename)
+			return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 		}
-		ctx.Log.Info("successfully parsed %s file", yaml.AtlantisYAMLFilename)
+		ctx.Log.Info("successfully parsed %s file", config.AtlantisYAMLFilename)
 		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
 		if err != nil {
 			return nil, err
@@ -249,7 +290,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
 					ctx,
-					models.PlanCommand,
+					command.Plan,
 					mergedCfg,
 					commentFlags,
 					repoDir,
@@ -263,20 +304,21 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	} else {
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.
-		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
+		ctx.Log.Info("found no %s file", config.AtlantisYAMLFilename)
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList)
-		if err != nil {
-			return nil, errors.Wrapf(err, "finding modified projects: %s", modifiedFiles)
-		}
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
-			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
+			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, repoDir)
+			if err != nil {
+				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", repoDir)
+			}
+			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)
 
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
 					ctx,
-					models.PlanCommand,
+					command.Plan,
 					pCfg,
 					commentFlags,
 					repoDir,
@@ -289,20 +331,24 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		}
 	}
 
+	sort.Slice(projCtxs, func(i, j int) bool {
+		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
+	})
+
 	return projCtxs, nil
 }
 
 // buildProjectPlanCommand builds a plan context for a single project.
 // cmd must be for only one project.
-func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
 
-	var pcc []models.ProjectCommandContext
+	var pcc []command.ProjectContext
 	ctx.Log.Debug("building plan command")
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
 	if err != nil {
 		return pcc, err
 	}
@@ -328,7 +374,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 
 	return p.buildProjectCommandCtx(
 		ctx,
-		models.PlanCommand,
+		command.Plan,
 		cmd.ProjectName,
 		cmd.Flags,
 		defaultRepoDir,
@@ -340,22 +386,22 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
 // there is no config, then projectCfg and repoCfg will be nil.
-func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName string, dir string, workspace string, repoDir string) (projectsCfg []valid.Project, repoCfg *valid.RepoCfg, err error) {
+func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName string, dir string, workspace string, repoDir string) (projectsCfg []valid.Project, repoCfg *valid.RepoCfg, err error) {
 	hasConfigFile, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {
-		err = errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
+		err = errors.Wrapf(err, "looking for %s file in %q", config.AtlantisYAMLFilename, repoDir)
 		return
 	}
 	if !hasConfigFile {
 		if projectName != "" {
-			err = fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
+			err = fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", config.AtlantisYAMLFilename)
 			return
 		}
 		return
 	}
 
 	var repoConfig valid.RepoCfg
-	repoConfig, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID())
+	repoConfig, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
 	if err != nil {
 		return
 	}
@@ -372,7 +418,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 			}
 		}
 		if len(projectsCfg) == 0 {
-			err = fmt.Errorf("no project with name %q is defined in %s", projectName, yaml.AtlantisYAMLFilename)
+			err = fmt.Errorf("no project with name %q is defined in %s", projectName, config.AtlantisYAMLFilename)
 			return
 		}
 		return
@@ -383,7 +429,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 		return
 	}
 	if len(projCfgs) > 1 {
-		err = fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", yaml.AtlantisYAMLFilename, dir, workspace)
+		err = fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", config.AtlantisYAMLFilename, dir, workspace)
 		return
 	}
 	projectsCfg = projCfgs
@@ -392,7 +438,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 
 // buildAllProjectCommands builds contexts for a command for every project that has
 // pending plans in this ctx.
-func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *command.Context, commentCmd *CommentCommand) ([]command.ProjectContext, error) {
 	// Lock all dirs in this pull request (instead of a single dir) because we
 	// don't know how many dirs we'll need to run the command in.
 	unlockFn, err := p.WorkingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
@@ -418,7 +464,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *CommandConte
 		return nil, err
 	}
 
-	var cmds []models.ProjectCommandContext
+	var cmds []command.ProjectContext
 	for _, plan := range plans {
 		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
 		if err != nil {
@@ -426,19 +472,24 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *CommandConte
 		}
 		cmds = append(cmds, commentCmds...)
 	}
+
+	sort.Slice(cmds, func(i, j int) bool {
+		return cmds[i].ExecutionOrderGroup < cmds[j].ExecutionOrderGroup
+	})
+
 	return cmds, nil
 }
 
 // buildProjectApplyCommand builds an apply command for the single project
 // identified by cmd.
-func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
 
-	var projCtx []models.ProjectCommandContext
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
+	var projCtx []command.ProjectContext
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
 	if err != nil {
 		return projCtx, err
 	}
@@ -460,7 +511,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 
 	return p.buildProjectCommandCtx(
 		ctx,
-		models.ApplyCommand,
+		command.Apply,
 		cmd.ProjectName,
 		cmd.Flags,
 		repoDir,
@@ -472,14 +523,14 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 
 // buildProjectVersionCommand builds a version command for the single project
 // identified by cmd.
-func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
 
-	var projCtx []models.ProjectCommandContext
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
+	var projCtx []command.ProjectContext
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
 	if err != nil {
 		return projCtx, err
 	}
@@ -501,7 +552,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *CommandCo
 
 	return p.buildProjectCommandCtx(
 		ctx,
-		models.VersionCommand,
+		command.Version,
 		cmd.ProjectName,
 		cmd.Flags,
 		repoDir,
@@ -513,20 +564,20 @@ func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *CommandCo
 
 // buildProjectCommandCtx builds a context for a single or several projects identified
 // by the parameters.
-func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContext,
-	cmd models.CommandName,
+func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Context,
+	cmd command.Name,
 	projectName string,
 	commentFlags []string,
 	repoDir string,
 	repoRelDir string,
 	workspace string,
-	verbose bool) ([]models.ProjectCommandContext, error) {
+	verbose bool) ([]command.ProjectContext, error) {
 
 	matchingProjects, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
 	if err != nil {
-		return []models.ProjectCommandContext{}, err
+		return []command.ProjectContext{}, err
 	}
-	var projCtxs []models.ProjectCommandContext
+	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
 	automerge := DefaultAutomergeEnabled
 	parallelApply := DefaultParallelApplyEnabled
@@ -579,7 +630,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	}
 
 	if err := p.validateWorkspaceAllowed(repoCfgPtr, repoRelDir, workspace); err != nil {
-		return []models.ProjectCommandContext{}, err
+		return []command.ProjectContext{}, err
 	}
 
 	return projCtxs, nil

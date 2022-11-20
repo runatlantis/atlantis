@@ -11,8 +11,10 @@ import (
 // usageTmpl returns a cobra-compatible usage template that will be printed
 // during the help output.
 // This template prints help like:
-//   --name=<value>
-//    <description>
+//
+//	--name=<value>
+//	 <description>
+//
 // We use it over the default template so that the output it easier to read.
 func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, boolFlags map[string]boolFlag) string {
 	var flagNames []string

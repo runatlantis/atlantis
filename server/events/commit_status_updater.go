@@ -15,10 +15,12 @@ package events
 
 import (
 	"fmt"
-	"strings"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_commit_status_updater.go CommitStatusUpdater
@@ -28,13 +30,13 @@ import (
 type CommitStatusUpdater interface {
 	// UpdateCombined updates the combined status of the head commit of pull.
 	// A combined status represents all the projects modified in the pull.
-	UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error
+	UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name) error
 	// UpdateCombinedCount updates the combined status to reflect the
 	// numSuccess out of numTotal.
-	UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error
+	UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
-	UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error
+	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error
 }
 
 // DefaultCommitStatusUpdater implements CommitStatusUpdater.
@@ -44,8 +46,8 @@ type DefaultCommitStatusUpdater struct {
 	StatusName string
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
-	src := fmt.Sprintf("%s/%s", d.StatusName, command.String())
+func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name) error {
+	src := fmt.Sprintf("%s/%s", d.StatusName, cmdName.String())
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
@@ -55,27 +57,27 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull model
 	case models.SuccessCommitStatus:
 		descripWords = "succeeded."
 	}
-	descrip := fmt.Sprintf("%s %s", strings.Title(command.String()), descripWords)
+	descrip := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), descripWords)
 	return d.Client.UpdateStatus(repo, pull, status, src, descrip, "")
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error {
-	src := fmt.Sprintf("%s/%s", d.StatusName, command.String())
+func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
+	src := fmt.Sprintf("%s/%s", d.StatusName, cmdName.String())
 	cmdVerb := "unknown"
 
-	switch command {
-	case models.PlanCommand:
+	switch cmdName {
+	case command.Plan:
 		cmdVerb = "planned"
-	case models.PolicyCheckCommand:
+	case command.PolicyCheck:
 		cmdVerb = "policies checked"
-	case models.ApplyCommand:
+	case command.Apply:
 		cmdVerb = "applied"
 	}
 
 	return d.Client.UpdateStatus(repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error {
+func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error {
 	projectID := ctx.ProjectName
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
@@ -90,6 +92,7 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandCont
 	case models.SuccessCommitStatus:
 		descripWords = "succeeded."
 	}
-	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), descripWords)
+
+	descrip := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), descripWords)
 	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
 }

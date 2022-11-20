@@ -5,7 +5,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 // MinimumVersionStepRunnerDelegate ensures that a given step runner can't run unless the command version being used
@@ -30,7 +30,7 @@ func NewMinimumVersionStepRunnerDelegate(minimumVersionStr string, defaultVersio
 	}, nil
 }
 
-func (r *MinimumVersionStepRunnerDelegate) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (r *MinimumVersionStepRunnerDelegate) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	tfVersion := r.defaultTfVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion

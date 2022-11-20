@@ -1,17 +1,17 @@
 package runtime
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 // NullRunner is a runner that isn't configured for a given plan type but outputs nothing
 type NullRunner struct{}
 
-func (p NullRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (p NullRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	ctx.Log.Debug("runner not configured for plan type")
 
 	return "", nil
@@ -20,7 +20,7 @@ func (p NullRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, pa
 // RemoteBackendUnsupportedRunner is a runner that is responsible for outputting that the remote backend is unsupported
 type RemoteBackendUnsupportedRunner struct{}
 
-func (p RemoteBackendUnsupportedRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (p RemoteBackendUnsupportedRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	ctx.Log.Debug("runner not configured for remote backend")
 
 	return "Remote backend is unsupported for this step.", nil
@@ -40,7 +40,7 @@ type PlanTypeStepRunnerDelegate struct {
 }
 
 func (p *PlanTypeStepRunnerDelegate) isRemotePlan(planFile string) (bool, error) {
-	data, err := ioutil.ReadFile(planFile)
+	data, err := os.ReadFile(planFile)
 
 	if err != nil {
 		return false, errors.Wrapf(err, "unable to read %s", planFile)
@@ -49,7 +49,7 @@ func (p *PlanTypeStepRunnerDelegate) isRemotePlan(planFile string) (bool, error)
 	return IsRemotePlan(data), nil
 }
 
-func (p *PlanTypeStepRunnerDelegate) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (p *PlanTypeStepRunnerDelegate) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	remotePlan, err := p.isRemotePlan(planFile)
 

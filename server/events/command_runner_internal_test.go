@@ -3,20 +3,21 @@ package events
 import (
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestApplyUpdateCommitStatus(t *testing.T) {
 	cases := map[string]struct {
-		cmd           models.CommandName
+		cmd           command.Name
 		pullStatus    models.PullStatus
 		expStatus     models.CommitStatus
 		expNumSuccess int
 		expNumTotal   int
 	}{
 		"apply, one pending": {
-			cmd: models.ApplyCommand,
+			cmd: command.Apply,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -32,7 +33,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			expNumTotal:   2,
 		},
 		"apply, all successful": {
-			cmd: models.ApplyCommand,
+			cmd: command.Apply,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -48,7 +49,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			expNumTotal:   2,
 		},
 		"apply, one errored, one pending": {
-			cmd: models.ApplyCommand,
+			cmd: command.Apply,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -74,7 +75,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			cr := &ApplyCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&CommandContext{}, c.pullStatus)
+			cr.updateCommitStatus(&command.Context{}, c.pullStatus)
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
@@ -87,14 +88,14 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 
 func TestPlanUpdateCommitStatus(t *testing.T) {
 	cases := map[string]struct {
-		cmd           models.CommandName
+		cmd           command.Name
 		pullStatus    models.PullStatus
 		expStatus     models.CommitStatus
 		expNumSuccess int
 		expNumTotal   int
 	}{
 		"single plan success": {
-			cmd: models.PlanCommand,
+			cmd: command.Plan,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -107,7 +108,7 @@ func TestPlanUpdateCommitStatus(t *testing.T) {
 			expNumTotal:   1,
 		},
 		"one plan error, other errors": {
-			cmd: models.PlanCommand,
+			cmd: command.Plan,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -136,7 +137,7 @@ func TestPlanUpdateCommitStatus(t *testing.T) {
 			cr := &PlanCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&CommandContext{}, c.pullStatus)
+			cr.updateCommitStatus(&command.Context{}, c.pullStatus)
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
@@ -151,12 +152,12 @@ type MockCSU struct {
 	CalledRepo       models.Repo
 	CalledPull       models.PullRequest
 	CalledStatus     models.CommitStatus
-	CalledCommand    models.CommandName
+	CalledCommand    command.Name
 	CalledNumSuccess int
 	CalledNumTotal   int
 }
 
-func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error {
+func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command command.Name, numSuccess int, numTotal int) error {
 	m.CalledRepo = repo
 	m.CalledPull = pull
 	m.CalledStatus = status
@@ -165,9 +166,9 @@ func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest,
 	m.CalledNumTotal = numTotal
 	return nil
 }
-func (m *MockCSU) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
+func (m *MockCSU) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command command.Name) error {
 	return nil
 }
-func (m *MockCSU) UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error {
+func (m *MockCSU) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error {
 	return nil
 }

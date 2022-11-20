@@ -14,7 +14,6 @@
 package db_test
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -22,6 +21,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 	bolt "go.etcd.io/bbolt"
@@ -48,7 +48,7 @@ func TestLockCommandNotSet(t *testing.T) {
 	t.Log("retrieving apply lock when there are none should return empty LockCommand")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	exists, err := b.CheckCommandLock(models.ApplyCommand)
+	exists, err := b.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Assert(t, exists == nil, "exp nil")
 }
@@ -58,10 +58,10 @@ func TestLockCommandEnabled(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 	timeNow := time.Now()
-	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	_, err := b.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	config, err := b.CheckCommandLock(models.ApplyCommand)
+	config, err := b.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Equals(t, true, config.IsLocked())
 }
@@ -71,10 +71,10 @@ func TestLockCommandFail(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 	timeNow := time.Now()
-	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	_, err := b.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	_, err = b.LockCommand(models.ApplyCommand, timeNow)
+	_, err = b.LockCommand(command.Apply, timeNow)
 	ErrEquals(t, "db transaction failed: lock already exists", err)
 }
 
@@ -83,17 +83,17 @@ func TestUnlockCommandDisabled(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 	timeNow := time.Now()
-	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	_, err := b.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	config, err := b.CheckCommandLock(models.ApplyCommand)
+	config, err := b.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Equals(t, true, config.IsLocked())
 
-	err = b.UnlockCommand(models.ApplyCommand)
+	err = b.UnlockCommand(command.Apply)
 	Ok(t, err)
 
-	config, err = b.CheckCommandLock(models.ApplyCommand)
+	config, err = b.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Assert(t, config == nil, "exp nil object")
 }
@@ -102,7 +102,7 @@ func TestUnlockCommandFail(t *testing.T) {
 	t.Log("setting the apply lock")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	err := b.UnlockCommand(models.ApplyCommand)
+	err := b.UnlockCommand(command.Apply)
 	ErrEquals(t, "db transaction failed: no lock exists", err)
 }
 
@@ -110,7 +110,7 @@ func TestMixedLocksPresent(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 	timeNow := time.Now()
-	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	_, err := b.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
 	_, _, err = b.TryLock(lock)
@@ -432,8 +432,7 @@ func TestGetLock(t *testing.T) {
 
 // Test we can create a status and then getCommandLock it.
 func TestPullStatus_UpdateGet(t *testing.T) {
-	b, cleanup := newTestDB2(t)
-	defer cleanup()
+	b := newTestDB2(t)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -457,9 +456,9 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 	}
 	status, err := b.UpdatePullWithResults(
 		pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
-				Command:    models.PlanCommand,
+				Command:    command.Plan,
 				RepoRelDir: ".",
 				Workspace:  "default",
 				Failure:    "failure",
@@ -483,8 +482,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 // Test we can create a status, delete it, and then we shouldn't be able to getCommandLock
 // it.
 func TestPullStatus_UpdateDeleteGet(t *testing.T) {
-	b, cleanup := newTestDB2(t)
-	defer cleanup()
+	b := newTestDB2(t)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -508,7 +506,7 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 	}
 	_, err := b.UpdatePullWithResults(
 		pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
@@ -529,8 +527,7 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 // pull status, and when we getCommandLock all the project statuses, that specific project
 // should be updated.
 func TestPullStatus_UpdateProject(t *testing.T) {
-	b, cleanup := newTestDB2(t)
-	defer cleanup()
+	b := newTestDB2(t)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -554,7 +551,7 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 	}
 	_, err := b.UpdatePullWithResults(
 		pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
@@ -593,8 +590,7 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 // Test that if we update an existing pull status and our new status is for a
 // different HeadSHA, that we just overwrite the old status.
 func TestPullStatus_UpdateNewCommit(t *testing.T) {
-	b, cleanup := newTestDB2(t)
-	defer cleanup()
+	b := newTestDB2(t)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -618,7 +614,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 	}
 	_, err := b.UpdatePullWithResults(
 		pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
@@ -629,7 +625,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 
 	pull.HeadCommit = "newsha"
 	status, err := b.UpdatePullWithResults(pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
 				RepoRelDir:   ".",
 				Workspace:    "staging",
@@ -656,8 +652,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 // Test that if we update an existing pull status and our new status is for a
 // the same commit, that we merge the statuses.
 func TestPullStatus_UpdateMerge(t *testing.T) {
-	b, cleanup := newTestDB2(t)
-	defer cleanup()
+	b := newTestDB2(t)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -681,22 +676,22 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 	}
 	_, err := b.UpdatePullWithResults(
 		pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
-				Command:    models.PlanCommand,
+				Command:    command.Plan,
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
 				Failure:    "failure",
 			},
 			{
-				Command:     models.PlanCommand,
+				Command:     command.Plan,
 				RepoRelDir:  "projectname",
 				Workspace:   "default",
 				ProjectName: "projectname",
 				Failure:     "failure",
 			},
 			{
-				Command:    models.PlanCommand,
+				Command:    command.Plan,
 				RepoRelDir: "staythesame",
 				Workspace:  "default",
 				PlanSuccess: &models.PlanSuccess{
@@ -710,22 +705,22 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 	Ok(t, err)
 
 	updateStatus, err := b.UpdatePullWithResults(pull,
-		[]models.ProjectResult{
+		[]command.ProjectResult{
 			{
-				Command:      models.ApplyCommand,
+				Command:      command.Apply,
 				RepoRelDir:   "mergeme",
 				Workspace:    "default",
 				ApplySuccess: "applied!",
 			},
 			{
-				Command:     models.ApplyCommand,
+				Command:     command.Apply,
 				RepoRelDir:  "projectname",
 				Workspace:   "default",
 				ProjectName: "projectname",
 				Error:       errors.New("apply error"),
 			},
 			{
-				Command:      models.ApplyCommand,
+				Command:      command.Apply,
 				RepoRelDir:   "newresult",
 				Workspace:    "default",
 				ApplySuccess: "success!",
@@ -769,7 +764,7 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 // newTestDB returns a TestDB using a temporary path.
 func newTestDB() (*bolt.DB, *db.BoltDB) {
 	// Retrieve a temporary path.
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create temp file"))
 	}
@@ -796,13 +791,11 @@ func newTestDB() (*bolt.DB, *db.BoltDB) {
 	return boltDB, b
 }
 
-func newTestDB2(t *testing.T) (*db.BoltDB, func()) {
-	tmp, cleanup := TempDir(t)
+func newTestDB2(t *testing.T) *db.BoltDB {
+	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	return boltDB, func() {
-		cleanup()
-	}
+	return boltDB
 }
 
 func cleanupDB(db *bolt.DB) {

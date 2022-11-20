@@ -39,7 +39,7 @@ type DiffStatFile struct {
 }
 
 type Actor struct {
-	Nickname *string `json:"nickname,omitempty" validate:"required"`
+	AccountID *string `json:"account_id,omitempty" validate:"required"`
 }
 type Repository struct {
 	FullName *string `json:"full_name,omitempty" validate:"required"`

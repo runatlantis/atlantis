@@ -30,7 +30,6 @@
     },
     "created_on": "2018-07-19T19:51:50.607374+00:00",
     "user": {
-      "username": "lkysow",
       "display_name": "Luke",
       "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
       "links": {
@@ -100,7 +99,7 @@
         }
       },
       "branch": {
-        "name": "master"
+        "name": "main"
       },
       "repository": {
         "full_name": "lkysow/atlantis-example",
@@ -159,7 +158,6 @@
     },
     "state": "MERGED",
     "author": {
-      "username": "lkysow",
       "display_name": "Luke",
       "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
       "links": {
@@ -181,7 +179,6 @@
       {
         "type": "participant",
         "user": {
-          "username": "lkysow",
           "display_name": "Luke",
           "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
           "links": {
@@ -214,7 +211,6 @@
       }
     },
     "closed_by": {
-      "username": "lkysow",
       "display_name": "Luke",
       "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
       "links": {
@@ -234,7 +230,6 @@
     "task_count": 0
   },
   "actor": {
-    "username": "lkysow",
     "nickname": "lkysow",
     "display_name": "Luke",
     "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
@@ -269,7 +264,6 @@
     },
     "full_name": "lkysow/atlantis-example",
     "owner": {
-      "username": "lkysow",
       "display_name": "Luke",
       "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
       "links": {

@@ -2,10 +2,11 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
 	"reflect"
 
-	slack "github.com/nlopes/slack"
+	"github.com/petergtz/pegomock"
+
+	slack "github.com/slack-go/slack"
 )
 
 func AnySlackPostMessageParameters() slack.PostMessageParameters {

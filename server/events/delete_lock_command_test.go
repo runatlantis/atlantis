@@ -72,14 +72,13 @@ func TestDeleteLock_Success(t *testing.T) {
 			RepoFullName: "owner/repo",
 		},
 	}, nil)
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	db, err := db.New(tmp)
 	Ok(t, err)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:           l,
 		Logger:           logging.NewNoopLogger(t),
-		DB:               db,
+		Backend:          db,
 		WorkingDirLocker: workingDirLocker,
 		WorkingDir:       workingDir,
 	}

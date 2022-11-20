@@ -16,7 +16,7 @@ package events
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/google/go-github/v31/github"
@@ -60,7 +60,7 @@ func (d *DefaultGithubRequestValidator) validateAgainstSecret(r *http.Request, s
 func (d *DefaultGithubRequestValidator) validateWithoutSecret(r *http.Request) ([]byte, error) {
 	switch ct := r.Header.Get("Content-Type"); ct {
 	case "application/json":
-		payload, err := ioutil.ReadAll(r.Body)
+		payload, err := io.ReadAll(r.Body)
 		if err != nil {
 			return nil, fmt.Errorf("could not read body: %s", err)
 		}

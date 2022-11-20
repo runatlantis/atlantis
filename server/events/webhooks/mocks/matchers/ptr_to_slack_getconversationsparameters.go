@@ -5,7 +5,7 @@ import (
 	"github.com/petergtz/pegomock"
 	"reflect"
 
-	slack "github.com/nlopes/slack"
+	slack "github.com/slack-go/slack"
 )
 
 func AnyPtrToSlackGetConversationsParameters() *slack.GetConversationsParameters {

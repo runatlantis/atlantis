@@ -352,14 +352,173 @@ v{{ .AtlantisVersion }}
 </html>
 `))
 
+// ProjectJobData holds the data needed to stream the current PR information
+type ProjectJobData struct {
+	AtlantisVersion string
+	ProjectPath     string
+	CleanedBasePath string
+}
+
+var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>atlantis</title>
+    <meta name="description" content>
+    <meta name="author" content>
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
+    <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
+    <style>
+      #terminal {
+        position: fixed;
+        top: 200px;
+        left: 0px;
+        bottom: 0px;
+        right: 0px;
+        overflow: auto;
+        border: 5px solid white;
+        }
+
+      .terminal.xterm {
+        padding: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <section class="header">
+    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
+    <p class="title-heading">atlantis</p>
+    <p class="title-heading"><strong></strong></p>
+    </section>
+    <div class="spacer"></div>
+    <br>
+    <section>
+      <div id="terminal"></div>
+    </section>
+  </div>
+  <footer>Initializing...
+  </footer>
+
+    <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-4.9.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.6.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
+
+    <script>
+      function updateTerminalStatus(msg) {
+          document.getElementsByTagName("footer")[0].innerText = msg;
+      }
+      var term = new Terminal({scrollback: 15000});
+      var socket = new WebSocket(
+        (document.location.protocol === "http:" ? "ws://" : "wss://") +
+        document.location.host +
+        document.location.pathname +
+        "/ws");
+
+      socket.onopen = function(event) {
+        updateTerminalStatus("Running...");
+      };
+      socket.onclose = function(event) {
+        updateTerminalStatus("Done");
+      };
+
+      window.addEventListener("unload", function(event) {
+        websocket.close();
+      })
+      var attachAddon = new AttachAddon.AttachAddon(socket);
+      var fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(attachAddon);
+      term.loadAddon(fitAddon);
+      term.open(document.getElementById("terminal"));
+      fitAddon.fit();
+      window.addEventListener("resize", () => fitAddon.fit());
+    </script>
+  </body>
+</html>
+`))
+
+type ProjectJobsError struct {
+	AtlantisVersion string
+	ProjectPath     string
+	CleanedBasePath string
+}
+
+var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>atlantis</title>
+    <meta name="description" content>
+    <meta name="author" content>
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
+    <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
+    <style>
+      #terminal {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <section class="header">
+      <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
+      <p class="title-heading">atlantis</p>
+      <p class="title-heading"><strong></strong></p>
+      </section>
+      <div class="spacer"></div>
+      <br>
+      <section>
+        <div id="terminal"></div>
+      </section>
+    </div>
+    <footer>
+    </footer>
+
+    <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-4.9.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.6.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
+
+    <script>
+      var term = new Terminal();
+      var socket = new WebSocket(
+        (document.location.protocol === "http:" ? "ws://" : "wss://") + 
+        document.location.host +
+        document.location.pathname +
+        "/ws");
+      var attachAddon = new AttachAddon.AttachAddon(socket);
+      var fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(attachAddon);
+      term.loadAddon(fitAddon);
+      term.open(document.getElementById("terminal"));
+      term.write('Project Does Not Exist in PR')
+      fitAddon.fit();
+      window.addEventListener("resize", () => fitAddon.fit());
+    </script>
+  </body>
+</html>
+`))
+
 // GithubSetupData holds the data for rendering the github app setup page
 type GithubSetupData struct {
-	Target        string
-	Manifest      string
-	ID            int64
-	Key           string
-	WebhookSecret string
-	URL           string
+	Target          string
+	Manifest        string
+	ID              int64
+	Key             string
+	WebhookSecret   string
+	URL             string
+	CleanedBasePath string
 }
 
 var GithubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").Parse(`
@@ -371,9 +530,9 @@ var GithubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").
   <meta name="description" content="">
   <meta name="author" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/static/css/normalize.css">
-  <link rel="stylesheet" href="/static/css/skeleton.css">
-  <link rel="stylesheet" href="/static/css/custom.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
   <style>
 
     form {
@@ -408,13 +567,13 @@ var GithubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").
       width: 80%;
     }
   </style>
-  <link rel="icon" type="image/png" href="/static/images/atlantis-icon.png">
-  <script src="/static/js/jquery-3.5.1.min.js"></script>
+  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
+  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
 </head>
 <body>
 <div class="container">
   <section class="header">
-    <a title="atlantis" href="/"><img class="hero" src="/static/images/atlantis-icon_512.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
 
     <p class="js-discard-success"><strong>

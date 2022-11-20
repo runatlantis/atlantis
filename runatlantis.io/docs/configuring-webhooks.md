@@ -11,14 +11,14 @@ See the instructions for your specific provider below.
 [[toc]]
 
 ## GitHub/GitHub Enterprise
-You can install your webhook at the [organization](https://help.github.com/articles/differences-between-user-and-organization-accounts/) level, or for each individual repository.
+You can install your webhook at the [organization](https://docs.github.com/en/get-started/learning-about-github/types-of-github-accounts) level, or for each individual repository.
 
 ::: tip NOTE
 If only some of the repos in your organization are to be managed by Atlantis, then you
 may want to only install on specific repos for now.
 :::
 
-When authenticating as a Github App, Webhooks are automatically created and need no additional setup, beyond being installed to your organization/user account after creation. Refer to the [Github App setup](access-credentials.md#github-app) section for instructions on how to do so.
+When authenticating as a GitHub App, Webhooks are automatically created and need no additional setup, beyond being installed to your organization/user account after creation. Refer to the [GitHub App setup](access-credentials.md#github-app) section for instructions on how to do so.
 
 If you're installing on the organization, navigate to your organization's page and click **Settings**.
 If installing on a single repository, navigate to the repository home page and click **Settings**.
@@ -82,9 +82,8 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - Double-check you added `/events` to the end of your URL.
 - Set **Secret** to the Webhook Secret you generated previously
   - **NOTE** If you're adding a webhook to multiple repositories, each repository will need to use the **same** secret.
-- Under **Repository** select **Push**
-- Under **Pull Request**, select: Opened, Modified, Merged, Declined, Deleted and Comment added
-- Click **Save**<img src="../guide/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;">
+- Under **Pull Request**, select: Opened, Source branch updated, Merged, Declined, Deleted and Comment added
+- Click **Save**<img src="../guide/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 600px;">
 - See [Next Steps](#next-steps)
 
 ## Azure DevOps
@@ -119,6 +118,6 @@ Repeat the process above until you have webhook subscriptions for the following 
 
 ## Next Steps
 * To verify that Atlantis is receiving your webhooks, create a test pull request
-  to your repo. 
+  to your repo.
 * You should see the request show up in the Atlantis logs at an `INFO` level.
 * You'll now need to configure Atlantis to add your [Provider Credentials](provider-credentials.md)

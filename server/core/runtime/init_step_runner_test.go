@@ -1,7 +1,7 @@
 package runtime_test
 
 import (
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -14,9 +14,9 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/logging"
-	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -49,30 +49,31 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			terraform := mocks.NewMockClient()
 
 			logger := logging.NewNoopLogger(t)
+			ctx := command.ProjectContext{
+				Workspace:  "workspace",
+				RepoRelDir: ".",
+				Log:        logger,
+			}
 
 			tfVersion, _ := version.NewVersion(c.version)
 			iso := runtime.InitStepRunner{
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
 
-			output, err := iso.Run(models.ProjectCommandContext{
-				Workspace:  "workspace",
-				RepoRelDir: ".",
-				Log:        logger,
-			}, []string{"extra", "args"}, "/path", map[string]string(nil))
+			output, err := iso.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
 
 			// If using init then we specify -input=false but not for get.
-			expArgs := []string{c.expCmd, "-input=false", "-no-color", "-upgrade", "extra", "args"}
+			expArgs := []string{c.expCmd, "-input=false", "-upgrade", "extra", "args"}
 			if c.expCmd == "get" {
-				expArgs = []string{c.expCmd, "-no-color", "-upgrade", "extra", "args"}
+				expArgs = []string{c.expCmd, "-upgrade", "extra", "args"}
 			}
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expArgs, map[string]string(nil), tfVersion, "workspace")
 		})
 	}
 }
@@ -82,7 +83,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 	RegisterMockTestingT(t)
 	tfClient := mocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	When(tfClient.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(tfClient.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", errors.New("error"))
 
 	tfVersion, _ := version.NewVersion("0.11.0")
@@ -91,7 +92,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 		DefaultTFVersion:  tfVersion,
 	}
 
-	output, err := iso.Run(models.ProjectCommandContext{
+	output, err := iso.Run(command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
@@ -102,103 +103,102 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 
 func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
-	err := ioutil.WriteFile(lockFilePath, nil, 0600)
+	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
 	// commit lock file
 	runCmd(t, repoDir, "git", "add", ".terraform.lock.hcl")
 	runCmd(t, repoDir, "git", "commit", "-m", "add .terraform.lock.hcl")
 
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+		Log:        logger,
+	}
+
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
-
-	logger := logging.NewNoopLogger(t)
 
 	tfVersion, _ := version.NewVersion("0.14.0")
 	iso := runtime.InitStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 
-	output, err := iso.Run(models.ProjectCommandContext{
-		Workspace:  "workspace",
-		RepoRelDir: ".",
-		Log:        logger,
-	}, []string{"extra", "args"}, repoDir, map[string]string(nil))
+	output, err := iso.Run(ctx, []string{"extra", "args"}, repoDir, map[string]string(nil))
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
 
-	expectedArgs := []string{"init", "-input=false", "-no-color", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	expectedArgs := []string{"init", "-input=false", "extra", "args"}
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
 }
 
 func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
-
 	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+		Log:        logger,
+	}
 
 	tfVersion, _ := version.NewVersion("0.14.0")
 	iso := runtime.InitStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 
-	output, err := iso.Run(models.ProjectCommandContext{
-		Workspace:  "workspace",
-		RepoRelDir: ".",
-		Log:        logger,
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	output, err := iso.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
 
-	expectedArgs := []string{"init", "-input=false", "-no-color", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
 }
 
 func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 	lockFilePath := filepath.Join(tmpDir, ".terraform.lock.hcl")
-	err := ioutil.WriteFile(lockFilePath, nil, 0600)
+	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
 
 	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+		Log:        logger,
+	}
 
 	tfVersion, _ := version.NewVersion("0.13.0")
 	iso := runtime.InitStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 
-	output, err := iso.Run(models.ProjectCommandContext{
-		Workspace:  "workspace",
-		RepoRelDir: ".",
-		Log:        logger,
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	output, err := iso.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
 
-	expectedArgs := []string{"init", "-input=false", "-no-color", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
 }
 
 func TestRun_InitExtraArgsDeDupe(t *testing.T) {
@@ -211,32 +211,32 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 		{
 			"No extra args",
 			[]string{},
-			[]string{"init", "-input=false", "-no-color", "-upgrade"},
+			[]string{"init", "-input=false", "-upgrade"},
 		},
 		{
 			"Override -upgrade",
 			[]string{"-upgrade=false"},
-			[]string{"init", "-input=false", "-no-color", "-upgrade=false"},
+			[]string{"init", "-input=false", "-upgrade=false"},
 		},
 		{
 			"Override -input",
 			[]string{"-input=true"},
-			[]string{"init", "-input=true", "-no-color", "-upgrade"},
+			[]string{"init", "-input=true", "-upgrade"},
 		},
 		{
 			"Override -input and -upgrade",
 			[]string{"-input=true", "-upgrade=false"},
-			[]string{"init", "-input=true", "-no-color", "-upgrade=false"},
+			[]string{"init", "-input=true", "-upgrade=false"},
 		},
 		{
 			"Non duplicate extra args",
 			[]string{"extra", "args"},
-			[]string{"init", "-input=false", "-no-color", "-upgrade", "extra", "args"},
+			[]string{"init", "-input=false", "-upgrade", "extra", "args"},
 		},
 		{
 			"Override upgrade with extra args",
 			[]string{"extra", "args", "-upgrade=false"},
-			[]string{"init", "-input=false", "-no-color", "-upgrade=false", "extra", "args"},
+			[]string{"init", "-input=false", "-upgrade=false", "extra", "args"},
 		},
 	}
 
@@ -245,36 +245,36 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 			terraform := mocks.NewMockClient()
 
 			logger := logging.NewNoopLogger(t)
+			ctx := command.ProjectContext{
+				Workspace:  "workspace",
+				RepoRelDir: ".",
+				Log:        logger,
+			}
 
 			tfVersion, _ := version.NewVersion("0.10.0")
 			iso := runtime.InitStepRunner{
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
 
-			output, err := iso.Run(models.ProjectCommandContext{
-				Workspace:  "workspace",
-				RepoRelDir: ".",
-				Log:        logger,
-			}, c.extraArgs, "/path", map[string]string(nil))
+			output, err := iso.Run(ctx, c.extraArgs, "/path", map[string]string(nil))
 			Ok(t, err)
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
 
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", c.expectedArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", c.expectedArgs, map[string]string(nil), tfVersion, "workspace")
 		})
 	}
 }
 
 func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
-	err := ioutil.WriteFile(lockFilePath, nil, 0600)
+	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -283,24 +283,26 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	tfVersion, _ := version.NewVersion("0.14.0")
+
 	iso := runtime.InitStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 
-	output, err := iso.Run(models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
-	}, []string{"extra", "args"}, repoDir, map[string]string(nil))
+	}
+	output, err := iso.Run(ctx, []string{"extra", "args"}, repoDir, map[string]string(nil))
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
 
-	expectedArgs := []string{"init", "-input=false", "-no-color", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {
@@ -312,14 +314,15 @@ func runCmd(t *testing.T, dir string, name string, args ...string) string {
 	return string(cpOut)
 }
 
-func initRepo(t *testing.T) (string, func()) {
-	repoDir, cleanup := TempDir(t)
+func initRepo(t *testing.T) string {
+	repoDir := t.TempDir()
 	runCmd(t, repoDir, "git", "init")
 	runCmd(t, repoDir, "touch", ".gitkeep")
 	runCmd(t, repoDir, "git", "add", ".gitkeep")
 	runCmd(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, repoDir, "git", "config", "--local", "commit.gpgsign", "false")
 	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, repoDir, "git", "branch", "branch")
-	return repoDir, cleanup
+	return repoDir
 }

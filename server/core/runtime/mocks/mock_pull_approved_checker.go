@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock"
+	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
 type MockPullApprovedChecker struct {
@@ -25,17 +26,17 @@ func NewMockPullApprovedChecker(options ...pegomock.Option) *MockPullApprovedChe
 func (mock *MockPullApprovedChecker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPullApprovedChecker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPullApprovedChecker) PullIsApproved(baseRepo models.Repo, pull models.PullRequest) (bool, error) {
+func (mock *MockPullApprovedChecker) PullIsApproved(baseRepo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPullApprovedChecker().")
 	}
 	params := []pegomock.Param{baseRepo, pull}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("PullIsApproved", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 bool
+	result := pegomock.GetGenericMockFrom(mock).Invoke("PullIsApproved", params, []reflect.Type{reflect.TypeOf((*models.ApprovalStatus)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.ApprovalStatus
 	var ret1 error
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(bool)
+			ret0 = result[0].(models.ApprovalStatus)
 		}
 		if result[1] != nil {
 			ret1 = result[1].(error)

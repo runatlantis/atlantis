@@ -22,8 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/core/config"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
 	version "github.com/hashicorp/go-version"
@@ -168,15 +169,17 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	approvals, _, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	if approvals.ApprovalsLeft > 0 {
-		return false, nil
+		return approvalStatus, nil
 	}
-	return true, nil
+	return models.ApprovalStatus{
+		IsApproved: true,
+	}, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
@@ -190,7 +193,7 @@ func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 // See:
 // - https://gitlab.com/gitlab-org/gitlab-ee/issues/3169
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
-func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
 	if err != nil {
 		return false, err
@@ -209,10 +212,12 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	for _, status := range statuses {
-		if !strings.HasSuffix(status.Name, fmt.Sprintf("/%s", models.ApplyCommand.String())) {
-			if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
-				return false, nil
-			}
+		// Ignore any commit statuses with 'atlantis/apply' as prefix
+		if strings.HasPrefix(status.Name, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+			continue
+		}
+		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
+			return false, nil
 		}
 	}
 
@@ -230,10 +235,10 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 // UpdateStatus updates the build status of a commit.
 func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
-	gitlabState := gitlab.Failed
+	gitlabState := gitlab.Pending
 	switch state {
 	case models.PendingCommitStatus:
-		gitlabState = gitlab.Pending
+		gitlabState = gitlab.Running
 	case models.FailedCommitStatus:
 		gitlabState = gitlab.Failed
 	case models.SuccessCommitStatus:
@@ -244,6 +249,7 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 		Context:     gitlab.String(src),
 		Description: gitlab.String(description),
 		TargetURL:   &url,
+		Ref:         gitlab.String(pull.HeadBranch),
 	})
 	return err
 }
@@ -352,13 +358,18 @@ func MustConstraint(constraint string) version.Constraints {
 	return c
 }
 
+// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
+func (g *GitlabClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	return nil, nil
+}
+
 // DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)
 // The first return value indicate that repo contain atlantis.yaml or not
 // if BaseRepo had one repo config file, its content will placed on the second return value
 func (g *GitlabClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	opt := gitlab.GetRawFileOptions{Ref: gitlab.String(pull.HeadBranch)}
 
-	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, yaml.AtlantisYAMLFilename, &opt)
+	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, config.AtlantisYAMLFilename, &opt)
 	if resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil
 	}
@@ -372,4 +383,12 @@ func (g *GitlabClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []
 
 func (g *GitlabClient) SupportsSingleFileDownload(repo models.Repo) bool {
 	return true
+}
+
+func (g *GitlabClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	project, _, err := g.Client.Projects.GetProject(repo, nil)
+	if err != nil {
+		return "", err
+	}
+	return project.HTTPURLToRepo, nil
 }

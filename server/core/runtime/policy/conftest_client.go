@@ -9,12 +9,14 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime/cache"
 	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 const (
@@ -69,8 +71,9 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 	return commandArgs, nil
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_conftest_client.go SourceResolver
 // SourceResolver resolves the policy set to a local fs path
+//
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_conftest_client.go SourceResolver
 type SourceResolver interface {
 	Resolve(policySet valid.PolicySet) (string, error)
 }
@@ -94,7 +97,7 @@ func (p *SourceResolverProxy) Resolve(policySet valid.PolicySet) (string, error)
 	case valid.LocalPolicySet:
 		return p.localSourceResolver.Resolve(policySet)
 	default:
-		return "", errors.New(fmt.Sprintf("unable to resolve policy set source %s", source))
+		return "", fmt.Errorf("unable to resolve policy set source %s", source)
 	}
 }
 
@@ -106,7 +109,7 @@ func (c ConfTestVersionDownloader) downloadConfTestVersion(v *version.Version, d
 	versionURLPrefix := fmt.Sprintf("%s%s", conftestDownloadURLPrefix, v.Original())
 
 	// download binary in addition to checksum file
-	binURL := fmt.Sprintf("%s/conftest_%s_%s_%s.tar.gz", versionURLPrefix, v.Original(), strings.Title(runtime.GOOS), conftestArch)
+	binURL := fmt.Sprintf("%s/conftest_%s_%s_%s.tar.gz", versionURLPrefix, v.Original(), cases.Title(language.English).String(runtime.GOOS), conftestArch)
 	checksumURL := fmt.Sprintf("%s/checksums.txt", versionURLPrefix)
 
 	// underlying implementation uses go-getter so the URL is formatted as such.
@@ -159,7 +162,7 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 	}
 }
 
-func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
+func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
 	policyArgs := []Arg{}
 	policySetNames := []string{}
 	ctx.Log.Debug("policy sets, %s ", ctx.PolicySets)
@@ -237,7 +240,7 @@ func getDefaultVersion() (*version.Version, error) {
 	defaultVersion, exists := os.LookupEnv(DefaultConftestVersionEnvKey)
 
 	if !exists {
-		return nil, errors.New(fmt.Sprintf("%s not set.", DefaultConftestVersionEnvKey))
+		return nil, fmt.Errorf("%s not set", DefaultConftestVersionEnvKey)
 	}
 
 	wrappedVersion, err := version.NewVersion(defaultVersion)

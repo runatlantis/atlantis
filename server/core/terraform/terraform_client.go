@@ -3,7 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the License);
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an AS IS BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,10 +17,7 @@
 package terraform
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,8 +30,18 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+
+	"github.com/runatlantis/atlantis/server/core/runtime/models"
+	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
+	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 )
+
+var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
+
+// Setting the buffer size to 10mb
+const BufioScannerBufferSize = 10 * 1024 * 1024
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_terraform_client.go Client
 
@@ -40,7 +49,7 @@ type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
 	// workspace which should be set as an environment variable.
-	RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
@@ -70,6 +79,8 @@ type DefaultClient struct {
 
 	// usePluginCache determines whether or not to set the TF_PLUGIN_CACHE_DIR env var
 	usePluginCache bool
+
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_downloader.go Downloader
@@ -81,11 +92,12 @@ type Downloader interface {
 }
 
 // versionRegex extracts the version from `terraform version` output.
-//     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
-//	   => 0.12.0-alpha4
 //
-//     Terraform v0.11.10
-//	   => 0.11.10
+//	    Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
+//		   => 0.12.0-alpha4
+//
+//	    Terraform v0.11.10
+//		   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
 // NewClientWithDefaultVersion creates a new terraform client and pre-fetches the default version
@@ -101,6 +113,7 @@ func NewClientWithDefaultVersion(
 	tfDownloader Downloader,
 	usePluginCache bool,
 	fetchAsync bool,
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 ) (*DefaultClient, error) {
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
@@ -158,7 +171,6 @@ func NewClientWithDefaultVersion(
 			return nil, err
 		}
 	}
-
 	return &DefaultClient{
 		defaultVersion:          finalDefaultVersion,
 		terraformPluginCacheDir: cacheDir,
@@ -168,6 +180,7 @@ func NewClientWithDefaultVersion(
 		versionsLock:            &versionsLock,
 		versions:                versions,
 		usePluginCache:          usePluginCache,
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}, nil
 
 }
@@ -182,7 +195,9 @@ func NewTestClient(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	usePluginCache bool) (*DefaultClient, error) {
+	usePluginCache bool,
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
+) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
 		binDir,
@@ -195,6 +210,7 @@ func NewTestClient(
 		tfDownloader,
 		usePluginCache,
 		false,
+		projectCmdOutputHandler,
 	)
 }
 
@@ -216,7 +232,9 @@ func NewClient(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	usePluginCache bool) (*DefaultClient, error) {
+	usePluginCache bool,
+	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
+) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
 		binDir,
@@ -229,6 +247,7 @@ func NewClient(
 		tfDownloader,
 		usePluginCache,
 		true,
+		projectCmdOutputHandler,
 	)
 }
 
@@ -261,8 +280,26 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 }
 
 // See Client.RunCommandWithVersion.
-func (c *DefaultClient) RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
-	tfCmd, cmd, err := c.prepCmd(log, v, workspace, path, args)
+func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
+	if isAsyncEligibleCommand(args[0]) {
+		_, outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
+
+		var lines []string
+		var err error
+		for line := range outCh {
+			if line.Err != nil {
+				err = line.Err
+				break
+			}
+			lines = append(lines, line.Line)
+		}
+		output := strings.Join(lines, "\n")
+
+		// sanitize output by stripping out any ansi characters.
+		output = ansi.Strip(output)
+		return fmt.Sprintf("%s\n", output), err
+	}
+	tfCmd, cmd, err := c.prepExecCmd(ctx.Log, v, workspace, path, args)
 	if err != nil {
 		return "", err
 	}
@@ -274,17 +311,31 @@ func (c *DefaultClient) RunCommandWithVersion(log logging.SimpleLogging, path st
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-		log.Err(err.Error())
-		return string(out), err
+		ctx.Log.Err(err.Error())
+		return ansi.Strip(string(out)), err
 	}
-	log.Info("successfully ran %q in %q", tfCmd, path)
-	return string(out), nil
+	ctx.Log.Info("successfully ran %q in %q", tfCmd, path)
+
+	return ansi.Strip(string(out)), nil
 }
 
-// prepCmd builds a ready to execute command based on the version of terraform
+// prepExecCmd builds a ready to execute command based on the version of terraform
 // v, and args. It returns a printable representation of the command that will
 // be run and the actual command.
-func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, workspace string, path string, args []string) (string, *exec.Cmd, error) {
+func (c *DefaultClient) prepExecCmd(log logging.SimpleLogging, v *version.Version, workspace string, path string, args []string) (string, *exec.Cmd, error) {
+	tfCmd, envVars, err := c.prepCmd(log, v, workspace, path, args)
+	if err != nil {
+		return "", nil, err
+	}
+	cmd := exec.Command("sh", "-c", tfCmd)
+	cmd.Dir = path
+	cmd.Env = envVars
+	return tfCmd, cmd, nil
+}
+
+// prepCmd prepares a shell command (to be interpreted with `sh -c <cmd>`) and set of environment
+// variables for running terraform.
+func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, workspace string, path string, args []string) (string, []string, error) {
 	if v == nil {
 		v = c.defaultVersion
 	}
@@ -310,7 +361,6 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, w
 		"TF_IN_AUTOMATION=true",
 		// Cache plugins so terraform init runs faster.
 		fmt.Sprintf("WORKSPACE=%s", workspace),
-		fmt.Sprintf("TF_WORKSPACE=%s", workspace),
 		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", v.String()),
 		fmt.Sprintf("DIR=%s", path),
 	}
@@ -321,18 +371,7 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, w
 	// AWS_ACCESS_KEY.
 	envVars = append(envVars, os.Environ()...)
 	tfCmd := fmt.Sprintf("%s %s", binPath, strings.Join(args, " "))
-	cmd := exec.Command("sh", "-c", tfCmd)
-	cmd.Dir = path
-	cmd.Env = envVars
-	return tfCmd, cmd, nil
-}
-
-// Line represents a line that was output from a terraform command.
-type Line struct {
-	// Line is the contents of the line (without the newline).
-	Line string
-	// Err is set if there was an error.
-	Err error
+	return tfCmd, envVars, nil
 }
 
 // RunCommandAsync runs terraform with args. It immediately returns an
@@ -341,93 +380,28 @@ type Line struct {
 // Callers can use the input channel to pass stdin input to the command.
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
-func (c *DefaultClient) RunCommandAsync(log logging.SimpleLogging, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan Line) {
-	outCh := make(chan Line)
-	inCh := make(chan string)
-
-	// We start a goroutine to do our work asynchronously and then immediately
-	// return our channels.
-	go func() {
-
-		// Ensure we close our channels when we exit.
-		defer func() {
+func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan models.Line) {
+	cmd, envVars, err := c.prepCmd(ctx.Log, v, workspace, path, args)
+	if err != nil {
+		// The signature of `RunCommandAsync` doesn't provide for returning an immediate error, only one
+		// once reading the output. Since we won't be spawning a process, simulate that by sending the
+		// errorcustomEnvVars to the output channel.
+		outCh := make(chan models.Line)
+		inCh := make(chan string)
+		go func() {
+			outCh <- models.Line{Err: err}
 			close(outCh)
 			close(inCh)
 		}()
+		return inCh, outCh
+	}
 
-		tfCmd, cmd, err := c.prepCmd(log, v, workspace, path, args)
-		if err != nil {
-			log.Err(err.Error())
-			outCh <- Line{Err: err}
-			return
-		}
-		stdout, _ := cmd.StdoutPipe()
-		stderr, _ := cmd.StderrPipe()
-		stdin, _ := cmd.StdinPipe()
-		envVars := cmd.Env
-		for key, val := range customEnvVars {
-			envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
-		}
-		cmd.Env = envVars
+	for key, val := range customEnvVars {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
+	}
 
-		log.Debug("starting %q in %q", tfCmd, path)
-		err = cmd.Start()
-		if err != nil {
-			err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-			log.Err(err.Error())
-			outCh <- Line{Err: err}
-			return
-		}
-
-		// If we get anything on inCh, write it to stdin.
-		// This function will exit when inCh is closed which we do in our defer.
-		go func() {
-			for line := range inCh {
-				log.Debug("writing %q to remote command's stdin", line)
-				_, err := io.WriteString(stdin, line)
-				if err != nil {
-					log.Err(errors.Wrapf(err, "writing %q to process", line).Error())
-				}
-			}
-		}()
-
-		// Use a waitgroup to block until our stdout/err copying is complete.
-		wg := new(sync.WaitGroup)
-		wg.Add(2)
-
-		// Asynchronously copy from stdout/err to outCh.
-		go func() {
-			s := bufio.NewScanner(stdout)
-			for s.Scan() {
-				outCh <- Line{Line: s.Text()}
-			}
-			wg.Done()
-		}()
-		go func() {
-			s := bufio.NewScanner(stderr)
-			for s.Scan() {
-				outCh <- Line{Line: s.Text()}
-			}
-			wg.Done()
-		}()
-
-		// Wait for our copying to complete. This *must* be done before
-		// calling cmd.Wait(). (see https://github.com/golang/go/issues/19685)
-		wg.Wait()
-
-		// Wait for the command to complete.
-		err = cmd.Wait()
-
-		// We're done now. Send an error if there was one.
-		if err != nil {
-			err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-			log.Err(err.Error())
-			outCh <- Line{Err: err}
-		} else {
-			log.Info("successfully ran %q in %q", tfCmd, path)
-		}
-	}()
-
+	runner := models.NewShellCommandRunner(cmd, envVars, path, true, c.projectCmdOutputHandler)
+	inCh, outCh := runner.RunCommandAsync(ctx)
 	return inCh, outCh
 }
 
@@ -491,7 +465,7 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 	// what we would have written to it, then we error out because we don't
 	// want to overwrite anything.
 	if _, err := os.Stat(rcFile); err == nil {
-		currContents, err := ioutil.ReadFile(rcFile) // nolint: gosec
+		currContents, err := os.ReadFile(rcFile) // nolint: gosec
 		if err != nil {
 			return errors.Wrapf(err, "trying to read %s to ensure we're not overwriting it", rcFile)
 		}
@@ -503,10 +477,19 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 		return nil
 	}
 
-	if err := ioutil.WriteFile(rcFile, []byte(config), 0600); err != nil {
+	if err := os.WriteFile(rcFile, []byte(config), 0600); err != nil {
 		return errors.Wrapf(err, "writing generated %s file with TFE token to %s", rcFilename, rcFile)
 	}
 	return nil
+}
+
+func isAsyncEligibleCommand(cmd string) bool {
+	for _, validCmd := range LogStreamingValidCmds {
+		if validCmd == cmd {
+			return true
+		}
+	}
+	return false
 }
 
 func getVersion(tfBinary string) (*version.Version, error) {

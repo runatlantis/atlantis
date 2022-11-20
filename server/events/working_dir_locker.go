@@ -27,11 +27,11 @@ import (
 // on disk and we haven't written Atlantis (yet) to handle concurrent execution
 // within this workspace.
 type WorkingDirLocker interface {
-	// TryLock tries to acquire a lock for this repo, workspace and pull.
+	// TryLock tries to acquire a lock for this repo, pull, workspace, and path.
 	// It returns a function that should be used to unlock the workspace and
 	// an error if the workspace is already locked. The error is expected to
 	// be printed to the pull request.
-	TryLock(repoFullName string, pullNum int, workspace string) (func(), error)
+	TryLock(repoFullName string, pullNum int, workspace string, path string) (func(), error)
 	// TryLockPull tries to acquire a lock for all the workspaces in this repo
 	// and pull.
 	// It returns a function that should be used to unlock the workspace and
@@ -74,31 +74,31 @@ func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int) 
 	}, nil
 }
 
-func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string) (func(), error) {
+func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string) (func(), error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	pullKey := d.pullKey(repoFullName, pullNum)
-	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace)
+	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path)
 	for _, l := range d.locks {
 		if l == pullKey || l == workspaceKey {
-			return func() {}, fmt.Errorf("The %s workspace is currently locked by another"+
+			return func() {}, fmt.Errorf("The %s workspace at path %s is currently locked by another"+
 				" command that is running for this pull request.\n"+
-				"Wait until the previous command is complete and try again.", workspace)
+				"Wait until the previous command is complete and try again.", workspace, path)
 		}
 	}
 	d.locks = append(d.locks, workspaceKey)
 	return func() {
-		d.unlock(repoFullName, pullNum, workspace)
+		d.unlock(repoFullName, pullNum, workspace, path)
 	}, nil
 }
 
 // Unlock unlocks the workspace for this pull.
-func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, workspace string) {
+func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, workspace string, path string) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace)
+	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path)
 	d.removeLock(workspaceKey)
 }
 
@@ -121,8 +121,8 @@ func (d *DefaultWorkingDirLocker) removeLock(key string) {
 	d.locks = newLocks
 }
 
-func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace string) string {
-	return fmt.Sprintf("%s/%s", d.pullKey(repo, pull), workspace)
+func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace string, path string) string {
+	return fmt.Sprintf("%s/%s/%s", d.pullKey(repo, pull), workspace, path)
 }
 
 func (d *DefaultWorkingDirLocker) pullKey(repo string, pull int) string {

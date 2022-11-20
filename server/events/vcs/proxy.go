@@ -64,12 +64,12 @@ func (d *ClientProxy) HidePrevCommandComments(repo models.Repo, pullNum int, com
 	return d.clients[repo.VCSHost.Type].HidePrevCommandComments(repo, pullNum, command)
 }
 
-func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	return d.clients[repo.VCSHost.Type].PullIsApproved(repo, pull)
 }
 
-func (d *ClientProxy) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
-	return d.clients[repo.VCSHost.Type].PullIsMergeable(repo, pull)
+func (d *ClientProxy) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+	return d.clients[repo.VCSHost.Type].PullIsMergeable(repo, pull, vcsstatusname)
 }
 
 func (d *ClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
@@ -84,10 +84,18 @@ func (d *ClientProxy) MarkdownPullLink(pull models.PullRequest) (string, error) 
 	return d.clients[pull.BaseRepo.VCSHost.Type].MarkdownPullLink(pull)
 }
 
+func (d *ClientProxy) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	return d.clients[repo.VCSHost.Type].GetTeamNamesForUser(repo, user)
+}
+
 func (d *ClientProxy) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	return d.clients[pull.BaseRepo.VCSHost.Type].DownloadRepoConfigFile(pull)
 }
 
 func (d *ClientProxy) SupportsSingleFileDownload(repo models.Repo) bool {
 	return d.clients[repo.VCSHost.Type].SupportsSingleFileDownload(repo)
+}
+
+func (d *ClientProxy) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return d.clients[VCSHostType].GetCloneURL(VCSHostType, repo)
 }

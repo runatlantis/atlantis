@@ -45,6 +45,10 @@ atlantis plan -w staging
 * `-w workspace` Switch to this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) before planning. Defaults to `default`. If not using Terraform workspaces you can ignore this.
 * `--verbose` Append Atlantis log to comment.
 
+::: warning NOTE
+A `atlantis plan` (without flags), like autoplans, discards all plans previously created with `atlantis plan` `-p`/`-d`/`-w`
+:::
+
 ### Additional Terraform flags
 
 If you need to run `terraform plan` with additional arguments, like `-target=resource` or `-var 'foo-bar'` or `-var-file myfile.tfvars`
@@ -65,6 +69,7 @@ Runs `terraform apply` for the plan that matches the directory/project/workspace
 
 ::: tip
 If no directory/project/workspace is specified, ex. `atlantis apply`, this command will apply **all unapplied plans from this pull request**.
+This includes all projects that have been planned manually with `atlantis plan` `-p`/`-d`/`-w` since the last autoplan or `atlantis plan` command.
 :::
 
 ### Examples
@@ -86,6 +91,7 @@ atlantis apply -w staging
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use `.` for root.
 * `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w`.
 * `-w workspace` Apply the plan for this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html). If not using Terraform workspaces you can ignore this.
+* `--auto-merge-disabled` Disable [automerge](automerging.html) for this apply command.
 * `--verbose` Append Atlantis log to comment.
 
 ### Additional Terraform flags

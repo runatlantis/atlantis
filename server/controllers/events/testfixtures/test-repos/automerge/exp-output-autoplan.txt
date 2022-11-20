@@ -21,6 +21,7 @@ Terraform will perform the following actions:
 
 Plan: 1 to add, 0 to change, 0 to destroy.
 
+
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -49,6 +50,7 @@ Terraform will perform the following actions:
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
+
 
 ```
 

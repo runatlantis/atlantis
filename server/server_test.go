@@ -15,8 +15,9 @@ package server_test
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -36,9 +37,8 @@ import (
 
 func TestNewServer(t *testing.T) {
 	t.Log("Run through NewServer constructor")
-	tmpDir, err := ioutil.TempDir("", "")
-	Ok(t, err)
-	_, err = server.NewServer(server.UserConfig{
+	tmpDir := t.TempDir()
+	_, err := server.NewServer(server.UserConfig{
 		DataDir:     tmpDir,
 		AtlantisURL: "http://example.com",
 	}, server.Config{})
@@ -48,9 +48,8 @@ func TestNewServer(t *testing.T) {
 // todo: test what happens if we set different flags. The generated config should be different.
 
 func TestNewServer_InvalidAtlantisURL(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "")
-	Ok(t, err)
-	_, err = server.NewServer(server.UserConfig{
+	tmpDir := t.TempDir()
+	_, err := server.NewServer(server.UserConfig{
 		DataDir:     tmpDir,
 		AtlantisURL: "example.com",
 	}, server.Config{
@@ -138,12 +137,55 @@ func TestHealthz(t *testing.T) {
 	w := httptest.NewRecorder()
 	s.Healthz(w, req)
 	Equals(t, http.StatusOK, w.Result().StatusCode)
-	body, _ := ioutil.ReadAll(w.Result().Body)
+	body, _ := io.ReadAll(w.Result().Body)
 	Equals(t, "application/json", w.Result().Header["Content-Type"][0])
 	Equals(t,
 		`{
   "status": "ok"
 }`, string(body))
+}
+
+type mockRW struct{}
+
+var _ http.ResponseWriter = mockRW{}
+var mh = http.Header{}
+
+func (w mockRW) WriteHeader(int)           {}
+func (w mockRW) Write([]byte) (int, error) { return 0, nil }
+func (w mockRW) Header() http.Header       { return mh }
+
+var w = mockRW{}
+var s = &server.Server{}
+
+func BenchmarkHealthz(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		s.Healthz(w, nil)
+	}
+}
+
+func TestGetCertificate(t *testing.T) {
+	s := server.Server{}
+	clientHelloInfo := &tls.ClientHelloInfo{}
+
+	// Initial certificate load
+	s.SSLCertFile = "../testdata/cert.pem"
+	s.SSLKeyFile = "../testdata/key.pem"
+	cert, err := s.GetSSLCertificate(clientHelloInfo)
+	Ok(t, err)
+
+	// Certificate reload
+	s.SSLCertFile = "../testdata/cert2.pem"
+	s.SSLKeyFile = "../testdata/key2.pem"
+	s.CertLastRefreshTime = s.CertLastRefreshTime.Add(-1 * time.Second)
+	s.KeyLastRefreshTime = s.KeyLastRefreshTime.Add(-1 * time.Second)
+	newCert, err := s.GetSSLCertificate(clientHelloInfo)
+
+	Ok(t, err)
+	Assert(
+		t,
+		!bytes.Equal(bytes.Join(cert.Certificate, nil), bytes.Join(newCert.Certificate, nil)),
+		"Certificate expected to rotate")
 }
 
 func TestParseAtlantisURL(t *testing.T) {

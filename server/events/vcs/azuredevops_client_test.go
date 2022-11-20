@@ -3,10 +3,11 @@ package vcs_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -191,7 +192,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 					case "/owner/project/_apis/git/repositories/repo/pullrequests/22/statuses?api-version=5.1-preview.1":
 						gotRequest = true
 						defer r.Body.Close() // nolint: errcheck
-						body, err := ioutil.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
 						exp := fmt.Sprintf(partResponse, c.expState)
 						if c.supportsIterations == true {
@@ -361,10 +362,10 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 		},
 	}
 
-	jsonPullRequestBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
+	jsonPullRequestBytes, err := os.ReadFile("fixtures/azuredevops-pr.json")
 	Ok(t, err)
 
-	jsonPolicyEvaluationBytes, err := ioutil.ReadFile("fixtures/azuredevops-policyevaluations.json")
+	jsonPolicyEvaluationBytes, err := os.ReadFile("fixtures/azuredevops-policyevaluations.json")
 	Ok(t, err)
 
 	pullRequestBody := string(jsonPullRequestBytes)
@@ -413,7 +414,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				},
 			}, models.PullRequest{
 				Num: 1,
-			})
+			}, "atlantis-test")
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})
@@ -465,7 +466,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 		},
 	}
 
-	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
+	jsBytes, err := os.ReadFile("fixtures/azuredevops-pr.json")
 	Ok(t, err)
 
 	json := string(jsBytes)
@@ -495,7 +496,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 
 			defer disableSSLVerification()()
 
-			actApproved, err := client.PullIsApproved(models.Repo{
+			approvalStatus, err := client.PullIsApproved(models.Repo{
 				FullName:          "owner/project/repo",
 				Owner:             "owner",
 				Name:              "repo",
@@ -509,14 +510,14 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 				Num: 1,
 			})
 			Ok(t, err)
-			Equals(t, c.expApproved, actApproved)
+			Equals(t, c.expApproved, approvalStatus.IsApproved)
 		})
 	}
 }
 
 func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 	// Use a real Azure DevOps json response and edit the mergeable_state field.
-	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
+	jsBytes, err := os.ReadFile("fixtures/azuredevops-pr.json")
 	Ok(t, err)
 	response := string(jsBytes)
 

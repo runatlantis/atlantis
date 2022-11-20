@@ -1,0 +1,51 @@
+env:
+  - CGO_ENABLED=0
+builds:
+  - targets:
+    - darwin_amd64
+    - darwin_arm64
+    - linux_386
+    - linux_amd64
+    - linux_arm
+    - linux_arm64
+    - windows_386
+    - windows_amd64
+
+archives:
+  - id: zip
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format: zip
+    files:
+      - none*
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  skip: true
+
+release:
+  github:
+    owner: runatlantis
+    name: atlantis
+
+  # If set to true, will not auto-publish the release.
+  # Default is false.
+  draft: false
+
+  # If set, will create a release discussion in the category specified.
+  #
+  # Warning: do not use categories in the 'Announcement' format.
+  #  Check https://github.com/goreleaser/goreleaser/issues/2304 for more info.
+  #
+  # Default is empty.
+  discussion_category_name: General
+
+  # If set to auto, will mark the release as not ready for production
+  # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
+  # If set to true, will mark the release as not ready for production.
+  # Default is false.
+  prerelease: auto
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"

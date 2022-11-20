@@ -14,9 +14,10 @@
 package events
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	gitlab "github.com/xanzy/go-gitlab"
@@ -61,14 +62,13 @@ func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, 
 
 	// Validate secret if specified.
 	headerSecret := r.Header.Get(secretHeader)
-	secretStr := string(secret)
-	if len(secret) != 0 && headerSecret != secretStr {
+	if len(secret) != 0 && subtle.ConstantTimeCompare(secret, []byte(headerSecret)) != 1 {
 		return nil, fmt.Errorf("header %s=%s did not match expected secret", secretHeader, headerSecret)
 	}
 
 	// Parse request into a gitlab object based on the object type specified
 	// in the gitlabHeader.
-	bytes, err := ioutil.ReadAll(r.Body)
+	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}

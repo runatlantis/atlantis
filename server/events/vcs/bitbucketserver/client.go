@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -28,6 +27,11 @@ type Client struct {
 	Password    string
 	BaseURL     string
 	AtlantisURL string
+}
+
+type DeleteSourceBranch struct {
+	Name   string `json:"name"`
+	DryRun bool   `json:"dryRun"`
 }
 
 // NewClient builds a bitbucket cloud client. Returns an error if the baseURL is
@@ -161,33 +165,35 @@ func (b *Client) postComment(repo models.Repo, pullNum int, comment string) erro
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repo.Name, pull.Num)
 	resp, err := b.makeRequest("GET", path, nil)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		return approvalStatus, errors.Wrapf(err, "Could not parse response %q", string(resp))
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		return approvalStatus, errors.Wrapf(err, "API response %q was missing fields", string(resp))
 	}
 	for _, reviewer := range pullResp.Reviewers {
 		if *reviewer.Approved {
-			return true, nil
+			return models.ApprovalStatus{
+				IsApproved: true,
+			}, nil
 		}
 	}
-	return false, nil
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
 		return false, err
@@ -265,6 +271,21 @@ func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullReque
 	}
 	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
 	_, err = b.makeRequest("POST", path, nil)
+	if err != nil {
+		return err
+	}
+	if pullOptions.DeleteSourceBranchOnMerge {
+		bodyBytes, err := json.Marshal(DeleteSourceBranch{Name: "refs/heads/" + pull.HeadBranch, DryRun: false})
+		if err != nil {
+			return errors.Wrap(err, "json encoding")
+		}
+
+		path = fmt.Sprintf("%s/rest/branch-utils/1.0/projects/%s/repos/%s/branches", b.BaseURL, projectKey, pull.BaseRepo.Name)
+		_, err = b.makeRequest("DELETE", path, bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			return err
+		}
+	}
 	return err
 }
 
@@ -279,7 +300,11 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	if err != nil {
 		return nil, err
 	}
-	req.SetBasicAuth(b.Username, b.Password)
+
+	// Personal access tokens can be sent as basic auth or bearer
+	bearer := "Bearer " + b.Password
+	req.Header.Add("Authorization", bearer)
+
 	if body != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
@@ -302,14 +327,19 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	requestStr := fmt.Sprintf("%s %s", method, path)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != 204 {
-		respBody, _ := ioutil.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("making request %q unexpected status code: %d, body: %s", requestStr, resp.StatusCode, string(respBody))
 	}
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrapf(err, "reading response from request %q", requestStr)
 	}
 	return respBody, nil
+}
+
+// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
+func (b *Client) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	return nil, nil
 }
 
 func (b *Client) SupportsSingleFileDownload(repo models.Repo) bool {
@@ -321,4 +351,8 @@ func (b *Client) SupportsSingleFileDownload(repo models.Repo) bool {
 // if BaseRepo had one repo config file, its content will placed on the second return value
 func (b *Client) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("not implemented")
+}
+
+func (b *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
 }

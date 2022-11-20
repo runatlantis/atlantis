@@ -1,6 +1,9 @@
 package events
 
-import "github.com/runatlantis/atlantis/server/events/models"
+import (
+	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
+)
 
 func NewPolicyCheckCommandRunner(
 	dbUpdater *DBUpdater,
@@ -9,6 +12,7 @@ func NewPolicyCheckCommandRunner(
 	projectCommandRunner ProjectPolicyCheckCommandRunner,
 	parallelPoolSize int,
 	silenceVCSStatusNoProjects bool,
+	quietPolicyChecks bool,
 ) *PolicyCheckCommandRunner {
 	return &PolicyCheckCommandRunner{
 		dbUpdater:                  dbUpdater,
@@ -17,6 +21,7 @@ func NewPolicyCheckCommandRunner(
 		prjCmdRunner:               projectCommandRunner,
 		parallelPoolSize:           parallelPoolSize,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		quietPolicyChecks:          quietPolicyChecks,
 	}
 }
 
@@ -29,9 +34,10 @@ type PolicyCheckCommandRunner struct {
 	// SilenceVCSStatusNoProjects is whether any plan should set commit status if no projects
 	// are found
 	silenceVCSStatusNoProjects bool
+	quietPolicyChecks          bool
 }
 
-func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.ProjectCommandContext) {
+func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.ProjectContext) {
 	if len(cmds) == 0 {
 		ctx.Log.Info("no projects to run policy_check in")
 		if !p.silenceVCSStatusNoProjects {
@@ -39,7 +45,7 @@ func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.Projec
 			// with 0/0 projects policy_checked successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, models.PolicyCheckCommand, 0, 0); err != nil {
+			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		}
@@ -47,11 +53,11 @@ func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.Projec
 	}
 
 	// So set policy_check commit status to pending
-	if err := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PolicyCheckCommand); err != nil {
+	if err := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
-	var result CommandResult
+	var result command.Result
 	if p.isParallelEnabled(cmds) {
 		ctx.Log.Info("Running policy_checks in parallel")
 		result = runProjectCmdsParallel(cmds, p.prjCmdRunner.PolicyCheck, p.parallelPoolSize)
@@ -59,7 +65,10 @@ func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.Projec
 		result = runProjectCmds(cmds, p.prjCmdRunner.PolicyCheck)
 	}
 
-	p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
+	// Quiet policy checks unless there's an error
+	if result.HasErrors() || !p.quietPolicyChecks {
+		p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
+	}
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
@@ -69,7 +78,7 @@ func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.Projec
 	p.updateCommitStatus(ctx, pullStatus)
 }
 
-func (p *PolicyCheckCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus models.PullStatus) {
+func (p *PolicyCheckCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus
@@ -81,11 +90,11 @@ func (p *PolicyCheckCommandRunner) updateCommitStatus(ctx *CommandContext, pullS
 		status = models.FailedCommitStatus
 	}
 
-	if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, status, models.PolicyCheckCommand, numSuccess, len(pullStatus.Projects)); err != nil {
+	if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, numSuccess, len(pullStatus.Projects)); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 }
 
-func (p *PolicyCheckCommandRunner) isParallelEnabled(cmds []models.ProjectCommandContext) bool {
+func (p *PolicyCheckCommandRunner) isParallelEnabled(cmds []command.ProjectContext) bool {
 	return len(cmds) > 0 && cmds[0].ParallelPolicyCheckEnabled
 }

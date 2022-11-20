@@ -6,5 +6,6 @@ null_resource.automerge[0]: Creation complete after *s [id=*******************]
 
 Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 
+
 ```
 

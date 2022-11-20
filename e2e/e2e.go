@@ -15,13 +15,12 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"time"
 
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v48/github"
 )
 
 type E2ETester struct {
@@ -78,7 +77,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	randomData := []byte(testFileData)
 	filePath := fmt.Sprintf("%s/%s/%s", cloneDir, t.projectType.Name, testFileName)
 	log.Printf("creating file to commit %q", filePath)
-	err := ioutil.WriteFile(filePath, randomData, 0644)
+	err := os.WriteFile(filePath, randomData, 0644)
 	if err != nil {
 		return e2eResult, fmt.Errorf("couldn't write file %s: %v", filePath, err)
 	}
@@ -111,7 +110,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	title := fmt.Sprintf("This is a test pull request for atlantis e2e test for %s project type", t.projectType.Name)
 	head := fmt.Sprintf("%s:%s", t.ownerName, branchName)
 	body := ""
-	base := "master"
+	base := "main"
 	newPullRequest := &github.NewPullRequest{Title: &title, Head: &head, Body: &body, Base: &base}
 
 	pull, _, err := t.githubClient.client.PullRequests.Create(t.githubClient.ctx, t.ownerName, t.repoName, newPullRequest)

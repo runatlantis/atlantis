@@ -4,9 +4,9 @@ When using a self-signed certificate for Atlantis (with flags `--ssl-cert-file` 
 there are a few considerations.
 
 Atlantis uses the web server from the standard Go library, 
-the method name is [ListenAndServeTLS](https://golang.org/pkg/net/http/#ListenAndServeTLS).
+the method name is [ListenAndServeTLS](https://pkg.go.dev/net/http#ListenAndServeTLS).
 
-`ListenAndServeTLS` acts identically to [ListenAndServe](https://golang.org/pkg/net/http/#ListenAndServe),
+`ListenAndServeTLS` acts identically to [ListenAndServe](https://pkg.go.dev/net/http#ListenAndServe),
 except that it expects HTTPS connections. 
 Additionally, files containing a certificate and matching private key for the server must be provided. 
 If the certificate is signed by a certificate authority, 
@@ -14,7 +14,7 @@ the file passed to `--ssl-cert-file` should be the concatenation of the server's
 
 If you have this error when specifying a TLS cert with a key: 
 ```
-[EROR] server.go:413 server: Tls: private key does not match public key
+[ERROR] server.go:413 server: Tls: private key does not match public key
 ```
 
 Check that the locally signed certificate authority is prepended to the self signed certificate.

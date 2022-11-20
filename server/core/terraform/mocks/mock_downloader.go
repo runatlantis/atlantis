@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	go_getter "github.com/hashicorp/go-getter"
-	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 	"time"
+
+	go_getter "github.com/hashicorp/go-getter"
+	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockDownloader struct {

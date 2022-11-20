@@ -3,7 +3,6 @@ package events_test
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,6 +18,8 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
@@ -27,18 +28,20 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-const ConftestVersion = "0.25.0"
+const ConftestVersion = "0.35.0"
 
 var applyLocker locking.ApplyLocker
 var userConfig server.UserConfig
@@ -46,6 +49,8 @@ var userConfig server.UserConfig
 type NoopTFDownloader struct{}
 
 var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
+
+var mockPostWorkflowHookRunner *runtimemocks.MockPostWorkflowHookRunner
 
 func (m *NoopTFDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
 	return nil
@@ -389,8 +394,7 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
-			defer cleanup()
+			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
 
 			// Setup test dependencies.
@@ -424,7 +428,10 @@ func TestGitHubWorkflow(t *testing.T) {
 			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsPreWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+
+			// Let's verify the post-workflow hook was called for each comment including the pull request opened event
+			mockPostWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some post dummy command"), AnyString())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -511,6 +518,20 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			},
 			LockFileTracked: false,
 		},
+		{
+			Description:   "Modified .terraform.lock.hcl triggers autoplan ",
+			RepoDir:       "simple-with-lockfile",
+			ModifiedFiles: []string{".terraform.lock.hcl"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis plan",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-plan.txt"},
+			},
+			LockFileTracked: true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -522,12 +543,11 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
-			defer cleanup()
+			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 
 			oldLockFilePath, err := filepath.Abs(filepath.Join("testfixtures", "null_provider_lockfile_old_version"))
 			Ok(t, err)
-			oldLockFileContent, err := ioutil.ReadFile(oldLockFilePath)
+			oldLockFileContent, err := os.ReadFile(oldLockFilePath)
 			Ok(t, err)
 
 			if c.LockFileTracked {
@@ -549,7 +569,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			ResponseContains(t, w, 200, "Processing...")
 
 			// check lock file content
-			actualLockFileContent, err := ioutil.ReadFile(fmt.Sprintf("%s/repos/runatlantis/atlantis-tests/2/default/.terraform.lock.hcl", atlantisWorkspace.DataDir))
+			actualLockFileContent, err := os.ReadFile(fmt.Sprintf("%s/repos/runatlantis/atlantis-tests/2/default/.terraform.lock.hcl", atlantisWorkspace.DataDir))
 			Ok(t, err)
 			if c.LockFileTracked {
 				if string(oldLockFileContent) != string(actualLockFileContent) {
@@ -578,7 +598,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			}
 
 			// check lock file content
-			actualLockFileContent, err = ioutil.ReadFile(fmt.Sprintf("%s/repos/runatlantis/atlantis-tests/2/default/.terraform.lock.hcl", atlantisWorkspace.DataDir))
+			actualLockFileContent, err = os.ReadFile(fmt.Sprintf("%s/repos/runatlantis/atlantis-tests/2/default/.terraform.lock.hcl", atlantisWorkspace.DataDir))
 			Ok(t, err)
 			if c.LockFileTracked {
 				if string(oldLockFileContent) != string(actualLockFileContent) {
@@ -593,7 +613,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			}
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(runtimematchers.AnyModelsPreWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -631,6 +651,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		ExpAutomerge bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
 		ExpAutoplan bool
+		// ExpQuietPolicyChecks is true if we expect Atlantis to exclude policy check output
+		// when there's no error
+		ExpQuietPolicyChecks bool
+		// ExpQuietPolicyCheckFailure is true when we expect Atlantis to post back policy check failures
+		// even when QuietPolicyChecks is enabled
+		ExpQuietPolicyCheckFailure bool
 		// ExpParallel is true if we expect Atlantis to run parallel plans or applies.
 		ExpParallel bool
 		// ExpReplies is a list of files containing the expected replies that
@@ -715,6 +741,38 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:          "successful policy checks with quiet flag enabled",
+			RepoDir:              "policy-checks-success-silent",
+			ModifiedFiles:        []string{"main.tf"},
+			ExpAutoplan:          true,
+			ExpQuietPolicyChecks: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:                "failing policy checks with quiet flag enabled",
+			RepoDir:                    "policy-checks",
+			ModifiedFiles:              []string{"main.tf"},
+			ExpAutoplan:                true,
+			ExpQuietPolicyChecks:       true,
+			ExpQuietPolicyCheckFailure: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -724,17 +782,20 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// reset userConfig
 			userConfig = server.UserConfig{}
 			userConfig.EnablePolicyChecksFlag = true
+			userConfig.QuietPolicyChecks = c.ExpQuietPolicyChecks
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
+
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
-			defer cleanup()
+			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
-			When(vcsClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
+			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest(), "atlantis-test")).ThenReturn(true, nil)
+			When(vcsClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(models.ApprovalStatus{
+				IsApproved: true,
+			}, nil)
 			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 
@@ -780,6 +841,10 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				expNumReplies++
 			}
 
+			if c.ExpQuietPolicyChecks && !c.ExpQuietPolicyCheckFailure {
+				expNumReplies--
+			}
+
 			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
@@ -798,8 +863,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
-	dataDir, binDir, cacheDir, cleanup := mkSubDirs(t)
-	defer cleanup()
+	dataDir, binDir, cacheDir := mkSubDirs(t)
 
 	//env vars
 
@@ -813,6 +877,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	// Real dependencies.
 	logger := logging.NewNoopLogger(t)
@@ -827,10 +892,11 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		GithubUser: "github-user",
 		GitlabUser: "gitlab-user",
 	}
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false)
+	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, projectCmdOutputHandler)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
+	backend := boltdb
 	lockingClient := locking.NewClient(boltdb)
 	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	projectLocker := &events.DefaultProjectLocker{
@@ -844,16 +910,22 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	defaultTFVersion := terraformClient.DefaultVersion()
 	locker := events.NewDefaultWorkingDirLocker()
-	parser := &yaml.ParserValidator{}
+	parser := &config.ParserValidator{}
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg: true,
 		MergeableReq: false,
 		ApprovedReq:  false,
-		PreWorkflowHooks: []*valid.PreWorkflowHook{
+		PreWorkflowHooks: []*valid.WorkflowHook{
 			{
 				StepName:   "global_hook",
 				RunCommand: "some dummy command",
+			},
+		},
+		PostWorkflowHooks: []*valid.WorkflowHook{
+			{
+				StepName:   "global_hook",
+				RunCommand: "some post dummy command",
 			},
 		},
 		PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
@@ -877,6 +949,17 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: mockPreWorkflowHookRunner,
 	}
+
+	mockPostWorkflowHookRunner = runtimemocks.NewMockPostWorkflowHookRunner()
+	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
+		VCSClient:              e2eVCSClient,
+		GlobalCfg:              globalCfg,
+		WorkingDirLocker:       locker,
+		WorkingDir:             workingDir,
+		PostWorkflowHookRunner: mockPostWorkflowHookRunner,
+	}
+	statsScope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		userConfig.EnablePolicyChecksFlag,
 		parser,
@@ -889,7 +972,9 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		commentParser,
 		false,
 		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		statsScope,
+		logger,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
@@ -928,26 +1013,26 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 			TerraformExecutor: terraformClient,
 		},
 		RunStepRunner: &runtime.RunStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
+			TerraformExecutor:       terraformClient,
+			DefaultTFVersion:        defaultTFVersion,
+			ProjectCmdOutputHandler: projectCmdOutputHandler,
 		},
 		WorkingDir:       workingDir,
 		Webhooks:         &mockWebhookSender{},
 		WorkingDirLocker: locker,
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
-			PullApprovedChecker: e2eVCSClient,
-			WorkingDir:          workingDir,
+			WorkingDir: workingDir,
 		},
 	}
 
 	dbUpdater := &events.DBUpdater{
-		DB: boltdb,
+		Backend: backend,
 	}
 
 	pullUpdater := &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            e2eVCSClient,
-		MarkdownRenderer:     &events.MarkdownRenderer{},
+		MarkdownRenderer:     events.GetMarkdownRenderer(false, false, false, false, false, false, ""),
 	}
 
 	autoMerger := &events.AutoMerger{
@@ -962,6 +1047,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		projectCommandRunner,
 		parallelPoolSize,
 		false,
+		userConfig.QuietPolicyChecks,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
@@ -980,7 +1066,10 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		boltdb,
+		lockingClient,
 	)
+
+	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		e2eVCSClient,
@@ -996,6 +1085,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		false,
+		"atlantis-test",
+		e2ePullReqStatusFetcher,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -1022,27 +1113,29 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		silenceNoProjects,
 	)
 
-	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
-		models.PlanCommand:            planCommandRunner,
-		models.ApplyCommand:           applyCommandRunner,
-		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
-		models.UnlockCommand:          unlockCommandRunner,
-		models.VersionCommand:         versionCommandRunner,
+	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
+		command.Plan:            planCommandRunner,
+		command.Apply:           applyCommandRunner,
+		command.ApprovePolicies: approvePoliciesCommandRunner,
+		command.Unlock:          unlockCommandRunner,
+		command.Version:         versionCommandRunner,
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
-		EventParser:                   eventParser,
-		VCSClient:                     e2eVCSClient,
-		GithubPullGetter:              e2eGithubGetter,
-		GitlabMergeRequestGetter:      e2eGitlabGetter,
-		Logger:                        logger,
-		GlobalCfg:                     globalCfg,
-		AllowForkPRs:                  allowForkPRs,
-		AllowForkPRsFlag:              "allow-fork-prs",
-		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
-		Drainer:                       drainer,
-		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
-		PullStatusFetcher:             boltdb,
+		EventParser:                    eventParser,
+		VCSClient:                      e2eVCSClient,
+		GithubPullGetter:               e2eGithubGetter,
+		GitlabMergeRequestGetter:       e2eGitlabGetter,
+		Logger:                         logger,
+		GlobalCfg:                      globalCfg,
+		StatsScope:                     statsScope,
+		AllowForkPRs:                   allowForkPRs,
+		AllowForkPRsFlag:               "allow-fork-prs",
+		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
+		Drainer:                        drainer,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		PullStatusFetcher:              backend,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
@@ -1052,12 +1145,15 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		TestingMode:   true,
 		CommandRunner: commandRunner,
 		PullCleaner: &events.PullClosedExecutor{
-			Locker:     lockingClient,
-			VCSClient:  e2eVCSClient,
-			WorkingDir: workingDir,
-			DB:         boltdb,
+			Locker:                   lockingClient,
+			VCSClient:                e2eVCSClient,
+			WorkingDir:               workingDir,
+			Backend:                  backend,
+			PullClosedTemplate:       &events.PullClosedEventTemplate{},
+			LogStreamResourceCleaner: projectCmdOutputHandler,
 		},
 		Logger:                       logger,
+		Scope:                        statsScope,
 		Parser:                       eventParser,
 		CommentParser:                commentParser,
 		GithubWebhookSecret:          nil,
@@ -1084,7 +1180,7 @@ func (w *mockWebhookSender) Send(log logging.SimpleLogging, result webhooks.Appl
 }
 
 func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
-	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent.json"))
 	Ok(t, err)
 	requestJSON = []byte(strings.Replace(string(requestJSON), "###comment body###", comment, 1))
 	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
@@ -1095,7 +1191,7 @@ func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
 }
 
 func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
-	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubPullRequestOpenedEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestOpenedEvent.json"))
 	Ok(t, err)
 	// Replace sha with expected sha.
 	requestJSONStr := strings.Replace(string(requestJSON), "c31fd9ea6f557ad2ea659944c3844a059b83bc5d", headSHA, -1)
@@ -1107,7 +1203,7 @@ func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
 }
 
 func GitHubPullRequestClosedEvent(t *testing.T) *http.Request {
-	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubPullRequestClosedEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestClosedEvent.json"))
 	Ok(t, err)
 	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
 	Ok(t, err)
@@ -1138,7 +1234,7 @@ func GitHubPullRequestParsed(headSHA string) *github.PullRequest {
 				FullName: github.String("runatlantis/atlantis-tests"),
 				CloneURL: github.String("https://github.com/runatlantis/atlantis-tests.git"),
 			},
-			Ref: github.String("master"),
+			Ref: github.String("main"),
 		},
 		User: &github.User{
 			Login: github.String("atlantisbot"),
@@ -1159,11 +1255,11 @@ func absRepoPath(t *testing.T, repoDir string) string {
 // The purpose of this function is to create a real git repository with a branch
 // called 'branch' from the files under repoDir. This is so we can check in
 // those files normally to this repo without needing a .git directory.
-func initializeRepo(t *testing.T, repoDir string) (string, string, func()) {
+func initializeRepo(t *testing.T, repoDir string) (string, string) {
 	originRepo := absRepoPath(t, repoDir)
 
 	// Copy the files to the temp dir.
-	destDir, cleanup := TempDir(t)
+	destDir := t.TempDir()
 	runCmd(t, "", "cp", "-r", fmt.Sprintf("%s/.", originRepo), destDir)
 
 	// Initialize the git repo.
@@ -1179,7 +1275,7 @@ func initializeRepo(t *testing.T, repoDir string) (string, string, func()) {
 	headSHA := runCmd(t, destDir, "git", "rev-parse", "HEAD")
 	headSHA = strings.Trim(headSHA, "\n")
 
-	return destDir, headSHA, cleanup
+	return destDir, headSHA
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {
@@ -1217,7 +1313,7 @@ func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir 
 	}
 
 	for _, expFile := range expReplies {
-		exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
+		exp, err := os.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
 		Ok(t, err)
 		expStr := string(exp)
 		// My editor adds a newline to all the files, so if the actual comment
@@ -1235,7 +1331,7 @@ func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir 
 				t.FailNow()
 			} else {
 				actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")
-				err := ioutil.WriteFile(actFile, []byte(act), 0600)
+				err := os.WriteFile(actFile, []byte(act), 0600)
 				Ok(t, err)
 				cwd, err := os.Getwd()
 				Ok(t, err)
@@ -1248,8 +1344,8 @@ func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir 
 }
 
 // returns parent, bindir, cachedir, cleanup func
-func mkSubDirs(t *testing.T) (string, string, string, func()) {
-	tmp, cleanup := TempDir(t)
+func mkSubDirs(t *testing.T) (string, string, string) {
+	tmp := t.TempDir()
 	binDir := filepath.Join(tmp, "bin")
 	err := os.MkdirAll(binDir, 0700)
 	Ok(t, err)
@@ -1258,7 +1354,7 @@ func mkSubDirs(t *testing.T) (string, string, string, func()) {
 	err = os.MkdirAll(cachedir, 0700)
 	Ok(t, err)
 
-	return tmp, binDir, cachedir, cleanup
+	return tmp, binDir, cachedir
 }
 
 // Will fail test if conftest isn't in path and isn't version >= 0.25.0
@@ -1276,7 +1372,7 @@ func ensureRunningConftest(t *testing.T) {
 	versionOutput := string(versionOutBytes)
 	match := versionConftestRegex.FindStringSubmatch(versionOutput)
 	if len(match) <= 1 {
-		t.Logf("could not parse contest version from %s", versionOutput)
+		t.Logf("could not parse conftest version from %s", versionOutput)
 		t.FailNow()
 	}
 	localVersion, err := version.NewVersion(match[1])
@@ -1318,11 +1414,17 @@ func ensureRunning014(t *testing.T) {
 }
 
 // versionRegex extracts the version from `terraform version` output.
-//     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
-//	   => 0.12.0-alpha4
 //
-//     Terraform v0.11.10
-//	   => 0.11.10
+//	    Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
+//		   => 0.12.0-alpha4
+//
+//	    Terraform v0.11.10
+//		   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
-var versionConftestRegex = regexp.MustCompile("Version: (.*?)(\\s.*)?\n")
+/*
+ * Newer versions will return both Conftest and OPA
+ * Conftest: 0.35.0
+ * OPA: 0.45.0
+ */
+var versionConftestRegex = regexp.MustCompile("Conftest: (.*?)(\\s.*)?\n")

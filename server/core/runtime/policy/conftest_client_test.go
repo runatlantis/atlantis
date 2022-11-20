@@ -5,19 +5,21 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime/cache/mocks"
 	models_mocks "github.com/runatlantis/atlantis/server/core/runtime/models/mocks"
 	conftest_mocks "github.com/runatlantis/atlantis/server/core/runtime/policy/mocks"
 	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 func TestConfTestVersionDownloader(t *testing.T) {
@@ -25,7 +27,7 @@ func TestConfTestVersionDownloader(t *testing.T) {
 	version, _ := version.NewVersion("0.25.0")
 	destPath := "some/path"
 
-	fullURL := fmt.Sprintf("https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/conftest_0.25.0_%s_x86_64.tar.gz?checksum=file:https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/checksums.txt", strings.Title(runtime.GOOS))
+	fullURL := fmt.Sprintf("https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/conftest_0.25.0_%s_x86_64.tar.gz?checksum=file:https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/checksums.txt", cases.Title(language.English).String(runtime.GOOS))
 
 	RegisterMockTestingT(t)
 
@@ -159,7 +161,7 @@ func TestRun(t *testing.T) {
 		Name:   policySetName2,
 	}
 
-	ctx := models.ProjectCommandContext{
+	ctx := command.ProjectContext{
 		PolicySets: valid.PolicySets{
 			PolicySets: []valid.PolicySet{
 				policySet1,

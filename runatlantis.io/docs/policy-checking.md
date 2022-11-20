@@ -49,9 +49,37 @@ policies:
       source: local
 ```
 
-`name` - A name of your policy set.
-`path` - Path to a policies directory.
-`source` - Tells atlantis where to fetch the policies from. Currently you can only host policies locally by using `local`.
+- `name` - A name of your policy set.
+- `path` - Path to a policies directory. *Note: replace `<CODE_DIRECTORY>` with absolute dir path to conftest policy/policies.*
+- `source` - Tells atlantis where to fetch the policies from. Currently you can only host policies locally by using `local`.
+
+By default conftest is configured to only run the `main` package. If you wish to run specific/multiple policies consider passing `--namespace` or `--all-namespaces` to conftest with [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) via a custom workflow as shown in the below example.
+
+Example Server Side Repo configuration using `--all-namespaces` and a local src dir.
+
+```
+repos:
+  - id: github.com/myorg/example-repo
+    workflow: custom
+policies:
+  owners:
+    users:
+      - example-dev
+  policy_sets:
+    - name: example-conf-tests
+      path: /home/atlantis/conftest_policies  # Consider separate vcs & mount into container
+      source: local
+workflows:
+  custom:
+    plan:
+      steps:
+        - init
+        - plan
+    policy_check:
+      steps:
+        - policy_check:
+            extra_args: ["-p /home/atlantis/conftest_policies/", "--all-namespaces"]
+```
 
 ### Step 3: Write the policy
 
@@ -90,9 +118,5 @@ deny[msg] {
 }
 
 ```
-
-::: tip Notes
-By default conftest is configured to only run the `main` package. If you want to change this behavior [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) can be used to pass in flags to conftest such as `--namespace` or `--all-namespaces`
-:::
 
 That's it! Now your Atlantis instance is configured to run policies on your Terraform plans 🎉

@@ -136,7 +136,7 @@ func (g *AzureDevopsClient) HidePrevCommandComments(repo models.Repo, pullNum in
 
 // PullIsApproved returns true if the merge request was approved by another reviewer.
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
-func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{
@@ -144,7 +144,7 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 	}
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
-		return false, errors.Wrap(err, "getting pull request")
+		return approvalStatus, errors.Wrap(err, "getting pull request")
 	}
 
 	for _, review := range adPull.Reviewers {
@@ -157,15 +157,17 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 		}
 
 		if review.GetVote() == azuredevops.VoteApproved || review.GetVote() == azuredevops.VoteApprovedWithSuggestions {
-			return true, nil
+			return models.ApprovalStatus{
+				IsApproved: true,
+			}, nil
 		}
 	}
 
-	return false, nil
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
@@ -304,7 +306,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest, pullOptions model
 		return fmt.Errorf("the user %s is not found in the organization %s", g.UserName, owner)
 	}
 
-	imageURL := "https://github.com/runatlantis/atlantis/raw/master/runatlantis.io/.vuepress/public/hero.png"
+	imageURL := "https://github.com/runatlantis/atlantis/raw/main/runatlantis.io/.vuepress/public/hero.png"
 	id := azuredevops.IdentityRef{
 		Descriptor: &descriptor,
 		ID:         userID,
@@ -360,8 +362,9 @@ func (g *AzureDevopsClient) MarkdownPullLink(pull models.PullRequest) (string, e
 // repoFullName format owner/project/repo.
 //
 // Ex. runatlantis/atlantis => (runatlantis, atlantis)
-//     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
-//     azuredevops/project/atlantis => (azuredevops, project, atlantis)
+//
+//	gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
+//	azuredevops/project/atlantis => (azuredevops, project, atlantis)
 func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project string, repo string) {
 	firstSlashIdx := strings.Index(repoFullName, "/")
 	lastSlashIdx := strings.LastIndex(repoFullName, "/")
@@ -375,6 +378,11 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 			repoFullName[lastSlashIdx+1:]
 	}
 	return repoFullName[:lastSlashIdx], "", repoFullName[lastSlashIdx+1:]
+}
+
+// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
+func (g *AzureDevopsClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+	return nil, nil
 }
 
 func (g *AzureDevopsClient) SupportsSingleFileDownload(repo models.Repo) bool {
@@ -402,4 +410,8 @@ func GitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
 		Name:  &name,
 		Genre: &genre,
 	}
+}
+
+func (g *AzureDevopsClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
 }
