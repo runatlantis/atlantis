@@ -33,13 +33,14 @@ type ProjectLocker interface {
 	// The third return value is a function that can be called to unlock the
 	// lock. It will only be set if the lock was acquired. Any errors will set
 	// error.
-	TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error)
+	TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, disableRepoLocking bool) (*TryLockResponse, error)
 }
 
 // DefaultProjectLocker implements ProjectLocker.
 type DefaultProjectLocker struct {
-	Locker    locking.Locker
-	VCSClient vcs.Client
+	Locker     locking.Locker
+	NoOpLocker locking.Locker
+	VCSClient  vcs.Client
 }
 
 // TryLockResponse is the result of trying to lock a project.
@@ -58,8 +59,13 @@ type TryLockResponse struct {
 }
 
 // TryLock implements ProjectLocker.TryLock.
-func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error) {
-	lockAttempt, err := p.Locker.TryLock(project, workspace, pull, user)
+func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, disableRepoLocking bool) (*TryLockResponse, error) {
+	locker := p.Locker
+	if disableRepoLocking {
+		locker = p.NoOpLocker
+	}
+
+	lockAttempt, err := locker.TryLock(project, workspace, pull, user)
 	if err != nil {
 		return nil, err
 	}

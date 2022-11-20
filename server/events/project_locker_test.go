@@ -53,7 +53,7 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 		},
 		nil,
 	)
-	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, false)
 	link, _ := mockClient.MarkdownPullLink(lockingPull)
 	Ok(t, err)
 	Equals(t, &events.TryLockResponse{
@@ -90,7 +90,7 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 		},
 		nil,
 	)
-	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, false)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
 
@@ -129,7 +129,7 @@ func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 		},
 		nil,
 	)
-	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, false)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
 
@@ -138,4 +138,37 @@ func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 	err = res.UnlockFn()
 	Ok(t, err)
 	mockLocker.VerifyWasCalledOnce().Unlock(lockKey)
+}
+
+func TestDefaultProjectLocker_DisableRepoLocking(t *testing.T) {
+	RegisterMockTestingT(t)
+	var githubClient *vcs.GithubClient
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
+	mockLocker := mocks.NewMockLocker()
+	noOpLocker := mocks.NewMockLocker()
+	locker := events.DefaultProjectLocker{
+		Locker:     mockLocker,
+		NoOpLocker: noOpLocker,
+		VCSClient:  mockClient,
+	}
+	expProject := models.Project{}
+	expWorkspace := "default"
+	expPull := models.PullRequest{Num: 2}
+	expUser := models.User{}
+
+	lockKey := "key"
+	When(noOpLocker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
+		locking.TryLockResponse{
+			LockAcquired: true,
+			CurrLock:     models.ProjectLock{},
+			LockKey:      lockKey,
+		},
+		nil,
+	)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
+	Ok(t, err)
+	Equals(t, true, res.LockAcquired)
+
+	// default locker was never called
+	mockLocker.VerifyWasCalled(Never()).TryLock(expProject, expWorkspace, expPull, expUser)
 }

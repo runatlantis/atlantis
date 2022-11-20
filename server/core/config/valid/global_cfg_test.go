@@ -57,6 +57,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				AllowedOverrides:          []string{},
 				AllowCustomWorkflows:      Bool(false),
 				DeleteSourceBranchOnMerge: Bool(false),
+				DisableRepoLocking:        Bool(false),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -163,7 +164,7 @@ func TestNewGlobalCfg(t *testing.T) {
 
 			if c.allowRepoCfg {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
-				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"}
+				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow", "delete_source_branch_on_merge", "disable_repo_locking"}
 			}
 			if c.mergeableReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "mergeable")
@@ -761,6 +762,36 @@ repos:
 				Name:            "",
 				AutoplanEnabled: false,
 				PolicySets:      emptyPolicySets,
+			},
+		},
+		"repo-side disable_repo_locking win out if allowed": {
+			gCfg: `
+repos:
+- id: /.*/
+  disable_repo_locking: true
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:                ".",
+				Workspace:          "default",
+				ApplyRequirements:  []string{},
+				DisableRepoLocking: &[]bool{false}[0],
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{},
+				Workflow: valid.Workflow{
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultPlanStage,
+				},
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				DisableRepoLocking: true,
 			},
 		},
 		"last server-side match wins": {

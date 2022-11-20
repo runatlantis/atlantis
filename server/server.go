@@ -430,9 +430,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
+	noOpLocker := locking.NewNoOpLocker()
 	if userConfig.DisableRepoLocking {
 		logger.Info("Repo Locking is disabled")
-		lockingClient = locking.NewNoOpLocker()
+		lockingClient = noOpLocker
 	} else {
 		lockingClient = locking.NewClient(backend)
 	}
@@ -458,8 +459,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:    lockingClient,
-		VCSClient: vcsClient,
+		Locker:     lockingClient,
+		NoOpLocker: noOpLocker,
+		VCSClient:  vcsClient,
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,

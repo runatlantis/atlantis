@@ -30,6 +30,7 @@ type Project struct {
 	Autoplan                  *Autoplan `yaml:"autoplan,omitempty"`
 	ApplyRequirements         []string  `yaml:"apply_requirements,omitempty"`
 	DeleteSourceBranchOnMerge *bool     `yaml:"delete_source_branch_on_merge,omitempty"`
+	DisableRepoLocking        *bool     `yaml:"disable_repo_locking,omitempty"`
 	ExecutionOrderGroup       *int      `yaml:"execution_order_group,omitempty"`
 }
 
@@ -116,6 +117,10 @@ func (p Project) ToValid() valid.Project {
 
 	if p.DeleteSourceBranchOnMerge != nil {
 		v.DeleteSourceBranchOnMerge = p.DeleteSourceBranchOnMerge
+	}
+
+	if p.DisableRepoLocking != nil {
+		v.DisableRepoLocking = p.DisableRepoLocking
 	}
 
 	if p.ExecutionOrderGroup != nil {
