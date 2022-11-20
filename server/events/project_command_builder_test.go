@@ -1076,6 +1076,7 @@ func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 		AtlantisYAML   string
 		ExpectedCtxs   int
 		ExpectedClones InvocationCountMatcher
+		ModifiedFiles  []string
 	}{
 		{
 			AtlantisYAML: `
@@ -1084,20 +1085,22 @@ projects:
 - dir: dir1`,
 			ExpectedCtxs:   0,
 			ExpectedClones: Never(),
+			ModifiedFiles:  []string{"dir2/main.tf"},
 		},
 		{
 			AtlantisYAML: `
 version: 3
 parallel_plan: true`,
-			ExpectedCtxs:   1,
+			ExpectedCtxs:   0,
 			ExpectedClones: Once(),
+			ModifiedFiles:  []string{"README.md"},
 		},
 	}
 
 	for _, c := range cases {
 		RegisterMockTestingT(t)
 		vcsClient := vcsmocks.NewMockClient()
-		When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+		When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 		When(vcsClient.SupportsSingleFileDownload(matchers.AnyModelsRepo())).ThenReturn(true)
 		When(vcsClient.DownloadRepoConfigFile(matchers.AnyModelsPullRequest())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
 		workingDir := mocks.NewMockWorkingDir()
