@@ -5,8 +5,6 @@ import (
 	"sort"
 
 	"github.com/Masterminds/semver"
-	"github.com/hashicorp/terraform-config-inspect/tfconfig"
-
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
 
