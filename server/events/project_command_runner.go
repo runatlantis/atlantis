@@ -146,15 +146,15 @@ type ProjectOutputWrapper struct {
 }
 
 func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectResult {
-	ctx.CommandResult = p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
+	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
 	p.JobMessageSender.Send(ctx, "", OperationComplete)
-	return ctx.CommandResult
+	return result
 }
 
 func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
-	ctx.CommandResult = p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
+	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
 	p.JobMessageSender.Send(ctx, "", OperationComplete)
-	return ctx.CommandResult
+	return result
 }
 
 func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult) command.ProjectResult {
