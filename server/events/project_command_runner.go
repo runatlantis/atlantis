@@ -146,15 +146,15 @@ type ProjectOutputWrapper struct {
 }
 
 func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectResult {
-	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
+	ctx.CommandResult = p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
 	p.JobMessageSender.Send(ctx, "", OperationComplete)
-	return result
+	return ctx.CommandResult
 }
 
 func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
-	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
+	ctx.CommandResult = p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
 	p.JobMessageSender.Send(ctx, "", OperationComplete)
-	return result
+	return ctx.CommandResult
 }
 
 func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult) command.ProjectResult {
@@ -167,6 +167,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 
 	// ensures we are differentiating between project level command and overall command
 	result := execute(ctx)
+	ctx.CommandResult = result
 
 	if result.Error != nil || result.Failure != "" {
 		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus); err != nil {

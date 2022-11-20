@@ -51,14 +51,13 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull model
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
-		descripWords = "in progress..."
+		descripWords = genProjectStatusDescription(cmdName.String(), "in progress...")
 	case models.FailedCommitStatus:
-		descripWords = "failed."
+		descripWords = genProjectStatusDescription(cmdName.String(), "failed.")
 	case models.SuccessCommitStatus:
-		descripWords = "succeeded."
+		descripWords = genProjectStatusDescription(cmdName.String(), "succeeded.")
 	}
-	descrip := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), descripWords)
-	return d.Client.UpdateStatus(repo, pull, status, src, descrip, "")
+	return d.Client.UpdateStatus(repo, pull, status, src, descripWords, "")
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
@@ -86,13 +85,19 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, c
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
-		descripWords = "in progress..."
+		descripWords = genProjectStatusDescription(cmdName.String(), "in progress...")
 	case models.FailedCommitStatus:
-		descripWords = "failed."
+		descripWords = genProjectStatusDescription(cmdName.String(), "failed.")
 	case models.SuccessCommitStatus:
-		descripWords = "succeeded."
+		if ctx.CommandResult.PlanSuccess != nil {
+			descripWords = ctx.CommandResult.PlanSuccess.Summary()
+		} else {
+			descripWords = genProjectStatusDescription(cmdName.String(), "succeeded.")
+		}
 	}
+	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descripWords, url)
+}
 
-	descrip := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), descripWords)
-	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
+func genProjectStatusDescription(cmdName, description string) string {
+	return fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName), description)
 }
