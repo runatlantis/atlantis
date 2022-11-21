@@ -915,7 +915,7 @@ func TestRepo_BranchMatches(t *testing.T) {
 	Equals(t, false, (valid.Repo{BranchRegex: regexp.MustCompile("^main$")}).BranchMatches("foo-main"))
 	Equals(t, false, (valid.Repo{BranchRegex: regexp.MustCompile("^main$")}).BranchMatches("main-foo"))
 	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("(main|master)")}).BranchMatches("main"))
-	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("(main|master)")}).BranchMatches("master"))
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("(main|master)")}).BranchMatches("main"))
 	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("release")}).BranchMatches("release-stage"))
 	Equals(t, false, (valid.Repo{BranchRegex: regexp.MustCompile("release")}).BranchMatches("main"))
 }
@@ -933,7 +933,7 @@ func TestGlobalCfg_MatchingRepo(t *testing.T) {
 	}
 	repo2 := valid.Repo{
 		ID:                "github.com/owner/repo",
-		BranchRegex:       regexp.MustCompile("^master$"),
+		BranchRegex:       regexp.MustCompile("^main$"),
 		ApplyRequirements: []string{"approved", "mergeable"},
 	}
 

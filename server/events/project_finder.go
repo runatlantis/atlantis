@@ -16,7 +16,6 @@ package events
 import (
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -77,7 +76,7 @@ var cloudBlockSchema = &hcl.BodySchema{
 
 func (p *DefaultProjectFinder) DetermineWorkspaceFromHCL(log logging.SimpleLogging, absRepoDir string) (string, error) {
 	log.Info("looking for Terraform Cloud workspace from configuration in %q", absRepoDir)
-	infos, err := ioutil.ReadDir(absRepoDir)
+	infos, err := os.ReadDir(absRepoDir)
 	if err != nil {
 		return "", err
 	}

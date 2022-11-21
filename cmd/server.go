@@ -83,6 +83,7 @@ const (
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
+	QuietPolicyChecks                = "quiet-policy-checks"
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
@@ -214,7 +215,7 @@ var stringFlags = map[string]stringFlag{
 	CheckoutStrategyFlag: {
 		description: "How to check out pull requests. Accepts either 'branch' (default) or 'merge'." +
 			" If set to branch, Atlantis will check out the source branch of the pull request." +
-			" If set to merge, Atlantis will check out the destination branch of the pull request (ex. master)" +
+			" If set to merge, Atlantis will check out the destination branch of the pull request (ex. main, master)" +
 			" and then locally perform a git merge of the source branch." +
 			" This effectively means Atlantis operates on the repo as it will look" +
 			" after the pull request is merged.",
@@ -429,6 +430,10 @@ var boolFlags = map[string]boolFlag{
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
+	QuietPolicyChecks: {
+		description:  "Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings.",
 		defaultValue: false,
 	},
 	RedisTLSEnabled: {

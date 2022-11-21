@@ -13,11 +13,11 @@ FROM ghcr.io/runatlantis/atlantis-base:2022.11.13 AS base
 ARG TARGETPLATFORM
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=1.3.4
+ENV DEFAULT_TERRAFORM_VERSION=1.3.5
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 1.0.11 1.1.9 1.2.9 ${DEFAULT_TERRAFORM_VERSION}" && \
+RUN AVAILABLE_TERRAFORM_VERSIONS="1.0.11 1.1.9 1.2.9 ${DEFAULT_TERRAFORM_VERSION}" && \
     case "${TARGETPLATFORM}" in \
         "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
         "linux/arm64") TERRAFORM_ARCH=arm64 ;; \

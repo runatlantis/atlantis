@@ -55,8 +55,8 @@
     }
   },
   "toRef": {
-    "id": "refs/heads/master",
-    "displayId": "master",
+    "id": "refs/heads/main",
+    "displayId": "main",
     "latestCommit": "59e03b9cc44e16e20741e328faaac26e377c07bf",
     "repository": {
       "slug": "example",
