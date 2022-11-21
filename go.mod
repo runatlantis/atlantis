@@ -39,7 +39,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli v1.22.10
 	github.com/urfave/negroni v1.0.0
-	github.com/warrensbox/terraform-switcher v0.1.0
+	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
 	github.com/xanzy/go-gitlab v0.74.0
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.23.0
@@ -148,5 +148,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.3.0 // indirect
 )
-
-require github.com/warren-veerasingam/terraform-switcher v0.1.0 // indirect
