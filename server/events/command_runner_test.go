@@ -32,7 +32,6 @@ import (
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
-	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
@@ -87,7 +86,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	Ok(t, err)
 
 	drainer = &events.Drainer{}
-	deleteLockCommand = eventmocks.NewMockDeleteLockCommand()
+	deleteLockCommand = mocks.NewMockDeleteLockCommand()
 	applyLockChecker = lockingmocks.NewMockApplyLockChecker()
 	lockingLocker = lockingmocks.NewMockLocker()
 
