@@ -5,7 +5,6 @@ jobs:
     - image: ghcr.io/runatlantis/testing-env:2022.11.17
     steps:
     - checkout
-    - run: make test-all
     - run: make check-fmt
     - run: make check-lint
   e2e:
