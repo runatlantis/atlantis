@@ -861,7 +861,6 @@ func TestDefaultProjectCommandBuilder_TerraformVersion(t *testing.T) {
 	// If terraform configuration is used, result should be `0.12.8`.
 	// If project configuration is used, result should be `0.12.6`.
 	// If default is to be used, result should be `nil`.
-	// baseVersion := "0.12.8"
 
 	baseVersionConfig := `
 terraform {
