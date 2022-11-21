@@ -596,7 +596,7 @@ func createDirEnv(t *testing.T, files []string, atlantisYaml string, destroyFlag
 	}
 	r := config.ParserValidator{}
 	var globalCfg = valid.NewGlobalCfg(true, false, false)
-	config, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
+	config, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
 	Ok(t, err)
 
 	return config, tmpDir, cleanup
