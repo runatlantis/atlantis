@@ -16,14 +16,14 @@ Only the directory in the repo and Terraform workspace are locked, not the whole
 
 ## Why
 1. Because `atlantis apply` is being done before the pull request is merged, after
-an apply your `master` branch does not represent the most up to date version of your infrastructure
+an apply your `main` branch does not represent the most up to date version of your infrastructure
 anymore. With locking, you can ensure that no other changes will be made until the
 pull request is merged.
 
 ::: tip Why not apply on merge?
 Sometimes `terraform apply` fails. If the apply were to fail after the pull
 request was merged, you would need to create a new pull request to fix it.
-With locking + applying on the branch, you effectively mimic merging to master
+With locking + applying on the branch, you effectively mimic merging to main
 but with the added ability to re-plan/apply multiple times if things don't work.
 :::
 2. If there is already a `plan` in progress, other users won't see a plan that

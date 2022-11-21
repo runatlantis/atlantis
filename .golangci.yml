@@ -10,7 +10,6 @@ linters:
   - gosec
   - gosimple
   - ineffassign
-  - interfacer
   - staticcheck
   - structcheck
   - typecheck

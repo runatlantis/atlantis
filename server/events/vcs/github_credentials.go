@@ -108,7 +108,7 @@ func (c *GithubAppCredentials) GetUser() (string, error) {
 	}
 	// Currently there is no way to get the bot's login info, so this is a
 	// hack until Github exposes that.
-	return fmt.Sprintf("%s[bot]", app.GetName()), nil
+	return fmt.Sprintf("%s[bot]", app.GetSlug()), nil
 }
 
 // GetToken returns a fresh installation token.

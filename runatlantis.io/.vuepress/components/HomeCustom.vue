@@ -35,7 +35,7 @@
                   the Terraform plan output before it's applied.
                 </li>
                 <li><img class="checkmark" src="/checkmark.svg">Ensure that you
-                  apply changes before merging to master.
+                  apply changes before merging to main.
                 </li>
               </ul>
             </div>

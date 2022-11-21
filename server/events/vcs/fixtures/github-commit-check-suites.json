@@ -26,7 +26,7 @@
                         }
                     },
                     "base": {
-                        "ref": "master",
+                        "ref": "main",
                         "sha": "6f5744874b33ceb6a5c91edc91085991dbd1f61a",
                         "repo": {
                             "id": 474926944,

@@ -179,12 +179,12 @@
         "forks": 0,
         "open_issues": 1,
         "watchers": 0,
-        "default_branch": "master"
+        "default_branch": "main"
       }
     },
     "base": {
-      "label": "runatlantis:master",
-      "ref": "master",
+      "label": "runatlantis:main",
+      "ref": "main",
       "sha": "f59a822e83b3cd193142c7624ea635a5d7894388",
       "user": {
         "login": "runatlantis",
@@ -303,7 +303,7 @@
         "forks": 0,
         "open_issues": 1,
         "watchers": 0,
-        "default_branch": "master"
+        "default_branch": "main"
       }
     },
     "_links": {
@@ -443,7 +443,7 @@
     "forks": 0,
     "open_issues": 1,
     "watchers": 0,
-    "default_branch": "master"
+    "default_branch": "main"
   },
   "sender": {
     "login": "runatlantis",

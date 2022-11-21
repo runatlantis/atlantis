@@ -383,9 +383,14 @@ Values are chosen in this order:
 
 ### `--gh-team-allowlist`
   ```bash
-  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply"
+  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply"
   ```
   Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
+  
+  ::: warning NOTE
+  You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
+  i.e., "Engineering Team:plan, Infrastructure Team:apply"
+  :::
 
 ### `--gh-allow-mergeable-bypass-apply`
   ```bash
@@ -455,6 +460,21 @@ Values are chosen in this order:
   atlantis server --log-level="<debug|info|warn|error>"
   ```
   Log level. Defaults to `info`.
+
+### `--markdown-template-overrides-dir`
+  ```bash
+  atlantis server --markdown-template-overrides-dir="path/to/templates/"
+  ```
+  Directory where Atlantis will read in overrides for markdown templates used to render comments on pull requests.
+  Markdown template overrides may be specified either in individual files, or all together in a single file. All template
+  override files _must_ have the `.tmpl` extension, otherwise they will not be parsed.
+
+  Markdown templates which may have overrides can be found [here](https://github.com/runatlantis/atlantis/tree/main/server/events/templates)
+
+  Please be mindful that settings like `--enable-diff-markdown-format` depend on logic defined in the templates. It is
+  possible to diverge from expected behavior, if care is not taken when overriding default templates.
+
+  Defaults to the atlantis home directory `/home/atlantis/.markdown_templates/` in `/$HOME/.markdown_templates`.
 
 ### `--parallel-pool-size`
   ```bash
@@ -767,3 +787,9 @@ Values are chosen in this order:
   atlantis server --web-password="atlantis"
   ```
   Password used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--websocket-check-origin`
+  ```bash
+  atlantis server --websocket-check-origin
+  ```
+  Only allow websockets connection when they originate from the running Atlantis web server
