@@ -309,9 +309,18 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 		}
 	}
 
+	body := event.GetComment().GetBody()
+
+	if strings.HasPrefix(body, "atlantis ") {
+		err = e.VCSClient.ReactToComment(baseRepo, *event.Comment.ID, "eyes")
+		if err != nil {
+			logger.Warn("Failed to react to comment: %s", err)
+		}
+	}
+
 	// We pass in nil for maybeHeadRepo because the head repo data isn't
 	// available in the GithubIssueComment event.
-	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, pullNum, event.Comment.GetBody(), models.Github)
+	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, pullNum, body, models.Github)
 }
 
 // HandleBitbucketCloudCommentEvent handles comment events from Bitbucket.

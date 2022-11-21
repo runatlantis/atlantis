@@ -100,6 +100,11 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, co
 	return err
 }
 
+func (b *Client) ReactToComment(repo models.Repo, commentID int64, reaction string) error {
+	// TODO: Bitbucket support for reactions
+	return nil
+}
+
 func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	return nil
 }
