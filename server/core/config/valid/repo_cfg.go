@@ -23,7 +23,7 @@ type RepoCfg struct {
 	ParallelPlan              bool
 	ParallelPolicyCheck       bool
 	DeleteSourceBranchOnMerge *bool
-	DisableRepoLocking        *bool
+	RepoLocking               *bool
 	AllowedRegexpPrefixes     []string
 }
 
@@ -128,7 +128,7 @@ type Project struct {
 	Autoplan                  Autoplan
 	ApplyRequirements         []string
 	DeleteSourceBranchOnMerge *bool
-	DisableRepoLocking        *bool
+	RepoLocking               *bool
 	ExecutionOrderGroup       int
 }
 

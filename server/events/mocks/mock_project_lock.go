@@ -28,11 +28,11 @@ func NewMockProjectLocker(options ...pegomock.Option) *MockProjectLocker {
 func (mock *MockProjectLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockProjectLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, disableRepoLocking bool) (*events.TryLockResponse, error) {
+func (mock *MockProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) (*events.TryLockResponse, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectLocker().")
 	}
-	params := []pegomock.Param{log, pull, user, workspace, project, disableRepoLocking}
+	params := []pegomock.Param{log, pull, user, workspace, project, repoLocking}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", params, []reflect.Type{reflect.TypeOf((**events.TryLockResponse)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *events.TryLockResponse
 	var ret1 error
@@ -84,8 +84,8 @@ type VerifierMockProjectLocker struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, disableRepoLocking bool) *MockProjectLocker_TryLock_OngoingVerification {
-	params := []pegomock.Param{log, pull, user, workspace, project, disableRepoLocking}
+func (verifier *VerifierMockProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) *MockProjectLocker_TryLock_OngoingVerification {
+	params := []pegomock.Param{log, pull, user, workspace, project, repoLocking}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLock", params, verifier.timeout)
 	return &MockProjectLocker_TryLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -96,8 +96,8 @@ type MockProjectLocker_TryLock_OngoingVerification struct {
 }
 
 func (c *MockProjectLocker_TryLock_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.PullRequest, models.User, string, models.Project, bool) {
-	log, pull, user, workspace, project, disableRepoLocking := c.GetAllCapturedArguments()
-	return log[len(log)-1], pull[len(pull)-1], user[len(user)-1], workspace[len(workspace)-1], project[len(project)-1], disableRepoLocking[len(disableRepoLocking)-1]
+	log, pull, user, workspace, project, repoLocking := c.GetAllCapturedArguments()
+	return log[len(log)-1], pull[len(pull)-1], user[len(user)-1], workspace[len(workspace)-1], project[len(project)-1], repoLocking[len(repoLocking)-1]
 }
 
 func (c *MockProjectLocker_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.PullRequest, _param2 []models.User, _param3 []string, _param4 []models.Project, _param5 []bool) {

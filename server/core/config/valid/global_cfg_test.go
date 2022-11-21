@@ -57,7 +57,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				AllowedOverrides:          []string{},
 				AllowCustomWorkflows:      Bool(false),
 				DeleteSourceBranchOnMerge: Bool(false),
-				DisableRepoLocking:        Bool(false),
+				RepoLocking:               Bool(true),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -164,7 +164,7 @@ func TestNewGlobalCfg(t *testing.T) {
 
 			if c.allowRepoCfg {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
-				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow", "delete_source_branch_on_merge", "disable_repo_locking"}
+				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking"}
 			}
 			if c.mergeableReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "mergeable")
@@ -611,6 +611,7 @@ policies:
 				Workspace:       "default",
 				Name:            "",
 				AutoplanEnabled: false,
+				RepoLocking:     true,
 			},
 		},
 		"policies set correct version if specified": {
@@ -652,6 +653,7 @@ policies:
 				Workspace:       "default",
 				Name:            "",
 				AutoplanEnabled: false,
+				RepoLocking:     true,
 			},
 		},
 	}
@@ -733,6 +735,7 @@ workflows:
 				Name:            "",
 				AutoplanEnabled: false,
 				PolicySets:      emptyPolicySets,
+				RepoLocking:     true,
 			},
 		},
 		"repo-side apply reqs win out if allowed": {
@@ -762,20 +765,21 @@ repos:
 				Name:            "",
 				AutoplanEnabled: false,
 				PolicySets:      emptyPolicySets,
+				RepoLocking:     true,
 			},
 		},
-		"repo-side disable_repo_locking win out if allowed": {
+		"repo-side repo_locking win out if allowed": {
 			gCfg: `
 repos:
 - id: /.*/
-  disable_repo_locking: true
+  repo_locking: false
 `,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{
-				Dir:                ".",
-				Workspace:          "default",
-				ApplyRequirements:  []string{},
-				DisableRepoLocking: &[]bool{false}[0],
+				Dir:               ".",
+				Workspace:         "default",
+				ApplyRequirements: []string{},
+				RepoLocking:       Bool(true),
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
@@ -786,12 +790,12 @@ repos:
 					PolicyCheck: valid.DefaultPolicyCheckStage,
 					Plan:        valid.DefaultPlanStage,
 				},
-				RepoRelDir:         ".",
-				Workspace:          "default",
-				Name:               "",
-				AutoplanEnabled:    false,
-				PolicySets:         emptyPolicySets,
-				DisableRepoLocking: true,
+				RepoRelDir:      ".",
+				Workspace:       "default",
+				Name:            "",
+				AutoplanEnabled: false,
+				PolicySets:      emptyPolicySets,
+				RepoLocking:     false,
 			},
 		},
 		"last server-side match wins": {
@@ -824,6 +828,7 @@ repos:
 				Name:            "myname",
 				AutoplanEnabled: false,
 				PolicySets:      emptyPolicySets,
+				RepoLocking:     true,
 			},
 		},
 		"autoplan is set properly": {
@@ -852,6 +857,7 @@ repos:
 				Name:            "myname",
 				AutoplanEnabled: true,
 				PolicySets:      emptyPolicySets,
+				RepoLocking:     true,
 			},
 		},
 		"execution order group is set": {
@@ -882,6 +888,7 @@ repos:
 				AutoplanEnabled:     true,
 				PolicySets:          emptyPolicySets,
 				ExecutionOrderGroup: 10,
+				RepoLocking:         true,
 			},
 		},
 	}

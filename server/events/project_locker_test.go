@@ -53,7 +53,7 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 		},
 		nil,
 	)
-	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, false)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
 	link, _ := mockClient.MarkdownPullLink(lockingPull)
 	Ok(t, err)
 	Equals(t, &events.TryLockResponse{
@@ -90,7 +90,7 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 		},
 		nil,
 	)
-	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, false)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
 
@@ -129,7 +129,7 @@ func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 		},
 		nil,
 	)
-	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, false)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
 
@@ -140,7 +140,7 @@ func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 	mockLocker.VerifyWasCalledOnce().Unlock(lockKey)
 }
 
-func TestDefaultProjectLocker_DisableRepoLocking(t *testing.T) {
+func TestDefaultProjectLocker_RepoLocking(t *testing.T) {
 	RegisterMockTestingT(t)
 	var githubClient *vcs.GithubClient
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
@@ -165,7 +165,7 @@ func TestDefaultProjectLocker_DisableRepoLocking(t *testing.T) {
 		},
 		nil,
 	)
-	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, false)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
 

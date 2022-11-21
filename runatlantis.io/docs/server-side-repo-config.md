@@ -44,7 +44,7 @@ repos:
 
   # allowed_overrides specifies which keys can be overridden by this repo in
   # its atlantis.yaml file.
-  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge, disable_repo_locking]
+  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge, repo_locking]
 
   # allowed_workflows specifies which workflows the repos that match 
   # are allowed to select.
@@ -59,9 +59,9 @@ repos:
   # If false (default), the source branch won't be deleted on merge
   delete_source_branch_on_merge: true
 
-  # disable_repo_locking defines whether lock repository when planning.
-  # If false (default), atlantis try to get a lock.
-  disable_repo_locking: true
+  # repo_locking defines whether lock repository when planning.
+  # If true (default), atlantis try to get a lock.
+  repo_locking: true
 
   # pre_workflow_hooks defines arbitrary list of scripts to execute before workflow execution.
   pre_workflow_hooks: 
@@ -402,11 +402,11 @@ If you set a workflow with the key `default`, it will override this.
 | branch                        | string   | none    | no       | An regex matching pull requests by base branch (the branch the pull request is getting merged into). By default, all branches are matched                                                                                                                                                                 |
 | workflow                      | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                        |
 | apply_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Apply Requirements](apply-requirements.html) for more details.                                                                      |
-| allowed_overrides             | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge` and `disable_repo_locking`                                                                                                               |
+| allowed_overrides             | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge` and `repo_locking`                                                                                                                       |
 | allowed_workflows             | []string | none    | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                                                                                           |
 | allow_custom_workflows        | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                                                                                        |
 | delete_source_branch_on_merge | bool     | false   | no       | Whether or not to delete the source branch on merge (only AzureDevOps and GitLab support)                                                                                                                                                                                                                 |
-| disable_repo_locking          | bool     | false   | no       | Whether or not to disable to get a lock                                                                                                                                                                                                                                                                   |
+| repo_locking                  | bool     | false   | no       | Whether or not to get a lock                                                                                                                                                                                                                                                                              |
 
 
 :::tip Notes
