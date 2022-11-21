@@ -3,6 +3,7 @@ module github.com/runatlantis/atlantis
 go 1.19
 
 require (
+	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/alicebob/miniredis/v2 v2.23.1
 	github.com/bradleyfalzon/ghinstallation/v2 v2.1.0
@@ -38,10 +39,10 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli v1.22.10
 	github.com/urfave/negroni v1.0.0
+	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
 	github.com/xanzy/go-gitlab v0.74.0
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.23.0
-	golang.org/x/sync v0.1.0
 	golang.org/x/term v0.2.0
 	golang.org/x/text v0.4.0
 	gopkg.in/go-playground/validator.v9 v9.31.0
