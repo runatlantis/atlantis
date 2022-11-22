@@ -480,8 +480,8 @@ var boolFlags = map[string]boolFlag{
 	},
 	StrictPlanFileList: {
 		description:  "Block plan requests from projects outside the files modified in the pull request.",
-                defaultValue: false,
-        },
+		defaultValue: false,
+	},
 	WebsocketCheckOrigin: {
 		description:  "Enable websocket origin check",
 		defaultValue: false,
