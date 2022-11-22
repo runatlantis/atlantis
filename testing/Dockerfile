@@ -5,7 +5,7 @@ RUN apt-get update && apt-get --no-install-recommends -y install unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Terraform
-ENV TERRAFORM_VERSION=1.3.4
+ENV TERRAFORM_VERSION=1.3.5
 RUN case $(uname -m) in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
     wget -nv -O terraform.zip https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${ARCH}.zip && \
     mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
@@ -25,3 +25,7 @@ RUN case $(uname -m) in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64|armv7l) ARC
     ln -s /usr/local/bin/cft/versions/${CONFTEST_VERSION}/conftest /usr/local/bin/conftest${CONFTEST_VERSION} && \
     rm conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
     rm checksums.txt
+
+RUN useradd -u 1001 -m atlantis
+
+USER atlantis

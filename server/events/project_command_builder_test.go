@@ -867,6 +867,7 @@ func TestDefaultProjectCommandBuilder_TerraformVersion(t *testing.T) {
 	// If terraform configuration is used, result should be `0.12.8`.
 	// If project configuration is used, result should be `0.12.6`.
 	// If default is to be used, result should be `nil`.
+
 	baseVersionConfig := `
 terraform {
   required_version = "%s0.12.8"
@@ -881,7 +882,29 @@ projects:
 `
 
 	exactSymbols := []string{"", "="}
-	nonExactSymbols := []string{">", ">=", "<", "<=", "~="}
+	// Depending on when the tests are run, the > and >= matching versions will have to be increased.
+	// It's probably not worth testing the terraform-switcher version here so we only test <, <=, and ~>.
+	// One way to test this in the future is to mock tfswitcher.GetTFList() to return the highest
+	// version of 1.3.5.
+	// nonExactSymbols := []string{">", ">=", "<", "<=", "~>"}
+	nonExactSymbols := []string{"<", "<=", "~>"}
+	nonExactVersions := map[string]map[string][]int{
+		// ">": {
+		// 	"project1": {1, 3, 5},
+		// },
+		// ">=": {
+		// 	"project1": {1, 3, 5},
+		// },
+		"<": {
+			"project1": {0, 12, 7},
+		},
+		"<=": {
+			"project1": {0, 12, 8},
+		},
+		"~>": {
+			"project1": {0, 12, 31},
+		},
+	}
 
 	type testCase struct {
 		DirStructure  map[string]interface{}
@@ -914,9 +937,7 @@ projects:
 				},
 			},
 			ModifiedFiles: []string{"project1/main.tf"},
-			Exp: map[string][]int{
-				"project1": nil,
-			},
+			Exp:           nonExactVersions[nonExactSymbol],
 		}
 	}
 

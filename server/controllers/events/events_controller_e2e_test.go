@@ -41,7 +41,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-const ConftestVersion = "0.25.0"
+const ConftestVersion = "0.35.0"
 
 var applyLocker locking.ApplyLocker
 var userConfig server.UserConfig
@@ -1373,7 +1373,7 @@ func ensureRunningConftest(t *testing.T) {
 	versionOutput := string(versionOutBytes)
 	match := versionConftestRegex.FindStringSubmatch(versionOutput)
 	if len(match) <= 1 {
-		t.Logf("could not parse contest version from %s", versionOutput)
+		t.Logf("could not parse conftest version from %s", versionOutput)
 		t.FailNow()
 	}
 	localVersion, err := version.NewVersion(match[1])
@@ -1423,4 +1423,9 @@ func ensureRunning014(t *testing.T) {
 //		   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
-var versionConftestRegex = regexp.MustCompile("Version: (.*?)(\\s.*)?\n")
+/*
+ * Newer versions will return both Conftest and OPA
+ * Conftest: 0.35.0
+ * OPA: 0.45.0
+ */
+var versionConftestRegex = regexp.MustCompile("Conftest: (.*?)(\\s.*)?\n")
