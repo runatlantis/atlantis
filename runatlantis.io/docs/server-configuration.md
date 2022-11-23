@@ -237,9 +237,9 @@ Values are chosen in this order:
 
 ### `--checkout-strategy`
   ```bash
-  atlantis server --checkout-strategy="branch"
+  atlantis server --checkout-strategy="<branch|merge>"
   # or
-  ATLANTIS_CHECKOUT_STRATEGY="branch"
+  ATLANTIS_CHECKOUT_STRATEGY="<branch|merge>"
   ```
   How to check out pull requests. Use either `branch` or `merge`.
   Defaults to `branch`. See [Checkout Strategy](checkout-strategy.html) for more details.
@@ -691,7 +691,7 @@ Values are chosen in this order:
   # NOTE: Use single quotes to avoid shell expansion of *.
   atlantis server --repo-allowlist='github.com/myorg/*'
   # or
-  ATLANTIS_REPO_ALLOWLIST=true
+  ATLANTIS_REPO_ALLOWLIST='github.com/myorg/*'
   ```
   Atlantis requires you to specify an allowlist of repositories it will accept webhooks from.
 
