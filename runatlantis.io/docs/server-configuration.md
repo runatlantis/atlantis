@@ -562,54 +562,72 @@ Values are chosen in this order:
 ### `--parallel-pool-size`
   ```bash
   atlantis server --parallel-pool-size=100
+  # or
+  ATLANTIS_PARALLEL_POOL_SIZE=100
   ```
   Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
 
 ### `--port`
   ```bash
   atlantis server --port=8080
+  # or
+  ATLANTIS_SERVER_PORT=8080
   ```
   Port to bind to. Defaults to `4141`.
 
 ### `--quiet-policy-checks`
   ```bash
   atlantis server --quiet-policy-checks
+  # or
+  ATLANTIS_QUIET_POLICY_CHECKS=true
   ```
   Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
 
 ### `--redis-host`
   ```bash
   atlantis server --redis-host="localhost"
+  # or
+  ATLANTIS_REDIS_HOST="localhost"
   ```
   The Redis Hostname for when using a Locking DB type of `redis`.
 
 ### `--redis-password`
   ```bash
   atlantis server --redis-password="password123"
+  # or (recommended)
+  ATLANTIS_REDIS_PASSWORD="password123"
   ```
   The Redis Password for when using a Locking DB type of `redis`.
 
 ### `--redis-port`
   ```bash
   atlantis server --redis-port=6379
+  # or
+  ATLANTIS_REDIS_PORT=6379
   ```
   The Redis Port for when using a Locking DB type of `redis`. Defaults to `6379`.
 
 ### `--redis-db`
   ```bash
   atlantis server --redis-db=0
+  # or
+  ATLANTIS_REDIS_DB=0
   ```
   The Redis Database to use when using a Locking DB type of `redis`. Defaults to `0`.
 
 ### `--redis-tls-enabled`
   ```bash
   atlantis server --redis-tls-enabled=false
+  # or
+  ATLANTIS_REDIS_TLS_ENABLED=false
   ```
   Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
 
 ### `--redis-insecure-skip-verify`
   ```bash
   atlantis server --redis-insecure-skip-verify=false
+  # or
+  ATLANTIS_REDIS_INSECURE_SKIP_VERIFY=false
   ```
   Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate. Defaults to `false`.
 
@@ -620,12 +638,16 @@ Values are chosen in this order:
 ### `--repo-config`
   ```bash
   atlantis server --repo-config="path/to/repos.yaml"
+  # or
+  ATLANTIS_REPO_CONFIG="path/to/repos.yaml"
   ```
   Path to a YAML server-side repo config file. See [Server Side Repo Config](server-side-repo-config.html).
 
 ### `--repo-config-json`
   ```bash
   atlantis server --repo-config-json='{"repos":[{"id":"/.*/", "apply_requirements":["mergeable"]}]}'
+  # or
+  ATLANTIS_REPO_CONFIG_JSON='{"repos":[{"id":"/.*/", "apply_requirements":["mergeable"]}]}'
   ```
   Specify server-side repo config as a JSON string. Useful if you don't want to write a config file to disk.
   See [Server Side Repo Config](server-side-repo-config.html) for more details.
@@ -666,7 +688,7 @@ Values are chosen in this order:
   # NOTE: Use single quotes to avoid shell expansion of *.
   atlantis server --repo-allowlist='github.com/myorg/*'
   # or
-  ATLANTIS_ALLOWLIST=true
+  ATLANTIS_REPO_ALLOWLIST=true
   ```
   Atlantis requires you to specify an allowlist of repositories it will accept webhooks from.
 
@@ -793,6 +815,8 @@ Values are chosen in this order:
 ### `--ssl-cert-file`
   ```bash
   atlantis server --ssl-cert-file="/etc/ssl/certs/my-cert.crt"
+  # or
+  ATLANTIS_SSL_CERT_FILE="/etc/ssl/certs/my-cert.crt"
   ```
   File containing x509 Certificate used for serving HTTPS.
   If the cert is signed by a CA, the file should be the concatenation
@@ -801,18 +825,24 @@ Values are chosen in this order:
 ### `--ssl-key-file`
   ```bash
   atlantis server --ssl-cert-file="/etc/ssl/private/my-cert.key"
+  # or
+  ATLANTIS_SSL_CERT_FILE="/etc/ssl/private/my-cert.key"
   ```
   File containing x509 private key matching `--ssl-cert-file`.
 
 ### `--stats-namespace`
   ```bash
   atlantis server --stats-namespace="myatlantis"
+  # or
+  ATLANTIS_STATS_NAMESPACE="myatlantis"
   ```
   Namespace for emitting stats/metrics. See [stats.html#Metrics/Stats](stats.html#Metrics/Stats).
 
 ### `--tf-download-url`
   ```bash
   atlantis server --tf-download-url="https://releases.company.com"
+  # or
+  ATLANTIS_TF_DOWNLOAD_URL="https://releases.company.com"
   ```
   An alternative URL to download Terraform versions if they are missing. Useful in an airgapped
   environment where releases.hashicorp.com is not available. Directory structure of the custom
@@ -821,6 +851,8 @@ Values are chosen in this order:
 ### `--tfe-hostname`
   ```bash
   atlantis server --tfe-hostname="my-terraform-enterprise.company.com"
+  # or
+  ATLANTIS_TFE_HOSTNAME="my-terraform-enterprise.company.com"
   ```
   Hostname of your Terraform Enterprise installation to be used in conjunction with
   `--tfe-token`. See [Terraform Cloud](terraform-cloud.html) for more details.
