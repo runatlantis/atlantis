@@ -829,7 +829,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --ssl-cert-file="/etc/ssl/private/my-cert.key"
   # or
-  ATLANTIS_SSL_CERT_FILE="/etc/ssl/private/my-cert.key"
+  ATLANTIS_SSL_KEY_FILE="/etc/ssl/private/my-cert.key"
   ```
   File containing x509 private key matching `--ssl-cert-file`.
 
