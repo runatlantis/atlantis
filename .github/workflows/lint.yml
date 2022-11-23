@@ -1,6 +1,11 @@
 name: linter
 
-on: [pull_request]
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths-ignore:
+      - 'runatlantis.io/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
