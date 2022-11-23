@@ -284,7 +284,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --disable-apply-all
   # or
-  ATLANTIS_APPLY_ALL=true
+  ATLANTIS_DISABLE_APPLY_ALL=true
   ```
   Disable \"atlantis apply\" command so a specific project/workspace/directory has to
   be specified for applies.
