@@ -64,6 +64,19 @@ type GithubAppTemporarySecrets struct {
 	URL string
 }
 
+type GithubReview struct {
+	Id          githubv4.ID
+	SubmittedAt githubv4.DateTime
+	Author      struct {
+		Login githubv4.String
+	}
+}
+
+type GithubPRReviewSummary struct {
+	ReviewDecision githubv4.String
+	reviews        []GithubReview
+}
+
 // NewGithubClient returns a valid GitHub client.
 func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, logger logging.SimpleLogging) (*GithubClient, error) {
 	transport, err := credentials.Client()
@@ -246,6 +259,53 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 	return nil
 }
 
+func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (GithubPRReviewSummary, error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				ReviewDecision githubv4.String
+				Reviews        struct {
+					Nodes []GithubReview
+					// contains pagination information
+					PageInfo struct {
+						EndCursor   githubv4.String
+						HasNextPage githubv4.Boolean
+					}
+				} `graphql:"reviews(first: $entries, after: $reviewCursor, states: $reviewState)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":        githubv4.String(repo.Owner),
+		"name":         githubv4.String(repo.Name),
+		"number":       githubv4.Int(pull.Num),
+		"entries":      githubv4.Int(10),
+		"reviewState":  []githubv4.PullRequestReviewState{githubv4.PullRequestReviewStateApproved},
+		"reviewCursor": (*githubv4.String)(nil), // Null after argument to get first page.
+	}
+
+	var allReviews []GithubReview
+	for {
+		err := g.v4Client.Query(g.ctx, &query, variables)
+		if err != nil {
+			return GithubPRReviewSummary{
+				query.Repository.PullRequest.ReviewDecision,
+				allReviews,
+			}, errors.Wrap(err, "getting reviewDecision")
+		}
+		allReviews = append(allReviews, query.Repository.PullRequest.Reviews.Nodes...)
+		if !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
+			break
+		}
+		variables["reviewCursor"] = githubv4.NewString(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
+	}
+	return GithubPRReviewSummary{
+		query.Repository.PullRequest.ReviewDecision,
+		allReviews,
+	}, nil
+}
+
 // PullIsApproved returns true if the pull request was approved.
 func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	nextPage := 0
@@ -279,71 +339,11 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 }
 
 func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
-	// TODO pagination
-
-	// {
-	//  repository(owner: "secustor", name: "renovate_terraform_lock_in_subdirectory") {
-	//    pullRequest(number: 13) {
-	//      reviewDecision
-	//      reviews(first: 10, states: APPROVED) {
-	//        pageInfo {
-	//          endCursor
-	//          hasNextPage
-	//        }
-	//        nodes {
-	//          id
-	//          submittedAt
-	//          author {
-	//            login
-	//          }
-	//        }
-	//      }
-	//    }
-	//  }
-	//}
-	var query struct {
-		Repository struct {
-			PullRequest struct {
-				ReviewDecision githubv4.String
-				Reviews        struct {
-					Nodes []struct {
-						Id          githubv4.ID
-						SubmittedAt githubv4.DateTime
-						Author      struct {
-							Login githubv4.String
-						}
-					}
-					// contains pagination information
-					PageInfo struct {
-						EndCursor   githubv4.String
-						HasNextPage githubv4.Boolean
-					}
-				} `graphql:"reviews(first: $entries, states: $reviewState)"`
-			} `graphql:"pullRequest(number: $number)"`
-		} `graphql:"repository(owner: $owner, name: $name)"`
-	}
-
-	variables := map[string]interface{}{
-		"owner":       githubv4.String(repo.Owner),
-		"name":        githubv4.String(repo.Name),
-		"number":      githubv4.Int(pull.Num),
-		"entries":     githubv4.Int(10),
-		"reviewState": []githubv4.PullRequestReviewState{githubv4.PullRequestReviewStateApproved},
-	}
-
-	err := g.v4Client.Query(g.ctx, &query, variables)
+	reviewStatus, err := g.getPRReviews(repo, pull)
 	if err != nil {
-		return errors.Wrap(err, "getting reviewDecision")
+		return err
 	}
 
-	// mutation ($input: DismissPullRequestReviewInput!) {
-	//  dismissPullRequestReview(input: $input) {
-	//
-	//    pullRequestReview {
-	//      id
-	//    }
-	//  }
-	//}
 	var mutation struct {
 		DismissPullRequestReview struct {
 			PullRequestReview struct {
@@ -351,20 +351,14 @@ func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest)
 			}
 		} `graphql:"dismissPullRequestReview(input: $input)"`
 	}
-	for _, review := range query.Repository.PullRequest.Reviews.Nodes {
-		// {
-		//  "input": {
-		//    "message": "This is a test",
-		//    "pullRequestReviewId": "PRR_kwDOFxULt85GwUSw"
-		//  }
-		//}
+	for _, review := range reviewStatus.reviews {
 		input := githubv4.DismissPullRequestReviewInput{
 			PullRequestReviewID: review.Id,
 			Message:             pullRequestDismissalMessage,
 			ClientMutationID:    clientMutationID,
 		}
 		mutationResult := &mutation
-		err = g.v4Client.Mutate(g.ctx, mutationResult, input, nil)
+		err := g.v4Client.Mutate(g.ctx, mutationResult, input, nil)
 		if err != nil {
 			return errors.Wrap(err, "dismissing reviewDecision")
 		}

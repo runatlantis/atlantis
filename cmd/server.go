@@ -60,6 +60,7 @@ const (
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
+	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
@@ -391,6 +392,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableRepoLockingFlag: {
 		description: "Disable atlantis locking repos",
+	},
+	DiscardApprovalOnPlanFlag: {
+		description:  "Enables the discarding of approval if a new plan has been executed. Currently on Github is supported",
+		defaultValue: false,
 	},
 	EnablePolicyChecksFlag: {
 		description:  "Enable atlantis to run user defined policy checks.  This is explicitly disabled for TFE/TFC backends since plan files are inaccessible.",
