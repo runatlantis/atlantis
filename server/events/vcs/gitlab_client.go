@@ -165,6 +165,47 @@ func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment stri
 }
 
 func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	var allComments []*gitlab.Note
+	nextPage := 0
+	for {
+		comments, resp, err := g.Client.Notes.ListMergeRequestNotes(repo.FullName, pullNum, &gitlab.ListMergeRequestNotesOptions{
+			// Sort:        gitlab.String("created_at"),
+			// OrderBy:     gitlab.String("asc"),
+			ListOptions: gitlab.ListOptions{Page: nextPage},
+		})
+		if err != nil {
+			return errors.Wrap(err, "listing comments")
+		}
+		allComments = append(allComments, comments...)
+		if resp.NextPage == 0 {
+			break
+		}
+		nextPage = resp.NextPage
+	}
+
+	currentUser, _, err := g.Client.Users.CurrentUser()
+
+	if err != nil {
+		return errors.Wrap(err, "error getting currentuser")
+	}
+
+	for _, comment := range allComments {
+		if !strings.EqualFold(comment.Author.Username, currentUser.Username) {
+			continue
+		}
+		body := strings.Split(comment.Body, "\n")
+		if len(body) == 0 {
+			continue
+		}
+		firstLine := strings.ToLower(body[0])
+		if !strings.Contains(firstLine, strings.ToLower(command)) {
+			continue
+		}
+		if _, err := g.Client.Notes.DeleteMergeRequestNote(repo.FullName, pullNum, comment.ID); err != nil {
+			return errors.Wrapf(err, "deleting comment %s", comment.ID)
+		}
+	}
+
 	return nil
 }
 
