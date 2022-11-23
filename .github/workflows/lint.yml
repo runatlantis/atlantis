@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   golangci-lint:
+    if: github.event.pull_request.draft == false
     name: runner / golangci-lint
     runs-on: ubuntu-22.04
     steps:
@@ -25,6 +26,7 @@ jobs:
 
   # Use revive via golangci-lint binary with "warning" level.
   revive:
+    if: github.event.pull_request.draft == false
     name: runner / revive
     runs-on: ubuntu-22.04
     steps:
@@ -39,6 +41,7 @@ jobs:
 
   # You can add more and more supported linters with different config.
   errcheck:
+    if: github.event.pull_request.draft == false
     name: runner / errcheck
     runs-on: ubuntu-22.04
     steps:
