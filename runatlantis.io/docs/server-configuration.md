@@ -467,6 +467,7 @@ Values are chosen in this order:
 
   ::: warning NOTE
   If there aren't any required checks set in the Github branch protection settings then this will cause atlantis to fail.
+  See issue https://github.com/runatlantis/atlantis/issues/2663.
   :::
 
 ### `--gitlab-hostname`
@@ -548,6 +549,8 @@ Values are chosen in this order:
   # or
   ATLANTIS_MARKDOWN_TEMPLATE_OVERRIDES_DIR="path/to/templates/"
   ```
+  This will be available in v0.21.0.
+
   Directory where Atlantis will read in overrides for markdown templates used to render comments on pull requests.
   Markdown template overrides may be specified either in individual files, or all together in a single file. All template
   override files _must_ have the `.tmpl` extension, otherwise they will not be parsed.
@@ -571,7 +574,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --port=8080
   # or
-  ATLANTIS_SERVER_PORT=8080
+  ATLANTIS_PORT=8080
   ```
   Port to bind to. Defaults to `4141`.
 
