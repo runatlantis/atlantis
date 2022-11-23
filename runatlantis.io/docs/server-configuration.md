@@ -50,12 +50,16 @@ Values are chosen in this order:
 ### `--allow-draft-prs`
   ```bash
   atlantis server --allow-draft-prs
+  # or
+  ATLANTIS_ALLOW_DRAFT_PRS=true
   ```
   Respond to pull requests from draft prs. Defaults to `false`.
 
 ### `--allow-fork-prs`
   ```bash
   atlantis server --allow-fork-prs
+  # or
+  ATLANTIS_ALLOW_FORK_PRS=true
   ```
   Respond to pull requests from forks. Defaults to `false`.
 
@@ -71,6 +75,8 @@ Values are chosen in this order:
   <Badge text="Deprecated" type="warn"/>
   ```bash
   atlantis server --allow-repo-config
+  # or
+  ATLANTIS_ALLOW_REPO_CONFIG=true
   ```
   This flag is deprecated. It allows all repos to use all restricted
   `atlantis.yaml` keys. See [Repo Level Atlantis.yaml](repo-level-atlantis-yaml.html) for more details.
@@ -106,6 +112,8 @@ Values are chosen in this order:
 ### `--automerge`
   ```bash
   atlantis server --automerge
+  # or
+  ATLANTIS_AUTOMERGE=true
   ```
   Automatically merge pull requests after all plans have been successfully applied.
   Defaults to `false`. See [Automerging](automerging.html) for more details.
@@ -114,6 +122,8 @@ Values are chosen in this order:
   ```bash
   # NOTE: Use single quotes to avoid shell expansion of *.
   atlantis server --autoplan-file-list='**/*.tf,project1/*.pkr.hcl'
+  # or
+  ATLANTIS_AUTOPLAN_FILE_LIST='**/*.tf,project1/*.pkr.hcl'
   ```
   List of file patterns that Atlantis will use to check if a directory contains modified files that should trigger project planning.
 
@@ -137,6 +147,8 @@ Values are chosen in this order:
 ### `--azuredevops-hostname`
   ```bash
   atlantis server --azuredevops-hostname="dev.azure.com"
+  # or
+  ATLANTIS_AZUREDEVOPS_HOSTNAME="dev.azure.com"
   ```
   Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
 
@@ -577,10 +589,13 @@ Values are chosen in this order:
 ### `--repo-whitelist`
   <Badge text="Deprecated" type="warn"/>
   Deprecated for `--repo-allowlist`.
+
 ### `--repo-allowlist`
   ```bash
   # NOTE: Use single quotes to avoid shell expansion of *.
   atlantis server --repo-allowlist='github.com/myorg/*'
+  # or
+  ATLANTIS_ALLOWLIST=true
   ```
   Atlantis requires you to specify an allowlist of repositories it will accept webhooks from.
 
@@ -609,6 +624,8 @@ Values are chosen in this order:
   <Badge text="Deprecated" type="warn"/>
   ```bash
   atlantis server --require-approval
+  # or
+  ATLANTIS_REQUIRE_APPROVAL=true
   ```
   This flag is deprecated. It requires all pull requests to be approved
   before `atlantis apply` is allowed. See [Apply Requirements](apply-requirements.html) for more details.
@@ -626,6 +643,8 @@ Values are chosen in this order:
   <Badge text="Deprecated" type="warn"/>
   ```bash
   atlantis server --require-mergeable
+  # or
+  ATLANTIS_REQUIRE_MERGEABLE=true
   ```
   This flag is deprecated. It causes all pull requests to be mergeable
   before `atlantis apply` is allowed. See [Apply Requirements](apply-requirements.html) for more details.
@@ -642,6 +661,8 @@ Values are chosen in this order:
 ### `--silence-fork-pr-errors`
   ```bash
   atlantis server --silence-fork-pr-errors
+  # or
+  ATLANTIS_SILENCE_FORK_PR_ERRORS=true
   ```
   Normally, if Atlantis receives a pull request webhook from a fork and --allow-fork-prs is not set,
   it will comment back with an error. This flag disables that commenting.
@@ -653,6 +674,8 @@ Values are chosen in this order:
 ### `--silence-allowlist-errors`
   ```bash
   atlantis server --silence-allowlist-errors
+  # or
+  ATLANTIS_SILENCE_ALLOWLIST_ERRORS=true
   ```
   Some users use the `--repo-allowlist` flag to control which repos Atlantis
   responds to. Normally, if Atlantis receives a pull request webhook from a repo not listed
@@ -664,6 +687,8 @@ Values are chosen in this order:
 ### `--silence-no-projects`
   ```bash
   atlantis server --silence-no-projects
+  # or
+  ATLANTIS_SILENCE_NO_PROJECTS=true
   ```
   `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 
@@ -673,12 +698,16 @@ Values are chosen in this order:
 ### `--silence-vcs-status-no-plans`
   ```bash
   atlantis server --silence-vcs-status-no-plans
+  # or
+  ATLANTIS_SILENCE_VCS_STATUS_NO_PLANS=true
   ```
   `--silence-vcs-status-no-plans` will tell Atlantis to ignore setting VCS status if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 
 ### `--skip-clone-no-changes`
   ```bash
   atlantis server --skip-clone-no-changes
+  # or
+  ATLANTIS_SKIP_CLONE_NO_CHANGES=true
   ```
   `--skip-clone-no-changes` will skip cloning the repo during autoplan if there are no changes to Terraform projects. This will only apply for GitHub and GitLab and only for repos that have `atlantis.yaml` file. Defaults to `false`.
 
@@ -730,6 +759,8 @@ Values are chosen in this order:
 ### `--tfe-local-execution-mode`
   ```bash
   atlantis server --tfe-local-execution-mode
+  # or
+  ATLANTIS_TFE_LOCAL_EXECUTION_MODE=true
   ```
   Enable if you're using local execution mode (instead of TFE/C's remote execution mode). See [Terraform Cloud](terraform-cloud.html) for more details.
 
@@ -744,6 +775,8 @@ Values are chosen in this order:
 ### `--var-file-allowlist`
   ```bash
   atlantis server --var-file-allowlist='/path/to/tfvars/dir'
+  # or
+  ATLANTIS_VAR_FILE_ALLOWLIST='/path/to/tfvars/dir'
   ```
   Comma-separated list of additional directory paths where [variable definition files](https://www.terraform.io/language/values/variables#variable-definitions-tfvars-files) can be read from.
   The paths in this argument should be absolute paths. Relative paths and globbing are currently not supported.
@@ -752,6 +785,8 @@ Values are chosen in this order:
 ### `--vcs-status-name`
   ```bash
   atlantis server --vcs-status-name="atlantis-dev"
+  # or
+  ATLANTIS_VCS_STATUS_NAME="atlantis-dev"
   ```
   Name used to identify Atlantis when updating a pull request status. Defaults to `atlantis`.
 
@@ -766,6 +801,17 @@ Values are chosen in this order:
   ```
   Write out a .git-credentials file with the provider user and token to allow
   cloning private modules over HTTPS or SSH. See [here](https://git-scm.com/docs/git-credential-store) for more information.
+  
+  Follow the `git::ssh` syntax to avoid using a custom `.gitconfig` with an `insteadOf`.
+  
+  ```hcl
+  module "private_submodule" {
+    source = "git::ssh://git@github.com/<org>/<repo>//modules/<some-module-name>?ref=v1.2.3"
+
+    # ...
+  }
+  ```
+  
   ::: warning SECURITY WARNING
   This does write secrets to disk and should only be enabled in a secure environment.
   :::
@@ -773,23 +819,31 @@ Values are chosen in this order:
 ### `--web-basic-auth`
   ```bash
   atlantis server --web-basic-auth
+  # or
+  ATLANTIS_WEB_BASIC_AUTH=true
   ```
   Enable Basic Authentication on the Atlantis web service.
 
 ### `--web-username`
   ```bash
   atlantis server --web-username="atlantis"
+  # or
+  ATLANTIS_WEB_USERNAME="atlantis"
   ```
   Username used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
 
 ### `--web-password`
   ```bash
   atlantis server --web-password="atlantis"
+  # or
+  ATLANTIS_WEB_PASSWORD="atlantis"
   ```
   Password used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
 
 ### `--websocket-check-origin`
   ```bash
   atlantis server --websocket-check-origin
+  # or
+  ATLANTIS_WEBSOCKET_CHECK_ORIGIN=true
   ```
   Only allow websockets connection when they originate from the running Atlantis web server
