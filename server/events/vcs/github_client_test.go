@@ -1170,3 +1170,199 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 	Ok(t, err)
 	Equals(t, []string{"frontend-developers", "employees"}, teams)
 }
+
+func TestGithubClient_DiscardReviews(t *testing.T) {
+	type ResponseDef struct {
+		httpCode int
+		body     string
+	}
+	type fields struct {
+		responses []ResponseDef
+	}
+	type args struct {
+		repo models.Repo
+		pull models.PullRequest
+	}
+
+	queryResponseSingleReview := `{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewDecision": "APPROVED",
+        "reviews": {
+          "nodes": [
+            {
+              "id": "PRR_kwDOFxULt85HBb7A",
+              "submittedAt": "2022-11-23T12:28:30Z",
+              "author": {
+                "login": "atlantis-test"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}`
+	queryResponseMultipleReviews := `{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewDecision": "APPROVED",
+        "reviews": {
+          "nodes": [
+            {
+              "id": "PRR_kwDOFxULt85HBb7A",
+              "submittedAt": "2022-11-23T12:28:30Z",
+              "author": {
+                "login": "atlantis-test"
+              }
+            },
+            {
+              "id": "PRR_kwDOFxULt85HBb7B",
+              "submittedAt": "2022-11-23T14:28:30Z",
+              "author": {
+                "login": "atlantis-test2"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}`
+	mutationResponseSingleReviewDismissal := `{
+  "data": {
+    "dismissPullRequestReview": {
+      "pullRequestReview": {
+        "id": "PRR_kwDOFxULt85HBb7A"
+      }
+    }
+  }
+}`
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "return no error if dismissing  a single approval",
+			fields: fields{
+				responses: []ResponseDef{
+					{
+						httpCode: 200,
+						body:     queryResponseSingleReview,
+					},
+					{
+						httpCode: 200,
+						body:     mutationResponseSingleReviewDismissal,
+					},
+				},
+			},
+			args:    args{},
+			wantErr: false,
+		},
+		{
+			name: "return no error if dismissing  multiple reviews",
+			fields: fields{
+				responses: []ResponseDef{
+					{
+						httpCode: 200,
+						body:     queryResponseMultipleReviews,
+					},
+					{
+						httpCode: 200,
+						body:     mutationResponseSingleReviewDismissal,
+					},
+					{
+						httpCode: 200,
+						body:     mutationResponseSingleReviewDismissal,
+					},
+				},
+			},
+			args:    args{},
+			wantErr: false,
+		},
+		{
+			name: "return error if query fails",
+			fields: fields{
+				responses: []ResponseDef{
+					{
+						httpCode: 500,
+						body:     "",
+					},
+				},
+			},
+			args:    args{},
+			wantErr: true,
+		},
+		{
+			name: "return error if mutating fails",
+			fields: fields{
+				responses: []ResponseDef{
+					{
+						httpCode: 200,
+						body:     queryResponseSingleReview,
+					},
+					{
+						httpCode: 500,
+						body:     "",
+					},
+				},
+			},
+			args:    args{},
+			wantErr: true,
+		},
+		{
+			name: "return error if dismissing fails after already dismissing one",
+			fields: fields{
+				responses: []ResponseDef{
+					{
+						httpCode: 200,
+						body:     queryResponseMultipleReviews,
+					},
+					{
+						httpCode: 200,
+						body:     mutationResponseSingleReviewDismissal,
+					},
+					{
+						httpCode: 500,
+						body:     "",
+					},
+				},
+			},
+			args:    args{},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Mocked GraphQL response for two teams
+			responseIndex := 0
+			responseLength := len(tt.fields.responses)
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.RequestURI != "/api/graphql" {
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+					Assert(t, responseIndex < responseLength, "requesting more responses than are defined")
+					response := tt.fields.responses[responseIndex]
+					responseIndex++
+					w.WriteHeader(response.httpCode)
+					w.Write([]byte(response.body)) // nolint: errcheck
+				}))
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{}, logging.NewNoopLogger(t))
+			Ok(t, err)
+			defer disableSSLVerification()()
+			if err := client.DiscardReviews(tt.args.repo, tt.args.pull); (err != nil) != tt.wantErr {
+				t.Errorf("DiscardReviews() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			Equals(t, responseLength, responseIndex) // check if all defined requests have been used
+		})
+	}
+}

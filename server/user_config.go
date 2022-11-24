@@ -29,6 +29,7 @@ type UserConfig struct {
 	DisableAutoplan                 bool   `mapstructure:"disable-autoplan"`
 	DisableMarkdownFolding          bool   `mapstructure:"disable-markdown-folding"`
 	DisableRepoLocking              bool   `mapstructure:"disable-repo-locking"`
+	DiscardApprovalOnPlanFlag       bool   `mapstructure:"discard-approval-on-plan"`
 	EnablePolicyChecksFlag          bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd                 bool   `mapstructure:"enable-regexp-cmd"`
 	EnableDiffMarkdownFormat        bool   `mapstructure:"enable-diff-markdown-format"`

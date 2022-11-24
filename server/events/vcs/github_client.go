@@ -74,7 +74,7 @@ type GithubReview struct {
 
 type GithubPRReviewSummary struct {
 	ReviewDecision githubv4.String
-	reviews        []GithubReview
+	Reviews        []GithubReview
 }
 
 // NewGithubClient returns a valid GitHub client.
@@ -351,7 +351,7 @@ func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest)
 			}
 		} `graphql:"dismissPullRequestReview(input: $input)"`
 	}
-	for _, review := range reviewStatus.reviews {
+	for _, review := range reviewStatus.Reviews {
 		input := githubv4.DismissPullRequestReviewInput{
 			PullRequestReviewID: review.Id,
 			Message:             pullRequestDismissalMessage,

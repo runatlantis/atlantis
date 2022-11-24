@@ -15,6 +15,21 @@ type MockClient struct {
 	fail func(message string, callerSkip ...int)
 }
 
+func (mock *MockClient) DiscardReviews(_param0 models.Repo, _param1 models.PullRequest) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockClient().")
+	}
+	params := []pegomock.Param{_param0, _param1}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("DiscardReviews", params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
 func NewMockClient(options ...pegomock.Option) *MockClient {
 	mock := &MockClient{}
 	for _, option := range options {
