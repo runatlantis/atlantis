@@ -65,7 +65,7 @@ type GithubAppTemporarySecrets struct {
 }
 
 type GithubReview struct {
-	Id          githubv4.ID
+	ID          githubv4.ID
 	SubmittedAt githubv4.DateTime
 	Author      struct {
 		Login githubv4.String
@@ -347,13 +347,13 @@ func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest)
 	var mutation struct {
 		DismissPullRequestReview struct {
 			PullRequestReview struct {
-				Id githubv4.ID
+				ID githubv4.ID
 			}
 		} `graphql:"dismissPullRequestReview(input: $input)"`
 	}
 	for _, review := range reviewStatus.Reviews {
 		input := githubv4.DismissPullRequestReviewInput{
-			PullRequestReviewID: review.Id,
+			PullRequestReviewID: review.ID,
 			Message:             pullRequestDismissalMessage,
 			ClientMutationID:    clientMutationID,
 		}
