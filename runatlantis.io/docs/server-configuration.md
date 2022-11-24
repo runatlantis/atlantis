@@ -839,7 +839,7 @@ Values are chosen in this order:
   # or
   ATLANTIS_STATS_NAMESPACE="myatlantis"
   ```
-  Namespace for emitting stats/metrics. See [stats.html#Metrics/Stats](stats.html#Metrics/Stats).
+  Namespace for emitting stats/metrics. See [stats](stats.html) section.
 
 ### `--tf-download-url`
   ```bash
