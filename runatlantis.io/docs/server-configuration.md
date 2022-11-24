@@ -159,13 +159,13 @@ Values are chosen in this order:
   ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD="password123"
   ```
   Azure DevOps basic authentication password for inbound webhooks (see
-  https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops).
+  [docs](https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)).
   
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure DevOps org. This means that an
   attacker could spoof calls to Atlantis and cause it to perform malicious
-  actions. Should be specified via the ATLANTIS_AZUREDEVOPS_BASIC_AUTH environment
+  actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_BASIC_AUTH` environment
   variable.
   :::
 
@@ -175,8 +175,7 @@ Values are chosen in this order:
   # or
   ATLANTIS_AZUREDEVOPS_WEBHOOK_USER="username@example.com"
   ```
-  Azure DevOps basic authentication username for inbound webhooks. Can also be specified via the ATLANTIS_AZUREDEVOPS_WEBHOOK_USER
-  environment variable.
+  Azure DevOps basic authentication username for inbound webhooks.
 
 ### `--azuredevops-token`
   ```bash
@@ -184,8 +183,7 @@ Values are chosen in this order:
   # or (recommended)
   ATLANTIS_AZUREDEVOPS_TOKEN="RandomStringProducedByAzureDevOps"
   ```
-  Azure DevOps token of API user. Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN
-  environment variable.
+  Azure DevOps token of API user.
 
 ### `--azuredevops-user`
   ```bash
@@ -278,7 +276,7 @@ Values are chosen in this order:
   # or
   ATLANTIS_DISABLE_APPLY=true
   ```
-  Disable all \"atlantis apply\" commands, regardless of which flags are passed with it.
+  Disable all `atlantis apply` commands, regardless of which flags are passed with it.
 
 ### `--disable-apply-all`
   ```bash
@@ -286,7 +284,7 @@ Values are chosen in this order:
   # or
   ATLANTIS_DISABLE_APPLY_ALL=true
   ```
-  Disable \"atlantis apply\" command so a specific project/workspace/directory has to
+  Disable `atlantis apply` command so a specific project/workspace/directory has to
   be specified for applies.
 
 ### `--disable-autoplan`
@@ -328,12 +326,14 @@ Values are chosen in this order:
   ATLANTIS_ENABLE_REGEXP_CMD=true
   ```
   Enable Atlantis to use regular expressions on plan/apply commands when `-p` flag is passed with it.
+  
+  This can be used to run all defined projects in `atlantis.yaml` using `atlantis plan -p .*`.
 
-  This will not work with `-d` yet and to use `-p` the projects must be defined in the repo `atlantis.yaml` file.
+  This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
   ::: warning SECURITY WARNING
   It's not supposed to be used with `--disable-apply-all`.
-  The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects
+  The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects.
   :::
 
 ### `--enable-diff-markdown-format`
@@ -572,9 +572,9 @@ Values are chosen in this order:
 
 ### `--port`
   ```bash
-  atlantis server --port=8080
+  atlantis server --port=4141
   # or
-  ATLANTIS_PORT=8080
+  ATLANTIS_PORT=4141
   ```
   Port to bind to. Defaults to `4141`.
 
@@ -811,7 +811,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --slack-token=token
   # or (recommended)
-  ATLANTIS_SLACK_TOKEN='token' atlantis server
+  ATLANTIS_SLACK_TOKEN='token'
   ```
   API token for Slack notifications. Slack is not fully supported. TODO: Slack docs.
 
@@ -827,7 +827,7 @@ Values are chosen in this order:
 
 ### `--ssl-key-file`
   ```bash
-  atlantis server --ssl-cert-file="/etc/ssl/private/my-cert.key"
+  atlantis server --ssl-key-file="/etc/ssl/private/my-cert.key"
   # or
   ATLANTIS_SSL_KEY_FILE="/etc/ssl/private/my-cert.key"
   ```
