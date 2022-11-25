@@ -31,7 +31,8 @@ release:
 
   # If set to true, will not auto-publish the release.
   # Default is false.
-  draft: false
+  draft: true
+  replace_existing_draft: false
 
   # If set, will create a release discussion in the category specified.
   #
