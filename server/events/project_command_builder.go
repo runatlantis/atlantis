@@ -230,9 +230,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 				return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 			}
 			ctx.Log.Info("successfully parsed remote %s file", config.AtlantisYAMLFilename)
-			if len(repoCfg.Projects) == 0 {
-				ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", config.AtlantisYAMLFilename)
-			} else {
+			if len(repoCfg.Projects) > 0 {
 				matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "")
 				if err != nil {
 					return nil, err
@@ -242,6 +240,8 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					ctx.Log.Info("skipping repo clone since no project was modified")
 					return []command.ProjectContext{}, nil
 				}
+			} else {
+				ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", config.AtlantisYAMLFilename)
 			}
 			// NOTE: We discard this work here and end up doing it again after
 			// cloning to ensure all the return values are set properly with
