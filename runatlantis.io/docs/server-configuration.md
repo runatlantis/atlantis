@@ -450,7 +450,9 @@ Values are chosen in this order:
   # or
   ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply"
   ```
-  Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
+  In versions v0.21.0 and below, the GitHub team name required the case sensitive team name. Future versions will allow name or slug.
+  
+  Comma-separated list of GitHub team name or slug and permission pairs. By default, any team can plan and apply.
   
   ::: warning NOTE
   You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
