@@ -1134,8 +1134,8 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 		  "organization": {
 			"teams":{
 				"edges":[
-					{"node":{"name":"frontend-developers"}},
-					{"node":{"name":"employees"}}
+					{"node":{"name": "Frontend Developers", "slug":"frontend-developers"}},
+					{"node":{"name": "Employees", "slug":"employees"}}
 				],
 				"pageInfo":{
 					"endCursor":"Y3Vyc29yOnYyOpHOAFMoLQ==",
@@ -1168,5 +1168,5 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 		Username: "testuser",
 	})
 	Ok(t, err)
-	Equals(t, []string{"frontend-developers", "employees"}, teams)
+	Equals(t, []string{"Frontend Developers", "frontend-developers", "Employees", "employees"}, teams)
 }
