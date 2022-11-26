@@ -61,9 +61,9 @@ jobs:
         startsWith(github.ref, 'refs/tags/')
       run: |
         echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-        echo "RELEASE_TYPE=${{ contains(github.ref, 'pre') ? 'pre' : 'stable' }}" >> $GITHUB_ENV
+        echo "RELEASE_TAG=${{ contains(github.ref, 'pre') ? 'prerelease-latest' : 'latest' }}" >> $GITHUB_ENV
 
-    - name: "Build and push atlantis:${{ env.RELEASE_VERSION }} image for ${{ env.RELEASE_TYPE }} release"
+    - name: "Build and push atlantis:${{ env.RELEASE_VERSION }} image for ${{ env.RELEASE_TAG }} release"
       if: |
         contains(fromJson('["push", "pull_request"]'), github.event_name) &&
         startsWith(github.ref, 'refs/tags/')
@@ -75,4 +75,4 @@ jobs:
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
           ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_VERSION }}
-          ghcr.io/${{ github.repository_owner }}/atlantis:${{ contains(github.ref, 'pre') ? 'prerelease-latest' : 'latest') }}
+          ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_TAG }}
