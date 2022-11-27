@@ -1,5 +1,25 @@
 {{ define "multiProjectHeader" -}}
-Ran {{.Command}} for {{ len .Results }} projects:
+<details><summary>Ran {{.Command}} for {{ len .Results }} projects:
+<table>
+<tr>
+<th>Plan</th>
+<th title="changed">:wrench:</th>
+<th title="no changes">:heavy_check_mark:</th>
+<th title="failed">:warning:</th><th title="locked">:lock:</th>
+</tr>
+<tr>
+<th>Project Summary:</th>
+<td title="Projects With Changes">{{.Changed}}</td>
+<td title="Unchanged Projects">{{.Unchanged}}</td>
+<td title="Failed Projects">{{.Failed}}</td>
+<td title="TODO, not implemented yet">LOCKED</td>
+</tr>
+<tr>
+<th>Plan Summary:</td>
+<td colspan="4">{{.TotalAdd}} to add, {{.TotalChange}} to change, {{.TotalDestroy}} to destroy.</td>
+</tr>
+</table>
+</summary>
 
 {{ range $result := .Results }}1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`
 {{end}}

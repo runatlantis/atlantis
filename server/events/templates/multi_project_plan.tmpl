@@ -1,5 +1,10 @@
 {{ define "multiProjectPlan" -}}
 {{ template "multiProjectHeader" . }}
+
+**Details**
+
+<details><summary>{{.TotalAdd}} to add, {{.TotalChange}} to change, {{.TotalDestroy}} to destroy.</summary>
+
 {{ $disableApplyAll := .DisableApplyAll }}{{ range $i, $result := .Results }}### {{add $i 1}}. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`
 {{$result.Rendered}}
 
@@ -8,4 +13,5 @@
     * `atlantis apply`
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
     * `atlantis unlock`{{end}}{{end}}{{ template "log" . }}
+</details>
 {{ end }}
