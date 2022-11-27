@@ -79,15 +79,26 @@ type failureData struct {
 	commonData
 }
 
+type SummaryStats struct {
+	Unchanged,
+	Changed,
+	Failed int
+	TotalAdd,
+	TotalChange,
+	TotalDestroy int
+}
+
 // resultData is data about a successful response.
 type resultData struct {
 	Results []projectResultTmplData
 	commonData
+	SummaryStats
 }
 
 type planSuccessData struct {
 	models.PlanSuccess
 	PlanSummary              string
+	PlanSummaryStats         models.PlanSummaryStats
 	PlanWasDeleted           bool
 	DisableApply             bool
 	DisableRepoLocking       bool
@@ -165,6 +176,16 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 	numPolicyCheckSuccesses := 0
 	numVersionSuccesses := 0
 
+	// Plan summary
+	numChanged := 0
+	numUnchanged := 0
+	numFailed := 0
+
+	// Plan totals
+	numTotalAdd := 0
+	numTotalChange := 0
+	numTotalDestroy := 0
+
 	templates := m.MarkdownTemplates
 
 	for _, result := range results {
@@ -185,6 +206,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				Command: common.Command,
 				Error:   result.Error.Error(),
 			})
+			numFailed++
 		} else if result.Failure != "" {
 			resultData.Rendered = m.renderTemplate(templates.Lookup("failure"), struct {
 				Command string
@@ -193,11 +215,27 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				Command: common.Command,
 				Failure: result.Failure,
 			})
+			numFailed++
 		} else if result.PlanSuccess != nil {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+				resultData.Rendered = m.renderTemplate(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanSummaryStats: result.PlanSuccess.SummaryStats(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			} else {
 				resultData.Rendered = m.renderTemplate(templates.Lookup("planSuccessUnwrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+			}
+			stats := result.PlanSuccess.SummaryStats()
+			if stats.Add > 0 || stats.Change > 0 || stats.Destroy > 0 {
+				numChanged++
+			} else {
+				numUnchanged++
+			}
+			if stats.Add > 0 {
+				numTotalAdd = numTotalAdd + stats.Add
+			}
+			if stats.Change > 0 {
+				numTotalChange = numTotalChange + stats.Change
+			}
+			if stats.Destroy > 0 {
+				numTotalDestroy = numTotalDestroy + stats.Destroy
 			}
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
@@ -254,7 +292,18 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 	default:
 		return "no template matched–this is a bug"
 	}
-	return m.renderTemplate(tmpl, resultData{resultsTmplData, common})
+
+	stats := SummaryStats{
+		Changed:   numChanged,
+		Unchanged: numUnchanged,
+		Failed:    numFailed,
+
+		TotalAdd:     numTotalAdd,
+		TotalChange:  numTotalChange,
+		TotalDestroy: numTotalDestroy,
+	}
+
+	return m.renderTemplate(tmpl, resultData{resultsTmplData, common, stats})
 }
 
 // shouldUseWrappedTmpl returns true if we should use the wrapped markdown

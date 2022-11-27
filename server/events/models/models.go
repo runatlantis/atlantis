@@ -23,6 +23,7 @@ import (
 	"net/url"
 	paths "path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -366,6 +367,15 @@ type PlanSuccess struct {
 	HasDiverged bool
 }
 
+type PlanSummaryStats struct {
+	// Add is the number of resources to add/added by this plan/apply
+	Add int
+	// Change is the number of resources to change/changed by this plan/apply
+	Change int
+	// Destroy is the number of resources to destroy/destroyed by this plan/apply
+	Destroy int
+}
+
 // Summary extracts one line summary of plan changes from TerraformOutput.
 func (p *PlanSuccess) Summary() string {
 	note := ""
@@ -380,6 +390,35 @@ func (p *PlanSuccess) Summary() string {
 	}
 	r = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 	return note + r.FindString(p.TerraformOutput)
+}
+
+// SummaryStats extracts summary stats of plan changes from TerraformOutput.
+func (p *PlanSuccess) SummaryStats() PlanSummaryStats {
+	stats := PlanSummaryStats{0, 0, 0}
+
+	r := regexp.MustCompile(`Plan: (\d+) to add, (\d+) to change, (\d+) to destroy.`)
+	if planNumbers := r.FindStringSubmatch(p.TerraformOutput); planNumbers != nil {
+		add, err := strconv.Atoi(planNumbers[1])
+		if err != nil {
+			// TODO log something
+		} else {
+			stats.Add = add
+		}
+		change, err := strconv.Atoi(planNumbers[2])
+		if err != nil {
+			// TODO log something
+		} else {
+			stats.Change = change
+		}
+		destroy, err := strconv.Atoi(planNumbers[3])
+		if err != nil {
+			// TODO log something
+		} else {
+			stats.Destroy = destroy
+		}
+	}
+
+	return stats
 }
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
