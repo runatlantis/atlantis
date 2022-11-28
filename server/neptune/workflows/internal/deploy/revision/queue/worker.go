@@ -189,9 +189,15 @@ func (w *Worker) Work(ctx workflow.Context) {
 		switch e := err.(type) {
 		case *ValidationError:
 			logger.Error(ctx, "deploy validation failed, moving to next one", key.ErrKey, e)
-		case terraform.PlanRejectionError:
+		case *terraform.PlanRejectionError:
 			logger.Warn(ctx, "Plan rejected")
 		default:
+
+			// If it's not a ValidationError or PlanRejectionError, it's most likely a TerraformClientError and it is possible the state file
+			// is mutated if the apply operation failed. If the next deployment in the queue is behind this commit [out of order] and we try to deploy
+			// it, we'd essentially go back in history which is not safe for terraform state files. So, as a safety measure, we'll update the failed
+			// deployment as latest deployment and allow redeploy as long as the failed deploy is the latest deployment.
+			w.latestDeployment = currentDeployment
 			logger.Error(ctx, "failed to deploy revision, moving to next one", key.ErrKey, err)
 		}
 
@@ -205,6 +211,10 @@ func (w *Worker) setCurrentDeploymentState(state CurrentDeployment) {
 
 func (w *Worker) GetCurrentDeploymentState() CurrentDeployment {
 	return w.currentDeployment
+}
+
+func (w *Worker) GetLatestDeployment() *deployment.Info {
+	return w.latestDeployment
 }
 
 func (w *Worker) awaitWork(ctx workflow.Context) workflow.Future {

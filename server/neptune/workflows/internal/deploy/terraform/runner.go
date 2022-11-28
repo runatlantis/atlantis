@@ -12,6 +12,12 @@ type PlanRejectionError struct {
 	msg string
 }
 
+func NewPlanRejectionError(msg string) *PlanRejectionError {
+	return &PlanRejectionError{
+		msg: msg,
+	}
+}
+
 func (e PlanRejectionError) Error() string {
 	return e.msg
 }

@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	key "github.com/runatlantis/atlantis/server/neptune/context"
 	"io"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	key "github.com/runatlantis/atlantis/server/neptune/context"
 
 	"github.com/hashicorp/go-version"
 	"github.com/palantir/go-githubapp/githubapp"
@@ -27,7 +28,12 @@ type TerraformClientError struct {
 
 func (e TerraformClientError) Error() string {
 	return e.err.Error()
+}
 
+func NewTerraformClientError(err error) *TerraformClientError {
+	return &TerraformClientError{
+		err: err,
+	}
 }
 
 func wrapTerraformError(err error, message string) TerraformClientError {

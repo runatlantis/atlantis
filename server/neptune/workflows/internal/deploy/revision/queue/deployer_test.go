@@ -2,6 +2,7 @@ package queue_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -15,14 +16,29 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 )
 
+type ErrorType string
+
+const (
+	PlanRejectionError   ErrorType = "PlanRejectionError"
+	TerraformClientError ErrorType = "TerraformClientError"
+)
+
 type testTerraformWorkflowRunner struct {
+	expectedDeployment terraform.DeploymentInfo
+	expectedErrorType  ErrorType
 }
 
 func (r testTerraformWorkflowRunner) Run(ctx workflow.Context, deploymentInfo terraform.DeploymentInfo) error {
+	if r.expectedErrorType == PlanRejectionError {
+		return terraform.NewPlanRejectionError("plan rejected")
+	} else if r.expectedErrorType == TerraformClientError {
+		return activities.NewTerraformClientError(errors.New("error"))
+	}
 	return nil
 }
 
@@ -51,6 +67,7 @@ func (t *testDeployActivity) AuditJob(ctx context.Context, request activities.Au
 type deployerRequest struct {
 	Info         terraform.DeploymentInfo
 	LatestDeploy *deployment.Info
+	ErrType      ErrorType
 }
 
 func testDeployerWorkflow(ctx workflow.Context, r deployerRequest) (*deployment.Info, error) {
@@ -62,8 +79,11 @@ func testDeployerWorkflow(ctx workflow.Context, r deployerRequest) (*deployment.
 	var a *testDeployActivity
 
 	deployer := &queue.Deployer{
-		Activities:              a,
-		TerraformWorkflowRunner: &testTerraformWorkflowRunner{},
+		Activities: a,
+		TerraformWorkflowRunner: &testTerraformWorkflowRunner{
+			expectedDeployment: r.Info,
+			expectedErrorType:  r.ErrType,
+		},
 	}
 
 	return deployer.Deploy(ctx, r.Info, r.LatestDeploy)
@@ -500,4 +520,160 @@ func TestDeployer_CompareCommit_DeployDiverged(t *testing.T) {
 			Name:  deploymentInfo.Repo.Name,
 		},
 	}, resp)
+}
+
+func TestDeployer_WorkflowFailure_PlanRejection_SkipUpdateLatestDeployment(t *testing.T) {
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestWorkflowEnvironment()
+
+	da := &testDeployActivity{}
+	env.RegisterActivity(da)
+
+	repo := github.Repo{
+		Owner: "owner",
+		Name:  "test",
+	}
+
+	root := model.Root{
+		Name: "root_1",
+	}
+
+	deploymentInfo := terraform.DeploymentInfo{
+		ID:         uuid.UUID{},
+		Revision:   "3455",
+		CheckRunID: 1234,
+		Root:       root,
+		Repo:       repo,
+	}
+
+	latestDeployedRevision := &deployment.Info{
+		ID:       deploymentInfo.ID.String(),
+		Version:  1.0,
+		Revision: "3255",
+		Root: deployment.Root{
+			Name: deploymentInfo.Root.Name,
+		},
+		Repo: deployment.Repo{
+			Owner: deploymentInfo.Repo.Owner,
+			Name:  deploymentInfo.Repo.Name,
+		},
+	}
+
+	compareCommitRequest := activities.CompareCommitRequest{
+		Repo:                   repo,
+		DeployRequestRevision:  deploymentInfo.Revision,
+		LatestDeployedRevision: latestDeployedRevision.Revision,
+	}
+
+	compareCommitResponse := activities.CompareCommitResponse{
+		CommitComparison: activities.DirectionAhead,
+	}
+
+	env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
+
+	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
+		Info:         deploymentInfo,
+		LatestDeploy: latestDeployedRevision,
+		ErrType:      PlanRejectionError,
+	})
+
+	env.AssertExpectations(t)
+
+	var resp *deployment.Info
+	err := env.GetWorkflowResult(&resp)
+
+	wfErr, ok := err.(*temporal.WorkflowExecutionError)
+	assert.True(t, ok)
+
+	appErr, ok := wfErr.Unwrap().(*temporal.ApplicationError)
+	assert.True(t, ok)
+
+	receivedErrType := appErr.Type()
+
+	assert.Equal(t, "PlanRejectionError", receivedErrType)
+}
+
+func TestDeployer_TerraformClientError_UpdateLatestDeployment(t *testing.T) {
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestWorkflowEnvironment()
+
+	da := &testDeployActivity{}
+	env.RegisterActivity(da)
+
+	repo := github.Repo{
+		Owner: "owner",
+		Name:  "test",
+	}
+
+	root := model.Root{
+		Name: "root_1",
+	}
+
+	deploymentInfo := terraform.DeploymentInfo{
+		ID:         uuid.UUID{},
+		Revision:   "3455",
+		CheckRunID: 1234,
+		Root:       root,
+		Repo:       repo,
+	}
+
+	latestDeployedRevision := &deployment.Info{
+		ID:       deploymentInfo.ID.String(),
+		Version:  1.0,
+		Revision: "3255",
+		Root: deployment.Root{
+			Name: deploymentInfo.Root.Name,
+		},
+		Repo: deployment.Repo{
+			Owner: deploymentInfo.Repo.Owner,
+			Name:  deploymentInfo.Repo.Name,
+		},
+	}
+
+	compareCommitRequest := activities.CompareCommitRequest{
+		Repo:                   repo,
+		DeployRequestRevision:  deploymentInfo.Revision,
+		LatestDeployedRevision: latestDeployedRevision.Revision,
+	}
+
+	compareCommitResponse := activities.CompareCommitResponse{
+		CommitComparison: activities.DirectionAhead,
+	}
+
+	storeDeploymentRequest := activities.StoreLatestDeploymentRequest{
+		DeploymentInfo: &deployment.Info{
+			Version:  deployment.InfoSchemaVersion,
+			ID:       deploymentInfo.ID.String(),
+			Revision: deploymentInfo.Revision,
+			Root: deployment.Root{
+				Name: deploymentInfo.Root.Name,
+			},
+			Repo: deployment.Repo{
+				Owner: deploymentInfo.Repo.Owner,
+				Name:  deploymentInfo.Repo.Name,
+			},
+		},
+	}
+
+	env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
+	env.OnActivity(da.StoreLatestDeployment, mock.Anything, storeDeploymentRequest).Return(nil)
+
+	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
+		Info:         deploymentInfo,
+		LatestDeploy: latestDeployedRevision,
+		ErrType:      TerraformClientError,
+	})
+
+	env.AssertExpectations(t)
+
+	var resp *deployment.Info
+	err := env.GetWorkflowResult(&resp)
+
+	wfErr, ok := err.(*temporal.WorkflowExecutionError)
+	assert.True(t, ok)
+
+	appErr, ok := wfErr.Unwrap().(*temporal.ApplicationError)
+	assert.True(t, ok)
+
+	assert.Equal(t, "TerraformClientError", appErr.Type())
 }

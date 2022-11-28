@@ -2,10 +2,12 @@ package queue_test
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
-	"go.temporal.io/sdk/client"
 	"testing"
 	"time"
+
+	"go.temporal.io/sdk/client"
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
@@ -50,9 +52,11 @@ func (q *testQueue) SetLockForMergedItems(ctx workflow.Context, state queue.Lock
 }
 
 type workerRequest struct {
-	Queue                   []internalTerraform.DeploymentInfo
-	ExpectedValidationError *queue.ValidationError
-	InitialLockStatus       queue.LockStatus
+	Queue                         []internalTerraform.DeploymentInfo
+	ExpectedValidationErrors      []*queue.ValidationError
+	ExpectedPlanRejectionErrros   []*internalTerraform.PlanRejectionError
+	ExpectedTerraformClientErrors []*activities.TerraformClientError
+	InitialLockStatus             queue.LockStatus
 }
 
 type workerResponse struct {
@@ -66,11 +70,14 @@ type queueAndState struct {
 	State             queue.WorkerState
 	Lock              queue.LockState
 	CurrentDeployment queue.CurrentDeployment
+	LatestDeployment  *deployment.Info
 }
 
 type testDeployer struct {
-	expectedRevisions       []*deployment.Info
-	expectedValidationError *queue.ValidationError
+	expectedRevisions             []*deployment.Info
+	expectedValidationErrors      []*queue.ValidationError
+	expectedPlanRejectionErrros   []*internalTerraform.PlanRejectionError
+	ExpectedTerraformClientErrors []*activities.TerraformClientError
 
 	capturedLatestDeployments []*deployment.Info
 
@@ -83,9 +90,14 @@ func (d *testDeployer) Deploy(ctx workflow.Context, requestedDeployment internal
 	d.capturedLatestDeployments = append(d.capturedLatestDeployments, latestDeployment)
 	info := d.expectedRevisions[d.count]
 
+	// Checking if the error is nil instead of returning the nil error directly since Temporal wraps the error somehow
 	var err error
-	if d.count == 0 && d.expectedValidationError != nil {
-		err = d.expectedValidationError
+	if d.expectedValidationErrors[d.count] != nil {
+		err = d.expectedValidationErrors[d.count]
+	} else if d.expectedPlanRejectionErrros[d.count] != nil {
+		err = d.expectedPlanRejectionErrros[d.count]
+	} else if d.ExpectedTerraformClientErrors[d.count] != nil {
+		err = d.ExpectedTerraformClientErrors[d.count]
 	}
 	d.count++
 
@@ -112,8 +124,10 @@ func testWorkerWorkflow(ctx workflow.Context, r workerRequest) (workerResponse, 
 	}
 
 	deployer := &testDeployer{
-		expectedRevisions:       infos,
-		expectedValidationError: r.ExpectedValidationError,
+		expectedRevisions:             infos,
+		expectedValidationErrors:      r.ExpectedValidationErrors,
+		expectedPlanRejectionErrros:   r.ExpectedPlanRejectionErrros,
+		ExpectedTerraformClientErrors: r.ExpectedTerraformClientErrors,
 	}
 
 	worker := queue.Worker{
@@ -129,6 +143,7 @@ func testWorkerWorkflow(ctx workflow.Context, r workerRequest) (workerResponse, 
 			State:             worker.GetState(),
 			Lock:              q.Lock,
 			CurrentDeployment: worker.GetCurrentDeploymentState(),
+			LatestDeployment:  worker.GetLatestDeployment(),
 		}, nil
 	})
 	if err != nil {
@@ -249,6 +264,15 @@ func TestWorker_DeploysItems(t *testing.T) {
 
 	env.ExecuteWorkflow(testWorkerWorkflow, workerRequest{
 		Queue: deploymentInfoList,
+		ExpectedValidationErrors: []*queue.ValidationError{
+			nil, nil,
+		},
+		ExpectedPlanRejectionErrros: []*internalTerraform.PlanRejectionError{
+			nil, nil,
+		},
+		ExpectedTerraformClientErrors: []*activities.TerraformClientError{
+			nil, nil,
+		},
 	})
 
 	env.AssertExpectations(t)
@@ -266,7 +290,7 @@ func TestWorker_DeploysItems(t *testing.T) {
 	assert.True(t, resp.QueueIsEmpty)
 }
 
-func TestWorker_DeploysItems_ValidationError(t *testing.T) {
+func TestWorker_DeploysItems_ValidationError_SkipLatestDeploymentUpdate(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 
@@ -285,6 +309,11 @@ func TestWorker_DeploysItems_ValidationError(t *testing.T) {
 
 		assert.True(t, q.QueueIsEmpty)
 		assert.Equal(t, queue.WaitingWorkerState, q.State)
+
+		// 1st deploy is the latest deployment since 2nd deploy resulted in a validation error
+		assert.Equal(t, deployment.Info{
+			Revision: "1",
+		}, *q.LatestDeployment)
 
 		env.CancelWorkflow()
 
@@ -316,9 +345,24 @@ func TestWorker_DeploysItems_ValidationError(t *testing.T) {
 		},
 	}
 
+	expectedValidationErrors := []*queue.ValidationError{
+		nil, queue.NewValidationError("err"),
+	}
+
+	// 2nd deploy failed due to validation error so the 1st deploy should be the expected latest deployment
+	expectedLatestDeployment := deployment.Info{
+		Revision: "1",
+	}
+
 	env.ExecuteWorkflow(testWorkerWorkflow, workerRequest{
-		Queue:                   deploymentInfoList,
-		ExpectedValidationError: queue.NewValidationError("err"),
+		Queue:                    deploymentInfoList,
+		ExpectedValidationErrors: expectedValidationErrors,
+		ExpectedPlanRejectionErrros: []*internalTerraform.PlanRejectionError{
+			nil, nil,
+		},
+		ExpectedTerraformClientErrors: []*activities.TerraformClientError{
+			nil, nil,
+		},
 	})
 
 	env.AssertExpectations(t)
@@ -328,8 +372,9 @@ func TestWorker_DeploysItems_ValidationError(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, queue.CompleteWorkerState, resp.EndState)
+
 	assert.Equal(t, []*deployment.Info{
-		nil, nil,
+		nil, &expectedLatestDeployment,
 	}, resp.CapturedArgs)
 	assert.True(t, resp.QueueIsEmpty)
 }
@@ -440,4 +485,179 @@ func TestNewWorker(t *testing.T) {
 
 		assert.Equal(t, queue.LockState{}, r.Lock)
 	})
+}
+
+func TestWorker_DeploysItems_PlanRejectionError_SkipLatestDeploymentUpdate(t *testing.T) {
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestWorkflowEnvironment()
+
+	// we set this callback so we can query the state of the queue
+	// after all processing has complete to determine whether we should
+	// shutdown the worker
+	env.RegisterDelayedCallback(func() {
+		encoded, err := env.QueryWorkflow("queue")
+
+		assert.NoError(t, err)
+
+		var q queueAndState
+		err = encoded.Get(&q)
+
+		assert.NoError(t, err)
+
+		assert.True(t, q.QueueIsEmpty)
+		assert.Equal(t, queue.WaitingWorkerState, q.State)
+
+		// 1st deploy is the latest deployment since 2nd deploy resulted in a validation error
+		assert.Equal(t, deployment.Info{
+			Revision: "1",
+		}, *q.LatestDeployment)
+
+		env.CancelWorkflow()
+
+	}, 10*time.Second)
+
+	repo := github.Repo{
+		Owner: "owner",
+		Name:  "test",
+	}
+
+	deploymentInfoList := []internalTerraform.DeploymentInfo{
+		{
+			ID:         uuid.UUID{},
+			Revision:   "1",
+			CheckRunID: 1234,
+			Root: terraform.Root{
+				Name: "root_1",
+			},
+			Repo: repo,
+		},
+		{
+			ID:         uuid.UUID{},
+			Revision:   "2",
+			CheckRunID: 5678,
+			Root: terraform.Root{
+				Name: "root_2",
+			},
+			Repo: repo,
+		},
+	}
+
+	expectedPlanRejectionErrors := []*internalTerraform.PlanRejectionError{
+		nil, internalTerraform.NewPlanRejectionError("plan rejected"),
+	}
+
+	// 2nd deploy failed due to plan rejection error so the 1st deploy should be the expected latest deployment
+	expectedLatestDeployment := deployment.Info{
+		Revision: "1",
+	}
+
+	env.ExecuteWorkflow(testWorkerWorkflow, workerRequest{
+		Queue:                       deploymentInfoList,
+		ExpectedPlanRejectionErrros: expectedPlanRejectionErrors,
+		ExpectedValidationErrors: []*queue.ValidationError{
+			nil, nil,
+		},
+		ExpectedTerraformClientErrors: []*activities.TerraformClientError{
+			nil, nil,
+		},
+	})
+
+	env.AssertExpectations(t)
+
+	var resp workerResponse
+	err := env.GetWorkflowResult(&resp)
+	assert.NoError(t, err)
+
+	assert.Equal(t, queue.CompleteWorkerState, resp.EndState)
+
+	assert.Equal(t, []*deployment.Info{
+		nil, &expectedLatestDeployment,
+	}, resp.CapturedArgs)
+	assert.True(t, resp.QueueIsEmpty)
+}
+
+func TestWorker_DeploysItems_TerraformClientError_UpdateLatestDeployment(t *testing.T) {
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestWorkflowEnvironment()
+
+	// we set this callback so we can query the state of the queue
+	// after all processing has complete to determine whether we should
+	// shutdown the worker
+	env.RegisterDelayedCallback(func() {
+		encoded, err := env.QueryWorkflow("queue")
+
+		assert.NoError(t, err)
+
+		var q queueAndState
+		err = encoded.Get(&q)
+
+		assert.NoError(t, err)
+
+		assert.True(t, q.QueueIsEmpty)
+		assert.Equal(t, queue.WaitingWorkerState, q.State)
+
+		//  2nd deploy since it resulted in a TFClient error
+		assert.Equal(t, deployment.Info{
+			Revision: "2",
+		}, *q.LatestDeployment)
+
+		env.CancelWorkflow()
+
+	}, 10*time.Second)
+
+	repo := github.Repo{
+		Owner: "owner",
+		Name:  "test",
+	}
+
+	deploymentInfoList := []internalTerraform.DeploymentInfo{
+		{
+			ID:         uuid.UUID{},
+			Revision:   "1",
+			CheckRunID: 1234,
+			Root: terraform.Root{
+				Name: "root_1",
+			},
+			Repo: repo,
+		},
+		{
+			ID:         uuid.UUID{},
+			Revision:   "2",
+			CheckRunID: 5678,
+			Root: terraform.Root{
+				Name: "root_2",
+			},
+			Repo: repo,
+		},
+	}
+
+	firstDeployment := deployment.Info{
+		Revision: "1",
+	}
+
+	env.ExecuteWorkflow(testWorkerWorkflow, workerRequest{
+		Queue: deploymentInfoList,
+		ExpectedPlanRejectionErrros: []*internalTerraform.PlanRejectionError{
+			nil, nil,
+		},
+		ExpectedValidationErrors: []*queue.ValidationError{
+			nil, nil,
+		},
+		ExpectedTerraformClientErrors: []*activities.TerraformClientError{
+			nil, activities.NewTerraformClientError(errors.New("tf client error")),
+		},
+	})
+
+	env.AssertExpectations(t)
+
+	var resp workerResponse
+	err := env.GetWorkflowResult(&resp)
+	assert.NoError(t, err)
+
+	assert.Equal(t, queue.CompleteWorkerState, resp.EndState)
+
+	assert.Equal(t, []*deployment.Info{
+		nil, &firstDeployment,
+	}, resp.CapturedArgs)
+	assert.True(t, resp.QueueIsEmpty)
 }
