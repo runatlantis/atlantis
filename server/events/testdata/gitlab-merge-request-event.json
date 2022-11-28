@@ -17,7 +17,7 @@
     "namespace": "lkysow",
     "visibility_level": 20,
     "path_with_namespace": "lkysow/atlantis-example",
-    "default_branch": "master",
+    "default_branch": "main",
     "ci_config_path": null,
     "homepage": "https://gitlab.com/lkysow/atlantis-example",
     "url": "git@gitlab.com:lkysow/atlantis-example.git",
@@ -46,7 +46,7 @@
     "source_branch": "patch-1",
     "source_project_id": 4580910,
     "state": "opened",
-    "target_branch": "master",
+    "target_branch": "main",
     "target_project_id": 4580910,
     "time_estimate": 0,
     "title": "Update main.tf",
@@ -64,7 +64,7 @@
       "namespace": "sourceorg",
       "visibility_level": 20,
       "path_with_namespace": "sourceorg/atlantis-example",
-      "default_branch": "master",
+      "default_branch": "main",
       "ci_config_path": null,
       "homepage": "https://gitlab.com/sourceorg/atlantis-example",
       "url": "git@gitlab.com:sourceorg/atlantis-example.git",
@@ -82,7 +82,7 @@
       "namespace": "lkysow",
       "visibility_level": 20,
       "path_with_namespace": "lkysow/atlantis-example",
-      "default_branch": "master",
+      "default_branch": "main",
       "ci_config_path": null,
       "homepage": "https://gitlab.com/lkysow/atlantis-example",
       "url": "git@gitlab.com:lkysow/atlantis-example.git",
@@ -146,7 +146,7 @@
     },
     "target_branch": {
       "previous": null,
-      "current": "master"
+      "current": "main"
     },
     "target_project_id": {
       "previous": null,

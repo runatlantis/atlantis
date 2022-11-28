@@ -702,7 +702,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 						w.Write([]byte(commitJSON)) // nolint: errcheck
 					case "/api/graphql":
 						w.Write([]byte(reviewDecision)) // nolint: errcheck
-					case "/api/v3/repos/owner/repo/branches/master/protection":
+					case "/api/v3/repos/owner/repo/branches/main/protection":
 						w.Write([]byte(branchProtectionJSON)) // nolint: errcheck
 					case "/api/v3/repos/owner/repo/commits/new-topic/check-suites":
 						w.Write([]byte(checkSuites)) // nolint: errcheck
@@ -1134,8 +1134,8 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 		  "organization": {
 			"teams":{
 				"edges":[
-					{"node":{"name":"frontend-developers"}},
-					{"node":{"name":"employees"}}
+					{"node":{"name": "Frontend Developers", "slug":"frontend-developers"}},
+					{"node":{"name": "Employees", "slug":"employees"}}
 				],
 				"pageInfo":{
 					"endCursor":"Y3Vyc29yOnYyOpHOAFMoLQ==",
@@ -1168,5 +1168,5 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 		Username: "testuser",
 	})
 	Ok(t, err)
-	Equals(t, []string{"frontend-developers", "employees"}, teams)
+	Equals(t, []string{"Frontend Developers", "frontend-developers", "Employees", "employees"}, teams)
 }

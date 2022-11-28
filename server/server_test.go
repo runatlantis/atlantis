@@ -15,6 +15,7 @@ package server_test
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"io"
 	"net/http"
@@ -161,6 +162,30 @@ func BenchmarkHealthz(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		s.Healthz(w, nil)
 	}
+}
+
+func TestGetCertificate(t *testing.T) {
+	s := server.Server{}
+	clientHelloInfo := &tls.ClientHelloInfo{}
+
+	// Initial certificate load
+	s.SSLCertFile = "../testdata/cert.pem"
+	s.SSLKeyFile = "../testdata/key.pem"
+	cert, err := s.GetSSLCertificate(clientHelloInfo)
+	Ok(t, err)
+
+	// Certificate reload
+	s.SSLCertFile = "../testdata/cert2.pem"
+	s.SSLKeyFile = "../testdata/key2.pem"
+	s.CertLastRefreshTime = s.CertLastRefreshTime.Add(-1 * time.Second)
+	s.KeyLastRefreshTime = s.KeyLastRefreshTime.Add(-1 * time.Second)
+	newCert, err := s.GetSSLCertificate(clientHelloInfo)
+
+	Ok(t, err)
+	Assert(
+		t,
+		!bytes.Equal(bytes.Join(cert.Certificate, nil), bytes.Join(newCert.Certificate, nil)),
+		"Certificate expected to rotate")
 }
 
 func TestParseAtlantisURL(t *testing.T) {

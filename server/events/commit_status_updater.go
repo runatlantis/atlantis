@@ -15,11 +15,12 @@ package events
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_commit_status_updater.go CommitStatusUpdater
@@ -56,7 +57,7 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull model
 	case models.SuccessCommitStatus:
 		descripWords = "succeeded."
 	}
-	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), descripWords)
+	descrip := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), descripWords)
 	return d.Client.UpdateStatus(repo, pull, status, src, descrip, "")
 }
 
@@ -92,6 +93,6 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, c
 		descripWords = "succeeded."
 	}
 
-	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), descripWords)
+	descrip := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), descripWords)
 	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
 }

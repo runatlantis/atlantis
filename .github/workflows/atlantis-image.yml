@@ -3,7 +3,7 @@ name: atlantis-image
 on:
   push:
     branches:
-      - 'master'
+      - 'main'
     tags:
       - v*.*.* # stable release like, v0.19.2
       - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
@@ -20,6 +20,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    env:
+      RELEASE_TYPE: ${{ contains(github.ref, 'pre') && 'pre' || 'stable' }}
+      RELEASE_TAG: ${{ contains(github.ref, 'pre') && 'prerelease-latest' || 'latest' }}
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-go@v3
@@ -49,33 +52,28 @@ jobs:
       with:
         context: .
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        pull: true
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
           ghcr.io/${{ github.repository_owner }}/atlantis:dev
 
     # Publish release to container registry
     - name: populate release version
-      if: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) && startsWith(github.ref, 'refs/tags/') }}
+      if: |
+        contains(fromJson('["push", "pull_request"]'), github.event_name) &&
+        startsWith(github.ref, 'refs/tags/')
       run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
 
-    - name: Build and push atlantis:${{ env.RELEASE_VERSION }} image for pre release
-      if: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) && startsWith(github.ref, 'refs/tags/') && contains(github.ref, '-pre.') }}
+    - name: "Build and push atlantis:${{ env.RELEASE_VERSION }} image for ${{ env.RELEASE_TYPE }} release"
+      if: |
+        contains(fromJson('["push", "pull_request"]'), github.event_name) &&
+        startsWith(github.ref, 'refs/tags/')
       uses: docker/build-push-action@v3
       with:
         context: .
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        pull: true
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
           ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_VERSION }}
-          ghcr.io/${{ github.repository_owner }}/atlantis:prerelease-latest
-
-    - name: Build and push atlantis:${{ env.RELEASE_VERSION }} image for stable release
-      if: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) && startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, '-pre.')) }}
-      uses: docker/build-push-action@v3
-      with:
-        context: .
-        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: |
-          ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_VERSION }}
-          ghcr.io/${{ github.repository_owner }}/atlantis:latest
+          ghcr.io/${{ github.repository_owner }}/atlantis:${{ env.RELEASE_TAG }}

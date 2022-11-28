@@ -3,22 +3,31 @@ name: tester
 on:
   push:
     branches:
-      - "master"
+      - "main"
+    paths-ignore:
+      - 'runatlantis.io/**'
   pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
     branches:
-      - "master"
+      - "main"
+    paths-ignore:
+      - 'runatlantis.io/**'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   test:
+    if: github.event.pull_request.draft == false
     name: runner / gotest
     runs-on: ubuntu-22.04
-    container: ghcr.io/runatlantis/testing-env:2021.08.31
+    container: ghcr.io/runatlantis/testing-env:2022.11.17
     steps:
-      # user in image needs write access to do anything
-      - name: setup
-        run: sudo chmod -R 777 $GITHUB_WORKSPACE /github /__w/_temp
       - uses: actions/checkout@v3.0.2
       - run: make test-all

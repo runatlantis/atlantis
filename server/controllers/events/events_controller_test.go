@@ -17,6 +17,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+
 	. "github.com/petergtz/pegomock"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
@@ -29,14 +38,6 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"testing"
 )
 
 const githubHeader = "X-Github-Event"
@@ -697,7 +698,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 				HeadCommit: "2d9fb6b9a46eafb1dcef7b008d1a429d45ca742c",
 				URL:        "https://bbserver.com/projects/PROJ/repos/repository/pull-requests/10",
 				HeadBranch: "decline-me",
-				BaseBranch: "master",
+				BaseBranch: "main",
 				Author:     "admin",
 				State:      models.OpenPullState,
 				BaseRepo:   expRepo,

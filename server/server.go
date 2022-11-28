@@ -17,6 +17,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
@@ -32,6 +33,9 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/prometheus"
+
 	cfg "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -39,12 +43,13 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
-	"github.com/uber-go/tally"
-	"github.com/uber-go/tally/prometheus"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
+	"github.com/urfave/negroni"
+
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
@@ -62,8 +67,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/static"
-	"github.com/urfave/cli"
-	"github.com/urfave/negroni"
 )
 
 const (
@@ -112,6 +115,9 @@ type Server struct {
 	ProjectJobsErrorTemplate       templates.TemplateWriter
 	SSLCertFile                    string
 	SSLKeyFile                     string
+	CertLastRefreshTime            time.Time
+	KeyLastRefreshTime             time.Time
+	SSLCert                        *tls.Certificate
 	Drainer                        *events.Drainer
 	WebAuthentication              bool
 	WebUsername                    string
@@ -312,6 +318,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				return nil, err
 			}
 		}
+	}
+
+	// default the project files used to generate the module index to the autoplan-file-list if autoplan-modules is true
+	// but no files are specified
+	if userConfig.AutoplanModules && userConfig.AutoplanModulesFromProjects == "" {
+		userConfig.AutoplanModulesFromProjects = userConfig.AutoplanFileList
 	}
 
 	var webhooksConfig []webhooks.Config
@@ -529,6 +541,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commentParser,
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
+		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
 		statsScope,
 		logger,
@@ -890,13 +903,15 @@ func (s *Server) Start() error {
 		s.ProjectCmdOutputHandler.Handle()
 	}()
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n} // nolint: gosec
+	tlsConfig := &tls.Config{GetCertificate: s.GetSSLCertificate, MinVersion: tls.VersionTLS12}
+
+	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n, TLSConfig: tlsConfig, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
 
 		var err error
 		if s.SSLCertFile != "" && s.SSLKeyFile != "" {
-			err = server.ListenAndServeTLS(s.SSLCertFile, s.SSLKeyFile)
+			err = server.ListenAndServeTLS("", "")
 		} else {
 			err = server.ListenAndServe()
 		}
@@ -1011,6 +1026,30 @@ func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 var healthzData = []byte(`{
   "status": "ok"
 }`)
+
+func (s *Server) GetSSLCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	certStat, err := os.Stat(s.SSLCertFile)
+	if err != nil {
+		return nil, fmt.Errorf("while getting cert file modification time: %w", err)
+	}
+
+	keyStat, err := os.Stat(s.SSLKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("while getting key file modification time: %w", err)
+	}
+
+	if s.SSLCert == nil || certStat.ModTime() != s.CertLastRefreshTime || keyStat.ModTime() != s.KeyLastRefreshTime {
+		cert, err := tls.LoadX509KeyPair(s.SSLCertFile, s.SSLKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("while loading tls cert: %w", err)
+		}
+
+		s.SSLCert = &cert
+		s.CertLastRefreshTime = certStat.ModTime()
+		s.KeyLastRefreshTime = keyStat.ModTime()
+	}
+	return s.SSLCert, nil
+}
 
 // ParseAtlantisURL parses the user-passed atlantis URL to ensure it is valid
 // and we can use it in our templates.

@@ -6,7 +6,7 @@ on:
       - "testing/**"
       - ".github/workflows/testing-env-image.yml"
     branches:
-      - "master"
+      - "main"
   pull_request:
     paths:
       - 'testing/**'
@@ -45,6 +45,7 @@ jobs:
       with:
         context: testing
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        pull: true
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
            ghcr.io/runatlantis/testing-env:${{env.TODAY}}

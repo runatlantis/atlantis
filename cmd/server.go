@@ -23,12 +23,13 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/moby/pkg/fileutils"
 	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // To add a new flag you must:
@@ -46,6 +47,8 @@ const (
 	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutomergeFlag                    = "automerge"
+	AutoplanModules                  = "autoplan-modules"
+	AutoplanModulesFromProjects      = "autoplan-modules-from-projects"
 	AutoplanFileListFlag             = "autoplan-file-list"
 	BitbucketBaseURLFlag             = "bitbucket-base-url"
 	BitbucketTokenFlag               = "bitbucket-token"
@@ -80,6 +83,7 @@ const (
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
+	QuietPolicyChecks                = "quiet-policy-checks"
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
@@ -176,6 +180,13 @@ var stringFlags = map[string]stringFlag{
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
 	},
+	AutoplanModulesFromProjects: {
+		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
+			" Indexed projects will automatically be planned if a module they depend on is modified." +
+			" Patterns use the dockerignore (https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax." +
+			" A custom Workflow that uses autoplan 'when_modified' will ignore this value.",
+		defaultValue: "",
+	},
 	AutoplanFileListFlag: {
 		description: "Comma separated list of file patterns that Atlantis will use to check if a directory contains modified files that should trigger project planning." +
 			" Patterns use the dockerignore (https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax." +
@@ -204,7 +215,7 @@ var stringFlags = map[string]stringFlag{
 	CheckoutStrategyFlag: {
 		description: "How to check out pull requests. Accepts either 'branch' (default) or 'merge'." +
 			" If set to branch, Atlantis will check out the source branch of the pull request." +
-			" If set to merge, Atlantis will check out the destination branch of the pull request (ex. master)" +
+			" If set to merge, Atlantis will check out the destination branch of the pull request (ex. main, master)" +
 			" and then locally perform a git merge of the source branch." +
 			" This effectively means Atlantis operates on the repo as it will look" +
 			" after the pull request is merged.",
@@ -373,6 +384,10 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 		hidden:       true,
 	},
+	AutoplanModules: {
+		description:  "Automatically plan projects that have a changed module from the local repository.",
+		defaultValue: false,
+	},
 	AutomergeFlag: {
 		description:  "Automatically merge pull requests when all plans are successfully applied.",
 		defaultValue: false,
@@ -415,6 +430,10 @@ var boolFlags = map[string]boolFlag{
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
+	QuietPolicyChecks: {
+		description:  "Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings.",
 		defaultValue: false,
 	},
 	RedisTLSEnabled: {
