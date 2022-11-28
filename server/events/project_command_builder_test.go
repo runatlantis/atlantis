@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
@@ -157,6 +158,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				scope,
 				logger,
@@ -424,6 +426,7 @@ projects:
 					&events.CommentParser{},
 					false,
 					true,
+					"",
 					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 					scope,
 					logger,
@@ -578,6 +581,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				scope,
 				logger,
@@ -668,6 +672,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		scope,
 		logger,
@@ -752,6 +757,7 @@ projects:
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		scope,
 		logger,
@@ -830,6 +836,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				scope,
 				logger,
@@ -1033,6 +1040,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				scope,
 				logger,
@@ -1100,6 +1108,7 @@ projects:
 		&events.CommentParser{},
 		true,
 		false,
+		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		scope,
 		logger,
@@ -1157,6 +1166,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		scope,
 		logger,
@@ -1238,6 +1248,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		scope,
 		logger,

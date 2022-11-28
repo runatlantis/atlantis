@@ -627,6 +627,7 @@ func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) (
 				Edges []struct {
 					Node struct {
 						Name string
+						Slug string
 					}
 				}
 				PageInfo struct {
@@ -644,7 +645,7 @@ func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) (
 			return nil, err
 		}
 		for _, edge := range q.Organization.Teams.Edges {
-			teamNames = append(teamNames, edge.Node.Name)
+			teamNames = append(teamNames, edge.Node.Name, edge.Node.Slug)
 		}
 		if !q.Organization.Teams.PageInfo.HasNextPage {
 			break

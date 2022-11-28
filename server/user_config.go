@@ -13,6 +13,8 @@ type UserConfig struct {
 	AtlantisURL                     string `mapstructure:"atlantis-url"`
 	Automerge                       bool   `mapstructure:"automerge"`
 	AutoplanFileList                string `mapstructure:"autoplan-file-list"`
+	AutoplanModules                 bool   `mapstructure:"autoplan-modules"`
+	AutoplanModulesFromProjects     string `mapstructure:"autoplan-modules-from-projects"`
 	AzureDevopsToken                string `mapstructure:"azuredevops-token"`
 	AzureDevopsUser                 string `mapstructure:"azuredevops-user"`
 	AzureDevopsWebhookPassword      string `mapstructure:"azuredevops-webhook-password"`
