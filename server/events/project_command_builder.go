@@ -284,7 +284,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		ctx.Log.Info("successfully parsed %s file", config.AtlantisYAMLFilename)
 	}
 
-	if hasRepoCfg && len(repoCfg.Projects) > 0 {
+	if len(repoCfg.Projects) > 0 {
 		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
 		if err != nil {
 			return nil, err
