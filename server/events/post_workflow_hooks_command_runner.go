@@ -13,7 +13,7 @@ import (
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_post_workflows_hooks_command_runner.go PostWorkflowHooksCommandRunner
 
 type PostWorkflowHooksCommandRunner interface {
-	RunPostHooks(ctx *command.Context) error
+	RunPostHooks(ctx *command.Context, cmd *CommentCommand) error
 }
 
 // DefaultPostWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
@@ -28,7 +28,7 @@ type DefaultPostWorkflowHooksCommandRunner struct {
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
 func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
-	ctx *command.Context,
+	ctx *command.Context, cmd *CommentCommand,
 ) error {
 	pull := ctx.Pull
 	baseRepo := pull.BaseRepo
@@ -62,14 +62,20 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 		return err
 	}
 
+	var escapedArgs []string
+	if cmd != nil {
+		escapedArgs = escapeArgs(cmd.Flags)
+	}
+
 	err = w.runHooks(
 		models.WorkflowHookCommandContext{
-			BaseRepo: baseRepo,
-			HeadRepo: headRepo,
-			Log:      log,
-			Pull:     pull,
-			User:     user,
-			Verbose:  false,
+			BaseRepo:           baseRepo,
+			HeadRepo:           headRepo,
+			Log:                log,
+			Pull:               pull,
+			User:               user,
+			Verbose:            false,
+			EscapedCommentArgs: escapedArgs,
 		},
 		postWorkflowHooks, repoDir)
 

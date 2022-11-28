@@ -354,6 +354,17 @@ func TestAzureDevopsSplitRepoFullName(t *testing.T) {
 		})
 	}
 }
+
+func TestPolicyCheckSuccess_Summary(t *testing.T) {
+	pcs := models.PolicyCheckSuccess{
+		PolicyCheckOutput: `WARN - <redacted plan file> - main - example main package
+
+20 tests, 19 passed, 1 warnings, 0 failures, 0 exceptions`,
+	}
+
+	Equals(t, "20 tests, 19 passed, 1 warnings, 0 failures, 0 exceptions", pcs.Summary())
+}
+
 func TestPullStatus_StatusCount(t *testing.T) {
 	ps := models.PullStatus{
 		Projects: []models.ProjectStatus{

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 )
@@ -24,6 +25,7 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		"BASE_BRANCH_NAME": ctx.Pull.BaseBranch,
 		"BASE_REPO_NAME":   ctx.BaseRepo.Name,
 		"BASE_REPO_OWNER":  ctx.BaseRepo.Owner,
+		"COMMENT_ARGS":     strings.Join(ctx.EscapedCommentArgs, ","),
 		"DIR":              path,
 		"HEAD_BRANCH_NAME": ctx.Pull.HeadBranch,
 		"HEAD_COMMIT":      ctx.Pull.HeadCommit,

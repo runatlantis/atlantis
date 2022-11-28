@@ -17,6 +17,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
@@ -35,6 +36,7 @@ import (
 	cfg "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/redis"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
@@ -111,6 +113,9 @@ type Server struct {
 	ProjectJobsErrorTemplate       templates.TemplateWriter
 	SSLCertFile                    string
 	SSLKeyFile                     string
+	CertLastRefreshTime            time.Time
+	KeyLastRefreshTime             time.Time
+	SSLCert                        *tls.Certificate
 	Drainer                        *events.Drainer
 	WebAuthentication              bool
 	WebUsername                    string
@@ -157,6 +162,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient vcs.IGithubClient
 	var githubAppEnabled bool
+	var githubConfig vcs.GithubConfig
 	var githubCredentials vcs.GithubCredentials
 	var gitlabClient *vcs.GitlabClient
 	var bitbucketCloudClient *bitbucketcloud.Client
@@ -198,6 +204,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
+		if userConfig.GithubAllowMergeableBypassApply {
+			githubConfig = vcs.GithubConfig{
+				AllowMergeableBypassApply: true,
+			}
+		}
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
 			githubCredentials = &vcs.GithubUserCredentials{
@@ -227,7 +238,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger)
+		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -382,27 +393,43 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil && flag.Lookup("test.v") == nil {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
-	markdownRenderer := &events.MarkdownRenderer{
-		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
-		DisableApplyAll:          userConfig.DisableApplyAll,
-		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
-		DisableApply:             userConfig.DisableApply,
-		DisableRepoLocking:       userConfig.DisableRepoLocking,
-		EnableDiffMarkdownFormat: userConfig.EnableDiffMarkdownFormat,
-	}
+	markdownRenderer := events.GetMarkdownRenderer(
+		gitlabClient.SupportsCommonMark(),
+		userConfig.DisableApplyAll,
+		userConfig.DisableMarkdownFolding,
+		userConfig.DisableApply,
+		userConfig.DisableRepoLocking,
+		userConfig.EnableDiffMarkdownFormat,
+		userConfig.MarkdownTemplateOverridesDir,
+	)
 
-	boltdb, err := db.New(userConfig.DataDir)
-	if err != nil {
-		return nil, err
-	}
 	var lockingClient locking.Locker
 	var applyLockingClient locking.ApplyLocker
+	var backend locking.Backend
+
+	switch dbtype := userConfig.LockingDBType; dbtype {
+	case "redis":
+		logger.Info("Utilizing Redis DB")
+		backend, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
+		if err != nil {
+			return nil, err
+		}
+	case "boltdb":
+		logger.Info("Utilizing BoltDB")
+		backend, err = db.New(userConfig.DataDir)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if userConfig.DisableRepoLocking {
+		logger.Info("Repo Locking is disabled")
 		lockingClient = locking.NewNoOpLocker()
 	} else {
-		lockingClient = locking.NewClient(boltdb)
+		lockingClient = locking.NewClient(backend)
 	}
-	applyLockingClient = locking.NewApplyClient(boltdb, userConfig.DisableApply)
+
+	applyLockingClient = locking.NewApplyClient(backend, userConfig.DisableApply)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
@@ -431,7 +458,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:           logger,
 		WorkingDir:       workingDir,
 		WorkingDirLocker: workingDirLocker,
-		DB:               boltdb,
+		Backend:          backend,
 	}
 
 	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
@@ -441,7 +468,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
 			Logger:                   logger,
-			DB:                       boltdb,
+			Backend:                  backend,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 			VCSClient:                vcsClient,
@@ -571,7 +598,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	dbUpdater := &events.DBUpdater{
-		DB: boltdb,
+		Backend: backend,
 	}
 
 	pullUpdater := &events.PullUpdater{
@@ -601,6 +628,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		instrumentedProjectCmdRunner,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceVCSStatusNoProjects,
+		userConfig.QuietPolicyChecks,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
@@ -618,7 +646,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		autoMerger,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
-		boltdb,
+		backend,
+		lockingClient,
 	)
 
 	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
@@ -632,7 +661,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		boltdb,
+		backend,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
@@ -699,7 +728,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              boltdb,
+		PullStatusFetcher:              backend,
 		TeamAllowlistChecker:           githubTeamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 	}
@@ -717,7 +746,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockDetailTemplate: templates.LockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
-		DB:                 boltdb,
+		Backend:            backend,
 		DeleteLockCommand:  deleteLockCommand,
 	}
 
@@ -725,6 +754,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		logger,
 		controllers.JobIDKeyGenerator{},
 		projectCmdOutputHandler,
+		userConfig.WebsocketCheckOrigin,
 	)
 
 	jobsController := &controllers.JobsController{
@@ -733,7 +763,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		ProjectJobsTemplate:      templates.ProjectJobsTemplate,
 		ProjectJobsErrorTemplate: templates.ProjectJobsErrorTemplate,
-		Db:                       boltdb,
+		Backend:                  backend,
 		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
@@ -866,13 +896,15 @@ func (s *Server) Start() error {
 		s.ProjectCmdOutputHandler.Handle()
 	}()
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
+	tlsConfig := &tls.Config{GetCertificate: s.GetSSLCertificate, MinVersion: tls.VersionTLS12}
+
+	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n, TLSConfig: tlsConfig, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
 
 		var err error
 		if s.SSLCertFile != "" && s.SSLKeyFile != "" {
-			err = server.ListenAndServeTLS(s.SSLCertFile, s.SSLKeyFile)
+			err = server.ListenAndServeTLS("", "")
 		} else {
 			err = server.ListenAndServe()
 		}
@@ -987,6 +1019,30 @@ func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 var healthzData = []byte(`{
   "status": "ok"
 }`)
+
+func (s *Server) GetSSLCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	certStat, err := os.Stat(s.SSLCertFile)
+	if err != nil {
+		return nil, fmt.Errorf("while getting cert file modification time: %w", err)
+	}
+
+	keyStat, err := os.Stat(s.SSLKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("while getting key file modification time: %w", err)
+	}
+
+	if s.SSLCert == nil || certStat.ModTime() != s.CertLastRefreshTime || keyStat.ModTime() != s.KeyLastRefreshTime {
+		cert, err := tls.LoadX509KeyPair(s.SSLCertFile, s.SSLKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("while loading tls cert: %w", err)
+		}
+
+		s.SSLCert = &cert
+		s.CertLastRefreshTime = certStat.ModTime()
+		s.KeyLastRefreshTime = keyStat.ModTime()
+	}
+	return s.SSLCert, nil
+}
 
 // ParseAtlantisURL parses the user-passed atlantis URL to ensure it is valid
 // and we can use it in our templates.

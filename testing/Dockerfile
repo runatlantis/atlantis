@@ -1,9 +1,11 @@
-FROM golang:1.17
+FROM golang:1.19
 
-RUN apt-get update && apt-get install unzip
+RUN apt-get update && apt-get --no-install-recommends -y install unzip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Terraform
-ENV TERRAFORM_VERSION=1.2.4
+ENV TERRAFORM_VERSION=1.3.5
 RUN case $(uname -m) in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
     wget -nv -O terraform.zip https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${ARCH}.zip && \
     mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
@@ -12,7 +14,8 @@ RUN case $(uname -m) in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH
     rm terraform.zip
 
 # Install conftest
-ENV CONFTEST_VERSION=0.33.0
+ENV CONFTEST_VERSION=0.35.0
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN case $(uname -m) in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
     curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
     curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/checksums.txt && \
@@ -23,4 +26,6 @@ RUN case $(uname -m) in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64|armv7l) ARC
     rm conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
     rm checksums.txt
 
-RUN go get golang.org/x/tools/cmd/goimports
+RUN useradd -u 1001 -m atlantis
+
+USER atlantis

@@ -54,8 +54,8 @@
     }
   },
   "toRef": {
-    "id": "refs/heads/master",
-    "displayId": "master",
+    "id": "refs/heads/main",
+    "displayId": "main",
     "latestCommit": "bbc7b2a29344646ec8605be9603a0aa625a627ef",
     "repository": {
       "slug": "atlantis-example",

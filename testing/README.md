@@ -3,9 +3,9 @@
 The Docker image used by the tests is `runatlantis/testing-env`. It's built by the Dockerfie
 in this directory.
 
-The image is automatically built by Docker Hub on merges to `master`.
+The image is automatically built by Docker Hub on merges to `main`.
 
-To update the image, create a pull request that updates the Dockerfile and get it merged to `master`.
+To update the image, create a pull request that updates the Dockerfile and get it merged to `main`.
 
 Wait until the build at https://hub.docker.com/repository/docker/runatlantis/testing-env/builds finishes
 and then scroll to the bottom to find output like:

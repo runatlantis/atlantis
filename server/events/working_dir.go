@@ -14,7 +14,6 @@
 package events
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"golang.org/x/sync/semaphore"
 )
 
 const workingDirPrefix = "repos"
@@ -79,7 +77,7 @@ type FileWorkspace struct {
 // path to the root of the cloned repo. It also returns
 // a boolean indicating if we should warn users that the branch we're
 // merging into has been updated since we cloned it.
-//If the repo already exists and is at
+// If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(
@@ -130,15 +128,15 @@ func (w *FileWorkspace) Clone(
 // warnDiverged returns true if we should warn the user that the branch we're
 // merging into has diverged from what we currently have checked out.
 // This matters in the case of the merge checkout strategy because after
-// cloning the repo and doing the merge, it's possible master was updated.
+// cloning the repo and doing the merge, it's possible main was updated.
 // Then users won't be getting the merge functionality they expected.
 // If there are any errors we return false since we prefer things to succeed
 // vs. stopping the plan/apply.
 func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
-		// It only makes sense to warn that master has diverged if we're using
+		// It only makes sense to warn that main has diverged if we're using
 		// the checkout merge strategy. If we're just checking out the branch,
-		// then it doesn't matter what's going on with master because we've
+		// then it doesn't matter what's going on with main because we've
 		// decided to always run off the branch.
 		return false
 	}
@@ -174,9 +172,9 @@ func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullReq
 
 	hasDiverged := w.HasDiverged(log, cloneDir)
 	if hasDiverged {
-		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
+		log.Info("remote main branch is ahead and thereby has new commits, it is recommended to pull new commits")
 	} else {
-		log.Debug("remote master branch has no new commits")
+		log.Debug("remote main branch has no new commits")
 	}
 	return hasDiverged
 }
@@ -187,7 +185,7 @@ func (w *FileWorkspace) HasDiverged(log logging.SimpleLogging, cloneDir string) 
 		// we assume false here for 'branch' strategy.
 		return false
 	}
-	// Check if remote master branch has diverged.
+	// Check if remote main branch has diverged.
 	statusUnoCmd := exec.Command("git", "status", "--untracked-files=no")
 	statusUnoCmd.Dir = cloneDir
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
@@ -204,15 +202,12 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	headRepo models.Repo,
 	p models.PullRequest) error {
 
-	value, _ := cloneLocks.LoadOrStore(cloneDir, semaphore.NewWeighted(1))
-	sem := value.(*semaphore.Weighted)
+	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
+	mutex := value.(*sync.Mutex)
 
-	defer sem.Release(1)
-	if acquired := sem.TryAcquire(1); !acquired {
-		err := sem.Acquire(context.TODO(), 1)
-		if err != nil {
-			return errors.Wrap(err, "waiting for repository to be cloned")
-		}
+	defer mutex.Unlock()
+	if locked := mutex.TryLock(); !locked {
+		mutex.Lock()
 		return nil
 	}
 
