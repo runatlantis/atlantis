@@ -50,12 +50,16 @@ Values are chosen in this order:
 ### `--allow-draft-prs`
   ```bash
   atlantis server --allow-draft-prs
+  # or
+  ATLANTIS_ALLOW_DRAFT_PRS=true
   ```
   Respond to pull requests from draft prs. Defaults to `false`.
 
 ### `--allow-fork-prs`
   ```bash
   atlantis server --allow-fork-prs
+  # or
+  ATLANTIS_ALLOW_FORK_PRS=true
   ```
   Respond to pull requests from forks. Defaults to `false`.
 
@@ -71,6 +75,8 @@ Values are chosen in this order:
   <Badge text="Deprecated" type="warn"/>
   ```bash
   atlantis server --allow-repo-config
+  # or
+  ATLANTIS_ALLOW_REPO_CONFIG=true
   ```
   This flag is deprecated. It allows all repos to use all restricted
   `atlantis.yaml` keys. See [Repo Level Atlantis.yaml](repo-level-atlantis-yaml.html) for more details.
@@ -106,6 +112,8 @@ Values are chosen in this order:
 ### `--automerge`
   ```bash
   atlantis server --automerge
+  # or
+  ATLANTIS_AUTOMERGE=true
   ```
   Automatically merge pull requests after all plans have been successfully applied.
   Defaults to `false`. See [Automerging](automerging.html) for more details.
@@ -114,6 +122,8 @@ Values are chosen in this order:
   ```bash
   # NOTE: Use single quotes to avoid shell expansion of *.
   atlantis server --autoplan-file-list='**/*.tf,project1/*.pkr.hcl'
+  # or
+  ATLANTIS_AUTOPLAN_FILE_LIST='**/*.tf,project1/*.pkr.hcl'
   ```
   List of file patterns that Atlantis will use to check if a directory contains modified files that should trigger project planning.
 
@@ -137,47 +147,57 @@ Values are chosen in this order:
 ### `--azuredevops-hostname`
   ```bash
   atlantis server --azuredevops-hostname="dev.azure.com"
+  # or
+  ATLANTIS_AZUREDEVOPS_HOSTNAME="dev.azure.com"
   ```
   Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
 
 ### `--azuredevops-webhook-password`
   ```bash
   atlantis server --azuredevops-webhook-password="password123"
+  # or (recommended)
+  ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD="password123"
   ```
   Azure DevOps basic authentication password for inbound webhooks (see
-  https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops).
+  [docs](https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)).
   
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure DevOps org. This means that an
   attacker could spoof calls to Atlantis and cause it to perform malicious
-  actions. Should be specified via the ATLANTIS_AZUREDEVOPS_BASIC_AUTH environment
+  actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_BASIC_AUTH` environment
   variable.
   :::
 
 ### `--azuredevops-webhook-user`
   ```bash
   atlantis server --azuredevops-webhook-user="username@example.com"
+  # or
+  ATLANTIS_AZUREDEVOPS_WEBHOOK_USER="username@example.com"
   ```
-  Azure DevOps basic authentication username for inbound webhooks. Can also be specified via the ATLANTIS_AZUREDEVOPS_WEBHOOK_USER
-  environment variable.
+  Azure DevOps basic authentication username for inbound webhooks.
 
 ### `--azuredevops-token`
   ```bash
   atlantis server --azuredevops-token="RandomStringProducedByAzureDevOps"
+  # or (recommended)
+  ATLANTIS_AZUREDEVOPS_TOKEN="RandomStringProducedByAzureDevOps"
   ```
-  Azure DevOps token of API user. Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN
-  environment variable.
+  Azure DevOps token of API user.
 
 ### `--azuredevops-user`
   ```bash
   atlantis server --azuredevops-user="username@example.com"
+  # or
+  ATLANTIS_AZUREDEVOPS_USER="username@example.com"
   ```
   Azure DevOps username of API user.
 
 ### `--bitbucket-base-url`
   ```bash
   atlantis server --bitbucket-base-url="http://bitbucket.corp:7990/basepath"
+  # or
+  ATLANTIS_BITBUCKET_BASE_URL="http://bitbucket.corp:7990/basepath"
   ```
   Base URL of Bitbucket Server (aka Stash) installation. Must include
   `http://` or `https://`. If using Bitbucket Cloud (bitbucket.org), do not set. Defaults to
@@ -187,13 +207,15 @@ Values are chosen in this order:
   ```bash
   atlantis server --bitbucket-token="token"
   # or (recommended)
-  ATLANTIS_BITBUCKET_TOKEN='token' atlantis server
+  ATLANTIS_BITBUCKET_TOKEN="token"
   ```
   Bitbucket app password of API user.
 
 ### `--bitbucket-user`
   ```bash
   atlantis server --bitbucket-user="myuser"
+  # or
+  ATLANTIS_BITBUCKET_USER="myuser"
   ```
   Bitbucket username of API user.
 
@@ -201,7 +223,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --bitbucket-webhook-secret="secret"
   # or (recommended)
-  ATLANTIS_BITBUCKET_WEBHOOK_SECRET='secret' atlantis server
+  ATLANTIS_BITBUCKET_WEBHOOK_SECRET="secret"
   ```
   Secret used to validate Bitbucket webhooks. Only Bitbucket Server supports webhook secrets.
   For Bitbucket.org, see [Security](security.html#bitbucket-cloud-bitbucket-org) for mitigations.
@@ -214,19 +236,25 @@ Values are chosen in this order:
 ### `--checkout-strategy`
   ```bash
   atlantis server --checkout-strategy="<branch|merge>"
+  # or
+  ATLANTIS_CHECKOUT_STRATEGY="<branch|merge>"
   ```
-  How to check out pull requests.
+  How to check out pull requests. Use either `branch` or `merge`.
   Defaults to `branch`. See [Checkout Strategy](checkout-strategy.html) for more details.
 
 ### `--config`
   ```bash
   atlantis server --config="my/config/file.yaml"
+  # or
+  ATLANTIS_CONFIG="my/config/file.yaml"
   ```
   YAML config file where flags can also be set. See [Config File](#config-file) for more details.
 
 ### `--data-dir`
   ```bash
   atlantis server --data-dir="path/to/data/dir"
+  # or
+  ATLANTIS_DATA_DIR="path/to/data/dir"
   ```
   Directory where Atlantis will store its data. Will be created if it doesn't exist.
   Defaults to `~/.atlantis`. Atlantis will store its database, checked out repos, Terraform plans and downloaded
@@ -235,7 +263,9 @@ Values are chosen in this order:
 
 ### `--default-tf-version`
   ```bash
-  atlantis server --default-tf-version="v0.12.0"
+  atlantis server --default-tf-version="v0.12.31"
+  # or
+  ATLANTIS_DEFAULT_TF_VERSION="v0.12.31"
   ```
   Terraform version to default to. Will download to `<data-dir>/bin/terraform<version>`
   if not in `PATH`. See [Terraform Versions](terraform-versions.html) for more details.
@@ -243,55 +273,74 @@ Values are chosen in this order:
 ### `--disable-apply`
   ```bash
   atlantis server --disable-apply
+  # or
+  ATLANTIS_DISABLE_APPLY=true
   ```
-  Disable all \"atlantis apply\" commands, regardless of which flags are passed with it.
+  Disable all `atlantis apply` commands, regardless of which flags are passed with it.
 
 ### `--disable-apply-all`
   ```bash
   atlantis server --disable-apply-all
+  # or
+  ATLANTIS_DISABLE_APPLY_ALL=true
   ```
-  Disable \"atlantis apply\" command so a specific project/workspace/directory has to
+  Disable `atlantis apply` command so a specific project/workspace/directory has to
   be specified for applies.
 
 ### `--disable-autoplan`
   ```bash
   atlantis server --disable-autoplan
+  # or
+  ATLANTIS_DISABLE_AUTOPLAN=true
   ```
-  Disable atlantis auto planning
+  Disable atlantis auto planning.
 
 ### `--disable-markdown-folding`
   ```bash
   atlantis server --disable-markdown-folding
+  # or
+  ATLANTIS_DISABLE_MARKDOWN_FOLDER=true
   ```
-  Disable folding in markdown output.
+  Disable folding in markdown output using the `<details>` html tag.
 
 ### `--disable-repo-locking`
   ```bash
   atlantis server --disable-repo-locking
+  # or
+  ATLANTIS_DISABLE_REPO_LOCKING=true
   ```
-  Stops atlantis locking projects and or workspaces when running terraform
+  Stops atlantis from locking projects and or workspaces when running terraform.
 
 ### `--enable-policy-checks`
-  <Badge text="beta" type="warn"/>
   ```bash
   atlantis server --enable-policy-checks
+  # or
+  ATLANTIS_ENABLE_POLICY_CHECKS=true
   ```
   Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](https://www.runatlantis.io/docs/server-side-repo-config.html#reference).
 
 ### `--enable-regexp-cmd`
   ```bash
   atlantis server --enable-regexp-cmd
+  # or
+  ATLANTIS_ENABLE_REGEXP_CMD=true
   ```
-  Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.
+  Enable Atlantis to use regular expressions on plan/apply commands when `-p` flag is passed with it.
+  
+  This can be used to run all defined projects in `atlantis.yaml` using `atlantis plan -p .*`.
+
+  This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
   ::: warning SECURITY WARNING
   It's not supposed to be used with `--disable-apply-all`.
-  The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects
+  The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects.
   :::
 
 ### `--enable-diff-markdown-format`
   ```bash
   atlantis server --enable-diff-markdown-format
+  # or
+  ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
   ```
   Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 
@@ -300,6 +349,8 @@ Values are chosen in this order:
 ### `--gh-hostname`
   ```bash
   atlantis server --gh-hostname="my.github.enterprise.com"
+  # or
+  ATLANTIS_GH_HOSTNAME="my.github.enterprise.com"
   ```
   Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
   don't set. Defaults to `github.com`.
@@ -308,13 +359,15 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-token="token"
   # or (recommended)
-  ATLANTIS_GH_TOKEN='token' atlantis server
+  ATLANTIS_GH_TOKEN="token"
   ```
   GitHub token of API user.
 
 ### `--gh-user`
   ```bash
   atlantis server --gh-user="myuser"
+  # or
+  ATLANTIS_GH_USER="myuser"
   ```
    GitHub username of API user.
 
@@ -322,7 +375,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-webhook-secret="secret"
   # or (recommended)
-  ATLANTIS_GH_WEBHOOK_SECRET='secret' atlantis server
+  ATLANTIS_GH_WEBHOOK_SECRET="secret"
   ```
   Secret used to validate GitHub webhooks (see [https://developer.github.com/webhooks/securing/](https://docs.github.com/en/developers/webhooks-and-events/webhooks/securing-your-webhooks)).
 
@@ -334,12 +387,16 @@ Values are chosen in this order:
 ### `--gh-org`
   ```bash
   atlantis server --gh-org="myorgname"
+  # or
+  ATLANTIS_GH_ORG="myorgname"
   ```
   GitHub organization name. Set to enable creating a private GitHub app for this organization.
 
 ### `--gh-app-id`
   ```bash
   atlantis server --gh-app-id="00000"
+  # or
+  ATLANTIS_GH_APP_ID="00000"
   ```
   GitHub app ID. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/apps/installations).
 
@@ -362,18 +419,24 @@ Values are chosen in this order:
 ### `--gh-app-slug`
   ```bash
   atlantis server --gh-app-slug="myappslug"
+  # or
+  ATLANTIS_GH_APP_SLUG="myappslug"
   ```
   A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`.
 
 ### `--gh-app-key-file`
   ```bash
   atlantis server --gh-app-key-file="path/to/app-key.pem"
+  # or
+  ATLANTIS_GH_APP_KEY_FILE="path/to/app-key.pem"
   ```
   Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/apps/installations).
 
 ### `--gh-app-key`
   ```bash
   atlantis server --gh-app-key="-----BEGIN RSA PRIVATE KEY-----(...)"
+  # or
+  ATLANTIS_GH_APP_KEY="-----BEGIN RSA PRIVATE KEY-----(...)"
   ```
   The PEM encoded private key for the GitHub App.
 
@@ -384,8 +447,16 @@ Values are chosen in this order:
 ### `--gh-team-allowlist`
   ```bash
   atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply"
+  # or
+  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply"
   ```
-  Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
+  In versions v0.21.0 and later, the GitHub team name can be a name or a slug.
+  
+  In versions v0.20.1 and below, the Github team name required the case sensitive team name.
+  
+  Comma-separated list of GitHub teams and permission pairs.
+  
+  By default, any team can plan and apply.
   
   ::: warning NOTE
   You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
@@ -395,12 +466,21 @@ Values are chosen in this order:
 ### `--gh-allow-mergeable-bypass-apply`
   ```bash
   atlantis server --gh-allow-mergeable-bypass-apply
+  # or
+  ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY=true
   ```
   Feature flag to enable ability to use `mergeable` mode with required apply status check.
+
+  ::: warning NOTE
+  If there aren't any required checks set in the Github branch protection settings then this will cause atlantis to fail.
+  See issue https://github.com/runatlantis/atlantis/issues/2663.
+  :::
 
 ### `--gitlab-hostname`
   ```bash
   atlantis server --gitlab-hostname="my.gitlab.enterprise.com"
+  # or
+  ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
   ```
   Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
   don't set. Defaults to `gitlab.com`.
@@ -409,21 +489,23 @@ Values are chosen in this order:
   ```bash
   atlantis server --gitlab-token="token"
   # or (recommended)
-  ATLANTIS_GITLAB_TOKEN='token' atlantis server
+  ATLANTIS_GITLAB_TOKEN="token"
   ```
   GitLab token of API user.
 
 ### `--gitlab-user`
   ```bash
   atlantis server --gitlab-user="myuser"
+  # or
+  ATLANTIS_GITLAB_USER="myuser"
   ```
-   GitLab username of API user.
+  GitLab username of API user.
 
 ### `--gitlab-webhook-secret`
   ```bash
   atlantis server --gitlab-webhook-secret="secret"
   # or (recommended)
-  ATLANTIS_GITLAB_WEBHOOK_SECRET='secret' atlantis server
+  ATLANTIS_GITLAB_WEBHOOK_SECRET="secret"
   ```
   Secret used to validate GitLab webhooks.
 
@@ -441,13 +523,17 @@ Values are chosen in this order:
 ### `--hide-prev-plan-comments`
   ```bash
   atlantis server --hide-prev-plan-comments
+  # or
+  ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
   ```
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub currently.
+  GitHub currently. This is not enabled by default.
 
 ### `--locking-db-type`
   ```bash
   atlantis server --locking-db-type="<boltdb|redis>"
+  # or
+  ATLANTIS_LOCKING_DB_TYPE="<boltdb|redis>"
   ```
   The locking database type to use for storing plan and apply locks. Defaults to `boltdb`.
 
@@ -458,13 +544,19 @@ Values are chosen in this order:
 ### `--log-level`
   ```bash
   atlantis server --log-level="<debug|info|warn|error>"
+  # or
+  ATLANTIS_LOG_LEVEL="<debug|info|warn|error>"
   ```
   Log level. Defaults to `info`.
 
 ### `--markdown-template-overrides-dir`
   ```bash
   atlantis server --markdown-template-overrides-dir="path/to/templates/"
+  # or
+  ATLANTIS_MARKDOWN_TEMPLATE_OVERRIDES_DIR="path/to/templates/"
   ```
+  This will be available in v0.21.0.
+
   Directory where Atlantis will read in overrides for markdown templates used to render comments on pull requests.
   Markdown template overrides may be specified either in individual files, or all together in a single file. All template
   override files _must_ have the `.tmpl` extension, otherwise they will not be parsed.
@@ -479,54 +571,72 @@ Values are chosen in this order:
 ### `--parallel-pool-size`
   ```bash
   atlantis server --parallel-pool-size=100
+  # or
+  ATLANTIS_PARALLEL_POOL_SIZE=100
   ```
   Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
 
 ### `--port`
   ```bash
-  atlantis server --port=8080
+  atlantis server --port=4141
+  # or
+  ATLANTIS_PORT=4141
   ```
   Port to bind to. Defaults to `4141`.
 
 ### `--quiet-policy-checks`
   ```bash
   atlantis server --quiet-policy-checks
+  # or
+  ATLANTIS_QUIET_POLICY_CHECKS=true
   ```
   Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
 
 ### `--redis-host`
   ```bash
   atlantis server --redis-host="localhost"
+  # or
+  ATLANTIS_REDIS_HOST="localhost"
   ```
   The Redis Hostname for when using a Locking DB type of `redis`.
 
 ### `--redis-password`
   ```bash
   atlantis server --redis-password="password123"
+  # or (recommended)
+  ATLANTIS_REDIS_PASSWORD="password123"
   ```
   The Redis Password for when using a Locking DB type of `redis`.
 
 ### `--redis-port`
   ```bash
   atlantis server --redis-port=6379
+  # or
+  ATLANTIS_REDIS_PORT=6379
   ```
   The Redis Port for when using a Locking DB type of `redis`. Defaults to `6379`.
 
 ### `--redis-db`
   ```bash
   atlantis server --redis-db=0
+  # or
+  ATLANTIS_REDIS_DB=0
   ```
   The Redis Database to use when using a Locking DB type of `redis`. Defaults to `0`.
 
 ### `--redis-tls-enabled`
   ```bash
   atlantis server --redis-tls-enabled=false
+  # or
+  ATLANTIS_REDIS_TLS_ENABLED=false
   ```
   Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
 
 ### `--redis-insecure-skip-verify`
   ```bash
   atlantis server --redis-insecure-skip-verify=false
+  # or
+  ATLANTIS_REDIS_INSECURE_SKIP_VERIFY=false
   ```
   Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate. Defaults to `false`.
 
@@ -537,12 +647,16 @@ Values are chosen in this order:
 ### `--repo-config`
   ```bash
   atlantis server --repo-config="path/to/repos.yaml"
+  # or
+  ATLANTIS_REPO_CONFIG="path/to/repos.yaml"
   ```
   Path to a YAML server-side repo config file. See [Server Side Repo Config](server-side-repo-config.html).
 
 ### `--repo-config-json`
   ```bash
   atlantis server --repo-config-json='{"repos":[{"id":"/.*/", "apply_requirements":["mergeable"]}]}'
+  # or
+  ATLANTIS_REPO_CONFIG_JSON='{"repos":[{"id":"/.*/", "apply_requirements":["mergeable"]}]}'
   ```
   Specify server-side repo config as a JSON string. Useful if you don't want to write a config file to disk.
   See [Server Side Repo Config](server-side-repo-config.html) for more details.
@@ -577,10 +691,13 @@ Values are chosen in this order:
 ### `--repo-whitelist`
   <Badge text="Deprecated" type="warn"/>
   Deprecated for `--repo-allowlist`.
+
 ### `--repo-allowlist`
   ```bash
   # NOTE: Use single quotes to avoid shell expansion of *.
   atlantis server --repo-allowlist='github.com/myorg/*'
+  # or
+  ATLANTIS_REPO_ALLOWLIST='github.com/myorg/*'
   ```
   Atlantis requires you to specify an allowlist of repositories it will accept webhooks from.
 
@@ -609,6 +726,8 @@ Values are chosen in this order:
   <Badge text="Deprecated" type="warn"/>
   ```bash
   atlantis server --require-approval
+  # or
+  ATLANTIS_REQUIRE_APPROVAL=true
   ```
   This flag is deprecated. It requires all pull requests to be approved
   before `atlantis apply` is allowed. See [Apply Requirements](apply-requirements.html) for more details.
@@ -626,6 +745,8 @@ Values are chosen in this order:
   <Badge text="Deprecated" type="warn"/>
   ```bash
   atlantis server --require-mergeable
+  # or
+  ATLANTIS_REQUIRE_MERGEABLE=true
   ```
   This flag is deprecated. It causes all pull requests to be mergeable
   before `atlantis apply` is allowed. See [Apply Requirements](apply-requirements.html) for more details.
@@ -642,6 +763,8 @@ Values are chosen in this order:
 ### `--silence-fork-pr-errors`
   ```bash
   atlantis server --silence-fork-pr-errors
+  # or
+  ATLANTIS_SILENCE_FORK_PR_ERRORS=true
   ```
   Normally, if Atlantis receives a pull request webhook from a fork and --allow-fork-prs is not set,
   it will comment back with an error. This flag disables that commenting.
@@ -653,6 +776,8 @@ Values are chosen in this order:
 ### `--silence-allowlist-errors`
   ```bash
   atlantis server --silence-allowlist-errors
+  # or
+  ATLANTIS_SILENCE_ALLOWLIST_ERRORS=true
   ```
   Some users use the `--repo-allowlist` flag to control which repos Atlantis
   responds to. Normally, if Atlantis receives a pull request webhook from a repo not listed
@@ -664,6 +789,8 @@ Values are chosen in this order:
 ### `--silence-no-projects`
   ```bash
   atlantis server --silence-no-projects
+  # or
+  ATLANTIS_SILENCE_NO_PROJECTS=true
   ```
   `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 
@@ -673,12 +800,16 @@ Values are chosen in this order:
 ### `--silence-vcs-status-no-plans`
   ```bash
   atlantis server --silence-vcs-status-no-plans
+  # or
+  ATLANTIS_SILENCE_VCS_STATUS_NO_PLANS=true
   ```
   `--silence-vcs-status-no-plans` will tell Atlantis to ignore setting VCS status if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 
 ### `--skip-clone-no-changes`
   ```bash
   atlantis server --skip-clone-no-changes
+  # or
+  ATLANTIS_SKIP_CLONE_NO_CHANGES=true
   ```
   `--skip-clone-no-changes` will skip cloning the repo during autoplan if there are no changes to Terraform projects. This will only apply for GitHub and GitLab and only for repos that have `atlantis.yaml` file. Defaults to `false`.
 
@@ -686,13 +817,15 @@ Values are chosen in this order:
   ```bash
   atlantis server --slack-token=token
   # or (recommended)
-  ATLANTIS_SLACK_TOKEN='token' atlantis server
+  ATLANTIS_SLACK_TOKEN='token'
   ```
   API token for Slack notifications. Slack is not fully supported. TODO: Slack docs.
 
 ### `--ssl-cert-file`
   ```bash
   atlantis server --ssl-cert-file="/etc/ssl/certs/my-cert.crt"
+  # or
+  ATLANTIS_SSL_CERT_FILE="/etc/ssl/certs/my-cert.crt"
   ```
   File containing x509 Certificate used for serving HTTPS.
   If the cert is signed by a CA, the file should be the concatenation
@@ -700,19 +833,25 @@ Values are chosen in this order:
 
 ### `--ssl-key-file`
   ```bash
-  atlantis server --ssl-cert-file="/etc/ssl/private/my-cert.key"
+  atlantis server --ssl-key-file="/etc/ssl/private/my-cert.key"
+  # or
+  ATLANTIS_SSL_KEY_FILE="/etc/ssl/private/my-cert.key"
   ```
   File containing x509 private key matching `--ssl-cert-file`.
 
 ### `--stats-namespace`
   ```bash
   atlantis server --stats-namespace="myatlantis"
+  # or
+  ATLANTIS_STATS_NAMESPACE="myatlantis"
   ```
-  Namespace for emitting stats/metrics. See (stats.html#Metrics/Stats)
+  Namespace for emitting stats/metrics. See [stats](stats.html) section.
 
 ### `--tf-download-url`
   ```bash
   atlantis server --tf-download-url="https://releases.company.com"
+  # or
+  ATLANTIS_TF_DOWNLOAD_URL="https://releases.company.com"
   ```
   An alternative URL to download Terraform versions if they are missing. Useful in an airgapped
   environment where releases.hashicorp.com is not available. Directory structure of the custom
@@ -721,6 +860,8 @@ Values are chosen in this order:
 ### `--tfe-hostname`
   ```bash
   atlantis server --tfe-hostname="my-terraform-enterprise.company.com"
+  # or
+  ATLANTIS_TFE_HOSTNAME="my-terraform-enterprise.company.com"
   ```
   Hostname of your Terraform Enterprise installation to be used in conjunction with
   `--tfe-token`. See [Terraform Cloud](terraform-cloud.html) for more details.
@@ -730,6 +871,8 @@ Values are chosen in this order:
 ### `--tfe-local-execution-mode`
   ```bash
   atlantis server --tfe-local-execution-mode
+  # or
+  ATLANTIS_TFE_LOCAL_EXECUTION_MODE=true
   ```
   Enable if you're using local execution mode (instead of TFE/C's remote execution mode). See [Terraform Cloud](terraform-cloud.html) for more details.
 
@@ -744,6 +887,8 @@ Values are chosen in this order:
 ### `--var-file-allowlist`
   ```bash
   atlantis server --var-file-allowlist='/path/to/tfvars/dir'
+  # or
+  ATLANTIS_VAR_FILE_ALLOWLIST='/path/to/tfvars/dir'
   ```
   Comma-separated list of additional directory paths where [variable definition files](https://www.terraform.io/language/values/variables#variable-definitions-tfvars-files) can be read from.
   The paths in this argument should be absolute paths. Relative paths and globbing are currently not supported.
@@ -752,6 +897,8 @@ Values are chosen in this order:
 ### `--vcs-status-name`
   ```bash
   atlantis server --vcs-status-name="atlantis-dev"
+  # or
+  ATLANTIS_VCS_STATUS_NAME="atlantis-dev"
   ```
   Name used to identify Atlantis when updating a pull request status. Defaults to `atlantis`.
 
@@ -766,6 +913,17 @@ Values are chosen in this order:
   ```
   Write out a .git-credentials file with the provider user and token to allow
   cloning private modules over HTTPS or SSH. See [here](https://git-scm.com/docs/git-credential-store) for more information.
+  
+  Follow the `git::ssh` syntax to avoid using a custom `.gitconfig` with an `insteadOf`.
+  
+  ```hcl
+  module "private_submodule" {
+    source = "git::ssh://git@github.com/<org>/<repo>//modules/<some-module-name>?ref=v1.2.3"
+
+    # ...
+  }
+  ```
+  
   ::: warning SECURITY WARNING
   This does write secrets to disk and should only be enabled in a secure environment.
   :::
@@ -773,23 +931,31 @@ Values are chosen in this order:
 ### `--web-basic-auth`
   ```bash
   atlantis server --web-basic-auth
+  # or
+  ATLANTIS_WEB_BASIC_AUTH=true
   ```
   Enable Basic Authentication on the Atlantis web service.
 
 ### `--web-username`
   ```bash
   atlantis server --web-username="atlantis"
+  # or
+  ATLANTIS_WEB_USERNAME="atlantis"
   ```
   Username used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
 
 ### `--web-password`
   ```bash
   atlantis server --web-password="atlantis"
+  # or
+  ATLANTIS_WEB_PASSWORD="atlantis"
   ```
   Password used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
 
 ### `--websocket-check-origin`
   ```bash
   atlantis server --websocket-check-origin
+  # or
+  ATLANTIS_WEBSOCKET_CHECK_ORIGIN=true
   ```
   Only allow websockets connection when they originate from the running Atlantis web server

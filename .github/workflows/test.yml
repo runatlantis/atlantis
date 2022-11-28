@@ -4,15 +4,27 @@ on:
   push:
     branches:
       - "main"
+    paths-ignore:
+      - 'runatlantis.io/**'
   pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
     branches:
       - "main"
+    paths-ignore:
+      - 'runatlantis.io/**'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   test:
+    if: github.event.pull_request.draft == false
     name: runner / gotest
     runs-on: ubuntu-22.04
     container: ghcr.io/runatlantis/testing-env:2022.11.17
