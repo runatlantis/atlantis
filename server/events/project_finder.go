@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/moby/moby/pkg/fileutils"
 	"github.com/pkg/errors"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 
@@ -38,7 +40,7 @@ type ProjectFinder interface {
 	// DetermineProjects returns the list of projects that were modified based on
 	// the modifiedFiles. The list will be de-duplicated.
 	// absRepoDir is the path to the cloned repo on disk.
-	DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project
+	DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string, moduleInfo ModuleProjects) []models.Project
 	// DetermineProjectsViaConfig returns the list of projects that were modified
 	// based on modifiedFiles and the repo's config.
 	// absRepoDir is the path to the cloned repo on disk.
@@ -134,7 +136,7 @@ var ignoredFilenameFragments = []string{"terraform.tfstate", "terraform.tfstate.
 type DefaultProjectFinder struct{}
 
 // See ProjectFinder.DetermineProjects.
-func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project {
+func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string, moduleInfo ModuleProjects) []models.Project {
 	var projects []models.Project
 
 	modifiedTerraformFiles := p.filterToFileList(log, modifiedFiles, autoplanFileList)
@@ -146,9 +148,13 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 
 	var dirs []string
 	for _, modifiedFile := range modifiedTerraformFiles {
-		projectDir := p.getProjectDir(modifiedFile, absRepoDir)
+		projectDir := getProjectDir(modifiedFile, absRepoDir)
 		if projectDir != "" {
 			dirs = append(dirs, projectDir)
+		} else if moduleInfo != nil {
+			downstreamProjects := moduleInfo.DependentProjects(path.Dir(modifiedFile))
+			log.Debug("found downstream projects for %q: %v", modifiedFile, downstreamProjects)
+			dirs = append(dirs, downstreamProjects...)
 		}
 	}
 	uniqueDirs := p.unique(dirs)
@@ -270,7 +276,11 @@ func (p *DefaultProjectFinder) shouldIgnore(fileName string) bool {
 // if the root is valid by looking for a main.tf file. It returns a relative
 // path to the repo. If the project is at the root returns ".". If modified file
 // doesn't lead to a valid project path, returns an empty string.
-func (p *DefaultProjectFinder) getProjectDir(modifiedFilePath string, repoDir string) string {
+func getProjectDir(modifiedFilePath string, repoDir string) string {
+	return getProjectDirFromFs(os.DirFS(repoDir), modifiedFilePath)
+}
+
+func getProjectDirFromFs(files fs.FS, modifiedFilePath string) string {
 	dir := path.Dir(modifiedFilePath)
 	if path.Base(dir) == "env" {
 		// If the modified file was inside an env/ directory, we treat this
@@ -286,7 +296,7 @@ func (p *DefaultProjectFinder) getProjectDir(modifiedFilePath string, repoDir st
 
 	// Surrounding dir with /'s so we can match on /modules/ even if dir is
 	// "modules" or "project1/modules"
-	if strings.Contains("/"+dir+"/", "/modules/") {
+	if isModule(dir) {
 		// We treat changes inside modules/ folders specially. There are two cases:
 		// 1. modules folder inside project:
 		// root/
@@ -318,7 +328,7 @@ func (p *DefaultProjectFinder) getProjectDir(modifiedFilePath string, repoDir st
 		modulesParent := modulesSplit[0]
 
 		// Now we check whether there is a main.tf in the parent.
-		if _, err := os.Stat(filepath.Join(repoDir, modulesParent, "main.tf")); os.IsNotExist(err) {
+		if _, err := fs.Stat(files, filepath.Join(modulesParent, "main.tf")); errors.Is(err, fs.ErrNotExist) {
 			return ""
 		}
 		return path.Clean(modulesParent)
@@ -327,6 +337,10 @@ func (p *DefaultProjectFinder) getProjectDir(modifiedFilePath string, repoDir st
 	// If it wasn't a modules directory, we assume we're in a project and return
 	// this directory.
 	return dir
+}
+
+func isModule(dir string) bool {
+	return strings.Contains("/"+dir+"/", "/modules/")
 }
 
 // unique de-duplicates strs.
