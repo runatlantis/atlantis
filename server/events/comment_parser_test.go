@@ -827,6 +827,9 @@ func TestParse_VCSUsername(t *testing.T) {
 var PlanUsage = `Usage of plan:
   -d, --dir string         Which directory to run plan in relative to root of repo,
                            ex. 'child/dir'.
+  -f, --filter string      Filter which directories to run plan based on the
+                           specified pattern. Cannot be used at same time as dir or
+                           project flags.
   -p, --project string     Which project to run plan for. Refers to the name of the
                            project configured in atlantis.yaml. Cannot be used at
                            same time as workspace or dir flags.
@@ -838,6 +841,9 @@ var ApplyUsage = `Usage of apply:
       --auto-merge-disabled   Disable automerge after apply.
   -d, --dir string            Apply the plan for this directory, relative to root of
                               repo, ex. 'child/dir'.
+  -f, --filter string         Filter which directories to run apply based on the
+                              specified pattern. Cannot be used at same time as dir
+                              or project flags.
   -p, --project string        Apply the plan for this project. Refers to the name of
                               the project configured in atlantis.yaml. Cannot be
                               used at same time as workspace or dir flags.

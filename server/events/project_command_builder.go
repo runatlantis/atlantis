@@ -3,6 +3,7 @@ package events
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 
 	"github.com/uber-go/tally"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
@@ -170,7 +172,7 @@ type DefaultProjectCommandBuilder struct {
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
-	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false)
+	projCtxs, err := p.buildPlanAllCommands(ctx, &CommentCommand{})
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +190,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 // See ProjectCommandBuilder.BuildPlanCommands.
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
-		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose)
+		return p.buildPlanAllCommands(ctx, cmd)
 	}
 	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
 	return pcc, err
@@ -217,7 +219,7 @@ func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
 // modified in this ctx.
-func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context, commentFlags []string, verbose bool) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	// We'll need the list of modified files.
 	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
@@ -288,7 +290,14 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		if err != nil {
 			return nil, err
 		}
-		ctx.Log.Info("%d projects are to be planned based on their when_modified config", len(matchingProjects))
+
+		if cmd.Filter != "" {
+			filteredProjects, err := filterValidProjects(matchingProjects, cmd.Filter)
+			if err != nil {
+				return nil, err
+			}
+			matchingProjects = filteredProjects
+		}
 
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
@@ -299,13 +308,13 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					ctx,
 					command.Plan,
 					mergedCfg,
-					commentFlags,
+					cmd.Flags,
 					repoDir,
 					repoCfg.Automerge,
 					mergedCfg.DeleteSourceBranchOnMerge,
 					repoCfg.ParallelApply,
 					repoCfg.ParallelPlan,
-					verbose,
+					cmd.IsVerbose(),
 				)...)
 		}
 	} else {
@@ -320,6 +329,15 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		ctx.Log.Debug("moduleInfo for %s (matching %q) = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
+
+		if cmd.Filter != "" {
+			filteredProjects, err := filterProjects(modifiedProjects, cmd.Filter)
+			if err != nil {
+				return nil, err
+			}
+			modifiedProjects = filteredProjects
+		}
+
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, repoDir)
@@ -333,13 +351,13 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					ctx,
 					command.Plan,
 					pCfg,
-					commentFlags,
+					cmd.Flags,
 					repoDir,
 					DefaultAutomergeEnabled,
 					pCfg.DeleteSourceBranchOnMerge,
 					DefaultParallelApplyEnabled,
 					DefaultParallelPlanEnabled,
-					verbose,
+					cmd.IsVerbose(),
 				)...)
 		}
 	}
@@ -468,6 +486,14 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *command.Cont
 	plans, err := p.PendingPlanFinder.Find(pullDir)
 	if err != nil {
 		return nil, err
+	}
+
+	if commentCmd.Filter != "" {
+		filteredPlans, err := filterPlans(plans, commentCmd.Filter)
+		if err != nil {
+			return nil, err
+		}
+		plans = filteredPlans
 	}
 
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
@@ -660,4 +686,46 @@ func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(repoCfg *valid.R
 	}
 
 	return repoCfg.ValidateWorkspaceAllowed(repoRelDir, workspace)
+}
+
+func filterProjects(projects []models.Project, filter string) ([]models.Project, error) {
+	filteredProjects := make([]models.Project, 0, len(projects))
+	for _, proj := range projects {
+		match, err := filepath.Match(filter, proj.Path)
+		if err != nil {
+			return nil, err
+		}
+		if match {
+			filteredProjects = append(filteredProjects, proj)
+		}
+	}
+	return filteredProjects, nil
+}
+
+func filterValidProjects(projects []valid.Project, filter string) ([]valid.Project, error) {
+	filteredProjects := make([]valid.Project, 0, len(projects))
+	for _, proj := range projects {
+		match, err := filepath.Match(filter, proj.Dir)
+		if err != nil {
+			return nil, err
+		}
+		if match {
+			filteredProjects = append(filteredProjects, proj)
+		}
+	}
+	return filteredProjects, nil
+}
+
+func filterPlans(plans []PendingPlan, filter string) ([]PendingPlan, error) {
+	filteredPlans := make([]PendingPlan, 0, len(plans))
+	for _, plan := range plans {
+		match, err := filepath.Match(filter, plan.RepoRelDir)
+		if err != nil {
+			return nil, err
+		}
+		if match {
+			filteredPlans = append(filteredPlans, plan)
+		}
+	}
+	return filteredPlans, nil
 }
