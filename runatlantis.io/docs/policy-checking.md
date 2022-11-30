@@ -140,7 +140,7 @@ workflows:
             extra_args: ["--update", "s3::https://s3.amazonaws.com/bucket/foo"]
 ```
 
-Note that authentication may need to be configured separately if pulling policies from sources that require it. For example, to pull policies from an S3 bucket, Atlantis host can be configured with a default AWS profile that has [permission](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_s3_rw-bucket.html) to `s3:GetObject` and `s3:ListBucket` from the S3 bucket.
+Note that authentication may need to be configured separately if pulling policies from sources that require it. For example, to pull policies from an S3 bucket, Atlantis host can be configured with a default AWS profile that has permission to `s3:GetObject` and `s3:ListBucket` from the S3 bucket.
 
 ### Running policy check against Terraform source code
 
