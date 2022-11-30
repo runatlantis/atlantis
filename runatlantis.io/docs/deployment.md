@@ -563,7 +563,7 @@ If you need to modify the Docker image that we provide, for instance to add the 
 ### Microsoft Azure
 The standard [Kubernetes Helm Chart](#kubernetes-helm-chart) should work fine on [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/aks/intro-kubernetes).
 
-Another option is [Azure Container Instances](https://docs.microsoft.com/en-us/azure/container-instances/). See this community member's [repo](https://github.com/jplane/atlantis-on-aci) for install scripts and more information on running Atlantis on ACI.
+Another option is [Azure Container Instances](https://docs.microsoft.com/en-us/azure/container-instances/). See this community member's [repo](https://github.com/getindata/terraform-azurerm-atlantis) for Terraform module and more information on running Atlantis on ACI.
 
 ### Roll Your Own
 If you want to roll your own Atlantis installation, you can get the `atlantis`
