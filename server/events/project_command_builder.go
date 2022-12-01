@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -352,6 +353,15 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		workspace = cmd.Workspace
 	}
 
+	var pcc []command.ProjectContext
+
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return pcc, err
+	}
+
 	if p.StrictPlanFileList {
 		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
 		if err != nil {
@@ -368,12 +378,40 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 			}
 
 			if !foundDir {
-				return nil, fmt.Errorf("the dir \"%s\" is not in the plan list of this pull request", cmd.RepoRelDir)
+				return pcc, fmt.Errorf("the dir \"%s\" is not in the plan list of this pull request", cmd.RepoRelDir)
+			}
+		}
+
+		if cmd.ProjectName != "" {
+			var notFoundFiles = []string{}
+			var repoConfig valid.RepoCfg
+
+			repoConfig, err = p.ParserValidator.ParseRepoCfg(defaultRepoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+			if err != nil {
+				return pcc, err
+			}
+			repoCfgProjects := repoConfig.FindProjectsByName(cmd.ProjectName)
+
+			for _, f := range modifiedFiles {
+				foundDir := false
+
+				for _, p := range repoCfgProjects {
+					if filepath.Dir(f) == p.Dir {
+						foundDir = true
+					}
+				}
+
+				if !foundDir {
+					notFoundFiles = append(notFoundFiles, filepath.Dir(f))
+				}
+			}
+
+			if len(notFoundFiles) > 0 {
+				return pcc, fmt.Errorf("the following directories are present in the pull request but not in the requested project:\n%s", strings.Join(notFoundFiles, "\n"))
 			}
 		}
 	}
 
-	var pcc []command.ProjectContext
 	ctx.Log.Debug("building plan command")
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
 	if err != nil {
@@ -390,13 +428,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	repoRelDir := DefaultRepoRelDir
 	if cmd.RepoRelDir != "" {
 		repoRelDir = cmd.RepoRelDir
-	}
-
-	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
-	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
-	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
-	if err != nil {
-		return pcc, err
 	}
 
 	return p.buildProjectCommandCtx(
