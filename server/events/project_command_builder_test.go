@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
@@ -157,6 +158,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				scope,
 				logger,
@@ -424,6 +426,7 @@ projects:
 					&events.CommentParser{},
 					false,
 					true,
+					"",
 					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 					scope,
 					logger,
@@ -483,6 +486,33 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 					"main.tf": nil,
 				},
 			},
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			Exp: []expCtxFields{
+				{
+					ProjectName: "",
+					RepoRelDir:  "project1",
+					Workspace:   "default",
+				},
+				{
+					ProjectName: "",
+					RepoRelDir:  "project2",
+					Workspace:   "default",
+				},
+			},
+		},
+		"no projects in atlantis.yaml": {
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `
+version: 3
+parallel_plan: true
+`,
 			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
 			Exp: []expCtxFields{
 				{
@@ -578,6 +608,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				scope,
 				logger,
@@ -668,6 +699,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		scope,
 		logger,
@@ -752,6 +784,7 @@ projects:
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		scope,
 		logger,
@@ -830,6 +863,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				scope,
 				logger,
@@ -1033,6 +1067,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				scope,
 				logger,
@@ -1066,60 +1101,83 @@ projects:
 
 // Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
-	atlantisYAML := `
+	cases := []struct {
+		AtlantisYAML   string
+		ExpectedCtxs   int
+		ExpectedClones InvocationCountMatcher
+		ModifiedFiles  []string
+	}{
+		{
+			AtlantisYAML: `
 version: 3
 projects:
-- dir: dir1`
-
-	RegisterMockTestingT(t)
-	vcsClient := vcsmocks.NewMockClient()
-	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
-	When(vcsClient.SupportsSingleFileDownload(matchers.AnyModelsRepo())).ThenReturn(true)
-	When(vcsClient.DownloadRepoConfigFile(matchers.AnyModelsPullRequest())).ThenReturn(true, []byte(atlantisYAML), nil)
-	workingDir := mocks.NewMockWorkingDir()
-
-	logger := logging.NewNoopLogger(t)
-
-	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  true,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
-	}
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
-
-	builder := events.NewProjectCommandBuilder(
-		false,
-		&config.ParserValidator{},
-		&events.DefaultProjectFinder{},
-		vcsClient,
-		workingDir,
-		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfgFromArgs(globalCfgArgs),
-		&events.DefaultPendingPlanFinder{},
-		&events.CommentParser{},
-		true,
-		false,
-		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
-		scope,
-		logger,
-	)
-
-	var actCtxs []command.ProjectContext
-	var err error
-	actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
-		HeadRepo: models.Repo{},
-		Pull:     models.PullRequest{},
-		User:     models.User{},
-		Log:      logger,
-		Scope:    scope,
-		PullRequestStatus: models.PullReqStatus{
-			Mergeable: true,
+- dir: dir1`,
+			ExpectedCtxs:   0,
+			ExpectedClones: Never(),
+			ModifiedFiles:  []string{"dir2/main.tf"},
 		},
-	})
-	Ok(t, err)
-	Equals(t, 0, len(actCtxs))
-	workingDir.VerifyWasCalled(Never()).Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())
+		{
+			AtlantisYAML: `
+version: 3
+parallel_plan: true`,
+			ExpectedCtxs:   0,
+			ExpectedClones: Once(),
+			ModifiedFiles:  []string{"README.md"},
+		},
+	}
+
+	for _, c := range cases {
+		RegisterMockTestingT(t)
+		vcsClient := vcsmocks.NewMockClient()
+		When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+		When(vcsClient.SupportsSingleFileDownload(matchers.AnyModelsRepo())).ThenReturn(true)
+		When(vcsClient.DownloadRepoConfigFile(matchers.AnyModelsPullRequest())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
+		workingDir := mocks.NewMockWorkingDir()
+
+		logger := logging.NewNoopLogger(t)
+
+		globalCfgArgs := valid.GlobalCfgArgs{
+			AllowRepoCfg:  true,
+			MergeableReq:  false,
+			ApprovedReq:   false,
+			UnDivergedReq: false,
+		}
+		scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
+		builder := events.NewProjectCommandBuilder(
+			false,
+			&config.ParserValidator{},
+			&events.DefaultProjectFinder{},
+			vcsClient,
+			workingDir,
+			events.NewDefaultWorkingDirLocker(),
+			valid.NewGlobalCfgFromArgs(globalCfgArgs),
+			&events.DefaultPendingPlanFinder{},
+			&events.CommentParser{},
+			true,
+			false,
+			"",
+			"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+			scope,
+			logger,
+		)
+
+		var actCtxs []command.ProjectContext
+		var err error
+		actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
+			HeadRepo: models.Repo{},
+			Pull:     models.PullRequest{},
+			User:     models.User{},
+			Log:      logger,
+			Scope:    scope,
+			PullRequestStatus: models.PullReqStatus{
+				Mergeable: true,
+			},
+		})
+		Ok(t, err)
+		Equals(t, c.ExpectedCtxs, len(actCtxs))
+		workingDir.VerifyWasCalled(c.ExpectedClones).Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())
+	}
 }
 
 func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanCommand(t *testing.T) {
@@ -1157,6 +1215,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		scope,
 		logger,
@@ -1238,6 +1297,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		scope,
 		logger,

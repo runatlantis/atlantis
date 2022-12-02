@@ -33,6 +33,9 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/prometheus"
+
 	cfg "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -40,12 +43,13 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
-	"github.com/uber-go/tally"
-	"github.com/uber-go/tally/prometheus"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
+	"github.com/urfave/negroni"
+
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
@@ -63,8 +67,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/static"
-	"github.com/urfave/cli"
-	"github.com/urfave/negroni"
 )
 
 const (
@@ -318,6 +320,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
+	// default the project files used to generate the module index to the autoplan-file-list if autoplan-modules is true
+	// but no files are specified
+	if userConfig.AutoplanModules && userConfig.AutoplanModulesFromProjects == "" {
+		userConfig.AutoplanModulesFromProjects = userConfig.AutoplanFileList
+	}
+
 	var webhooksConfig []webhooks.Config
 	for _, c := range userConfig.Webhooks {
 		config := webhooks.Config{
@@ -533,6 +541,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commentParser,
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
+		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
 		statsScope,
 		logger,
