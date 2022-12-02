@@ -244,12 +244,23 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	case models.SuccessCommitStatus:
 		gitlabState = gitlab.Success
 	}
+
+	mr, _ := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
+	refTarget := ""
+
+	if mr.Pipeline == nil {
+		refTarget = pull.HeadBranch
+	} else if mr.Pipeline.Source == "merge_request_event" {
+		refTarget = fmt.Sprintf("refs/merge-requests/%v/head", pull.Num)
+	} else {
+		refTarget = pull.HeadBranch
+	}
 	_, _, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
 		State:       gitlabState,
 		Context:     gitlab.String(src),
 		Description: gitlab.String(description),
 		TargetURL:   &url,
-		Ref:         gitlab.String(pull.HeadBranch),
+		Ref:         gitlab.String(refTarget),
 	})
 	return err
 }
