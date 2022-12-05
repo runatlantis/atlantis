@@ -249,7 +249,6 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	if err != nil {
 		return err
 	}
-	
 	// refTarget is set to current branch if no pipeline is assigned to the commit,
 	// otherwise it is set to the pipeline created by the merge_request_event rule
 	refTarget := pull.HeadBranch

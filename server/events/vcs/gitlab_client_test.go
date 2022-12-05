@@ -218,7 +218,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 						w.Write([]byte("{}")) // nolint: errcheck
 					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
 						w.WriteHeader(http.StatusOK)
-						w.Write([]byte(pipelineSuccess)) // nolint: errcheck					
+						w.Write([]byte(pipelineSuccess)) // nolint: errcheck
 					case "/api/v4/":
 						// Rate limiter requests.
 						w.WriteHeader(http.StatusOK)
