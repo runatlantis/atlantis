@@ -3,7 +3,9 @@ FROM golang:1.19.3-alpine AS builder
 
 WORKDIR /app
 COPY . /app
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
 
 # Stage 2
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
