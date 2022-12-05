@@ -44,7 +44,7 @@ require (
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.23.0
 	golang.org/x/term v0.2.0
-	golang.org/x/text v0.4.0
+	golang.org/x/text v0.5.0
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/yaml.v2 v2.4.0
 )
