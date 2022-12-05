@@ -141,34 +141,72 @@ func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 }
 
 func TestDefaultProjectLocker_RepoLocking(t *testing.T) {
-	RegisterMockTestingT(t)
 	var githubClient *vcs.GithubClient
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
-	mockLocker := mocks.NewMockLocker()
-	noOpLocker := mocks.NewMockLocker()
-	locker := events.DefaultProjectLocker{
-		Locker:     mockLocker,
-		NoOpLocker: noOpLocker,
-		VCSClient:  mockClient,
-	}
 	expProject := models.Project{}
 	expWorkspace := "default"
 	expPull := models.PullRequest{Num: 2}
 	expUser := models.User{}
-
 	lockKey := "key"
-	When(noOpLocker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
-		locking.TryLockResponse{
-			LockAcquired: true,
-			CurrLock:     models.ProjectLock{},
-			LockKey:      lockKey,
-		},
-		nil,
-	)
-	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, false)
-	Ok(t, err)
-	Equals(t, true, res.LockAcquired)
 
-	// default locker was never called
-	mockLocker.VerifyWasCalled(Never()).TryLock(expProject, expWorkspace, expPull, expUser)
+	tests := []struct {
+		name        string
+		repoLocking bool
+		setup       func(locker *mocks.MockLocker, noOpLocker *mocks.MockLocker)
+		verify      func(locker *mocks.MockLocker, noOpLocker *mocks.MockLocker)
+	}{
+		{
+			"enable repo locking",
+			true,
+			func(locker *mocks.MockLocker, noOpLocker *mocks.MockLocker) {
+				When(locker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
+					locking.TryLockResponse{
+						LockAcquired: true,
+						CurrLock:     models.ProjectLock{},
+						LockKey:      lockKey,
+					},
+					nil,
+				)
+			},
+			func(locker *mocks.MockLocker, noOpLocker *mocks.MockLocker) {
+				locker.VerifyWasCalledOnce().TryLock(expProject, expWorkspace, expPull, expUser)
+				noOpLocker.VerifyWasCalled(Never()).TryLock(expProject, expWorkspace, expPull, expUser)
+			},
+		},
+		{
+			"disable repo locking",
+			false,
+			func(locker *mocks.MockLocker, noOpLocker *mocks.MockLocker) {
+				When(noOpLocker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
+					locking.TryLockResponse{
+						LockAcquired: true,
+						CurrLock:     models.ProjectLock{},
+						LockKey:      lockKey,
+					},
+					nil,
+				)
+			},
+			func(locker *mocks.MockLocker, noOpLocker *mocks.MockLocker) {
+				locker.VerifyWasCalled(Never()).TryLock(expProject, expWorkspace, expPull, expUser)
+				noOpLocker.VerifyWasCalledOnce().TryLock(expProject, expWorkspace, expPull, expUser)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockLocker := mocks.NewMockLocker()
+			mockNoOpLocker := mocks.NewMockLocker()
+			locker := events.DefaultProjectLocker{
+				Locker:     mockLocker,
+				NoOpLocker: mockNoOpLocker,
+				VCSClient:  mockClient,
+			}
+			tt.setup(mockLocker, mockNoOpLocker)
+			res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, tt.repoLocking)
+			Ok(t, err)
+			Equals(t, true, res.LockAcquired)
+			tt.verify(mockLocker, mockNoOpLocker)
+		})
+	}
 }
