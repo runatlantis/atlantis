@@ -41,8 +41,6 @@ const (
 	autoMergeDisabledFlagShort = ""
 	verboseFlagLong            = "verbose"
 	verboseFlagShort           = ""
-	filterFlagLong             = "filter"
-	filterFlagShort            = "f"
 	atlantisExecutable         = "atlantis"
 )
 
@@ -184,7 +182,6 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var verbose, autoMergeDisabled bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
-	var filter string
 
 	// Set up the flag parsing depending on the command.
 	switch cmd {
@@ -196,7 +193,6 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Which project to run plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", config.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
-		flagSet.StringVarP(&filter, filterFlagLong, filterFlagShort, "", "Filter which directories to run plan based on the specified pattern. Cannot be used at same time as dir or project flags.")
 	case command.Apply.String():
 		name = command.Apply
 		flagSet = pflag.NewFlagSet(command.Apply.String(), pflag.ContinueOnError)
@@ -206,7 +202,6 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", config.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
-		flagSet.StringVarP(&filter, filterFlagLong, filterFlagShort, "", "Filter which directories to run apply based on the specified pattern. Cannot be used at same time as dir or project flags.")
 	case command.ApprovePolicies.String():
 		name = command.ApprovePolicies
 		flagSet = pflag.NewFlagSet(command.ApprovePolicies.String(), pflag.ContinueOnError)
@@ -260,21 +255,11 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
 
-	filter, err = e.validateFilter(filter)
-	if err != nil {
-		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
-	}
-
 	// Use the same validation that Terraform uses: https://git.io/vxGhU. Plus
 	// we also don't allow '..'. We don't want the workspace to contain a path
 	// since we create files based on the name.
 	if workspace != url.PathEscape(workspace) || strings.Contains(workspace, "..") {
 		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace: %q", workspace), cmd, flagSet)}
-	}
-
-	if filter != "" && (dir != "" || project != "") {
-		err := fmt.Sprintf("cannot use -%s/--%s at same time as -%s/--%s or -%s/--%s", filterFlagShort, filterFlagLong, dirFlagShort, dirFlagLong, projectFlagShort, projectFlagLong)
-		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 	}
 
 	// If project is specified, dir or workspace should not be set. Since we
@@ -288,7 +273,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, verbose, autoMergeDisabled, workspace, project, filter),
+		Command: NewCommentCommand(dir, extraArgs, name, verbose, autoMergeDisabled, workspace, project),
 	}
 }
 
@@ -367,21 +352,6 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 	}
 
 	return validatedDir, nil
-}
-
-func (e *CommentParser) validateFilter(filter string) (string, error) {
-	if filter == "" {
-		return filter, nil
-	}
-
-	validatedFilter := strings.TrimPrefix(filter, "./")
-
-	_, err := filepath.Match("", validatedFilter)
-	if err != nil {
-		return "", fmt.Errorf("invalid filter pattern %s", filter)
-	}
-
-	return validatedFilter, nil
 }
 
 func (e *CommentParser) stringInSlice(a string, list []string) bool {

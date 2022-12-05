@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/uber-go/tally"
 
@@ -189,7 +190,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 
 // See ProjectCommandBuilder.BuildPlanCommands.
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
-	if !cmd.IsForSpecificProject() {
+	if !cmd.IsForSpecificProject() || (p.EnableRegExpCmd && cmd.HasDirPatternMatching()) {
 		return p.buildPlanAllCommands(ctx, cmd)
 	}
 	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
@@ -198,7 +199,7 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, c
 
 // See ProjectCommandBuilder.BuildApplyCommands.
 func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
-	if !cmd.IsForSpecificProject() {
+	if !cmd.IsForSpecificProject() || (p.EnableRegExpCmd && cmd.HasDirPatternMatching()) {
 		return p.buildAllProjectCommands(ctx, cmd)
 	}
 	pac, err := p.buildProjectApplyCommand(ctx, cmd)
@@ -299,8 +300,8 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			return nil, err
 		}
 
-		if cmd.Filter != "" {
-			filteredProjects, err := filterValidProjects(matchingProjects, cmd.Filter)
+		if p.EnableRegExpCmd && cmd.RepoRelDir != "" {
+			filteredProjects, err := filterValidProjects(matchingProjects, cmd.RepoRelDir)
 			if err != nil {
 				return nil, err
 			}
@@ -342,8 +343,8 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 
-		if cmd.Filter != "" {
-			filteredProjects, err := filterProjects(modifiedProjects, cmd.Filter)
+		if p.EnableRegExpCmd && cmd.RepoRelDir != "" {
+			filteredProjects, err := filterProjects(modifiedProjects, cmd.RepoRelDir)
 			if err != nil {
 				return nil, err
 			}
@@ -500,8 +501,8 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *command.Cont
 		return nil, err
 	}
 
-	if commentCmd.Filter != "" {
-		filteredPlans, err := filterPlans(plans, commentCmd.Filter)
+	if p.EnableRegExpCmd && commentCmd.RepoRelDir != "" {
+		filteredPlans, err := filterPlans(plans, commentCmd.RepoRelDir)
 		if err != nil {
 			return nil, err
 		}
@@ -701,9 +702,10 @@ func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(repoCfg *valid.R
 }
 
 func filterProjects(projects []models.Project, filter string) ([]models.Project, error) {
+	trimmedFilter := strings.TrimPrefix(filter, "./")
 	filteredProjects := make([]models.Project, 0, len(projects))
 	for _, proj := range projects {
-		match, err := filepath.Match(filter, proj.Path)
+		match, err := filepath.Match(trimmedFilter, proj.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -715,9 +717,10 @@ func filterProjects(projects []models.Project, filter string) ([]models.Project,
 }
 
 func filterValidProjects(projects []valid.Project, filter string) ([]valid.Project, error) {
+	trimmedFilter := strings.TrimPrefix(filter, "./")
 	filteredProjects := make([]valid.Project, 0, len(projects))
 	for _, proj := range projects {
-		match, err := filepath.Match(filter, proj.Dir)
+		match, err := filepath.Match(trimmedFilter, proj.Dir)
 		if err != nil {
 			return nil, err
 		}
@@ -729,9 +732,10 @@ func filterValidProjects(projects []valid.Project, filter string) ([]valid.Proje
 }
 
 func filterPlans(plans []PendingPlan, filter string) ([]PendingPlan, error) {
+	trimmedFilter := strings.TrimPrefix(filter, "./")
 	filteredPlans := make([]PendingPlan, 0, len(plans))
 	for _, plan := range plans {
-		match, err := filepath.Match(filter, plan.RepoRelDir)
+		match, err := filepath.Match(trimmedFilter, plan.RepoRelDir)
 		if err != nil {
 			return nil, err
 		}
