@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -123,6 +124,8 @@ projects:
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
+	terraformClient := terraform_mocks.NewMockClient()
+
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -163,6 +166,7 @@ projects:
 				false,
 				scope,
 				logger,
+				terraformClient,
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -415,6 +419,8 @@ projects:
 					UnDivergedReq: false,
 				}
 
+				terraformClient := terraform_mocks.NewMockClient()
+
 				builder := events.NewProjectCommandBuilder(
 					false,
 					&config.ParserValidator{},
@@ -432,6 +438,7 @@ projects:
 					false,
 					scope,
 					logger,
+					terraformClient,
 				)
 
 				var actCtxs []command.ProjectContext
@@ -588,6 +595,8 @@ projects:
 				UnDivergedReq: false,
 			}
 
+			terraformClient := terraform_mocks.NewMockClient()
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&config.ParserValidator{},
@@ -605,6 +614,7 @@ projects:
 				true,
 				scope,
 				logger,
+				terraformClient,
 			)
 
 			var actCtxs []command.ProjectContext
@@ -758,6 +768,8 @@ projects:
 				UnDivergedReq: false,
 			}
 
+			terraformClient := terraform_mocks.NewMockClient()
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&config.ParserValidator{},
@@ -775,6 +787,7 @@ projects:
 				false,
 				scope,
 				logger,
+				terraformClient,
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -850,6 +863,8 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	}
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
+	terraformClient := terraform_mocks.NewMockClient()
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&config.ParserValidator{},
@@ -867,6 +882,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		false,
 		scope,
 		logger,
+		terraformClient,
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -935,6 +951,7 @@ projects:
 	}
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	terraformClient := terraform_mocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -953,6 +970,7 @@ projects:
 		false,
 		scope,
 		logger,
+		terraformClient,
 	)
 
 	ctx := &command.Context{
@@ -1016,6 +1034,8 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				UnDivergedReq: false,
 			}
 
+			terraformClient := terraform_mocks.NewMockClient()
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&config.ParserValidator{},
@@ -1033,6 +1053,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				false,
 				scope,
 				logger,
+				terraformClient,
 			)
 
 			var actCtxs []command.ProjectContext
@@ -1220,6 +1241,7 @@ projects:
 				ApprovedReq:   false,
 				UnDivergedReq: false,
 			}
+			terraformClient := terraform_mocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1238,6 +1260,7 @@ projects:
 				false,
 				scope,
 				logger,
+				terraformClient,
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -1310,6 +1333,7 @@ parallel_plan: true`,
 			UnDivergedReq: false,
 		}
 		scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+		terraformClient := terraform_mocks.NewMockClient()
 
 		builder := events.NewProjectCommandBuilder(
 			false,
@@ -1328,6 +1352,7 @@ parallel_plan: true`,
 			false,
 			scope,
 			logger,
+			terraformClient,
 		)
 
 		var actCtxs []command.ProjectContext
@@ -1370,6 +1395,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	terraformClient := terraform_mocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		true,
@@ -1388,6 +1414,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		false,
 		scope,
 		logger,
+		terraformClient,
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -1453,6 +1480,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		ApprovedReq:   false,
 		UnDivergedReq: false,
 	}
+	terraformClient := terraform_mocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1471,6 +1499,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		false,
 		scope,
 		logger,
+		terraformClient,
 	)
 
 	ctxs, err := builder.BuildVersionCommands(

@@ -61,6 +61,25 @@ func (mock *MockClient) EnsureVersion(log logging.SimpleLogging, v *go_version.V
 	return ret0
 }
 
+func (mock *MockClient) ListAvailableVersions(log logging.SimpleLogging) ([]string, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockClient().")
+	}
+	params := []pegomock.Param{log}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ListAvailableVersions", params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 []string
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].([]string)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockClient) VerifyWasCalledOnce() *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
@@ -171,6 +190,33 @@ func (c *MockClient_EnsureVersion_OngoingVerification) GetAllCapturedArguments()
 		_param1 = make([]*go_version.Version, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(*go_version.Version)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockClient) ListAvailableVersions(log logging.SimpleLogging) *MockClient_ListAvailableVersions_OngoingVerification {
+	params := []pegomock.Param{log}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ListAvailableVersions", params, verifier.timeout)
+	return &MockClient_ListAvailableVersions_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockClient_ListAvailableVersions_OngoingVerification struct {
+	mock              *MockClient
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockClient_ListAvailableVersions_OngoingVerification) GetCapturedArguments() logging.SimpleLogging {
+	log := c.GetAllCapturedArguments()
+	return log[len(log)-1]
+}
+
+func (c *MockClient_ListAvailableVersions_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(logging.SimpleLogging)
 		}
 	}
 	return

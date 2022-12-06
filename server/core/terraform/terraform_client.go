@@ -30,6 +30,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+	"github.com/warrensbox/terraform-switcher/lib"
 
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -53,6 +54,8 @@ type Client interface {
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
+
+	ListAvailableVersions(log logging.SimpleLogging) ([]string, error)
 }
 
 type DefaultClient struct {
@@ -260,6 +263,14 @@ func (c *DefaultClient) DefaultVersion() *version.Version {
 // TerraformBinDir returns the directory where we download Terraform binaries.
 func (c *DefaultClient) TerraformBinDir() string {
 	return c.binDir
+}
+
+// ListAvailableVersions returns all available version of Terraform. If downloads are disabled, this will return an empty list.
+func (c *DefaultClient) ListAvailableVersions(log logging.SimpleLogging) ([]string, error) {
+	url := fmt.Sprintf("%s/terraform", c.downloadBaseURL)
+	log.Debug("Listing Terraform versions available at: %s", url)
+	versions, err := lib.GetTFList(url, true)
+	return versions, err
 }
 
 // See Client.EnsureVersion.

@@ -557,6 +557,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.RestrictFileList,
 		statsScope,
 		logger,
+		terraformClient,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
