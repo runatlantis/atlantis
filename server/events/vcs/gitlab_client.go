@@ -253,7 +253,8 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	// otherwise it is set to the pipeline created by the merge_request_event rule
 	refTarget := pull.HeadBranch
 	if mr.Pipeline != nil {
-		if mr.Pipeline.Source == "merge_request_event" {
+		switch mr.Pipeline.Source {
+		case "merge_request_event":
 			refTarget = fmt.Sprintf("refs/merge-requests/%d/head", pull.Num)
 		}
 	}
