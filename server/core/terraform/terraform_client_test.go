@@ -76,7 +76,7 @@ is 0.11.13. You can update by downloading from developer.hashicorp.com/terraform
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, false, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -110,7 +110,7 @@ is 0.11.13. You can update by downloading from developer.hashicorp.com/terraform
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, false, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -131,8 +131,8 @@ func TestNewClient_NoTF(t *testing.T) {
 	// Set PATH to only include our empty directory.
 	defer tempSetEnv(t, "PATH", tmp)()
 
-	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
-	ErrEquals(t, "terraform not found in $PATH. Set --default-tf-version or download terraform from https://developer.hashicorp.com/terraform/downloads", err)
+	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, false, true, projectCmdOutputHandler)
+	ErrEquals(t, "terraform not found in $PATH. Set --default-tf-version or download terraform from https://www.terraform.io/downloads.html", err)
 }
 
 // Test that if the default-tf flag is set and that binary is in our PATH
@@ -154,7 +154,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, false, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -182,7 +182,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(logging.NewNoopLogger(t), binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
+	c, err := terraform.NewClient(logging.NewNoopLogger(t), binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, false, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -214,7 +214,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 		err := os.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0700) // #nosec G306
 		return []pegomock.ReturnValue{err}
 	})
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, "https://my-mirror.releases.mycompany.com", mockDownloader, true, projectCmdOutputHandler)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, "https://my-mirror.releases.mycompany.com", mockDownloader, false, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -240,7 +240,7 @@ func TestNewClient_BadVersion(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	_, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
+	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, false, true, projectCmdOutputHandler)
 	ErrEquals(t, "Malformed version: malformed", err)
 }
 
@@ -269,7 +269,7 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 		return []pegomock.ReturnValue{err}
 	})
 
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true, projectCmdOutputHandler)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, false, true, projectCmdOutputHandler)
 	Ok(t, err)
 	Equals(t, "0.11.10", c.DefaultVersion().String())
 
@@ -291,7 +291,7 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 
 	mockDownloader := mocks.NewMockDownloader()
 
-	c, err := terraform.NewTestClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true, projectCmdOutputHandler)
+	c, err := terraform.NewTestClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, false, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Equals(t, "0.11.10", c.DefaultVersion().String())
