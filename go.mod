@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/alicebob/miniredis/v2 v2.23.1
 	github.com/bradleyfalzon/ghinstallation/v2 v2.1.0
 	github.com/briandowns/spinner v1.19.0
@@ -14,7 +14,7 @@ require (
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/go-test/deep v1.0.8
-	github.com/golang-jwt/jwt/v4 v4.4.2
+	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/google/go-github/v31 v31.0.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
@@ -42,7 +42,7 @@ require (
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
 	github.com/xanzy/go-gitlab v0.76.0
 	go.etcd.io/bbolt v1.3.6
-	go.uber.org/zap v1.23.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/term v0.2.0
 	golang.org/x/text v0.5.0
 	gopkg.in/go-playground/validator.v9 v9.31.0
@@ -78,7 +78,7 @@ require (
 	cloud.google.com/go/iam v0.7.0 // indirect
 	cloud.google.com/go/storage v1.28.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.1.1 // indirect
+	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
