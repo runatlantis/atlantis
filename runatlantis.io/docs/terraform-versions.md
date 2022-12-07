@@ -15,13 +15,17 @@ projects:
 See [atlantis.yaml Use Cases](repo-level-atlantis-yaml.html#terraform-versions) for more details.
 
 ## Via terraform config
-Alternatively, one can use the terraform configuration block's `required_version` key to specify an *exact* version:
+Alternatively, one can use the terraform configuration block's `required_version` key to [specify an exact version or version constraint](https://developer.hashicorp.com/terraform/language/expressions/version-constraints#version-constraint-syntax):
 ```tf
 terraform {
   required_version = "0.12.0"
 }
 ```
-See [Terraform `required_version`](https://www.terraform.io/language/settings) for reference.
+See [Terraform `required_version`](https://developer.hashicorp.com/terraform/language/settings#specifying-a-required-terraform-version) for reference.
+
+::: tip NOTE
+A `terraform_version` specified in the `atlantis.yaml` file takes precedence over both the default version and the `required_version` in the terraform config.
+:::
 
 ::: tip NOTE
 Atlantis will automatically download the version specified.
