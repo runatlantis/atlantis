@@ -279,10 +279,10 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 	// Now switch back to master and advance the master branch by another
 	// commit.
-	runCmd(t, repoDir, "git", "checkout", "master")
-	runCmd(t, repoDir, "touch", "master-file")
-	runCmd(t, repoDir, "git", "add", "master-file")
-	runCmd(t, repoDir, "git", "commit", "-m", "master-commit")
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-file")
+	runCmd(t, repoDir, "git", "add", "main-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "main-commit")
 
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 
@@ -305,7 +305,7 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 		cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
 			BaseRepo:   models.Repo{},
 			HeadBranch: "branch",
-			BaseBranch: "master",
+			BaseBranch: "main",
 		}, "default")
 		Ok(t, err)
 		Equals(t, false, hasDiverged)
@@ -333,7 +333,7 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 		cloneDir, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
 			BaseRepo:   models.Repo{},
 			HeadBranch: "branch",
-			BaseBranch: "master",
+			BaseBranch: "main",
 		}, "default")
 		Ok(t, err)
 		Equals(t, false, hasDiverged)
