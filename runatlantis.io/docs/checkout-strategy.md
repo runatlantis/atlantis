@@ -48,9 +48,9 @@ commit is pushed to `main` **after** Atlantis runs `plan`, nothing will happen.
 :::
 
 To optimize cloning time Atlantis does not fetch full repository in this mode. Instead, shallow clone of two branches is performed. The depth of clone is specified by `--checkout-depth` flag. Default value is 50 commits. The cloning is performed in a following manner:
-* Shallow clone of `master` branch is performed with depth of `--checkout-depth` value.
+* Shallow clone of `main` branch is performed with depth of `--checkout-depth` value.
 * `branch` is retrieved, including the same amount of commits.
-* Merge base of `master` and `branch` is checked for existence in the shallow clone.
+* Merge base of `main` and `branch` is checked for existence in the shallow clone.
 * If the merge base is not present, it means that either of branches are ahead of merge base by more than `--checkout-depth` commits. In this case full repo history is fetched.
 
 If your commit history often diverges by more than 50 commits you could tune the `--checkout-depth` parameter to avoid full fetches.
