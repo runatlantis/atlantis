@@ -28,7 +28,8 @@ For this you'll need to:
   * `incoming-webhook`
   * `mpim:read`
 * Install the app onto your Slack workspace
-* Create a channel in your Slack workspace (e.g. `my-channel`), and add the app to it
+* Create a channel in your Slack workspace (e.g. `my-channel`) or use existing
+* Add the app to Created channel or existing channel ( cklick channel name then tab integrations, there Click "Add apps"
 
 ## Configuring Atlantis
 

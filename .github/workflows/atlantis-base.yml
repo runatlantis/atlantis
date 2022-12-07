@@ -47,6 +47,8 @@ jobs:
     - name: Build and push atlantis-base:${{env.TODAY}} image
       uses: docker/build-push-action@v3
       with:
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
         context: docker-base
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: ${{ github.event_name != 'pull_request' }}

@@ -1,11 +1,11 @@
-FROM golang:1.19
+FROM golang:1.19.3
 
 RUN apt-get update && apt-get --no-install-recommends -y install unzip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Terraform
-ENV TERRAFORM_VERSION=1.3.5
+ENV TERRAFORM_VERSION=1.3.6
 RUN case $(uname -m) in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
     wget -nv -O terraform.zip https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${ARCH}.zip && \
     mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \

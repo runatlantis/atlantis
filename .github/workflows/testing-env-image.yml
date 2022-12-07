@@ -43,6 +43,8 @@ jobs:
     - name: Build and push testing-env:${{env.TODAY}} image
       uses: docker/build-push-action@v3
       with:
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
         context: testing
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: ${{ github.event_name != 'pull_request' }}
