@@ -3,17 +3,19 @@ FROM golang:1.19.3-alpine AS builder
 
 WORKDIR /app
 COPY . /app
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
 
 # Stage 2
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM ghcr.io/runatlantis/atlantis-base:2022.11.24 AS base
+FROM ghcr.io/runatlantis/atlantis-base:2022.12.05 AS base
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=1.3.5
+ENV DEFAULT_TERRAFORM_VERSION=1.3.6
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
