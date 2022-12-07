@@ -261,8 +261,7 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 
 func TestClone_CheckoutMergeShallow(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	runCmd(t, repoDir, "git", "commit", "--allow-empty", "-m", "should not be cloned")
 	oldCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
@@ -289,8 +288,7 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 	// Test that we don't check out full repo if using CheckoutMerge strategy
 	t.Run("Shallow", func(t *testing.T) {
-		dataDir, cleanup2 := TempDir(t)
-		defer cleanup2()
+		dataDir := TempDir(t)
 
 		wd := &events.FileWorkspace{
 			DataDir:       dataDir,
@@ -320,8 +318,7 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 	// Test that we will check out full repo if CheckoutDepth is too small
 	t.Run("FullClone", func(t *testing.T) {
-		dataDir, cleanup2 := TempDir(t)
-		defer cleanup2()
+		dataDir := TempDir(t)
 
 		wd := &events.FileWorkspace{
 			DataDir:       dataDir,
