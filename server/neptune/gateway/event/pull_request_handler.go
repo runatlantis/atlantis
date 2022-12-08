@@ -13,10 +13,11 @@ import (
 
 // PullRequestEvent is our internal representation of a vcs based pr event
 type PullRequest struct {
-	Pull      models.PullRequest
-	User      models.User
-	EventType models.PullRequestEventType
-	Timestamp time.Time
+	Pull              models.PullRequest
+	User              models.User
+	EventType         models.PullRequestEventType
+	Timestamp         time.Time
+	InstallationToken int64
 }
 
 func NewAutoplannerValidatorProxy(

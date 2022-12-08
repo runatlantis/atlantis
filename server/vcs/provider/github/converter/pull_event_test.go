@@ -18,6 +18,9 @@ var PullEvent = github.PullRequestEvent{
 	Repo:        &Repo,
 	PullRequest: &Pull,
 	Action:      github.String("opened"),
+	Installation: &github.Installation{
+		ID: github.Int64(1),
+	},
 }
 
 func TestConvert_PullRequestEvent(t *testing.T) {
@@ -78,6 +81,7 @@ func TestConvert_PullRequestEvent(t *testing.T) {
 	}, actPull.Pull)
 	Equals(t, models.OpenedPullEvent, actPull.EventType)
 	Equals(t, models.User{Username: "user"}, actPull.User)
+	Equals(t, int64(1), actPull.InstallationToken)
 }
 
 func TestConvert_PullRequestEvent_Draft(t *testing.T) {
@@ -102,6 +106,7 @@ func TestConvert_PullRequestEvent_Draft(t *testing.T) {
 	pull, err = subject.Convert(&testEvent)
 	Ok(t, err)
 	Equals(t, models.OpenedPullEvent, pull.EventType)
+	Equals(t, int64(1), pull.InstallationToken)
 }
 
 func TestConvert_PullRequestEvent_EventType(t *testing.T) {
@@ -196,6 +201,7 @@ func TestConvert_PullRequestEvent_EventType(t *testing.T) {
 			subjectDraft.AllowDraftPRs = true
 			pull, err = subjectDraft.Convert(&event)
 			Ok(t, err)
+			Equals(t, int64(1), pull.InstallationToken)
 			Equals(t, c.exp, pull.EventType)
 		})
 	}

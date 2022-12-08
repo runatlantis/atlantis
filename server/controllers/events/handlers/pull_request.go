@@ -28,6 +28,7 @@ func (p *Autoplanner) Handle(ctx context.Context, _ *http.BufferedRequest, event
 		event.Pull,
 		event.User,
 		event.Timestamp,
+		event.InstallationToken,
 	)
 
 	return nil

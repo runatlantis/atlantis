@@ -202,7 +202,7 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	headRepo := fixtures.GithubRepo
 	headRepo.FullName = "forkrepo/atlantis"
 	headRepo.Owner = "forkrepo"
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, headRepo, modelPull, fixtures.User, fixtures.Pull.Num, nil, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, headRepo, modelPull, fixtures.User, fixtures.Pull.Num, nil, time.Now(), 0)
 	commentMessage := "Atlantis commands can't be run on fork pull requests."
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, commentMessage, "")
 }
@@ -222,7 +222,7 @@ func TestRunCommentCommand_PreWorkflowHookError(t *testing.T) {
 
 			ch.PreWorkflowHooksCommandRunner = preWorkflowHooksCommandRunner
 
-			ch.RunCommentCommand(ctx, fixtures.GithubRepo, modelPull.BaseRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: cmd}, time.Now())
+			ch.RunCommentCommand(ctx, fixtures.GithubRepo, modelPull.BaseRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: cmd}, time.Now(), 0)
 			_, _, _, status, cmdName, _, _ := vcsUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsVcsStatus(), matchers.AnyCommandName(), AnyString(), AnyString()).GetCapturedArguments()
 			Equals(t, models.FailedVCSStatus, status)
 			Equals(t, cmd, cmdName)
@@ -241,7 +241,7 @@ func TestRunCommentCommand_PreWorkflowHookError(t *testing.T) {
 
 		ch.PreWorkflowHooksCommandRunner = preWorkflowHooksCommandRunner
 
-		ch.RunCommentCommand(ctx, fixtures.GithubRepo, modelPull.BaseRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
+		ch.RunCommentCommand(ctx, fixtures.GithubRepo, modelPull.BaseRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now(), 0)
 		_, _, _, status, cmdName, _, _ := vcsUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsVcsStatus(), matchers.AnyCommandName(), AnyString(), AnyString()).GetCapturedArguments()
 		Equals(t, models.FailedVCSStatus, status)
 		Equals(t, command.PolicyCheck, cmdName)
@@ -255,7 +255,7 @@ func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) 
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now(), 0)
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 	vcsUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 		matchers.AnyContextContext(),
@@ -278,7 +278,7 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, modelPull.Num, &command.Comment{Name: command.Apply}, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, modelPull.Num, &command.Comment{Name: command.Apply}, time.Now(), 0)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "**Error:** Running `atlantis apply` without flags is disabled. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags.", "apply")
 }
 
@@ -295,7 +295,7 @@ func TestForceApplyRunCommentCommandRunner_CommentWhenEnabled(t *testing.T) {
 
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
 
-	fa.RunCommentCommand(ctx, fixtures.GithubRepo, models.Repo{}, models.PullRequest{}, fixtures.User, modelPull.Num, &command.Comment{Name: command.Apply, ForceApply: true}, time.Now())
+	fa.RunCommentCommand(ctx, fixtures.GithubRepo, models.Repo{}, models.PullRequest{}, fixtures.User, modelPull.Num, &command.Comment{Name: command.Apply, ForceApply: true}, time.Now(), 0)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "⚠️ WARNING ⚠️\n\n You have bypassed all apply requirements for this PR 🚀 . This can have unpredictable consequences 🙏🏽 and should only be used in an emergency 🆘 .\n\n 𝐓𝐡𝐢𝐬 𝐚𝐜𝐭𝐢𝐨𝐧 𝐰𝐢𝐥𝐥 𝐛𝐞 𝐚𝐮𝐝𝐢𝐭𝐞𝐝.\n", "")
 }
 
@@ -316,7 +316,7 @@ func TestRunCommentCommand_DisableDisableAutoplan(t *testing.T) {
 			},
 		}, nil)
 
-	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now())
+	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now(), 0)
 	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())
 }
 
@@ -327,7 +327,7 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 	ctx := context.Background()
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.ClosedPullState, Num: fixtures.Pull.Num}
 
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, nil, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, nil, time.Now(), 0)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on closed pull requests", "")
 }
 
@@ -342,7 +342,7 @@ func TestRunCommentCommand_MatchedBranch(t *testing.T) {
 	})
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, BaseBranch: "main"}
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Plan}, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Plan}, time.Now(), 0)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Ran Plan for 0 projects:\n\n\n\n", "plan")
 }
 
@@ -357,7 +357,7 @@ func TestRunCommentCommand_UnmatchedBranch(t *testing.T) {
 	})
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, BaseBranch: "foo"}
 
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Plan}, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Plan}, time.Now(), 0)
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
@@ -370,7 +370,7 @@ func TestRunUnlockCommand_VCSComment(t *testing.T) {
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Unlock}, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Unlock}, time.Now(), 0)
 
 	deleteLockCommand.VerifyWasCalledOnce().DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "All Atlantis locks for this PR have been unlocked and plans discarded", "unlock")
@@ -386,7 +386,7 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 	When(deleteLockCommand.DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(0, errors.New("err"))
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Unlock}, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Unlock}, time.Now(), 0)
 
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Failed to delete PR locks", "unlock")
 }
@@ -403,7 +403,7 @@ func TestRunAutoplanCommand_PreWorkflowHookError(t *testing.T) {
 
 	ch.PreWorkflowHooksCommandRunner = preWorkflowHooksCommandRunner
 
-	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now())
+	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now(), 0)
 	_, _, _, status, cmdName, _, _ := vcsUpdater.VerifyWasCalledOnce().UpdateCombined(matchers.AnyContextContext(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyModelsVcsStatus(), matchers.AnyCommandName(), AnyString(), AnyString()).GetCapturedArguments()
 	Equals(t, models.FailedVCSStatus, status)
 	Equals(t, command.Plan, cmdName)
@@ -431,7 +431,7 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 
 	When(workingDir.GetPullDir(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(tmp, nil)
 
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.ApprovePolicies}, time.Now(), 0)
 	vcsUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
@@ -480,7 +480,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 
 	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, fixtures.Pull.Num, &command.Comment{
 		Name: command.ApprovePolicies,
-	}, time.Now())
+	}, time.Now(), 0)
 	vcsUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 		matchers.AnyContextContext(),
 		matchers.AnyModelsRepo(),
@@ -536,7 +536,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	})
 
 	When(workingDir.GetPullDir(fixtures.GithubRepo, modelPull)).ThenReturn(tmp, nil)
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, modelPull, fixtures.User, fixtures.Pull.Num, &command.Comment{Name: command.Apply}, time.Now(), 0)
 }
 
 func TestRunCommentCommand_DrainOngoing(t *testing.T) {
@@ -544,7 +544,7 @@ func TestRunCommentCommand_DrainOngoing(t *testing.T) {
 	vcsClient := setup(t)
 	ctx := context.Background()
 	drainer.ShutdownBlocking()
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, models.PullRequest{}, fixtures.User, fixtures.Pull.Num, nil, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, models.PullRequest{}, fixtures.User, fixtures.Pull.Num, nil, time.Now(), 0)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Atlantis server is shutting down, please try again later.", "")
 }
 
@@ -552,7 +552,7 @@ func TestRunCommentCommand_DrainNotOngoing(t *testing.T) {
 	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occurred")
 	setup(t)
 	ctx := context.Background()
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, models.PullRequest{}, fixtures.User, fixtures.Pull.Num, nil, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, models.PullRequest{}, fixtures.User, fixtures.Pull.Num, nil, time.Now(), 0)
 	Equals(t, 0, drainer.GetStatus().InProgressOps)
 }
 
@@ -561,7 +561,7 @@ func TestRunAutoplanCommand_DrainOngoing(t *testing.T) {
 	vcsClient := setup(t)
 	ctx := context.Background()
 	drainer.ShutdownBlocking()
-	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now())
+	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now(), 0)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Atlantis server is shutting down, please try again later.", "plan")
 }
 
@@ -572,7 +572,7 @@ func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
 	fixtures.Pull.BaseRepo = fixtures.GithubRepo
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(false)
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
-	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now())
+	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now(), 0)
 	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())
 	Equals(t, 0, drainer.GetStatus().InProgressOps)
 }
@@ -584,7 +584,7 @@ func TestRunCommentCommand_DropStaleRequest(t *testing.T) {
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(true)
 
-	ch.RunCommentCommand(ctx, fixtures.GithubRepo, models.Repo{}, models.PullRequest{}, fixtures.User, modelPull.Num, &command.Comment{Name: command.Apply}, time.Now())
+	ch.RunCommentCommand(ctx, fixtures.GithubRepo, models.Repo{}, models.PullRequest{}, fixtures.User, modelPull.Num, &command.Comment{Name: command.Apply}, time.Now(), 0)
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
@@ -594,6 +594,6 @@ func TestRunAutoplanCommand_DropStaleRequest(t *testing.T) {
 	ctx := context.Background()
 	When(staleCommandChecker.CommandIsStale(matchers.AnyPtrToModelsCommandContext())).ThenReturn(true)
 
-	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now())
+	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now(), 0)
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }

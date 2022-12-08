@@ -2,6 +2,7 @@ package converter
 
 import (
 	"fmt"
+	"github.com/palantir/go-githubapp/githubapp"
 	"time"
 
 	"github.com/google/go-github/v45/github"
@@ -63,10 +64,13 @@ func (e PullEventConverter) Convert(pullEvent *github.PullRequestEvent) (event.P
 		eventTimestamp = *pullEvent.PullRequest.UpdatedAt
 	}
 
+	installationToken := githubapp.GetInstallationIDFromEvent(pullEvent)
+
 	return event.PullRequest{
-		Pull:      pull,
-		EventType: pullEventType,
-		User:      models.User{Username: senderUsername},
-		Timestamp: eventTimestamp,
+		Pull:              pull,
+		EventType:         pullEventType,
+		User:              models.User{Username: senderUsername},
+		Timestamp:         eventTimestamp,
+		InstallationToken: installationToken,
 	}, nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/runatlantis/atlantis/server/events/metrics"
-	contextInternal "github.com/runatlantis/atlantis/server/neptune/context"
 	"path/filepath"
 	"strings"
 
@@ -80,14 +79,13 @@ func (c *ConfTestExecutor) Run(prjCtx command.ProjectContext, executablePath, wo
 
 	title := c.buildTitle(policyNames)
 	output := c.sanitizeOutput(inputFile, title+cmdOutput)
-	installationToken, ok := prjCtx.RequestCtx.Value(contextInternal.InstallationIDKey).(int64)
-	if !ok {
+	if prjCtx.InstallationToken == 0 {
 		prjCtx.Log.ErrorContext(prjCtx.RequestCtx, "missing installation token")
 		scope.Counter(metrics.ExecutionErrorMetric).Inc(1)
 		return output, errors.New(internalError)
 	}
 
-	failedPolicies, err = c.PolicyFilter.Filter(prjCtx.RequestCtx, installationToken, prjCtx.HeadRepo, prjCtx.Pull.Num, failedPolicies)
+	failedPolicies, err = c.PolicyFilter.Filter(prjCtx.RequestCtx, prjCtx.InstallationToken, prjCtx.HeadRepo, prjCtx.Pull.Num, failedPolicies)
 	if err != nil {
 		prjCtx.Log.ErrorContext(prjCtx.RequestCtx, fmt.Sprintf("error filtering out approved policies: %s", err.Error()))
 		// use generic error message here as error output is what user sees

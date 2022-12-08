@@ -81,6 +81,7 @@ func (h *CommandHandler) Handle(ctx context.Context, _ *http.BufferedRequest, ev
 		event.PullNum,
 		command,
 		event.Timestamp,
+		event.InstallationToken,
 	)
 	return nil
 }

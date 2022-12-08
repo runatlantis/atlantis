@@ -44,4 +44,6 @@ type Context struct {
 	// Time Atlantis received VCS event, triggering command to be executed
 	TriggerTimestamp time.Time
 	RequestCtx       context.Context
+
+	InstallationToken int64
 }

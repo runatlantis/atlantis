@@ -78,6 +78,7 @@ func NewProjectContext(
 		JobID:                uuid.New().String(),
 		RequestCtx:           ctx.RequestCtx,
 		WorkflowModeType:     projCfg.WorkflowMode,
+		InstallationToken:    ctx.InstallationToken,
 	}
 }
 
@@ -157,7 +158,8 @@ type ProjectContext struct {
 	// StatusID is used for consecutive status updates in the step runners
 	StatusID string
 
-	WorkflowModeType valid.WorkflowModeType
+	WorkflowModeType  valid.WorkflowModeType
+	InstallationToken int64
 }
 
 // ProjectCloneDir creates relative path to clone the repo to. If we are running

@@ -32,9 +32,10 @@ func buildTestProjectCtx(t *testing.T, policySets []valid.PolicySet) command.Pro
 			Owners:     valid.PolicyOwners{},
 			PolicySets: policySets,
 		},
-		Log:        logging.NewNoopCtxLogger(t),
-		Scope:      tally.NewTestScope("test", map[string]string{}),
-		RequestCtx: ctx,
+		Log:               logging.NewNoopCtxLogger(t),
+		Scope:             tally.NewTestScope("test", map[string]string{}),
+		RequestCtx:        ctx,
+		InstallationToken: 1,
 	}
 }
 
