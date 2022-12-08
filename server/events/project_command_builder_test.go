@@ -464,6 +464,166 @@ projects:
 	}
 }
 
+// Test building a plan and apply command for one project
+// with the StrictPlanFileList
+func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithStrictPlanFileList(t *testing.T) {
+	cases := []struct {
+		Description        string
+		AtlantisYAML       string
+		DirectoryStructure map[string]interface{}
+		ModifiedFiles      []string
+		Cmd                events.CommentCommand
+		ExpErr             string
+	}{
+		{
+			Description: "planning a file outside of the changed files",
+			Cmd: events.CommentCommand{
+				Name:       command.Plan,
+				RepoRelDir: "directory-1",
+				Workspace:  "default",
+			},
+			DirectoryStructure: map[string]interface{}{
+				"directory-1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"directory-2": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles: []string{"directory-2/main.tf"},
+			ExpErr:        "the dir \"directory-1\" is not in the plan list of this pull request",
+		},
+		{
+			Description: "planning a file of the changed files",
+			Cmd: events.CommentCommand{
+				Name:       command.Plan,
+				RepoRelDir: "directory-1",
+				Workspace:  "default",
+			},
+			DirectoryStructure: map[string]interface{}{
+				"directory-1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"directory-2": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles: []string{"directory-1/main.tf"},
+		},
+		{
+			Description: "planning a project outside of the requested changed files",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: "project-1",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- name: project-1
+  dir: directory-1
+- name: project-2
+  dir: directory-2
+`,
+			DirectoryStructure: map[string]interface{}{
+				"directory-1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"directory-2": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles: []string{"directory-2/main.tf"},
+			ExpErr:        "the following directories are present in the pull request but not in the requested project:\ndirectory-2",
+		},
+		{
+			Description: "planning a project defined in the requested changed files",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: "project-1",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- name: project-1
+  dir: directory-1
+- name: project-2
+  dir: directory-2
+`,
+			DirectoryStructure: map[string]interface{}{
+				"directory-1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"directory-2": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles: []string{"directory-1/main.tf"},
+		},
+	}
+
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
+	for _, c := range cases {
+		t.Run(c.Description+"_"+command.Plan.String(), func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir := DirStructure(t, c.DirectoryStructure)
+
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
+			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			if c.AtlantisYAML != "" {
+				err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				Ok(t, err)
+			}
+
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{},
+				false,
+				true,
+				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				true,
+				scope,
+				logger,
+			)
+
+			var actCtxs []command.ProjectContext
+			var err error
+			actCtxs, err = builder.BuildPlanCommands(&command.Context{
+				Log:   logger,
+				Scope: scope,
+			}, &c.Cmd)
+
+			if c.ExpErr != "" {
+				ErrEquals(t, c.ExpErr, err)
+				return
+			}
+			Ok(t, err)
+			Equals(t, 1, len(actCtxs))
+		})
+	}
+}
+
 func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 	// expCtxFields define the ctx fields we're going to assert on.
 	// Since we're focused on autoplanning here, we don't validate all the
