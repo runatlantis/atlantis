@@ -55,8 +55,8 @@ type QueueWorker interface {
 
 func Workflow(ctx workflow.Context, request Request, tfWorkflow terraform.Workflow) error {
 	options := workflow.ActivityOptions{
-		TaskQueue:              TaskQueue,
-		ScheduleToCloseTimeout: 5 * time.Second,
+		TaskQueue:           TaskQueue,
+		StartToCloseTimeout: 5 * time.Second,
 	}
 	ctx = workflow.WithActivityOptions(ctx, options)
 
