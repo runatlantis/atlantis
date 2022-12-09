@@ -378,6 +378,8 @@ and set `--autoplan-modules` to `false`.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
+  This will bypass `--restrict-file-list` if regex is used, normal commands will stil be blocked if necessary.
+
   ::: warning SECURITY WARNING
   It's not supposed to be used with `--disable-apply-all`.
   The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects.
@@ -892,7 +894,10 @@ and set `--autoplan-modules` to `false`.
   # or (recommended)
   ATLANTIS_RESTRICT_FILE_LIST=true
   ```
-  `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request. Defaults to `false`.
+  `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
+  This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
+  like `atlantis plan -p .*` will still work if used. normal commands will stil be blocked if necessary.
+  Defaults to `false`.
 
 ### `--stats-namespace`
   ```bash
