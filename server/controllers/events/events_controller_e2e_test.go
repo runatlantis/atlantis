@@ -975,6 +975,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		false,
 		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		false,
 		statsScope,
 		logger,
 	)

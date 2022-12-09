@@ -627,6 +627,7 @@ projects:
 				false,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				statsScope,
 				logger,
 			)
@@ -829,6 +830,7 @@ projects:
 				true,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				statsScope,
 				logger,
 			)
@@ -1059,6 +1061,7 @@ workflows:
 				false,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				statsScope,
 				logger,
 			)
