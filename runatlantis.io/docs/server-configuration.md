@@ -892,7 +892,7 @@ and set `--autoplan-modules` to `false`.
   # or (recommended)
   ATLANTIS_RESTRICT_FILE_LIST=true
   ```
-  `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
+  `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request. Defaults to `false`.
 
 ### `--stats-namespace`
   ```bash
