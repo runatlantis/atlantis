@@ -15,6 +15,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -156,6 +157,19 @@ func TestExecute_Flags(t *testing.T) {
 	for flag, exp := range testFlags {
 		Equals(t, exp, configVal(t, passedConfig, flag))
 	}
+}
+
+func TestExecute_GHAppKeyFile(t *testing.T) {
+	t.Log("Should use all the values from the config file.")
+	tmpFile := tempFile(t, "testdata")
+	defer os.Remove(tmpFile) // nolint: errcheck
+	c := setup(map[string]interface{}{
+		GHAppKeyFileFlag:  tmpFile,
+		GHAppIDFlag:       int64(1),
+		RepoAllowlistFlag: "*",
+	}, t)
+	err := c.Execute()
+	assert.NoError(t, err)
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
@@ -458,14 +472,6 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			map[string]interface{}{
 				GHUserFlag:  "user",
 				GHTokenFlag: "token",
-			},
-			false,
-		},
-		{
-			"github app and key file set and should be successful",
-			map[string]interface{}{
-				GHAppIDFlag:      "1",
-				GHAppKeyFileFlag: "key.pem",
 			},
 			false,
 		},

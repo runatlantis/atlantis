@@ -90,13 +90,13 @@ func (p *LocalSourceResolver) Resolve(policySet valid.PolicySet) (string, error)
 
 // SourceResolverProxy proxies to underlying source resolvers dynamically
 type SourceResolverProxy struct {
-	localSourceResolver SourceResolver
+	LocalSourceResolver SourceResolver
 }
 
 func (p *SourceResolverProxy) Resolve(policySet valid.PolicySet) (string, error) {
 	switch source := policySet.Source; source {
 	case valid.LocalPolicySet:
-		return p.localSourceResolver.Resolve(policySet)
+		return p.LocalSourceResolver.Resolve(policySet)
 	default:
 		return "", fmt.Errorf("unable to resolve policy set source %s", source)
 	}
@@ -157,7 +157,7 @@ func NewConfTestExecutorWorkflow(log logging.Logger, versionRootDir string, conf
 		VersionCache:           versionCache,
 		DefaultConftestVersion: version,
 		SourceResolver: &SourceResolverProxy{
-			localSourceResolver: &LocalSourceResolver{},
+			LocalSourceResolver: &LocalSourceResolver{},
 		},
 		Exec: runtime_models.LocalExec{},
 	}

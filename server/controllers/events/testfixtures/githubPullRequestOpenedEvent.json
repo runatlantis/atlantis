@@ -464,5 +464,8 @@
     "received_events_url": "https://api.github.com/users/runatlantis/received_events",
     "type": "User",
     "site_admin": false
+  },
+  "installation": {
+    "id": 12345
   }
 }

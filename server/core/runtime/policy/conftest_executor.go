@@ -3,7 +3,11 @@ package policy
 import (
 	"context"
 	"fmt"
+	"github.com/palantir/go-githubapp/githubapp"
+	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/metrics"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	"path/filepath"
 	"strings"
 
@@ -38,9 +42,24 @@ type ConfTestExecutor struct {
 	PolicyFilter   policyFilter
 }
 
+func NewConfTestExecutor(cfg valid.GlobalCfg, creator githubapp.ClientCreator) *ConfTestExecutor {
+	return &ConfTestExecutor{
+		SourceResolver: &SourceResolverProxy{
+			LocalSourceResolver: &LocalSourceResolver{},
+		},
+		Exec: runtime_models.LocalExec{},
+		PolicyFilter: &events.ApprovedPolicyFilter{
+			GlobalCfg: cfg,
+			PRReviewsFetcher: &github.PRReviewerFetcher{
+				ClientCreator: creator,
+			},
+		},
+	}
+}
+
 // Run performs conftest policy tests against changes and fails if any policy does not pass. It also runs an all-or-nothing
 // filter that will filter out all policy failures based on the filter criteria.
-func (c *ConfTestExecutor) Run(prjCtx command.ProjectContext, executablePath, workdir string, envs map[string]string, extraArgs []string) (string, error) {
+func (c *ConfTestExecutor) Run(_ context.Context, prjCtx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
 	var policyArgs []Arg
 	var policyNames []string
 	var failedPolicies []valid.PolicySet

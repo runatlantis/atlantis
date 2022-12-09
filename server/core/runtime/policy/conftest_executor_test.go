@@ -65,7 +65,7 @@ func TestConfTestExecutor_PolicySuccess(t *testing.T) {
 	}
 	prjCtx := buildTestProjectCtx(t, policySets)
 	expectedTitle := buildTestTitle(policySets)
-	cmdOutput, err := executor.Run(prjCtx, executablePath, workDir, map[string]string{}, args)
+	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	assert.NoError(t, err)
 	assert.True(t, sourceResolver.isCalled)
 	assert.True(t, exec.isCalled)
@@ -93,7 +93,7 @@ func TestConfTestExecutor_PolicySuccess_FilteredFailures(t *testing.T) {
 	}
 	prjCtx := buildTestProjectCtx(t, policySets)
 	expectedTitle := buildTestTitle(policySets)
-	cmdOutput, err := executor.Run(prjCtx, executablePath, workDir, map[string]string{}, args)
+	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	assert.NoError(t, err)
 	assert.True(t, sourceResolver.isCalled)
 	assert.True(t, exec.isCalled)
@@ -122,7 +122,7 @@ func TestConfTestExecutor_PolicyFailure_NotFiltered(t *testing.T) {
 	}
 	var args []string
 	prjCtx := buildTestProjectCtx(t, policySets)
-	cmdOutput, err := executor.Run(prjCtx, executablePath, workDir, map[string]string{}, args)
+	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	expectedTitle := buildTestTitle(policySets)
 	assert.Error(t, err)
 	assert.True(t, sourceResolver.isCalled)
@@ -146,7 +146,7 @@ func TestConfTestExecutor_BuildArgError(t *testing.T) {
 	var args []string
 	var policySets []valid.PolicySet
 	prjCtx := buildTestProjectCtx(t, policySets)
-	cmdOutput, err := executor.Run(prjCtx, executablePath, workDir, map[string]string{}, args)
+	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	assert.Error(t, err)
 	assert.False(t, sourceResolver.isCalled)
 	assert.False(t, exec.isCalled)
@@ -170,7 +170,7 @@ func TestConfTestExecutor_SourceResolverError(t *testing.T) {
 		{Name: policyA},
 	}
 	prjCtx := buildTestProjectCtx(t, policySets)
-	cmdOutput, err := executor.Run(prjCtx, executablePath, workDir, map[string]string{}, args)
+	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	assert.Error(t, err)
 	assert.True(t, sourceResolver.isCalled)
 	assert.False(t, exec.isCalled)
@@ -196,7 +196,7 @@ func TestConfTestExecutor_FilterFailure(t *testing.T) {
 	var args []string
 	prjCtx := buildTestProjectCtx(t, policySets)
 	expectedTitle := buildTestTitle(policySets)
-	cmdOutput, err := executor.Run(prjCtx, executablePath, workDir, map[string]string{}, args)
+	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	assert.Error(t, err)
 	assert.True(t, sourceResolver.isCalled)
 	assert.True(t, exec.isCalled)
@@ -232,7 +232,7 @@ func TestConfTestExecutor_MissingInstallationToken(t *testing.T) {
 		RequestCtx: context.Background(),
 	}
 	expectedTitle := buildTestTitle(policySets)
-	cmdOutput, err := executor.Run(prjCtx, executablePath, workDir, map[string]string{}, args)
+	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	assert.Error(t, err)
 	assert.True(t, sourceResolver.isCalled)
 	assert.True(t, exec.isCalled)

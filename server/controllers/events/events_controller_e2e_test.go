@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -402,6 +403,19 @@ func TestGitHubWorkflow(t *testing.T) {
 }
 
 func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
+	featureConfig := feature.StringRetriever(`platform-mode:
+  percentage: 100
+  true: true
+  false: false
+  default: false
+  trackEvents: false
+policy-v2:
+  percentage: 100
+  true: true
+  false: false
+  default: false
+  rule: key in ["runatlantis/atlantis-tests"]
+  trackEvents: false`)
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -508,7 +522,9 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			ghClient := &testGithubClient{ExpectedModifiedFiles: c.ModifiedFiles}
 
-			headSHA, ctrl, _ := setupE2E(t, c.RepoDir, userConfig, ghClient)
+			headSHA, ctrl, _ := setupE2E(t, c.RepoDir, userConfig, ghClient, e2eOptions{
+				featureConfig: featureConfig,
+			})
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
@@ -552,6 +568,13 @@ func TestGitHubWorkflowPullRequestsWorkflows(t *testing.T) {
   true: true
   false: false
   default: false
+  trackEvents: false
+policy-v2:
+  percentage: 100
+  true: true
+  false: false
+  default: false
+  rule: key in ["runatlantis/atlantis-tests"]
   trackEvents: false`)
 
 	if testing.Short() {
@@ -806,10 +829,23 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	// swapping out version cache to something that always returns local contest
 	// binary
 	conftextExec.VersionCache = conftestCache
-
+	conftestExecutor := &policy.ConfTestExecutor{
+		SourceResolver: &policy.SourceResolverProxy{
+			LocalSourceResolver: &policy.LocalSourceResolver{},
+		},
+		Exec: runtime_models.LocalExec{},
+		PolicyFilter: &events.ApprovedPolicyFilter{
+			GlobalCfg: globalCfg,
+			PRReviewsFetcher: &mockReviewFetcher{
+				approvers: []string{},
+			},
+		},
+	}
 	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
 		conftestVersion,
 		conftextExec,
+		conftestExecutor,
+		featureAllocator,
 	)
 	Ok(t, err)
 	initStepRunner := &runtime.InitStepRunner{
@@ -1349,6 +1385,17 @@ type testStaleCommandChecker struct{}
 
 func (t *testStaleCommandChecker) CommandIsStale(ctx *command.Context) bool {
 	return false
+}
+
+type mockReviewFetcher struct {
+	approvers []string
+	error     error
+	isCalled  bool
+}
+
+func (f *mockReviewFetcher) ListApprovalReviewers(_ context.Context, _ int64, _ models.Repo, _ int) ([]string, error) {
+	f.isCalled = true
+	return f.approvers, f.error
 }
 
 type testGithubClient struct {

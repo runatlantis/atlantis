@@ -19,6 +19,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/palantir/go-githubapp/githubapp"
+	middleware "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"io"
 	"log"
 	"net/http"
@@ -136,6 +138,7 @@ type Config struct {
 	AtlantisVersion      string
 	DefaultTFVersionFlag string
 	RepoConfigJSONFlag   string
+	AppCfg               githubapp.Config
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -572,10 +575,22 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing show step runner")
 	}
 
-	conftestExecutor := policy.NewConfTestExecutorWorkflow(ctxLogger, binDir, &terraform.DefaultDownloader{})
+	clientCreator, err := githubapp.NewDefaultCachingClientCreator(
+		config.AppCfg,
+		githubapp.WithClientMiddleware(
+			middleware.ClientMetrics(statsScope.SubScope("github")),
+		))
+	if err != nil {
+		return nil, errors.Wrap(err, "creating github client creator")
+	}
+
+	legacyConftestExecutor := policy.NewConfTestExecutorWorkflow(ctxLogger, binDir, &terraform.DefaultDownloader{})
+	conftestExecutor := policy.NewConfTestExecutor(globalCfg, clientCreator)
 	policyCheckStepRunner, err := runtime.NewPolicyCheckStepRunner(
 		defaultTfVersion,
+		legacyConftestExecutor,
 		conftestExecutor,
+		featureAllocator,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing policy check runner")

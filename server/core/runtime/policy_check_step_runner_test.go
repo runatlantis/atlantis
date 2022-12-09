@@ -2,82 +2,198 @@ package runtime_test
 
 import (
 	"context"
-	"errors"
+	"github.com/runatlantis/atlantis/server/lyft/feature"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	"github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestRun(t *testing.T) {
-	RegisterMockTestingT(t)
-	logger := logging.NewNoopCtxLogger(t)
-	workspace := "default"
-	v, _ := version.NewVersion("1.0")
-	workdir := "/path"
-	executablePath := "some/path/conftest"
+const (
+	expectedOutput = "output"
+	executablePath = "some/path/conftest"
+)
 
-	ctx := context.Background()
-	prjCtx := command.ProjectContext{
-		Log:                logger,
-		EscapedCommentArgs: []string{"comment", "args"},
-		Workspace:          workspace,
-		RepoRelDir:         ".",
-		User:               models.User{Username: "username"},
-		Pull: models.PullRequest{
-			Num: 2,
-		},
+func buildTestPrjCtx(t *testing.T) command.ProjectContext {
+	v, err := version.NewVersion("1.0")
+	assert.NoError(t, err)
+	return command.ProjectContext{
+		Log: logging.NewNoopCtxLogger(t),
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
-			Owner:    "owner",
-			Name:     "repo",
 		},
 		PolicySets: valid.PolicySets{
 			Version:    v,
 			PolicySets: []valid.PolicySet{},
 		},
 	}
+}
 
-	executorWorkflow := mocks.NewMockVersionedExecutorWorkflow()
-	s := &runtime.PolicyCheckStepRunner{
-		VersionEnsurer: executorWorkflow,
-		Executor:       executorWorkflow,
+func TestRun_Successful(t *testing.T) {
+	prjCtx := buildTestPrjCtx(t)
+	ensurer := &mockEnsurer{}
+	executor := &mockExecutor{
+		output: expectedOutput,
 	}
+	legacyExecutor := &mockLegacyExecutor{}
+	allocator := &mockFeatureAllocator{
+		enabled: true,
+	}
+	runner := &runtime.PolicyCheckStepRunner{
+		VersionEnsurer: ensurer,
+		Executor:       executor,
+		LegacyExecutor: legacyExecutor,
+		Allocator:      allocator,
+	}
+	output, err := runner.Run(context.Background(), prjCtx, []string{}, executablePath, map[string]string{})
+	assert.NoError(t, err)
+	assert.Equal(t, output, expectedOutput)
+	assert.True(t, ensurer.isCalled)
+	assert.True(t, executor.isCalled)
+	assert.True(t, allocator.isCalled)
+	assert.False(t, legacyExecutor.isCalled)
+}
 
-	t.Run("success", func(t *testing.T) {
-		extraArgs := []string{"extra", "args"}
-		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)
-		When(executorWorkflow.Run(ctx, prjCtx, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("Success!", nil)
+func TestRun_LegacySuccess(t *testing.T) {
+	prjCtx := buildTestPrjCtx(t)
+	ensurer := &mockEnsurer{}
+	executor := &mockExecutor{}
+	legacyExecutor := &mockLegacyExecutor{
+		output: expectedOutput,
+	}
+	allocator := &mockFeatureAllocator{}
+	runner := &runtime.PolicyCheckStepRunner{
+		VersionEnsurer: ensurer,
+		Executor:       executor,
+		LegacyExecutor: legacyExecutor,
+		Allocator:      allocator,
+	}
+	output, err := runner.Run(context.Background(), prjCtx, []string{}, executablePath, map[string]string{})
+	assert.NoError(t, err)
+	assert.Equal(t, output, expectedOutput)
+	assert.True(t, ensurer.isCalled)
+	assert.False(t, executor.isCalled)
+	assert.True(t, allocator.isCalled)
+	assert.True(t, legacyExecutor.isCalled)
+}
 
-		output, err := s.Run(ctx, prjCtx, extraArgs, workdir, map[string]string(nil))
+func TestRun_LegacySuccess_AllocationError(t *testing.T) {
+	prjCtx := buildTestPrjCtx(t)
+	ensurer := &mockEnsurer{}
+	executor := &mockExecutor{}
+	legacyExecutor := &mockLegacyExecutor{
+		output: expectedOutput,
+	}
+	allocator := &mockFeatureAllocator{
+		err: assert.AnError,
+	}
+	runner := &runtime.PolicyCheckStepRunner{
+		VersionEnsurer: ensurer,
+		Executor:       executor,
+		LegacyExecutor: legacyExecutor,
+		Allocator:      allocator,
+	}
+	output, err := runner.Run(context.Background(), prjCtx, []string{}, executablePath, map[string]string{})
+	assert.NoError(t, err)
+	assert.Equal(t, output, expectedOutput)
+	assert.True(t, ensurer.isCalled)
+	assert.False(t, executor.isCalled)
+	assert.True(t, allocator.isCalled)
+	assert.True(t, legacyExecutor.isCalled)
+}
 
-		Ok(t, err)
-		Equals(t, "Success!", output)
-	})
+func TestRun_LegacyFailure(t *testing.T) {
+	prjCtx := buildTestPrjCtx(t)
+	ensurer := &mockEnsurer{}
+	executor := &mockExecutor{}
+	legacyExecutor := &mockLegacyExecutor{
+		output: expectedOutput,
+		err:    assert.AnError,
+	}
+	allocator := &mockFeatureAllocator{}
+	runner := &runtime.PolicyCheckStepRunner{
+		VersionEnsurer: ensurer,
+		Executor:       executor,
+		LegacyExecutor: legacyExecutor,
+		Allocator:      allocator,
+	}
+	output, err := runner.Run(context.Background(), prjCtx, []string{}, executablePath, map[string]string{})
+	assert.Error(t, err)
+	assert.Equal(t, output, expectedOutput)
+	assert.True(t, ensurer.isCalled)
+	assert.False(t, executor.isCalled)
+	assert.True(t, allocator.isCalled)
+	assert.True(t, legacyExecutor.isCalled)
+}
 
-	t.Run("ensure version failure", func(t *testing.T) {
-		extraArgs := []string{"extra", "args"}
-		expectedErr := errors.New("error ensuring version")
-		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn("", expectedErr)
+func TestRun_EnsurerFailure(t *testing.T) {
+	prjCtx := buildTestPrjCtx(t)
+	ensurer := &mockEnsurer{
+		err: assert.AnError,
+	}
+	executor := &mockExecutor{}
+	legacyExecutor := &mockLegacyExecutor{}
+	allocator := &mockFeatureAllocator{}
+	runner := &runtime.PolicyCheckStepRunner{
+		VersionEnsurer: ensurer,
+		Executor:       executor,
+		LegacyExecutor: legacyExecutor,
+		Allocator:      allocator,
+	}
+	output, err := runner.Run(context.Background(), prjCtx, []string{}, executablePath, map[string]string{})
+	assert.Error(t, err)
+	assert.Empty(t, output)
+	assert.True(t, ensurer.isCalled)
+	assert.False(t, executor.isCalled)
+	assert.False(t, allocator.isCalled)
+	assert.False(t, legacyExecutor.isCalled)
+}
 
-		_, err := s.Run(ctx, prjCtx, extraArgs, workdir, map[string]string(nil))
+type mockFeatureAllocator struct {
+	enabled  bool
+	err      error
+	isCalled bool
+}
 
-		Assert(t, err != nil, "error is not nil")
-	})
-	t.Run("executor failure", func(t *testing.T) {
-		extraArgs := []string{"extra", "args"}
-		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)
-		When(executorWorkflow.Run(ctx, prjCtx, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("", errors.New("error running executor"))
+func (t *mockFeatureAllocator) ShouldAllocate(_ feature.Name, _ feature.FeatureContext) (bool, error) {
+	t.isCalled = true
+	return t.enabled, t.err
+}
 
-		_, err := s.Run(ctx, prjCtx, extraArgs, workdir, map[string]string(nil))
+type mockLegacyExecutor struct {
+	output   string
+	err      error
+	isCalled bool
+}
 
-		Assert(t, err != nil, "error is not nil")
-	})
+func (t *mockLegacyExecutor) Run(_ context.Context, _ command.ProjectContext, _ string, _ map[string]string, _ string, _ []string) (string, error) {
+	t.isCalled = true
+	return t.output, t.err
+}
+
+type mockExecutor struct {
+	output   string
+	err      error
+	isCalled bool
+}
+
+func (t *mockExecutor) Run(_ context.Context, _ command.ProjectContext, _ string, _ map[string]string, _ string, _ []string) (string, error) {
+	t.isCalled = true
+	return t.output, t.err
+}
+
+type mockEnsurer struct {
+	output   string
+	err      error
+	isCalled bool
+}
+
+func (t *mockEnsurer) EnsureExecutorVersion(_ logging.Logger, _ *version.Version) (string, error) {
+	t.isCalled = true
+	return t.output, t.err
 }
