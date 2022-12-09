@@ -899,10 +899,12 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	Ok(t, err)
 	backend := boltdb
 	lockingClient := locking.NewClient(boltdb)
+	noOpLocker := locking.NewNoOpLocker()
 	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:    lockingClient,
-		VCSClient: e2eVCSClient,
+		Locker:     lockingClient,
+		NoOpLocker: noOpLocker,
+		VCSClient:  e2eVCSClient,
 	}
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
