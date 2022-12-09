@@ -114,7 +114,7 @@ const (
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
-	StrictPlanFileList         = "strict-plan-file-list"
+	RestrictFileList           = "restrict-file-list"
 	TFDownloadURLFlag          = "tf-download-url"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
@@ -497,7 +497,7 @@ var boolFlags = map[string]boolFlag{
 		description:  "Switches on or off the Basic Authentication on the HTTP Middleware interface",
 		defaultValue: DefaultWebBasicAuth,
 	},
-	StrictPlanFileList: {
+	RestrictFileList: {
 		description:  "Block plan requests from projects outside the files modified in the pull request.",
 		defaultValue: false,
 	},

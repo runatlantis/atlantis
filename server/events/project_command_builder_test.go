@@ -465,8 +465,8 @@ projects:
 }
 
 // Test building a plan and apply command for one project
-// with the StrictPlanFileList
-func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithStrictPlanFileList(t *testing.T) {
+// with the RestrictFileList
+func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFileList(t *testing.T) {
 	cases := []struct {
 		Description        string
 		AtlantisYAML       string

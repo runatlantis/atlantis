@@ -886,13 +886,13 @@ and set `--autoplan-modules` to `false`.
   ```
   File containing x509 private key matching `--ssl-cert-file`.
 
-### `--strict-plan-file-list`
+### `--restrict-file-list`
   ```bash
-  atlantis server --strict-plan-file-list
+  atlantis server --restrict-file-list
   # or (recommended)
-  ATLANTIS_STRICT_PLAN_FILE_LIST=true
+  ATLANTIS_RESTRICT_FILE_LIST=true
   ```
-  `--strict-plan-file-list` will block plan requests from projects outside the files modified in the pull request.
+  `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
 
 ### `--stats-namespace`
   ```bash

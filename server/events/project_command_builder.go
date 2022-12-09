@@ -50,7 +50,7 @@ func NewInstrumentedProjectCommandBuilder(
 	EnableRegExpCmd bool,
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
-	StrictPlanFileList bool,
+	RestrictFileList bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 ) *InstrumentedProjectCommandBuilder {
@@ -69,7 +69,7 @@ func NewInstrumentedProjectCommandBuilder(
 			EnableRegExpCmd,
 			AutoDetectModuleFiles,
 			AutoplanFileList,
-			StrictPlanFileList,
+			RestrictFileList,
 			scope,
 			logger,
 		),
@@ -91,7 +91,7 @@ func NewProjectCommandBuilder(
 	EnableRegExpCmd bool,
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
-	StrictPlanFileList bool,
+	RestrictFileList bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 ) *DefaultProjectCommandBuilder {
@@ -107,7 +107,7 @@ func NewProjectCommandBuilder(
 		EnableRegExpCmd:       EnableRegExpCmd,
 		AutoDetectModuleFiles: AutoDetectModuleFiles,
 		AutoplanFileList:      AutoplanFileList,
-		StrictPlanFileList:    StrictPlanFileList,
+		RestrictFileList:      RestrictFileList,
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
@@ -172,7 +172,7 @@ type DefaultProjectCommandBuilder struct {
 	AutoDetectModuleFiles        string
 	AutoplanFileList             string
 	EnableDiffMarkdownFormat     bool
-	StrictPlanFileList           bool
+	RestrictFileList             bool
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -387,7 +387,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		return pcc, err
 	}
 
-	if p.StrictPlanFileList {
+	if p.RestrictFileList {
 		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
 		if err != nil {
 			return nil, err

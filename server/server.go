@@ -543,7 +543,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.EnableRegExpCmd,
 		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
-		userConfig.StrictPlanFileList,
+		userConfig.RestrictFileList,
 		statsScope,
 		logger,
 	)
