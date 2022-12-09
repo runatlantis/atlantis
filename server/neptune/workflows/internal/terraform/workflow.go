@@ -38,8 +38,8 @@ type jobRunner interface {
 }
 
 const (
-	StartToCloseTimeout = 24 * time.Hour
-	HeartBeatTimeout    = 1 * time.Minute
+	ScheduleToCloseTimeout = 24 * time.Hour
+	HeartBeatTimeout       = 1 * time.Minute
 
 	// 1 week timeout for review gate
 	ReviewGateTimeout = 24 * time.Hour * 7
@@ -231,8 +231,8 @@ func (r *Runner) Run(ctx workflow.Context) error {
 
 func (r *Runner) run(ctx workflow.Context) error {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: StartToCloseTimeout,
-		HeartbeatTimeout:    HeartBeatTimeout,
+		ScheduleToCloseTimeout: ScheduleToCloseTimeout,
+		HeartbeatTimeout:       HeartBeatTimeout,
 	})
 	var response *activities.GetWorkerInfoResponse
 	err := workflow.ExecuteActivity(ctx, r.TerraformActivities.GetWorkerInfo).Get(ctx, &response)
