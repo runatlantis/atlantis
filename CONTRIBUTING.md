@@ -130,7 +130,7 @@ We use [pegomock](https://github.com/petergtz/pegomock) for mocking. If you're
 modifying any interfaces that are mocked, you'll need to regen the mocks for that
 interface.
 
-Install using `go get github.com/petergtz/pegomock/pegomock`
+Install using `go install github.com/petergtz/pegomock/pegomock`
 
 If you see errors like:
 ```
