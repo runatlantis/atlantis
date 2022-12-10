@@ -11,6 +11,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 
 	"github.com/pkg/errors"
 
@@ -54,6 +55,13 @@ func NewInstrumentedProjectCommandBuilder(
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 ) *InstrumentedProjectCommandBuilder {
+	scope = scope.SubScope("builder")
+
+	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric} {
+		s := scope.Counter(m)
+		s.Inc(0)
+	}
+
 	return &InstrumentedProjectCommandBuilder{
 		ProjectCommandBuilder: NewProjectCommandBuilder(
 			policyChecksSupported,
@@ -74,6 +82,7 @@ func NewInstrumentedProjectCommandBuilder(
 			logger,
 		),
 		Logger: logger,
+		scope:  scope,
 	}
 }
 
@@ -317,7 +326,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					commentFlags,
 					repoDir,
 					repoCfg.Automerge,
-					mergedCfg.DeleteSourceBranchOnMerge,
 					repoCfg.ParallelApply,
 					repoCfg.ParallelPlan,
 					verbose,
@@ -355,7 +363,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					commentFlags,
 					repoDir,
 					DefaultAutomergeEnabled,
-					pCfg.DeleteSourceBranchOnMerge,
 					DefaultParallelApplyEnabled,
 					DefaultParallelPlanEnabled,
 					verbose,
@@ -689,7 +696,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					commentFlags,
 					repoDir,
 					automerge,
-					projCfg.DeleteSourceBranchOnMerge,
 					parallelApply,
 					parallelPlan,
 					verbose,
@@ -705,7 +711,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				commentFlags,
 				repoDir,
 				automerge,
-				projCfg.DeleteSourceBranchOnMerge,
 				parallelApply,
 				parallelPlan,
 				verbose,
