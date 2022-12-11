@@ -1222,7 +1222,7 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   allowed_overrides: [invalid]`,
-			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\", \"workflow\" and \"delete_source_branch_on_merge\" are supported.).).",
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\", \"workflow\", \"delete_source_branch_on_merge\" and \"repo_locking\" are supported.).).",
 		},
 		"invalid apply_requirement": {
 			input: `repos:
@@ -1450,6 +1450,7 @@ workflows:
 						AllowedOverrides:          []string{},
 						AllowCustomWorkflows:      Bool(false),
 						DeleteSourceBranchOnMerge: Bool(false),
+						RepoLocking:               Bool(true),
 					},
 				},
 				Workflows: map[string]valid.Workflow{

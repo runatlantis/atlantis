@@ -44,7 +44,7 @@ type ProjectCommandContextBuilder interface {
 		prjCfg valid.MergedProjectCfg,
 		commentFlags []string,
 		repoDir string,
-		automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
+		automerge, parallelApply, parallelPlan, verbose bool,
 	) []command.ProjectContext
 }
 
@@ -63,12 +63,12 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
+	automerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []command.ProjectContext) {
 	cb.ProjectCounter.Inc(1)
 
 	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
-		ctx, cmdName, prjCfg, commentFlags, repoDir, automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose,
+		ctx, cmdName, prjCfg, commentFlags, repoDir, automerge, parallelApply, parallelPlan, verbose,
 	)
 
 	projectCmds = []command.ProjectContext{}
@@ -95,7 +95,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
+	automerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []command.ProjectContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
 
@@ -129,7 +129,6 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		prjCfg.PolicySets,
 		escapeArgs(commentFlags),
 		automerge,
-		deleteSourceBranchOnMerge,
 		parallelApply,
 		parallelPlan,
 		verbose,
@@ -153,7 +152,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
+	automerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []command.ProjectContext) {
 	ctx.Log.Debug("PolicyChecks are enabled")
 
@@ -170,7 +169,6 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		commentFlags,
 		repoDir,
 		automerge,
-		deleteSourceBranchOnMerge,
 		parallelApply,
 		parallelPlan,
 		verbose,
@@ -191,7 +189,6 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			prjCfg.PolicySets,
 			escapeArgs(commentFlags),
 			automerge,
-			deleteSourceBranchOnMerge,
 			parallelApply,
 			parallelPlan,
 			verbose,
@@ -215,7 +212,6 @@ func newProjectCommandContext(ctx *command.Context,
 	policySets valid.PolicySets,
 	escapedCommentArgs []string,
 	automergeEnabled bool,
-	deleteSourceBranchOnMerge,
 	parallelApplyEnabled bool,
 	parallelPlanEnabled bool,
 	verbose bool,
@@ -247,7 +243,8 @@ func newProjectCommandContext(ctx *command.Context,
 		BaseRepo:                   ctx.Pull.BaseRepo,
 		EscapedCommentArgs:         escapedCommentArgs,
 		AutomergeEnabled:           automergeEnabled,
-		DeleteSourceBranchOnMerge:  deleteSourceBranchOnMerge,
+		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
+		RepoLocking:                projCfg.RepoLocking,
 		ParallelApplyEnabled:       parallelApplyEnabled,
 		ParallelPlanEnabled:        parallelPlanEnabled,
 		ParallelPolicyCheckEnabled: parallelPlanEnabled,

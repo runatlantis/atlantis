@@ -1,13 +1,15 @@
 # Stage 1: build artifact
-FROM golang:1.19.3-alpine AS builder
+FROM golang:1.19.4-alpine AS builder
 
 WORKDIR /app
 COPY . /app
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
 
 # Stage 2
-# The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM ghcr.io/runatlantis/atlantis-base:2022.11.24 AS base
+# The runatlantis/atlantis-base is created by docker-base/Dockerfile
+FROM ghcr.io/runatlantis/atlantis-base:2022.12.11 AS base
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM

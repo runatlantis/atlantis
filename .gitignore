@@ -20,3 +20,5 @@ atlantis.env
 # gitreleaser
 dist/
 tmp-CHANGELOG.md
+
+.envrc

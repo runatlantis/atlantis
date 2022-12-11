@@ -1,7 +1,7 @@
 # This Dockerfile builds our base image with gosu, dumb-init and the atlantis
 # user. We split this from the main Dockerfile because this base doesn't change
 # and also because it kept breaking the build due to flakiness.
-FROM alpine:3.16.3
+FROM alpine:3.17.0
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # We use gosu to step down from root and run as the atlantis user so we need
@@ -26,19 +26,19 @@ ARG TARGETPLATFORM
 
 # Install packages needed for running Atlantis.
 RUN apk add --no-cache \
-        ca-certificates=20220614-r0 \
-        curl=7.83.1-r4 \
-        git=2.36.3-r0 \
-        unzip=6.0-r9 \
-        bash=5.1.16-r2 \
-        openssh=9.0_p1-r2 \
-        libcap=2.64-r0 \
-        dumb-init=1.2.5-r1 \
-        gcompat=1.0.0-r4 && \
+        ca-certificates=20220614-r2 \
+        curl=7.86.0-r1 \
+        git=2.38.1-r0 \
+        unzip=6.0-r13 \
+        bash=5.2.12-r0 \
+        openssh=9.1_p1-r1 \
+        libcap=2.66-r0 \
+        dumb-init=1.2.5-r2 \
+        gcompat=1.1.0-r0 && \
     # Install packages needed for building dependencies.
     apk add --no-cache --virtual .build-deps \
-        gnupg=2.2.35-r4 \
-        openssl=1.1.1s-r0 && \
+        gnupg=2.2.40-r0 \
+        openssl=3.0.7-r0 && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
     # git-lfs
