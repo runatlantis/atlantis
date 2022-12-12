@@ -66,27 +66,28 @@ func NewWithClient(client *redis.Client, bucket string, globalBucket string) (*R
 // acquired, it will return true and the lock returned will be newLock.
 // If the lock is not acquired, it will return false and the current
 // lock that is preventing this lock from being acquired.
-func (r *RedisDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
+func (r *RedisDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, models.EnqueueStatus, error) {
 	var currLock models.ProjectLock
 	key := r.lockKey(newLock.Project, newLock.Workspace)
 	newLockSerialized, _ := json.Marshal(newLock)
+	var enqueueStatus models.EnqueueStatus // Lock Queue is not supported for Redis at the time being
 
 	val, err := r.client.Get(ctx, key).Result()
 	// if there is no run at that key then we're free to create the lock
 	if err == redis.Nil {
 		err := r.client.Set(ctx, key, newLockSerialized, 0).Err()
 		if err != nil {
-			return false, currLock, errors.Wrap(err, "db transaction failed")
+			return false, currLock, enqueueStatus, errors.Wrap(err, "db transaction failed")
 		}
-		return true, newLock, nil
+		return true, newLock, enqueueStatus, nil
 	} else if err != nil {
 		// otherwise the lock fails, return to caller the run that's holding the lock
-		return false, currLock, errors.Wrap(err, "db transaction failed")
+		return false, currLock, enqueueStatus, errors.Wrap(err, "db transaction failed")
 	} else {
 		if err := json.Unmarshal([]byte(val), &currLock); err != nil {
-			return false, currLock, errors.Wrap(err, "failed to deserialize current lock")
+			return false, currLock, enqueueStatus, errors.Wrap(err, "failed to deserialize current lock")
 		}
-		return false, currLock, nil
+		return false, currLock, enqueueStatus, nil
 	}
 }
 
@@ -94,21 +95,21 @@ func (r *RedisDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock,
 // If there is no lock, then it will return a nil pointer.
 // If there is a lock, then it will delete it, and then return a pointer
 // to the deleted lock.
-func (r *RedisDB) Unlock(project models.Project, workspace string) (*models.ProjectLock, error) {
+func (r *RedisDB) Unlock(project models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error) {
 	var lock models.ProjectLock
 	key := r.lockKey(project, workspace)
 
 	val, err := r.client.Get(ctx, key).Result()
 	if err == redis.Nil {
-		return nil, nil
+		return nil, nil, nil
 	} else if err != nil {
-		return nil, errors.Wrap(err, "db transaction failed")
+		return nil, nil, errors.Wrap(err, "db transaction failed")
 	} else {
 		if err := json.Unmarshal([]byte(val), &lock); err != nil {
-			return nil, errors.Wrap(err, "failed to deserialize current lock")
+			return nil, nil, errors.Wrap(err, "failed to deserialize current lock")
 		}
 		r.client.Del(ctx, key)
-		return &lock, nil
+		return &lock, nil, nil
 	}
 }
 
@@ -156,7 +157,7 @@ func (r *RedisDB) GetLock(project models.Project, workspace string) (*models.Pro
 }
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
-func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, models.DequeueStatus, error) {
 	var locks []models.ProjectLock
 
 	iter := r.client.Scan(ctx, 0, fmt.Sprintf("pr/%s*", repoFullName), 0).Iterator()
@@ -164,24 +165,28 @@ func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.Proje
 		var lock models.ProjectLock
 		val, err := r.client.Get(ctx, iter.Val()).Result()
 		if err != nil {
-			return nil, errors.Wrap(err, "db transaction failed")
+			return nil, models.DequeueStatus{ProjectLocks: nil}, errors.Wrap(err, "db transaction failed")
 		}
 		if err := json.Unmarshal([]byte(val), &lock); err != nil {
-			return locks, errors.Wrap(err, fmt.Sprintf("failed to deserialize lock at key '%s'", iter.Val()))
+			return locks, models.DequeueStatus{ProjectLocks: nil}, errors.Wrap(err, fmt.Sprintf("failed to deserialize lock at key '%s'", iter.Val()))
 		}
 		if lock.Pull.Num == pullNum {
 			locks = append(locks, lock)
-			if _, err := r.Unlock(lock.Project, lock.Workspace); err != nil {
-				return locks, errors.Wrapf(err, "unlocking repo %s, path %s, workspace %s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)
+			if _, _, err := r.Unlock(lock.Project, lock.Workspace); err != nil {
+				return locks, models.DequeueStatus{ProjectLocks: nil}, errors.Wrapf(err, "unlocking repo %s, path %s, workspace %s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)
 			}
 		}
 	}
 
 	if err := iter.Err(); err != nil {
-		return locks, errors.Wrap(err, "db transaction failed")
+		return locks, models.DequeueStatus{ProjectLocks: nil}, errors.Wrap(err, "db transaction failed")
 	}
 
-	return locks, nil
+	return locks, models.DequeueStatus{ProjectLocks: nil}, nil
+}
+
+func (r *RedisDB) GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error) {
+	return nil, errors.New("Unsupported feature")
 }
 
 func (r *RedisDB) LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error) {

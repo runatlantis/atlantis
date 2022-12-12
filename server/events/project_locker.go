@@ -59,6 +59,7 @@ type TryLockResponse struct {
 
 // TryLock implements ProjectLocker.TryLock.
 func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error) {
+	// TODO monikma extend the tests
 	lockAttempt, err := p.Locker.TryLock(project, workspace, pull, user)
 	if err != nil {
 		return nil, err
@@ -68,10 +69,19 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 		if err != nil {
 			return nil, err
 		}
-		failureMsg := fmt.Sprintf(
-			"This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
-			link,
-			link)
+		failureMsg := fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s.", link)
+		switch lockAttempt.EnqueueStatus.Status {
+		case models.Enqueued:
+			failureMsg = fmt.Sprintf("%s This PR entered the waiting queue :clock130:, number of PRs ahead of you: **%d**.", failureMsg, lockAttempt.EnqueueStatus.ProjectLocksInFront)
+		case models.AlreadyInTheQueue:
+			failureMsg = fmt.Sprintf("%s This PR is already in the queue :clock130:, number of PRs ahead of you: **%d**.", failureMsg, lockAttempt.EnqueueStatus.ProjectLocksInFront)
+		default:
+			failureMsg = fmt.Sprintf(
+				"[%s] This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+				"Fatal error, could not enqueue for some reason. Please check atlantis logs",
+				link,
+				link)
+		}
 		return &TryLockResponse{
 			LockAcquired:      false,
 			LockFailureReason: failureMsg,
@@ -81,7 +91,9 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 	return &TryLockResponse{
 		LockAcquired: true,
 		UnlockFn: func() error {
-			_, err := p.Locker.Unlock(lockAttempt.LockKey)
+			// TODO monikma #8 this will be called if there was a plan error and the lock was automatically dropped;
+			// Should we assure dequeuing of the next PR here too?
+			_, _, err := p.Locker.Unlock(lockAttempt.LockKey)
 			return err
 		},
 		LockKey: lockAttempt.LockKey,

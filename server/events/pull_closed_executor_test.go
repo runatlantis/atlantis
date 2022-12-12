@@ -71,7 +71,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	err = errors.New("err")
-	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, err)
+	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, models.DequeueStatus{ProjectLocks: nil}, err)
 	actualErr := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 	Equals(t, "cleaning up locks: err", actualErr.Error())
 }
@@ -92,7 +92,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 		WorkingDir: w,
 		Backend:    db,
 	}
-	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
+	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, models.DequeueStatus{ProjectLocks: nil}, nil)
 	err = pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 	Ok(t, err)
 	cp.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
@@ -179,7 +179,7 @@ func TestCleanUpPullComments(t *testing.T) {
 				Backend:    db,
 			}
 			t.Log("testing: " + c.Description)
-			When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)
+			When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, models.DequeueStatus{ProjectLocks: nil}, nil)
 			err = pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 			Ok(t, err)
 			_, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString()).GetCapturedArguments()
@@ -267,7 +267,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 				Workspace: "default",
 			},
 		}
-		When(locker.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(locks, nil)
+		When(locker.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(locks, models.DequeueStatus{ProjectLocks: nil}, nil)
 
 		// Clean up.
 		err = pullClosedExecutor.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)

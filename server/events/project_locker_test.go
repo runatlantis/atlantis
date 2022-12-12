@@ -58,7 +58,7 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 	Ok(t, err)
 	Equals(t, &events.TryLockResponse{
 		LockAcquired:      false,
-		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.", link, link),
+		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s. This PR entered the waiting queue :clock130:, number of PRs ahead of you: **%d**.", link, 0),
 	}, res)
 }
 
