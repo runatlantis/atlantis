@@ -21,6 +21,7 @@ var preWh events.DefaultPreWorkflowHooksCommandRunner
 var preWhWorkingDir *mocks.MockWorkingDir
 var preWhWorkingDirLocker *mocks.MockWorkingDirLocker
 var whPreWorkflowHookRunner *runtime_mocks.MockPreWorkflowHookRunner
+var preCommitStatusUpdater *mocks.MockCommitStatusUpdater
 
 func preWorkflowHooksSetup(t *testing.T) {
 	RegisterMockTestingT(t)
@@ -28,12 +29,14 @@ func preWorkflowHooksSetup(t *testing.T) {
 	preWhWorkingDir = mocks.NewMockWorkingDir()
 	preWhWorkingDirLocker = mocks.NewMockWorkingDirLocker()
 	whPreWorkflowHookRunner = runtime_mocks.NewMockPreWorkflowHookRunner()
+	preCommitStatusUpdater = mocks.NewMockCommitStatusUpdater()
 
 	preWh = events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             vcsClient,
 		WorkingDirLocker:      preWhWorkingDirLocker,
 		WorkingDir:            preWhWorkingDir,
 		PreWorkflowHookRunner: whPreWorkflowHookRunner,
+		CommitStatusUpdater:   preCommitStatusUpdater,
 	}
 }
 

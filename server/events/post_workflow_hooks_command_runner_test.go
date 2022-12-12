@@ -22,6 +22,7 @@ var postWh events.DefaultPostWorkflowHooksCommandRunner
 var postWhWorkingDir *mocks.MockWorkingDir
 var postWhWorkingDirLocker *mocks.MockWorkingDirLocker
 var whPostWorkflowHookRunner *runtime_mocks.MockPostWorkflowHookRunner
+var postCommitStatusUpdater *mocks.MockCommitStatusUpdater
 
 func postWorkflowHooksSetup(t *testing.T) {
 	RegisterMockTestingT(t)
@@ -29,12 +30,14 @@ func postWorkflowHooksSetup(t *testing.T) {
 	postWhWorkingDir = mocks.NewMockWorkingDir()
 	postWhWorkingDirLocker = mocks.NewMockWorkingDirLocker()
 	whPostWorkflowHookRunner = runtime_mocks.NewMockPostWorkflowHookRunner()
+	postCommitStatusUpdater = mocks.NewMockCommitStatusUpdater()
 
 	postWh = events.DefaultPostWorkflowHooksCommandRunner{
 		VCSClient:              vcsClient,
 		WorkingDirLocker:       postWhWorkingDirLocker,
 		WorkingDir:             postWhWorkingDir,
 		PostWorkflowHookRunner: whPostWorkflowHookRunner,
+		CommitStatusUpdater:    postCommitStatusUpdater,
 	}
 }
 
