@@ -6,8 +6,8 @@ Bugfixes and new Features
 
 https://github.com/runatlantis/atlantis/releases/tag/v0.21.0
 
-## Backwards Incompatibilities / Notes:
-* Terraform version prior 1.x have been removed to reduce the image size ([#2619](https://github.com/runatlantis/atlantis/pull/2619))
+## Breaking changes
+* Terraform version 1.x have been removed to deprecate beta versions of terraform and reduce the docker image size. Each version of terraform is about 80 MB. ([#2619](https://github.com/runatlantis/atlantis/pull/2619))
 
 # v0.20.1
 
