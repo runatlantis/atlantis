@@ -6,6 +6,9 @@ Bugfixes and new Features
 
 https://github.com/runatlantis/atlantis/releases/tag/v0.21.0
 
+## Backwards Incompatibilities / Notes:
+* Terraform version prior 1.x have been removed to reduce the image size ([#2619](https://github.com/runatlantis/atlantis/pull/2619))
+
 # v0.20.1
 
 Bugfixes and new Features
