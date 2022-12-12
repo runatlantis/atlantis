@@ -4,8 +4,6 @@ PKG := $(shell go list ./... | grep -v e2e | grep -v static | grep -v mocks | gr
 PKG_COMMAS := $(shell go list ./... | grep -v e2e | grep -v static | grep -v mocks | grep -v testing | tr '\n' ',')
 IMAGE_NAME := runatlantis/atlantis
 
-.PHONY: test
-
 .DEFAULT_GOAL := help
 help: ## List targets & descriptions
 	@cat Makefile* | grep -E '^[a-zA-Z_-]+:.*?## .*$$' | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -25,18 +23,27 @@ build-service: ## Build the main Go service
 go-generate: ## Run go generate in all packages
 	./scripts/go-generate.sh
 
-regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them.
+regen-mocks: ## Delete and regenerate all mocks
 	find . -type f | grep mocks/mock_ | xargs rm
 	find . -type f | grep mocks/matchers | xargs rm
 	@# not using $(PKG) here because that includes directories that have now
 	@# been made empty, causing go generate to fail.
 	./scripts/go-generate.sh
 
+.PHONY: test
 test: ## Run tests
 	@go test -short $(PKG)
 
+.PHONY: docker/test
+docker/test: ## Run tests in docker
+	docker run -it -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:2022.11.17 sh -c "cd /atlantis && make test"
+
 test-all: ## Run tests including integration
 	@go test  $(PKG)
+
+.PHONY: docker/test-all
+docker/test-all: ## Run all tests in docker
+	docker run -it -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:2022.11.17 sh -c "cd /atlantis && make test-all"
 
 test-coverage:
 	@mkdir -p .cover
@@ -51,11 +58,11 @@ dev-docker:
 	GOOS=linux GOARCH=amd64 go build -o atlantis .
 	docker build -f Dockerfile.dev -t atlantis-dev .
 
-dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
+dist: ## Package static/ using go-bindata-assetfs into a single binary
 	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -o bindata_assetfs.go -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static
 
 release: ## Create packages for a release
-	docker run -v $$(pwd):/go/src/github.com/runatlantis/atlantis circleci/golang:1.17 sh -c 'cd /go/src/github.com/runatlantis/atlantis && scripts/binary-release.sh'
+	docker run -v $$(pwd):/go/src/github.com/runatlantis/atlantis cimg/go:1.19 sh -c 'cd /go/src/github.com/runatlantis/atlantis && scripts/binary-release.sh'
 
 fmt: ## Run goimports (which also formats)
 	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
@@ -64,7 +71,7 @@ lint: ## Run linter locally
 	golangci-lint run
 
 check-lint: ## Run linter in CI/CD. If running locally use 'lint'
-	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin v1.39.0
+	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin v1.49.0
 	./bin/golangci-lint run -j 4 --timeout 5m
 
 check-fmt: ## Fail if not formatted

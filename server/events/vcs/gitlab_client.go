@@ -249,6 +249,7 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 		Context:     gitlab.String(src),
 		Description: gitlab.String(description),
 		TargetURL:   &url,
+		Ref:         gitlab.String(pull.HeadBranch),
 	})
 	return err
 }

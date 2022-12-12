@@ -11,7 +11,7 @@ import (
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
 
 type PreWorkflowHooksCommandRunner interface {
-	RunPreHooks(ctx *command.Context) error
+	RunPreHooks(ctx *command.Context, cmd *CommentCommand) error
 }
 
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
@@ -24,9 +24,7 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 }
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
-func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
-	ctx *command.Context,
-) error {
+func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context, cmd *CommentCommand) error {
 	pull := ctx.Pull
 	baseRepo := pull.BaseRepo
 	headRepo := ctx.HeadRepo
@@ -59,14 +57,20 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 		return err
 	}
 
+	var escapedArgs []string
+	if cmd != nil {
+		escapedArgs = escapeArgs(cmd.Flags)
+	}
+
 	err = w.runHooks(
 		models.WorkflowHookCommandContext{
-			BaseRepo: baseRepo,
-			HeadRepo: headRepo,
-			Log:      log,
-			Pull:     pull,
-			User:     user,
-			Verbose:  false,
+			BaseRepo:           baseRepo,
+			HeadRepo:           headRepo,
+			Log:                log,
+			Pull:               pull,
+			User:               user,
+			Verbose:            false,
+			EscapedCommentArgs: escapedArgs,
 		},
 		preWorkflowHooks, repoDir)
 

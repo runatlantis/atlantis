@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/website_link_checker/**'
     branches:
-      - "master"
+      - "main"
   workflow_dispatch:
 
 concurrency:

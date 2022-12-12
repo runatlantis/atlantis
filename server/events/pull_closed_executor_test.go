@@ -40,8 +40,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	t.Log("when workspace.Delete returns an error, we return it")
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkingDir()
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	db, err := db.New(tmp)
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
@@ -60,8 +59,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	db, err := db.New(tmp)
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
@@ -82,8 +80,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	cp := vcsmocks.NewMockClient()
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	db, err := db.New(tmp)
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
@@ -168,8 +165,7 @@ func TestCleanUpPullComments(t *testing.T) {
 			w := mocks.NewMockWorkingDir()
 			cp := vcsmocks.NewMockClient()
 			l := lockmocks.NewMockLocker()
-			tmp, cleanup := TempDir(t)
-			defer cleanup()
+			tmp := t.TempDir()
 			db, err := db.New(tmp)
 			Ok(t, err)
 			pce := events.PullClosedExecutor{

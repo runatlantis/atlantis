@@ -36,8 +36,7 @@ func TestRun_NoDir(t *testing.T) {
 }
 
 func TestRun_NoPlanFile(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: nil,
 	}
@@ -49,8 +48,7 @@ func TestRun_NoPlanFile(t *testing.T) {
 }
 
 func TestRun_Success(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
 	err := os.WriteFile(planPath, nil, 0600)
 	logger := logging.NewNoopLogger(t)
@@ -80,8 +78,7 @@ func TestRun_Success(t *testing.T) {
 
 func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	// When running for a project, the planfile has a different name.
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 	planPath := filepath.Join(tmpDir, "projectname-default.tfplan")
 	err := os.WriteFile(planPath, nil, 0600)
 
@@ -112,8 +109,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 }
 
 func TestRun_UsesConfiguredTFVersion(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
 	err := os.WriteFile(planPath, nil, 0600)
 	Ok(t, err)
@@ -199,8 +195,7 @@ func TestRun_UsingTarget(t *testing.T) {
 		descrip := fmt.Sprintf("comments flags: %s extra args: %s",
 			strings.Join(c.commentFlags, ", "), strings.Join(c.extraArgs, ", "))
 		t.Run(descrip, func(t *testing.T) {
-			tmpDir, cleanup := TempDir(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
 			planPath := filepath.Join(tmpDir, "workspace.tfplan")
 			err := os.WriteFile(planPath, nil, 0600)
 			Ok(t, err)
@@ -227,8 +222,7 @@ func TestRun_UsingTarget(t *testing.T) {
 
 // Test that apply works for remote applies.
 func TestRun_RemoteApply_Success(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
 	planFileContents := `
 An execution plan has been generated and is shown below.
@@ -285,8 +279,7 @@ Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
 
 // Test that if the plan is different, we error out.
 func TestRun_RemoteApply_PlanChanged(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
 	planFileContents := `
 An execution plan has been generated and is shown below.

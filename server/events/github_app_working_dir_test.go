@@ -18,12 +18,10 @@ import (
 // Test that if we don't have any existing files, we check out the repo with a github app.
 func TestClone_GithubAppNoneExisting(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
 
-	dataDir, cleanup2 := TempDir(t)
-	defer cleanup2()
+	dataDir := t.TempDir()
 
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,

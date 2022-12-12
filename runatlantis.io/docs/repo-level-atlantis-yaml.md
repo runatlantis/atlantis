@@ -51,6 +51,7 @@ parallel_plan: true
 parallel_apply: true
 projects:
 - name: my-project-name
+  branch: /main/
   dir: .
   workspace: default
   terraform_version: v0.11.0
@@ -76,6 +77,22 @@ workflows:
 allowed_regexp_prefixes:
 - dev/
 - staging/
+```
+
+## Auto generate projects
+
+This is useful if you have many projects in a repository. This assumes the `default` workspace (or no workspace).
+
+Run this in the root of your repository. This will use gnu `grep` to search terraform files for an S3 backend (terraform dir), retrieve the directory path, retrieve the unique entries, and then use `yq` to return the YAML of a simple project dir setup which can then be modified to your liking.
+
+```sh
+grep -P 'backend[\s]+"s3"' **/*.tf |
+  rev | cut -d'/' -f2- | rev |
+  sort |
+  uniq |
+  while read d; do \
+    echo '[ {"dir": "'"$d"'", "autoplan": {"when_modified": ["**/*.tf.*"] }} ]' | yq -PM; \
+  done
 ```
 
 ## Use Cases
@@ -214,7 +231,7 @@ projects:
 ```
 With this config above, Atlantis runs planning/applying for project2 first, then for project1.
 Several projects can have same `execution_order_group`. Any order in one group isn't guaranteed.
-`parallel_plan` and `parallel_apply` respect these order groups, so parallel planning/applying works 
+`parallel_plan` and `parallel_apply` respect these order groups, so parallel planning/applying works
 in each group one by one.
 
 ### Custom Backend Config
@@ -242,6 +259,7 @@ allowed_regexp_prefixes:
 ### Project
 ```yaml
 name: myname
+branch: /mybranch/
 dir: mydir
 workspace: myworkspace
 execution_order_group: 0
@@ -255,7 +273,7 @@ workflow: myworkflow
 | Key                                    | Type                  | Default     | Required | Description                                                                                                                                                                                                                          |
 |----------------------------------------|-----------------------|-------------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | name                                   | string                | none        | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                                    |
-| dir                                    | string                | none        | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                   |
+| branch                                 | string                | none        | no       | Regex matching projects by the base branch of pull request (the branch the pull request is getting merged into). Only projects that match the PR's branch will be considered. By default, all branches are matched.                  || dir                                    | string                | none        | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                   |
 | workspace                              | string                | `"default"` | no       | The [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                               |
 | execution_order_group                  | int                   | `0`         | no       | Index of execution order group. Projects will be sort by this field before planning/applying.                                                                                                                                        |
 | delete_source_branch_on_merge          | bool                  | `false`     | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                    |

@@ -384,7 +384,7 @@ func (p *PlanSuccess) Summary() string {
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
-	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s=\s|\s->\s|<<|\{|\(known after apply\)|\[)(.*)`)
+	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s=\s|\s->\s|<<|\{|\(known after apply\)| {2,}[^ ]+:.*)(.*)`)
 	diffListRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
 	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
 
@@ -409,6 +409,17 @@ type PolicyCheckSuccess struct {
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
 	HasDiverged bool
+}
+
+// Summary extracts one line summary of policy check.
+func (p *PolicyCheckSuccess) Summary() string {
+	note := ""
+
+	r := regexp.MustCompile(`\d+ tests, \d+ passed, \d+ warnings, \d+ failures, \d+ exceptions`)
+	if match := r.FindString(p.PolicyCheckOutput); match != "" {
+		return note + match
+	}
+	return note
 }
 
 type VersionSuccess struct {
@@ -510,6 +521,11 @@ type WorkflowHookCommandContext struct {
 	User User
 	// Verbose is true when the user would like verbose output.
 	Verbose bool
+	// EscapedCommentArgs are the extra arguments that were added to the atlantis
+	// command, ex. atlantis plan -- -target=resource. We then escape them
+	// by adding a \ before each character so that they can be used within
+	// sh -c safely, i.e. sh -c "terraform plan $(touch bad)".
+	EscapedCommentArgs []string
 }
 
 type EnqueueStatusType int

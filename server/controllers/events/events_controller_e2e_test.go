@@ -41,7 +41,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-const ConftestVersion = "0.25.0"
+const ConftestVersion = "0.35.0"
 
 var applyLocker locking.ApplyLocker
 var userConfig server.UserConfig
@@ -394,8 +394,7 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
-			defer cleanup()
+			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
 
 			// Setup test dependencies.
@@ -544,8 +543,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
-			defer cleanup()
+			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 
 			oldLockFilePath, err := filepath.Abs(filepath.Join("testfixtures", "null_provider_lockfile_old_version"))
 			Ok(t, err)
@@ -653,6 +651,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		ExpAutomerge bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
 		ExpAutoplan bool
+		// ExpQuietPolicyChecks is true if we expect Atlantis to exclude policy check output
+		// when there's no error
+		ExpQuietPolicyChecks bool
+		// ExpQuietPolicyCheckFailure is true when we expect Atlantis to post back policy check failures
+		// even when QuietPolicyChecks is enabled
+		ExpQuietPolicyCheckFailure bool
 		// ExpParallel is true if we expect Atlantis to run parallel plans or applies.
 		ExpParallel bool
 		// ExpReplies is a list of files containing the expected replies that
@@ -737,6 +741,38 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:          "successful policy checks with quiet flag enabled",
+			RepoDir:              "policy-checks-success-silent",
+			ModifiedFiles:        []string{"main.tf"},
+			ExpAutoplan:          true,
+			ExpQuietPolicyChecks: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:                "failing policy checks with quiet flag enabled",
+			RepoDir:                    "policy-checks",
+			ModifiedFiles:              []string{"main.tf"},
+			ExpAutoplan:                true,
+			ExpQuietPolicyChecks:       true,
+			ExpQuietPolicyCheckFailure: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -746,12 +782,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// reset userConfig
 			userConfig = server.UserConfig{}
 			userConfig.EnablePolicyChecksFlag = true
+			userConfig.QuietPolicyChecks = c.ExpQuietPolicyChecks
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
-			defer cleanup()
+			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
 
 			// Setup test dependencies.
@@ -805,6 +841,10 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				expNumReplies++
 			}
 
+			if c.ExpQuietPolicyChecks && !c.ExpQuietPolicyCheckFailure {
+				expNumReplies--
+			}
+
 			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
@@ -823,8 +863,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
-	dataDir, binDir, cacheDir, cleanup := mkSubDirs(t)
-	defer cleanup()
+	dataDir, binDir, cacheDir := mkSubDirs(t)
 
 	//env vars
 
@@ -993,7 +1032,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	pullUpdater := &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            e2eVCSClient,
-		MarkdownRenderer:     &events.MarkdownRenderer{},
+		MarkdownRenderer:     events.GetMarkdownRenderer(false, false, false, false, false, false, ""),
 	}
 
 	autoMerger := &events.AutoMerger{
@@ -1008,6 +1047,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		projectCommandRunner,
 		parallelPoolSize,
 		false,
+		userConfig.QuietPolicyChecks,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
@@ -1194,7 +1234,7 @@ func GitHubPullRequestParsed(headSHA string) *github.PullRequest {
 				FullName: github.String("runatlantis/atlantis-tests"),
 				CloneURL: github.String("https://github.com/runatlantis/atlantis-tests.git"),
 			},
-			Ref: github.String("master"),
+			Ref: github.String("main"),
 		},
 		User: &github.User{
 			Login: github.String("atlantisbot"),
@@ -1215,11 +1255,11 @@ func absRepoPath(t *testing.T, repoDir string) string {
 // The purpose of this function is to create a real git repository with a branch
 // called 'branch' from the files under repoDir. This is so we can check in
 // those files normally to this repo without needing a .git directory.
-func initializeRepo(t *testing.T, repoDir string) (string, string, func()) {
+func initializeRepo(t *testing.T, repoDir string) (string, string) {
 	originRepo := absRepoPath(t, repoDir)
 
 	// Copy the files to the temp dir.
-	destDir, cleanup := TempDir(t)
+	destDir := t.TempDir()
 	runCmd(t, "", "cp", "-r", fmt.Sprintf("%s/.", originRepo), destDir)
 
 	// Initialize the git repo.
@@ -1235,7 +1275,7 @@ func initializeRepo(t *testing.T, repoDir string) (string, string, func()) {
 	headSHA := runCmd(t, destDir, "git", "rev-parse", "HEAD")
 	headSHA = strings.Trim(headSHA, "\n")
 
-	return destDir, headSHA, cleanup
+	return destDir, headSHA
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {
@@ -1304,8 +1344,8 @@ func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir 
 }
 
 // returns parent, bindir, cachedir, cleanup func
-func mkSubDirs(t *testing.T) (string, string, string, func()) {
-	tmp, cleanup := TempDir(t)
+func mkSubDirs(t *testing.T) (string, string, string) {
+	tmp := t.TempDir()
 	binDir := filepath.Join(tmp, "bin")
 	err := os.MkdirAll(binDir, 0700)
 	Ok(t, err)
@@ -1314,7 +1354,7 @@ func mkSubDirs(t *testing.T) (string, string, string, func()) {
 	err = os.MkdirAll(cachedir, 0700)
 	Ok(t, err)
 
-	return tmp, binDir, cachedir, cleanup
+	return tmp, binDir, cachedir
 }
 
 // Will fail test if conftest isn't in path and isn't version >= 0.25.0
@@ -1332,7 +1372,7 @@ func ensureRunningConftest(t *testing.T) {
 	versionOutput := string(versionOutBytes)
 	match := versionConftestRegex.FindStringSubmatch(versionOutput)
 	if len(match) <= 1 {
-		t.Logf("could not parse contest version from %s", versionOutput)
+		t.Logf("could not parse conftest version from %s", versionOutput)
 		t.FailNow()
 	}
 	localVersion, err := version.NewVersion(match[1])
@@ -1382,4 +1422,9 @@ func ensureRunning014(t *testing.T) {
 //		   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
-var versionConftestRegex = regexp.MustCompile("Version: (.*?)(\\s.*)?\n")
+/*
+ * Newer versions will return both Conftest and OPA
+ * Conftest: 0.35.0
+ * OPA: 0.45.0
+ */
+var versionConftestRegex = regexp.MustCompile("Conftest: (.*?)(\\s.*)?\n")
