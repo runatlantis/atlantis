@@ -99,20 +99,20 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 		}
 
 		if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, hookDescription); err != nil {
-			ctx.Log.Warn("unable to post workflow hook status: %s", err)
+			ctx.Log.Warn("unable to update post workflow hook status: %s", err)
 		}
 
 		_, err := w.PostWorkflowHookRunner.Run(ctx, hook.RunCommand, repoDir)
 
 		if err != nil {
 			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, hookDescription); err != nil {
-				ctx.Log.Warn("unable to post workflow hook status: %s", err)
+				ctx.Log.Warn("unable to update post workflow hook status: %s", err)
 			}
 			return err
 		}
 
 		if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, hookDescription); err != nil {
-			ctx.Log.Warn("unable to post workflow hook status: %s", err)
+			ctx.Log.Warn("unable to update post workflow hook status: %s", err)
 		}
 	}
 	return nil
