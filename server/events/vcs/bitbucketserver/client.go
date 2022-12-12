@@ -300,7 +300,11 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	if err != nil {
 		return nil, err
 	}
-	req.SetBasicAuth(b.Username, b.Password)
+
+	// Personal access tokens can be sent as basic auth or bearer
+	bearer := "Bearer " + b.Password
+	req.Header.Add("Authorization", bearer)
+
 	if body != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}

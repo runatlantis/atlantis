@@ -459,9 +459,10 @@ If you set a workflow with the key `default`, it will override this.
 
 ### Metrics
 
-| Key                    | Type              | Default | Required  | Description                              |
-|------------------------|-------------------|---------|-----------|------------------------------------------|
-| statsd                 | [Statsd](#statsd) | none    | no        | Statsd metrics provider                  |
+| Key                    | Type                      | Default | Required  | Description                              |
+|------------------------|---------------------------|---------|-----------|------------------------------------------|
+| statsd                 | [Statsd](#statsd)         | none    | no        | Statsd metrics provider                  |
+| prometheus             | [Prometheus](#prometheus) | none    | no        | Statsd metrics provider                  |
 
 ### Statsd
 
@@ -469,3 +470,9 @@ If you set a workflow with the key `default`, it will override this.
 | ------ | ------ | ------- | -------- | -------------------------------------- |
 | host   | string | none    | yes      | statsd host ip address                 |
 | port   | string | none    | yes      | statsd port                            |
+
+### Prometheus
+
+| Key      | Type   | Default | Required | Description                            |
+| -------- | ------ | ------- | -------- | -------------------------------------- |
+| endpoint | string | none    | yes      | path to metrics endpoint               |

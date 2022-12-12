@@ -15,6 +15,7 @@ golangci-lint
 atlantis
 .devcontainer
 atlantis.env
+*.act
 
 # gitreleaser
 dist/

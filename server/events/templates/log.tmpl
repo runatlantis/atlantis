@@ -1,0 +1,9 @@
+{{ define "log" -}}
+{{if .Verbose}}
+<details><summary>Log</summary>
+  <p>
+
+```
+{{.Log}}```
+</p></details>{{end}}
+{{- end }}

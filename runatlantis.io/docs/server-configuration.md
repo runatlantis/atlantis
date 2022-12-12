@@ -134,6 +134,12 @@ Values are chosen in this order:
   * Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
     * `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
 
+### `--azuredevops-hostname`
+  ```bash
+  atlantis server --azuredevops-hostname="dev.azure.com"
+  ```
+  Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
+
 ### `--azuredevops-webhook-password`
   ```bash
   atlantis server --azuredevops-webhook-password="password123"
@@ -253,6 +259,12 @@ Values are chosen in this order:
   ```
   Disable atlantis auto planning
 
+### `--disable-markdown-folding`
+  ```bash
+  atlantis server --disable-markdown-folding
+  ```
+  Disable folding in markdown output.
+
 ### `--disable-repo-locking`
   ```bash
   atlantis server --disable-repo-locking
@@ -283,13 +295,13 @@ Values are chosen in this order:
   ```
   Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 
-  Useful to enable for use with Github.
+  Useful to enable for use with GitHub.
 
 ### `--gh-hostname`
   ```bash
   atlantis server --gh-hostname="my.github.enterprise.com"
   ```
-  Hostname of your GitHub Enterprise installation. If using [Github.com](https://github.com),
+  Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
   don't set. Defaults to `github.com`.
 
 ### `--gh-token`
@@ -323,7 +335,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --gh-org="myorgname"
   ```
-  GitHub organization name. Set to enable creating a private Github app for this organization.
+  GitHub organization name. Set to enable creating a private GitHub app for this organization.
 
 ### `--gh-app-id`
   ```bash
@@ -347,6 +359,12 @@ Values are chosen in this order:
   After which Atlantis will display your new app's credentials: your app's ID, its generated `--gh-webhook-secret` and the contents of the file for `--gh-app-key-file`. Update your Atlantis config accordingly, and restart the server.
   :::
 
+### `--gh-app-slug`
+  ```bash
+  atlantis server --gh-app-slug="myappslug"
+  ```
+  A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`.
+
 ### `--gh-app-key-file`
   ```bash
   atlantis server --gh-app-key-file="path/to/app-key.pem"
@@ -365,11 +383,16 @@ Values are chosen in this order:
 
 ### `--gh-team-allowlist`
   ```bash
-  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply"
+  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply"
   ```
   Comma-separated list of GitHub team name (not a slug) and permission pairs. By default, any team can plan and apply.
+  
+  ::: warning NOTE
+  You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
+  i.e., "Engineering Team:plan, Infrastructure Team:apply"
+  :::
 
-- ### `--gh-allow-mergeable-bypass-apply`
+### `--gh-allow-mergeable-bypass-apply`
   ```bash
   atlantis server --gh-allow-mergeable-bypass-apply
   ```
@@ -438,6 +461,21 @@ Values are chosen in this order:
   ```
   Log level. Defaults to `info`.
 
+### `--markdown-template-overrides-dir`
+  ```bash
+  atlantis server --markdown-template-overrides-dir="path/to/templates/"
+  ```
+  Directory where Atlantis will read in overrides for markdown templates used to render comments on pull requests.
+  Markdown template overrides may be specified either in individual files, or all together in a single file. All template
+  override files _must_ have the `.tmpl` extension, otherwise they will not be parsed.
+
+  Markdown templates which may have overrides can be found [here](https://github.com/runatlantis/atlantis/tree/main/server/events/templates)
+
+  Please be mindful that settings like `--enable-diff-markdown-format` depend on logic defined in the templates. It is
+  possible to diverge from expected behavior, if care is not taken when overriding default templates.
+
+  Defaults to the atlantis home directory `/home/atlantis/.markdown_templates/` in `/$HOME/.markdown_templates`.
+
 ### `--parallel-pool-size`
   ```bash
   atlantis server --parallel-pool-size=100
@@ -449,6 +487,12 @@ Values are chosen in this order:
   atlantis server --port=8080
   ```
   Port to bind to. Defaults to `4141`.
+
+### `--quiet-policy-checks`
+  ```bash
+  atlantis server --quiet-policy-checks
+  ```
+  Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
 
 ### `--redis-host`
   ```bash
@@ -605,6 +649,7 @@ Values are chosen in this order:
 ### `--silence-whitelist-errors`
   <Badge text="Deprecated" type="warn"/>
   Deprecated for `--silence-allowlist-errors`.
+
 ### `--silence-allowlist-errors`
   ```bash
   atlantis server --silence-allowlist-errors
@@ -724,3 +769,27 @@ Values are chosen in this order:
   ::: warning SECURITY WARNING
   This does write secrets to disk and should only be enabled in a secure environment.
   :::
+
+### `--web-basic-auth`
+  ```bash
+  atlantis server --web-basic-auth
+  ```
+  Enable Basic Authentication on the Atlantis web service.
+
+### `--web-username`
+  ```bash
+  atlantis server --web-username="atlantis"
+  ```
+  Username used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--web-password`
+  ```bash
+  atlantis server --web-password="atlantis"
+  ```
+  Password used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--websocket-check-origin`
+  ```bash
+  atlantis server --websocket-check-origin
+  ```
+  Only allow websockets connection when they originate from the running Atlantis web server

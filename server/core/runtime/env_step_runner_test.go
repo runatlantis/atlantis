@@ -52,8 +52,7 @@ func TestEnvStepRunner_Run(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.Command, func(t *testing.T) {
-			tmpDir, cleanup := TempDir(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
 			ctx := command.ProjectContext{
 				BaseRepo: models.Repo{
 					Name:  "basename",
@@ -66,7 +65,7 @@ func TestEnvStepRunner_Run(t *testing.T) {
 				Pull: models.PullRequest{
 					Num:        2,
 					HeadBranch: "add-feat",
-					BaseBranch: "master",
+					BaseBranch: "main",
 					Author:     "acme",
 				},
 				User: models.User{

@@ -454,7 +454,7 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
       <div id="terminal"></div>
     </section>
   </div>
-  <footer>
+  <footer>Initializing...
   </footer>
 
     <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
@@ -463,12 +463,23 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
 
     <script>
+      function updateTerminalStatus(msg) {
+          document.getElementsByTagName("footer")[0].innerText = msg;
+      }
       var term = new Terminal({scrollback: 15000});
       var socket = new WebSocket(
         (document.location.protocol === "http:" ? "ws://" : "wss://") +
         document.location.host +
         document.location.pathname +
         "/ws");
+
+      socket.onopen = function(event) {
+        updateTerminalStatus("Running...");
+      };
+      socket.onclose = function(event) {
+        updateTerminalStatus("Done");
+      };
+
       window.addEventListener("unload", function(event) {
         websocket.close();
       })

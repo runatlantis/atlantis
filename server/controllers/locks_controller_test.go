@@ -299,8 +299,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 		},
 	}, nil, nil)
 	var backend locking.Backend
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	backend, err := db.New(tmp)
 	Ok(t, err)
 	// Seed the DB with a successful plan for that project (that is later discarded).
@@ -354,8 +353,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	var backend locking.Backend
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	backend, err := db.New(tmp)
 	Ok(t, err)
 	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())).ThenReturn(errors.New("err"))
@@ -382,8 +380,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	var backend locking.Backend
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
+	tmp := t.TempDir()
 	backend, err := db.New(tmp)
 	Ok(t, err)
 	pull := models.PullRequest{

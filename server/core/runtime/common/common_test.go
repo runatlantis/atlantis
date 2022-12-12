@@ -98,8 +98,8 @@ func runCmd(t *testing.T, dir string, name string, args ...string) string {
 	return string(cpOut)
 }
 
-func initRepo(t *testing.T) (string, func()) {
-	repoDir, cleanup := TempDir(t)
+func initRepo(t *testing.T) string {
+	repoDir := t.TempDir()
 	runCmd(t, repoDir, "git", "init")
 	runCmd(t, repoDir, "touch", ".gitkeep")
 	runCmd(t, repoDir, "git", "add", ".gitkeep")
@@ -108,13 +108,12 @@ func initRepo(t *testing.T) (string, func()) {
 	runCmd(t, repoDir, "git", "config", "--local", "commit.gpgsign", "false")
 	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, repoDir, "git", "branch", "branch")
-	return repoDir, cleanup
+	return repoDir
 }
 
 func TestIsFileTracked(t *testing.T) {
 	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
+	repoDir := initRepo(t)
 
 	// file1 should not be tracked
 	tracked, err := IsFileTracked(repoDir, "file1")

@@ -15,12 +15,12 @@ package server_test
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"testing"
 	"time"
 
@@ -37,9 +37,8 @@ import (
 
 func TestNewServer(t *testing.T) {
 	t.Log("Run through NewServer constructor")
-	tmpDir, err := os.MkdirTemp("", "")
-	Ok(t, err)
-	_, err = server.NewServer(server.UserConfig{
+	tmpDir := t.TempDir()
+	_, err := server.NewServer(server.UserConfig{
 		DataDir:     tmpDir,
 		AtlantisURL: "http://example.com",
 	}, server.Config{})
@@ -49,9 +48,8 @@ func TestNewServer(t *testing.T) {
 // todo: test what happens if we set different flags. The generated config should be different.
 
 func TestNewServer_InvalidAtlantisURL(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "")
-	Ok(t, err)
-	_, err = server.NewServer(server.UserConfig{
+	tmpDir := t.TempDir()
+	_, err := server.NewServer(server.UserConfig{
 		DataDir:     tmpDir,
 		AtlantisURL: "example.com",
 	}, server.Config{
@@ -164,6 +162,30 @@ func BenchmarkHealthz(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		s.Healthz(w, nil)
 	}
+}
+
+func TestGetCertificate(t *testing.T) {
+	s := server.Server{}
+	clientHelloInfo := &tls.ClientHelloInfo{}
+
+	// Initial certificate load
+	s.SSLCertFile = "../testdata/cert.pem"
+	s.SSLKeyFile = "../testdata/key.pem"
+	cert, err := s.GetSSLCertificate(clientHelloInfo)
+	Ok(t, err)
+
+	// Certificate reload
+	s.SSLCertFile = "../testdata/cert2.pem"
+	s.SSLKeyFile = "../testdata/key2.pem"
+	s.CertLastRefreshTime = s.CertLastRefreshTime.Add(-1 * time.Second)
+	s.KeyLastRefreshTime = s.KeyLastRefreshTime.Add(-1 * time.Second)
+	newCert, err := s.GetSSLCertificate(clientHelloInfo)
+
+	Ok(t, err)
+	Assert(
+		t,
+		!bytes.Equal(bytes.Join(cert.Certificate, nil), bytes.Join(newCert.Certificate, nil)),
+		"Certificate expected to rotate")
 }
 
 func TestParseAtlantisURL(t *testing.T) {
