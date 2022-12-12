@@ -16,9 +16,10 @@ import (
 
 func TestPostWorkflowHookRunner_Run(t *testing.T) {
 	cases := []struct {
-		Command string
-		ExpOut  string
-		ExpErr  string
+		Command        string
+		ExpOut         string
+		ExpErr         string
+		ExpDescription string
 	}{
 		{
 			Command: "",
@@ -55,6 +56,10 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		{
 			Command: "echo user_name=$USER_NAME",
 			ExpOut:  "user_name=acme-user\n",
+		},
+		{
+			Command:        "echo something > $OUTPUT_FILE",
+			ExpDescription: "something",
 		},
 	}
 
@@ -94,7 +99,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 				},
 				Log: logger,
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir)
+			out, desc, err := r.Run(ctx, c.Command, tmpDir)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return
@@ -105,6 +110,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			// temp dir.
 			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 			Equals(t, expOut, out)
+			Equals(t, c.ExpDescription, desc)
 		})
 	}
 }
