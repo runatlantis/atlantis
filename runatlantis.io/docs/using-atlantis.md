@@ -125,7 +125,36 @@ They're ignored because they can't be specified for an already generated planfil
 If you would like to specify these flags, do it while running `atlantis plan`.
 
 ---
-<<<<<<< HEAD
+## atlantis import
+
+```bash
+atlantis import [options] -- [terraform import flags] addr id
+```
+### Explanation
+Runs `terraform import` that matches the directory/project/workspace.
+This command discards terraform plan result. Before apply, required `atlantis plan` again.
+
+### Examples
+```bash
+# Runs import
+atlantis import -- addr id
+
+# Runs import in the root directory of the repo with workspace `default`.
+atlantis import -d . -- addr id
+
+# Runs import in the `project1` directory of the repo with workspace `default`
+atlantis import -d project1 -- addr id
+
+# Runs import in the root directory of the repo with workspace `staging`
+atlantis import -w staging -- addr id
+```
+
+### Options
+* `-d directory` Import a resource for this directory, relative to root of repo. Use `.` for root.
+* `-p project` Import a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w`.
+* `-w workspace` Import a resource for this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html). If not using Terraform workspaces you can ignore this.
+
+---
 ## atlantis unlock
 ```bash
 atlantis unlock
@@ -148,32 +177,3 @@ See also [policy checking](/docs/policy-checking.html).
 
 ### Options
 * `--verbose` Append Atlantis log to comment.
-=======
-## atlantis import
-
-```bash
-atlantis import [options] -- [terraform import flags] addr id
-```
-### Explanation
-Runs `terraform import` that matches the directory/project/workspace.
-
-### Examples
-```bash
-# Runs import
-atlantis import -- addr id
-
-# Runs import in the root directory of the repo with workspace `default`.
-atlantis import -d . -- addr id
-
-# Runs import in the `project1` directory of the repo with workspace `default`
-atlantis import -d project1 -- addr id
-
-# Runs import in the root directory of the repo with workspace `staging`
-atlantis import -w staging -- addr id
-```
-
-### Options
-* `-d directory` Import a resource for this directory, relative to root of repo. Use `.` for root.
-* `-p project` Import a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w`.
-* `-w workspace` Import a resource for this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html). If not using Terraform workspaces you can ignore this.
->>>>>>> ec0bdf6c (feat: atlantis import)

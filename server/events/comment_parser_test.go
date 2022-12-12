@@ -914,9 +914,9 @@ var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
 var ImportUsage = `Usage of import -- ADDR ID:
   -d, --dir string         Which directory to run plan in relative to root of repo,
                            ex. 'child/dir'.
-  -p, --project string     Which project to run plan for. Refers to the name of the
-                           project configured in atlantis.yaml. Cannot be used at
-                           same time as workspace or dir flags.
+  -p, --project string     Which project to run import for. Refers to the name of
+                           the project configured in a repo config file. Cannot be
+                           used at same time as workspace or dir flags.
       --verbose            Append Atlantis log to comment.
   -w, --workspace string   Switch to this Terraform workspace before planning.
 `

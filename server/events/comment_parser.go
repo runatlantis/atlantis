@@ -222,7 +222,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.SetOutput(io.Discard)
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
-		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Which project to run plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", config.AtlantisYAMLFilename))
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run import for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", cmd)}
@@ -305,15 +305,6 @@ func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, p
 	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Apply.String(), flags)
 }
 
-<<<<<<< HEAD
-// BuildVersionComment builds a version comment for the specified args.
-func (e *CommentParser) BuildVersionComment(repoRelDir string, workspace string, project string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, false)
-	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Version.String(), flags)
-}
-
-=======
->>>>>>> ec0bdf6c (feat: atlantis import)
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
 	// Add quotes if dir has spaces.
 	if strings.Contains(repoRelDir, " ") {

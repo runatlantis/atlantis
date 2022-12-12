@@ -226,13 +226,9 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 			{
 				IDRegex:                   regexp.MustCompile(".*"),
 				BranchRegex:               regexp.MustCompile(".*"),
-<<<<<<< HEAD
 				RepoConfigFile:            args.RepoConfigFile,
-				ApplyRequirements:         applyReqs,
-=======
 				ApplyRequirements:         commandReqs,
 				ImportRequirements:        commandReqs,
->>>>>>> ec0bdf6c (feat: atlantis import)
 				PreWorkflowHooks:          args.PreWorkflowHooks,
 				Workflow:                  &defaultWorkflow,
 				PostWorkflowHooks:         args.PostWorkflowHooks,
