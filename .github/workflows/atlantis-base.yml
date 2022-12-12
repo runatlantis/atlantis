@@ -30,7 +30,7 @@ jobs:
     env:
       DOCKERFILE: "Dockerfile.${{ matrix.image_type }}"
       IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/atlantis-base
-      IMAGE_SUFFIX: ${{ contains(matrix.image_type, 'alpine') && '-alpine' || '' }}
+      IMAGE_SUFFIX: ${{ matrix.image_type != 'alpine' && format('-{0}', matrix.image_type) || '' }}
     steps:
     - uses: actions/checkout@v3
 
