@@ -28,7 +28,7 @@ ARG TARGETPLATFORM
 RUN apk add --no-cache \
         ca-certificates=20220614-r2 \
         curl=7.86.0-r1 \
-        git=2.38.1-r0 \
+        git=2.38.2-r0 \
         unzip=6.0-r13 \
         bash=5.2.12-r0 \
         openssh=9.1_p1-r1 \
