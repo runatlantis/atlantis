@@ -59,7 +59,7 @@ With modules, if you want `project1` automatically planned when `module1` is mod
 you need to create an `atlantis.yaml` file. See [atlantis.yaml Use Cases](repo-level-atlantis-yaml.html#configuring-planning) for more details.
 
 ###  Terraform Workspaces
-*See [Terraform's docs](https://www.terraform.io/docs/state/workspaces.html) if you are unfamiliar with workspaces.*
+*See [Terraform's docs](https://developer.hashicorp.com/terraform/language/state/workspaces) if you are unfamiliar with workspaces.*
 
 If you're using Terraform `>= 0.9.0`, Atlantis supports workspaces through an
 `atlantis.yaml` file that tells Atlantis the names of your workspaces

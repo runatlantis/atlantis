@@ -950,7 +950,7 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_VAR_FILE_ALLOWLIST='/path/to/tfvars/dir'
   ```
-  Comma-separated list of additional directory paths where [variable definition files](https://www.terraform.io/language/values/variables#variable-definitions-tfvars-files) can be read from.
+  Comma-separated list of additional directory paths where [variable definition files](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files) can be read from.
   The paths in this argument should be absolute paths. Relative paths and globbing are currently not supported.
   If this argument is not provided, it defaults to Atlantis' data directory, determined by the `--data-dir` argument.
 

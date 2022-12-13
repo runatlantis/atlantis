@@ -144,7 +144,7 @@ workflows:
 ```
 
 ### cdktf
-Here are the requirements to enable [cdktf](https://www.terraform.io/cdktf)
+Here are the requirements to enable [cdktf](https://developer.hashicorp.com/terraform/cdktf)
 
 - A custom image with `cdktf` installed
 - The autoplan file updated to trigger off of `**/cdk.tf.json`
