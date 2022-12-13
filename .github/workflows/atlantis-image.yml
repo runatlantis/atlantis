@@ -59,6 +59,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         context: .
+        build-args: ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
