@@ -4,11 +4,11 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	jobs "github.com/runatlantis/atlantis/server/jobs"
+	"reflect"
+	"time"
 )
 
 type MockPostWorkflowHookRunner struct {
@@ -26,23 +26,27 @@ func NewMockPostWorkflowHookRunner(options ...pegomock.Option) *MockPostWorkflow
 func (mock *MockPostWorkflowHookRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPostWorkflowHookRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, error) {
+func (mock *MockPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, hookId string, path string, outputHandler jobs.ProjectCommandOutputHandler) (string, string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPostWorkflowHookRunner().")
 	}
-	params := []pegomock.Param{ctx, command, path}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	params := []pegomock.Param{ctx, command, hookId, path, outputHandler}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
-	var ret1 error
+	var ret1 string
+	var ret2 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(string)
 		}
 		if result[1] != nil {
-			ret1 = result[1].(error)
+			ret1 = result[1].(string)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(error)
 		}
 	}
-	return ret0, ret1
+	return ret0, ret1, ret2
 }
 
 func (mock *MockPostWorkflowHookRunner) VerifyWasCalledOnce() *VerifierMockPostWorkflowHookRunner {
@@ -82,8 +86,8 @@ type VerifierMockPostWorkflowHookRunner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) *MockPostWorkflowHookRunner_Run_OngoingVerification {
-	params := []pegomock.Param{ctx, command, path}
+func (verifier *VerifierMockPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, hookId string, path string, outputHandler jobs.ProjectCommandOutputHandler) *MockPostWorkflowHookRunner_Run_OngoingVerification {
+	params := []pegomock.Param{ctx, command, hookId, path, outputHandler}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
 	return &MockPostWorkflowHookRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -93,12 +97,12 @@ type MockPostWorkflowHookRunner_Run_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockPostWorkflowHookRunner_Run_OngoingVerification) GetCapturedArguments() (models.WorkflowHookCommandContext, string, string) {
-	ctx, command, path := c.GetAllCapturedArguments()
-	return ctx[len(ctx)-1], command[len(command)-1], path[len(path)-1]
+func (c *MockPostWorkflowHookRunner_Run_OngoingVerification) GetCapturedArguments() (models.WorkflowHookCommandContext, string, string, string, jobs.ProjectCommandOutputHandler) {
+	ctx, command, hookId, path, outputHandler := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], command[len(command)-1], hookId[len(hookId)-1], path[len(path)-1], outputHandler[len(outputHandler)-1]
 }
 
-func (c *MockPostWorkflowHookRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.WorkflowHookCommandContext, _param1 []string, _param2 []string) {
+func (c *MockPostWorkflowHookRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.WorkflowHookCommandContext, _param1 []string, _param2 []string, _param3 []string, _param4 []jobs.ProjectCommandOutputHandler) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.WorkflowHookCommandContext, len(c.methodInvocations))
@@ -112,6 +116,14 @@ func (c *MockPostWorkflowHookRunner_Run_OngoingVerification) GetAllCapturedArgum
 		_param2 = make([]string, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(string)
+		}
+		_param3 = make([]string, len(c.methodInvocations))
+		for u, param := range params[3] {
+			_param3[u] = param.(string)
+		}
+		_param4 = make([]jobs.ProjectCommandOutputHandler, len(c.methodInvocations))
+		for u, param := range params[4] {
+			_param4[u] = param.(jobs.ProjectCommandOutputHandler)
 		}
 	}
 	return

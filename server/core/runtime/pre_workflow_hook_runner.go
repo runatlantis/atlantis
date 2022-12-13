@@ -8,16 +8,17 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/jobs"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
 type PreWorkflowHookRunner interface {
-	Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, error)
+	Run(ctx models.WorkflowHookCommandContext, command string, hookId string, path string, outputHandler jobs.ProjectCommandOutputHandler) (string, string, error)
 }
 
 type DefaultPreWorkflowHookRunner struct{}
 
-func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error) {
+func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, hookId string, path string, outputHandler jobs.ProjectCommandOutputHandler) (string, string, error) {
 	outputFilePath := filepath.Join(path, "OUTPUT_FILE")
 
 	cmd := exec.Command("sh", "-c", command) // #nosec
@@ -64,6 +65,9 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 			return "", "", err
 		}
 	}
+
+	outputHandler.SendWorkflowHook(ctx, hookId, string(out), false)
+	outputHandler.SendWorkflowHook(ctx, hookId, "", true)
 
 	ctx.Log.Info("successfully ran %q in %q", command, path)
 	return string(out), strings.Trim(string(cmdOut), "\n"), nil

@@ -175,10 +175,10 @@ func (m *MockCSU) UpdateProject(ctx command.ProjectContext, cmdName command.Name
 	return nil
 }
 
-func (m *MockCSU) UpdatePreWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string) error {
+func (m *MockCSU) UpdatePreWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
 	return nil
 }
 
-func (m *MockCSU) UpdatePostWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string) error {
+func (m *MockCSU) UpdatePostWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
 	return nil
 }

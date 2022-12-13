@@ -52,3 +52,14 @@ func (r *Router) GenerateProjectJobURL(ctx command.ProjectContext) (string, erro
 
 	return r.AtlantisURL.String() + jobURL.String(), nil
 }
+
+func (r *Router) GenerateProjectWorkflowHookURL(hookId string) (string, error) {
+	jobURL, err := r.Underlying.Get((r.ProjectJobsViewRouteName)).URL(
+		"job-id", hookId,
+	)
+	if err != nil {
+		return "", errors.Wrapf(err, "creating workflow hook url for %s", hookId)
+	}
+
+	return r.AtlantisURL.String() + jobURL.String(), nil
+}

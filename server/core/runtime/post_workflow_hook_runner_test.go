@@ -10,6 +10,7 @@ import (
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -73,6 +74,8 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		When(terraform.EnsureVersion(matchers.AnyPtrToLoggingSimpleLogger(), matchers2.AnyPtrToGoVersionVersion())).
 			ThenReturn(nil)
 
+		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+
 		logger := logging.NewNoopLogger(t)
 		tmpDir := t.TempDir()
 
@@ -99,7 +102,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 				},
 				Log: logger,
 			}
-			out, desc, err := r.Run(ctx, c.Command, tmpDir)
+			out, desc, err := r.Run(ctx, c.Command, AnyString(), tmpDir, projectCmdOutputHandler)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return
