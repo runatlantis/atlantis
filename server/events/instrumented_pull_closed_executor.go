@@ -21,8 +21,7 @@ func NewInstrumentedPullClosedExecutor(
 	scope = scope.SubScope("pullclosed_cleanup")
 
 	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric} {
-		s := scope.Counter(m)
-		s.Inc(0)
+		metrics.InitCounter(scope, m)
 	}
 
 	return &InstrumentedPullClosedExecutor{

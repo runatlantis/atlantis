@@ -22,8 +22,7 @@ func NewInstrumentedProjectCommandRunner(scope tally.Scope, projectCommandRunner
 	scope = scope.SubScope("project")
 
 	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric, metrics.ExecutionFailureMetric} {
-		s := scope.Counter(m)
-		s.Inc(0)
+		metrics.InitCounter(scope, m)
 	}
 
 	return &InstrumentedProjectCommandRunner{

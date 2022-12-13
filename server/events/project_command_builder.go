@@ -58,8 +58,7 @@ func NewInstrumentedProjectCommandBuilder(
 	scope = scope.SubScope("builder")
 
 	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric} {
-		s := scope.Counter(m)
-		s.Inc(0)
+		metrics.InitCounter(scope, m)
 	}
 
 	return &InstrumentedProjectCommandBuilder{
