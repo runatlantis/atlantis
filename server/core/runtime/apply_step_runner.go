@@ -42,6 +42,9 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
 		args := append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...)
+		if ctx.TerraformVersion.GreaterThanOrEqual(version.Must(version.NewVersion("1.1.0"))) {
+			args = append(args, "-no-color")
+		}
 		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion, envs)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
