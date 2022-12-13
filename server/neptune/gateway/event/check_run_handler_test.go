@@ -5,7 +5,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/neptune/gateway/sync"
+	"github.com/runatlantis/atlantis/server/neptune/sync"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/logging"

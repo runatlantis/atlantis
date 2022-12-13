@@ -5,7 +5,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
-	"github.com/runatlantis/atlantis/server/neptune/gateway/sync"
+	"github.com/runatlantis/atlantis/server/neptune/sync"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

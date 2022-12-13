@@ -21,6 +21,8 @@ import (
 	"github.com/runatlantis/atlantis/server/lyft/aws"
 	"github.com/runatlantis/atlantis/server/metrics"
 	neptune_http "github.com/runatlantis/atlantis/server/neptune/http"
+	internalSync "github.com/runatlantis/atlantis/server/neptune/sync"
+	"github.com/runatlantis/atlantis/server/neptune/sync/crons"
 	"github.com/runatlantis/atlantis/server/neptune/temporal"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/config"
 	"github.com/runatlantis/atlantis/server/neptune/temporalworker/controllers"
@@ -30,7 +32,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/aws/sns"
 	"github.com/runatlantis/atlantis/server/static"
 	"github.com/uber-go/tally/v4"
-	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
 	"go.temporal.io/sdk/worker"
 )
@@ -48,6 +49,8 @@ const (
 type Server struct {
 	Logger            logging.Logger
 	HTTPServerProxy   *neptune_http.ServerProxy
+	CronScheduler     *internalSync.CronScheduler
+	Crons             []*internalSync.Cron
 	Port              int
 	StatsScope        tally.Scope
 	StatsCloser       io.Closer
@@ -69,6 +72,9 @@ func NewServer(config *config.Config) (*Server, error) {
 	}
 
 	scope, statsCloser := metrics.NewScopeWithReporter(config.Metrics, config.CtxLogger, config.StatsNamespace, statsReporter)
+	scope = scope.Tagged(map[string]string{
+		"mode": "worker",
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -149,8 +155,17 @@ func NewServer(config *config.Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing github activities")
 	}
 
+	cronScheduler := internalSync.NewCronScheduler(config.CtxLogger)
+
 	server := Server{
-		Logger:              config.CtxLogger,
+		Logger:        config.CtxLogger,
+		CronScheduler: cronScheduler,
+		Crons: []*internalSync.Cron{
+			{
+				Executor:  crons.NewRuntimeStats(scope).Run,
+				Frequency: 1 * time.Minute,
+			},
+		},
 		HTTPServerProxy:     httpServerProxy,
 		Port:                config.ServerCfg.Port,
 		StatsScope:          scope,
@@ -167,8 +182,8 @@ func NewServer(config *config.Config) (*Server, error) {
 }
 
 func (s Server) Start() error {
-	defer s.Logger.Close()
-	defer s.TemporalClient.Close()
+	defer s.shutdown()
+
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -218,11 +233,17 @@ func (s Server) Start() error {
 		s.JobStreamHandler.Handle()
 	}()
 
+	for _, c := range s.Crons {
+		s.CronScheduler.Schedule(c)
+	}
+
 	<-stop
 	wg.Wait()
 
-	s.Logger.Info("Cleaning up stream handler")
+	return nil
+}
 
+func (s Server) shutdown() {
 	// On cleanup, stream handler closes all active receivers and persists in memory jobs to storage
 	ctx, cancel := context.WithTimeout(context.Background(), StreamHandlerTimeout)
 	defer cancel()
@@ -238,12 +259,13 @@ func (s Server) Start() error {
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := s.HTTPServerProxy.Shutdown(ctx); err != nil {
-		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
+		s.Logger.Error(err.Error())
 	}
 
-	s.TemporalClient.Close()
+	s.CronScheduler.Shutdown(5 * time.Second)
 
-	return nil
+	s.Logger.Close()
+	s.TemporalClient.Close()
 }
 
 func (s Server) buildDeployWorker() worker.Worker {
