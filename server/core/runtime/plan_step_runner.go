@@ -63,7 +63,7 @@ func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(output, remoteOpsErr01114) || strings.Contains(output, remoteOpsErr012) || strings.Contains(output, remoteOpsErr100) || strings.Contains(output, remoteOpsErr110)
+	return strings.Contains(output, remoteOpsErr110) || strings.Contains(output, remoteOpsErr01114) || strings.Contains(output, remoteOpsErr012) || strings.Contains(output, remoteOpsErr100)
 }
 
 // remotePlan runs a terraform plan command compatible with TFE remote
