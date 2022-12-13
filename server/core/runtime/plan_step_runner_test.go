@@ -819,10 +819,7 @@ Terraform will perform the following actions:
 
 Plan: 0 to add, 0 to change, 1 to destroy.`), "expect plan success")
 
-			expRemotePlanArgs := []string{"plan", "-input=false", "-refresh", "extra", "args", "comment", "args"}
-			if tfVersion.GreaterThanOrEqual(version.Must(version.NewVersion("1.1.0"))) {
-				expRemotePlanArgs = []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
-			}
+			expRemotePlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
 			Equals(t, expRemotePlanArgs, asyncTf.CalledArgs)
 
 			// Verify that the fake plan file we write has the correct contents.

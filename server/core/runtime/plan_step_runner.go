@@ -70,12 +70,9 @@ func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
 // operations.
 func (p *PlanStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []string, path string, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
 	argList := [][]string{
-		{"plan", "-input=false", "-refresh"},
+		{"plan", "-input=false", "-refresh", "-no-color"},
 		extraArgs,
 		ctx.EscapedCommentArgs,
-	}
-	if tfVersion.GreaterThanOrEqual(version.Must(version.NewVersion("1.1.0"))) {
-		argList[0] = append(argList[0], "-no-color")
 	}
 	args := p.flatten(argList)
 	output, err := p.runRemotePlan(ctx, args, path, tfVersion, envs)
