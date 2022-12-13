@@ -1,4 +1,4 @@
-FROM golang:1.19.3
+FROM golang:1.19.4
 
 RUN apt-get update && apt-get --no-install-recommends -y install unzip \
     && apt-get clean \
