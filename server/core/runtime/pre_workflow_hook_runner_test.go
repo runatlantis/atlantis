@@ -74,12 +74,12 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		When(terraform.EnsureVersion(matchers.AnyPtrToLoggingSimpleLogger(), matchers2.AnyPtrToGoVersionVersion())).
 			ThenReturn(nil)
 
-		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-
 		logger := logging.NewNoopLogger(t)
 		tmpDir := t.TempDir()
 
-		r := runtime.DefaultPreWorkflowHookRunner{}
+		r := runtime.DefaultPreWorkflowHookRunner{
+			OutputHandler: jobmocks.NewMockProjectCommandOutputHandler(),
+		}
 		t.Run(c.Command, func(t *testing.T) {
 			ctx := models.WorkflowHookCommandContext{
 				BaseRepo: models.Repo{
@@ -102,7 +102,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 				},
 				Log: logger,
 			}
-			out, desc, err := r.Run(ctx, c.Command, AnyString(), tmpDir, projectCmdOutputHandler)
+			out, desc, err := r.Run(ctx, c.Command, tmpDir)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

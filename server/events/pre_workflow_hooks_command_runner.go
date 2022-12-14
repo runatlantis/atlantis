@@ -3,14 +3,14 @@ package events
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/jobs"
 )
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
 
 // PreWorkflowHookURLGenerator generates urls to view the pre workflow progress.
 type PreWorkflowHookURLGenerator interface {
@@ -31,7 +31,6 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 	GlobalCfg             valid.GlobalCfg
 	PreWorkflowHookRunner runtime.PreWorkflowHookRunner
 	CommitStatusUpdater   CommitStatusUpdater
-	OutputHandler         jobs.ProjectCommandOutputHandler
 	Router                PreWorkflowHookURLGenerator
 }
 
@@ -83,6 +82,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 			User:               user,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
+			HookID:             "123",
 		},
 		preWorkflowHooks, repoDir)
 
@@ -104,8 +104,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			hookDescription = fmt.Sprintf("Pre workflow hook #%d", i)
 		}
 
-		hookId := uuid.New().String()
-		url, err := w.Router.GenerateProjectWorkflowHookURL(hookId)
+		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
 		if err != nil {
 			return err
 		}
@@ -115,7 +114,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			return err
 		}
 
-		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, hookId, repoDir, w.OutputHandler)
+		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, repoDir)
 
 		if err != nil {
 			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, hookDescription, runtimeDesc, url); err != nil {

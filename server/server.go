@@ -518,24 +518,26 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisVersion: config.AtlantisVersion,
 	}
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
-		VCSClient:             vcsClient,
-		GlobalCfg:             globalCfg,
-		WorkingDirLocker:      workingDirLocker,
-		WorkingDir:            workingDir,
-		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{},
-		CommitStatusUpdater:   commitStatusUpdater,
-		OutputHandler:         projectCmdOutputHandler,
-		Router:                router,
+		VCSClient:        vcsClient,
+		GlobalCfg:        globalCfg,
+		WorkingDirLocker: workingDirLocker,
+		WorkingDir:       workingDir,
+		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{
+			OutputHandler: projectCmdOutputHandler,
+		},
+		CommitStatusUpdater: commitStatusUpdater,
+		Router:              router,
 	}
 	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
-		VCSClient:              vcsClient,
-		GlobalCfg:              globalCfg,
-		WorkingDirLocker:       workingDirLocker,
-		WorkingDir:             workingDir,
-		PostWorkflowHookRunner: runtime.DefaultPostWorkflowHookRunner{},
-		CommitStatusUpdater:    commitStatusUpdater,
-		OutputHandler:          projectCmdOutputHandler,
-		Router:                 router,
+		VCSClient:        vcsClient,
+		GlobalCfg:        globalCfg,
+		WorkingDirLocker: workingDirLocker,
+		WorkingDir:       workingDir,
+		PostWorkflowHookRunner: runtime.DefaultPostWorkflowHookRunner{
+			OutputHandler: projectCmdOutputHandler,
+		},
+		CommitStatusUpdater: commitStatusUpdater,
+		Router:              router,
 	}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		policyChecksEnabled,

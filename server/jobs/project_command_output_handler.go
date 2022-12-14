@@ -55,7 +55,7 @@ type ProjectCommandOutputHandler interface {
 	// Send will enqueue the msg and wait for Handle() to receive the message.
 	Send(ctx command.ProjectContext, msg string, operationComplete bool)
 
-	SendWorkflowHook(ctx models.WorkflowHookCommandContext, hookId string, msg string, operationComplete bool)
+	SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool)
 
 	// Register registers a channel and blocks until it is caught up. Callers should call this asynchronously when attempting
 	// to read the channel in the same goroutine
@@ -110,9 +110,9 @@ func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg 
 	}
 }
 
-func (p *AsyncProjectCommandOutputHandler) SendWorkflowHook(ctx models.WorkflowHookCommandContext, hookId string, msg string, operationComplete bool) {
+func (p *AsyncProjectCommandOutputHandler) SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool) {
 	p.projectCmdOutput <- &ProjectCmdOutputLine{
-		JobID: hookId,
+		JobID: ctx.HookID,
 		JobInfo: JobInfo{
 			HeadCommit: ctx.Pull.HeadCommit,
 			PullInfo: PullInfo{
@@ -270,7 +270,7 @@ type NoopProjectOutputHandler struct{}
 func (p *NoopProjectOutputHandler) Send(ctx command.ProjectContext, msg string, isOperationComplete bool) {
 }
 
-func (p *NoopProjectOutputHandler) SendWorkflowHook(ctx models.WorkflowHookCommandContext, hookId string, msg string, operationComplete bool) {
+func (p *NoopProjectOutputHandler) SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool) {
 }
 
 func (p *NoopProjectOutputHandler) Register(jobID string, receiver chan string)   {}

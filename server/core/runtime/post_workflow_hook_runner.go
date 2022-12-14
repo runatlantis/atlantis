@@ -13,12 +13,14 @@ import (
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_post_workflows_hook_runner.go PostWorkflowHookRunner
 type PostWorkflowHookRunner interface {
-	Run(ctx models.WorkflowHookCommandContext, command string, hookId string, path string, outputHandler jobs.ProjectCommandOutputHandler) (string, string, error)
+	Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error)
 }
 
-type DefaultPostWorkflowHookRunner struct{}
+type DefaultPostWorkflowHookRunner struct {
+	OutputHandler jobs.ProjectCommandOutputHandler
+}
 
-func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, hookId string, path string, outputHandler jobs.ProjectCommandOutputHandler) (string, string, error) {
+func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error) {
 	outputFilePath := filepath.Join(path, "OUTPUT_FILE")
 
 	cmd := exec.Command("sh", "-c", command) // #nosec
@@ -55,20 +57,20 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		return "", "", err
 	}
 
-	var cmdOut []byte
-	var errOut error
+	var customStatusOut []byte
 	if _, err := os.Stat(outputFilePath); err == nil {
-		cmdOut, errOut = os.ReadFile(outputFilePath)
-		if errOut != nil {
+		var customStatusErr error
+		customStatusOut, customStatusErr = os.ReadFile(outputFilePath)
+		if customStatusErr != nil {
 			err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
 			ctx.Log.Debug("error: %s", err)
 			return "", "", err
 		}
 	}
 
-	outputHandler.SendWorkflowHook(ctx, hookId, "test", false)
-	outputHandler.SendWorkflowHook(ctx, hookId, "", true)
+	wh.OutputHandler.SendWorkflowHook(ctx, string(out), false)
+	wh.OutputHandler.SendWorkflowHook(ctx, "", true)
 
 	ctx.Log.Info("successfully ran %q in %q", command, path)
-	return string(out), strings.Trim(string(cmdOut), "\n"), nil
+	return string(out), strings.Trim(string(customStatusOut), "\n"), nil
 }

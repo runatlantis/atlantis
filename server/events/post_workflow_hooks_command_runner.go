@@ -3,14 +3,19 @@ package events
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/jobs"
 )
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_post_workflow_hook_url_generator.go PostWorkflowHookURLGenerator
+
+// PostWorkflowHookURLGenerator generates urls to view the post workflow progress.
+type PostWorkflowHookURLGenerator interface {
+	GenerateProjectWorkflowHookURL(hookId string) (string, error)
+}
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_post_workflows_hooks_command_runner.go PostWorkflowHooksCommandRunner
 
@@ -26,8 +31,7 @@ type DefaultPostWorkflowHooksCommandRunner struct {
 	GlobalCfg              valid.GlobalCfg
 	PostWorkflowHookRunner runtime.PostWorkflowHookRunner
 	CommitStatusUpdater    CommitStatusUpdater
-	OutputHandler          jobs.ProjectCommandOutputHandler
-	Router                 PreWorkflowHookURLGenerator
+	Router                 PostWorkflowHookURLGenerator
 }
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
@@ -102,8 +106,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 			hookDescription = fmt.Sprintf("Post workflow hook #%d", i)
 		}
 
-		hookId := uuid.New().String()
-		url, err := w.Router.GenerateProjectWorkflowHookURL(hookId)
+		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
 		if err != nil {
 			return err
 		}
@@ -112,7 +115,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 			ctx.Log.Warn("unable to update post workflow hook status: %s", err)
 		}
 
-		_, runtimeDesc, err := w.PostWorkflowHookRunner.Run(ctx, hook.RunCommand, hookId, repoDir, w.OutputHandler)
+		_, runtimeDesc, err := w.PostWorkflowHookRunner.Run(ctx, hook.RunCommand, repoDir)
 
 		if err != nil {
 			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, hookDescription, runtimeDesc, url); err != nil {
