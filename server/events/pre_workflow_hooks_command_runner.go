@@ -14,7 +14,7 @@ import (
 
 // PreWorkflowHookURLGenerator generates urls to view the pre workflow progress.
 type PreWorkflowHookURLGenerator interface {
-	GenerateProjectWorkflowHookURL(hookId string) (string, error)
+	GenerateProjectWorkflowHookURL(hookID string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner

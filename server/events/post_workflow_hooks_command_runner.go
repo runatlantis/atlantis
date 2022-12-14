@@ -14,7 +14,7 @@ import (
 
 // PostWorkflowHookURLGenerator generates urls to view the post workflow progress.
 type PostWorkflowHookURLGenerator interface {
-	GenerateProjectWorkflowHookURL(hookId string) (string, error)
+	GenerateProjectWorkflowHookURL(hookID string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_post_workflows_hooks_command_runner.go PostWorkflowHooksCommandRunner
