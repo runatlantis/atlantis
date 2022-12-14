@@ -854,8 +854,8 @@ var PlanUsage = `Usage of plan:
   -d, --dir string         Which directory to run plan in relative to root of repo,
                            ex. 'child/dir'.
   -p, --project string     Which project to run plan for. Refers to the name of the
-                           project configured in atlantis.yaml. Cannot be used at
-                           same time as workspace or dir flags.
+                           project configured in a repo config file. Cannot be used
+                           at same time as workspace or dir flags.
       --verbose            Append Atlantis log to comment.
   -w, --workspace string   Switch to this Terraform workspace before planning.
 `
@@ -865,8 +865,8 @@ var ApplyUsage = `Usage of apply:
   -d, --dir string            Apply the plan for this directory, relative to root of
                               repo, ex. 'child/dir'.
   -p, --project string        Apply the plan for this project. Refers to the name of
-                              the project configured in atlantis.yaml. Cannot be
-                              used at same time as workspace or dir flags.
+                              the project configured in a repo config file. Cannot
+                              be used at same time as workspace or dir flags.
       --verbose               Append Atlantis log to comment.
   -w, --workspace string      Apply the plan for this Terraform workspace.
 `

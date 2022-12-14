@@ -24,6 +24,9 @@ const DefaultWorkflowName = "default"
 const DeleteSourceBranchOnMergeKey = "delete_source_branch_on_merge"
 const RepoLockingKey = "repo_locking"
 
+// DefaultAtlantisFile is the default name of the config file for each repo.
+const DefaultAtlantisFile = "atlantis.yaml"
+
 // NonOverrideableApplyReqs will get applied across all "repos" in the server side config.
 // If repo config is allowed overrides, they can override this.
 // TODO: Make this more customizable, not everyone wants this rigid workflow
@@ -62,6 +65,7 @@ type Repo struct {
 	// If ID is set then this will be nil.
 	IDRegex                   *regexp.Regexp
 	BranchRegex               *regexp.Regexp
+	RepoConfigFile            string
 	ApplyRequirements         []string
 	PreWorkflowHooks          []*WorkflowHook
 	Workflow                  *Workflow
@@ -157,6 +161,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 }
 
 type GlobalCfgArgs struct {
+	RepoConfigFile     string
 	AllowRepoCfg       bool
 	MergeableReq       bool
 	ApprovedReq        bool
@@ -205,6 +210,7 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 			{
 				IDRegex:                   regexp.MustCompile(".*"),
 				BranchRegex:               regexp.MustCompile(".*"),
+				RepoConfigFile:            args.RepoConfigFile,
 				ApplyRequirements:         applyReqs,
 				PreWorkflowHooks:          args.PreWorkflowHooks,
 				Workflow:                  &defaultWorkflow,
@@ -520,4 +526,14 @@ func (g GlobalCfg) MatchingRepo(repoID string) *Repo {
 		}
 	}
 	return nil
+}
+
+// RepoConfigFile returns a repository specific file path
+// If not defined, return atlantis.yaml as default
+func (g GlobalCfg) RepoConfigFile(repoID string) string {
+	repo := g.MatchingRepo(repoID)
+	if repo != nil && repo.RepoConfigFile != "" {
+		return repo.RepoConfigFile
+	}
+	return DefaultAtlantisFile
 }

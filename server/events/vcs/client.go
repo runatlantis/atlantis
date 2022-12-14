@@ -40,10 +40,10 @@ type Client interface {
 	MarkdownPullLink(pull models.PullRequest) (string, error)
 	GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error)
 
-	// DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)
-	// The first return value indicate that repo contain atlantis.yaml or not
-	// if BaseRepo had one repo config file, its content will placed on the second return value
-	DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error)
+	// GetFileContent a repository file content from VCS (which support fetch a single file from repository)
+	// The first return value indicates whether the repo contains a file or not
+	// if BaseRepo had a file, its content will placed on the second return value
+	GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error)
 	SupportsSingleFileDownload(repo models.Repo) bool
 	GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error)
 }

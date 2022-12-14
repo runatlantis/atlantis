@@ -20,8 +20,8 @@ keys by setting the `allowed_overrides` key there. See the [Server Side Repo Con
 more details.
 
 **Notes**
-* `atlantis.yaml` files must be placed at the root of the repo
-* The only supported name is `atlantis.yaml`. Not `atlantis.yml` or `.atlantis.yaml`.
+* By default, repo root `atlantis.yaml` file is used.
+* You can change this behaviour by setting [Server Side Repo Config](server-side-repo-config.html)
 
 ::: danger DANGER
 Atlantis uses the `atlantis.yaml` version from the pull request, similar to other

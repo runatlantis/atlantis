@@ -35,6 +35,10 @@ repos:
   # By default, all branches are matched
   branch: /.*/
 
+  # repo_config_file specifies which repo config file to use for this repo.
+  # By default, atlantis.yaml is used.
+  repo_config_file: path/to/atlantis.yaml
+
   # apply_requirements sets the Apply Requirements for all repos that match.
   apply_requirements: [approved, mergeable]
 
@@ -168,7 +172,7 @@ repos:
 Then each allowed repo can have an `atlantis.yaml` file that
 sets `apply_requirements` to an empty array (disabling the requirement).
 ```yaml
-# atlantis.yaml in the repo root
+# atlantis.yaml in the repo root or set repo_config_file in repos.yaml
 version: 3
 projects:
 - dir: .
@@ -400,6 +404,7 @@ If you set a workflow with the key `default`, it will override this.
 |-------------------------------|----------|---------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | id                            | string   | none    | yes      | Value can be a regular expression when specified as /&lt;regex&gt;/ or an exact string match. Repo IDs are of the form `{vcs hostname}/{org}/{name}`, ex. `github.com/owner/repo`. Hostname is specified without scheme or port. For Bitbucket Server, {org} is the **name** of the project, not the key. |
 | branch                        | string   | none    | no       | An regex matching pull requests by base branch (the branch the pull request is getting merged into). By default, all branches are matched                                                                                                                                                                 |
+| repo_config_file              | string   | none    | no       | Repo config file path in this repo. By default, use `atlantis.yaml` which is located on repository root. When multiple atlantis servers work with the same repo, please set different file names.                                                                                                         |
 | workflow                      | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                        |
 | apply_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Apply Requirements](apply-requirements.html) for more details.                                                                      |
 | allowed_overrides             | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge` and `repo_locking`                                                                                                                       |
