@@ -38,8 +38,8 @@ type CommitStatusUpdater interface {
 	// ctx.
 	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error
 
-	UpdatePreWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
-	UpdatePostWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
+	UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
+	UpdatePostWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
 }
 
 // DefaultCommitStatusUpdater implements CommitStatusUpdater.
@@ -100,15 +100,15 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, c
 	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
 }
 
-func (d *DefaultCommitStatusUpdater) UpdatePreWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
-	return d.updateWorkflowHook(repo, pull, status, hookDescription, runtimeDescription, "pre_workflow_hook", url)
+func (d *DefaultCommitStatusUpdater) UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
+	return d.updateWorkflowHook(pull, status, hookDescription, runtimeDescription, "pre_workflow_hook", url)
 }
 
-func (d *DefaultCommitStatusUpdater) UpdatePostWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
-	return d.updateWorkflowHook(repo, pull, status, hookDescription, runtimeDescription, "post_workflow_hook", url)
+func (d *DefaultCommitStatusUpdater) UpdatePostWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
+	return d.updateWorkflowHook(pull, status, hookDescription, runtimeDescription, "post_workflow_hook", url)
 }
 
-func (d *DefaultCommitStatusUpdater) updateWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, workflowType string, url string) error {
+func (d *DefaultCommitStatusUpdater) updateWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, workflowType string, url string) error {
 	src := fmt.Sprintf("%s/%s: %s", d.StatusName, workflowType, hookDescription)
 
 	var descripWords string
@@ -125,5 +125,5 @@ func (d *DefaultCommitStatusUpdater) updateWorkflowHook(repo models.Repo, pull m
 		}
 	}
 
-	return d.Client.UpdateStatus(repo, pull, status, src, descripWords, url)
+	return d.Client.UpdateStatus(pull.BaseRepo, pull, status, src, descripWords, url)
 }

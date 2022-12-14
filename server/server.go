@@ -527,7 +527,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		},
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
-		UUIDGenerator:       events.DefaultPreWorkflowHookUUIDGenerator{},
 	}
 	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
 		VCSClient:        vcsClient,
@@ -539,7 +538,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		},
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
-		UUIDGenerator:       events.DefaultPreWorkflowHookUUIDGenerator{},
 	}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		policyChecksEnabled,

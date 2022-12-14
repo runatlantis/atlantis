@@ -71,11 +71,11 @@ func (mock *MockCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, c
 	return ret0
 }
 
-func (mock *MockCommitStatusUpdater) UpdatePreWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
+func (mock *MockCommitStatusUpdater) UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommitStatusUpdater().")
 	}
-	params := []pegomock.Param{repo, pull, status, hookDescription, runtimeDescription, url}
+	params := []pegomock.Param{pull, status, hookDescription, runtimeDescription, url}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdatePreWorkflowHook", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -86,11 +86,11 @@ func (mock *MockCommitStatusUpdater) UpdatePreWorkflowHook(repo models.Repo, pul
 	return ret0
 }
 
-func (mock *MockCommitStatusUpdater) UpdatePostWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
+func (mock *MockCommitStatusUpdater) UpdatePostWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommitStatusUpdater().")
 	}
-	params := []pegomock.Param{repo, pull, status, hookDescription, runtimeDescription, url}
+	params := []pegomock.Param{pull, status, hookDescription, runtimeDescription, url}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdatePostWorkflowHook", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -263,8 +263,8 @@ func (c *MockCommitStatusUpdater_UpdateProject_OngoingVerification) GetAllCaptur
 	return
 }
 
-func (verifier *VerifierMockCommitStatusUpdater) UpdatePreWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) *MockCommitStatusUpdater_UpdatePreWorkflowHook_OngoingVerification {
-	params := []pegomock.Param{repo, pull, status, hookDescription, runtimeDescription, url}
+func (verifier *VerifierMockCommitStatusUpdater) UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) *MockCommitStatusUpdater_UpdatePreWorkflowHook_OngoingVerification {
+	params := []pegomock.Param{pull, status, hookDescription, runtimeDescription, url}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdatePreWorkflowHook", params, verifier.timeout)
 	return &MockCommitStatusUpdater_UpdatePreWorkflowHook_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -274,25 +274,25 @@ type MockCommitStatusUpdater_UpdatePreWorkflowHook_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockCommitStatusUpdater_UpdatePreWorkflowHook_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, string, string, string) {
-	repo, pull, status, hookDescription, runtimeDescription, url := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pull[len(pull)-1], status[len(status)-1], hookDescription[len(hookDescription)-1], runtimeDescription[len(runtimeDescription)-1], url[len(url)-1]
+func (c *MockCommitStatusUpdater_UpdatePreWorkflowHook_OngoingVerification) GetCapturedArguments() (models.PullRequest, models.CommitStatus, string, string, string) {
+	pull, status, hookDescription, runtimeDescription, url := c.GetAllCapturedArguments()
+	return pull[len(pull)-1], status[len(status)-1], hookDescription[len(hookDescription)-1], runtimeDescription[len(runtimeDescription)-1], url[len(url)-1]
 }
 
-func (c *MockCommitStatusUpdater_UpdatePreWorkflowHook_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []string, _param4 []string, _param5 []string) {
+func (c *MockCommitStatusUpdater_UpdatePreWorkflowHook_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest, _param1 []models.CommitStatus, _param2 []string, _param3 []string, _param4 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(c.methodInvocations))
+		_param0 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(models.Repo)
+			_param0[u] = param.(models.PullRequest)
 		}
-		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		_param1 = make([]models.CommitStatus, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequest)
+			_param1[u] = param.(models.CommitStatus)
 		}
-		_param2 = make([]models.CommitStatus, len(c.methodInvocations))
+		_param2 = make([]string, len(c.methodInvocations))
 		for u, param := range params[2] {
-			_param2[u] = param.(models.CommitStatus)
+			_param2[u] = param.(string)
 		}
 		_param3 = make([]string, len(c.methodInvocations))
 		for u, param := range params[3] {
@@ -302,16 +302,12 @@ func (c *MockCommitStatusUpdater_UpdatePreWorkflowHook_OngoingVerification) GetA
 		for u, param := range params[4] {
 			_param4[u] = param.(string)
 		}
-		_param5 = make([]string, len(c.methodInvocations))
-		for u, param := range params[5] {
-			_param5[u] = param.(string)
-		}
 	}
 	return
 }
 
-func (verifier *VerifierMockCommitStatusUpdater) UpdatePostWorkflowHook(repo models.Repo, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) *MockCommitStatusUpdater_UpdatePostWorkflowHook_OngoingVerification {
-	params := []pegomock.Param{repo, pull, status, hookDescription, runtimeDescription, url}
+func (verifier *VerifierMockCommitStatusUpdater) UpdatePostWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) *MockCommitStatusUpdater_UpdatePostWorkflowHook_OngoingVerification {
+	params := []pegomock.Param{pull, status, hookDescription, runtimeDescription, url}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdatePostWorkflowHook", params, verifier.timeout)
 	return &MockCommitStatusUpdater_UpdatePostWorkflowHook_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -321,25 +317,25 @@ type MockCommitStatusUpdater_UpdatePostWorkflowHook_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockCommitStatusUpdater_UpdatePostWorkflowHook_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, string, string, string) {
-	repo, pull, status, hookDescription, runtimeDescription, url := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pull[len(pull)-1], status[len(status)-1], hookDescription[len(hookDescription)-1], runtimeDescription[len(runtimeDescription)-1], url[len(url)-1]
+func (c *MockCommitStatusUpdater_UpdatePostWorkflowHook_OngoingVerification) GetCapturedArguments() (models.PullRequest, models.CommitStatus, string, string, string) {
+	pull, status, hookDescription, runtimeDescription, url := c.GetAllCapturedArguments()
+	return pull[len(pull)-1], status[len(status)-1], hookDescription[len(hookDescription)-1], runtimeDescription[len(runtimeDescription)-1], url[len(url)-1]
 }
 
-func (c *MockCommitStatusUpdater_UpdatePostWorkflowHook_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []string, _param4 []string, _param5 []string) {
+func (c *MockCommitStatusUpdater_UpdatePostWorkflowHook_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest, _param1 []models.CommitStatus, _param2 []string, _param3 []string, _param4 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(c.methodInvocations))
+		_param0 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(models.Repo)
+			_param0[u] = param.(models.PullRequest)
 		}
-		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		_param1 = make([]models.CommitStatus, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequest)
+			_param1[u] = param.(models.CommitStatus)
 		}
-		_param2 = make([]models.CommitStatus, len(c.methodInvocations))
+		_param2 = make([]string, len(c.methodInvocations))
 		for u, param := range params[2] {
-			_param2[u] = param.(models.CommitStatus)
+			_param2[u] = param.(string)
 		}
 		_param3 = make([]string, len(c.methodInvocations))
 		for u, param := range params[3] {
@@ -348,10 +344,6 @@ func (c *MockCommitStatusUpdater_UpdatePostWorkflowHook_OngoingVerification) Get
 		_param4 = make([]string, len(c.methodInvocations))
 		for u, param := range params[4] {
 			_param4[u] = param.(string)
-		}
-		_param5 = make([]string, len(c.methodInvocations))
-		for u, param := range params[5] {
-			_param5[u] = param.(string)
 		}
 	}
 	return

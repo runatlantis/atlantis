@@ -3,6 +3,7 @@ package events
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -32,7 +33,6 @@ type DefaultPostWorkflowHooksCommandRunner struct {
 	PostWorkflowHookRunner runtime.PostWorkflowHookRunner
 	CommitStatusUpdater    CommitStatusUpdater
 	Router                 PostWorkflowHookURLGenerator
-	UUIDGenerator          UUIDGenerator
 }
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
@@ -85,7 +85,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 			User:               user,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
-			HookID:             w.UUIDGenerator.GenerateUUID(),
+			HookID:             uuid.NewString(),
 		},
 		postWorkflowHooks, repoDir)
 
@@ -113,20 +113,20 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, hookDescription, "", url); err != nil {
+		if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull, models.PendingCommitStatus, hookDescription, "", url); err != nil {
 			ctx.Log.Warn("unable to update post workflow hook status: %s", err)
 		}
 
 		_, runtimeDesc, err := w.PostWorkflowHookRunner.Run(ctx, hook.RunCommand, repoDir)
 
 		if err != nil {
-			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, hookDescription, runtimeDesc, url); err != nil {
+			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull, models.FailedCommitStatus, hookDescription, runtimeDesc, url); err != nil {
 				ctx.Log.Warn("unable to update post workflow hook status: %s", err)
 			}
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, hookDescription, runtimeDesc, url); err != nil {
+		if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull, models.SuccessCommitStatus, hookDescription, runtimeDesc, url); err != nil {
 			ctx.Log.Warn("unable to update post workflow hook status: %s", err)
 		}
 	}

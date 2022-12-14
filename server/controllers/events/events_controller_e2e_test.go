@@ -944,22 +944,30 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	parallelPoolSize := 1
 	silenceNoProjects := false
 
+	commitStatusUpdater := mocks.NewMockCommitStatusUpdater()
+
 	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
+	preWorkflowHookURLGenerator := mocks.NewMockPreWorkflowHookURLGenerator()
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             e2eVCSClient,
 		GlobalCfg:             globalCfg,
 		WorkingDirLocker:      locker,
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: mockPreWorkflowHookRunner,
+		CommitStatusUpdater:   commitStatusUpdater,
+		Router:                preWorkflowHookURLGenerator,
 	}
 
 	mockPostWorkflowHookRunner = runtimemocks.NewMockPostWorkflowHookRunner()
+	postWorkflowHookURLGenerator := mocks.NewMockPostWorkflowHookURLGenerator()
 	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
 		VCSClient:              e2eVCSClient,
 		GlobalCfg:              globalCfg,
 		WorkingDirLocker:       locker,
 		WorkingDir:             workingDir,
 		PostWorkflowHookRunner: mockPostWorkflowHookRunner,
+		CommitStatusUpdater:    commitStatusUpdater,
+		Router:                 postWorkflowHookURLGenerator,
 	}
 	statsScope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 

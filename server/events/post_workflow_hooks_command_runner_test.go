@@ -4,7 +4,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	runtime_mocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
+	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
 
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -23,7 +25,6 @@ var postWhWorkingDir *mocks.MockWorkingDir
 var postWhWorkingDirLocker *mocks.MockWorkingDirLocker
 var whPostWorkflowHookRunner *runtime_mocks.MockPostWorkflowHookRunner
 var postCommitStatusUpdater *mocks.MockCommitStatusUpdater
-var postUUIDGenerator *mocks.MockUUIDGenerator
 
 func postWorkflowHooksSetup(t *testing.T) {
 	RegisterMockTestingT(t)
@@ -33,7 +34,6 @@ func postWorkflowHooksSetup(t *testing.T) {
 	whPostWorkflowHookRunner = runtime_mocks.NewMockPostWorkflowHookRunner()
 	postCommitStatusUpdater = mocks.NewMockCommitStatusUpdater()
 	postWorkflowHookURLGenerator := mocks.NewMockPostWorkflowHookURLGenerator()
-	postUUIDGenerator = mocks.NewMockUUIDGenerator()
 
 	postWh = events.DefaultPostWorkflowHooksCommandRunner{
 		VCSClient:              vcsClient,
@@ -42,7 +42,6 @@ func postWorkflowHooksSetup(t *testing.T) {
 		PostWorkflowHookRunner: whPostWorkflowHookRunner,
 		CommitStatusUpdater:    postCommitStatusUpdater,
 		Router:                 postWorkflowHookURLGenerator,
-		UUIDGenerator:          postUUIDGenerator,
 	}
 }
 
@@ -68,7 +67,6 @@ func TestRunPostHooks_Clone(t *testing.T) {
 	repoDir := "path/to/repo"
 	result := "some result"
 	runtimeDesc := ""
-	mockUUID := "12345"
 
 	pCtx := models.WorkflowHookCommandContext{
 		BaseRepo: fixtures.GithubRepo,
@@ -77,7 +75,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		Log:      log,
 		User:     fixtures.User,
 		Verbose:  false,
-		HookID:   mockUUID,
+		HookID:   uuid.NewString(),
 	}
 
 	t.Run("success hooks in cfg", func(t *testing.T) {
@@ -101,7 +99,6 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		postWh.GlobalCfg = globalCfg
 
-		When(postUUIDGenerator.GenerateUUID()).ThenReturn(mockUUID)
 		When(postWhWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
 		When(whPostWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, runtimeDesc, nil)
@@ -109,7 +106,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		err := postWh.RunPostHooks(ctx, nil)
 
 		Ok(t, err)
-		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(pCtx, testHook.RunCommand, repoDir)
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 	t.Run("success hooks not in cfg", func(t *testing.T) {
@@ -132,8 +129,6 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		}
 
 		postWh.GlobalCfg = globalCfg
-
-		When(postUUIDGenerator.GenerateUUID()).ThenReturn(mockUUID)
 
 		err := postWh.RunPostHooks(ctx, nil)
 
@@ -159,7 +154,6 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		postWh.GlobalCfg = globalCfg
 
-		When(postUUIDGenerator.GenerateUUID()).ThenReturn(mockUUID)
 		When(postWhWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(func() {}, errors.New("some error"))
 
 		err := postWh.RunPostHooks(ctx, nil)
@@ -190,7 +184,6 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		postWh.GlobalCfg = globalCfg
 
-		When(postUUIDGenerator.GenerateUUID()).ThenReturn(mockUUID)
 		When(postWhWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, errors.New("some error"))
 
@@ -223,10 +216,9 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		postWh.GlobalCfg = globalCfg
 
-		When(postUUIDGenerator.GenerateUUID()).ThenReturn(mockUUID)
 		When(postWhWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
-		When(whPostWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, runtimeDesc, errors.New("some error"))
+		When(whPostWorkflowHookRunner.Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))).ThenReturn(result, runtimeDesc, errors.New("some error"))
 
 		err := postWh.RunPostHooks(ctx, nil)
 
@@ -262,15 +254,14 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		postWh.GlobalCfg = globalCfg
 
-		When(postUUIDGenerator.GenerateUUID()).ThenReturn(mockUUID)
 		When(postWhWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
-		When(whPostWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, runtimeDesc, nil)
+		When(whPostWorkflowHookRunner.Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
 		err := postWh.RunPostHooks(ctx, cmd)
 
 		Ok(t, err)
-		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(expectedCtx, testHook.RunCommand, repoDir)
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 }
