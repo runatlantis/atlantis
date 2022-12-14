@@ -1,4 +1,9 @@
+ARG ATLANTIS_BASE=ghcr.io/runatlantis/atlantis-base
+ARG ATLANTIS_BASE_TAG_DATE=2022.12.12
+ARG ATLANTIS_BASE_TAG_TYPE=alpine
+
 # Stage 1: build artifact
+
 FROM golang:1.19.4-alpine AS builder
 
 WORKDIR /app
@@ -9,7 +14,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Stage 2
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile
-FROM ghcr.io/runatlantis/atlantis-base:2022.12.11 AS base
+FROM ${ATLANTIS_BASE}:${ATLANTIS_BASE_TAG_DATE}-${ATLANTIS_BASE_TAG_TYPE} AS base
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM

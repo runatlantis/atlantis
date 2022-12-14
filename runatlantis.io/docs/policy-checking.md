@@ -154,3 +154,7 @@ workflows:
         - show
         - run: conftest test $SHOWFILE *.tf
 ```
+
+### Quiet policy checks
+
+By default, Atlantis will add a comment to all pull requests with the policy check result - both successes and failures. Version 0.21.0 added the [`--quiet-policy-checks`](server-configuration.html#quiet-policy-checks) option, which will instead only add comments when policy checks fail, significantly reducing the number of comments when most policy check results succeed.
