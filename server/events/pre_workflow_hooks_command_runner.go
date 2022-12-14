@@ -32,6 +32,7 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 	PreWorkflowHookRunner runtime.PreWorkflowHookRunner
 	CommitStatusUpdater   CommitStatusUpdater
 	Router                PreWorkflowHookURLGenerator
+	UUIDGenerator         UUIDGenerator
 }
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
@@ -82,7 +83,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 			User:               user,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
-			HookID:             "123",
+			HookID:             w.UUIDGenerator.GenerateUUID(),
 		},
 		preWorkflowHooks, repoDir)
 

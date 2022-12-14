@@ -57,6 +57,8 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		return "", "", err
 	}
 
+	// Read the value from the "outputFilePath" file
+	// to be returned as a custom description.
 	var customStatusOut []byte
 	if _, err := os.Stat(outputFilePath); err == nil {
 		var customStatusErr error

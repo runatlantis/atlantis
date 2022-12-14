@@ -8,7 +8,7 @@ workflows](custom-workflows.html#custom-run-command) in several ways.
    present. This be utilized to [dynamically generate repo configs](pre-workflow-hooks.html#dynamic-repo-config-generation).
 2. Pre workflow hooks are run outside of Atlantis commands. Which means
    they do not surface their output back to the PR as a comment.
-3. Pre workflow hooks only allow `run` commands.
+3. Pre workflow hooks only allow `run` and `description` commands.
 
 [[toc]]
 
@@ -31,6 +31,7 @@ repos:
     - id: /.*/
       pre_workflow_hooks:
         - run: ./repo-config-generator.sh
+          description: Generating configs
 ```
 ## Reference
 ### Custom `run` Command
@@ -39,9 +40,10 @@ command](custom-workflows.html#custom-run-command).
 ```yaml
 - run: custom-command
 ```
-| Key | Type   | Default | Required | Description          |
-| --- | ------ | ------- | -------- | -------------------- |
-| run | string | none    | no       | Run a custom command |
+| Key         | Type   | Default | Required | Description          |
+| ----------- | ------ | ------- | -------- | -------------------- |
+| run         | string | none    | no       | Run a custom command |
+| description | string | none    | no       | Pre hook description |
 
 ::: tip Notes
 * `run` commands are executed with the following environment variables:
@@ -58,5 +60,6 @@ command](custom-workflows.html#custom-run-command).
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
+  * `OUTPUT_FILE` - An output file you can use to customize the success or failure status. ex. `echo 'failure' > $OUTPUT_FILE`.
 :::
 

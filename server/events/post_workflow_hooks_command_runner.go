@@ -32,6 +32,7 @@ type DefaultPostWorkflowHooksCommandRunner struct {
 	PostWorkflowHookRunner runtime.PostWorkflowHookRunner
 	CommitStatusUpdater    CommitStatusUpdater
 	Router                 PostWorkflowHookURLGenerator
+	UUIDGenerator          UUIDGenerator
 }
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
@@ -84,6 +85,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 			User:               user,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
+			HookID:             w.UUIDGenerator.GenerateUUID(),
 		},
 		postWorkflowHooks, repoDir)
 
