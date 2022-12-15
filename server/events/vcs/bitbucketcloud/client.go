@@ -263,7 +263,7 @@ func (b *Client) SupportsSingleFileDownload(models.Repo) bool {
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (b *Client) GetFileContent(pull models.PullRequest, repoConfigFile string) (bool, []byte, error) {
+func (b *Client) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("Not Implemented")
 }
 
