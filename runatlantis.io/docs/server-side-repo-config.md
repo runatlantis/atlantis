@@ -361,6 +361,50 @@ workflows:
 See [Custom Workflows](custom-workflows.html) for more details on writing
 custom workflows.
 
+### Multiple Atlantis Servers Handle The Same Repository
+Sometimes, you want to run multiple Atlantis servers handles a repository for reasons such as the server's permissions.
+In this case, you can use different [atlantis.yaml](repo-level-atlantis-yaml.html) repository config file by using different `repos.yaml`.
+
+For example, let's consider a situation that you want to separate `production-server` handles `atlantis-production.yaml` and `staging-server` handles `atlantis-staging.yaml`.
+
+Firstly, you need to deploy 2 Atlantis servers, `production-server` and `staging-server`.
+Each servers have different permissions and different `repos.yaml` file.
+`repos.yaml` contains `repo_config_file` key to specify the repository config file name.
+
+```yaml
+# repos.yaml
+repos:
+- id: /.*/
+  repo_config_file: atlantis-production.yaml # for production-server
+  # repo_config_file: atlantis-staging.yaml # for staging-serever
+```
+
+Then, you need to create `atlantis-production.yaml` and `atlantis-staging.yaml` files in the repository.
+See the configuration examples in [atlantis.yaml](repo-level-atlantis-yaml.html).
+
+```yaml
+# atlantis-production.yaml
+version: 3
+projects:
+- name: project
+  branch: /production/
+  dir: infrastructure/production
+---
+# atlantis-staging.yaml
+version: 3
+projects:
+  - name: project
+    branch: /staging/
+    dir: infrastructure/staging
+```
+
+Now, you setup 2 webhook URLs for your repository, which send events to `production-server` and `staging-server` respectively.
+Each servers handle different repository config files.
+
+:::tip Notes
+* If `no projects` comments are annoying, set [--silence-no-projects](server-configuration.html#silence-no-projects).
+:::
+
 ## Reference
 
 ### Top-Level Keys
