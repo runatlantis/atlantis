@@ -685,22 +685,45 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 
 // Test plans if using remote ops.
 func TestRun_RemoteOps(t *testing.T) {
-	cases := map[string]string{
-		"0.11.15 error": `Error: Saving a generated plan is currently not supported!
+	cases := []struct {
+		name         string
+		tfVersion    string
+		remoteOpsErr string
+	}{
+		{
+			name:      "0.11.15 error",
+			tfVersion: "0.11.15",
+			remoteOpsErr: `Error: Saving a generated plan is currently not supported!
 
 The "remote" backend does not support saving the generated execution
 plan locally at this time.
 
 `,
-		"0.12.* error": `Error: Saving a generated plan is currently not supported
+		},
+		{
+			name:      "0.12.* error",
+			tfVersion: "0.12.0",
+			remoteOpsErr: `Error: Saving a generated plan is currently not supported
 
 The "remote" backend does not support saving the generated execution plan
 locally at this time.
 
 `,
+		},
+		{
+			name:      "1.1.0 error",
+			tfVersion: "1.1.0",
+			remoteOpsErr: `╷
+│ Error: Saving a generated plan is currently not supported
+│ 
+│ Terraform Cloud does not support saving the generated execution plan
+│ locally at this time.
+╵
+`,
+		},
 	}
-	for name, remoteOpsErr := range cases {
-		t.Run(name, func(t *testing.T) {
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
 
 			logger := logging.NewNoopLogger(t)
 			// Now that mocking is set up, we're ready to run the plan.
@@ -722,7 +745,7 @@ locally at this time.
 			RegisterMockTestingT(t)
 			terraform := mocks.NewMockClient()
 
-			tfVersion, _ := version.NewVersion("0.11.12")
+			tfVersion, _ := version.NewVersion(c.tfVersion)
 			updater := mocks2.NewMockCommitStatusUpdater()
 			asyncTf := &remotePlanMock{}
 			s := runtime.PlanStepRunner{
@@ -763,16 +786,28 @@ locally at this time.
 				"comment",
 				"args",
 			}
+			if tfVersion.GreaterThanOrEqual(version.Must(version.NewVersion("0.12.0"))) {
+				expPlanArgs = []string{"plan",
+					"-input=false",
+					"-refresh",
+					"-out",
+					fmt.Sprintf("%q", filepath.Join(absProjectPath, "default.tfplan")),
+					"extra",
+					"args",
+					"comment",
+					"args",
+				}
+			}
 
 			planErr := errors.New("exit status 1: err")
-			planOutput := "\n" + remoteOpsErr
+			planOutput := "\n" + c.remoteOpsErr
 			asyncTf.LinesToSend = remotePlanOutput
 			When(terraform.RunCommandWithVersion(ctx, absProjectPath, expPlanArgs, map[string]string(nil), tfVersion, "default")).
 				ThenReturn(planOutput, planErr)
 
 			output, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath, map[string]string(nil))
 			Ok(t, err)
-			Equals(t, `
+			Assert(t, strings.Contains(output, `
 An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
 - destroy
@@ -782,26 +817,15 @@ Terraform will perform the following actions:
 - null_resource.hi[1]
 
 
-Plan: 0 to add, 0 to change, 1 to destroy.`, output)
+Plan: 0 to add, 0 to change, 1 to destroy.`), "expect plan success")
 
-			expRemotePlanArgs := []string{"plan", "-input=false", "-refresh", "extra", "args", "comment", "args"}
+			expRemotePlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
 			Equals(t, expRemotePlanArgs, asyncTf.CalledArgs)
 
 			// Verify that the fake plan file we write has the correct contents.
 			bytes, err := os.ReadFile(filepath.Join(absProjectPath, "default.tfplan"))
 			Ok(t, err)
-			Equals(t, `Atlantis: this plan was created by remote ops
-
-An execution plan has been generated and is shown below.
-Resource actions are indicated with the following symbols:
-  - destroy
-
-Terraform will perform the following actions:
-
-  - null_resource.hi[1]
-
-
-Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
+			Assert(t, strings.HasPrefix(string(bytes), "Atlantis: this plan was created by remote ops"), "expect remote plan")
 
 			// Ensure that the status was updated with the runURL.
 			runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
