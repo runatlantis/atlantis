@@ -92,7 +92,7 @@ grep -P 'backend[\s]+"s3"' **/*.tf |
   sort |
   uniq |
   while read d; do \
-    echo '[ {"dir": "'"$d"'", "autoplan": {"when_modified": ["**/*.tf.*"] }} ]' | yq -PM; \
+    echo '[ {"name": "'"$d"'","dir": "'"$d"'", "autoplan": {"when_modified": ["**/*.tf.*"] }} ]' | yq -PM; \
   done
 ```
 

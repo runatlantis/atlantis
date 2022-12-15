@@ -372,9 +372,9 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_ENABLE_REGEXP_CMD=true
   ```
-  Enable Atlantis to use regular expressions on plan/apply commands when `-p` flag is passed with it.
+  Enable Atlantis to use regular expressions to run plan/apply commands against defined project names when `-p` flag is passed with it.
   
-  This can be used to run all defined projects in `atlantis.yaml` using `atlantis plan -p .*`.
+  This can be used to run all defined projects (with the `name` key) in `atlantis.yaml` using `atlantis plan -p .*`.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
