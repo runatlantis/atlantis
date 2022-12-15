@@ -7,7 +7,7 @@ Atlantis could be exploited by
 * An attacker submitting a pull request that contains a malicious Terraform file that
   uses a malicious provider or an [`external` data source](https://registry.terraform.io/providers/hashicorp/external/latest/docs/data-sources/data_source)
   that Atlantis then runs `terraform plan` on (which it does automatically unless you've turned off automatic plans).
-* Running `terraform apply` on a malicious Terraform file with [local-exec](https://www.terraform.io/docs/provisioners/local-exec.html)
+* Running `terraform apply` on a malicious Terraform file with [local-exec](https://developer.hashicorp.com/terraform/language/resources/provisioners/local-exec)
     ```tf
     resource "null_resource" "null" {
       provisioner "local-exec" {
@@ -64,7 +64,7 @@ To prevent this, you could:
    requiring a "thumbs-up" on the PR before allowing the `plan` to continue. Conftest could be of use here.
 
 ### `--var-file-allowlist`
-The files on your Atlantis install may be accessible as [variable definition files](https://www.terraform.io/language/values/variables#variable-definitions-tfvars-files)
+The files on your Atlantis install may be accessible as [variable definition files](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files)
 from pull requests by adding  
 `atlantis plan -- -var-file=/path/to/file` comments. To mitigate this security risk, Atlantis has limited such access
 only to the files allowlisted by the `--var-file-allowlist` flag. If this argument is not provided, it defaults to

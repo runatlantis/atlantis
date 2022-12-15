@@ -58,7 +58,7 @@ func TestNewClient_LocalTFOnly(t *testing.T) {
 	fakeBinOut := `Terraform v0.11.10
 
 Your version of Terraform is out of date! The latest version
-is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
+is 0.11.13. You can update by downloading from developer.hashicorp.com/terraform/downloads
 `
 	tmp, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
@@ -93,7 +93,7 @@ func TestNewClient_LocalTFMatchesFlag(t *testing.T) {
 	fakeBinOut := `Terraform v0.11.10
 
 Your version of Terraform is out of date! The latest version
-is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
+is 0.11.13. You can update by downloading from developer.hashicorp.com/terraform/downloads
 `
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir := mkSubDirs(t)
@@ -132,7 +132,7 @@ func TestNewClient_NoTF(t *testing.T) {
 	defer tempSetEnv(t, "PATH", tmp)()
 
 	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, projectCmdOutputHandler)
-	ErrEquals(t, "terraform not found in $PATH. Set --default-tf-version or download terraform from https://www.terraform.io/downloads.html", err)
+	ErrEquals(t, "terraform not found in $PATH. Set --default-tf-version or download terraform from https://developer.hashicorp.com/terraform/downloads", err)
 }
 
 // Test that if the default-tf flag is set and that binary is in our PATH

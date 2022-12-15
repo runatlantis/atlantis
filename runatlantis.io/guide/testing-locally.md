@@ -12,7 +12,7 @@ Steps:
 
 ## Install Terraform
 `terraform` needs to be in the `$PATH` for Atlantis.
-Download from [https://www.terraform.io/downloads.html](https://www.terraform.io/downloads.html)
+Download from [https://developer.hashicorp.com/terraform/downloads](https://developer.hashicorp.com/terraform/downloads)
 ```
 unzip path/to/terraform_*.zip -d /usr/local/bin
 ```
