@@ -199,13 +199,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	statsScope, closer, err := metrics.NewScope(globalCfg.Metrics, ctxLogger, userConfig.StatsNamespace)
+	if err != nil {
+		return nil, errors.Wrapf(err, "instantiating metrics scope")
+	}
+
+	statsScope = statsScope.Tagged(map[string]string{
+		"mode": "legacyworker",
+	})
 
 	logFilter := filter.LogFilter{
 		Regexes: globalCfg.TerraformLogFilter.Regexes,
-	}
-
-	if err != nil {
-		return nil, errors.Wrapf(err, "instantiating metrics scope")
 	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {

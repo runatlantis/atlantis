@@ -35,6 +35,8 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event/preworkflow"
 	httpInternal "github.com/runatlantis/atlantis/server/neptune/http"
 	"github.com/runatlantis/atlantis/server/neptune/sync"
+	internalSync "github.com/runatlantis/atlantis/server/neptune/sync"
+	"github.com/runatlantis/atlantis/server/neptune/sync/crons"
 	"github.com/runatlantis/atlantis/server/neptune/temporal"
 	middleware "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/vcs/markdown"
@@ -76,6 +78,7 @@ type Config struct {
 }
 
 type Server struct {
+	Crons          []*internalSync.Cron
 	StatsCloser    io.Closer
 	Handler        http.Handler
 	Logger         logging.Logger
@@ -84,6 +87,7 @@ type Server struct {
 	Scheduler      *sync.AsyncScheduler
 	Server         httpInternal.ServerProxy
 	TemporalClient client.Client
+	CronScheduler  *internalSync.CronScheduler
 }
 
 // NewServer injects all dependencies nothing should "start" here
@@ -117,6 +121,9 @@ func NewServer(config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	statsScope = statsScope.Tagged(map[string]string{
+		"mode": "gateway",
+	})
 
 	privateKey, err := os.ReadFile(config.GithubAppKeyFile)
 	if err != nil {
@@ -333,7 +340,15 @@ func NewServer(config Config) (*Server, error) {
 		SSLKeyFile:  config.SSLKeyFile,
 	}
 
+	cronScheduler := internalSync.NewCronScheduler(ctxLogger)
+
 	return &Server{
+		Crons: []*internalSync.Cron{
+			{
+				Executor:  crons.NewRuntimeStats(statsScope).Run,
+				Frequency: 1 * time.Minute,
+			},
+		},
 		StatsCloser:    closer,
 		Handler:        n,
 		Scheduler:      asyncScheduler,
@@ -342,6 +357,7 @@ func NewServer(config Config) (*Server, error) {
 		Drainer:        drainer,
 		TemporalClient: temporalClient,
 		Server:         s,
+		CronScheduler:  cronScheduler,
 	}, nil
 
 }
@@ -349,9 +365,6 @@ func NewServer(config Config) (*Server, error) {
 // Start is blocking and listens for incoming requests until a configured shutdown
 // signal is received.
 func (s *Server) Start() error {
-	defer s.Logger.Close()
-	defer s.TemporalClient.Close()
-
 	// we create a base context that is marked done when we get a sigterm.
 	// we should use this context for other async work to ensure we
 	// are gracefully handling shutdown and not dropping data.
@@ -370,6 +383,10 @@ func (s *Server) Start() error {
 		return err
 	})
 
+	for _, c := range s.Crons {
+		s.CronScheduler.Schedule(c)
+	}
+
 	<-gCtx.Done()
 	s.Logger.Warn("Received interrupt. Waiting for in-progress operations to complete")
 
@@ -385,6 +402,8 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Shutdown() error {
+	defer s.Logger.Close()
+	defer s.TemporalClient.Close()
 
 	// legacy way of draining ops, we should remove
 	// in favor of context based approach.
@@ -405,6 +424,8 @@ func (s *Server) Shutdown() error {
 	if err := s.Server.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
 	}
+
+	s.CronScheduler.Shutdown(5 * time.Second)
 
 	s.TemporalClient.Close()
 

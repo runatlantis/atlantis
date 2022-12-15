@@ -72,12 +72,13 @@ func NewServer(config *config.Config) (*Server, error) {
 	}
 
 	scope, statsCloser := metrics.NewScopeWithReporter(config.Metrics, config.CtxLogger, config.StatsNamespace, statsReporter)
-	scope = scope.Tagged(map[string]string{
-		"mode": "worker",
-	})
 	if err != nil {
 		return nil, err
 	}
+
+	scope = scope.Tagged(map[string]string{
+		"mode": "worker",
+	})
 
 	// Build dependencies required for output handler and jobs controller
 	jobStore, err := job.NewStorageBackendStore(config.JobConfig, scope.SubScope("job.store"), config.CtxLogger)
