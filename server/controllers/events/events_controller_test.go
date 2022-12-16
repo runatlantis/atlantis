@@ -556,6 +556,68 @@ func TestPost_AzureDevopsPullRequestIgnoreEvent(t *testing.T) {
 	}
 }
 
+func TestPost_AzureDevopsPullRequestDeletedCommentIgnoreEvent(t *testing.T) {
+	u := "user"
+	user := []byte(u)
+
+	t.Log("when the event is an azure devops pull request deleted comment event we ignore it")
+	RegisterMockTestingT(t)
+	v := mocks.NewMockAzureDevopsRequestValidator()
+	p := emocks.NewMockEventParsing()
+	cp := emocks.NewMockCommentParsing()
+	cr := emocks.NewMockCommandRunner()
+	c := emocks.NewMockPullCleaner()
+	vcsmock := vcsmocks.NewMockClient()
+	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
+	Ok(t, err)
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	e := events_controllers.VCSEventsController{
+		TestingMode:                     true,
+		Logger:                          logger,
+		Scope:                           scope,
+		ApplyDisabled:                   false,
+		AzureDevopsWebhookBasicUser:     user,
+		AzureDevopsWebhookBasicPassword: secret,
+		AzureDevopsRequestValidator:     v,
+		Parser:                          p,
+		CommentParser:                   cp,
+		CommandRunner:                   cr,
+		PullCleaner:                     c,
+		SupportedVCSHosts:               []models.VCSHostType{models.AzureDevops},
+		RepoAllowlistChecker:            repoAllowlistChecker,
+		VCSClient:                       vcsmock,
+	}
+
+	payload := `{
+		"subscriptionId": "11111111-1111-1111-1111-111111111111",
+		"notificationId": 1,
+		"id": "22222222-2222-2222-2222-222222222222",
+		"eventType": "ms.vss-code.git-pullrequest-comment-event",
+		"publisherId": "tfs",
+		"message": {
+			"text": "Dev has deleted a pull request comment"
+		},
+		"resource": {
+			"comment": {
+				"id": 1,
+				"isDeleted": true,
+				"commentType": "text"
+			}
+		}
+	}`
+
+	t.Run("Dev has deleted a pull request comment", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", strings.NewReader(payload))
+		req.Header.Set(azuredevopsHeader, "reqID")
+		When(v.Validate(req, user, secret)).ThenReturn([]byte(payload), nil)
+		w := httptest.NewRecorder()
+		e.Parser = &events.EventParser{}
+		e.Post(w, req)
+		ResponseContains(t, w, http.StatusOK, "Ignoring comment event since it is linked to deleting a pull request comment")
+	})
+}
+
 func TestPost_GithubPullRequestClosedErrCleaningPull(t *testing.T) {
 	t.Skip("relies too much on mocks, should use real event parser")
 	t.Log("when the event is a closed pull request and we have an error calling CleanUpPull we return a 503")
