@@ -403,6 +403,7 @@ Each servers handle different repository config files.
 
 :::tip Notes
 * If `no projects` comments are annoying, set [--silence-no-projects](server-configuration.html#silence-no-projects).
+* When using different atlantis server vcs users such as `@atlantis-staging`, you can call `@atlantis-staging plan` instead `atlantis plan` to call `staging-server` only.
 :::
 
 ## Reference
