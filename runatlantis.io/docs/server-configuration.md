@@ -395,6 +395,16 @@ and set `--autoplan-modules` to `false`.
 
   Useful to enable for use with GitHub.
 
+### `--executable-name`
+  ```bash
+  atlantis server --executable-name="atlantis"
+  # or
+  ATLANTIS_EXECUTABLE_NAME="atlantis"
+  ```
+  Comment command trigger executable name. Defaults to `atlantis`.
+
+  This is useful when running multiple Atlantis servers against a single repository.
+
 ### `--gh-hostname`
   ```bash
   atlantis server --gh-hostname="my.github.enterprise.com"

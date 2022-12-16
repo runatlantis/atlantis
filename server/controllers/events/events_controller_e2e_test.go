@@ -890,8 +890,9 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		GitlabToken: "gitlab-token",
 	}
 	commentParser := &events.CommentParser{
-		GithubUser: "github-user",
-		GitlabUser: "gitlab-user",
+		GithubUser:     "github-user",
+		GitlabUser:     "gitlab-user",
+		ExecutableName: "atlantis",
 	}
 	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, projectCmdOutputHandler)
 	Ok(t, err)
