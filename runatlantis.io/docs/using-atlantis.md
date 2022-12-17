@@ -13,7 +13,7 @@ You can use following executable names.
   * `@GithubUser` is the VCS host user which you connected to Atlantis by user token.
 :::
 
-Currently supports following commands.
+Currently, Atlantis supports the following commands.
 [[toc]]
 
 ---
