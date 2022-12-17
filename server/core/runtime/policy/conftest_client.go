@@ -15,6 +15,8 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 const (
@@ -107,7 +109,7 @@ func (c ConfTestVersionDownloader) downloadConfTestVersion(v *version.Version, d
 	versionURLPrefix := fmt.Sprintf("%s%s", conftestDownloadURLPrefix, v.Original())
 
 	// download binary in addition to checksum file
-	binURL := fmt.Sprintf("%s/conftest_%s_%s_%s.tar.gz", versionURLPrefix, v.Original(), strings.Title(runtime.GOOS), conftestArch)
+	binURL := fmt.Sprintf("%s/conftest_%s_%s_%s.tar.gz", versionURLPrefix, v.Original(), cases.Title(language.English).String(runtime.GOOS), conftestArch)
 	checksumURL := fmt.Sprintf("%s/checksums.txt", versionURLPrefix)
 
 	// underlying implementation uses go-getter so the URL is formatted as such.

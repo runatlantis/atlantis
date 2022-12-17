@@ -120,3 +120,41 @@ deny[msg] {
 ```
 
 That's it! Now your Atlantis instance is configured to run policies on your Terraform plans 🎉
+
+## Customizing the conftest command
+
+### Pulling policies from a remote location
+
+Conftest supports [pulling policies](https://www.conftest.dev/sharing/#pulling) from remote locations such as S3, git, OCI, and other protocols supported by the [go-getter](https://github.com/hashicorp/go-getter) library. The key [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) can be used to pass in the [`--update`](https://www.conftest.dev/sharing/#-update-flag) flag to tell `conftest` to pull the policies into the project folder before running the policy check.
+
+```yaml
+workflows:
+  custom:
+    plan:
+      steps:
+        - init
+        - plan
+    policy_check:
+      steps:
+        - policy_check:
+            extra_args: ["--update", "s3::https://s3.amazonaws.com/bucket/foo"]
+```
+
+Note that authentication may need to be configured separately if pulling policies from sources that require it. For example, to pull policies from an S3 bucket, Atlantis host can be configured with a default AWS profile that has permission to `s3:GetObject` and `s3:ListBucket` from the S3 bucket.
+
+### Running policy check against Terraform source code
+
+By default, Atlantis runs the policy check against the [`SHOWFILE`](https://www.runatlantis.io/docs/custom-workflows.html#custom-run-command). In order to run the policy test against Terraform files directly, override the default `conftest` command used and pass in `*.tf` as one of the inputs to `conftest`. The `show` step is required so that Atlantis will generate the `SHOWFILE`.
+
+```yaml
+workflows:
+  custom:
+    policy_check:
+      steps:
+        - show
+        - run: conftest test $SHOWFILE *.tf
+```
+
+### Quiet policy checks
+
+By default, Atlantis will add a comment to all pull requests with the policy check result - both successes and failures. Version 0.21.0 added the [`--quiet-policy-checks`](server-configuration.html#quiet-policy-checks) option, which will instead only add comments when policy checks fail, significantly reducing the number of comments when most policy check results succeed.

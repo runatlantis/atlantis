@@ -3,13 +3,13 @@ name: atlantis-base
 on:
   push:
     paths:
-      - 'docker-base/**'
+      - 'docker-base/Dockerfile.*'
       - '.github/workflows/atlantis-base.yml'
     branches:
       - "main"
   pull_request:
     paths:
-      - 'docker-base/**'
+      - 'docker-base/Dockerfile.*'
       - '.github/workflows/atlantis-base.yml'
   workflow_dispatch:
 
@@ -23,7 +23,14 @@ concurrency:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        image_type: [alpine, debian]
     runs-on: ubuntu-22.04
+    env:
+      DOCKERFILE: "Dockerfile.${{ matrix.image_type }}"
+      IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/atlantis-base
+      IMAGE_SUFFIX: ${{ matrix.image_type != 'alpine' && format('-{0}', matrix.image_type) || '' }}
     steps:
     - uses: actions/checkout@v3
 
@@ -42,14 +49,28 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-    - run: echo "TODAY=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
 
-    - name: Build and push atlantis-base:${{env.TODAY}} image
+    - name: Populate release version
+      run: echo "RELEASE_VERSION=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
+
+    - name: Build and push atlantis-base:${{ env.RELEASE_VERSION }}${{ env.IMAGE_SUFFIX }} image
       uses: docker/build-push-action@v3
       with:
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
         context: docker-base
+        build-args: ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+        file: docker-base/${{ env.DOCKERFILE }}
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: ${{ github.event_name != 'pull_request' }}
+        # release version is the YYYYMMDD date of the build i.e. 20301210
+        # release version also has the image type appended i.e. 20301210-alpine
+        # release tag is latest i.e. latest
+        # release tag also has the image type appended i.e. latest-alpine
+        # if it's Dec 10, 2030 and alpine, it will do 20301210, 20301210-alpine, latest, latest-alpine
+        # if it's Dec 10, 2030 and debian, it will do 20301210-debian, latest-debian
         tags: |
-          ghcr.io/${{ github.repository_owner }}/atlantis-base:${{env.TODAY}}
-          ghcr.io/${{ github.repository_owner }}/atlantis-base:latest
+          ${{ env.IMAGE_BASE }}:${{ env.RELEASE_VERSION }}${{ env.IMAGE_SUFFIX }}
+          ${{ env.IMAGE_BASE }}:${{ env.RELEASE_VERSION }}-${{ matrix.image_type }}
+          ${{ env.IMAGE_BASE }}:latest${{ env.IMAGE_SUFFIX }}
+          ${{ env.IMAGE_BASE }}:latest-${{ matrix.image_type }}

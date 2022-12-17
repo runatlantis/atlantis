@@ -18,9 +18,14 @@ type InstrumentedPullClosedExecutor struct {
 func NewInstrumentedPullClosedExecutor(
 	scope tally.Scope, log logging.SimpleLogging, cleaner PullCleaner,
 ) PullCleaner {
+	scope = scope.SubScope("pullclosed_cleanup")
+
+	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric} {
+		metrics.InitCounter(scope, m)
+	}
 
 	return &InstrumentedPullClosedExecutor{
-		scope:   scope.SubScope("pullclosed_cleanup"),
+		scope:   scope,
 		log:     log,
 		cleaner: cleaner,
 	}

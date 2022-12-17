@@ -41,7 +41,6 @@ const (
 	autoMergeDisabledFlagShort = ""
 	verboseFlagLong            = "verbose"
 	verboseFlagShort           = ""
-	atlantisExecutable         = "atlantis"
 )
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -79,6 +78,7 @@ type CommentParser struct {
 	BitbucketUser   string
 	AzureDevopsUser string
 	ApplyDisabled   bool
+	ExecutableName  string
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -144,7 +144,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	case models.AzureDevops:
 		vcsUser = e.AzureDevopsUser
 	}
-	executableNames := []string{"run", atlantisExecutable, "@" + vcsUser}
+	executableNames := []string{"run", e.ExecutableName, "@" + vcsUser}
 	if !e.stringInSlice(args[0], executableNames) {
 		return CommentParseResult{Ignore: true}
 	}
@@ -290,19 +290,19 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 		}
 		commentFlags = fmt.Sprintf(" -- %s", strings.Join(flagsWithoutQuotes, " "))
 	}
-	return fmt.Sprintf("%s %s%s%s", atlantisExecutable, command.Plan.String(), flags, commentFlags)
+	return fmt.Sprintf("%s %s%s%s", e.ExecutableName, command.Plan.String(), flags, commentFlags)
 }
 
 // BuildApplyComment builds an apply comment for the specified args.
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
 	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled)
-	return fmt.Sprintf("%s %s%s", atlantisExecutable, command.Apply.String(), flags)
+	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Apply.String(), flags)
 }
 
 // BuildVersionComment builds a version comment for the specified args.
 func (e *CommentParser) BuildVersionComment(repoRelDir string, workspace string, project string) string {
 	flags := e.buildFlags(repoRelDir, workspace, project, false)
-	return fmt.Sprintf("%s %s%s", atlantisExecutable, command.Version.String(), flags)
+	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Version.String(), flags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {

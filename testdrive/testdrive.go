@@ -78,7 +78,7 @@ In this pull request we will learn how to use Atlantis.
     $$$
     atlantis apply
     $$$
-    **NOTE:** Because this example isn't using [remote state storage](https://www.terraform.io/docs/state/remote.html) the state will be lost once the pull request is merged. To use Atlantis properly, you **must** be using remote state.
+    **NOTE:** Because this example isn't using [remote state storage](https://developer.hashicorp.com/terraform/language/state/remote) the state will be lost once the pull request is merged. To use Atlantis properly, you **must** be using remote state.
 
 1. Finally, merge the pull request to unlock this directory.
 

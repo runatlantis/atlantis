@@ -88,20 +88,21 @@ type ProjectContext struct {
 	PolicySets valid.PolicySets
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
+	// RepoLocking will get a lock when plan
+	RepoLocking bool
 	// UUID for atlantis logs
 	JobID string
 	// The index of order group. Before planning/applying it will use to sort projects. Default is 0.
 	ExecutionOrderGroup int
 }
 
-// SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
-// instead of a pointer since we want scopes to mirror our function stack
-func (p ProjectContext) SetScope(scope string) {
+// SetScopeTags adds ProjectContext tags to a new returned scope.
+func (p ProjectContext) SetScopeTags(scope tally.Scope) tally.Scope {
 	v := ""
 	if p.TerraformVersion != nil {
 		v = p.TerraformVersion.String()
 	}
-	p.Scope = p.Scope.SubScope(scope).Tagged(map[string]string{ //nolint
+	return scope.Tagged(map[string]string{
 		"base_repo":         p.BaseRepo.FullName,
 		"pr_number":         strconv.Itoa(p.Pull.Num),
 		"project":           p.ProjectName,

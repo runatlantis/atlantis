@@ -15,7 +15,7 @@ Read the docs below :point_down: depending on your use-case.
 
 ## Using Atlantis With Free Remote State Storage
 To use Atlantis with Free Remote State Storage, you need to:
-1. Migrate your state to Terraform Cloud. See [Migrating State from Local Terraform](https://www.terraform.io/docs/cloud/migrate/index.html)
+1. Migrate your state to Terraform Cloud. See [Migrating State from Local Terraform](https://developer.hashicorp.com/terraform/cloud-docs/migrate)
 1. Update any projects that are referencing the state you migrated to use the new location
 1. [Generate a Terraform Cloud/Enterprise Token](#generating-a-terraform-cloud-enterprise-token)
 1. [Pass the token to Atlantis](#passing-the-token-to-atlantis)
@@ -25,7 +25,7 @@ Cloud.
 
 ## Using Atlantis With Terraform Cloud Remote Operations or Terraform Enterprise
 Atlantis integrates with the full version of Terraform Cloud and Terraform Enterprise
-via the [remote backend](https://www.terraform.io/docs/backends/types/remote.html).
+via the [remote backend](https://developer.hashicorp.com/terraform/language/settings/backends/remote).
 
 Atlantis will run `terraform` commands as usual, however those commands will
 actually be executed *remotely* in Terraform Cloud or Terraform Enterprise.
@@ -41,7 +41,7 @@ Using Atlantis with Terraform Cloud or Terraform Enterprise gives you access to 
 
 ### Getting Started
 To use Atlantis with Terraform Cloud Remote Operations or Terraform Enterprise, you need to:
-1. Migrate your state to Terraform Cloud/Enterprise. See [Migrating State from Local Terraform](https://www.terraform.io/docs/cloud/migrate/index.html)
+1. Migrate your state to Terraform Cloud/Enterprise. See [Migrating State from Local Terraform](https://developer.hashicorp.com/terraform/cloud-docs/migrate)
 1. Update any projects that are referencing the state you migrated to use the new location
 1. [Generate a Terraform Cloud/Enterprise Token](#generating-a-terraform-cloud-enterprise-token)
 1. [Pass the token to Atlantis](#passing-the-token-to-atlantis)

@@ -27,7 +27,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
-	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -75,6 +74,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		matchers.AnyModelsUser(),
 		AnyString(),
 		matchers.AnyModelsProject(),
+		AnyBool(),
 	)).ThenReturn(&events.TryLockResponse{
 		LockAcquired: true,
 		LockKey:      "lock-key",
@@ -189,8 +189,8 @@ func TestProjectOutputWrapper(t *testing.T) {
 			var prjResult command.ProjectResult
 			var expCommitStatus models.CommitStatus
 
-			mockJobURLSetter := eventmocks.NewMockJobURLSetter()
-			mockJobMessageSender := eventmocks.NewMockJobMessageSender()
+			mockJobURLSetter := mocks.NewMockJobURLSetter()
+			mockJobMessageSender := mocks.NewMockJobMessageSender()
 			mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
 			runner := &events.ProjectOutputWrapper{
@@ -567,6 +567,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		matchers.AnyModelsUser(),
 		AnyString(),
 		matchers.AnyModelsProject(),
+		AnyBool(),
 	)).ThenReturn(&events.TryLockResponse{
 		LockAcquired: true,
 		LockKey:      "lock-key",

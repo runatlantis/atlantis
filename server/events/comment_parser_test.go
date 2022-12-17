@@ -25,8 +25,9 @@ import (
 )
 
 var commentParser = events.CommentParser{
-	GithubUser: "github-user",
-	GitlabUser: "gitlab-user",
+	GithubUser:     "github-user",
+	GitlabUser:     "gitlab-user",
+	ExecutableName: "atlantis",
 }
 
 func TestParse_Ignored(t *testing.T) {
@@ -41,6 +42,30 @@ func TestParse_Ignored(t *testing.T) {
 	for _, c := range ignoreComments {
 		r := commentParser.Parse(c, models.Github)
 		Assert(t, r.Ignore, "expected Ignore to be true for comment %q", c)
+	}
+}
+
+func TestParse_ExecutableName(t *testing.T) {
+	cases := []struct {
+		user      string
+		expIgnore bool
+	}{
+		{"custom-executable-name", false},
+		{"run", false},
+		{"@github-user", false},
+		{"github-user", true},
+		{"atlantis", true},
+	}
+	for _, c := range cases {
+		t.Run(c.user, func(t *testing.T) {
+			var commentParser = events.CommentParser{
+				GithubUser:     "github-user",
+				ExecutableName: "custom-executable-name",
+			}
+			comment := fmt.Sprintf("%s help", c.user)
+			r := commentParser.Parse(comment, models.Github)
+			Assert(t, r.Ignore == c.expIgnore, "expected Ignore %q, but got %q", c.expIgnore, r.Ignore)
+		})
 	}
 }
 
@@ -789,6 +814,7 @@ func TestParse_VCSUsername(t *testing.T) {
 		GitlabUser:      "gl",
 		BitbucketUser:   "bb",
 		AzureDevopsUser: "ad",
+		ExecutableName:  "atlantis",
 	}
 	cases := []struct {
 		vcs  models.VCSHostType

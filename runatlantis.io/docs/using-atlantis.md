@@ -42,7 +42,7 @@ atlantis plan -w staging
 * `-d directory` Which directory to run plan in relative to root of repo. Use `.` for root.
     * Ex. `atlantis plan -d child/dir`
 * `-p project` Which project to run plan for. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w` because the project defines this already.
-* `-w workspace` Switch to this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) before planning. Defaults to `default`. If not using Terraform workspaces you can ignore this.
+* `-w workspace` Switch to this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) before planning. Defaults to `default`. If not using Terraform workspaces you can ignore this.
 * `--verbose` Append Atlantis log to comment.
 
 ::: warning NOTE
@@ -90,7 +90,7 @@ atlantis apply -w staging
 ### Options
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use `.` for root.
 * `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w`.
-* `-w workspace` Apply the plan for this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html). If not using Terraform workspaces you can ignore this.
+* `-w workspace` Apply the plan for this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). If not using Terraform workspaces you can ignore this.
 * `--auto-merge-disabled` Disable [automerge](automerging.html) for this apply command.
 * `--verbose` Append Atlantis log to comment.
 

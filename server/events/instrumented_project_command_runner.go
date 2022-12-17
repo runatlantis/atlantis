@@ -3,30 +3,53 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/uber-go/tally"
 )
 
+type IntrumentedCommandRunner interface {
+	Plan(ctx command.ProjectContext) command.ProjectResult
+	PolicyCheck(ctx command.ProjectContext) command.ProjectResult
+	Apply(ctx command.ProjectContext) command.ProjectResult
+	ApprovePolicies(ctx command.ProjectContext) command.ProjectResult
+}
+
 type InstrumentedProjectCommandRunner struct {
-	ProjectCommandRunner
+	projectCommandRunner ProjectCommandRunner
+	scope                tally.Scope
+}
+
+func NewInstrumentedProjectCommandRunner(scope tally.Scope, projectCommandRunner ProjectCommandRunner) *InstrumentedProjectCommandRunner {
+	scope = scope.SubScope("project")
+
+	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric, metrics.ExecutionFailureMetric} {
+		metrics.InitCounter(scope, m)
+	}
+
+	return &InstrumentedProjectCommandRunner{
+		projectCommandRunner: projectCommandRunner,
+		scope:                scope,
+	}
 }
 
 func (p *InstrumentedProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("plan", ctx, p.ProjectCommandRunner.Plan)
+	return RunAndEmitStats("plan", ctx, p.projectCommandRunner.Plan, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("policy check", ctx, p.ProjectCommandRunner.PolicyCheck)
+	return RunAndEmitStats("policy check", ctx, p.projectCommandRunner.PolicyCheck, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("apply", ctx, p.ProjectCommandRunner.Apply)
+	return RunAndEmitStats("apply", ctx, p.projectCommandRunner.Apply, p.scope)
 }
 
-func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult) command.ProjectResult {
+func (p *InstrumentedProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
+	return RunAndEmitStats("approve policies", ctx, p.projectCommandRunner.Apply, p.scope)
+}
 
+func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult, scope tally.Scope) command.ProjectResult {
 	// ensures we are differentiating between project level command and overall command
-	ctx.SetScope("project")
-
-	scope := ctx.Scope
+	scope = ctx.SetScopeTags(scope)
 	logger := ctx.Log
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()

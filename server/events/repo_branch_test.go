@@ -1,7 +1,7 @@
 package events
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -64,7 +64,7 @@ projects:
 	tmp := t.TempDir()
 
 	globalYAMLPath := filepath.Join(tmp, "config.yaml")
-	err := ioutil.WriteFile(globalYAMLPath, []byte(globalYAML), 0600)
+	err := os.WriteFile(globalYAMLPath, []byte(globalYAML), 0600)
 	require.NoError(t, err)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
@@ -79,7 +79,7 @@ projects:
 	require.NoError(t, err)
 
 	repoYAMLPath := filepath.Join(tmp, "atlantis.yaml")
-	err = ioutil.WriteFile(repoYAMLPath, []byte(repoYAML), 0600)
+	err = os.WriteFile(repoYAMLPath, []byte(repoYAML), 0600)
 	require.NoError(t, err)
 
 	repo, err := parser.ParseRepoCfg(tmp, global, "github.com/foo/bar", "main")

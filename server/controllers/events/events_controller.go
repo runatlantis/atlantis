@@ -171,9 +171,11 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	case *github.IssueCommentEvent:
 		resp = e.HandleGithubCommentEvent(event, githubReqID, logger)
 		scope = scope.SubScope(fmt.Sprintf("comment_%s", *event.Action))
+		scope = vcs.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetIssue().GetNumber())
 	case *github.PullRequestEvent:
 		resp = e.HandleGithubPullRequestEvent(logger, event, githubReqID)
 		scope = scope.SubScope(fmt.Sprintf("pr_%s", *event.Action))
+		scope = vcs.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetNumber())
 	default:
 		resp = HTTPResponse{
 			body: fmt.Sprintf("Ignoring unsupported event %s", githubReqID),
@@ -624,6 +626,12 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no comment is linked to payload; %s", azuredevopsReqID)
 		return
 	}
+
+	if *resource.Comment.IsDeleted {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since it is linked to deleting a pull request comment; %s", azuredevopsReqID)
+		return
+	}
+
 	strippedComment := bluemonday.StrictPolicy().SanitizeBytes([]byte(*resource.Comment.Content))
 
 	if resource.PullRequest == nil {

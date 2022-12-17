@@ -22,13 +22,14 @@ import (
 	"testing"
 
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
+
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"gopkg.in/yaml.v2"
 )
 
 // passedConfig is set to whatever config ended up being passed to NewServer.
@@ -102,6 +103,7 @@ var testFlags = map[string]interface{}{
 	SlackTokenFlag:                   "slack-token",
 	SSLCertFileFlag:                  "cert-file",
 	SSLKeyFileFlag:                   "key-file",
+	RestrictFileList:                 false,
 	TFDownloadURLFlag:                "https://my-hostname.com",
 	TFEHostnameFlag:                  "my-hostname",
 	TFELocalExecutionModeFlag:        true,
@@ -762,6 +764,23 @@ func TestExecute_RepoWhitelistDeprecation(t *testing.T) {
 	Ok(t, err)
 	Equals(t, true, passedConfig.SilenceAllowlistErrors)
 	Equals(t, "*", passedConfig.RepoAllowlist)
+}
+
+func TestExecute_AutoDetectModulesFromProjects_Env(t *testing.T) {
+	t.Setenv("ATLANTIS_AUTOPLAN_MODULES_FROM_PROJECTS", "**/init.tf")
+	c := setupWithDefaults(map[string]interface{}{}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, "**/init.tf", passedConfig.AutoplanModulesFromProjects)
+}
+
+func TestExecute_AutoDetectModulesFromProjects(t *testing.T) {
+	c := setupWithDefaults(map[string]interface{}{
+		AutoplanModulesFromProjects: "**/*.tf",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, "**/*.tf", passedConfig.AutoplanModulesFromProjects)
 }
 
 func TestExecute_AutoplanFileList(t *testing.T) {

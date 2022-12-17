@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+
 	"github.com/runatlantis/atlantis/server"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/core/config"
@@ -41,7 +42,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-const ConftestVersion = "0.25.0"
+const ConftestVersion = "0.35.0"
 
 var applyLocker locking.ApplyLocker
 var userConfig server.UserConfig
@@ -889,8 +890,9 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		GitlabToken: "gitlab-token",
 	}
 	commentParser := &events.CommentParser{
-		GithubUser: "github-user",
-		GitlabUser: "gitlab-user",
+		GithubUser:     "github-user",
+		GitlabUser:     "gitlab-user",
+		ExecutableName: "atlantis",
 	}
 	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, projectCmdOutputHandler)
 	Ok(t, err)
@@ -898,10 +900,12 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	Ok(t, err)
 	backend := boltdb
 	lockingClient := locking.NewClient(boltdb)
+	noOpLocker := locking.NewNoOpLocker()
 	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:    lockingClient,
-		VCSClient: e2eVCSClient,
+		Locker:     lockingClient,
+		NoOpLocker: noOpLocker,
+		VCSClient:  e2eVCSClient,
 	}
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
@@ -972,7 +976,9 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		commentParser,
 		false,
 		false,
+		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		false,
 		statsScope,
 		logger,
 	)
@@ -1372,7 +1378,7 @@ func ensureRunningConftest(t *testing.T) {
 	versionOutput := string(versionOutBytes)
 	match := versionConftestRegex.FindStringSubmatch(versionOutput)
 	if len(match) <= 1 {
-		t.Logf("could not parse contest version from %s", versionOutput)
+		t.Logf("could not parse conftest version from %s", versionOutput)
 		t.FailNow()
 	}
 	localVersion, err := version.NewVersion(match[1])
@@ -1422,4 +1428,9 @@ func ensureRunning014(t *testing.T) {
 //		   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
-var versionConftestRegex = regexp.MustCompile("Version: (.*?)(\\s.*)?\n")
+/*
+ * Newer versions will return both Conftest and OPA
+ * Conftest: 0.35.0
+ * OPA: 0.45.0
+ */
+var versionConftestRegex = regexp.MustCompile("Conftest: (.*?)(\\s.*)?\n")

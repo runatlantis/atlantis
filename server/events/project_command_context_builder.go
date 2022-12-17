@@ -2,16 +2,21 @@ package events
 
 import (
 	"path/filepath"
-	"regexp"
+	"sort"
 
+	"github.com/Masterminds/semver"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
+
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/uber-go/tally"
+	lib "github.com/warrensbox/terraform-switcher/lib"
 )
+
+var mirrorURL = "https://releases.hashicorp.com/terraform"
 
 func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope tally.Scope) ProjectCommandContextBuilder {
 	projectCommandContextBuilder := &DefaultProjectCommandContextBuilder{
@@ -39,7 +44,7 @@ type ProjectCommandContextBuilder interface {
 		prjCfg valid.MergedProjectCfg,
 		commentFlags []string,
 		repoDir string,
-		automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
+		automerge, parallelApply, parallelPlan, verbose bool,
 	) []command.ProjectContext
 }
 
@@ -58,12 +63,12 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
+	automerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []command.ProjectContext) {
 	cb.ProjectCounter.Inc(1)
 
 	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
-		ctx, cmdName, prjCfg, commentFlags, repoDir, automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose,
+		ctx, cmdName, prjCfg, commentFlags, repoDir, automerge, parallelApply, parallelPlan, verbose,
 	)
 
 	projectCmds = []command.ProjectContext{}
@@ -73,7 +78,7 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 		// specifically use the command name in the context instead of the arg
 		// since we can return multiple commands worth of contexts for a given command name arg
 		// to effectively pipeline them.
-		cmd.SetScope(cmd.CommandName.String())
+		cmd.Scope = cmd.SetScopeTags(cmd.Scope)
 		projectCmds = append(projectCmds, cmd)
 	}
 
@@ -90,7 +95,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
+	automerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []command.ProjectContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
 
@@ -124,7 +129,6 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		prjCfg.PolicySets,
 		escapeArgs(commentFlags),
 		automerge,
-		deleteSourceBranchOnMerge,
 		parallelApply,
 		parallelPlan,
 		verbose,
@@ -148,7 +152,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
+	automerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []command.ProjectContext) {
 	ctx.Log.Debug("PolicyChecks are enabled")
 
@@ -165,7 +169,6 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		commentFlags,
 		repoDir,
 		automerge,
-		deleteSourceBranchOnMerge,
 		parallelApply,
 		parallelPlan,
 		verbose,
@@ -186,7 +189,6 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			prjCfg.PolicySets,
 			escapeArgs(commentFlags),
 			automerge,
-			deleteSourceBranchOnMerge,
 			parallelApply,
 			parallelPlan,
 			verbose,
@@ -210,7 +212,6 @@ func newProjectCommandContext(ctx *command.Context,
 	policySets valid.PolicySets,
 	escapedCommentArgs []string,
 	automergeEnabled bool,
-	deleteSourceBranchOnMerge,
 	parallelApplyEnabled bool,
 	parallelPlanEnabled bool,
 	verbose bool,
@@ -242,7 +243,8 @@ func newProjectCommandContext(ctx *command.Context,
 		BaseRepo:                   ctx.Pull.BaseRepo,
 		EscapedCommentArgs:         escapedCommentArgs,
 		AutomergeEnabled:           automergeEnabled,
-		DeleteSourceBranchOnMerge:  deleteSourceBranchOnMerge,
+		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
+		RepoLocking:                projCfg.RepoLocking,
 		ParallelApplyEnabled:       parallelApplyEnabled,
 		ParallelPlanEnabled:        parallelPlanEnabled,
 		ParallelPolicyCheckEnabled: parallelPlanEnabled,
@@ -287,7 +289,6 @@ func getTfVersion(ctx *command.Context, absProjDir string) *version.Version {
 	module, diags := tfconfig.LoadModule(absProjDir)
 	if diags.HasErrors() {
 		ctx.Log.Err("trying to detect required version: %s", diags.Error())
-		return nil
 	}
 
 	if len(module.RequiredCore) != 1 {
@@ -295,21 +296,36 @@ func getTfVersion(ctx *command.Context, absProjDir string) *version.Version {
 		return nil
 	}
 	requiredVersionSetting := module.RequiredCore[0]
-
-	// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
-	re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
-	matched := re.FindStringSubmatch(requiredVersionSetting)
-	if len(matched) == 0 {
-		ctx.Log.Debug("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
-		return nil
-	}
 	ctx.Log.Debug("found required_version setting of %q", requiredVersionSetting)
-	version, err := version.NewVersion(matched[1])
-	if err != nil {
-		ctx.Log.Debug(err.Error())
+
+	tflist, _ := lib.GetTFList(mirrorURL, true)
+	constrains, _ := semver.NewConstraint(requiredVersionSetting)
+	versions := make([]*semver.Version, len(tflist))
+
+	for i, tfvals := range tflist {
+		version, err := semver.NewVersion(tfvals) //NewVersion parses a given version and returns an instance of Version or an error if unable to parse the version.
+		if err == nil {
+			versions[i] = version
+		}
+	}
+
+	if len(versions) == 0 {
+		ctx.Log.Debug("did not specify exact valid version in terraform configuration, found %q", requiredVersionSetting)
 		return nil
 	}
 
-	ctx.Log.Info("detected module requires version: %q", version.String())
-	return version
+	sort.Sort(sort.Reverse(semver.Collection(versions)))
+
+	for _, element := range versions {
+		if constrains.Check(element) { // Validate a version against a constraint
+			tfversionStr := element.String()
+			if lib.ValidVersionFormat(tfversionStr) { //check if version format is correct
+				tfversion, _ := version.NewVersion(tfversionStr)
+				ctx.Log.Info("detected module requires version: %s", tfversionStr)
+				return tfversion
+			}
+		}
+	}
+	ctx.Log.Debug("could not match any valid terraform version with %q", requiredVersionSetting)
+	return nil
 }
