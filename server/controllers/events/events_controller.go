@@ -746,6 +746,6 @@ func (e *VCSEventsController) commentNotAllowlisted(baseRepo models.Repo, pullNu
 	}
 }
 
-func isAzureDevOpsTestRepoURL(Url string) bool {
-	return (Url == "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079")
+func isAzureDevOpsTestRepoURL(URL string) bool {
+	return (URL == "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079")
 }
