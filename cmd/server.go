@@ -66,6 +66,7 @@ const (
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
+	ExecutableName                   = "executable-name"
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
 	GHTokenFlag                      = "gh-token"
@@ -135,6 +136,7 @@ const (
 	DefaultCheckoutStrategy             = "branch"
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
+	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
 	DefaultGitlabHostname               = "gitlab.com"
@@ -228,6 +230,10 @@ var stringFlags = map[string]stringFlag{
 	DataDirFlag: {
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	ExecutableName: {
+		description:  "Comment command executable name.",
+		defaultValue: DefaultExecutableName,
 	},
 	GHHostnameFlag: {
 		description:  "Hostname of your Github Enterprise installation. If using github.com, no need to set.",
@@ -748,6 +754,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.BitbucketBaseURL == "" {
 		c.BitbucketBaseURL = DefaultBitbucketBaseURL
+	}
+	if c.ExecutableName == "" {
+		c.ExecutableName = DefaultExecutableName
 	}
 	if c.LockingDBType == "" {
 		c.LockingDBType = DefaultLockingDBType
