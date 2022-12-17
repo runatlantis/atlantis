@@ -622,6 +622,11 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 		return
 	}
 
+	if isAzureDevOpsTestRepoUrl(*resource.PullRequest.Repository.URL) {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring Azure DevOps Test Event with Repo URL: %v %s", resource.PullRequest.Repository.URL, azuredevopsReqID)
+		return
+	}
+
 	if resource.Comment == nil {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no comment is linked to payload; %s", azuredevopsReqID)
 		return
@@ -681,6 +686,16 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseW
 		}
 	}
 
+	resource, ok := event.Resource.(*azuredevops.GitPullRequest)
+	if !ok || event.PayloadType != azuredevops.PullRequestEvent {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Event.Resource is nil or received bad event type %v; %s", event.Resource, azuredevopsReqID)
+		return
+	}
+	if isAzureDevOpsTestRepoUrl(*resource.Repository.URL) {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring Azure DevOps Test Event with Repo URL: %v %s", resource.Repository.URL, azuredevopsReqID)
+		return
+	}
+
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseAzureDevopsPullEvent(*event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, azuredevopsReqID)
@@ -729,4 +744,8 @@ func (e *VCSEventsController) commentNotAllowlisted(baseRepo models.Repo, pullNu
 	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
 		e.Logger.Err("unable to comment on pull request: %s", err)
 	}
+}
+
+func isAzureDevOpsTestRepoUrl(Url string) bool {
+	return (Url == "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079")
 }
