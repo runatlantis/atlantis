@@ -628,9 +628,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectCommandRunner: projectCommandRunner,
 		JobURLSetter:         jobs.NewJobURLSetter(router, commitStatusUpdater),
 	}
-	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
-		ProjectCommandRunner: projectOutputWrapper,
-	}
+	instrumentedProjectCmdRunner := events.NewInstrumentedProjectCommandRunner(
+		statsScope,
+		projectOutputWrapper,
+	)
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
 		dbUpdater,
