@@ -2,6 +2,17 @@
 
 Atlantis handle commands via pull request comments.
 ![Help Command](./images/pr-comment-help.png)
+
+::: tip
+You can use following executable names.
+* `atlantis help`
+  * `atlantis` is executable name. You can configure by [Executable Name](/docs/server-configuration.html#executable-name)
+* `run help`
+  * `run` is a global executable name.
+* `@GithubUser help`
+  * `@GithubUser` is the VCS host user which you connected to Atlantis by user token.
+:::
+
 Currently supports following commands.
 [[toc]]
 
