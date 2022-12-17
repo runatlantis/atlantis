@@ -1247,7 +1247,7 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "return no error if dismissing  a single approval",
+			name: "return no error if dismissing a single approval",
 			fields: fields{
 				responses: []ResponseDef{
 					{
@@ -1264,7 +1264,7 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "return no error if dismissing  multiple reviews",
+			name: "return no error if dismissing multiple reviews",
 			fields: fields{
 				responses: []ResponseDef{
 					{

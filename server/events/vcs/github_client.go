@@ -259,6 +259,8 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 	return nil
 }
 
+// getPRReviews Retrieves PR reviews for a pull request on a specific repository.
+// The reviews are being retrieved using pages with the size of 10 reviews.
 func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (GithubPRReviewSummary, error) {
 	var query struct {
 		Repository struct {
@@ -282,7 +284,7 @@ func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (
 		"number":       githubv4.Int(pull.Num),
 		"entries":      githubv4.Int(10),
 		"reviewState":  []githubv4.PullRequestReviewState{githubv4.PullRequestReviewStateApproved},
-		"reviewCursor": (*githubv4.String)(nil), // Null after argument to get first page.
+		"reviewCursor": (*githubv4.String)(nil), // initialize the reviewCursor with null
 	}
 
 	var allReviews []GithubReview
@@ -294,10 +296,13 @@ func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (
 				allReviews,
 			}, errors.Wrap(err, "getting reviewDecision")
 		}
+
 		allReviews = append(allReviews, query.Repository.PullRequest.Reviews.Nodes...)
+		// if we don't have a NextPage pointer, we have requested all pages
 		if !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
 			break
 		}
+		// set the end cursor, so the next batch of reviews is going to be requested and not the same again
 		variables["reviewCursor"] = githubv4.NewString(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
 	}
 	return GithubPRReviewSummary{
@@ -338,12 +343,14 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 	return approvalStatus, nil
 }
 
+// DiscardReviews dismisses all reviews on a pull request
 func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
 	reviewStatus, err := g.getPRReviews(repo, pull)
 	if err != nil {
 		return err
 	}
 
+	// https://docs.github.com/en/graphql/reference/input-objects#dismisspullrequestreviewinput
 	var mutation struct {
 		DismissPullRequestReview struct {
 			PullRequestReview struct {
@@ -351,6 +358,9 @@ func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest)
 			}
 		} `graphql:"dismissPullRequestReview(input: $input)"`
 	}
+
+	// dismiss every review one by one.
+	// currently there is no way to dismiss them in one mutation.
 	for _, review := range reviewStatus.Reviews {
 		input := githubv4.DismissPullRequestReviewInput{
 			PullRequestReviewID: review.ID,
