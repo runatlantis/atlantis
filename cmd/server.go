@@ -409,7 +409,7 @@ var boolFlags = map[string]boolFlag{
 		description: "Disable atlantis locking repos",
 	},
 	DiscardApprovalOnPlanFlag: {
-		description:  "Enables the discarding of approval if a new plan has been executed. Currently on Github is supported",
+		description:  "Enables the discarding of approval if a new plan has been executed. Currently only Github is supported",
 		defaultValue: false,
 	},
 	EnablePolicyChecksFlag: {
