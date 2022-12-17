@@ -622,7 +622,7 @@ func TestPost_AzureDevopsPullRequestCommentWebhookTestIgnoreEvent(t *testing.T) 
 	u := "user"
 	user := []byte(u)
 
-	t.Log("when the event is an azure devops webhook tests we ignore it")
+	t.Log("when the event is an azure devops webhook test we ignore it")
 	RegisterMockTestingT(t)
 	v := mocks.NewMockAzureDevopsRequestValidator()
 	p := emocks.NewMockEventParsing()
@@ -666,7 +666,9 @@ func TestPost_AzureDevopsPullRequestCommentWebhookTestIgnoreEvent(t *testing.T) 
 					"url": "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079"
 				}
 			},
-			"Comment": {}
+			"comment": {
+				"content": "This is my comment."
+			}
 		}}`
 
 	cases := []struct {
