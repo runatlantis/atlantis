@@ -267,7 +267,7 @@ null_resource.dir2[1]: Destruction complete after 0s
 Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
 `, output)
 
-	Equals(t, []string{"apply", "-input=false", "extra", "args", "comment", "args"}, tfExec.CalledArgs)
+	Equals(t, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args"}, tfExec.CalledArgs)
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 

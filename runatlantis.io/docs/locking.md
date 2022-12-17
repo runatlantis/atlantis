@@ -59,7 +59,7 @@ to delete the lock.
 Once a plan is discarded, you'll need to run `plan` again prior to running `apply` when you go back to that pull request.
 
 ## Relationship to Terraform State Locking
-Atlantis does not conflict with [Terraform State Locking](https://www.terraform.io/docs/state/locking.html). Under the hood, all
+Atlantis does not conflict with [Terraform State Locking](https://developer.hashicorp.com/terraform/language/state/locking). Under the hood, all
 Atlantis is doing is running `terraform plan` and `apply` and so all of the
 locking built in to those commands by Terraform isn't affected.
 

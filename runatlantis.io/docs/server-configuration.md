@@ -372,9 +372,9 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_ENABLE_REGEXP_CMD=true
   ```
-  Enable Atlantis to use regular expressions on plan/apply commands when `-p` flag is passed with it.
+  Enable Atlantis to use regular expressions to run plan/apply commands against defined project names when `-p` flag is passed with it.
   
-  This can be used to run all defined projects in `atlantis.yaml` using `atlantis plan -p .*`.
+  This can be used to run all defined projects (with the `name` key) in `atlantis.yaml` using `atlantis plan -p .*`.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
@@ -950,7 +950,7 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_VAR_FILE_ALLOWLIST='/path/to/tfvars/dir'
   ```
-  Comma-separated list of additional directory paths where [variable definition files](https://www.terraform.io/language/values/variables#variable-definitions-tfvars-files) can be read from.
+  Comma-separated list of additional directory paths where [variable definition files](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files) can be read from.
   The paths in this argument should be absolute paths. Relative paths and globbing are currently not supported.
   If this argument is not provided, it defaults to Atlantis' data directory, determined by the `--data-dir` argument.
 
