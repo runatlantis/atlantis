@@ -939,7 +939,12 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 		host = "dev.azure.com"
 	}
 
-	cloneURL := fmt.Sprintf("https://%s/%s/%s/_git/%s", host, owner, project, repo)
+	cloneURL := ""
+	if strings.Contains(host, "visualstudio.com") {
+		cloneURL = fmt.Sprintf("https://%s/%s/_git/%s", host, project, repo)
+	} else {
+		cloneURL = fmt.Sprintf("https://%s/%s/%s/_git/%s", host, owner, project, repo)
+	}
 	fmt.Println("%", cloneURL)
 	fullName := fmt.Sprintf("%s/%s/%s", owner, project, repo)
 	return models.NewRepo(models.AzureDevops, fullName, cloneURL, e.AzureDevopsUser, e.AzureDevopsToken)
