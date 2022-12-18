@@ -141,7 +141,7 @@ atlantis approve_policies
 ### Explanation
 Approves all current policy checking failures for the PR.
 
-See also [policy checking](/docs/policy-checking.html#how-it-works).
+See also [policy checking](/docs/policy-checking.html).
 
 ### Options
 * `--verbose` Append Atlantis log to comment.
