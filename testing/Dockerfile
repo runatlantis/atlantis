@@ -5,6 +5,7 @@ RUN apt-get update && apt-get --no-install-recommends -y install unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Terraform
+# renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ENV TERRAFORM_VERSION=1.3.6
 RUN case $(uname -m) in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
     wget -nv -O terraform.zip https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${ARCH}.zip && \
@@ -14,6 +15,7 @@ RUN case $(uname -m) in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH
     rm terraform.zip
 
 # Install conftest
+# renovate: datasource=github-releases depName=open-policy-agent/conftest
 ENV CONFTEST_VERSION=0.35.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN case $(uname -m) in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
