@@ -636,7 +636,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 	}
 	// Ensure we have >= TF 0.14 locally.
 	ensureRunning014(t)
-	// Ensure we have >= Conftest 0.21 locally.
+	// Ensure we have conftest locally.
 	ensureRunningConftest(t)
 
 	cases := []struct {
@@ -1363,11 +1363,11 @@ func mkSubDirs(t *testing.T) (string, string, string) {
 	return tmp, binDir, cachedir
 }
 
-// Will fail test if conftest isn't in path and isn't version >= 0.25.0
+// Will fail test if conftest isn't in path or is version less than specific version
 func ensureRunningConftest(t *testing.T) {
-	localPath, err := exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
+	localPath, err := exec.LookPath("conftest")
 	if err != nil {
-		t.Logf("conftest >= %s must be installed to run this test", ConftestVersion)
+		t.Logf("conftest must be installed to run this test")
 		t.FailNow()
 	}
 	versionOutBytes, err := exec.Command(localPath, "--version").Output() // #nosec
