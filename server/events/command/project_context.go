@@ -88,6 +88,8 @@ type ProjectContext struct {
 	PolicySets valid.PolicySets
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
+	// RepoLocking will get a lock when plan
+	RepoLocking bool
 	// UUID for atlantis logs
 	JobID string
 	// The index of order group. Before planning/applying it will use to sort projects. Default is 0.

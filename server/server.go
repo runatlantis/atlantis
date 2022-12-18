@@ -430,9 +430,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
+	noOpLocker := locking.NewNoOpLocker()
 	if userConfig.DisableRepoLocking {
 		logger.Info("Repo Locking is disabled")
-		lockingClient = locking.NewNoOpLocker()
+		lockingClient = noOpLocker
 	} else {
 		lockingClient = locking.NewClient(backend)
 	}
@@ -458,8 +459,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:    lockingClient,
-		VCSClient: vcsClient,
+		Locker:     lockingClient,
+		NoOpLocker: noOpLocker,
+		VCSClient:  vcsClient,
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
@@ -500,6 +502,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		BitbucketUser:   userConfig.BitbucketUser,
 		AzureDevopsUser: userConfig.AzureDevopsUser,
 		ApplyDisabled:   userConfig.DisableApply,
+		ExecutableName:  userConfig.ExecutableName,
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
@@ -543,6 +546,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.EnableRegExpCmd,
 		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
 		statsScope,
 		logger,
 	)
@@ -624,9 +628,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectCommandRunner: projectCommandRunner,
 		JobURLSetter:         jobs.NewJobURLSetter(router, commitStatusUpdater),
 	}
-	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
-		ProjectCommandRunner: projectOutputWrapper,
-	}
+	instrumentedProjectCmdRunner := events.NewInstrumentedProjectCommandRunner(
+		statsScope,
+		projectOutputWrapper,
+	)
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
 		dbUpdater,

@@ -66,6 +66,7 @@ const (
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
+	ExecutableName                   = "executable-name"
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
 	GHTokenFlag                      = "gh-token"
@@ -114,6 +115,7 @@ const (
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
+	RestrictFileList           = "restrict-file-list"
 	TFDownloadURLFlag          = "tf-download-url"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
@@ -134,6 +136,7 @@ const (
 	DefaultCheckoutStrategy             = "branch"
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
+	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
 	DefaultGitlabHostname               = "gitlab.com"
@@ -227,6 +230,10 @@ var stringFlags = map[string]stringFlag{
 	DataDirFlag: {
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	ExecutableName: {
+		description:  "Comment command executable name.",
+		defaultValue: DefaultExecutableName,
 	},
 	GHHostnameFlag: {
 		description:  "Hostname of your Github Enterprise installation. If using github.com, no need to set.",
@@ -496,6 +503,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Switches on or off the Basic Authentication on the HTTP Middleware interface",
 		defaultValue: DefaultWebBasicAuth,
 	},
+	RestrictFileList: {
+		description:  "Block plan requests from projects outside the files modified in the pull request.",
+		defaultValue: false,
+	},
 	WebsocketCheckOrigin: {
 		description:  "Enable websocket origin check",
 		defaultValue: false,
@@ -743,6 +754,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.BitbucketBaseURL == "" {
 		c.BitbucketBaseURL = DefaultBitbucketBaseURL
+	}
+	if c.ExecutableName == "" {
+		c.ExecutableName = DefaultExecutableName
 	}
 	if c.LockingDBType == "" {
 		c.LockingDBType = DefaultLockingDBType

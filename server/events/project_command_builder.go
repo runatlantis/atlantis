@@ -3,12 +3,15 @@ package events
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/uber-go/tally"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 
 	"github.com/pkg/errors"
 
@@ -48,9 +51,16 @@ func NewInstrumentedProjectCommandBuilder(
 	EnableRegExpCmd bool,
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
+	RestrictFileList bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 ) *InstrumentedProjectCommandBuilder {
+	scope = scope.SubScope("builder")
+
+	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric} {
+		metrics.InitCounter(scope, m)
+	}
+
 	return &InstrumentedProjectCommandBuilder{
 		ProjectCommandBuilder: NewProjectCommandBuilder(
 			policyChecksSupported,
@@ -66,10 +76,12 @@ func NewInstrumentedProjectCommandBuilder(
 			EnableRegExpCmd,
 			AutoDetectModuleFiles,
 			AutoplanFileList,
+			RestrictFileList,
 			scope,
 			logger,
 		),
 		Logger: logger,
+		scope:  scope,
 	}
 }
 
@@ -87,6 +99,7 @@ func NewProjectCommandBuilder(
 	EnableRegExpCmd bool,
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
+	RestrictFileList bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 ) *DefaultProjectCommandBuilder {
@@ -102,6 +115,7 @@ func NewProjectCommandBuilder(
 		EnableRegExpCmd:       EnableRegExpCmd,
 		AutoDetectModuleFiles: AutoDetectModuleFiles,
 		AutoplanFileList:      AutoplanFileList,
+		RestrictFileList:      RestrictFileList,
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
@@ -166,6 +180,7 @@ type DefaultProjectCommandBuilder struct {
 	AutoDetectModuleFiles        string
 	AutoplanFileList             string
 	EnableDiffMarkdownFormat     bool
+	RestrictFileList             bool
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -237,14 +252,18 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 				return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 			}
 			ctx.Log.Info("successfully parsed remote %s file", config.AtlantisYAMLFilename)
-			matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "")
-			if err != nil {
-				return nil, err
-			}
-			ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
-			if len(matchingProjects) == 0 {
-				ctx.Log.Info("skipping repo clone since no project was modified")
-				return []command.ProjectContext{}, nil
+			if len(repoCfg.Projects) > 0 {
+				matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "")
+				if err != nil {
+					return nil, err
+				}
+				ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
+				if len(matchingProjects) == 0 {
+					ctx.Log.Info("skipping repo clone since no project was modified")
+					return []command.ProjectContext{}, nil
+				}
+			} else {
+				ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", config.AtlantisYAMLFilename)
 			}
 			// NOTE: We discard this work here and end up doing it again after
 			// cloning to ensure all the return values are set properly with
@@ -275,15 +294,19 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 	}
 
 	var projCtxs []command.ProjectContext
+	var repoCfg valid.RepoCfg
 
 	if hasRepoCfg {
-		// If there's a repo cfg then we'll use it to figure out which projects
+		// If there's a repo cfg with projects then we'll use it to figure out which projects
 		// should be planed.
-		repoCfg, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+		repoCfg, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
 		}
 		ctx.Log.Info("successfully parsed %s file", config.AtlantisYAMLFilename)
+	}
+
+	if len(repoCfg.Projects) > 0 {
 		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
 		if err != nil {
 			return nil, err
@@ -302,16 +325,19 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					commentFlags,
 					repoDir,
 					repoCfg.Automerge,
-					mergedCfg.DeleteSourceBranchOnMerge,
 					repoCfg.ParallelApply,
 					repoCfg.ParallelPlan,
 					verbose,
 				)...)
 		}
 	} else {
-		// If there is no config file, then we'll plan each project that
+		// If there is no config file or it specified no projects, then we'll plan each project that
 		// our algorithm determines was modified.
-		ctx.Log.Info("found no %s file", config.AtlantisYAMLFilename)
+		if hasRepoCfg {
+			ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", config.AtlantisYAMLFilename)
+		} else {
+			ctx.Log.Info("found no %s file", config.AtlantisYAMLFilename)
+		}
 		// build a module index for projects that are explicitly included
 		moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
 		if err != nil {
@@ -336,7 +362,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					commentFlags,
 					repoDir,
 					DefaultAutomergeEnabled,
-					pCfg.DeleteSourceBranchOnMerge,
 					DefaultParallelApplyEnabled,
 					DefaultParallelPlanEnabled,
 					verbose,
@@ -360,6 +385,64 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	}
 
 	var pcc []command.ProjectContext
+
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return pcc, err
+	}
+
+	if p.RestrictFileList {
+		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
+		if err != nil {
+			return nil, err
+		}
+
+		if cmd.RepoRelDir != "" {
+			foundDir := false
+
+			for _, f := range modifiedFiles {
+				if filepath.Dir(f) == cmd.RepoRelDir {
+					foundDir = true
+				}
+			}
+
+			if !foundDir {
+				return pcc, fmt.Errorf("the dir \"%s\" is not in the plan list of this pull request", cmd.RepoRelDir)
+			}
+		}
+
+		if cmd.ProjectName != "" {
+			var notFoundFiles = []string{}
+			var repoConfig valid.RepoCfg
+
+			repoConfig, err = p.ParserValidator.ParseRepoCfg(defaultRepoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+			if err != nil {
+				return pcc, err
+			}
+			repoCfgProjects := repoConfig.FindProjectsByName(cmd.ProjectName)
+
+			for _, f := range modifiedFiles {
+				foundDir := false
+
+				for _, p := range repoCfgProjects {
+					if filepath.Dir(f) == p.Dir {
+						foundDir = true
+					}
+				}
+
+				if !foundDir {
+					notFoundFiles = append(notFoundFiles, filepath.Dir(f))
+				}
+			}
+
+			if len(notFoundFiles) > 0 {
+				return pcc, fmt.Errorf("the following directories are present in the pull request but not in the requested project:\n%s", strings.Join(notFoundFiles, "\n"))
+			}
+		}
+	}
+
 	ctx.Log.Debug("building plan command")
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
 	if err != nil {
@@ -376,13 +459,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	repoRelDir := DefaultRepoRelDir
 	if cmd.RepoRelDir != "" {
 		repoRelDir = cmd.RepoRelDir
-	}
-
-	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
-	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
-	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
-	if err != nil {
-		return pcc, err
 	}
 
 	return p.buildProjectCommandCtx(
@@ -619,7 +695,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					commentFlags,
 					repoDir,
 					automerge,
-					projCfg.DeleteSourceBranchOnMerge,
 					parallelApply,
 					parallelPlan,
 					verbose,
@@ -635,7 +710,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				commentFlags,
 				repoDir,
 				automerge,
-				projCfg.DeleteSourceBranchOnMerge,
 				parallelApply,
 				parallelPlan,
 				verbose,

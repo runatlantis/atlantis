@@ -30,6 +30,7 @@ type Repo struct {
 	AllowedOverrides          []string       `yaml:"allowed_overrides" json:"allowed_overrides"`
 	AllowCustomWorkflows      *bool          `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
 	DeleteSourceBranchOnMerge *bool          `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
+	RepoLocking               *bool          `yaml:"repo_locking,omitempty" json:"repo_locking,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -173,8 +174,8 @@ func (r Repo) Validate() error {
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey {
-				return fmt.Errorf("%q is not a valid override, only %q, %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey)
+			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey {
+				return fmt.Errorf("%q is not a valid override, only %q, %q, %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey)
 			}
 		}
 		return nil
@@ -268,5 +269,6 @@ OUTER:
 		AllowedOverrides:          r.AllowedOverrides,
 		AllowCustomWorkflows:      r.AllowCustomWorkflows,
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
+		RepoLocking:               r.RepoLocking,
 	}
 }

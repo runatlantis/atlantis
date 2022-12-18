@@ -122,7 +122,7 @@ func NewClientWithDefaultVersion(
 
 	localPath, err := exec.LookPath("terraform")
 	if err != nil && defaultVersionStr == "" {
-		return nil, fmt.Errorf("terraform not found in $PATH. Set --%s or download terraform from https://www.terraform.io/downloads.html", defaultVersionFlagName)
+		return nil, fmt.Errorf("terraform not found in $PATH. Set --%s or download terraform from https://developer.hashicorp.com/terraform/downloads", defaultVersionFlagName)
 	}
 	if err == nil {
 		localVersion, err = getVersion(localPath)

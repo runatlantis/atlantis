@@ -103,7 +103,7 @@ workflows:
           extra_args: ["-lock=false"]
 ```
 
-If [policy checking](https://www.runatlantis.io/docs/policy-checking.html#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
+If [policy checking](/docs/policy-checking.html#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
 
 ```yaml
 workflows:
@@ -144,7 +144,7 @@ workflows:
 ```
 
 ### cdktf
-Here are the requirements to enable [cdktf](https://www.terraform.io/cdktf)
+Here are the requirements to enable [cdktf](https://developer.hashicorp.com/terraform/cdktf)
 
 - A custom image with `cdktf` installed
 - The autoplan file updated to trigger off of `**/cdk.tf.json`

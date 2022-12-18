@@ -1,9 +1,9 @@
 # FAQ
-**Q: Does Atlantis affect Terraform [remote state](https://www.terraform.io/docs/state/remote.html)?**
+**Q: Does Atlantis affect Terraform [remote state](https://developer.hashicorp.com/terraform/language/state/remote)?**
 
 A: No. Atlantis does not interfere with Terraform remote state in any way. Under the hood, Atlantis is simply executing `terraform plan` and `terraform apply`.
 
-**Q: How does Atlantis locking interact with Terraform [locking](https://www.terraform.io/docs/state/locking.html)?**
+**Q: How does Atlantis locking interact with Terraform [locking](https://developer.hashicorp.com/terraform/language/state/locking)?**
 
 A: Atlantis provides locking of pull requests that prevents concurrent modification of the same infrastructure (Terraform project) whereas Terraform locking only prevents two concurrent `terraform apply`'s from happening.
 
@@ -13,7 +13,7 @@ Terraform locking can be used alongside Atlantis locking since Atlantis is simpl
 
 A: Atlantis server can easily be run under the supervision of a init system like `upstart` or `systemd` to make sure `atlantis server` is always running.
 
-Atlantis currently stores all locking and Terraform plans locally on disk under the `--data-dir` directory (defaults to `~/.atlantis`). Because of this there is currently no way to run two or more Atlantis instances concurrently.
+Atlantis, by default, stores all locking and Terraform plans locally on disk under the `--data-dir` directory (defaults to `~/.atlantis`). If multiple Atlantis hosts are run by utilizing a shared redis backend, then it's important that the `data-dir` is using a shared filesystem between hosts.
 
 However, if you were to lose the data, all you would need to do is run `atlantis plan` again on the pull requests that are open. If someone tries to run `atlantis apply` after the data has been lost then they will get an error back, so they will have to re-plan anyway.
 

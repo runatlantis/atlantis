@@ -74,6 +74,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		matchers.AnyModelsUser(),
 		AnyString(),
 		matchers.AnyModelsProject(),
+		AnyBool(),
 	)).ThenReturn(&events.TryLockResponse{
 		LockAcquired: true,
 		LockKey:      "lock-key",
@@ -566,6 +567,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		matchers.AnyModelsUser(),
 		AnyString(),
 		matchers.AnyModelsProject(),
+		AnyBool(),
 	)).ThenReturn(&events.TryLockResponse{
 		LockAcquired: true,
 		LockKey:      "lock-key",

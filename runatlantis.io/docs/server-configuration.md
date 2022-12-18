@@ -372,11 +372,13 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_ENABLE_REGEXP_CMD=true
   ```
-  Enable Atlantis to use regular expressions on plan/apply commands when `-p` flag is passed with it.
+  Enable Atlantis to use regular expressions to run plan/apply commands against defined project names when `-p` flag is passed with it.
   
-  This can be used to run all defined projects in `atlantis.yaml` using `atlantis plan -p .*`.
+  This can be used to run all defined projects (with the `name` key) in `atlantis.yaml` using `atlantis plan -p .*`.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
+
+  This will bypass `--restrict-file-list` if regex is used, normal commands will stil be blocked if necessary.
 
   ::: warning SECURITY WARNING
   It's not supposed to be used with `--disable-apply-all`.
@@ -392,6 +394,16 @@ and set `--autoplan-modules` to `false`.
   Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 
   Useful to enable for use with GitHub.
+
+### `--executable-name`
+  ```bash
+  atlantis server --executable-name="atlantis"
+  # or
+  ATLANTIS_EXECUTABLE_NAME="atlantis"
+  ```
+  Comment command trigger executable name. Defaults to `atlantis`.
+
+  This is useful when running multiple Atlantis servers against a single repository.
 
 ### `--gh-hostname`
   ```bash
@@ -886,6 +898,17 @@ and set `--autoplan-modules` to `false`.
   ```
   File containing x509 private key matching `--ssl-cert-file`.
 
+### `--restrict-file-list`
+  ```bash
+  atlantis server --restrict-file-list
+  # or (recommended)
+  ATLANTIS_RESTRICT_FILE_LIST=true
+  ```
+  `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
+  This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
+  like `atlantis plan -p .*` will still work if used. normal commands will stil be blocked if necessary.
+  Defaults to `false`.
+
 ### `--stats-namespace`
   ```bash
   atlantis server --stats-namespace="myatlantis"
@@ -937,7 +960,7 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_VAR_FILE_ALLOWLIST='/path/to/tfvars/dir'
   ```
-  Comma-separated list of additional directory paths where [variable definition files](https://www.terraform.io/language/values/variables#variable-definitions-tfvars-files) can be read from.
+  Comma-separated list of additional directory paths where [variable definition files](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files) can be read from.
   The paths in this argument should be absolute paths. Relative paths and globbing are currently not supported.
   If this argument is not provided, it defaults to Atlantis' data directory, determined by the `--data-dir` argument.
 
