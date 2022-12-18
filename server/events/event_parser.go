@@ -940,6 +940,8 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	}
 
 	cloneURL := ""
+	// If statement allows compatibility with legacy Visual Studio Team Foundation Services URLs.
+	// Else statement covers Azure DevOps Services URLs
 	if strings.Contains(host, "visualstudio.com") {
 		cloneURL = fmt.Sprintf("https://%s/%s/_git/%s", host, project, repo)
 	} else {
