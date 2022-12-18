@@ -103,7 +103,7 @@ workflows:
           extra_args: ["-lock=false"]
 ```
 
-If [policy checking](https://www.runatlantis.io/docs/policy-checking.html#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
+If [policy checking](/docs/policy-checking.html#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
 
 ```yaml
 workflows:
