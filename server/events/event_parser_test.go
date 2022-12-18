@@ -1251,6 +1251,23 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 			Type:     models.AzureDevops,
 		},
 	}, r)
+
+	// this should be successful
+	repo = ADRepo
+	repo.WebURL = azuredevops.String("https://dev.azure.com/owner/project/_git/repo")
+	r, err = parser.ParseAzureDevopsRepo(&repo)
+	Ok(t, err)
+	Equals(t, models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "dev.azure.com",
+			Type:     models.AzureDevops,
+		},
+	}, r)
 }
 
 func TestParseAzureDevopsPullEvent(t *testing.T) {
