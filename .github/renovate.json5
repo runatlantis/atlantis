@@ -35,7 +35,7 @@
       matchPaths: [".github/**"],
       matchPackageNames: ["ghcr.io/runatlantis/testing-env"],
       groupName: "testing-env-ci-test",
-      schedules: ["every 1 hour after 00:00 and before 23:59 every day"],
+      schedules ["every 1 hour after 00:00 and before 23:59 every day"],
     },
   ],
   // https://docs.renovatebot.com/modules/manager/regex/
