@@ -42,7 +42,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-const ConftestVersion = "0.35.0"
+const ConftestVersion = "0.35.0" // renovate: datasource=github-releases depName=open-policy-agent/conftest
 
 var applyLocker locking.ApplyLocker
 var userConfig server.UserConfig
