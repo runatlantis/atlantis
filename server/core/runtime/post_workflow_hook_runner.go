@@ -21,26 +21,26 @@ type DefaultPostWorkflowHookRunner struct {
 }
 
 func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error) {
-	outputFilePath := filepath.Join(path, "OUTPUT_FILE")
+	outputFilePath := filepath.Join(path, "OUTPUT_STATUS_FILE")
 
 	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
 
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
-		"BASE_BRANCH_NAME": ctx.Pull.BaseBranch,
-		"BASE_REPO_NAME":   ctx.BaseRepo.Name,
-		"BASE_REPO_OWNER":  ctx.BaseRepo.Owner,
-		"COMMENT_ARGS":     strings.Join(ctx.EscapedCommentArgs, ","),
-		"DIR":              path,
-		"HEAD_BRANCH_NAME": ctx.Pull.HeadBranch,
-		"HEAD_COMMIT":      ctx.Pull.HeadCommit,
-		"HEAD_REPO_NAME":   ctx.HeadRepo.Name,
-		"HEAD_REPO_OWNER":  ctx.HeadRepo.Owner,
-		"PULL_AUTHOR":      ctx.Pull.Author,
-		"PULL_NUM":         fmt.Sprintf("%d", ctx.Pull.Num),
-		"USER_NAME":        ctx.User.Username,
-		"OUTPUT_FILE":      outputFilePath,
+		"BASE_BRANCH_NAME":   ctx.Pull.BaseBranch,
+		"BASE_REPO_NAME":     ctx.BaseRepo.Name,
+		"BASE_REPO_OWNER":    ctx.BaseRepo.Owner,
+		"COMMENT_ARGS":       strings.Join(ctx.EscapedCommentArgs, ","),
+		"DIR":                path,
+		"HEAD_BRANCH_NAME":   ctx.Pull.HeadBranch,
+		"HEAD_COMMIT":        ctx.Pull.HeadCommit,
+		"HEAD_REPO_NAME":     ctx.HeadRepo.Name,
+		"HEAD_REPO_OWNER":    ctx.HeadRepo.Owner,
+		"PULL_AUTHOR":        ctx.Pull.Author,
+		"PULL_NUM":           fmt.Sprintf("%d", ctx.Pull.Num),
+		"USER_NAME":          ctx.User.Username,
+		"OUTPUT_STATUS_FILE": outputFilePath,
 	}
 
 	finalEnvVars := baseEnvVars

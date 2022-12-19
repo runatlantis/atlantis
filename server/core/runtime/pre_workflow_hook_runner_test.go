@@ -59,7 +59,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 			ExpOut:  "user_name=acme-user\n",
 		},
 		{
-			Command:        "echo something > $OUTPUT_FILE",
+			Command:        "echo something > $OUTPUT_STATUS_FILE",
 			ExpDescription: "something",
 		},
 	}
