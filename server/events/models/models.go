@@ -526,4 +526,6 @@ type WorkflowHookCommandContext struct {
 	// by adding a \ before each character so that they can be used within
 	// sh -c safely, i.e. sh -c "terraform plan $(touch bad)".
 	EscapedCommentArgs []string
+	// UUID for reference
+	HookID string
 }

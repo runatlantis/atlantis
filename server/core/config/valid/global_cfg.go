@@ -96,8 +96,9 @@ type MergedProjectCfg struct {
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.
 type WorkflowHook struct {
-	StepName   string
-	RunCommand string
+	StepName        string
+	RunCommand      string
+	StepDescription string
 }
 
 // DefaultApplyStage is the Atlantis default apply stage.

@@ -37,6 +37,9 @@ type CommitStatusUpdater interface {
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
 	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error
+
+	UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
+	UpdatePostWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
 }
 
 // DefaultCommitStatusUpdater implements CommitStatusUpdater.
@@ -95,4 +98,32 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, c
 
 	descrip := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), descripWords)
 	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
+}
+
+func (d *DefaultCommitStatusUpdater) UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
+	return d.updateWorkflowHook(pull, status, hookDescription, runtimeDescription, "pre_workflow_hook", url)
+}
+
+func (d *DefaultCommitStatusUpdater) UpdatePostWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
+	return d.updateWorkflowHook(pull, status, hookDescription, runtimeDescription, "post_workflow_hook", url)
+}
+
+func (d *DefaultCommitStatusUpdater) updateWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, workflowType string, url string) error {
+	src := fmt.Sprintf("%s/%s: %s", d.StatusName, workflowType, hookDescription)
+
+	var descripWords string
+	if runtimeDescription != "" {
+		descripWords = runtimeDescription
+	} else {
+		switch status {
+		case models.PendingCommitStatus:
+			descripWords = "in progress..."
+		case models.FailedCommitStatus:
+			descripWords = "failed."
+		case models.SuccessCommitStatus:
+			descripWords = "succeeded."
+		}
+	}
+
+	return d.Client.UpdateStatus(pull.BaseRepo, pull, status, src, descripWords, url)
 }
