@@ -29,7 +29,7 @@ jobs:
   website_link_check:
     docker:
       # This image's Dockerfile is at runatlantis.io/Dockerfile
-    - image: ghcr.io/runatlantis/ci-link-checker:2021.06.22
+    - image: ghcr.io/runatlantis/ci-link-checker:2022.01.11
     steps:
     - checkout
     - run: yarn install
