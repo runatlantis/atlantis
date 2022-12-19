@@ -192,11 +192,11 @@
   $MQMobile = 719px
   $MQMobileNarrow = 419px
 
-  @import '~@temp/override.styl' // generated from user config
-
   $homeWidth = 960px
   $buttonColor = #34be68
   $darkBackground = rgb(250, 250, 250)
+  .container
+    padding-top 3.6rem
   .home
     padding 0 2rem
     max-width $homeWidth

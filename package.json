@@ -1,6 +1,7 @@
 {
   "devDependencies": {
-    "vuepress": "^0.14.2"
+    "@vuepress/plugin-google-analytics": "^1.9.7",
+    "vuepress": "^1.9.7"
   },
   "scripts": {
     "website:dev": "vuepress dev runatlantis.io",
