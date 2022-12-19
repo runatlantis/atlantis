@@ -32,10 +32,15 @@
     },
     {
       // we need to upgrade testing-env on ci quickly
-      matchPaths: [".github/**"],
       matchPackageNames: ["ghcr.io/runatlantis/testing-env"],
       groupName: "testing-env-ci-test",
       schedule: ["every 1 hour after 00:00 and before 23:59 every day"],
+    },
+    {
+      // use LTS node version for node docker image
+      matchDatasources: ["docker"],
+      matchPackageNames: ["node"],
+      versioning: "node",
     },
   ],
   // https://docs.renovatebot.com/modules/manager/regex/
