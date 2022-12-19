@@ -72,13 +72,10 @@ func (s WorkflowHook) Validate() error {
 func (s WorkflowHook) ToValid() *valid.WorkflowHook {
 	// This will trigger in case #4 (see WorkflowHook docs).
 	if len(s.StringVal) > 0 {
-		// After validation we assume there's only one key and it's a valid
-		// step name so we just use the first one.
-		for _, v := range s.StringVal {
-			return &valid.WorkflowHook{
-				StepName:   RunStepName,
-				RunCommand: v,
-			}
+		return &valid.WorkflowHook{
+			StepName:        RunStepName,
+			RunCommand:      s.StringVal["run"],
+			StepDescription: s.StringVal["description"],
 		}
 	}
 

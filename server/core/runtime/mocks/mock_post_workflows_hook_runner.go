@@ -4,11 +4,10 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	"reflect"
+	"time"
 )
 
 type MockPostWorkflowHookRunner struct {
@@ -26,23 +25,27 @@ func NewMockPostWorkflowHookRunner(options ...pegomock.Option) *MockPostWorkflow
 func (mock *MockPostWorkflowHookRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPostWorkflowHookRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, error) {
+func (mock *MockPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPostWorkflowHookRunner().")
 	}
 	params := []pegomock.Param{ctx, command, path}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
-	var ret1 error
+	var ret1 string
+	var ret2 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(string)
 		}
 		if result[1] != nil {
-			ret1 = result[1].(error)
+			ret1 = result[1].(string)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(error)
 		}
 	}
-	return ret0, ret1
+	return ret0, ret1, ret2
 }
 
 func (mock *MockPostWorkflowHookRunner) VerifyWasCalledOnce() *VerifierMockPostWorkflowHookRunner {

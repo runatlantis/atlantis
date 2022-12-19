@@ -10,15 +10,17 @@ import (
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
+	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestPostWorkflowHookRunner_Run(t *testing.T) {
 	cases := []struct {
-		Command string
-		ExpOut  string
-		ExpErr  string
+		Command        string
+		ExpOut         string
+		ExpErr         string
+		ExpDescription string
 	}{
 		{
 			Command: "",
@@ -56,6 +58,10 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Command: "echo user_name=$USER_NAME",
 			ExpOut:  "user_name=acme-user\n",
 		},
+		{
+			Command:        "echo something > $OUTPUT_STATUS_FILE",
+			ExpDescription: "something",
+		},
 	}
 
 	for _, c := range cases {
@@ -71,7 +77,9 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		logger := logging.NewNoopLogger(t)
 		tmpDir := t.TempDir()
 
-		r := runtime.DefaultPostWorkflowHookRunner{}
+		r := runtime.DefaultPostWorkflowHookRunner{
+			OutputHandler: jobmocks.NewMockProjectCommandOutputHandler(),
+		}
 		t.Run(c.Command, func(t *testing.T) {
 			ctx := models.WorkflowHookCommandContext{
 				BaseRepo: models.Repo{
@@ -94,7 +102,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 				},
 				Log: logger,
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir)
+			out, desc, err := r.Run(ctx, c.Command, tmpDir)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return
@@ -105,6 +113,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			// temp dir.
 			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 			Equals(t, expOut, out)
+			Equals(t, c.ExpDescription, desc)
 		})
 	}
 }
