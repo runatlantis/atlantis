@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-    - image: ghcr.io/runatlantis/testing-env:2022.12.17
+    - image: ghcr.io/runatlantis/testing-env:2022.12.19
     steps:
     - checkout
     - run: make check-fmt
