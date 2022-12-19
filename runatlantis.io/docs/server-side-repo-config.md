@@ -362,24 +362,26 @@ See [Custom Workflows](custom-workflows.html) for more details on writing
 custom workflows.
 
 ### Multiple Atlantis Servers Handle The Same Repository
-Sometimes, you want to run multiple Atlantis servers handles a repository for reasons such as the server's permissions.
-In this case, you can use different [atlantis.yaml](repo-level-atlantis-yaml.html) repository config file by using different `repos.yaml`.
+Running multiple Atlantis servers to handles the same repository can be done to separate permissions for each Atlantis server.
+In this case, a different [atlantis.yaml](repo-level-atlantis-yaml.html) repository config file can be used by using different `repos.yaml` files.
 
-For example, let's consider a situation that you want to separate `production-server` handles `atlantis-production.yaml` and `staging-server` handles `atlantis-staging.yaml`.
+For example, consider a situation where a separate `production-server` atlantis uses repo config `atlantis-production.yaml` and `staging-server` atlantis uses repo config `atlantis-staging.yaml`.
 
-Firstly, you need to deploy 2 Atlantis servers, `production-server` and `staging-server`.
-Each servers have different permissions and different `repos.yaml` file.
-`repos.yaml` contains `repo_config_file` key to specify the repository config file name.
+Firstly, deploy 2 Atlantis servers, `production-server` and `staging-server`.
+Each server has different permissions and a different `repos.yaml` file.
+The `repos.yaml` contains `repo_config_file` key to specify the repository atlantis config file path.
 
 ```yaml
 # repos.yaml
 repos:
 - id: /.*/
-  repo_config_file: atlantis-production.yaml # for production-server
-  # repo_config_file: atlantis-staging.yaml # for staging-serever
+  # for production-server
+  repo_config_file: atlantis-production.yaml
+  # for staging-server
+  # repo_config_file: atlantis-staging.yaml
 ```
 
-Then, you need to create `atlantis-production.yaml` and `atlantis-staging.yaml` files in the repository.
+Then, create `atlantis-production.yaml` and `atlantis-staging.yaml` files in the repository.
 See the configuration examples in [atlantis.yaml](repo-level-atlantis-yaml.html).
 
 ```yaml
@@ -398,13 +400,13 @@ projects:
     dir: infrastructure/staging
 ```
 
-Now, you setup 2 webhook URLs for your repository, which send events to `production-server` and `staging-server` respectively.
+Now, 2 webhook URLs can be setup for the repository, which send events to `production-server` and `staging-server` respectively.
 Each servers handle different repository config files.
 
 :::tip Notes
 * If `no projects` comments are annoying, set [--silence-no-projects](server-configuration.html#silence-no-projects).
-* You can customize command trigger executable name from `atlantis` to something you want by setting [Executable Name](server-configuration.html#executable-name).
-* When using different atlantis server vcs users such as `@atlantis-staging`, you can call `@atlantis-staging plan` instead `atlantis plan` to call `staging-server` only.
+* The command trigger executable name can be reconfigured from `atlantis` to something else by setting [Executable Name](server-configuration.html#executable-name).
+* When using different atlantis server vcs users such as `@atlantis-staging`, the comment `@atlantis-staging plan` can be used instead `atlantis plan` to call `staging-server` only.
 :::
 
 ## Reference
