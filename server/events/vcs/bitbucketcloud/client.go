@@ -228,6 +228,11 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	return req, nil
 }
 
+func (b *Client) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+	// TODO implement
+	return nil
+}
+
 func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]byte, error) {
 	req, err := b.prepRequest(method, path, reqBody)
 	if err != nil {

@@ -192,6 +192,11 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (appr
 	return approvalStatus, nil
 }
 
+func (b *Client) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+	// TODO implement
+	return nil
+}
+
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
 func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)

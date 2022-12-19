@@ -163,6 +163,10 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
+	if err = p.pullUpdater.VCSClient.DiscardReviews(baseRepo, pull); err != nil {
+		ctx.Log.Err("failed to remove approvals: %s", err)
+	}
+
 	if err = p.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, command.Plan); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}

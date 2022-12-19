@@ -35,6 +35,11 @@ import (
 // by GitHub.
 const maxCommentLength = 65536
 
+var (
+	clientMutationID            = githubv4.NewString("atlantis")
+	pullRequestDismissalMessage = *githubv4.NewString("Dismissing reviews because of plan changes")
+)
+
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
 	user     string
@@ -57,6 +62,19 @@ type GithubAppTemporarySecrets struct {
 	WebhookSecret string
 	// URL is a link to the app, like https://github.com/apps/octoapp.
 	URL string
+}
+
+type GithubReview struct {
+	ID          githubv4.ID
+	SubmittedAt githubv4.DateTime
+	Author      struct {
+		Login githubv4.String
+	}
+}
+
+type GithubPRReviewSummary struct {
+	ReviewDecision githubv4.String
+	Reviews        []GithubReview
 }
 
 // NewGithubClient returns a valid GitHub client.
@@ -241,6 +259,58 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 	return nil
 }
 
+// getPRReviews Retrieves PR reviews for a pull request on a specific repository.
+// The reviews are being retrieved using pages with the size of 10 reviews.
+func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (GithubPRReviewSummary, error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				ReviewDecision githubv4.String
+				Reviews        struct {
+					Nodes []GithubReview
+					// contains pagination information
+					PageInfo struct {
+						EndCursor   githubv4.String
+						HasNextPage githubv4.Boolean
+					}
+				} `graphql:"reviews(first: $entries, after: $reviewCursor, states: $reviewState)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":        githubv4.String(repo.Owner),
+		"name":         githubv4.String(repo.Name),
+		"number":       githubv4.Int(pull.Num),
+		"entries":      githubv4.Int(10),
+		"reviewState":  []githubv4.PullRequestReviewState{githubv4.PullRequestReviewStateApproved},
+		"reviewCursor": (*githubv4.String)(nil), // initialize the reviewCursor with null
+	}
+
+	var allReviews []GithubReview
+	for {
+		err := g.v4Client.Query(g.ctx, &query, variables)
+		if err != nil {
+			return GithubPRReviewSummary{
+				query.Repository.PullRequest.ReviewDecision,
+				allReviews,
+			}, errors.Wrap(err, "getting reviewDecision")
+		}
+
+		allReviews = append(allReviews, query.Repository.PullRequest.Reviews.Nodes...)
+		// if we don't have a NextPage pointer, we have requested all pages
+		if !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
+			break
+		}
+		// set the end cursor, so the next batch of reviews is going to be requested and not the same again
+		variables["reviewCursor"] = githubv4.NewString(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
+	}
+	return GithubPRReviewSummary{
+		query.Repository.PullRequest.ReviewDecision,
+		allReviews,
+	}, nil
+}
+
 // PullIsApproved returns true if the pull request was approved.
 func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	nextPage := 0
@@ -271,6 +341,39 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 		nextPage = resp.NextPage
 	}
 	return approvalStatus, nil
+}
+
+// DiscardReviews dismisses all reviews on a pull request
+func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+	reviewStatus, err := g.getPRReviews(repo, pull)
+	if err != nil {
+		return err
+	}
+
+	// https://docs.github.com/en/graphql/reference/input-objects#dismisspullrequestreviewinput
+	var mutation struct {
+		DismissPullRequestReview struct {
+			PullRequestReview struct {
+				ID githubv4.ID
+			}
+		} `graphql:"dismissPullRequestReview(input: $input)"`
+	}
+
+	// dismiss every review one by one.
+	// currently there is no way to dismiss them in one mutation.
+	for _, review := range reviewStatus.Reviews {
+		input := githubv4.DismissPullRequestReviewInput{
+			PullRequestReviewID: review.ID,
+			Message:             pullRequestDismissalMessage,
+			ClientMutationID:    clientMutationID,
+		}
+		mutationResult := &mutation
+		err := g.v4Client.Mutate(g.ctx, mutationResult, input, nil)
+		if err != nil {
+			return errors.Wrap(err, "dismissing reviewDecision")
+		}
+	}
+	return nil
 }
 
 // isRequiredCheck is a helper function to determine if a check is required or not
