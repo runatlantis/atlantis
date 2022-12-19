@@ -22,8 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/config"
-
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
@@ -382,13 +380,13 @@ func (g *GitlabClient) GetTeamNamesForUser(repo models.Repo, user models.User) (
 	return nil, nil
 }
 
-// DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)
-// The first return value indicate that repo contain atlantis.yaml or not
-// if BaseRepo had one repo config file, its content will placed on the second return value
-func (g *GitlabClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+// GetFileContent a repository file content from VCS (which support fetch a single file from repository)
+// The first return value indicates whether the repo contains a file or not
+// if BaseRepo had a file, its content will placed on the second return value
+func (g *GitlabClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
 	opt := gitlab.GetRawFileOptions{Ref: gitlab.String(pull.HeadBranch)}
 
-	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, config.AtlantisYAMLFilename, &opt)
+	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, fileName, &opt)
 	if resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil
 	}

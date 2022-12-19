@@ -25,7 +25,7 @@ var globalCfg = valid.NewGlobalCfgFromArgs(globalCfgArgs)
 
 func TestHasRepoCfg_DirDoesNotExist(t *testing.T) {
 	r := config.ParserValidator{}
-	exists, err := r.HasRepoCfg("/not/exist")
+	exists, err := r.HasRepoCfg("/not/exist", "unused.yaml")
 	Ok(t, err)
 	Equals(t, false, exists)
 }
@@ -33,19 +33,20 @@ func TestHasRepoCfg_DirDoesNotExist(t *testing.T) {
 func TestHasRepoCfg_FileDoesNotExist(t *testing.T) {
 	tmpDir := t.TempDir()
 	r := config.ParserValidator{}
-	exists, err := r.HasRepoCfg(tmpDir)
+	exists, err := r.HasRepoCfg(tmpDir, "not-exist.yaml")
 	Ok(t, err)
 	Equals(t, false, exists)
 }
 
 func TestHasRepoCfg_InvalidFileExtension(t *testing.T) {
 	tmpDir := t.TempDir()
-	_, err := os.Create(filepath.Join(tmpDir, "atlantis.yml"))
+	repoConfigFile := "atlantis.yml"
+	_, err := os.Create(filepath.Join(tmpDir, repoConfigFile))
 	Ok(t, err)
 
 	r := config.ParserValidator{}
-	_, err = r.HasRepoCfg(tmpDir)
-	ErrContains(t, "found \"atlantis.yml\" as config file; rename using the .yaml extension - \"atlantis.yaml\"", err)
+	_, err = r.HasRepoCfg(tmpDir, repoConfigFile)
+	ErrContains(t, "found \"atlantis.yml\" as config file; rename using the .yaml extension", err)
 }
 
 func TestParseRepoCfg_DirDoesNotExist(t *testing.T) {
@@ -1212,6 +1213,18 @@ func TestParseGlobalCfg(t *testing.T) {
   branch: /?/`,
 			expErr: "repos: (0: (branch: parsing: /?/: error parsing regexp: missing argument to repetition operator: `?`.).).",
 		},
+		"invalid repo_config_file which starts with a slash": {
+			input: `repos:
+- id: /.*/
+  repo_config_file: /etc/passwd`,
+			expErr: "repos: (0: (repo_config_file: must not starts with a slash '/'.).).",
+		},
+		"invalid repo_config_file which contains parent directory path": {
+			input: `repos:
+- id: /.*/
+  repo_config_file: ../../etc/passwd`,
+			expErr: "repos: (0: (repo_config_file: must not contains parent directory path like '../'.).).",
+		},
 		"workflow doesn't exist": {
 			input: `repos:
 - id: /.*/
@@ -1300,7 +1313,7 @@ workflows:
 			input: `
 repos:
 - id: github.com/owner/repo
-
+  repo_config_file: "path/to/atlantis.yaml"
   apply_requirements: [approved, mergeable]
   pre_workflow_hooks:
     - run: custom workflow command
@@ -1345,6 +1358,7 @@ policies:
 					defaultCfg.Repos[0],
 					{
 						ID:                   "github.com/owner/repo",
+						RepoConfigFile:       "path/to/atlantis.yaml",
 						ApplyRequirements:    []string{"approved", "mergeable"},
 						PreWorkflowHooks:     preWorkflowHooks,
 						Workflow:             &customWorkflow1,

@@ -35,6 +35,10 @@ repos:
   # By default, all branches are matched
   branch: /.*/
 
+  # repo_config_file specifies which repo config file to use for this repo.
+  # By default, atlantis.yaml is used.
+  repo_config_file: path/to/atlantis.yaml
+
   # apply_requirements sets the Apply Requirements for all repos that match.
   apply_requirements: [approved, mergeable]
 
@@ -168,7 +172,7 @@ repos:
 Then each allowed repo can have an `atlantis.yaml` file that
 sets `apply_requirements` to an empty array (disabling the requirement).
 ```yaml
-# atlantis.yaml in the repo root
+# atlantis.yaml in the repo root or set repo_config_file in repos.yaml
 version: 3
 projects:
 - dir: .
@@ -357,6 +361,54 @@ workflows:
 See [Custom Workflows](custom-workflows.html) for more details on writing
 custom workflows.
 
+### Multiple Atlantis Servers Handle The Same Repository
+Running multiple Atlantis servers to handle the same repository can be done to separate permissions for each Atlantis server.
+In this case, a different [atlantis.yaml](repo-level-atlantis-yaml.html) repository config file can be used by using different `repos.yaml` files.
+
+For example, consider a situation where a separate `production-server` atlantis uses repo config `atlantis-production.yaml` and `staging-server` atlantis uses repo config `atlantis-staging.yaml`.
+
+Firstly, deploy 2 Atlantis servers, `production-server` and `staging-server`.
+Each server has different permissions and a different `repos.yaml` file.
+The `repos.yaml` contains `repo_config_file` key to specify the repository atlantis config file path.
+
+```yaml
+# repos.yaml
+repos:
+- id: /.*/
+  # for production-server
+  repo_config_file: atlantis-production.yaml
+  # for staging-server
+  # repo_config_file: atlantis-staging.yaml
+```
+
+Then, create `atlantis-production.yaml` and `atlantis-staging.yaml` files in the repository.
+See the configuration examples in [atlantis.yaml](repo-level-atlantis-yaml.html).
+
+```yaml
+# atlantis-production.yaml
+version: 3
+projects:
+- name: project
+  branch: /production/
+  dir: infrastructure/production
+---
+# atlantis-staging.yaml
+version: 3
+projects:
+  - name: project
+    branch: /staging/
+    dir: infrastructure/staging
+```
+
+Now, 2 webhook URLs can be setup for the repository, which send events to `production-server` and `staging-server` respectively.
+Each servers handle different repository config files.
+
+:::tip Notes
+* If `no projects` comments are annoying, set [--silence-no-projects](server-configuration.html#silence-no-projects).
+* The command trigger executable name can be reconfigured from `atlantis` to something else by setting [Executable Name](server-configuration.html#executable-name).
+* When using different atlantis server vcs users such as `@atlantis-staging`, the comment `@atlantis-staging plan` can be used instead `atlantis plan` to call `staging-server` only.
+:::
+
 ## Reference
 
 ### Top-Level Keys
@@ -400,6 +452,7 @@ If you set a workflow with the key `default`, it will override this.
 |-------------------------------|----------|---------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | id                            | string   | none    | yes      | Value can be a regular expression when specified as /&lt;regex&gt;/ or an exact string match. Repo IDs are of the form `{vcs hostname}/{org}/{name}`, ex. `github.com/owner/repo`. Hostname is specified without scheme or port. For Bitbucket Server, {org} is the **name** of the project, not the key. |
 | branch                        | string   | none    | no       | An regex matching pull requests by base branch (the branch the pull request is getting merged into). By default, all branches are matched                                                                                                                                                                 |
+| repo_config_file              | string   | none    | no       | Repo config file path in this repo. By default, use `atlantis.yaml` which is located on repository root. When multiple atlantis servers work with the same repo, please set different file names.                                                                                                         |
 | workflow                      | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                        |
 | apply_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Apply Requirements](apply-requirements.html) for more details.                                                                      |
 | allowed_overrides             | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge` and `repo_locking`                                                                                                                       |
