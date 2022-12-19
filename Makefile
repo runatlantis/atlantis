@@ -83,5 +83,5 @@ end-to-end-deps: ## Install e2e dependencies
 end-to-end-tests: ## Run e2e tests
 	./scripts/e2e.sh
 
-website-dev:
+website-dev: ## Run runatlantic.io on localhost:8080
 	yarn website:dev

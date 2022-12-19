@@ -1,5 +1,5 @@
 ---
-layout: HomeCustom
+home: true
 pageClass: home-custom
 heroImage: /hero.png
 heroText: Atlantis
