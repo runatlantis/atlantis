@@ -1,10 +1,23 @@
 # Using Atlantis
 
-Atlantis currently supports three commands that can be run via pull request comments:
+Atlantis triggers commands via pull request comments.
+![Help Command](./images/pr-comment-help.png)
+
+::: tip
+You can use following executable names.
+* `atlantis help`
+  * `atlantis` is executable name. You can configure by [Executable Name](/docs/server-configuration.html#executable-name).
+* `run help`
+  * `run` is a global executable name.
+* `@GithubUser help`
+  * `@GithubUser` is the VCS host user which you connected to Atlantis by user token.
+:::
+
+Currently, Atlantis supports the following commands.
 [[toc]]
 
+---
 ## atlantis help
-![Help Command](./images/pr-comment-help.png)
 ```bash
 atlantis help
 ```
@@ -12,8 +25,16 @@ atlantis help
 View help
 
 ---
+## atlantis version
+```bash
+atlantis version
+```
+
+### Explanation
+Print the output of 'terraform version'.
+
+---
 ## atlantis plan
-![Plan Command](./images/pr-comment-plan.png)
 ```bash
 atlantis plan [options] -- [terraform plan flags]
 ```
@@ -60,7 +81,6 @@ If you always need to append a certain flag, see [Custom Workflow Use Cases](cus
 
 ---
 ## atlantis apply
-![Apply Command](./images/pr-comment-apply.png)
 ```bash
 atlantis apply [options] -- [terraform apply flags]
 ```
@@ -104,3 +124,26 @@ Because Atlantis under the hood is running `terraform apply plan.tfplan`, any Te
 They're ignored because they can't be specified for an already generated planfile.
 If you would like to specify these flags, do it while running `atlantis plan`.
 
+---
+## atlantis unlock
+```bash
+atlantis unlock
+```
+
+### Explanation
+Removes all atlantis locks and discards all plans for this PR.
+To unlock a specific plan you can use the Atlantis UI.
+
+---
+## atlantis approve_policies
+```bash
+atlantis approve_policies
+```
+
+### Explanation
+Approves all current policy checking failures for the PR.
+
+See also [policy checking](/docs/policy-checking.html).
+
+### Options
+* `--verbose` Append Atlantis log to comment.

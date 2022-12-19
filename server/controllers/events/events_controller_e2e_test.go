@@ -42,7 +42,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-const ConftestVersion = "0.35.0"
+const ConftestVersion = "0.36.0" // renovate: datasource=github-releases depName=open-policy-agent/conftest
 
 var applyLocker locking.ApplyLocker
 var userConfig server.UserConfig
@@ -80,6 +80,8 @@ func TestGitHubWorkflow(t *testing.T) {
 		Description string
 		// RepoDir is relative to testfixtures/test-repos.
 		RepoDir string
+		// RepoConfigFile is path for atlantis.yaml
+		RepoConfigFile string
 		// ModifiedFiles are the list of files that have been modified in this
 		// pull request.
 		ModifiedFiles []string
@@ -215,6 +217,24 @@ func TestGitHubWorkflow(t *testing.T) {
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
 				{"exp-output-apply-all.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:    "custom repo config file",
+			RepoDir:        "repo-config-file",
+			RepoConfigFile: "infrastructure/custom-name-atlantis.yaml",
+			ModifiedFiles: []string{
+				"infrastructure/staging/main.tf",
+				"infrastructure/production/main.tf",
+			},
+			ExpAutoplan: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
 				{"exp-output-merge.txt"},
 			},
 		},
@@ -393,7 +413,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			userConfig = server.UserConfig{}
 			userConfig.DisableApply = c.DisableApply
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, c.RepoConfigFile)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
@@ -542,7 +562,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			userConfig = server.UserConfig{}
 			userConfig.DisableApply = true
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, "")
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 
@@ -636,7 +656,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 	}
 	// Ensure we have >= TF 0.14 locally.
 	ensureRunning014(t)
-	// Ensure we have >= Conftest 0.21 locally.
+	// Ensure we have conftest locally.
 	ensureRunningConftest(t)
 
 	cases := []struct {
@@ -785,7 +805,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			userConfig.EnablePolicyChecksFlag = true
 			userConfig.QuietPolicyChecks = c.ExpQuietPolicyChecks
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, "")
 
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
@@ -793,7 +813,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest(), "atlantis-test")).ThenReturn(true, nil)
+			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest(), EqString("atlantis-test"))).ThenReturn(true, nil)
 			When(vcsClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(models.ApprovalStatus{
 				IsApproved: true,
 			}, nil)
@@ -862,7 +882,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 	}
 }
 
-func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	dataDir, binDir, cacheDir := mkSubDirs(t)
 
@@ -917,9 +937,10 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	parser := &config.ParserValidator{}
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg: true,
-		MergeableReq: false,
-		ApprovedReq:  false,
+		RepoConfigFile: repoConfigFile,
+		AllowRepoCfg:   true,
+		MergeableReq:   false,
+		ApprovedReq:    false,
 		PreWorkflowHooks: []*valid.WorkflowHook{
 			{
 				StepName:   "global_hook",
@@ -1363,11 +1384,11 @@ func mkSubDirs(t *testing.T) (string, string, string) {
 	return tmp, binDir, cachedir
 }
 
-// Will fail test if conftest isn't in path and isn't version >= 0.25.0
+// Will fail test if conftest isn't in path or is version less than specific version
 func ensureRunningConftest(t *testing.T) {
-	localPath, err := exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
+	localPath, err := exec.LookPath("conftest")
 	if err != nil {
-		t.Logf("conftest >= %s must be installed to run this test", ConftestVersion)
+		t.Logf("conftest must be installed to run this test")
 		t.FailNow()
 	}
 	versionOutBytes, err := exec.Command(localPath, "--version").Output() // #nosec

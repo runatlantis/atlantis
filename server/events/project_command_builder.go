@@ -241,17 +241,18 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
 
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
-		hasRepoCfg, repoCfgData, err := p.VCSClient.DownloadRepoConfigFile(ctx.Pull)
+		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Pull, repoCfgFile)
 		if err != nil {
-			return nil, errors.Wrapf(err, "downloading %s", config.AtlantisYAMLFilename)
+			return nil, errors.Wrapf(err, "downloading %s", repoCfgFile)
 		}
 
 		if hasRepoCfg {
 			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
 			if err != nil {
-				return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
+				return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 			}
-			ctx.Log.Info("successfully parsed remote %s file", config.AtlantisYAMLFilename)
+			ctx.Log.Info("successfully parsed remote %s file", repoCfgFile)
 			if len(repoCfg.Projects) > 0 {
 				matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "")
 				if err != nil {
@@ -263,7 +264,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					return []command.ProjectContext{}, nil
 				}
 			} else {
-				ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", config.AtlantisYAMLFilename)
+				ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", repoCfgFile)
 			}
 			// NOTE: We discard this work here and end up doing it again after
 			// cloning to ensure all the return values are set properly with
@@ -288,9 +289,10 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 	}
 
 	// Parse config file if it exists.
-	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir)
+	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
 	if err != nil {
-		return nil, errors.Wrapf(err, "looking for %s file in %q", config.AtlantisYAMLFilename, repoDir)
+		return nil, errors.Wrapf(err, "looking for %s file in %q", repoCfgFile, repoDir)
 	}
 
 	var projCtxs []command.ProjectContext
@@ -301,9 +303,9 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		// should be planed.
 		repoCfg, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)
+			return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 		}
-		ctx.Log.Info("successfully parsed %s file", config.AtlantisYAMLFilename)
+		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
 	}
 
 	if len(repoCfg.Projects) > 0 {
@@ -334,9 +336,9 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 		// If there is no config file or it specified no projects, then we'll plan each project that
 		// our algorithm determines was modified.
 		if hasRepoCfg {
-			ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", config.AtlantisYAMLFilename)
+			ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", repoCfgFile)
 		} else {
-			ctx.Log.Info("found no %s file", config.AtlantisYAMLFilename)
+			ctx.Log.Info("found no %s file", repoCfgFile)
 		}
 		// build a module index for projects that are explicitly included
 		moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
@@ -476,14 +478,15 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
 // there is no config, then projectCfg and repoCfg will be nil.
 func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName string, dir string, workspace string, repoDir string) (projectsCfg []valid.Project, repoCfg *valid.RepoCfg, err error) {
-	hasConfigFile, err := p.ParserValidator.HasRepoCfg(repoDir)
+	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
 	if err != nil {
-		err = errors.Wrapf(err, "looking for %s file in %q", config.AtlantisYAMLFilename, repoDir)
+		err = errors.Wrapf(err, "looking for %s file in %q", repoCfgFile, repoDir)
 		return
 	}
-	if !hasConfigFile {
+	if !hasRepoCfg {
 		if projectName != "" {
-			err = fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", config.AtlantisYAMLFilename)
+			err = fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", repoCfgFile)
 			return
 		}
 		return
@@ -507,7 +510,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 			}
 		}
 		if len(projectsCfg) == 0 {
-			err = fmt.Errorf("no project with name %q is defined in %s", projectName, config.AtlantisYAMLFilename)
+			err = fmt.Errorf("no project with name %q is defined in %s", projectName, repoCfgFile)
 			return
 		}
 		return
@@ -518,7 +521,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 		return
 	}
 	if len(projCfgs) > 1 {
-		err = fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", config.AtlantisYAMLFilename, dir, workspace)
+		err = fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", repoCfgFile, dir, workspace)
 		return
 	}
 	projectsCfg = projCfgs

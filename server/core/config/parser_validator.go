@@ -15,9 +15,6 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-// AtlantisYAMLFilename is the name of the config file for each repo.
-const AtlantisYAMLFilename = "atlantis.yaml"
-
 // ParserValidator parses and validates server-side repo config files and
 // repo-level atlantis.yaml files.
 type ParserValidator struct{}
@@ -25,15 +22,15 @@ type ParserValidator struct{}
 // HasRepoCfg returns true if there is a repo config (atlantis.yaml) file
 // for the repo at absRepoDir.
 // Returns an error if for some reason it can't read that directory.
-func (p *ParserValidator) HasRepoCfg(absRepoDir string) (bool, error) {
+func (p *ParserValidator) HasRepoCfg(absRepoDir, repoConfigFile string) (bool, error) {
 	// Checks for a config file with an invalid extension (atlantis.yml)
 	const invalidExtensionFilename = "atlantis.yml"
 	_, err := os.Stat(p.repoCfgPath(absRepoDir, invalidExtensionFilename))
 	if err == nil {
-		return false, errors.Errorf("found %q as config file; rename using the .yaml extension - %q", invalidExtensionFilename, AtlantisYAMLFilename)
+		return false, errors.Errorf("found %q as config file; rename using the .yaml extension", invalidExtensionFilename)
 	}
 
-	_, err = os.Stat(p.repoCfgPath(absRepoDir, AtlantisYAMLFilename))
+	_, err = os.Stat(p.repoCfgPath(absRepoDir, repoConfigFile))
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -44,12 +41,13 @@ func (p *ParserValidator) HasRepoCfg(absRepoDir string) (bool, error) {
 // repo at absRepoDir.
 // If there was no config file, it will return an os.IsNotExist(error).
 func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.GlobalCfg, repoID string, branch string) (valid.RepoCfg, error) {
-	configFile := p.repoCfgPath(absRepoDir, AtlantisYAMLFilename)
+	repoConfigFile := globalCfg.RepoConfigFile(repoID)
+	configFile := p.repoCfgPath(absRepoDir, repoConfigFile)
 	configData, err := os.ReadFile(configFile) // nolint: gosec
 
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
+			return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", repoConfigFile)
 		}
 		// Don't wrap os.IsNotExist errors because we want our callers to be
 		// able to detect if it's a NotExist err.

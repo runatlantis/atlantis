@@ -90,6 +90,8 @@ type ProjectContext struct {
 	DeleteSourceBranchOnMerge bool
 	// RepoLocking will get a lock when plan
 	RepoLocking bool
+	// RepoConfigFile
+	RepoConfigFile string
 	// UUID for atlantis logs
 	JobID string
 	// The index of order group. Before planning/applying it will use to sort projects. Default is 0.

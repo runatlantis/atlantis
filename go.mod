@@ -26,13 +26,13 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.21
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/moby/moby v20.10.21+incompatible
-	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
+	github.com/moby/moby v20.10.22+incompatible
+	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/petergtz/pegomock v2.9.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/remeh/sizedwaitgroup v1.0.0
-	github.com/shurcooL/githubv4 v0.0.0-20221021030919-a134b1472cc7
-	github.com/slack-go/slack v0.11.4
+	github.com/shurcooL/githubv4 v0.0.0-20221203213311-70889c5dac07
+	github.com/slack-go/slack v0.12.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.14.0
