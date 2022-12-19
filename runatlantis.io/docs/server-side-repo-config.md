@@ -362,7 +362,7 @@ See [Custom Workflows](custom-workflows.html) for more details on writing
 custom workflows.
 
 ### Multiple Atlantis Servers Handle The Same Repository
-Running multiple Atlantis servers to handles the same repository can be done to separate permissions for each Atlantis server.
+Running multiple Atlantis servers to handle the same repository can be done to separate permissions for each Atlantis server.
 In this case, a different [atlantis.yaml](repo-level-atlantis-yaml.html) repository config file can be used by using different `repos.yaml` files.
 
 For example, consider a situation where a separate `production-server` atlantis uses repo config `atlantis-production.yaml` and `staging-server` atlantis uses repo config `atlantis-staging.yaml`.
