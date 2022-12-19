@@ -70,8 +70,7 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		}
 	}
 
-	wh.OutputHandler.SendWorkflowHook(ctx, string(out), false)
-	wh.OutputHandler.SendWorkflowHook(ctx, "", true)
+	wh.OutputHandler.SendWorkflowHook(ctx, fmt.Sprintf("%s\n", string(out)), true)
 
 	ctx.Log.Info("successfully ran %q in %q", command, path)
 	return string(out), strings.Trim(string(customStatusOut), "\n"), nil
