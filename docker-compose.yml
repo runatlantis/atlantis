@@ -13,7 +13,7 @@ services:
         depends_on:
         - atlantis
     redis:
-        image: redis:6.2-alpine
+        image: redis:7.0-alpine
         restart: always
         ports:
         - '6379:6379'
