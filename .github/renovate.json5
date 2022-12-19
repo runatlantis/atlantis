@@ -34,7 +34,7 @@
       // we need to upgrade testing-env on ci quickly
       matchPackageNames: ["ghcr.io/runatlantis/testing-env"],
       groupName: "testing-env-ci-test",
-      schedules: ["every 1 hour after 00:00 and before 23:59 every day"],
+      schedule: ["every 1 hour after 00:00 and before 23:59 every day"],
     },
     {
       // use LTS node version for node docker image
