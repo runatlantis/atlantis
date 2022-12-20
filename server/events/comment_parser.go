@@ -23,7 +23,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/flynn-archive/go-shlex"
+	"github.com/google/shlex"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/spf13/pflag"

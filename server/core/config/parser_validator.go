@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	shlex "github.com/flynn-archive/go-shlex"
+	shlex "github.com/google/shlex"
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/raw"
