@@ -927,6 +927,13 @@ and set `--autoplan-modules` to `false`.
   environment where releases.hashicorp.com is not available. Directory structure of the custom
   endpoint should match that of releases.hashicorp.com.
 
+### `--tf-disable-downloads`
+  ```bash
+  atlantis server --tf-disable-downloads
+  ```
+  Prevent Atlantis from trying to list and download additional versions of Terraform.
+  Useful in an airgapped environment where a download mirror is not available.
+
 ### `--tfe-hostname`
   ```bash
   atlantis server --tfe-hostname="my-terraform-enterprise.company.com"
