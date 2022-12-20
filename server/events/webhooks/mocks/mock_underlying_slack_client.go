@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"time"
 
-	slack "github.com/slack-go/slack"
 	pegomock "github.com/petergtz/pegomock"
+	slack "github.com/slack-go/slack"
 )
 
 type MockUnderlyingSlackClient struct {

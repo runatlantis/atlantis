@@ -166,6 +166,11 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 	return approvalStatus, nil
 }
 
+func (g *AzureDevopsClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+	// TODO implement
+	return nil
+}
+
 // PullIsMergeable returns true if the merge request can be merged.
 func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
@@ -389,7 +394,7 @@ func (g *AzureDevopsClient) SupportsSingleFileDownload(repo models.Repo) bool {
 	return false
 }
 
-func (g *AzureDevopsClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+func (g *AzureDevopsClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("Not Implemented")
 }
 

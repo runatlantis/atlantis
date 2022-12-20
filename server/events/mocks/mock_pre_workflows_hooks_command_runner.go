@@ -4,12 +4,11 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	events "github.com/runatlantis/atlantis/server/events"
 	command "github.com/runatlantis/atlantis/server/events/command"
+	"reflect"
+	"time"
 )
 
 type MockPreWorkflowHooksCommandRunner struct {

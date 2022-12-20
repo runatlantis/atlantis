@@ -1,5 +1,10 @@
+ARG ATLANTIS_BASE=ghcr.io/runatlantis/atlantis-base
+ARG ATLANTIS_BASE_TAG_DATE=2022.12.12
+ARG ATLANTIS_BASE_TAG_TYPE=alpine
+
 # Stage 1: build artifact
-FROM golang:1.19.3-alpine AS builder
+
+FROM golang:1.19.4-alpine AS builder
 
 WORKDIR /app
 COPY . /app
@@ -8,13 +13,14 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
 
 # Stage 2
-# The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM ghcr.io/runatlantis/atlantis-base:2022.12.05 AS base
+# The runatlantis/atlantis-base is created by docker-base/Dockerfile
+FROM ${ATLANTIS_BASE}:${ATLANTIS_BASE_TAG_DATE}-${ATLANTIS_BASE_TAG_TYPE} AS base
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM
 
 # install terraform binaries
+# renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ENV DEFAULT_TERRAFORM_VERSION=1.3.6
 
 # In the official Atlantis image we only have the latest of each Terraform version.
@@ -38,7 +44,8 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="1.0.11 1.1.9 1.2.9 ${DEFAULT_TERRAFORM_VERSION
     done && \
     ln -s "/usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform" /usr/local/bin/terraform
 
-ENV DEFAULT_CONFTEST_VERSION=0.35.0
+# renovate: datasource=github-releases depName=open-policy-agent/conftest
+ENV DEFAULT_CONFTEST_VERSION=0.36.0
 
 RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
     case ${TARGETPLATFORM} in \

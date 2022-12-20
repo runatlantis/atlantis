@@ -22,6 +22,7 @@ type GlobalCfg struct {
 type Repo struct {
 	ID                        string         `yaml:"id" json:"id"`
 	Branch                    string         `yaml:"branch" json:"branch"`
+	RepoConfigFile            string         `yaml:"repo_config_file" json:"repo_config_file"`
 	ApplyRequirements         []string       `yaml:"apply_requirements" json:"apply_requirements"`
 	PreWorkflowHooks          []WorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
 	Workflow                  *string        `yaml:"workflow,omitempty" json:"workflow,omitempty"`
@@ -30,6 +31,7 @@ type Repo struct {
 	AllowedOverrides          []string       `yaml:"allowed_overrides" json:"allowed_overrides"`
 	AllowCustomWorkflows      *bool          `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
 	DeleteSourceBranchOnMerge *bool          `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
+	RepoLocking               *bool          `yaml:"repo_locking,omitempty" json:"repo_locking,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -170,11 +172,25 @@ func (r Repo) Validate() error {
 		return errors.Wrapf(err, "parsing: %s", branch)
 	}
 
+	repoConfigFileValid := func(value interface{}) error {
+		repoConfigFile := value.(string)
+		if repoConfigFile == "" {
+			return nil
+		}
+		if strings.HasPrefix(repoConfigFile, "/") {
+			return errors.New("must not starts with a slash '/'")
+		}
+		if strings.Contains(repoConfigFile, "../") || strings.Contains(repoConfigFile, "..\\") {
+			return errors.New("must not contains parent directory path like '../'")
+		}
+		return nil
+	}
+
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey {
-				return fmt.Errorf("%q is not a valid override, only %q, %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey)
+			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey {
+				return fmt.Errorf("%q is not a valid override, only %q, %q, %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey)
 			}
 		}
 		return nil
@@ -194,6 +210,7 @@ func (r Repo) Validate() error {
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.ID, validation.Required, validation.By(idValid)),
 		validation.Field(&r.Branch, validation.By(branchValid)),
+		validation.Field(&r.RepoConfigFile, validation.By(repoConfigFileValid)),
 		validation.Field(&r.AllowedOverrides, validation.By(overridesValid)),
 		validation.Field(&r.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
@@ -260,6 +277,7 @@ OUTER:
 		ID:                        id,
 		IDRegex:                   idRegex,
 		BranchRegex:               branchRegex,
+		RepoConfigFile:            r.RepoConfigFile,
 		ApplyRequirements:         mergedApplyReqs,
 		PreWorkflowHooks:          preWorkflowHooks,
 		Workflow:                  workflow,
@@ -268,5 +286,6 @@ OUTER:
 		AllowedOverrides:          r.AllowedOverrides,
 		AllowCustomWorkflows:      r.AllowCustomWorkflows,
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
+		RepoLocking:               r.RepoLocking,
 	}
 }

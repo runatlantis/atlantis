@@ -5,7 +5,7 @@ set -e
 
 # If the user is trying to run atlantis directly with some arguments, then
 # pass them to atlantis.
-if [ "${1:0:1}" = '-' ]; then
+if [ "$(echo "${1}" | cut -c1)" ]; then
     set -- atlantis "$@"
 fi
 
@@ -23,7 +23,7 @@ if atlantis help "$1" 2>&1 | grep -q "atlantis $1"; then
 fi
 
 # If the current uid running does not have a user create one in /etc/passwd
-if ! whoami &> /dev/null; then
+if ! whoami > /dev/null 2>&1; then
   if [ -w /etc/passwd ]; then
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:/home/atlantis:/sbin/nologin" >> /etc/passwd
   fi
@@ -32,11 +32,11 @@ fi
 # If we're running as root and we're trying to execute atlantis then we use
 # gosu to step down from root and run as the atlantis user.
 # In OpenShift, containers are run as a random users so we don't need to use gosu.
-if [[ $(id -u) == 0 ]] && [[ "$1" = 'atlantis' ]]; then
+if [ "$(id -u)" = 0 ] && [ "$1" = 'atlantis' ]; then
     # If requested, set the capability to bind to privileged ports before
     # we drop to the non-root user. Note that this doesn't work with all
     # storage drivers (it won't work with AUFS).
-    if [ ! -z ${ATLANTIS_ALLOW_PRIVILEGED_PORTS+x} ]; then
+    if [ -n "${ATLANTIS_ALLOW_PRIVILEGED_PORTS+x}" ]; then
         setcap "cap_net_bind_service=+ep" /bin/atlantis
     fi
 

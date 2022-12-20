@@ -63,7 +63,7 @@ Atlantis runs `terraform` with the following variables:
 | `atlantis_repo_name=atlantis`        | The name of the repo the pull request is in.                                                                                           |
 | `atlantis_pull_num=200`              | The pull request number.                                                                                                               |
 
-If you want to use `assume_role` with Atlantis and you're also using the [S3 Backend](https://www.terraform.io/docs/backends/types/s3.html),
+If you want to use `assume_role` with Atlantis and you're also using the [S3 Backend](https://developer.hashicorp.com/terraform/language/settings/backends/s3),
 make sure to add the `role_arn` option:
 
 ```bash

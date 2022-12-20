@@ -32,9 +32,11 @@ type UserConfig struct {
 	DisableAutoplan                 bool   `mapstructure:"disable-autoplan"`
 	DisableMarkdownFolding          bool   `mapstructure:"disable-markdown-folding"`
 	DisableRepoLocking              bool   `mapstructure:"disable-repo-locking"`
+	DiscardApprovalOnPlanFlag       bool   `mapstructure:"discard-approval-on-plan"`
 	EnablePolicyChecksFlag          bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd                 bool   `mapstructure:"enable-regexp-cmd"`
 	EnableDiffMarkdownFormat        bool   `mapstructure:"enable-diff-markdown-format"`
+	ExecutableName                  string `mapstructure:"executable-name"`
 	GithubAllowMergeableBypassApply bool   `mapstructure:"gh-allow-mergeable-bypass-apply"`
 	GithubHostname                  string `mapstructure:"gh-hostname"`
 	GithubToken                     string `mapstructure:"gh-token"`
@@ -97,6 +99,7 @@ type UserConfig struct {
 	SlackToken             string          `mapstructure:"slack-token"`
 	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
+	RestrictFileList       bool            `mapstructure:"restrict-file-list"`
 	TFDownloadURL          string          `mapstructure:"tf-download-url"`
 	TFEHostname            string          `mapstructure:"tfe-hostname"`
 	TFELocalExecutionMode  bool            `mapstructure:"tfe-local-execution-mode"`

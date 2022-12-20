@@ -25,8 +25,9 @@ import (
 )
 
 var commentParser = events.CommentParser{
-	GithubUser: "github-user",
-	GitlabUser: "gitlab-user",
+	GithubUser:     "github-user",
+	GitlabUser:     "gitlab-user",
+	ExecutableName: "atlantis",
 }
 
 func TestParse_Ignored(t *testing.T) {
@@ -41,6 +42,30 @@ func TestParse_Ignored(t *testing.T) {
 	for _, c := range ignoreComments {
 		r := commentParser.Parse(c, models.Github)
 		Assert(t, r.Ignore, "expected Ignore to be true for comment %q", c)
+	}
+}
+
+func TestParse_ExecutableName(t *testing.T) {
+	cases := []struct {
+		user      string
+		expIgnore bool
+	}{
+		{"custom-executable-name", false},
+		{"run", false},
+		{"@github-user", false},
+		{"github-user", true},
+		{"atlantis", true},
+	}
+	for _, c := range cases {
+		t.Run(c.user, func(t *testing.T) {
+			var commentParser = events.CommentParser{
+				GithubUser:     "github-user",
+				ExecutableName: "custom-executable-name",
+			}
+			comment := fmt.Sprintf("%s help", c.user)
+			r := commentParser.Parse(comment, models.Github)
+			Assert(t, r.Ignore == c.expIgnore, "expected Ignore %q, but got %q", c.expIgnore, r.Ignore)
+		})
 	}
 }
 
@@ -789,6 +814,7 @@ func TestParse_VCSUsername(t *testing.T) {
 		GitlabUser:      "gl",
 		BitbucketUser:   "bb",
 		AzureDevopsUser: "ad",
+		ExecutableName:  "atlantis",
 	}
 	cases := []struct {
 		vcs  models.VCSHostType
@@ -828,8 +854,8 @@ var PlanUsage = `Usage of plan:
   -d, --dir string         Which directory to run plan in relative to root of repo,
                            ex. 'child/dir'.
   -p, --project string     Which project to run plan for. Refers to the name of the
-                           project configured in atlantis.yaml. Cannot be used at
-                           same time as workspace or dir flags.
+                           project configured in a repo config file. Cannot be used
+                           at same time as workspace or dir flags.
       --verbose            Append Atlantis log to comment.
   -w, --workspace string   Switch to this Terraform workspace before planning.
 `
@@ -839,8 +865,8 @@ var ApplyUsage = `Usage of apply:
   -d, --dir string            Apply the plan for this directory, relative to root of
                               repo, ex. 'child/dir'.
   -p, --project string        Apply the plan for this project. Refers to the name of
-                              the project configured in atlantis.yaml. Cannot be
-                              used at same time as workspace or dir flags.
+                              the project configured in a repo config file. Cannot
+                              be used at same time as workspace or dir flags.
       --verbose               Append Atlantis log to comment.
   -w, --workspace string      Apply the plan for this Terraform workspace.
 `

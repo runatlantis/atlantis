@@ -4,21 +4,21 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/uber-go/tally"
 )
 
 type InstrumentedProjectCommandBuilder struct {
 	ProjectCommandBuilder
 	Logger logging.SimpleLogging
+	scope  tally.Scope
 }
 
 func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
-	scope := ctx.Scope.SubScope("builder")
-
-	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	timer := b.scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
-	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
-	executionError := scope.Counter(metrics.ExecutionErrorMetric)
+	executionSuccess := b.scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := b.scope.Counter(metrics.ExecutionErrorMetric)
 
 	projectCmds, err := b.ProjectCommandBuilder.BuildApplyCommands(ctx, comment)
 
@@ -33,13 +33,11 @@ func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Cont
 
 }
 func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
-	scope := ctx.Scope.SubScope("builder")
-
-	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	timer := b.scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
-	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
-	executionError := scope.Counter(metrics.ExecutionErrorMetric)
+	executionSuccess := b.scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := b.scope.Counter(metrics.ExecutionErrorMetric)
 
 	projectCmds, err := b.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
 
@@ -54,13 +52,11 @@ func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.C
 
 }
 func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
-	scope := ctx.Scope.SubScope("builder")
-
-	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	timer := b.scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
-	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
-	executionError := scope.Counter(metrics.ExecutionErrorMetric)
+	executionSuccess := b.scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := b.scope.Counter(metrics.ExecutionErrorMetric)
 
 	projectCmds, err := b.ProjectCommandBuilder.BuildPlanCommands(ctx, comment)
 

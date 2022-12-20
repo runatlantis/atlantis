@@ -166,9 +166,19 @@ func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest,
 	m.CalledNumTotal = numTotal
 	return nil
 }
+
 func (m *MockCSU) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command command.Name) error {
 	return nil
 }
+
 func (m *MockCSU) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error {
+	return nil
+}
+
+func (m *MockCSU) UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
+	return nil
+}
+
+func (m *MockCSU) UpdatePostWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
 	return nil
 }

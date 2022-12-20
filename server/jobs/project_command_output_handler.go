@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -54,6 +55,8 @@ type ProjectCommandOutputHandler interface {
 	// Send will enqueue the msg and wait for Handle() to receive the message.
 	Send(ctx command.ProjectContext, msg string, operationComplete bool)
 
+	SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool)
+
 	// Register registers a channel and blocks until it is caught up. Callers should call this asynchronously when attempting
 	// to read the channel in the same goroutine
 	Register(jobID string, receiver chan string)
@@ -100,6 +103,21 @@ func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg 
 				Repo:        ctx.BaseRepo.Name,
 				ProjectName: ctx.ProjectName,
 				Workspace:   ctx.Workspace,
+			},
+		},
+		Line:              msg,
+		OperationComplete: operationComplete,
+	}
+}
+
+func (p *AsyncProjectCommandOutputHandler) SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool) {
+	p.projectCmdOutput <- &ProjectCmdOutputLine{
+		JobID: ctx.HookID,
+		JobInfo: JobInfo{
+			HeadCommit: ctx.Pull.HeadCommit,
+			PullInfo: PullInfo{
+				PullNum: ctx.Pull.Num,
+				Repo:    ctx.BaseRepo.Name,
 			},
 		},
 		Line:              msg,
@@ -250,6 +268,9 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 type NoopProjectOutputHandler struct{}
 
 func (p *NoopProjectOutputHandler) Send(ctx command.ProjectContext, msg string, isOperationComplete bool) {
+}
+
+func (p *NoopProjectOutputHandler) SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool) {
 }
 
 func (p *NoopProjectOutputHandler) Register(jobID string, receiver chan string)   {}

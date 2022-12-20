@@ -228,6 +228,11 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	return req, nil
 }
 
+func (b *Client) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+	// TODO implement
+	return nil
+}
+
 func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]byte, error) {
 	req, err := b.prepRequest(method, path, reqBody)
 	if err != nil {
@@ -260,10 +265,10 @@ func (b *Client) SupportsSingleFileDownload(models.Repo) bool {
 	return false
 }
 
-// DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)
-// The first return value indicate that repo contain atlantis.yaml or not
-// if BaseRepo had one repo config file, its content will placed on the second return value
-func (b *Client) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+// GetFileContent a repository file content from VCS (which support fetch a single file from repository)
+// The first return value indicates whether the repo contains a file or not
+// if BaseRepo had a file, its content will placed on the second return value
+func (b *Client) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("Not Implemented")
 }
 
