@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	shlex "github.com/google/shlex"
 	validation "github.com/go-ozzo/ozzo-validation"
+	shlex "github.com/google/shlex"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
