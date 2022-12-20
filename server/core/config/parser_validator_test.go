@@ -1729,7 +1729,7 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
 		},
 		{
 			in:       "echo 'a b",
-			expV2Err: "unable to parse \"echo 'a b\": EOF found when expecting closing quote.",
+			expV2Err: "unable to parse \"echo 'a b\": EOF found when expecting closing quote",
 		},
 		{
 			in:    `mkdir a/b/c || printf \'your main.tf file does not provide default region.\\ncheck\'`,
