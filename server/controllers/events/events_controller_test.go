@@ -618,6 +618,73 @@ func TestPost_AzureDevopsPullRequestDeletedCommentIgnoreEvent(t *testing.T) {
 	})
 }
 
+func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
+	u := "user"
+	user := []byte(u)
+
+	t.Log("when the event should not be ignored it should succeed until parsing section")
+	RegisterMockTestingT(t)
+	v := mocks.NewMockAzureDevopsRequestValidator()
+	p := emocks.NewMockEventParsing()
+	cp := emocks.NewMockCommentParsing()
+	cr := emocks.NewMockCommandRunner()
+	c := emocks.NewMockPullCleaner()
+	vcsmock := vcsmocks.NewMockClient()
+	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
+	Ok(t, err)
+	logger := logging.NewNoopLogger(t)
+	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	e := events_controllers.VCSEventsController{
+		TestingMode:                     true,
+		Logger:                          logger,
+		Scope:                           scope,
+		ApplyDisabled:                   false,
+		AzureDevopsWebhookBasicUser:     user,
+		AzureDevopsWebhookBasicPassword: secret,
+		AzureDevopsRequestValidator:     v,
+		Parser:                          p,
+		CommentParser:                   cp,
+		CommandRunner:                   cr,
+		PullCleaner:                     c,
+		SupportedVCSHosts:               []models.VCSHostType{models.AzureDevops},
+		RepoAllowlistChecker:            repoAllowlistChecker,
+		VCSClient:                       vcsmock,
+	}
+
+	payload := `{
+		"subscriptionId": "11111111-1111-1111-1111-111111111111",
+		"notificationId": 1,
+		"id": "22222222-2222-2222-2222-222222222222",
+		"eventType": "ms.vss-code.git-pullrequest-comment-event",
+		"publisherId": "tfs",
+		"message": {
+			"text": "Testing to see if comment passes ignore conditions"
+		},
+		"resource": {
+			"comment": {
+				"id": 1,
+				"commentType": "text",
+				"content": "test"
+			},
+			"PullRequest": {
+				"pullRequestId": 1,
+				"Repository": ""
+			}
+		}
+	}`
+
+	t.Run("Testing to see if comment passes ignore conditions", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", strings.NewReader(payload))
+		req.Header.Set(azuredevopsHeader, "reqID")
+		When(v.Validate(req, user, secret)).ThenReturn([]byte(payload), nil)
+		w := httptest.NewRecorder()
+		e.Parser = &events.EventParser{}
+		e.Post(w, req)
+		t.Log(w)
+		ResponseContains(t, w, http.StatusBadRequest, "Failed parsing webhook: json: cannot unmarshal string into Go struct field")
+	})
+}
+
 func TestPost_GithubPullRequestClosedErrCleaningPull(t *testing.T) {
 	t.Skip("relies too much on mocks, should use real event parser")
 	t.Log("when the event is a closed pull request and we have an error calling CleanUpPull we return a 503")
