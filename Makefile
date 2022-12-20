@@ -36,7 +36,7 @@ test: ## Run tests
 
 .PHONY: docker/test
 docker/test: ## Run tests in docker
-	docker run -it -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:2022.12.17 sh -c "cd /atlantis && make test"
+	docker run -it -v $(PWD):/atlantis ghcr.io/runatlantis/testing-env:2022.12.17 sh -c "cd /atlantis && make test"
 
 test-all: ## Run tests including integration
 	@go test  $(PKG)
