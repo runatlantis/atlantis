@@ -10,12 +10,12 @@ require (
 	github.com/briandowns/spinner v1.19.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/elazarl/go-bindata-assetfs v1.0.1
-	github.com/flynn-archive/go-shlex v0.0.0-20150515145356-3f9db97f8568
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/go-test/deep v1.1.0
 	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/google/go-github/v48 v48.2.0
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
