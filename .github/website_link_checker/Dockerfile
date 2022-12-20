@@ -1,6 +1,6 @@
 # This Dockerfile builds runatlantis/ci-link-checker.
 # It is used in CircleCI to check if the website has any broken links.
-FROM node:14
+FROM node:18
 ENV DOCKERIZE_VERSION v0.6.1
 
 # Muffet is used to check for broken links.
