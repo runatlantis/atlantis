@@ -2,6 +2,7 @@ package events
 
 import (
 	"path/filepath"
+	"regexp"
 	"sort"
 
 	"github.com/Masterminds/semver"
@@ -283,6 +284,29 @@ func escapeArgs(args []string) []string {
 	return escaped
 }
 
+/*
+    if len(module.RequiredCore) != 1 {
+		ctx.Log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+		return nil
+	}
+	requiredVersionSetting := module.RequiredCore[0]
+
+	// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
+	re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
+	matched := re.FindStringSubmatch(requiredVersionSetting)
+	if len(matched) == 0 {
+		ctx.Log.Debug("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
+		return nil
+	}
+	ctx.Log.Debug("found required_version setting of %q", requiredVersionSetting)
+	version, err := version.NewVersion(matched[1])
+	if err != nil {
+		ctx.Log.Debug(err.Error())
+		return nil
+	}
+
+*/
+
 // Extracts required_version from Terraform configuration.
 // Returns nil if unable to determine version from configuration.
 func getTfVersion(ctx *command.Context, terraformClient terraform.Client, absProjDir string) *version.Version {
@@ -302,13 +326,26 @@ func getTfVersion(ctx *command.Context, terraformClient terraform.Client, absPro
 	if err != nil {
 		ctx.Log.Err("Unable to list Terraform versions")
 	}
-	constrains, _ := semver.NewConstraint(requiredVersionSetting)
+
+	if len(tfVersions) == 0 {
+		// Fall back to an exact required version string
+		// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
+		re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
+		matched := re.FindStringSubmatch(requiredVersionSetting)
+		if len(matched) == 0 {
+			ctx.Log.Debug("Did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
+			return nil
+		}
+		tfVersions = []string{matched[1]}
+	}
+
+	constraint, _ := semver.NewConstraint(requiredVersionSetting)
 	versions := make([]*semver.Version, len(tfVersions))
 
 	for i, tfvals := range tfVersions {
-		version, err := semver.NewVersion(tfvals) //NewVersion parses a given version and returns an instance of Version or an error if unable to parse the version.
+		newVersion, err := semver.NewVersion(tfvals) //NewVersion parses a given version and returns an instance of Version or an error if unable to parse the version.
 		if err == nil {
-			versions[i] = version
+			versions[i] = newVersion
 		}
 	}
 
@@ -320,7 +357,7 @@ func getTfVersion(ctx *command.Context, terraformClient terraform.Client, absPro
 	sort.Sort(sort.Reverse(semver.Collection(versions)))
 
 	for _, element := range versions {
-		if constrains.Check(element) { // Validate a version against a constraint
+		if constraint.Check(element) { // Validate a version against a constraint
 			tfversionStr := element.String()
 			if lib.ValidVersionFormat(tfversionStr) { //check if version format is correct
 				tfversion, _ := version.NewVersion(tfversionStr)
