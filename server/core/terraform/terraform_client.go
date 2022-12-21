@@ -465,21 +465,20 @@ func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string
 	}
 	if downloadsDisabled {
 		return "", fmt.Errorf("could not find terraform version %s in PATH or %s, and downloads are disabled", v.String(), binDir)
-	} else {
-
-		log.Info("could not find terraform version %s in PATH or %s, downloading from %s", v.String(), binDir, downloadURL)
-		urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
-		binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
-		checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
-		fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
-		if err := dl.GetFile(dest, fullSrcURL); err != nil {
-			return "", errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
-		}
-
-		log.Info("downloaded terraform %s to %s", v.String(), dest)
-		versions[v.String()] = dest
-		return dest, nil
 	}
+
+	log.Info("could not find terraform version %s in PATH or %s, downloading from %s", v.String(), binDir, downloadURL)
+	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
+	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
+	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
+	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
+	if err := dl.GetFile(dest, fullSrcURL); err != nil {
+		return "", errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
+	}
+
+	log.Info("downloaded terraform %s to %s", v.String(), dest)
+	versions[v.String()] = dest
+	return dest, nil
 }
 
 // generateRCFile generates a .terraformrc file containing config for tfeToken

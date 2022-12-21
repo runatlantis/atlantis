@@ -100,7 +100,7 @@ type UserConfig struct {
 	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
 	RestrictFileList       bool            `mapstructure:"restrict-file-list"`
 	TFDownloadURL          string          `mapstructure:"tf-download-url"`
-	TFDisableDownloads     bool            `mapstructure:"tf-disable-downloads""`
+	TFDisableDownloads     bool            `mapstructure:"tf-disable-downloads"`
 	TFEHostname            string          `mapstructure:"tfe-hostname"`
 	TFELocalExecutionMode  bool            `mapstructure:"tfe-local-execution-mode"`
 	TFEToken               string          `mapstructure:"tfe-token"`
