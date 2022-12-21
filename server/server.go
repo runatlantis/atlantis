@@ -574,10 +574,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing policy check step runner")
 	}
 
-	if err != nil {
-		return nil, errors.Wrap(err, "initializing import step runner")
-	}
-
 	applyRequirementHandler := &events.DefaultCommandRequirementHandler{
 		WorkingDir: workingDir,
 	}
