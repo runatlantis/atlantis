@@ -161,6 +161,11 @@ func TestParse_UnusedArguments(t *testing.T) {
 			"arg arg2 --",
 			"arg arg2",
 		},
+		{
+			command.Import,
+			"arg arg2 --",
+			"arg arg2",
+		},
 	}
 	for _, c := range cases {
 		comment := fmt.Sprintf("atlantis %s %s", c.Command.String(), c.Args)
@@ -174,6 +179,8 @@ func TestParse_UnusedArguments(t *testing.T) {
 				usage = ApplyUsage
 			case command.ApprovePolicies:
 				usage = ApprovePolicyUsage
+			case command.Import:
+				usage = ImportUsage
 			}
 			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s.\n%s```", c.Unused, usage), r.CommentResponse)
 		})
@@ -225,17 +232,22 @@ func TestParse_InvalidCommand(t *testing.T) {
 func TestParse_SubcommandUsage(t *testing.T) {
 	t.Log("given a comment asking for the usage of a subcommand should " +
 		"return help")
-	comments := []string{
-		"atlantis plan -h",
-		"atlantis plan --help",
-		"atlantis apply -h",
-		"atlantis apply --help",
-		"atlantis approve_policies -h",
-		"atlantis approve_policies --help",
+	tests := []struct {
+		input    string
+		expUsage string
+	}{
+		{"atlantis plan -h", "plan"},
+		{"atlantis plan --help", "plan"},
+		{"atlantis apply -h", "apply"},
+		{"atlantis apply --help", "apply"},
+		{"atlantis approve_policies -h", "approve_policies"},
+		{"atlantis approve_policies --help", "approve_policies"},
+		{"atlantis import -h", "import -- ADDR ID"},
+		{"atlantis import --help", "import -- ADDR ID"},
 	}
-	for _, c := range comments {
-		r := commentParser.Parse(c, models.Github)
-		exp := "Usage of " + strings.Fields(c)[1]
+	for _, c := range tests {
+		r := commentParser.Parse(c.input, models.Github)
+		exp := "Usage of " + c.expUsage
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 		Assert(t, !strings.Contains(r.CommentResponse, "Error:"),
@@ -266,6 +278,10 @@ func TestParse_InvalidFlags(t *testing.T) {
 			"atlantis apply --abc",
 			"Error: unknown flag: --abc",
 		},
+		{
+			"atlantis import --abc",
+			"Error: unknown flag: --abc",
+		},
 	}
 	for _, c := range cases {
 		r := commentParser.Parse(c.comment, models.Github)
@@ -281,13 +297,17 @@ func TestParse_RelativeDirPath(t *testing.T) {
 	comments := []string{
 		"atlantis plan -d ..",
 		"atlantis apply -d ..",
+		"atlantis import -d ..",
 		// These won't return an error because we prepend with . when parsing.
 		//"atlantis plan -d /..",
 		//"atlantis apply -d /..",
+		//"atlantis import -d /..",
 		"atlantis plan -d ./..",
 		"atlantis apply -d ./..",
+		"atlantis import -d ./..",
 		"atlantis plan -d a/b/../../..",
 		"atlantis apply -d a/../..",
+		"atlantis import -d a/../..",
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
@@ -331,12 +351,16 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 	comments := []string{
 		"atlantis plan -w ..",
 		"atlantis apply -w ..",
+		"atlantis import -w ..",
 		"atlantis plan -w /",
 		"atlantis apply -w /",
+		"atlantis import -w /",
 		"atlantis plan -w ..abc",
 		"atlantis apply -w abc..",
+		"atlantis import -w abc..",
 		"atlantis plan -w abc..abc",
 		"atlantis apply -w ../../../etc/passwd",
+		"atlantis import -w ../../../etc/passwd",
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
@@ -582,7 +606,7 @@ func TestParse_Parsing(t *testing.T) {
 	}
 
 	for _, test := range cases {
-		for _, cmdName := range []string{"plan", "apply"} {
+		for _, cmdName := range []string{"plan", "apply", "import"} {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
 			t.Run(comment, func(t *testing.T) {
 				r := commentParser.Parse(comment, models.Github)
@@ -600,6 +624,9 @@ func TestParse_Parsing(t *testing.T) {
 				}
 				if cmdName == "approve_policies" {
 					Assert(t, r.Command.Name == command.ApprovePolicies, "did not parse comment %q as approve_policies command", comment)
+				}
+				if cmdName == "import" {
+					Assert(t, r.Command.Name == command.Import, "did not parse comment %q as import command", comment)
 				}
 			})
 		}
@@ -719,9 +746,6 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 				case command.Apply:
 					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled)
 					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
-				case command.Version:
-					actComment := commentParser.BuildVersionComment(c.repoRelDir, c.workspace, c.project)
-					Equals(t, fmt.Sprintf("atlantis version %s", c.expVersionFlags), actComment)
 				}
 			}
 		})
@@ -762,6 +786,8 @@ Commands:
   approve_policies
            Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
+  import   Runs 'terraform import' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
   help     View help.
 
 Flags:
@@ -791,6 +817,8 @@ Commands:
   approve_policies
            Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
+  import   Runs 'terraform import' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
   help     View help.
 
 Flags:
@@ -874,6 +902,7 @@ var ApplyUsage = `Usage of apply:
 var ApprovePolicyUsage = `Usage of approve_policies:
       --verbose   Append Atlantis log to comment.
 `
+
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
 	`atlantis unlock
 
@@ -881,3 +910,13 @@ var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
   Arguments or flags are not supported at the moment.
   If you need to unlock a specific project please use the atlantis UI.` +
 	"\n```"
+
+var ImportUsage = `Usage of import -- ADDR ID:
+  -d, --dir string         Which directory to run plan in relative to root of repo,
+                           ex. 'child/dir'.
+  -p, --project string     Which project to run plan for. Refers to the name of the
+                           project configured in atlantis.yaml. Cannot be used at
+                           same time as workspace or dir flags.
+      --verbose            Append Atlantis log to comment.
+  -w, --workspace string   Switch to this Terraform workspace before planning.
+`

@@ -21,10 +21,12 @@ const (
 	PolicyCheck
 	// ApprovePolicies is a command to approve policies with owner check
 	ApprovePolicies
-	// Autoplan is a command to run terrafor plan on PR open/update if autoplan is enabled
+	// Autoplan is a command to run terraform plan on PR open/update if autoplan is enabled
 	Autoplan
 	// Version is a command to run terraform version.
 	Version
+	// Import is a command to run terraform import
+	Import
 	// Adding more? Don't forget to update String() below
 )
 
@@ -49,6 +51,18 @@ func (c Name) String() string {
 		return "approve_policies"
 	case Version:
 		return "version"
+	case Import:
+		return "import"
 	}
 	return ""
+}
+
+// DefaultUsage returns the command default usage
+func (c Name) DefaultUsage() string {
+	switch c {
+	case Import:
+		return "import -- ADDR ID"
+	default:
+		return c.String()
+	}
 }

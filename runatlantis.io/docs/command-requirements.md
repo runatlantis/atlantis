@@ -1,9 +1,9 @@
-# Apply Requirements
+# Command Requirements
 [[toc]]
 
 ## Intro
-Atlantis allows you to require certain conditions be satisfied **before** an `atlantis apply`
-command can be run:
+Atlantis allows you to require certain conditions be satisfied **before** `atlantis apply` and `atlantis import`
+commands can be run:
 
 * [Approved](#approved) – requires pull requests to be approved by at least one user other than the author
 * [Mergeable](#mergeable) – requires pull requests to be able to be merged
@@ -70,12 +70,12 @@ You can set the `mergeable` requirement by:
      apply_requirements: [mergeable]
     ```
 
-1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in your `repos.yaml` config:
+1. Or by allowing an `atlantis.yaml` file to specify `apply_requirements` and `import_requirements` keys in your `repos.yaml` config:
     #### repos.yaml
     ```yaml
     repos:
     - id: /.*/
-      allowed_overrides: [apply_requirements]
+      allowed_overrides: [apply_requirements, import_requirements]
     ```
 
     #### atlantis.yaml
@@ -84,6 +84,7 @@ You can set the `mergeable` requirement by:
     projects:
     - dir: .
       apply_requirements: [mergeable]
+      import_requirements: [mergeable]
     ```
 
 #### Meaning
@@ -152,18 +153,19 @@ Applies to `merge` checkout strategy only.
 
 #### Usage
 You can set the `undiverged` requirement by:
-1. Creating a `repos.yaml` file with the `apply_requirements` key:
+1. Creating a `repos.yaml` file with `apply_requirements` and `import_requirements` keys:
    ```yaml
    repos:
    - id: /.*/
      apply_requirements: [undiverged]
+     import_requirements: [undiverged]
    ```
 1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in your `repos.yaml` config:
    #### repos.yaml
     ```yaml
     repos:
     - id: /.*/
-      allowed_overrides: [apply_requirements]
+      allowed_overrides: [apply_requirements, apply_requirements]
     ```
 
    #### atlantis.yaml
@@ -172,6 +174,7 @@ You can set the `undiverged` requirement by:
     projects:
     - dir: .
       apply_requirements: [undiverged]
+      import_requirements: [undiverged]
      ```
 #### Meaning
 The `merge` checkout strategy creates a temporary merge commit and runs the `plan` on the Atlantis local version of the PR
@@ -180,8 +183,8 @@ if there are no changes to the source branch. `undiverged` enforces that Atlanti
 with remote so that the state of the source during the `apply` is identical to that if you were to merge the PR at that
 time.
 
-## Setting Apply Requirements
-As mentioned above, you can set apply requirements via flags, in `repos.yaml`, or in `atlantis.yaml` if `repos.yaml`
+## Setting Command Requirements
+As mentioned above, you can set command requirements via flags, in `repos.yaml`, or in `atlantis.yaml` if `repos.yaml`
 allows the override.
 
 ### Flags Override
@@ -197,19 +200,22 @@ If you only want some projects/repos to have apply requirements, then you must
    repos:
    - id: /.*/
      apply_requirements: [approved]
+     import_requirements: [approved]
    # Regex that defaults all repos to requiring approval
    - id: /github.com/runatlantis/.*/
      # Regex to match any repo under the atlantis namespace, and not require approval
      # except for repos that might match later in the chain
      apply_requirements: []
+     import_requirements: []
    - id: github.com/runatlantis/atlantis
      apply_requirements: [approved]
+     import_requirements: [approved]
      # Exact string match of the github.com/runatlantis/atlantis repo
      # that sets apply_requirements to approved
    ```
 
 1. Specify which projects have which requirements via an `atlantis.yaml` file, and allowing
-   `apply_requirements` to be set in in `atlantis.yaml` by the server side `repos.yaml`
+   `apply_requirements` and `import_requirements` to be set in `atlantis.yaml` by the server side `repos.yaml`
    config.
 
    For example if I have two directories, `staging` and `production`, I might use:
@@ -217,7 +223,7 @@ If you only want some projects/repos to have apply requirements, then you must
    ```yaml
    repos:
    - id: /.*/
-     allowed_overrides: [apply_requirements]
+     allowed_overrides: [apply_requirements, import_requirements]
      # Allow any repo to specify apply_requirements in atlantis.yaml
    ```
 
@@ -226,13 +232,15 @@ If you only want some projects/repos to have apply requirements, then you must
    version: 3
    projects:
    - dir: staging
-     # By default, apply_requirements is empty so this
+     # By default, apply_requirements and import_requirements are empty so this
      # isn't strictly necessary.
      apply_requirements: []
+     import_requirements: []
    - dir: production
      # This requirement will only apply to the
      # production directory.
      apply_requirements: [mergeable]
+     import_requirements: [mergeable]
 
 
 ### Multiple Requirements

@@ -411,6 +411,14 @@ type PolicyCheckSuccess struct {
 	HasDiverged bool
 }
 
+// ImportSuccess is the result of a successful import run.
+type ImportSuccess struct {
+	// Output is the output from terraform import
+	Output string
+	// RePlanCmd is the command that users should run to re-plan this project.
+	RePlanCmd string
+}
+
 // Summary extracts one line summary of policy check.
 func (p *PolicyCheckSuccess) Summary() string {
 	note := ""

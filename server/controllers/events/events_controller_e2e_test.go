@@ -404,6 +404,44 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:   "import single project",
+			RepoDir:       "import-single-project",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis import -- random_id.dummy1 AA",
+				"atlantis apply",
+				"atlantis import -- random_id.dummy2 BB",
+				"atlantis plan",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-import-dummy1.txt"},
+				{"exp-output-apply-no-projects.txt"},
+				{"exp-output-import-dummy2.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "import multiple project",
+			RepoDir:       "import-multiple-project",
+			ModifiedFiles: []string{"dir1/main.tf", "dir2/main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis import -- random_id.dummy1 AA",
+				"atlantis import -d dir1 -- random_id.dummy1 AA",
+				"atlantis plan",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-import-multiple-projects.txt"},
+				{"exp-output-import-dummy1.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -1047,6 +1085,10 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
 		},
+		ImportStepRunner: &runtime.ImportStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTFVersion,
+		},
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFVersion:        defaultTFVersion,
@@ -1055,7 +1097,7 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		WorkingDir:       workingDir,
 		Webhooks:         &mockWebhookSender{},
 		WorkingDirLocker: locker,
-		AggregateApplyRequirements: &events.AggregateApplyRequirements{
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: workingDir,
 		},
 	}
@@ -1148,12 +1190,19 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		silenceNoProjects,
 	)
 
+	importCommandRunner := events.NewImportCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
 		command.ApprovePolicies: approvePoliciesCommandRunner,
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
+		command.Import:          importCommandRunner,
 	}
 
 	commandRunner := &events.DefaultCommandRunner{

@@ -45,6 +45,16 @@ func TestNewGlobalCfg(t *testing.T) {
 				},
 			},
 		},
+		Import: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "init",
+				},
+				{
+					StepName: "import",
+				},
+			},
+		},
 	}
 	baseCfg := valid.GlobalCfg{
 		Repos: []valid.Repo{
@@ -52,6 +62,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				IDRegex:                   regexp.MustCompile(".*"),
 				BranchRegex:               regexp.MustCompile(".*"),
 				ApplyRequirements:         []string{},
+				ImportRequirements:        []string{},
 				Workflow:                  &expDefaultWorkflow,
 				AllowedWorkflows:          []string{},
 				AllowedOverrides:          []string{},
@@ -164,16 +175,19 @@ func TestNewGlobalCfg(t *testing.T) {
 
 			if c.allowRepoCfg {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
-				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking"}
+				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking"}
 			}
 			if c.mergeableReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "mergeable")
+				exp.Repos[0].ImportRequirements = append(exp.Repos[0].ImportRequirements, "mergeable")
 			}
 			if c.approvedReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "approved")
+				exp.Repos[0].ImportRequirements = append(exp.Repos[0].ImportRequirements, "approved")
 			}
 			if c.unDivergedReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "undiverged")
+				exp.Repos[0].ImportRequirements = append(exp.Repos[0].ImportRequirements, "undiverged")
 			}
 
 			Equals(t, exp, act)
@@ -533,6 +547,25 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			repoID: "github.com/owner/repo",
 			expErr: "repo config not allowed to set 'apply_requirements' key: server-side config needs 'allowed_overrides: [apply_requirements]'",
 		},
+		"import_reqs not allowed": {
+			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
+				AllowRepoCfg:  false,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}),
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:                ".",
+						Workspace:          "default",
+						ImportRequirements: []string{""},
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "repo config not allowed to set 'import_requirements' key: server-side config needs 'allowed_overrides: [import_requirements]'",
+		},
 		"repo workflow doesn't exist": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
 				AllowRepoCfg:  true,
@@ -590,12 +623,14 @@ policies:
 				WorkflowName: String("custom"),
 			},
 			exp: valid.MergedProjectCfg{
-				ApplyRequirements: []string{},
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
 				Workflow: valid.Workflow{
 					Name:        "default",
 					Apply:       valid.DefaultApplyStage,
 					Plan:        valid.DefaultPlanStage,
 					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Import:      valid.DefaultImportStage,
 				},
 				PolicySets: valid.PolicySets{
 					Version: nil,
@@ -632,12 +667,14 @@ policies:
 				WorkflowName: String("custom"),
 			},
 			exp: valid.MergedProjectCfg{
-				ApplyRequirements: []string{},
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
 				Workflow: valid.Workflow{
 					Name:        "default",
 					Apply:       valid.DefaultApplyStage,
 					Plan:        valid.DefaultPlanStage,
 					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Import:      valid.DefaultImportStage,
 				},
 				PolicySets: valid.PolicySets{
 					Version: version,
@@ -693,6 +730,13 @@ policies:
 func TestGlobalCfg_MergeProjectCfg(t *testing.T) {
 	var emptyPolicySets valid.PolicySets
 
+	defaultWorkflow := valid.Workflow{
+		Name:        "default",
+		Apply:       valid.DefaultApplyStage,
+		PolicyCheck: valid.DefaultPolicyCheckStage,
+		Plan:        valid.DefaultPlanStage,
+		Import:      valid.DefaultImportStage,
+	}
 	cases := map[string]struct {
 		gCfg          string
 		repoID        string
@@ -717,7 +761,8 @@ workflows:
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				ApplyRequirements: []string{},
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
 				Workflow: valid.Workflow{
 					Name:        "custom",
 					Apply:       valid.DefaultApplyStage,
@@ -729,6 +774,7 @@ workflows:
 							},
 						},
 					},
+					Import: valid.DefaultImportStage,
 				},
 				RepoRelDir:      ".",
 				Workspace:       "default",
@@ -747,25 +793,49 @@ repos:
 `,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{
-				Dir:               ".",
-				Workspace:         "default",
-				ApplyRequirements: []string{"mergeable"},
+				Dir:                ".",
+				Workspace:          "default",
+				ApplyRequirements:  []string{"mergeable"},
+				ImportRequirements: []string{},
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				ApplyRequirements: []string{"mergeable"},
-				Workflow: valid.Workflow{
-					Name:        "default",
-					Apply:       valid.DefaultApplyStage,
-					PolicyCheck: valid.DefaultPolicyCheckStage,
-					Plan:        valid.DefaultPlanStage,
-				},
-				RepoRelDir:      ".",
-				Workspace:       "default",
-				Name:            "",
-				AutoplanEnabled: false,
-				PolicySets:      emptyPolicySets,
-				RepoLocking:     true,
+				ApplyRequirements:  []string{"mergeable"},
+				ImportRequirements: []string{},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+			},
+		},
+		"repo-side import reqs win out if allowed": {
+			gCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [import_requirements]
+  import_requirements: [approved]
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:                ".",
+				Workspace:          "default",
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{"mergeable"},
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{"mergeable"},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
 			},
 		},
 		"repo-side repo_locking win out if allowed": {
@@ -776,26 +846,23 @@ repos:
 `,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{
-				Dir:               ".",
-				Workspace:         "default",
-				ApplyRequirements: []string{},
-				RepoLocking:       Bool(true),
+				Dir:                ".",
+				Workspace:          "default",
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
+				RepoLocking:        Bool(true),
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				ApplyRequirements: []string{},
-				Workflow: valid.Workflow{
-					Name:        "default",
-					Apply:       valid.DefaultApplyStage,
-					PolicyCheck: valid.DefaultPolicyCheckStage,
-					Plan:        valid.DefaultPlanStage,
-				},
-				RepoRelDir:      ".",
-				Workspace:       "default",
-				Name:            "",
-				AutoplanEnabled: false,
-				PolicySets:      emptyPolicySets,
-				RepoLocking:     false,
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        false,
 			},
 		},
 		"last server-side match wins": {
@@ -803,10 +870,13 @@ repos:
 repos:
 - id: /.*/
   apply_requirements: [approved]
+  import_requirements: [approved]
 - id: /github.com/.*/
   apply_requirements: [mergeable]
+  import_requirements: [mergeable]
 - id: github.com/owner/repo
   apply_requirements: [approved, mergeable]
+  import_requirements: [approved, mergeable]
 `,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{
@@ -816,19 +886,15 @@ repos:
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				ApplyRequirements: []string{"approved", "mergeable"},
-				Workflow: valid.Workflow{
-					Name:        "default",
-					Apply:       valid.DefaultApplyStage,
-					PolicyCheck: valid.DefaultPolicyCheckStage,
-					Plan:        valid.DefaultPlanStage,
-				},
-				RepoRelDir:      "mydir",
-				Workspace:       "myworkspace",
-				Name:            "myname",
-				AutoplanEnabled: false,
-				PolicySets:      emptyPolicySets,
-				RepoLocking:     true,
+				ApplyRequirements:  []string{"approved", "mergeable"},
+				ImportRequirements: []string{"approved", "mergeable"},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         "mydir",
+				Workspace:          "myworkspace",
+				Name:               "myname",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
 			},
 		},
 		"autoplan is set properly": {
@@ -845,19 +911,15 @@ repos:
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				ApplyRequirements: []string{},
-				Workflow: valid.Workflow{
-					Name:        "default",
-					Apply:       valid.DefaultApplyStage,
-					PolicyCheck: valid.DefaultPolicyCheckStage,
-					Plan:        valid.DefaultPlanStage,
-				},
-				RepoRelDir:      "mydir",
-				Workspace:       "myworkspace",
-				Name:            "myname",
-				AutoplanEnabled: true,
-				PolicySets:      emptyPolicySets,
-				RepoLocking:     true,
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         "mydir",
+				Workspace:          "myworkspace",
+				Name:               "myname",
+				AutoplanEnabled:    true,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
 			},
 		},
 		"execution order group is set": {
@@ -875,13 +937,9 @@ repos:
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				ApplyRequirements: []string{},
-				Workflow: valid.Workflow{
-					Name:        "default",
-					Apply:       valid.DefaultApplyStage,
-					PolicyCheck: valid.DefaultPolicyCheckStage,
-					Plan:        valid.DefaultPlanStage,
-				},
+				ApplyRequirements:   []string{},
+				ImportRequirements:  []string{},
+				Workflow:            defaultWorkflow,
 				RepoRelDir:          "mydir",
 				Workspace:           "myworkspace",
 				Name:                "myname",
@@ -960,19 +1018,22 @@ func TestRepo_BranchMatches(t *testing.T) {
 
 func TestGlobalCfg_MatchingRepo(t *testing.T) {
 	defaultRepo := valid.Repo{
-		IDRegex:           regexp.MustCompile(".*"),
-		BranchRegex:       regexp.MustCompile(".*"),
-		ApplyRequirements: []string{},
+		IDRegex:            regexp.MustCompile(".*"),
+		BranchRegex:        regexp.MustCompile(".*"),
+		ApplyRequirements:  []string{},
+		ImportRequirements: []string{},
 	}
 	repo1 := valid.Repo{
-		IDRegex:           regexp.MustCompile(".*"),
-		BranchRegex:       regexp.MustCompile("^main$"),
-		ApplyRequirements: []string{"approved"},
+		IDRegex:            regexp.MustCompile(".*"),
+		BranchRegex:        regexp.MustCompile("^main$"),
+		ApplyRequirements:  []string{"approved"},
+		ImportRequirements: []string{"approved"},
 	}
 	repo2 := valid.Repo{
-		ID:                "github.com/owner/repo",
-		BranchRegex:       regexp.MustCompile("^main$"),
-		ApplyRequirements: []string{"approved", "mergeable"},
+		ID:                 "github.com/owner/repo",
+		BranchRegex:        regexp.MustCompile("^main$"),
+		ApplyRequirements:  []string{"approved", "mergeable"},
+		ImportRequirements: []string{"approved", "mergeable"},
 	}
 
 	cases := map[string]struct {

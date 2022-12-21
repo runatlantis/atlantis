@@ -999,30 +999,31 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 // being used. Right now this only applies to flags that have been made obsolete
 // due to server-side config.
 func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
-	var applyReqs []string
+	var commandReqs []string
 	var deprecatedFlags []string
 	if userConfig.RequireApproval {
 		deprecatedFlags = append(deprecatedFlags, RequireApprovalFlag)
-		applyReqs = append(applyReqs, valid.ApprovedApplyReq)
+		commandReqs = append(commandReqs, valid.ApprovedCommandReq)
 	}
 	if userConfig.RequireMergeable {
 		deprecatedFlags = append(deprecatedFlags, RequireMergeableFlag)
-		applyReqs = append(applyReqs, valid.MergeableApplyReq)
+		commandReqs = append(commandReqs, valid.MergeableCommandReq)
 	}
 
 	// Build up strings with what the recommended yaml and json config should
 	// be instead of using the deprecated flags.
 	yamlCfg := "---\nrepos:\n- id: /.*/"
 	jsonCfg := `{"repos":[{"id":"/.*/"`
-	if len(applyReqs) > 0 {
-		yamlCfg += fmt.Sprintf("\n  apply_requirements: [%s]", strings.Join(applyReqs, ", "))
-		jsonCfg += fmt.Sprintf(`, "apply_requirements":["%s"]`, strings.Join(applyReqs, "\", \""))
-
+	if len(commandReqs) > 0 {
+		yamlCfg += fmt.Sprintf("\n  apply_requirements: [%s]", strings.Join(commandReqs, ", "))
+		yamlCfg += fmt.Sprintf("\n  import_requirements: [%s]", strings.Join(commandReqs, ", "))
+		jsonCfg += fmt.Sprintf(`, "apply_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
+		jsonCfg += fmt.Sprintf(`, "import_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
 	}
 	if userConfig.AllowRepoConfig {
 		deprecatedFlags = append(deprecatedFlags, AllowRepoConfigFlag)
-		yamlCfg += "\n  allowed_overrides: [apply_requirements, workflow]\n  allow_custom_workflows: true"
-		jsonCfg += `, "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true`
+		yamlCfg += "\n  allowed_overrides: [apply_requirements, import_requirements, workflow]\n  allow_custom_workflows: true"
+		jsonCfg += `, "allowed_overrides":["apply_requirements","import_requirements","workflow"], "allow_custom_workflows":true`
 	}
 	jsonCfg += "}]}"
 
