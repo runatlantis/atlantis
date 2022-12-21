@@ -9,7 +9,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/uber-go/tally"
 )
 
@@ -115,7 +114,7 @@ func (p ProjectContext) SetProjectScopeTags(scope tally.Scope) tally.Scope {
 		Workspace:        p.Workspace,
 	}
 
-	return metrics.SetScopeTags(scope, tags.Loadtags())
+	return scope.Tagged(tags.Loadtags())
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result

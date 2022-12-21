@@ -20,7 +20,7 @@ type InstrumentedProjectCommandRunner struct {
 
 func NewInstrumentedProjectCommandRunner(scope tally.Scope, projectCommandRunner ProjectCommandRunner) *InstrumentedProjectCommandRunner {
 	projectTags := command.ProjectScopeTags{}
-	scope = metrics.SetScopeTags(scope.SubScope("project"), projectTags.Loadtags())
+	scope = scope.Tagged(projectTags.Loadtags())
 
 	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric, metrics.ExecutionFailureMetric} {
 		metrics.InitCounter(scope, m)
