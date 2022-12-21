@@ -106,7 +106,7 @@ func (p ProjectContext) SetProjectScopeTags(scope tally.Scope) tally.Scope {
 		v = p.TerraformVersion.String()
 	}
 
-	tags := ScopeTags{
+	tags := ProjectScopeTags{
 		BaseRepo:         p.BaseRepo.FullName,
 		PrNumber:         strconv.Itoa(p.Pull.Num),
 		Project:          p.ProjectName,

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-type ScopeTags struct {
+type ProjectScopeTags struct {
 	BaseRepo         string
 	PrNumber         string
 	Project          string
@@ -15,7 +15,7 @@ type ScopeTags struct {
 	Workspace        string
 }
 
-func (s ScopeTags) Loadtags() map[string]string {
+func (s ProjectScopeTags) Loadtags() map[string]string {
 	tags := make(map[string]string)
 
 	v := reflect.ValueOf(s)
