@@ -128,7 +128,7 @@ If you would like to specify these flags, do it while running `atlantis plan`.
 ## atlantis import
 
 ```bash
-atlantis import [options] -- [terraform import flags] addr id
+atlantis import [options] ADDRESS ID -- [terraform import flags]
 ```
 ### Explanation
 Runs `terraform import` that matches the directory/project/workspace.
@@ -137,16 +137,16 @@ This command discards terraform plan result. Before apply, required `atlantis pl
 ### Examples
 ```bash
 # Runs import
-atlantis import -- addr id
+atlantis import ADDRESS ID
 
 # Runs import in the root directory of the repo with workspace `default`.
-atlantis import -d . -- addr id
+atlantis import -d . ADDRESS ID
 
 # Runs import in the `project1` directory of the repo with workspace `default`
-atlantis import -d project1 -- addr id
+atlantis import -d project1 ADDRESS ID
 
 # Runs import in the root directory of the repo with workspace `staging`
-atlantis import -w staging -- addr id
+atlantis import -w staging ADDRESS ID
 ```
 
 ### Options

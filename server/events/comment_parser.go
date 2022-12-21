@@ -109,7 +109,7 @@ type CommentParseResult struct {
 // - atlantis unlock
 // - atlantis version
 // - atlantis approve_policies
-// - atlantis import -- addr id
+// - atlantis import ADDRESS ID
 func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) CommentParseResult {
 	comment := strings.TrimSpace(rawComment)
 
@@ -180,6 +180,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var verbose, autoMergeDisabled bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
+	var requiredCommandArgCount int
 
 	// Set up the flag parsing depending on the command.
 	switch cmd {
@@ -224,6 +225,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run import for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+		requiredCommandArgCount = 2 // import requires `atlantis import <addr> <id>` args
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", cmd)}
 	}
@@ -241,19 +243,24 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
 
-	var unusedArgs []string
+	var commandArgs []string // commandArgs are the arguments that are passed before `--` without any parameter flags.
 	if flagSet.ArgsLenAtDash() == -1 {
-		unusedArgs = flagSet.Args()
+		commandArgs = flagSet.Args()
 	} else {
-		unusedArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
+		commandArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
 	}
-	if len(unusedArgs) > 0 {
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(unusedArgs, " ")), name.DefaultUsage(), flagSet)}
+	if len(commandArgs) != requiredCommandArgCount {
+		if requiredCommandArgCount > 0 {
+			return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid argument count – %s", strings.Join(commandArgs, " ")), name.DefaultUsage(), flagSet)}
+		}
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(commandArgs, " ")), name.DefaultUsage(), flagSet)}
 	}
 
-	var extraArgs []string
+	var extraArgs []string // command extra_args
+	// pass commandArgs into extraArgs. This is because after comment_parser, we will use extra_args only.
+	extraArgs = append(extraArgs, commandArgs...)
 	if flagSet.ArgsLenAtDash() != -1 {
-		extraArgs = flagSet.Args()[flagSet.ArgsLenAtDash():]
+		extraArgs = append(extraArgs, flagSet.Args()[flagSet.ArgsLenAtDash():]...)
 	}
 
 	dir, err = e.validateDir(dir)

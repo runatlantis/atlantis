@@ -56,7 +56,7 @@ func TestName_DefaultUsage(t *testing.T) {
 		{command.PolicyCheck, "policy_check"},
 		{command.ApprovePolicies, "approve_policies"},
 		{command.Version, "version"},
-		{command.Import, "import -- ADDR ID"},
+		{command.Import, "import ADDRESS ID"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.c.String(), func(t *testing.T) {

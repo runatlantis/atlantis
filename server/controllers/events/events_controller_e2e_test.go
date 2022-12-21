@@ -410,9 +410,9 @@ func TestGitHubWorkflow(t *testing.T) {
 			ModifiedFiles: []string{"main.tf"},
 			ExpAutoplan:   true,
 			Comments: []string{
-				"atlantis import -- random_id.dummy1 AA",
+				"atlantis import random_id.dummy1 AA",
 				"atlantis apply",
-				"atlantis import -- random_id.dummy2 BB",
+				"atlantis import random_id.dummy2 BB",
 				"atlantis plan",
 			},
 			ExpReplies: [][]string{
@@ -430,8 +430,8 @@ func TestGitHubWorkflow(t *testing.T) {
 			ModifiedFiles: []string{"dir1/main.tf", "dir2/main.tf"},
 			ExpAutoplan:   true,
 			Comments: []string{
-				"atlantis import -- random_id.dummy1 AA",
-				"atlantis import -d dir1 -- random_id.dummy1 AA",
+				"atlantis import random_id.dummy1 AA",
+				"atlantis import -d dir1 random_id.dummy1 AA",
 				"atlantis plan",
 			},
 			ExpReplies: [][]string{

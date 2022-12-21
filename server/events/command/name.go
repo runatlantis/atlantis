@@ -61,7 +61,7 @@ func (c Name) String() string {
 func (c Name) DefaultUsage() string {
 	switch c {
 	case Import:
-		return "import -- ADDR ID"
+		return "import ADDRESS ID"
 	default:
 		return c.String()
 	}
