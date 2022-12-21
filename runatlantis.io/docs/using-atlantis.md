@@ -63,7 +63,7 @@ atlantis plan -w staging
 * `-d directory` Which directory to run plan in relative to root of repo. Use `.` for root.
     * Ex. `atlantis plan -d child/dir`
 * `-p project` Which project to run plan for. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w` because the project defines this already.
-* `-w workspace` Switch to this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) before planning. Defaults to `default`. If not using Terraform workspaces you can ignore this.
+* `-w workspace` Switch to this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) before planning. Defaults to `default`. Ignore this if Terraform workspaces are unused.
 * `--verbose` Append Atlantis log to comment.
 
 ::: warning NOTE
@@ -110,7 +110,7 @@ atlantis apply -w staging
 ### Options
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use `.` for root.
 * `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w`.
-* `-w workspace` Apply the plan for this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). If not using Terraform workspaces you can ignore this.
+* `-w workspace` Apply the plan for this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
 * `--auto-merge-disabled` Disable [automerge](automerging.html) for this apply command.
 * `--verbose` Append Atlantis log to comment.
 
@@ -132,14 +132,14 @@ atlantis import [options] ADDRESS ID -- [terraform import flags]
 ```
 ### Explanation
 Runs `terraform import` that matches the directory/project/workspace.
-This command discards terraform plan result. Before apply, required `atlantis plan` again.
+This command discards the terraform plan result. After an import and before an apply, another `atlantis plan` must be run again.
 
 ### Examples
 ```bash
 # Runs import
 atlantis import ADDRESS ID
 
-# Runs import in the root directory of the repo with workspace `default`.
+# Runs import in the root directory of the repo with workspace `default`
 atlantis import -d . ADDRESS ID
 
 # Runs import in the `project1` directory of the repo with workspace `default`
@@ -151,8 +151,8 @@ atlantis import -w staging ADDRESS ID
 
 ### Options
 * `-d directory` Import a resource for this directory, relative to root of repo. Use `.` for root.
-* `-p project` Import a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w`.
-* `-w workspace` Import a resource for this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html). If not using Terraform workspaces you can ignore this.
+* `-p project` Import a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml`](repo-level-atlantis-yaml.html) repo configuration file. This cannot be used at the same time as `-d` or `-w`.
+* `-w workspace` Import a resource for a specific [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
 
 ---
 ## atlantis unlock

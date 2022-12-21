@@ -47,6 +47,15 @@ workflows:
       - init
       - plan:
           extra_args: ["-var-file", "production.tfvars"]
+    apply:
+      steps:
+        - apply:
+            extra_args: ["-var-file", "production.tfvars"]
+    import:
+      steps:
+        - init
+        - import:
+            extra_args: ["-var-file", "production.tfvars"]
 ```
 Then in your repo-level `atlantis.yaml` file, you would reference the workflows:
 ```yaml

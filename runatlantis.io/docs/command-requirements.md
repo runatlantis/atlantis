@@ -160,12 +160,12 @@ You can set the `undiverged` requirement by:
      apply_requirements: [undiverged]
      import_requirements: [undiverged]
    ```
-1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in your `repos.yaml` config:
+1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` and `import_requirements` keys in your `repos.yaml` config:
    #### repos.yaml
     ```yaml
     repos:
     - id: /.*/
-      allowed_overrides: [apply_requirements, apply_requirements]
+      allowed_overrides: [apply_requirements, import_requirements]
     ```
 
    #### atlantis.yaml

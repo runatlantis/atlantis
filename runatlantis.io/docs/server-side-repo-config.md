@@ -100,7 +100,7 @@ workflows:
 ## Use Cases
 Here are some of the reasons you might want to use a repo config.
 
-### Requiring PR Is Approved Before Apply or Import
+### Requiring PR Is Approved Before an applicable subcommand
 If you want to require that all (or specific) repos must have pull requests
 approved before Atlantis will allow running `apply` or `import`, use the `apply_requirements` or `import_requirements` keys.
 
