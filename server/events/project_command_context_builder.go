@@ -284,29 +284,6 @@ func escapeArgs(args []string) []string {
 	return escaped
 }
 
-/*
-    if len(module.RequiredCore) != 1 {
-		ctx.Log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
-		return nil
-	}
-	requiredVersionSetting := module.RequiredCore[0]
-
-	// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
-	re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
-	matched := re.FindStringSubmatch(requiredVersionSetting)
-	if len(matched) == 0 {
-		ctx.Log.Debug("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
-		return nil
-	}
-	ctx.Log.Debug("found required_version setting of %q", requiredVersionSetting)
-	version, err := version.NewVersion(matched[1])
-	if err != nil {
-		ctx.Log.Debug(err.Error())
-		return nil
-	}
-
-*/
-
 // Extracts required_version from Terraform configuration.
 // Returns nil if unable to determine version from configuration.
 func getTfVersion(ctx *command.Context, terraformClient terraform.Client, absProjDir string) *version.Version {
