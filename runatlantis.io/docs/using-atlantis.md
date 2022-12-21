@@ -72,7 +72,7 @@ A `atlantis plan` (without flags), like autoplans, discards all plans previously
 
 ### Additional Terraform flags
 
-If you need to run `terraform plan` with additional arguments, like `-target=resource` or `-var 'foo-bar'` or `-var-file myfile.tfvars`
+If you need to run `terraform plan` with additional arguments, like `-target=resource` or `-var 'foo=bar'` or `-var-file myfile.tfvars`
 you can append them to the end of the comment after `--`, ex.
 ```
 atlantis plan -d dir -- -var foo='bar'
@@ -126,7 +126,6 @@ If you would like to specify these flags, do it while running `atlantis plan`.
 
 ---
 ## atlantis import
-
 ```bash
 atlantis import [options] ADDRESS ID -- [terraform import flags]
 ```
@@ -149,10 +148,24 @@ atlantis import -d project1 ADDRESS ID
 atlantis import -w staging ADDRESS ID
 ```
 
+::: tip
+* If import for_each resources, it requires a single quoted address.
+  * ex. `atlantis import 'aws_instance.example["foo"]' i-1234567890abcdef0`
+:::
+
 ### Options
 * `-d directory` Import a resource for this directory, relative to root of repo. Use `.` for root.
 * `-p project` Import a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml`](repo-level-atlantis-yaml.html) repo configuration file. This cannot be used at the same time as `-d` or `-w`.
 * `-w workspace` Import a resource for a specific [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
+
+### Additional Terraform flags
+
+If you need to run `terraform import` with additional arguments, like `-var 'foo=bar'` or `-var-file myfile.tfvars`
+you can append them to the end of the comment after `--`, ex.
+```
+atlantis imoport -d dir 'aws_instance.example["foo"]' i-1234567890abcdef0 -- -var foo='bar'
+```
+If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
 
 ---
 ## atlantis unlock

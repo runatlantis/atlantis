@@ -2,6 +2,7 @@ package events_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -420,6 +421,24 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-import-dummy1.txt"},
 				{"exp-output-apply-no-projects.txt"},
 				{"exp-output-import-dummy2.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "import single project with -var",
+			RepoDir:       "import-single-project-var",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis import 'random_id.for_each[\"overridden\"]' AA -- -var var=overridden",
+				"atlantis import random_id.count[0] BB",
+				"atlantis plan -- -var var=overridden",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-import-foreach.txt"},
+				{"exp-output-import-count.txt"},
 				{"exp-output-plan-again.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -1266,7 +1285,9 @@ func (w *mockWebhookSender) Send(log logging.SimpleLogging, result webhooks.Appl
 func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
 	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent.json"))
 	Ok(t, err)
-	requestJSON = []byte(strings.Replace(string(requestJSON), "###comment body###", comment, 1))
+	escapedComment, err := json.Marshal(comment)
+	Ok(t, err)
+	requestJSON = []byte(strings.Replace(string(requestJSON), "\"###comment body###\"", string(escapedComment), 1))
 	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
 	Ok(t, err)
 	req.Header.Set("Content-Type", "application/json")

@@ -225,7 +225,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run import for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
-		requiredCommandArgCount = 2 // import requires `atlantis import <addr> <id>` args
+		requiredCommandArgCount = 2 // import requires `atlantis import ADDRESS ID` args
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", cmd)}
 	}
@@ -257,11 +257,15 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	var extraArgs []string // command extra_args
-	// pass commandArgs into extraArgs. This is because after comment_parser, we will use extra_args only.
-	extraArgs = append(extraArgs, commandArgs...)
 	if flagSet.ArgsLenAtDash() != -1 {
 		extraArgs = append(extraArgs, flagSet.Args()[flagSet.ArgsLenAtDash():]...)
 	}
+	// pass commandArgs into extraArgs after extra args.
+	// - after comment_parser, we will use extra_args only.
+	// - terraform command args accept after options like followings
+	//   - from: `atlantis import ADDRESS ID -- -var foo=bar
+	//   - to: `terraform import -var foo=bar ADDRESS ID`
+	extraArgs = append(extraArgs, commandArgs...)
 
 	dir, err = e.validateDir(dir)
 	if err != nil {

@@ -624,7 +624,7 @@ func TestParse_Parsing(t *testing.T) {
 	}
 
 	for _, test := range cases {
-		for _, cmdName := range []string{"plan", "apply", "import address id"} {
+		for _, cmdName := range []string{"plan", "apply", "import 'some[\"addr\"]' id"} {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
 			t.Run(comment, func(t *testing.T) {
 				r := commentParser.Parse(comment, models.Github)
@@ -645,10 +645,13 @@ func TestParse_Parsing(t *testing.T) {
 					Assert(t, r.Command.Name == command.ApprovePolicies, "did not parse comment %q as approve_policies command", comment)
 					Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 				}
-				if cmdName == "import" {
-					expExtraArgs := fmt.Sprintf("%s address id", test.expExtraArgs)
+				if strings.HasPrefix(cmdName, "import") {
+					expExtraArgs := "some[\"addr\"] id" // import use default args with `some["addr"] id`
+					if test.expExtraArgs != "" {
+						expExtraArgs = fmt.Sprintf("%s %s", test.expExtraArgs, expExtraArgs)
+					}
 					Assert(t, r.Command.Name == command.Import, "did not parse comment %q as import command", comment)
-					Assert(t, expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
+					Assert(t, expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", expExtraArgs, actExtraArgs, comment)
 				}
 			})
 		}
