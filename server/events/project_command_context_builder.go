@@ -2,17 +2,10 @@ package events
 
 import (
 	"path/filepath"
-	"regexp"
-	"sort"
 
-	"github.com/Masterminds/semver"
 	"github.com/google/uuid"
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/core/terraform"
-	"github.com/warrensbox/terraform-switcher/lib"
-
-	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/uber-go/tally"
@@ -115,7 +108,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	// If TerraformVersion not defined in config file look for a
 	// terraform.require_version block.
 	if prjCfg.TerraformVersion == nil {
-		prjCfg.TerraformVersion = getTfVersion(ctx, terraformClient, filepath.Join(repoDir, prjCfg.RepoRelDir))
+		prjCfg.TerraformVersion = terraformClient.DetectVersion(filepath.Join(repoDir, prjCfg.RepoRelDir), ctx.Log)
 	}
 
 	projectCmdContext := newProjectCommandContext(
@@ -159,7 +152,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	// If TerraformVersion not defined in config file look for a
 	// terraform.require_version block.
 	if prjCfg.TerraformVersion == nil {
-		prjCfg.TerraformVersion = getTfVersion(ctx, terraformClient, filepath.Join(repoDir, prjCfg.RepoRelDir))
+		prjCfg.TerraformVersion = terraformClient.DetectVersion(filepath.Join(repoDir, prjCfg.RepoRelDir), ctx.Log)
 	}
 
 	projectCmds = cb.ProjectCommandContextBuilder.BuildProjectContext(
@@ -282,67 +275,4 @@ func escapeArgs(args []string) []string {
 		escaped = append(escaped, escapedArg)
 	}
 	return escaped
-}
-
-// Extracts required_version from Terraform configuration.
-// Returns nil if unable to determine version from configuration.
-func getTfVersion(ctx *command.Context, terraformClient terraform.Client, absProjDir string) *version.Version {
-	module, diags := tfconfig.LoadModule(absProjDir)
-	if diags.HasErrors() {
-		ctx.Log.Err("trying to detect required version: %s", diags.Error())
-	}
-
-	if len(module.RequiredCore) != 1 {
-		ctx.Log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
-		return nil
-	}
-	requiredVersionSetting := module.RequiredCore[0]
-	ctx.Log.Debug("found required_version setting of %q", requiredVersionSetting)
-
-	tfVersions, err := terraformClient.ListAvailableVersions(ctx.Log)
-	if err != nil {
-		ctx.Log.Err("Unable to list Terraform versions")
-	}
-
-	if len(tfVersions) == 0 {
-		// Fall back to an exact required version string
-		// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
-		re := regexp.MustCompile(`^=?\s*([0-9.]+)\s*$`)
-		matched := re.FindStringSubmatch(requiredVersionSetting)
-		if len(matched) == 0 {
-			ctx.Log.Debug("Did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
-			return nil
-		}
-		tfVersions = []string{matched[1]}
-	}
-
-	constraint, _ := semver.NewConstraint(requiredVersionSetting)
-	versions := make([]*semver.Version, len(tfVersions))
-
-	for i, tfvals := range tfVersions {
-		newVersion, err := semver.NewVersion(tfvals) //NewVersion parses a given version and returns an instance of Version or an error if unable to parse the version.
-		if err == nil {
-			versions[i] = newVersion
-		}
-	}
-
-	if len(versions) == 0 {
-		ctx.Log.Debug("did not specify exact valid version in terraform configuration, found %q", requiredVersionSetting)
-		return nil
-	}
-
-	sort.Sort(sort.Reverse(semver.Collection(versions)))
-
-	for _, element := range versions {
-		if constraint.Check(element) { // Validate a version against a constraint
-			tfversionStr := element.String()
-			if lib.ValidVersionFormat(tfversionStr) { //check if version format is correct
-				tfversion, _ := version.NewVersion(tfversionStr)
-				ctx.Log.Info("detected module requires version: %s", tfversionStr)
-				return tfversion
-			}
-		}
-	}
-	ctx.Log.Debug("could not match any valid terraform version with %q", requiredVersionSetting)
-	return nil
 }

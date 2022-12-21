@@ -23,11 +23,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 
+	"github.com/Masterminds/semver"
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
+	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/warrensbox/terraform-switcher/lib"
@@ -55,7 +58,11 @@ type Client interface {
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
 
+	// ListAvailableVersions returns all available version of Terraform, if available; otherwise this will return an empty list.
 	ListAvailableVersions(log logging.SimpleLogging) ([]string, error)
+
+	// DetectVersion Extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
+	DetectVersion(projectDirectory string, log logging.SimpleLogging) *version.Version
 }
 
 type DefaultClient struct {
@@ -272,7 +279,7 @@ func (c *DefaultClient) TerraformBinDir() string {
 	return c.binDir
 }
 
-// ListAvailableVersions returns all available version of Terraform. If downloads are disabled, this will return an empty list.
+// ListAvailableVersions returns all available version of Terraform. If downloads are not allowed, this will return an empty list.
 func (c *DefaultClient) ListAvailableVersions(log logging.SimpleLogging) ([]string, error) {
 	url := fmt.Sprintf("%s/terraform", c.downloadBaseURL)
 
@@ -284,6 +291,69 @@ func (c *DefaultClient) ListAvailableVersions(log logging.SimpleLogging) ([]stri
 	log.Debug("Listing Terraform versions available at: %s", url)
 	versions, err := lib.GetTFList(url, true)
 	return versions, err
+}
+
+// DetectVersion Extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
+// This will also try to intelligently evaluate non-exact matches by listing the available versions of Terraform and picking the best match.
+func (c *DefaultClient) DetectVersion(projectDirectory string, log logging.SimpleLogging) *version.Version {
+	module, diags := tfconfig.LoadModule(projectDirectory)
+	if diags.HasErrors() {
+		log.Err("trying to detect required version: %s", diags.Error())
+	}
+
+	if len(module.RequiredCore) != 1 {
+		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+		return nil
+	}
+	requiredVersionSetting := module.RequiredCore[0]
+	log.Debug("found required_version setting of %q", requiredVersionSetting)
+
+	tfVersions, err := c.ListAvailableVersions(log)
+	if err != nil {
+		log.Err("Unable to list Terraform versions, may fall back to default: %s", err)
+	}
+
+	if len(tfVersions) == 0 {
+		// Fall back to an exact required version string
+		// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
+		re := regexp.MustCompile(`^=?\s*([0-9.]+)\s*$`)
+		matched := re.FindStringSubmatch(requiredVersionSetting)
+		if len(matched) == 0 {
+			log.Debug("Did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
+			return nil
+		}
+		tfVersions = []string{matched[1]}
+	}
+
+	constraint, _ := semver.NewConstraint(requiredVersionSetting)
+	versions := make([]*semver.Version, len(tfVersions))
+
+	for i, tfvals := range tfVersions {
+		newVersion, err := semver.NewVersion(tfvals) //NewVersion parses a given version and returns an instance of Version or an error if unable to parse the version.
+		if err == nil {
+			versions[i] = newVersion
+		}
+	}
+
+	if len(versions) == 0 {
+		log.Debug("did not specify exact valid version in terraform configuration, found %q", requiredVersionSetting)
+		return nil
+	}
+
+	sort.Sort(sort.Reverse(semver.Collection(versions)))
+
+	for _, element := range versions {
+		if constraint.Check(element) { // Validate a version against a constraint
+			tfversionStr := element.String()
+			if lib.ValidVersionFormat(tfversionStr) { //check if version format is correct
+				tfversion, _ := version.NewVersion(tfversionStr)
+				log.Info("detected module requires version: %s", tfversionStr)
+				return tfversion
+			}
+		}
+	}
+	log.Debug("could not match any valid terraform version with %q", requiredVersionSetting)
+	return nil
 }
 
 // See Client.EnsureVersion.

@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -356,4 +357,153 @@ func mkSubDirs(t *testing.T) (string, string, string) {
 	Ok(t, err)
 
 	return tmp, binDir, cachedir
+}
+
+// If TF downloads are disabled, test that terraform version is used when specified in terraform configuration only if an exact version
+func TestDefaultProjectCommandBuilder_TerraformVersion(t *testing.T) {
+	// For the following tests:
+	// If terraform configuration is used, result should be `0.12.8`.
+	// If project configuration is used, result should be `0.12.6`.
+	// If an inexact version is used, the result should be `nil`
+	// If default is to be used, result should be `nil`.
+
+	baseVersionConfig := `
+terraform {
+  required_version = "%s0.12.8"
+}
+`
+
+	exactSymbols := []string{"", "="}
+	// Depending on when the tests are run, the > and >= matching versions will have to be increased.
+	// It's probably not worth testing the terraform-switcher version here so we only test <, <=, and ~>.
+	// One way to test this in the future is to mock tfswitcher.GetTFList() to return the highest
+	// version of 1.3.5.
+	// nonExactSymbols := []string{">", ">=", "<", "<=", "~>"}
+	nonExactSymbols := []string{"<", "<=", "~>"}
+	nonExactVersions := map[string]map[string]string{
+		// ">": {
+		// 	"project1": "1.3.5",
+		// },
+		// ">=": {
+		// 	"project1": "1.3.5",
+		// },
+		"<": {
+			"project1": "0.12.7",
+		},
+		"<=": {
+			"project1": "0.12.8",
+		},
+		"~>": {
+			"project1": "0.12.31",
+		},
+	}
+
+	type testCase struct {
+		DirStructure map[string]interface{}
+		Exp          map[string]string
+		IsExact      bool
+	}
+
+	testCases := make(map[string]testCase)
+
+	for _, exactSymbol := range exactSymbols {
+		testCases[fmt.Sprintf("exact version using \"%s\"", exactSymbol)] = testCase{
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbol),
+				},
+			},
+			Exp: map[string]string{
+				"project1": "0.12.8",
+			},
+			IsExact: true,
+		}
+	}
+
+	for _, nonExactSymbol := range nonExactSymbols {
+		testCases[fmt.Sprintf("non-exact version using \"%s\"", nonExactSymbol)] = testCase{
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": fmt.Sprintf(baseVersionConfig, nonExactSymbol),
+				},
+			},
+			Exp:     nonExactVersions[nonExactSymbol],
+			IsExact: false,
+		}
+	}
+
+	testCases["no version specified"] = testCase{
+		DirStructure: map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf": nil,
+			},
+		},
+		Exp: map[string]string{
+			"project1": "",
+		},
+		IsExact: true,
+	}
+
+	testCases["projects with different terraform versions"] = testCase{
+		DirStructure: map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
+			},
+			"project2": map[string]interface{}{
+				"main.tf": strings.Replace(fmt.Sprintf(baseVersionConfig, exactSymbols[0]), "0.12.8", "0.12.9", -1),
+			},
+		},
+		Exp: map[string]string{
+			"project1": "0.12.8",
+			"project2": "0.12.9",
+		},
+		IsExact: true,
+	}
+
+	runDetectVersionTestCase := func(t *testing.T, name string, testCase testCase, downloadsAllowed bool) bool {
+		return t.Run(name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+
+			logger := logging.NewNoopLogger(t)
+			RegisterMockTestingT(t)
+			_, binDir, cacheDir := mkSubDirs(t)
+			projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+
+			mockDownloader := mocks.NewMockDownloader()
+			c, err := terraform.NewTestClient(logger,
+				binDir,
+				cacheDir,
+				"",
+				"",
+				"",
+				cmd.DefaultTFVersionFlag,
+				cmd.DefaultTFDownloadURL,
+				mockDownloader,
+				downloadsAllowed,
+				true,
+				projectCmdOutputHandler)
+			Ok(t, err)
+
+			tmpDir := DirStructure(t, testCase.DirStructure)
+
+			for project, expectedVersion := range testCase.Exp {
+				detectedVersion := c.DetectVersion(filepath.Join(tmpDir, project), logger)
+
+				expectNil := expectedVersion == "" || (!testCase.IsExact && !downloadsAllowed)
+				if expectNil {
+					Assert(t, detectedVersion == nil, "TerraformVersion is supposed to be nil.")
+				} else {
+					Assert(t, detectedVersion != nil, "TerraformVersion is nil.")
+					Ok(t, err)
+					Equals(t, expectedVersion, detectedVersion.String())
+				}
+			}
+
+		})
+	}
+
+	for name, testCase := range testCases {
+		runDetectVersionTestCase(t, name+": Downloads Allowed", testCase, true)
+		runDetectVersionTestCase(t, name+": Downloads Disabled", testCase, false)
+	}
 }

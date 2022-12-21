@@ -1,12 +1,12 @@
 package events_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 
@@ -1092,7 +1092,7 @@ func TestDefaultProjectCommandBuilder_TerraformVersion(t *testing.T) {
 
 	baseVersionConfig := `
 terraform {
-  required_version = "%s0.12.8"
+  required_version = "0.12.8"
 }
 `
 
@@ -1103,77 +1103,26 @@ projects:
   terraform_version: v0.12.6
 `
 
-	exactSymbols := []string{"", "="}
-	// Depending on when the tests are run, the > and >= matching versions will have to be increased.
-	// It's probably not worth testing the terraform-switcher version here so we only test <, <=, and ~>.
-	// One way to test this in the future is to mock tfswitcher.GetTFList() to return the highest
-	// version of 1.3.5.
-	// nonExactSymbols := []string{">", ">=", "<", "<=", "~>"}
-	nonExactSymbols := []string{"<", "<=", "~>"}
-	nonExactVersions := map[string]map[string][]int{
-		// ">": {
-		// 	"project1": {1, 3, 5},
-		// },
-		// ">=": {
-		// 	"project1": {1, 3, 5},
-		// },
-		"<": {
-			"project1": {0, 12, 7},
-		},
-		"<=": {
-			"project1": {0, 12, 8},
-		},
-		"~>": {
-			"project1": {0, 12, 31},
-		},
-	}
-
 	type testCase struct {
 		DirStructure  map[string]interface{}
 		AtlantisYAML  string
 		ModifiedFiles []string
-		Exp           map[string][]int
+		Exp           map[string]string
 	}
 
 	testCases := make(map[string]testCase)
-
-	for _, exactSymbol := range exactSymbols {
-		testCases[fmt.Sprintf("exact version in terraform config using \"%s\"", exactSymbol)] = testCase{
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbol),
-				},
-			},
-			ModifiedFiles: []string{"project1/main.tf"},
-			Exp: map[string][]int{
-				"project1": {0, 12, 8},
-			},
-		}
-	}
-
-	for _, nonExactSymbol := range nonExactSymbols {
-		testCases[fmt.Sprintf("non-exact version in terraform config using \"%s\"", nonExactSymbol)] = testCase{
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": fmt.Sprintf(baseVersionConfig, nonExactSymbol),
-				},
-			},
-			ModifiedFiles: []string{"project1/main.tf"},
-			Exp:           nonExactVersions[nonExactSymbol],
-		}
-	}
 
 	// atlantis.yaml should take precedence over terraform config
 	testCases["with project config and terraform config"] = testCase{
 		DirStructure: map[string]interface{}{
 			"project1": map[string]interface{}{
-				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
+				"main.tf": baseVersionConfig,
 			},
 			valid.DefaultAtlantisFile: atlantisYamlContent,
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
-		Exp: map[string][]int{
-			"project1": {0, 12, 6},
+		Exp: map[string]string{
+			"project1": "0.12.6",
 		},
 	}
 
@@ -1185,8 +1134,8 @@ projects:
 			valid.DefaultAtlantisFile: atlantisYamlContent,
 		},
 		ModifiedFiles: []string{"project1/main.tf"},
-		Exp: map[string][]int{
-			"project1": {0, 12, 6},
+		Exp: map[string]string{
+			"project1": "0.12.6",
 		},
 	}
 
@@ -1197,24 +1146,24 @@ projects:
 			},
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
-		Exp: map[string][]int{
-			"project1": nil,
+		Exp: map[string]string{
+			"project1": "",
 		},
 	}
 
 	testCases["project with different terraform config"] = testCase{
 		DirStructure: map[string]interface{}{
 			"project1": map[string]interface{}{
-				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
+				"main.tf": baseVersionConfig,
 			},
 			"project2": map[string]interface{}{
-				"main.tf": strings.Replace(fmt.Sprintf(baseVersionConfig, exactSymbols[0]), "0.12.8", "0.12.9", -1),
+				"main.tf": strings.Replace(baseVersionConfig, "0.12.8", "0.12.9", -1),
 			},
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
-		Exp: map[string][]int{
-			"project1": {0, 12, 8},
-			"project2": {0, 12, 9},
+		Exp: map[string]string{
+			"project1": "0.12.8",
+			"project2": "0.12.9",
 		},
 	}
 
@@ -1249,228 +1198,17 @@ projects:
 				UnDivergedReq: false,
 			}
 
-			var versions []string
-			for i := 0; i < 32; i++ {
-				versions = append(versions, fmt.Sprintf("0.12.%d", i))
-			}
 			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn(versions, nil)
 
-			builder := events.NewProjectCommandBuilder(
-				false,
-				&config.ParserValidator{},
-				&events.DefaultProjectFinder{},
-				vcsClient,
-				workingDir,
-				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfgFromArgs(globalCfgArgs),
-				&events.DefaultPendingPlanFinder{},
-				&events.CommentParser{ExecutableName: "atlantis"},
-				false,
-				false,
-				"",
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
-				false,
-				scope,
-				logger,
-				terraformClient,
-			)
-
-			actCtxs, err := builder.BuildPlanCommands(
-				&command.Context{
-					Log:   logger,
-					Scope: scope,
-				},
-				&events.CommentCommand{
-					RepoRelDir: "",
-					Flags:      nil,
-					Name:       command.Plan,
-					Verbose:    false,
-				})
-
-			Ok(t, err)
-			Equals(t, len(testCase.Exp), len(actCtxs))
-			for _, actCtx := range actCtxs {
-				if testCase.Exp[actCtx.RepoRelDir] != nil {
-					Assert(t, actCtx.TerraformVersion != nil, "TerraformVersion is nil.")
-					Equals(t, testCase.Exp[actCtx.RepoRelDir], actCtx.TerraformVersion.Segments())
-				} else {
-					Assert(t, actCtx.TerraformVersion == nil, "TerraformVersion is supposed to be nil.")
+			When(terraformClient.DetectVersion(AnyString(), matchers.AnyLoggingSimpleLogging())).Then(func(params []Param) ReturnValues {
+				projectName := filepath.Base(params[0].(string))
+				testVersion := testCase.Exp[projectName]
+				if testVersion != "" {
+					v, _ := version.NewVersion(testVersion)
+					return []ReturnValue{v}
 				}
-			}
-		})
-	}
-}
-
-// If TF downloads are disabled, test that terraform version is used when specified in terraform configuration only if an exact version
-func TestDefaultProjectCommandBuilder_TerraformVersion_DownloadsDisabled(t *testing.T) {
-	// For the following tests:
-	// If terraform configuration is used, result should be `0.12.8`.
-	// If project configuration is used, result should be `0.12.6`.
-	// If an inexact version is used, the result should be `nil`
-	// If default is to be used, result should be `nil`.
-
-	baseVersionConfig := `
-terraform {
-  required_version = "%s0.12.8"
-}
-`
-
-	atlantisYamlContent := `
-version: 3
-projects:
-- dir: project1 # project1 uses the defaults
-  terraform_version: v0.12.6
-`
-
-	exactSymbols := []string{"", "="}
-	// Depending on when the tests are run, the > and >= matching versions will have to be increased.
-	// It's probably not worth testing the terraform-switcher version here so we only test <, <=, and ~>.
-	// One way to test this in the future is to mock tfswitcher.GetTFList() to return the highest
-	// version of 1.3.5.
-	// nonExactSymbols := []string{">", ">=", "<", "<=", "~>"}
-	nonExactSymbols := []string{"<", "<=", "~>"}
-	nonExactVersions := map[string]map[string][]int{
-		// ">": {
-		// 	"project1": nil,
-		// },
-		// ">=": {
-		// 	"project1": nil,
-		// },
-		"<": {
-			"project1": nil,
-		},
-		"<=": {
-			"project1": nil,
-		},
-		"~>": {
-			"project1": nil,
-		},
-	}
-
-	type testCase struct {
-		DirStructure  map[string]interface{}
-		AtlantisYAML  string
-		ModifiedFiles []string
-		Exp           map[string][]int
-	}
-
-	testCases := make(map[string]testCase)
-
-	for _, exactSymbol := range exactSymbols {
-		testCases[fmt.Sprintf("exact version in terraform config using \"%s\"", exactSymbol)] = testCase{
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbol),
-				},
-			},
-			ModifiedFiles: []string{"project1/main.tf"},
-			Exp: map[string][]int{
-				"project1": {0, 12, 8},
-			},
-		}
-	}
-
-	for _, nonExactSymbol := range nonExactSymbols {
-		testCases[fmt.Sprintf("non-exact version in terraform config using \"%s\"", nonExactSymbol)] = testCase{
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": fmt.Sprintf(baseVersionConfig, nonExactSymbol),
-				},
-			},
-			ModifiedFiles: []string{"project1/main.tf"},
-			Exp:           nonExactVersions[nonExactSymbol],
-		}
-	}
-
-	// atlantis.yaml should take precedence over terraform config
-	testCases["with project config and terraform config"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
-				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
-			},
-			valid.DefaultAtlantisFile: atlantisYamlContent,
-		},
-		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
-		Exp: map[string][]int{
-			"project1": {0, 12, 6},
-		},
-	}
-
-	testCases["with project config only"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
-				"main.tf": nil,
-			},
-			valid.DefaultAtlantisFile: atlantisYamlContent,
-		},
-		ModifiedFiles: []string{"project1/main.tf"},
-		Exp: map[string][]int{
-			"project1": {0, 12, 6},
-		},
-	}
-
-	testCases["neither project config or terraform config"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
-				"main.tf": nil,
-			},
-		},
-		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
-		Exp: map[string][]int{
-			"project1": nil,
-		},
-	}
-
-	testCases["project with different terraform config"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
-				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
-			},
-			"project2": map[string]interface{}{
-				"main.tf": strings.Replace(fmt.Sprintf(baseVersionConfig, exactSymbols[0]), "0.12.8", "0.12.9", -1),
-			},
-		},
-		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
-		Exp: map[string][]int{
-			"project1": {0, 12, 8},
-			"project2": {0, 12, 9},
-		},
-	}
-
-	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
-
-	for name, testCase := range testCases {
-		t.Run(name, func(t *testing.T) {
-			RegisterMockTestingT(t)
-
-			tmpDir := DirStructure(t, testCase.DirStructure)
-
-			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(testCase.ModifiedFiles, nil)
-
-			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(
-				matchers.AnyPtrToLoggingSimpleLogger(),
-				matchers.AnyModelsRepo(),
-				matchers.AnyModelsPullRequest(),
-				AnyString())).ThenReturn(tmpDir, false, nil)
-
-			When(workingDir.GetWorkingDir(
-				matchers.AnyModelsRepo(),
-				matchers.AnyModelsPullRequest(),
-				AnyString())).ThenReturn(tmpDir, nil)
-
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
-
-			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+				return nil
+			})
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1507,9 +1245,9 @@ projects:
 			Ok(t, err)
 			Equals(t, len(testCase.Exp), len(actCtxs))
 			for _, actCtx := range actCtxs {
-				if testCase.Exp[actCtx.RepoRelDir] != nil {
+				if testCase.Exp[actCtx.RepoRelDir] != "" {
 					Assert(t, actCtx.TerraformVersion != nil, "TerraformVersion is nil.")
-					Equals(t, testCase.Exp[actCtx.RepoRelDir], actCtx.TerraformVersion.Segments())
+					Equals(t, testCase.Exp[actCtx.RepoRelDir], actCtx.TerraformVersion.String())
 				} else {
 					Assert(t, actCtx.TerraformVersion == nil, "TerraformVersion is supposed to be nil.")
 				}
