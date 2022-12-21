@@ -19,7 +19,8 @@ type InstrumentedProjectCommandRunner struct {
 }
 
 func NewInstrumentedProjectCommandRunner(scope tally.Scope, projectCommandRunner ProjectCommandRunner) *InstrumentedProjectCommandRunner {
-	scope = scope.SubScope("project")
+	projectTags := command.ScopeTags{}
+	scope = metrics.SetScopeTags(scope.SubScope("project"), projectTags.Loadtags())
 
 	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric, metrics.ExecutionFailureMetric} {
 		metrics.InitCounter(scope, m)
@@ -49,7 +50,7 @@ func (p *InstrumentedProjectCommandRunner) ApprovePolicies(ctx command.ProjectCo
 
 func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult, scope tally.Scope) command.ProjectResult {
 	// ensures we are differentiating between project level command and overall command
-	scope = ctx.SetScopeTags(scope)
+	scope = ctx.SetProjectScopeTags(scope)
 	logger := ctx.Log
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()

@@ -72,3 +72,7 @@ func newStatsReporter(cfg valid.Metrics, logger logging.SimpleLogging) (tally.St
 
 	return tallystatsd.NewReporter(client, tallystatsd.Options{}), nil
 }
+
+func SetScopeTags(scope tally.Scope, tags map[string]string) tally.Scope {
+	return scope.Tagged(tags)
+}
