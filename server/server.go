@@ -393,7 +393,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		config.DefaultTFVersionFlag,
 		userConfig.TFDownloadURL,
 		&terraform.DefaultDownloader{},
-		userConfig.TFDisableDownloads,
+		userConfig.TFDownload,
 		true,
 		projectCmdOutputHandler)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we

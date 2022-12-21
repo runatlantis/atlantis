@@ -72,7 +72,7 @@ type DefaultClient struct {
 	// downloader downloads terraform versions.
 	downloader       Downloader
 	downloadBaseURL  string
-	disableDownloads bool
+	downloadsAllowed bool
 	// versions maps from the string representation of a tf version (ex. 0.11.10)
 	// to the absolute path of that binary on disk (if it exists).
 	// Use versionsLock to control access.
@@ -115,7 +115,7 @@ func NewClientWithDefaultVersion(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	disableDownloads bool,
+	allowDownloads bool,
 	usePluginCache bool,
 	fetchAsync bool,
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
@@ -152,7 +152,7 @@ func NewClientWithDefaultVersion(
 			// Since ensureVersion might end up downloading terraform,
 			// we call it asynchronously so as to not delay server startup.
 			versionsLock.Lock()
-			_, err := ensureVersion(log, tfDownloader, versions, defaultVersion, binDir, tfDownloadURL, disableDownloads)
+			_, err := ensureVersion(log, tfDownloader, versions, defaultVersion, binDir, tfDownloadURL, allowDownloads)
 			versionsLock.Unlock()
 			if err != nil {
 				log.Err("could not download terraform %s: %s", defaultVersion.String(), err)
@@ -182,7 +182,7 @@ func NewClientWithDefaultVersion(
 		binDir:                  binDir,
 		downloader:              tfDownloader,
 		downloadBaseURL:         tfDownloadURL,
-		disableDownloads:        disableDownloads,
+		downloadsAllowed:        allowDownloads,
 		versionsLock:            &versionsLock,
 		versions:                versions,
 		usePluginCache:          usePluginCache,
@@ -201,7 +201,7 @@ func NewTestClient(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	disableDownloads bool,
+	downloadsAllowed bool,
 	usePluginCache bool,
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 ) (*DefaultClient, error) {
@@ -215,7 +215,7 @@ func NewTestClient(
 		defaultVersionFlagName,
 		tfDownloadURL,
 		tfDownloader,
-		disableDownloads,
+		downloadsAllowed,
 		usePluginCache,
 		false,
 		projectCmdOutputHandler,
@@ -240,7 +240,7 @@ func NewClient(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	disableDownloads bool,
+	allowDownloads bool,
 	usePluginCache bool,
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 ) (*DefaultClient, error) {
@@ -254,7 +254,7 @@ func NewClient(
 		defaultVersionFlagName,
 		tfDownloadURL,
 		tfDownloader,
-		disableDownloads,
+		allowDownloads,
 		usePluginCache,
 		true,
 		projectCmdOutputHandler,
@@ -276,7 +276,7 @@ func (c *DefaultClient) TerraformBinDir() string {
 func (c *DefaultClient) ListAvailableVersions(log logging.SimpleLogging) ([]string, error) {
 	url := fmt.Sprintf("%s/terraform", c.downloadBaseURL)
 
-	if c.disableDownloads {
+	if !c.downloadsAllowed {
 		log.Debug("Terraform downloads disabled. Won't list Terraform versions available at %s", url)
 		return []string{}, nil
 	}
@@ -294,7 +294,7 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 
 	var err error
 	c.versionsLock.Lock()
-	_, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL, c.disableDownloads)
+	_, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadsAllowed)
 	c.versionsLock.Unlock()
 	if err != nil {
 		return err
@@ -371,7 +371,7 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, w
 	} else {
 		var err error
 		c.versionsLock.Lock()
-		binPath, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL, c.disableDownloads)
+		binPath, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadsAllowed)
 		c.versionsLock.Unlock()
 		if err != nil {
 			return "", nil, err
@@ -442,7 +442,7 @@ func MustConstraint(v string) version.Constraints {
 
 // ensureVersion returns the path to a terraform binary of version v.
 // It will download this version if we don't have it.
-func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string, downloadsDisabled bool) (string, error) {
+func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string, downloadsAllowed bool) (string, error) {
 	if binPath, ok := versions[v.String()]; ok {
 		return binPath, nil
 	}
@@ -463,7 +463,7 @@ func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string
 		versions[v.String()] = dest
 		return dest, nil
 	}
-	if downloadsDisabled {
+	if !downloadsAllowed {
 		return "", fmt.Errorf("could not find terraform version %s in PATH or %s, and downloads are disabled", v.String(), binDir)
 	}
 
