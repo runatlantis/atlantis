@@ -98,20 +98,23 @@ type ProjectContext struct {
 	ExecutionOrderGroup int
 }
 
-// SetScopeTags adds ProjectContext tags to a new returned scope.
-func (p ProjectContext) SetScopeTags(scope tally.Scope) tally.Scope {
+// SetProjectScopeTags adds ProjectContext tags to a new returned scope.
+func (p ProjectContext) SetProjectScopeTags(scope tally.Scope) tally.Scope {
 	v := ""
 	if p.TerraformVersion != nil {
 		v = p.TerraformVersion.String()
 	}
-	return scope.Tagged(map[string]string{
-		"base_repo":         p.BaseRepo.FullName,
-		"pr_number":         strconv.Itoa(p.Pull.Num),
-		"project":           p.ProjectName,
-		"project_path":      p.RepoRelDir,
-		"terraform_version": v,
-		"workspace":         p.Workspace,
-	})
+
+	tags := ProjectScopeTags{
+		BaseRepo:         p.BaseRepo.FullName,
+		PrNumber:         strconv.Itoa(p.Pull.Num),
+		Project:          p.ProjectName,
+		ProjectPath:      p.RepoRelDir,
+		TerraformVersion: v,
+		Workspace:        p.Workspace,
+	}
+
+	return scope.Tagged(tags.Loadtags())
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
