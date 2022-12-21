@@ -132,7 +132,7 @@ func TestNewClient_NoTF(t *testing.T) {
 	defer tempSetEnv(t, "PATH", tmp)()
 
 	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, false, true, projectCmdOutputHandler)
-	ErrEquals(t, "terraform not found in $PATH. Set --default-tf-version or download terraform from https://www.terraform.io/downloads.html", err)
+	ErrEquals(t, "terraform not found in $PATH. Set --default-tf-version or download terraform from https://developer.hashicorp.com/terraform/downloads", err)
 }
 
 // Test that if the default-tf flag is set and that binary is in our PATH
@@ -282,7 +282,7 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 	Equals(t, "\nTerraform v99.99.99\n\n", output)
 }
 
-// Test the EnsureVersion downloads terraform.
+// Test that EnsureVersion downloads terraform.
 func TestEnsureVersion_downloaded(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
@@ -310,6 +310,30 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 		runtime.GOARCH,
 		baseURL)
 	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetFile(filepath.Join(tmp, "bin", "terraform99.99.99"), expURL)
+}
+
+// Test that EnsureVersion throws an error when downloads are disabled
+func TestEnsureVersion_downloaded_downloadingDisabled(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+	_, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+
+	mockDownloader := mocks.NewMockDownloader()
+
+	disableDownloads := true
+	c, err := terraform.NewTestClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, disableDownloads, true, projectCmdOutputHandler)
+	Ok(t, err)
+
+	Equals(t, "0.11.10", c.DefaultVersion().String())
+
+	v, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+
+	err = c.EnsureVersion(logger, v)
+	ErrContains(t, "could not find terraform version", err)
+	ErrContains(t, "downloads are disabled", err)
+	mockDownloader.VerifyWasCalled(Never())
 }
 
 // tempSetEnv sets env var key to value. It returns a function that when called

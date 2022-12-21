@@ -330,7 +330,7 @@ func getTfVersion(ctx *command.Context, terraformClient terraform.Client, absPro
 	if len(tfVersions) == 0 {
 		// Fall back to an exact required version string
 		// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
-		re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
+		re := regexp.MustCompile(`^=?\s*([0-9.]+)\s*$`)
 		matched := re.FindStringSubmatch(requiredVersionSetting)
 		if len(matched) == 0 {
 			ctx.Log.Debug("Did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
