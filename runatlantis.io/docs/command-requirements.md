@@ -46,7 +46,7 @@ You can set the `approved` requirement by:
 #### Meaning
 Each VCS provider has different rules around who can approve:
 * **GitHub** – **Any user with read permissions** to the repo can approve a pull request
-* **GitLab** – You [can set](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html) who is allowed to approve
+* **GitLab** – The user who can approve can be set in the [repo settings](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html)
 * **Bitbucket Cloud (bitbucket.org)** – A user can approve their own pull request but
   Atlantis does not count that as an approval and requires an approval from at least one user that
   is not the author of the pull request
