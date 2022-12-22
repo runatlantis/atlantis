@@ -654,6 +654,44 @@ func TestPost_AzureDevopsPullRequestWebhookTestIgnoreEvent(t *testing.T) {
 			ResponseContains(t, w, http.StatusOK, "Ignoring Azure DevOps Test Event with Repo URL")
 		})
 	}
+
+func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
+	t.Log("when the event should not be ignored it should pass through all ignore statements without error")
+	e, _, _, ado, _, _, _, _, _ := setup(t)
+
+	repo := models.Repo{}
+	When(e.Parser.ParseAzureDevopsRepo(matchers.AnyPtrToAzuredevopsGitRepository())).ThenReturn(repo, nil)
+
+	payload := `{
+		"subscriptionId": "11111111-1111-1111-1111-111111111111",
+		"notificationId": 1,
+		"id": "22222222-2222-2222-2222-222222222222",
+		"eventType": "ms.vss-code.git-pullrequest-comment-event",
+		"publisherId": "tfs",
+		"message": {
+			"text": "Testing to see if comment passes ignore conditions"
+		},
+		"resource": {
+			"comment": {
+				"id": 1,
+				"commentType": "text",
+				"content": "test"
+			},
+			"pullRequest": {
+				"pullRequestId": 1,
+				"repository": {}
+			}
+		}
+	}`
+
+	t.Run("Testing to see if comment passes ignore conditions", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", strings.NewReader(payload))
+		req.Header.Set(azuredevopsHeader, "reqID")
+		When(ado.Validate(req, user, secret)).ThenReturn([]byte(payload), nil)
+		w := httptest.NewRecorder()
+		e.Post(w, req)
+		ResponseContains(t, w, http.StatusOK, "Processing...")
+	})
 }
 
 func TestPost_GithubPullRequestClosedErrCleaningPull(t *testing.T) {

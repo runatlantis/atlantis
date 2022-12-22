@@ -627,11 +627,10 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 		return
 	}
 
-	if resource.Comment.IsDeleted != nil {
-		if *resource.Comment.IsDeleted {
-			e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since it is linked to deleting a pull request comment; %s", azuredevopsReqID)
-			return
-		}
+
+	if resource.Comment.GetIsDeleted() {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since it is linked to deleting a pull request comment; %s", azuredevopsReqID)
+		return
 	}
 
 	strippedComment := bluemonday.StrictPolicy().SanitizeBytes([]byte(*resource.Comment.Content))
