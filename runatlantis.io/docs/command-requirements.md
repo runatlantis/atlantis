@@ -19,7 +19,7 @@ The `approved` requirement will prevent applies unless the pull request is appro
 by at least one person other than the author.
 
 #### Usage
-You can set the `approved` requirement by:
+The `approved` requirement by:
 1. Passing the `--require-approval` flag to `atlantis server` or
 1. Creating a `repos.yaml` file with the `apply_requirements` key:
    ```yaml
