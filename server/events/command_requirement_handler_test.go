@@ -69,7 +69,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
 				ProjectPlanStatus: models.ErroredPolicyCheckStatus,
 			},
-			wantFailure: "All policies must pass for project before running apply",
+			wantFailure: "All policies must pass for project before running apply.",
 			wantErr:     assert.NoError,
 		},
 		{
