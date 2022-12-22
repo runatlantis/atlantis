@@ -24,8 +24,8 @@ RUN case $(uname -m) in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64|armv7l) ARC
     sed -n "/conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz/p" checksums.txt | sha256sum -c && \
     mkdir -p /usr/local/bin/cft/versions/${CONFTEST_VERSION} && \
     tar -C  /usr/local/bin/cft/versions/${CONFTEST_VERSION} -xzf conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
-    # After migrating e2e test which use contest command instead of contest$version, you can remove contest$version command.
-    ln -s /usr/local/bin/cft/versions/${CONFTEST_VERSION}/conftest /usr/local/bin/conftest${CONFTEST_VERSION} && \
+    # Generally Atlantis requires `conftest$version` command. But we use `conftest` command in test.
+    # `conftest$version` command blocks upgrading conftest operation cause e2e test use this image.
     ln -s /usr/local/bin/cft/versions/${CONFTEST_VERSION}/conftest /usr/local/bin/conftest && \
     rm conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
     rm checksums.txt
