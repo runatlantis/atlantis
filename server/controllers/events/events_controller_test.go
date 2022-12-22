@@ -654,6 +654,7 @@ func TestPost_AzureDevopsPullRequestWebhookTestIgnoreEvent(t *testing.T) {
 			ResponseContains(t, w, http.StatusOK, "Ignoring Azure DevOps Test Event with Repo URL")
 		})
 	}
+}
 
 func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
 	t.Log("when the event should not be ignored it should pass through all ignore statements without error")
