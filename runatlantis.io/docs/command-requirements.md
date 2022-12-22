@@ -27,7 +27,7 @@ The `approved` requirement by:
    - id: /.*/
      apply_requirements: [approved]
    ```
-1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in your `repos.yaml` config:
+1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in the `repos.yaml` config:
     #### repos.yaml
     ```yaml
     repos:
