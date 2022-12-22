@@ -211,9 +211,14 @@ func (c *ConfTestExecutorWorkflow) sanitizeOutput(inputFile string, output strin
 }
 
 func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log logging.SimpleLogging, v *version.Version) (string, error) {
-	// we have no information to proceed so fail hard
+	// we have no information to proceed, so fallback to `conftest` command or fail hard
 	if c.DefaultConftestVersion == nil && v == nil {
-		return "", errors.New("no conftest version configured/specified")
+		localPath, err := c.Exec.LookPath(conftestBinaryName)
+		if err == nil {
+			log.Info("conftest version is not specified, so fallback to conftest command")
+			return localPath, nil
+		}
+		return "", errors.New("no conftest version configured/specified or not found conftest command")
 	}
 
 	var versionToRetrieve *version.Version
