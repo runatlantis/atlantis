@@ -161,7 +161,7 @@ atlantis import -w staging ADDRESS ID
 ### Additional Terraform flags
 
 If you need to run `terraform import` with additional arguments, like `-var 'foo=bar'` or `-var-file myfile.tfvars`
-you can append them to the end of the comment after `--`, ex.
+append them to the end of the comment after `--`, e.g.
 ```
 atlantis import -d dir 'aws_instance.example["foo"]' i-1234567890abcdef0 -- -var foo='bar'
 ```
