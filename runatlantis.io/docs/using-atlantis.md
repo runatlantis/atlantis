@@ -72,7 +72,7 @@ A `atlantis plan` (without flags), like autoplans, discards all plans previously
 
 ### Additional Terraform flags
 
-If you need to run `terraform plan` with additional arguments, like `-target=resource` or `-var 'foo=bar'` or `-var-file myfile.tfvars`
+If `terraform plan` requires additional arguments, like `-target=resource` or `-var 'foo=bar'` or `-var-file myfile.tfvars`
 you can append them to the end of the comment after `--`, ex.
 ```
 atlantis plan -d dir -- -var foo='bar'
