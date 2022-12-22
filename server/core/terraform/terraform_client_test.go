@@ -487,7 +487,7 @@ terraform {
 			tmpDir := DirStructure(t, testCase.DirStructure)
 
 			for project, expectedVersion := range testCase.Exp {
-				detectedVersion := c.DetectVersion(filepath.Join(tmpDir, project), logger)
+				detectedVersion := c.DetectVersion(logger, filepath.Join(tmpDir, project))
 
 				expectNil := expectedVersion == "" || (!testCase.IsExact && !downloadsAllowed)
 				if expectNil {

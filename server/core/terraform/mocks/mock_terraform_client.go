@@ -80,7 +80,7 @@ func (mock *MockClient) ListAvailableVersions(log logging.SimpleLogging) ([]stri
 	return ret0, ret1
 }
 
-func (mock *MockClient) DetectVersion(projectDirectory string, log logging.SimpleLogging) *go_version.Version {
+func (mock *MockClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *go_version.Version {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}

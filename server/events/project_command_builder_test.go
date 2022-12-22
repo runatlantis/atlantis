@@ -1200,8 +1200,8 @@ projects:
 
 			terraformClient := terraform_mocks.NewMockClient()
 
-			When(terraformClient.DetectVersion(AnyString(), matchers.AnyLoggingSimpleLogging())).Then(func(params []Param) ReturnValues {
-				projectName := filepath.Base(params[0].(string))
+			When(terraformClient.DetectVersion(matchers.AnyLoggingSimpleLogging(), AnyString())).Then(func(params []Param) ReturnValues {
+				projectName := filepath.Base(params[1].(string))
 				testVersion := testCase.Exp[projectName]
 				if testVersion != "" {
 					v, _ := version.NewVersion(testVersion)

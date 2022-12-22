@@ -108,7 +108,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	// If TerraformVersion not defined in config file look for a
 	// terraform.require_version block.
 	if prjCfg.TerraformVersion == nil {
-		prjCfg.TerraformVersion = terraformClient.DetectVersion(filepath.Join(repoDir, prjCfg.RepoRelDir), ctx.Log)
+		prjCfg.TerraformVersion = terraformClient.DetectVersion(ctx.Log, filepath.Join(repoDir, prjCfg.RepoRelDir))
 	}
 
 	projectCmdContext := newProjectCommandContext(
@@ -152,7 +152,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	// If TerraformVersion not defined in config file look for a
 	// terraform.require_version block.
 	if prjCfg.TerraformVersion == nil {
-		prjCfg.TerraformVersion = terraformClient.DetectVersion(filepath.Join(repoDir, prjCfg.RepoRelDir), ctx.Log)
+		prjCfg.TerraformVersion = terraformClient.DetectVersion(ctx.Log, filepath.Join(repoDir, prjCfg.RepoRelDir))
 	}
 
 	projectCmds = cb.ProjectCommandContextBuilder.BuildProjectContext(
