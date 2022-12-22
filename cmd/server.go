@@ -117,6 +117,7 @@ const (
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
 	RestrictFileList           = "restrict-file-list"
+	TFDownloadFlag             = "tf-download"
 	TFDownloadURLFlag          = "tf-download-url"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
@@ -151,6 +152,7 @@ const (
 	DefaultRedisTLSEnabled              = false
 	DefaultRedisInsecureSkipVerify      = false
 	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
+	DefaultTFDownload                   = true
 	DefaultTFEHostname                  = "app.terraform.io"
 	DefaultVCSStatusName                = "atlantis"
 	DefaultWebBasicAuth                 = false
@@ -499,6 +501,10 @@ var boolFlags = map[string]boolFlag{
 	SkipCloneNoChanges: {
 		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
 		defaultValue: false,
+	},
+	TFDownloadFlag: {
+		description:  "Allow Atlantis to list & download Terraform versions. Setting this to false can be helpful in air-gapped environments.",
+		defaultValue: DefaultTFDownload,
 	},
 	TFELocalExecutionModeFlag: {
 		description:  "Enable if you're using local execution mode (instead of TFE/C's remote execution mode).",

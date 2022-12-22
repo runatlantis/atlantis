@@ -10,6 +10,7 @@ import (
 	"github.com/uber-go/tally"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
@@ -54,6 +55,7 @@ func NewInstrumentedProjectCommandBuilder(
 	RestrictFileList bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
+	terraformClient terraform.Client,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -79,6 +81,7 @@ func NewInstrumentedProjectCommandBuilder(
 			RestrictFileList,
 			scope,
 			logger,
+			terraformClient,
 		),
 		Logger: logger,
 		scope:  scope,
@@ -102,6 +105,7 @@ func NewProjectCommandBuilder(
 	RestrictFileList bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
+	terraformClient terraform.Client,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
 		ParserValidator:       parserValidator,
@@ -121,6 +125,7 @@ func NewProjectCommandBuilder(
 			commentBuilder,
 			scope,
 		),
+		TerraformExecutor: terraformClient,
 	}
 }
 
@@ -181,6 +186,7 @@ type DefaultProjectCommandBuilder struct {
 	AutoplanFileList             string
 	EnableDiffMarkdownFormat     bool
 	RestrictFileList             bool
+	TerraformExecutor            terraform.Client
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -330,6 +336,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					repoCfg.ParallelApply,
 					repoCfg.ParallelPlan,
 					verbose,
+					p.TerraformExecutor,
 				)...)
 		}
 	} else {
@@ -367,6 +374,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					DefaultParallelApplyEnabled,
 					DefaultParallelPlanEnabled,
 					verbose,
+					p.TerraformExecutor,
 				)...)
 		}
 	}
@@ -701,6 +709,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					parallelApply,
 					parallelPlan,
 					verbose,
+					p.TerraformExecutor,
 				)...)
 		}
 	} else {
@@ -716,6 +725,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				parallelApply,
 				parallelPlan,
 				verbose,
+				p.TerraformExecutor,
 			)...)
 	}
 

@@ -917,6 +917,15 @@ and set `--autoplan-modules` to `false`.
   ```
   Namespace for emitting stats/metrics. See [stats](stats.html) section.
 
+### `--tf--download`
+  ```bash
+  atlantis server --tf-download=false
+  # or
+  ATLANTIS_TF_DOWNLOAD=false
+  ```
+Defaults to `true`. Allow Atlantis to list and download additional versions of Terraform.
+Setting this to `false` can be useful in an air-gapped environment where a download mirror is not available.
+
 ### `--tf-download-url`
   ```bash
   atlantis server --tf-download-url="https://releases.company.com"
@@ -926,6 +935,8 @@ and set `--autoplan-modules` to `false`.
   An alternative URL to download Terraform versions if they are missing. Useful in an airgapped
   environment where releases.hashicorp.com is not available. Directory structure of the custom
   endpoint should match that of releases.hashicorp.com.
+  
+  This has no impact if `--tf-download` is set to `false`.
 
 ### `--tfe-hostname`
   ```bash

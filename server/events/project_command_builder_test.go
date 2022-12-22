@@ -1,13 +1,14 @@
 package events_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -123,6 +124,9 @@ projects:
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
+	terraformClient := terraform_mocks.NewMockClient()
+	When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -163,6 +167,7 @@ projects:
 				false,
 				scope,
 				logger,
+				terraformClient,
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -415,6 +420,9 @@ projects:
 					UnDivergedReq: false,
 				}
 
+				terraformClient := terraform_mocks.NewMockClient()
+				When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+
 				builder := events.NewProjectCommandBuilder(
 					false,
 					&config.ParserValidator{},
@@ -432,6 +440,7 @@ projects:
 					false,
 					scope,
 					logger,
+					terraformClient,
 				)
 
 				var actCtxs []command.ProjectContext
@@ -588,6 +597,9 @@ projects:
 				UnDivergedReq: false,
 			}
 
+			terraformClient := terraform_mocks.NewMockClient()
+			When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&config.ParserValidator{},
@@ -605,6 +617,7 @@ projects:
 				true,
 				scope,
 				logger,
+				terraformClient,
 			)
 
 			var actCtxs []command.ProjectContext
@@ -758,6 +771,9 @@ projects:
 				UnDivergedReq: false,
 			}
 
+			terraformClient := terraform_mocks.NewMockClient()
+			When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&config.ParserValidator{},
@@ -775,6 +791,7 @@ projects:
 				false,
 				scope,
 				logger,
+				terraformClient,
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -850,6 +867,9 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	}
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
+	terraformClient := terraform_mocks.NewMockClient()
+	When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&config.ParserValidator{},
@@ -867,6 +887,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		false,
 		scope,
 		logger,
+		terraformClient,
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -935,6 +956,8 @@ projects:
 	}
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	terraformClient := terraform_mocks.NewMockClient()
+	When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -953,6 +976,7 @@ projects:
 		false,
 		scope,
 		logger,
+		terraformClient,
 	)
 
 	ctx := &command.Context{
@@ -1016,6 +1040,9 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				UnDivergedReq: false,
 			}
 
+			terraformClient := terraform_mocks.NewMockClient()
+			When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&config.ParserValidator{},
@@ -1033,6 +1060,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				false,
 				scope,
 				logger,
+				terraformClient,
 			)
 
 			var actCtxs []command.ProjectContext
@@ -1064,7 +1092,7 @@ func TestDefaultProjectCommandBuilder_TerraformVersion(t *testing.T) {
 
 	baseVersionConfig := `
 terraform {
-  required_version = "%s0.12.8"
+  required_version = "0.12.8"
 }
 `
 
@@ -1075,77 +1103,26 @@ projects:
   terraform_version: v0.12.6
 `
 
-	exactSymbols := []string{"", "="}
-	// Depending on when the tests are run, the > and >= matching versions will have to be increased.
-	// It's probably not worth testing the terraform-switcher version here so we only test <, <=, and ~>.
-	// One way to test this in the future is to mock tfswitcher.GetTFList() to return the highest
-	// version of 1.3.5.
-	// nonExactSymbols := []string{">", ">=", "<", "<=", "~>"}
-	nonExactSymbols := []string{"<", "<=", "~>"}
-	nonExactVersions := map[string]map[string][]int{
-		// ">": {
-		// 	"project1": {1, 3, 5},
-		// },
-		// ">=": {
-		// 	"project1": {1, 3, 5},
-		// },
-		"<": {
-			"project1": {0, 12, 7},
-		},
-		"<=": {
-			"project1": {0, 12, 8},
-		},
-		"~>": {
-			"project1": {0, 12, 31},
-		},
-	}
-
 	type testCase struct {
 		DirStructure  map[string]interface{}
 		AtlantisYAML  string
 		ModifiedFiles []string
-		Exp           map[string][]int
+		Exp           map[string]string
 	}
 
 	testCases := make(map[string]testCase)
-
-	for _, exactSymbol := range exactSymbols {
-		testCases[fmt.Sprintf("exact version in terraform config using \"%s\"", exactSymbol)] = testCase{
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbol),
-				},
-			},
-			ModifiedFiles: []string{"project1/main.tf"},
-			Exp: map[string][]int{
-				"project1": {0, 12, 8},
-			},
-		}
-	}
-
-	for _, nonExactSymbol := range nonExactSymbols {
-		testCases[fmt.Sprintf("non-exact version in terraform config using \"%s\"", nonExactSymbol)] = testCase{
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": fmt.Sprintf(baseVersionConfig, nonExactSymbol),
-				},
-			},
-			ModifiedFiles: []string{"project1/main.tf"},
-			Exp:           nonExactVersions[nonExactSymbol],
-		}
-	}
 
 	// atlantis.yaml should take precedence over terraform config
 	testCases["with project config and terraform config"] = testCase{
 		DirStructure: map[string]interface{}{
 			"project1": map[string]interface{}{
-				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
+				"main.tf": baseVersionConfig,
 			},
 			valid.DefaultAtlantisFile: atlantisYamlContent,
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
-		Exp: map[string][]int{
-			"project1": {0, 12, 6},
+		Exp: map[string]string{
+			"project1": "0.12.6",
 		},
 	}
 
@@ -1157,8 +1134,8 @@ projects:
 			valid.DefaultAtlantisFile: atlantisYamlContent,
 		},
 		ModifiedFiles: []string{"project1/main.tf"},
-		Exp: map[string][]int{
-			"project1": {0, 12, 6},
+		Exp: map[string]string{
+			"project1": "0.12.6",
 		},
 	}
 
@@ -1169,24 +1146,24 @@ projects:
 			},
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
-		Exp: map[string][]int{
-			"project1": nil,
+		Exp: map[string]string{
+			"project1": "",
 		},
 	}
 
 	testCases["project with different terraform config"] = testCase{
 		DirStructure: map[string]interface{}{
 			"project1": map[string]interface{}{
-				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
+				"main.tf": baseVersionConfig,
 			},
 			"project2": map[string]interface{}{
-				"main.tf": strings.Replace(fmt.Sprintf(baseVersionConfig, exactSymbols[0]), "0.12.8", "0.12.9", -1),
+				"main.tf": strings.Replace(baseVersionConfig, "0.12.8", "0.12.9", -1),
 			},
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
-		Exp: map[string][]int{
-			"project1": {0, 12, 8},
-			"project2": {0, 12, 9},
+		Exp: map[string]string{
+			"project1": "0.12.8",
+			"project2": "0.12.9",
 		},
 	}
 
@@ -1221,6 +1198,17 @@ projects:
 				UnDivergedReq: false,
 			}
 
+			terraformClient := terraform_mocks.NewMockClient()
+			When(terraformClient.DetectVersion(matchers.AnyLoggingSimpleLogging(), AnyString())).Then(func(params []Param) ReturnValues {
+				projectName := filepath.Base(params[1].(string))
+				testVersion := testCase.Exp[projectName]
+				if testVersion != "" {
+					v, _ := version.NewVersion(testVersion)
+					return []ReturnValue{v}
+				}
+				return nil
+			})
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&config.ParserValidator{},
@@ -1238,6 +1226,7 @@ projects:
 				false,
 				scope,
 				logger,
+				terraformClient,
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -1255,9 +1244,9 @@ projects:
 			Ok(t, err)
 			Equals(t, len(testCase.Exp), len(actCtxs))
 			for _, actCtx := range actCtxs {
-				if testCase.Exp[actCtx.RepoRelDir] != nil {
-					Assert(t, actCtx.TerraformVersion != nil, "TerraformVersion is nil.")
-					Equals(t, testCase.Exp[actCtx.RepoRelDir], actCtx.TerraformVersion.Segments())
+				if testCase.Exp[actCtx.RepoRelDir] != "" {
+					Assert(t, actCtx.TerraformVersion != nil, "TerraformVersion is nil, not %s for %s", testCase.Exp[actCtx.RepoRelDir], actCtx.RepoRelDir)
+					Equals(t, testCase.Exp[actCtx.RepoRelDir], actCtx.TerraformVersion.String())
 				} else {
 					Assert(t, actCtx.TerraformVersion == nil, "TerraformVersion is supposed to be nil.")
 				}
@@ -1310,6 +1299,8 @@ parallel_plan: true`,
 			UnDivergedReq: false,
 		}
 		scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+		terraformClient := terraform_mocks.NewMockClient()
+		When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
 
 		builder := events.NewProjectCommandBuilder(
 			false,
@@ -1328,6 +1319,7 @@ parallel_plan: true`,
 			false,
 			scope,
 			logger,
+			terraformClient,
 		)
 
 		var actCtxs []command.ProjectContext
@@ -1370,6 +1362,8 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	terraformClient := terraform_mocks.NewMockClient()
+	When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		true,
@@ -1388,6 +1382,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		false,
 		scope,
 		logger,
+		terraformClient,
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -1453,6 +1448,8 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		ApprovedReq:   false,
 		UnDivergedReq: false,
 	}
+	terraformClient := terraform_mocks.NewMockClient()
+	When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1471,6 +1468,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		false,
 		scope,
 		logger,
+		terraformClient,
 	)
 
 	ctxs, err := builder.BuildVersionCommands(

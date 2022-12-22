@@ -909,7 +909,7 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		GitlabUser:     "gitlab-user",
 		ExecutableName: "atlantis",
 	}
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, projectCmdOutputHandler)
+	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, true, false, projectCmdOutputHandler)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
@@ -1005,6 +1005,7 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		false,
 		statsScope,
 		logger,
+		terraformClient,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
