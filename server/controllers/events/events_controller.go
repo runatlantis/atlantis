@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/go-github/v31/github"
+	"github.com/google/go-github/v48/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"

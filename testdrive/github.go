@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v31/github"
+	"github.com/google/go-github/v48/github"
 )
 
 var githubUsername string

@@ -415,7 +415,7 @@ type PolicyCheckSuccess struct {
 func (p *PolicyCheckSuccess) Summary() string {
 	note := ""
 
-	r := regexp.MustCompile(`\d+ tests, \d+ passed, \d+ warnings, \d+ failures, \d+ exceptions`)
+	r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
 	if match := r.FindString(p.PolicyCheckOutput); match != "" {
 		return note + match
 	}
