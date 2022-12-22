@@ -68,7 +68,7 @@ Set the `mergeable` requirement by:
    repos:
    - id: /.*/
      apply_requirements: [mergeable]
-    ```
+   ```
 
 1. Or by allowing an `atlantis.yaml` file to specify `apply_requirements` and `import_requirements` keys in the `repos.yaml` config:
     #### repos.yaml
@@ -241,7 +241,7 @@ If you only want some projects/repos to have apply requirements, then you must
      # production directory.
      apply_requirements: [mergeable]
      import_requirements: [mergeable]
-
+   ```
 
 ### Multiple Requirements
 You can set any or all of `approved`, `mergeable`, and `undiverged` requirements.
