@@ -61,7 +61,7 @@ To require **certain people** to approve the pull request, look at the
 The `mergeable` requirement will prevent applies unless a pull request is able to be merged.
 
 #### Usage
-You can set the `mergeable` requirement by:
+Set the `mergeable` requirement by:
 1. Passing the `--require-mergeable` flag to `atlantis server` or
 1. Creating a `repos.yaml` file with the `apply_requirements` key:
    ```yaml
