@@ -622,7 +622,7 @@ func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
 	u := "user"
 	user := []byte(u)
 
-	t.Log("when the event should not be ignored it should succeed until parsing section")
+	t.Log("when the event should not be ignored it should pass through all ignore statements without error")
 	RegisterMockTestingT(t)
 	v := mocks.NewMockAzureDevopsRequestValidator()
 	p := emocks.NewMockEventParsing()
@@ -651,6 +651,9 @@ func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
 		VCSClient:                       vcsmock,
 	}
 
+	repo := models.Repo{}
+	When(e.Parser.ParseAzureDevopsRepo(matchers.AnyPtrToAzuredevopsGitRepository())).ThenReturn(repo, nil)
+
 	payload := `{
 		"subscriptionId": "11111111-1111-1111-1111-111111111111",
 		"notificationId": 1,
@@ -666,9 +669,9 @@ func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
 				"commentType": "text",
 				"content": "test"
 			},
-			"PullRequest": {
+			"pullRequest": {
 				"pullRequestId": 1,
-				"Repository": ""
+				"repository": {}
 			}
 		}
 	}`
@@ -678,10 +681,8 @@ func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
 		req.Header.Set(azuredevopsHeader, "reqID")
 		When(v.Validate(req, user, secret)).ThenReturn([]byte(payload), nil)
 		w := httptest.NewRecorder()
-		e.Parser = &events.EventParser{}
 		e.Post(w, req)
-		t.Log(w)
-		ResponseContains(t, w, http.StatusBadRequest, "Failed parsing webhook: json: cannot unmarshal string into Go struct field")
+		ResponseContains(t, w, http.StatusOK, "Processing...")
 	})
 }
 
