@@ -18,6 +18,7 @@ package terraform
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -289,6 +290,13 @@ func (c *DefaultClient) ListAvailableVersions(log logging.SimpleLogging) ([]stri
 	}
 
 	log.Debug("Listing Terraform versions available at: %s", url)
+	// terraform-switcher calls os.Exit(1) if it fails to successfully GET the configured URL.
+	// So, before calling it, test if we can connect. Then we can return an error instead if the request fails.
+	resp, err := http.Get(url)
+	if err != nil || resp.StatusCode != 200 {
+		return nil, fmt.Errorf("Unable to list Terraform versions: %s", err)
+	}
+
 	versions, err := lib.GetTFList(url, true)
 	return versions, err
 }
