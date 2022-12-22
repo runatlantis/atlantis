@@ -627,7 +627,6 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 		return
 	}
 
-
 	if resource.Comment.GetIsDeleted() {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since it is linked to deleting a pull request comment; %s", azuredevopsReqID)
 		return
