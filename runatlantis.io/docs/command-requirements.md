@@ -41,7 +41,7 @@ You can set the `approved` requirement by:
     projects:
     - dir: .
       apply_requirements: [approved]
-     ```
+    ```
 
 #### Meaning
 Each VCS provider has different rules around who can approve:
