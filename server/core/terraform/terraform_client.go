@@ -292,7 +292,7 @@ func (c *DefaultClient) ListAvailableVersions(log logging.SimpleLogging) ([]stri
 	log.Debug("Listing Terraform versions available at: %s", url)
 	// terraform-switcher calls os.Exit(1) if it fails to successfully GET the configured URL.
 	// So, before calling it, test if we can connect. Then we can return an error instead if the request fails.
-	resp, err := http.Get(url)
+	resp, err := http.Get(url) // #nosec G107 -- terraform-switch makes this same call below. Also, we don't process the response payload.
 	if err != nil || resp.StatusCode != 200 {
 		return nil, fmt.Errorf("Unable to list Terraform versions: %s", err)
 	}
