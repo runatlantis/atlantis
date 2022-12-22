@@ -220,7 +220,7 @@ projects:
 ```
 :::warning
 `apply_requirements` and `import_requirements` are restricted keys so this repo will need to be configured
-to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-side-repo-config.html#repos-can-set-their-own-apply-or-import-requirements).
+to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-side-repo-config.html#repos-can-set-their-own-apply-an-applicable-subcommand).
 :::
 
 ### Order of planning/applying
