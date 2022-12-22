@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v31/github"
+	"github.com/google/go-github/v48/github"
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
@@ -42,7 +42,9 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-const ConftestVersion = "0.36.0" // renovate: datasource=github-releases depName=open-policy-agent/conftest
+// In the e2e test, we use `conftest` not `conftest$version`.
+// Because if depends on the version, we need to upgrade test base image before e2e fix it.
+const conftestCommand = "conftest"
 
 var applyLocker locking.ApplyLocker
 var userConfig server.UserConfig
@@ -64,8 +66,8 @@ func (m *NoopTFDownloader) GetAny(dst, src string, opts ...getter.ClientOption) 
 type LocalConftestCache struct {
 }
 
-func (m *LocalConftestCache) Get(key *version.Version) (string, error) {
-	return exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
+func (m *LocalConftestCache) Get(_ *version.Version) (string, error) {
+	return exec.LookPath(conftestCommand)
 }
 
 func TestGitHubWorkflow(t *testing.T) {
@@ -886,13 +888,6 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 	allowForkPRs := false
 	dataDir, binDir, cacheDir := mkSubDirs(t)
 
-	//env vars
-
-	if userConfig.EnablePolicyChecksFlag {
-		// need this to be set or we'll fail the policy check step
-		os.Setenv(policy.DefaultConftestVersionEnvKey, "0.25.0")
-	}
-
 	// Mocks.
 	e2eVCSClient := vcsmocks.NewMockClient()
 	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
@@ -914,7 +909,7 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		GitlabUser:     "gitlab-user",
 		ExecutableName: "atlantis",
 	}
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, projectCmdOutputHandler)
+	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, true, false, projectCmdOutputHandler)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
@@ -1010,13 +1005,12 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		false,
 		statsScope,
 		logger,
+		terraformClient,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
 
 	Ok(t, err)
-
-	conftestVersion, _ := version.NewVersion(ConftestVersion)
 
 	conftextExec := policy.NewConfTestExecutorWorkflow(logger, binDir, &NoopTFDownloader{})
 
@@ -1025,7 +1019,7 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 	conftextExec.VersionCache = &LocalConftestCache{}
 
 	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
-		conftestVersion,
+		defaultTFVersion,
 		conftextExec,
 	)
 
@@ -1392,30 +1386,16 @@ func mkSubDirs(t *testing.T) (string, string, string) {
 	return tmp, binDir, cachedir
 }
 
-// Will fail test if conftest isn't in path or is version less than specific version
+// Will fail test if conftest isn't in path
 func ensureRunningConftest(t *testing.T) {
-	localPath, err := exec.LookPath("conftest")
+	// use `conftest` command instead `contest$version`, so tests may fail on the environment cause the output logs may become change by version.
+	t.Logf("conftest check may fail depends on conftest version. please use latest stable conftest.")
+	_, err := exec.LookPath(conftestCommand)
 	if err != nil {
-		t.Logf("conftest must be installed to run this test")
-		t.FailNow()
-	}
-	versionOutBytes, err := exec.Command(localPath, "--version").Output() // #nosec
-	if err != nil {
-		t.Logf("error running conftest version: %s", err)
-		t.FailNow()
-	}
-	versionOutput := string(versionOutBytes)
-	match := versionConftestRegex.FindStringSubmatch(versionOutput)
-	if len(match) <= 1 {
-		t.Logf("could not parse conftest version from %s", versionOutput)
-		t.FailNow()
-	}
-	localVersion, err := version.NewVersion(match[1])
-	Ok(t, err)
-	minVersion, err := version.NewVersion(ConftestVersion)
-	Ok(t, err)
-	if localVersion.LessThan(minVersion) {
-		t.Logf("must have contest version >= %s, you have %s", minVersion, localVersion)
+		t.Logf(`%s must be installed to run this test
+- on local, please install contest command or run 'make docker/test-all'
+- on CI, please check testing-env docker image contains conftest command. see testing/Dockerfile
+`, conftestCommand)
 		t.FailNow()
 	}
 }
@@ -1456,10 +1436,3 @@ func ensureRunning014(t *testing.T) {
 //	    Terraform v0.11.10
 //		   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
-
-/*
- * Newer versions will return both Conftest and OPA
- * Conftest: 0.35.0
- * OPA: 0.45.0
- */
-var versionConftestRegex = regexp.MustCompile("Conftest: (.*?)(\\s.*)?\n")

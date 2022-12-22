@@ -356,13 +356,19 @@ func TestAzureDevopsSplitRepoFullName(t *testing.T) {
 }
 
 func TestPolicyCheckSuccess_Summary(t *testing.T) {
-	pcs := models.PolicyCheckSuccess{
-		PolicyCheckOutput: `WARN - <redacted plan file> - main - example main package
-
-20 tests, 19 passed, 1 warnings, 0 failures, 0 exceptions`,
+	cases := []string{
+		"20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
+		"3 tests, 0 passed, 1 warning, 1 failure, 0 exceptions, 1 skipped",
+		"1 test, 0 passed, 1 warning, 1 failure, 1 exception",
 	}
-
-	Equals(t, "20 tests, 19 passed, 1 warnings, 0 failures, 0 exceptions", pcs.Summary())
+	for i, summary := range cases {
+		t.Run(fmt.Sprintf("summary %d", i), func(t *testing.T) {
+			pcs := models.PolicyCheckSuccess{
+				PolicyCheckOutput: `WARN - <redacted plan file> - main - example main package\n` + summary,
+			}
+			Equals(t, summary, pcs.Summary())
+		})
+	}
 }
 
 func TestPullStatus_StatusCount(t *testing.T) {

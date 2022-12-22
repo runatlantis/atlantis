@@ -64,16 +64,30 @@ func TestEnsureExecutorVersion(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	mockCache := mocks.NewMockExecutionVersionCache()
+	mockExec := models_mocks.NewMockExec()
 	log := logging.NewNoopLogger(t)
 
-	t.Run("no specified version or default version", func(t *testing.T) {
+	t.Run("no specified version or default version without conftest command", func(t *testing.T) {
 		subject := &ConfTestExecutorWorkflow{
 			VersionCache: mockCache,
+			Exec:         mockExec,
 		}
 
+		When(mockExec.LookPath(AnyString())).ThenReturn("", errors.New("not found"))
 		_, err := subject.EnsureExecutorVersion(log, nil)
 
 		Assert(t, err != nil, "expected error finding version")
+	})
+
+	t.Run("no specified version or default version with conftest command", func(t *testing.T) {
+		subject := &ConfTestExecutorWorkflow{
+			VersionCache: mockCache,
+			Exec:         mockExec,
+		}
+		When(mockExec.LookPath(AnyString())).ThenReturn(expectedPath, nil)
+		path, err := subject.EnsureExecutorVersion(log, nil)
+		Ok(t, err)
+		Assert(t, path == expectedPath, "path is expected")
 	})
 
 	t.Run("use default version", func(t *testing.T) {
