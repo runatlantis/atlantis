@@ -27,7 +27,7 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 		// this should come before mergeability check since mergeability is a superset of this check.
 		case valid.PoliciesPassedCommandReq:
 			if ctx.ProjectPlanStatus == models.ErroredPolicyCheckStatus {
-				return "All policies must pass for project before running apply", nil
+				return "All policies must pass for project before running apply.", nil
 			}
 		case raw.MergeableRequirement:
 			if !ctx.PullReqStatus.Mergeable {
