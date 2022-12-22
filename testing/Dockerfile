@@ -16,7 +16,7 @@ RUN case $(uname -m) in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH
 
 # Install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV CONFTEST_VERSION=0.36.0
+ENV CONFTEST_VERSION=0.37.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN case $(uname -m) in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
     curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
@@ -24,8 +24,8 @@ RUN case $(uname -m) in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64|armv7l) ARC
     sed -n "/conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz/p" checksums.txt | sha256sum -c && \
     mkdir -p /usr/local/bin/cft/versions/${CONFTEST_VERSION} && \
     tar -C  /usr/local/bin/cft/versions/${CONFTEST_VERSION} -xzf conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
-    # After migrating e2e test which use contest command instead of contest$version, you can remove contest$version command.
-    ln -s /usr/local/bin/cft/versions/${CONFTEST_VERSION}/conftest /usr/local/bin/conftest${CONFTEST_VERSION} && \
+    # Generally Atlantis requires `conftest$version` command. But we use `conftest` command in test.
+    # `conftest$version` command blocks upgrading conftest operation cause e2e test use this image.
     ln -s /usr/local/bin/cft/versions/${CONFTEST_VERSION}/conftest /usr/local/bin/conftest && \
     rm conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
     rm checksums.txt
