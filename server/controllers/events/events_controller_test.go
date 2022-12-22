@@ -562,37 +562,8 @@ func TestPost_AzureDevopsPullRequestDeletedCommentIgnoreEvent(t *testing.T) {
 }
 
 func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
-	u := "user"
-	user := []byte(u)
-
 	t.Log("when the event should not be ignored it should pass through all ignore statements without error")
-	RegisterMockTestingT(t)
-	v := mocks.NewMockAzureDevopsRequestValidator()
-	p := emocks.NewMockEventParsing()
-	cp := emocks.NewMockCommentParsing()
-	cr := emocks.NewMockCommandRunner()
-	c := emocks.NewMockPullCleaner()
-	vcsmock := vcsmocks.NewMockClient()
-	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
-	Ok(t, err)
-	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
-	e := events_controllers.VCSEventsController{
-		TestingMode:                     true,
-		Logger:                          logger,
-		Scope:                           scope,
-		ApplyDisabled:                   false,
-		AzureDevopsWebhookBasicUser:     user,
-		AzureDevopsWebhookBasicPassword: secret,
-		AzureDevopsRequestValidator:     v,
-		Parser:                          p,
-		CommentParser:                   cp,
-		CommandRunner:                   cr,
-		PullCleaner:                     c,
-		SupportedVCSHosts:               []models.VCSHostType{models.AzureDevops},
-		RepoAllowlistChecker:            repoAllowlistChecker,
-		VCSClient:                       vcsmock,
-	}
+	e, _, _, ado, _, _, _, _, _ := setup(t)
 
 	repo := models.Repo{}
 	When(e.Parser.ParseAzureDevopsRepo(matchers.AnyPtrToAzuredevopsGitRepository())).ThenReturn(repo, nil)
@@ -622,7 +593,7 @@ func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
 	t.Run("Testing to see if comment passes ignore conditions", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "", strings.NewReader(payload))
 		req.Header.Set(azuredevopsHeader, "reqID")
-		When(v.Validate(req, user, secret)).ThenReturn([]byte(payload), nil)
+		When(ado.Validate(req, user, secret)).ThenReturn([]byte(payload), nil)
 		w := httptest.NewRecorder()
 		e.Post(w, req)
 		ResponseContains(t, w, http.StatusOK, "Processing...")
