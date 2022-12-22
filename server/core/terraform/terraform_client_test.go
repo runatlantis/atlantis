@@ -332,7 +332,7 @@ func TestEnsureVersion_downloaded_downloadingDisabled(t *testing.T) {
 	Ok(t, err)
 
 	err = c.EnsureVersion(logger, v)
-	ErrContains(t, "could not find terraform version", err)
+	ErrContains(t, "Could not find terraform version", err)
 	ErrContains(t, "downloads are disabled", err)
 	mockDownloader.VerifyWasCalled(Never())
 }

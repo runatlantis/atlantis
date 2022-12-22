@@ -84,7 +84,7 @@ func (mock *MockClient) DetectVersion(log logging.SimpleLogging, projectDirector
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{projectDirectory, log}
+	params := []pegomock.Param{log, projectDirectory}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("DetectVersion", params, []reflect.Type{reflect.TypeOf((**go_version.Version)(nil)).Elem()})
 	var ret0 *go_version.Version
 	if len(result) != 0 {
@@ -237,8 +237,8 @@ func (c *MockClient_ListAvailableVersions_OngoingVerification) GetAllCapturedArg
 	return
 }
 
-func (verifier *VerifierMockClient) DetectVersion(projectDirectory string, log logging.SimpleLogging) *MockClient_DetectVersion_OngoingVerification {
-	params := []pegomock.Param{projectDirectory, log}
+func (verifier *VerifierMockClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *MockClient_DetectVersion_OngoingVerification {
+	params := []pegomock.Param{log, projectDirectory}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DetectVersion", params, verifier.timeout)
 	return &MockClient_DetectVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -248,21 +248,21 @@ type MockClient_DetectVersion_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockClient_DetectVersion_OngoingVerification) GetCapturedArguments() (string, logging.SimpleLogging) {
-	projectDirectory, log := c.GetAllCapturedArguments()
-	return projectDirectory[len(projectDirectory)-1], log[len(log)-1]
+func (c *MockClient_DetectVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string) {
+	log, projectDirectory := c.GetAllCapturedArguments()
+	return log[len(log)-1], projectDirectory[len(projectDirectory)-1]
 }
 
-func (c *MockClient_DetectVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []logging.SimpleLogging) {
+func (c *MockClient_DetectVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(string)
+			_param0[u] = param.(logging.SimpleLogging)
 		}
-		_param1 = make([]logging.SimpleLogging, len(c.methodInvocations))
+		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(logging.SimpleLogging)
+			_param1[u] = param.(string)
 		}
 	}
 	return

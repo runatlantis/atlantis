@@ -1199,7 +1199,6 @@ projects:
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
-
 			When(terraformClient.DetectVersion(matchers.AnyLoggingSimpleLogging(), AnyString())).Then(func(params []Param) ReturnValues {
 				projectName := filepath.Base(params[1].(string))
 				testVersion := testCase.Exp[projectName]
@@ -1246,7 +1245,7 @@ projects:
 			Equals(t, len(testCase.Exp), len(actCtxs))
 			for _, actCtx := range actCtxs {
 				if testCase.Exp[actCtx.RepoRelDir] != "" {
-					Assert(t, actCtx.TerraformVersion != nil, "TerraformVersion is nil.")
+					Assert(t, actCtx.TerraformVersion != nil, "TerraformVersion is nil, not %s for %s", testCase.Exp[actCtx.RepoRelDir], actCtx.RepoRelDir)
 					Equals(t, testCase.Exp[actCtx.RepoRelDir], actCtx.TerraformVersion.String())
 				} else {
 					Assert(t, actCtx.TerraformVersion == nil, "TerraformVersion is supposed to be nil.")
