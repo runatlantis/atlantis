@@ -91,7 +91,7 @@ Set the `mergeable` requirement by:
 Each VCS provider has a different concept of "mergeability":
 
 ::: warning
-Some VCS providers have a feature for branch protection to control "mergeability". If you want to use it,
+Some VCS providers have a feature for branch protection to control "mergeability". To use it,
 limit the base branch so to not bypass the branch protection.
 See also the `branch` keyword in [Server Side Repo Config](server-side-repo-config.html#reference) for more details.
 :::
