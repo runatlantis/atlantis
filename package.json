@@ -5,6 +5,6 @@
   },
   "scripts": {
     "website:dev": "vuepress dev runatlantis.io",
-    "website:build": "vuepress build runatlantis.io"
+    "website:build": "NODE_OPTIONS=--openssl-legacy-provider vuepress build runatlantis.io"
   }
 }

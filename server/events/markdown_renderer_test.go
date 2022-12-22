@@ -260,10 +260,15 @@ $$$
 			[]command.ProjectResult{
 				{
 					PolicyCheckSuccess: &models.PolicyCheckSuccess{
-						PolicyCheckOutput: "2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions",
-						LockURL:           "lock-url",
-						RePlanCmd:         "atlantis plan -d path -w workspace",
-						ApplyCmd:          "atlantis apply -d path -w workspace",
+						// strings.Repeat require to get wrapped result
+						PolicyCheckOutput: strings.Repeat("line\n", 13) + `Checking plan against the following policies:
+  test_policy
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions`,
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -273,7 +278,13 @@ $$$
 			models.Github,
 			`Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
 
+<details><summary>Show Output</summary>
+
 $$$diff
+` + strings.Repeat("line\n", 13) + `Checking plan against the following policies:
+  test_policy
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
 2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions
 $$$
 
@@ -282,6 +293,8 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
     * $atlantis plan -d path -w workspace$
+</details>
+2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
