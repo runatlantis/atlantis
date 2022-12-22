@@ -53,7 +53,7 @@ Each VCS provider has different rules around who can approve:
 * **Azure DevOps** – **All builtin groups include the "Contribute to pull requests"** permission and can approve a pull request
 
 :::tip Tip
-If you want to require **certain people** to approve the pull request, look at the
+To require **certain people** to approve the pull request, look at the
 [mergeable](#mergeable) requirement.
 :::
 
