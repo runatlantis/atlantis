@@ -165,7 +165,7 @@ you can append them to the end of the comment after `--`, ex.
 ```
 atlantis import -d dir 'aws_instance.example["foo"]' i-1234567890abcdef0 -- -var foo='bar'
 ```
-If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
+If a flag is needed to be always appended, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
 
 ---
 ## atlantis unlock
