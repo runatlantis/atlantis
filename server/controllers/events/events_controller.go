@@ -627,15 +627,22 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 		return
 	}
 
-	if *resource.Comment.IsDeleted {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since it is linked to deleting a pull request comment; %s", azuredevopsReqID)
-		return
+	if resource.Comment.IsDeleted != nil {
+		if *resource.Comment.IsDeleted {
+			e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since it is linked to deleting a pull request comment; %s", azuredevopsReqID)
+			return
+		}
 	}
 
 	strippedComment := bluemonday.StrictPolicy().SanitizeBytes([]byte(*resource.Comment.Content))
 
 	if resource.PullRequest == nil {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no pull request is linked to payload; %s", azuredevopsReqID)
+		return
+	}
+
+	if isAzureDevOpsTestRepoURL(*resource.PullRequest.Repository.URL) {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring Azure DevOps Test Event with Repo URL: %v %s", resource.PullRequest.Repository.URL, azuredevopsReqID)
 		return
 	}
 
@@ -679,6 +686,16 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseW
 			e.respond(w, logging.Debug, http.StatusOK, "%s: %s", msg, azuredevopsReqID)
 			return
 		}
+	}
+
+	resource, ok := event.Resource.(*azuredevops.GitPullRequest)
+	if !ok || event.PayloadType != azuredevops.PullRequestEvent {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Event.Resource is nil or received bad event type %v; %s", event.Resource, azuredevopsReqID)
+		return
+	}
+	if isAzureDevOpsTestRepoURL(*resource.Repository.URL) {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring Azure DevOps Test Event with Repo URL: %v %s", resource.Repository.URL, azuredevopsReqID)
+		return
 	}
 
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseAzureDevopsPullEvent(*event)
@@ -729,4 +746,8 @@ func (e *VCSEventsController) commentNotAllowlisted(baseRepo models.Repo, pullNu
 	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
 		e.Logger.Err("unable to comment on pull request: %s", err)
 	}
+}
+
+func isAzureDevOpsTestRepoURL(URL string) bool {
+	return (URL == "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079")
 }
