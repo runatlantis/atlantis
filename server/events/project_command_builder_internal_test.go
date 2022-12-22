@@ -7,9 +7,9 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
-
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -634,6 +634,8 @@ projects:
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
+			terraformClient := mocks.NewMockClient()
+
 			builder := NewProjectCommandBuilder(
 				false,
 				parser,
@@ -651,6 +653,7 @@ projects:
 				false,
 				statsScope,
 				logger,
+				terraformClient,
 			)
 
 			// We run a test for each type of command.
@@ -839,6 +842,8 @@ projects:
 			logger := logging.NewNoopLogger(t)
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
+			terraformClient := mocks.NewMockClient()
+
 			builder := NewProjectCommandBuilder(
 				false,
 				parser,
@@ -856,6 +861,7 @@ projects:
 				false,
 				statsScope,
 				logger,
+				terraformClient,
 			)
 
 			// We run a test for each type of command, again specific projects
@@ -1074,6 +1080,8 @@ workflows:
 			}
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
+			terraformClient := mocks.NewMockClient()
+
 			builder := NewProjectCommandBuilder(
 				true,
 				parser,
@@ -1091,6 +1099,7 @@ workflows:
 				false,
 				statsScope,
 				logger,
+				terraformClient,
 			)
 
 			cmd := command.PolicyCheck
