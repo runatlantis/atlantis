@@ -354,6 +354,14 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 			if err != nil {
 				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", repoDir)
 			}
+			automerge := DefaultAutomergeEnabled
+			parallelApply := DefaultParallelApplyEnabled
+			parallelPlan := DefaultParallelPlanEnabled
+			if hasRepoCfg {
+				automerge = repoCfg.Automerge
+				parallelApply = repoCfg.ParallelApply
+				parallelPlan = repoCfg.ParallelPlan
+			}
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)
 
 			projCtxs = append(projCtxs,
@@ -363,9 +371,9 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *command.Context
 					pCfg,
 					commentFlags,
 					repoDir,
-					DefaultAutomergeEnabled,
-					DefaultParallelApplyEnabled,
-					DefaultParallelPlanEnabled,
+					automerge,
+					parallelApply,
+					parallelPlan,
 					verbose,
 				)...)
 		}
