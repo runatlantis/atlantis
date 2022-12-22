@@ -70,7 +70,7 @@ You can set the `mergeable` requirement by:
      apply_requirements: [mergeable]
     ```
 
-1. Or by allowing an `atlantis.yaml` file to specify `apply_requirements` and `import_requirements` keys in your `repos.yaml` config:
+1. Or by allowing an `atlantis.yaml` file to specify `apply_requirements` and `import_requirements` keys in the `repos.yaml` config:
     #### repos.yaml
     ```yaml
     repos:
