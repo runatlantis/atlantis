@@ -24,6 +24,7 @@ type Repo struct {
 	Branch                    string         `yaml:"branch" json:"branch"`
 	RepoConfigFile            string         `yaml:"repo_config_file" json:"repo_config_file"`
 	ApplyRequirements         []string       `yaml:"apply_requirements" json:"apply_requirements"`
+	ImportRequirements        []string       `yaml:"import_requirements" json:"import_requirements"`
 	PreWorkflowHooks          []WorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
 	Workflow                  *string        `yaml:"workflow,omitempty" json:"workflow,omitempty"`
 	PostWorkflowHooks         []WorkflowHook `yaml:"post_workflow_hooks" json:"post_workflow_hooks"`
@@ -96,9 +97,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 
 	// assumes: globalcfg is always initialized with one repo .*
 	applyReqs := defaultCfg.Repos[0].ApplyRequirements
-
 	var globalApplyReqs []string
-
 	for _, req := range applyReqs {
 		for _, nonOverrideableReq := range valid.NonOverrideableApplyReqs {
 			if req == nonOverrideableReq {
@@ -106,6 +105,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 			}
 		}
 	}
+	globalImportReqs := defaultCfg.Repos[0].ImportRequirements
 
 	for k, v := range g.Workflows {
 		validatedWorkflow := v.ToValid(k)
@@ -126,7 +126,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 
 	var repos []valid.Repo
 	for _, r := range g.Repos {
-		repos = append(repos, r.ToValid(workflows, globalApplyReqs))
+		repos = append(repos, r.ToValid(workflows, globalApplyReqs, globalImportReqs))
 	}
 	repos = append(defaultCfg.Repos, repos...)
 
@@ -189,8 +189,8 @@ func (r Repo) Validate() error {
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey {
-				return fmt.Errorf("%q is not a valid override, only %q, %q, %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey)
+			if o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey {
+				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q and %q are supported", o, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey)
 			}
 		}
 		return nil
@@ -213,12 +213,13 @@ func (r Repo) Validate() error {
 		validation.Field(&r.RepoConfigFile, validation.By(repoConfigFileValid)),
 		validation.Field(&r.AllowedOverrides, validation.By(overridesValid)),
 		validation.Field(&r.ApplyRequirements, validation.By(validApplyReq)),
+		validation.Field(&r.ImportRequirements, validation.By(validImportReq)),
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
 		validation.Field(&r.DeleteSourceBranchOnMerge, validation.By(deleteSourceBranchOnMergeValid)),
 	)
 }
 
-func (r Repo) ToValid(workflows map[string]valid.Workflow, globalApplyReqs []string) valid.Repo {
+func (r Repo) ToValid(workflows map[string]valid.Workflow, globalApplyReqs []string, globalImportReqs []string) valid.Repo {
 	var id string
 	var idRegex *regexp.Regexp
 	if r.HasRegexID() {
@@ -259,18 +260,28 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow, globalApplyReqs []str
 	}
 
 	var mergedApplyReqs []string
-
 	mergedApplyReqs = append(mergedApplyReqs, r.ApplyRequirements...)
+	var mergedImportReqs []string
+	mergedImportReqs = append(mergedImportReqs, r.ImportRequirements...)
 
 	// only add global reqs if they don't exist already.
-OUTER:
+OuterGlobalApplyReqs:
 	for _, globalReq := range globalApplyReqs {
 		for _, currReq := range r.ApplyRequirements {
 			if globalReq == currReq {
-				continue OUTER
+				continue OuterGlobalApplyReqs
 			}
 		}
 		mergedApplyReqs = append(mergedApplyReqs, globalReq)
+	}
+OuterGlobalImportReqs:
+	for _, globalReq := range globalImportReqs {
+		for _, currReq := range r.ImportRequirements {
+			if globalReq == currReq {
+				continue OuterGlobalImportReqs
+			}
+		}
+		mergedImportReqs = append(mergedImportReqs, globalReq)
 	}
 
 	return valid.Repo{
@@ -279,6 +290,7 @@ OUTER:
 		BranchRegex:               branchRegex,
 		RepoConfigFile:            r.RepoConfigFile,
 		ApplyRequirements:         mergedApplyReqs,
+		ImportRequirements:        mergedImportReqs,
 		PreWorkflowHooks:          preWorkflowHooks,
 		Workflow:                  workflow,
 		PostWorkflowHooks:         postWorkflowHooks,

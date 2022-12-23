@@ -107,59 +107,82 @@ func TestParse_HelpResponseWithApplyDisabled(t *testing.T) {
 func TestParse_UnusedArguments(t *testing.T) {
 	t.Log("if there are unused flags we return an error")
 	cases := []struct {
-		Command command.Name
-		Args    string
-		Unused  string
+		Command    command.Name
+		Args       string
+		Unused     string
+		ExpMessage string
 	}{
 		{
 			command.Plan,
 			"-d . arg",
 			"arg",
+			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"arg -d .",
 			"arg",
+			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"arg",
 			"arg",
+			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"arg arg2",
 			"arg arg2",
+			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"-d . arg -w kjj arg2",
 			"arg arg2",
+			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"-d . arg",
 			"arg",
+			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"arg arg2",
 			"arg arg2",
+			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"arg arg2 -- useful",
 			"arg arg2",
+			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"arg arg2 --",
 			"arg arg2",
+			"unknown argument(s)",
 		},
 		{
 			command.ApprovePolicies,
 			"arg arg2 --",
 			"arg arg2",
+			"unknown argument(s)",
+		},
+		{
+			command.Import,
+			"arg --",
+			"arg",
+			"invalid argument count",
+		},
+		{
+			command.Import,
+			"arg1 arg2 arg3 --",
+			"arg1 arg2 arg3",
+			"invalid argument count",
 		},
 	}
 	for _, c := range cases {
@@ -174,8 +197,10 @@ func TestParse_UnusedArguments(t *testing.T) {
 				usage = ApplyUsage
 			case command.ApprovePolicies:
 				usage = ApprovePolicyUsage
+			case command.Import:
+				usage = ImportUsage
 			}
-			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s.\n%s```", c.Unused, usage), r.CommentResponse)
+			Equals(t, fmt.Sprintf("```\nError: %s – %s.\n%s```", c.ExpMessage, c.Unused, usage), r.CommentResponse)
 		})
 	}
 }
@@ -225,17 +250,22 @@ func TestParse_InvalidCommand(t *testing.T) {
 func TestParse_SubcommandUsage(t *testing.T) {
 	t.Log("given a comment asking for the usage of a subcommand should " +
 		"return help")
-	comments := []string{
-		"atlantis plan -h",
-		"atlantis plan --help",
-		"atlantis apply -h",
-		"atlantis apply --help",
-		"atlantis approve_policies -h",
-		"atlantis approve_policies --help",
+	tests := []struct {
+		input    string
+		expUsage string
+	}{
+		{"atlantis plan -h", "plan"},
+		{"atlantis plan --help", "plan"},
+		{"atlantis apply -h", "apply"},
+		{"atlantis apply --help", "apply"},
+		{"atlantis approve_policies -h", "approve_policies"},
+		{"atlantis approve_policies --help", "approve_policies"},
+		{"atlantis import -h", "import ADDRESS ID"},
+		{"atlantis import --help", "import ADDRESS ID"},
 	}
-	for _, c := range comments {
-		r := commentParser.Parse(c, models.Github)
-		exp := "Usage of " + strings.Fields(c)[1]
+	for _, c := range tests {
+		r := commentParser.Parse(c.input, models.Github)
+		exp := "Usage of " + c.expUsage
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 		Assert(t, !strings.Contains(r.CommentResponse, "Error:"),
@@ -266,6 +296,10 @@ func TestParse_InvalidFlags(t *testing.T) {
 			"atlantis apply --abc",
 			"Error: unknown flag: --abc",
 		},
+		{
+			"atlantis import --abc",
+			"Error: unknown flag: --abc",
+		},
 	}
 	for _, c := range cases {
 		r := commentParser.Parse(c.comment, models.Github)
@@ -281,13 +315,17 @@ func TestParse_RelativeDirPath(t *testing.T) {
 	comments := []string{
 		"atlantis plan -d ..",
 		"atlantis apply -d ..",
+		"atlantis import -d .. address id",
 		// These won't return an error because we prepend with . when parsing.
 		//"atlantis plan -d /..",
 		//"atlantis apply -d /..",
+		//"atlantis import -d /.. address id",
 		"atlantis plan -d ./..",
 		"atlantis apply -d ./..",
+		"atlantis import -d ./.. address id",
 		"atlantis plan -d a/b/../../..",
 		"atlantis apply -d a/../..",
+		"atlantis import -d a/../.. address id",
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
@@ -331,12 +369,16 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 	comments := []string{
 		"atlantis plan -w ..",
 		"atlantis apply -w ..",
+		"atlantis import -w .. address id",
 		"atlantis plan -w /",
 		"atlantis apply -w /",
+		"atlantis import -w / address id",
 		"atlantis plan -w ..abc",
 		"atlantis apply -w abc..",
+		"atlantis import -w abc.. address id",
 		"atlantis plan -w abc..abc",
 		"atlantis apply -w ../../../etc/passwd",
+		"atlantis import -w ../../../etc/passwd address id",
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
@@ -582,7 +624,7 @@ func TestParse_Parsing(t *testing.T) {
 	}
 
 	for _, test := range cases {
-		for _, cmdName := range []string{"plan", "apply"} {
+		for _, cmdName := range []string{"plan", "apply", "import 'some[\"addr\"]' id"} {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
 			t.Run(comment, func(t *testing.T) {
 				r := commentParser.Parse(comment, models.Github)
@@ -591,15 +633,25 @@ func TestParse_Parsing(t *testing.T) {
 				Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
 				Assert(t, test.expVerbose == r.Command.Verbose, "exp verbose to equal %v but was %v for comment %q", test.expVerbose, r.Command.Verbose, comment)
 				actExtraArgs := strings.Join(r.Command.Flags, " ")
-				Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 				if cmdName == "plan" {
 					Assert(t, r.Command.Name == command.Plan, "did not parse comment %q as plan command", comment)
+					Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 				}
 				if cmdName == "apply" {
 					Assert(t, r.Command.Name == command.Apply, "did not parse comment %q as apply command", comment)
+					Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 				}
 				if cmdName == "approve_policies" {
 					Assert(t, r.Command.Name == command.ApprovePolicies, "did not parse comment %q as approve_policies command", comment)
+					Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
+				}
+				if strings.HasPrefix(cmdName, "import") {
+					expExtraArgs := "some[\"addr\"] id" // import use default args with `some["addr"] id`
+					if test.expExtraArgs != "" {
+						expExtraArgs = fmt.Sprintf("%s %s", test.expExtraArgs, expExtraArgs)
+					}
+					Assert(t, r.Command.Name == command.Import, "did not parse comment %q as import command", comment)
+					Assert(t, expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", expExtraArgs, actExtraArgs, comment)
 				}
 			})
 		}
@@ -719,9 +771,6 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 				case command.Apply:
 					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled)
 					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
-				case command.Version:
-					actComment := commentParser.BuildVersionComment(c.repoRelDir, c.workspace, c.project)
-					Equals(t, fmt.Sprintf("atlantis version %s", c.expVersionFlags), actComment)
 				}
 			}
 		})
@@ -762,6 +811,8 @@ Commands:
   approve_policies
            Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
+  import   Runs 'terraform import' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
   help     View help.
 
 Flags:
@@ -791,6 +842,8 @@ Commands:
   approve_policies
            Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
+  import   Runs 'terraform import' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
   help     View help.
 
 Flags:
@@ -874,6 +927,7 @@ var ApplyUsage = `Usage of apply:
 var ApprovePolicyUsage = `Usage of approve_policies:
       --verbose   Append Atlantis log to comment.
 `
+
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
 	`atlantis unlock
 
@@ -881,3 +935,13 @@ var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
   Arguments or flags are not supported at the moment.
   If you need to unlock a specific project please use the atlantis UI.` +
 	"\n```"
+
+var ImportUsage = `Usage of import ADDRESS ID:
+  -d, --dir string         Which directory to run import in relative to root of
+                           repo, ex. 'child/dir'.
+  -p, --project string     Which project to run import for. Refers to the name of
+                           the project configured in a repo config file. Cannot be
+                           used at same time as workspace or dir flags.
+      --verbose            Append Atlantis log to comment.
+  -w, --workspace string   Switch to this Terraform workspace before importing.
+`
