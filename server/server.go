@@ -568,16 +568,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing show step runner")
 	}
 
-	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
+	policyCheckStepRunner, err := runtime.NewPolicyCheckStepRunner(
 		defaultTfVersion,
 		policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
 	)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing policy check runner")
+		return nil, errors.Wrap(err, "initializing policy check step runner")
 	}
 
-	applyRequirementHandler := &events.AggregateApplyRequirements{
+	applyRequirementHandler := &events.DefaultCommandRequirementHandler{
 		WorkingDir: workingDir,
 	}
 
@@ -595,7 +595,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			AsyncTFExec:         terraformClient,
 		},
 		ShowStepRunner:        showStepRunner,
-		PolicyCheckStepRunner: policyCheckRunner,
+		PolicyCheckStepRunner: policyCheckStepRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor:   terraformClient,
 			DefaultTFVersion:    defaultTfVersion,
@@ -613,10 +613,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-		WorkingDir:                 workingDir,
-		Webhooks:                   webhooksManager,
-		WorkingDirLocker:           workingDirLocker,
-		AggregateApplyRequirements: applyRequirementHandler,
+		ImportStepRunner: &runtime.ImportStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTfVersion,
+		},
+		WorkingDir:                workingDir,
+		Webhooks:                  webhooksManager,
+		WorkingDirLocker:          workingDirLocker,
+		CommandRequirementHandler: applyRequirementHandler,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -716,12 +720,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 	)
 
+	importCommandRunner := events.NewImportCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		instrumentedProjectCmdRunner,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
 		command.ApprovePolicies: approvePoliciesCommandRunner,
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
+		command.Import:          importCommandRunner,
 	}
 
 	githubTeamAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)

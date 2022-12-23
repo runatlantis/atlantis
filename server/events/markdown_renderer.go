@@ -33,6 +33,7 @@ var (
 	policyCheckCommandTitle     = command.PolicyCheck.TitleString()
 	approvePoliciesCommandTitle = command.ApprovePolicies.TitleString()
 	versionCommandTitle         = command.Version.TitleString()
+	importCommandTitle          = command.Import.TitleString()
 	// maxUnwrappedLines is the maximum number of lines the Terraform output
 	// can be before we wrap it in an expandable template.
 	maxUnwrappedLines = 12
@@ -220,6 +221,12 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				resultData.Rendered = m.renderTemplate(templates.Lookup("versionUnwrappedSuccess"), struct{ Output string }{result.VersionSuccess})
 			}
 			numVersionSuccesses++
+		} else if result.ImportSuccess != nil {
+			if m.shouldUseWrappedTmpl(vcsHost, result.ImportSuccess.Output) {
+				resultData.Rendered = m.renderTemplate(templates.Lookup("importSuccessWrapped"), result.ImportSuccess)
+			} else {
+				resultData.Rendered = m.renderTemplate(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
+			}
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
@@ -242,6 +249,8 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		tmpl = templates.Lookup("singleProjectVersionUnsuccessful")
 	case len(resultsTmplData) == 1 && common.Command == applyCommandTitle:
 		tmpl = templates.Lookup("singleProjectApply")
+	case len(resultsTmplData) == 1 && common.Command == importCommandTitle:
+		tmpl = templates.Lookup("singleProjectImport")
 	case common.Command == planCommandTitle,
 		common.Command == policyCheckCommandTitle:
 		tmpl = templates.Lookup("multiProjectPlan")
@@ -251,6 +260,8 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		tmpl = templates.Lookup("multiProjectApply")
 	case common.Command == versionCommandTitle:
 		tmpl = templates.Lookup("multiProjectVersion")
+	case common.Command == importCommandTitle:
+		tmpl = templates.Lookup("multiProjectImport")
 	default:
 		return "no template matched–this is a bug"
 	}

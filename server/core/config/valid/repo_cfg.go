@@ -127,6 +127,7 @@ type Project struct {
 	TerraformVersion          *version.Version
 	Autoplan                  Autoplan
 	ApplyRequirements         []string
+	ImportRequirements        []string
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
 	ExecutionOrderGroup       int
@@ -168,4 +169,5 @@ type Workflow struct {
 	Apply       Stage
 	Plan        Stage
 	PolicyCheck Stage
+	Import      Stage
 }

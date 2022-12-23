@@ -10,7 +10,7 @@ for using this step include:
 
 ## How it works?
 
-Enabling "policy checking" in addition to the [mergeable apply requirement](https://www.runatlantis.io/docs/apply-requirements.html#supported-requirements) blocks applies on plans that fail any of the defined conftest policies.
+Enabling "policy checking" in addition to the [mergeable apply requirement](/docs/command-requirements.html#supported-requirements) blocks applies on plans that fail any of the defined conftest policies.
 
 ![Policy Check Apply Failure](./images/policy-check-apply-failure.png)
 

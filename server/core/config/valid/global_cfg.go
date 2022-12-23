@@ -9,11 +9,12 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-const MergeableApplyReq = "mergeable"
-const ApprovedApplyReq = "approved"
-const UnDivergedApplyReq = "undiverged"
-const PoliciesPassedApplyReq = "policies_passed"
+const MergeableCommandReq = "mergeable"
+const ApprovedCommandReq = "approved"
+const UnDivergedCommandReq = "undiverged"
+const PoliciesPassedCommandReq = "policies_passed"
 const ApplyRequirementsKey = "apply_requirements"
+const ImportRequirementsKey = "import_requirements"
 const PreWorkflowHooksKey = "pre_workflow_hooks"
 const WorkflowKey = "workflow"
 const PostWorkflowHooksKey = "post_workflow_hooks"
@@ -32,7 +33,7 @@ const DefaultAtlantisFile = "atlantis.yaml"
 // TODO: Make this more customizable, not everyone wants this rigid workflow
 // maybe something along the lines of defining overridable/non-overrideable apply
 // requirements in the config and removing the flag to enable policy checking.
-var NonOverrideableApplyReqs = []string{PoliciesPassedApplyReq}
+var NonOverrideableApplyReqs = []string{PoliciesPassedCommandReq}
 
 // GlobalCfg is the final parsed version of server-side repo config.
 type GlobalCfg struct {
@@ -67,6 +68,7 @@ type Repo struct {
 	BranchRegex               *regexp.Regexp
 	RepoConfigFile            string
 	ApplyRequirements         []string
+	ImportRequirements        []string
 	PreWorkflowHooks          []*WorkflowHook
 	Workflow                  *Workflow
 	PostWorkflowHooks         []*WorkflowHook
@@ -79,6 +81,7 @@ type Repo struct {
 
 type MergedProjectCfg struct {
 	ApplyRequirements         []string
+	ImportRequirements        []string
 	Workflow                  Workflow
 	AllowedWorkflows          []string
 	RepoRelDir                string
@@ -134,6 +137,18 @@ var DefaultPlanStage = Stage{
 	},
 }
 
+// DefaultImportStage is the Atlantis default import stage.
+var DefaultImportStage = Stage{
+	Steps: []Step{
+		{
+			StepName: "init",
+		},
+		{
+			StepName: "import",
+		},
+	},
+}
+
 // Deprecated: use NewGlobalCfgFromArgs
 func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq bool, unDivergedReq bool, preWorkflowHooks []*WorkflowHook, postWorkflowHooks []*WorkflowHook) GlobalCfg {
 	return NewGlobalCfgFromArgs(GlobalCfgArgs{
@@ -178,31 +193,31 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 		Apply:       DefaultApplyStage,
 		Plan:        DefaultPlanStage,
 		PolicyCheck: DefaultPolicyCheckStage,
+		Import:      DefaultImportStage,
 	}
 	// Must construct slices here instead of using a `var` declaration because
 	// we treat nil slices differently.
-	applyReqs := []string{}
+	commandReqs := []string{}
 	allowedOverrides := []string{}
 	allowedWorkflows := []string{}
 	if args.MergeableReq {
-		applyReqs = append(applyReqs, MergeableApplyReq)
+		commandReqs = append(commandReqs, MergeableCommandReq)
 	}
 	if args.ApprovedReq {
-		applyReqs = append(applyReqs, ApprovedApplyReq)
+		commandReqs = append(commandReqs, ApprovedCommandReq)
 	}
 	if args.UnDivergedReq {
-		applyReqs = append(applyReqs, UnDivergedApplyReq)
+		commandReqs = append(commandReqs, UnDivergedCommandReq)
 	}
-
 	if args.PolicyCheckEnabled {
-		applyReqs = append(applyReqs, PoliciesPassedApplyReq)
+		commandReqs = append(commandReqs, PoliciesPassedCommandReq)
 	}
 
 	allowCustomWorkflows := false
 	deleteSourceBranchOnMerge := false
 	repoLockingKey := true
 	if args.AllowRepoCfg {
-		allowedOverrides = []string{ApplyRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey}
+		allowedOverrides = []string{ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey}
 		allowCustomWorkflows = true
 	}
 
@@ -212,7 +227,8 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 				IDRegex:                   regexp.MustCompile(".*"),
 				BranchRegex:               regexp.MustCompile(".*"),
 				RepoConfigFile:            args.RepoConfigFile,
-				ApplyRequirements:         applyReqs,
+				ApplyRequirements:         commandReqs,
+				ImportRequirements:        commandReqs,
 				PreWorkflowHooks:          args.PreWorkflowHooks,
 				Workflow:                  &defaultWorkflow,
 				PostWorkflowHooks:         args.PostWorkflowHooks,
@@ -257,7 +273,7 @@ func (r Repo) IDString() string {
 // final config. It assumes that all configs have been validated.
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
 	log.Debug("MergeProjectCfg started")
-	applyReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge, repoLocking := g.getMatchingCfg(log, repoID)
+	applyReqs, importReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge, repoLocking := g.getMatchingCfg(log, repoID)
 
 	// If repos are allowed to override certain keys then override them.
 	for _, key := range allowedOverrides {
@@ -266,6 +282,11 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 			if proj.ApplyRequirements != nil {
 				log.Debug("overriding server-defined %s with repo settings: [%s]", ApplyRequirementsKey, strings.Join(proj.ApplyRequirements, ","))
 				applyReqs = proj.ApplyRequirements
+			}
+		case ImportRequirementsKey:
+			if proj.ImportRequirements != nil {
+				log.Debug("overriding server-defined %s with repo settings: [%s]", ImportRequirementsKey, strings.Join(proj.ImportRequirements, ","))
+				importReqs = proj.ImportRequirements
 			}
 		case WorkflowKey:
 			if proj.WorkflowName != nil {
@@ -312,11 +333,12 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		log.Debug("MergeProjectCfg completed")
 	}
 
-	log.Debug("final settings: %s: [%s], %s: %s",
-		ApplyRequirementsKey, strings.Join(applyReqs, ","), WorkflowKey, workflow.Name)
+	log.Debug("final settings: %s: [%s], %s: [%s], %s: %s",
+		ApplyRequirementsKey, strings.Join(applyReqs, ","), ImportRequirementsKey, strings.Join(importReqs, ","), WorkflowKey, workflow.Name)
 
 	return MergedProjectCfg{
 		ApplyRequirements:         applyReqs,
+		ImportRequirements:        importReqs,
 		Workflow:                  workflow,
 		RepoRelDir:                proj.Dir,
 		Workspace:                 proj.Workspace,
@@ -335,9 +357,10 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 // repo with id repoID. It is used when there is no repo config.
 func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
 	log.Debug("building config based on server-side config")
-	applyReqs, workflow, _, _, deleteSourceBranchOnMerge, repoLocking := g.getMatchingCfg(log, repoID)
+	applyReqs, importReqs, workflow, _, _, deleteSourceBranchOnMerge, repoLocking := g.getMatchingCfg(log, repoID)
 	return MergedProjectCfg{
 		ApplyRequirements:         applyReqs,
+		ImportRequirements:        importReqs,
 		Workflow:                  workflow,
 		RepoRelDir:                repoRelDir,
 		Workspace:                 workspace,
@@ -386,6 +409,9 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		}
 		if p.ApplyRequirements != nil && !sliceContainsF(allowedOverrides, ApplyRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ApplyRequirementsKey, AllowedOverridesKey, ApplyRequirementsKey)
+		}
+		if p.ImportRequirements != nil && !sliceContainsF(allowedOverrides, ImportRequirementsKey) {
+			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ImportRequirementsKey, AllowedOverridesKey, ImportRequirementsKey)
 		}
 		if p.DeleteSourceBranchOnMerge != nil && !sliceContainsF(allowedOverrides, DeleteSourceBranchOnMergeKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", DeleteSourceBranchOnMergeKey, AllowedOverridesKey, DeleteSourceBranchOnMergeKey)
@@ -451,7 +477,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 }
 
 // getMatchingCfg returns the key settings for repoID.
-func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (applyReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocking bool) {
+func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (applyReqs []string, importReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocking bool) {
 	toLog := make(map[string]string)
 	traceF := func(repoIdx int, repoID string, key string, val interface{}) string {
 		from := "default server config"
@@ -473,7 +499,7 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 		return fmt.Sprintf("setting %s: %s from %s", key, valStr, from)
 	}
 
-	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, DeleteSourceBranchOnMergeKey, RepoLockingKey} {
+	for _, key := range []string{ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, DeleteSourceBranchOnMergeKey, RepoLockingKey} {
 		for i, repo := range g.Repos {
 			if repo.IDMatches(repoID) {
 				switch key {
@@ -481,6 +507,11 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 					if repo.ApplyRequirements != nil {
 						toLog[ApplyRequirementsKey] = traceF(i, repo.IDString(), ApplyRequirementsKey, repo.ApplyRequirements)
 						applyReqs = repo.ApplyRequirements
+					}
+				case ImportRequirementsKey:
+					if repo.ImportRequirements != nil {
+						toLog[ImportRequirementsKey] = traceF(i, repo.IDString(), ImportRequirementsKey, repo.ImportRequirements)
+						importReqs = repo.ImportRequirements
 					}
 				case WorkflowKey:
 					if repo.Workflow != nil {

@@ -103,6 +103,8 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		steps = []valid.Step{{
 			StepName: "version",
 		}}
+	case command.Import:
+		steps = prjCfg.Workflow.Import.Steps
 	}
 
 	// If TerraformVersion not defined in config file look for a
@@ -116,7 +118,6 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		cmdName,
 		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
-		cb.CommentBuilder.BuildVersionComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 		prjCfg,
 		steps,
 		prjCfg.PolicySets,
@@ -177,7 +178,6 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			command.PolicyCheck,
 			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
-			cb.CommentBuilder.BuildVersionComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 			prjCfg,
 			steps,
 			prjCfg.PolicySets,
@@ -200,7 +200,6 @@ func newProjectCommandContext(ctx *command.Context,
 	cmd command.Name,
 	applyCmd string,
 	planCmd string,
-	versionCmd string,
 	projCfg valid.MergedProjectCfg,
 	steps []valid.Step,
 	policySets valid.PolicySets,
@@ -251,6 +250,7 @@ func newProjectCommandContext(ctx *command.Context,
 		Pull:                       ctx.Pull,
 		ProjectName:                projCfg.Name,
 		ApplyRequirements:          projCfg.ApplyRequirements,
+		ImportRequirements:         projCfg.ImportRequirements,
 		RePlanCmd:                  planCmd,
 		RepoRelDir:                 projCfg.RepoRelDir,
 		RepoConfigVersion:          projCfg.RepoCfgVersion,

@@ -74,7 +74,7 @@ module.exports = {
                         'custom-workflows',
                         'repo-level-atlantis-yaml',
                         'upgrading-atlantis-yaml',
-                        'apply-requirements',
+                        'command-requirements',
                         'checkout-strategy',
                         'terraform-versions',
                         'terraform-cloud',

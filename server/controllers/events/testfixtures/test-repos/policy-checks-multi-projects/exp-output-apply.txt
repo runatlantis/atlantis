@@ -18,7 +18,7 @@ workspace = "default"
 
 ---
 ### 2. dir: `dir2` workspace: `default`
-**Apply Failed**: All policies must pass for project before running apply
+**Apply Failed**: All policies must pass for project before running apply.
 
 ---
 

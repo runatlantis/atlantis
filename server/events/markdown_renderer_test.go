@@ -304,6 +304,33 @@ $$$
 `,
 		},
 		{
+			"single successful import",
+			command.Import,
+			[]command.ProjectResult{
+				{
+					ImportSuccess: &models.ImportSuccess{
+						Output:    "import-output",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`Ran Import for project: $projectname$ dir: $path$ workspace: $workspace$
+
+$$$diff
+import-output
+$$$
+
+* :repeat: To **plan** this project again, comment:
+  * $atlantis plan -d path -w workspace$
+
+
+`,
+		},
+		{
 			"single successful apply",
 			command.Apply,
 			[]command.ProjectResult{
