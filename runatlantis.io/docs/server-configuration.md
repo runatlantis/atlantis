@@ -505,9 +505,9 @@ and set `--autoplan-modules` to `false`.
 
 ### `--gh-team-allowlist`
   ```bash
-  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply"
+  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
   # or
-  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply"
+  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
   ```
   In versions v0.21.0 and later, the GitHub team name can be a name or a slug.
   
@@ -789,7 +789,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_REQUIRE_APPROVAL=true
   ```
   This flag is deprecated. It requires all pull requests to be approved
-  before `atlantis apply` is allowed. See [Apply Requirements](apply-requirements.html) for more details.
+  before `atlantis apply` is allowed. See [Command Requirements](command-requirements.html) for more details.
 
   Instead of using this flag, create a server-side `--repo-config` file:
   ```yaml
@@ -808,7 +808,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_REQUIRE_MERGEABLE=true
   ```
   This flag is deprecated. It causes all pull requests to be mergeable
-  before `atlantis apply` is allowed. See [Apply Requirements](apply-requirements.html) for more details.
+  before `atlantis apply` is allowed. See [Command Requirements](command-requirements.html) for more details.
 
   Instead of using this flag, create a server-side `--repo-config` file:
   ```yaml
@@ -917,6 +917,15 @@ and set `--autoplan-modules` to `false`.
   ```
   Namespace for emitting stats/metrics. See [stats](stats.html) section.
 
+### `--tf--download`
+  ```bash
+  atlantis server --tf-download=false
+  # or
+  ATLANTIS_TF_DOWNLOAD=false
+  ```
+Defaults to `true`. Allow Atlantis to list and download additional versions of Terraform.
+Setting this to `false` can be useful in an air-gapped environment where a download mirror is not available.
+
 ### `--tf-download-url`
   ```bash
   atlantis server --tf-download-url="https://releases.company.com"
@@ -926,6 +935,8 @@ and set `--autoplan-modules` to `false`.
   An alternative URL to download Terraform versions if they are missing. Useful in an airgapped
   environment where releases.hashicorp.com is not available. Directory structure of the custom
   endpoint should match that of releases.hashicorp.com.
+  
+  This has no impact if `--tf-download` is set to `false`.
 
 ### `--tfe-hostname`
   ```bash

@@ -2,6 +2,7 @@ package events_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -403,6 +404,62 @@ func TestGitHubWorkflow(t *testing.T) {
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
 				{"exp-output-apply-locked.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "import single project",
+			RepoDir:       "import-single-project",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis import random_id.dummy1 AA",
+				"atlantis apply",
+				"atlantis import random_id.dummy2 BB",
+				"atlantis plan",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-import-dummy1.txt"},
+				{"exp-output-apply-no-projects.txt"},
+				{"exp-output-import-dummy2.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "import single project with -var",
+			RepoDir:       "import-single-project-var",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis import 'random_id.for_each[\"overridden\"]' AA -- -var var=overridden",
+				"atlantis import random_id.count[0] BB",
+				"atlantis plan -- -var var=overridden",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-import-foreach.txt"},
+				{"exp-output-import-count.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "import multiple project",
+			RepoDir:       "import-multiple-project",
+			ModifiedFiles: []string{"dir1/main.tf", "dir2/main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis import random_id.dummy1 AA",
+				"atlantis import -d dir1 random_id.dummy1 AA",
+				"atlantis plan",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-import-multiple-projects.txt"},
+				{"exp-output-import-dummy1.txt"},
+				{"exp-output-plan-again.txt"},
 				{"exp-output-merge.txt"},
 			},
 		},
@@ -909,7 +966,7 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		GitlabUser:     "gitlab-user",
 		ExecutableName: "atlantis",
 	}
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, projectCmdOutputHandler)
+	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, true, false, projectCmdOutputHandler)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
@@ -1005,6 +1062,7 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		false,
 		statsScope,
 		logger,
+		terraformClient,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
@@ -1040,6 +1098,10 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
 		},
+		ImportStepRunner: &runtime.ImportStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTFVersion,
+		},
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFVersion:        defaultTFVersion,
@@ -1048,7 +1110,7 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		WorkingDir:       workingDir,
 		Webhooks:         &mockWebhookSender{},
 		WorkingDirLocker: locker,
-		AggregateApplyRequirements: &events.AggregateApplyRequirements{
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: workingDir,
 		},
 	}
@@ -1141,12 +1203,19 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		silenceNoProjects,
 	)
 
+	importCommandRunner := events.NewImportCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
 		command.ApprovePolicies: approvePoliciesCommandRunner,
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
+		command.Import:          importCommandRunner,
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
@@ -1210,7 +1279,9 @@ func (w *mockWebhookSender) Send(log logging.SimpleLogging, result webhooks.Appl
 func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
 	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent.json"))
 	Ok(t, err)
-	requestJSON = []byte(strings.Replace(string(requestJSON), "###comment body###", comment, 1))
+	escapedComment, err := json.Marshal(comment)
+	Ok(t, err)
+	requestJSON = []byte(strings.Replace(string(requestJSON), "\"###comment body###\"", string(escapedComment), 1))
 	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
 	Ok(t, err)
 	req.Header.Set("Content-Type", "application/json")

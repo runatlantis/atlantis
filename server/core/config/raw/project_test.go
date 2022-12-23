@@ -21,14 +21,15 @@ func TestProject_UnmarshalYAML(t *testing.T) {
 			description: "omit unset fields",
 			input:       "",
 			exp: raw.Project{
-				Dir:               nil,
-				Workspace:         nil,
-				Workflow:          nil,
-				TerraformVersion:  nil,
-				Autoplan:          nil,
-				ApplyRequirements: nil,
-				Name:              nil,
-				Branch:            nil,
+				Dir:                nil,
+				Workspace:          nil,
+				Workflow:           nil,
+				TerraformVersion:   nil,
+				Autoplan:           nil,
+				ApplyRequirements:  nil,
+				ImportRequirements: nil,
+				Name:               nil,
+				Branch:             nil,
 			},
 		},
 		{
@@ -45,6 +46,8 @@ autoplan:
   enabled: false
 apply_requirements:
 - mergeable
+import_requirements:
+- mergeable
 execution_order_group: 10`,
 			exp: raw.Project{
 				Name:             String("myname"),
@@ -58,6 +61,7 @@ execution_order_group: 10`,
 					Enabled:      Bool(false),
 				},
 				ApplyRequirements:   []string{"mergeable"},
+				ImportRequirements:  []string{"mergeable"},
 				ExecutionOrderGroup: Int(10),
 			},
 		},
@@ -177,6 +181,22 @@ func TestProject_Validate(t *testing.T) {
 			input: raw.Project{
 				Dir:               String("."),
 				ApplyRequirements: []string{"undiverged", "mergeable", "approved"},
+			},
+			expErr: "",
+		},
+		{
+			description: "import reqs with unsupported",
+			input: raw.Project{
+				Dir:                String("."),
+				ImportRequirements: []string{"unsupported"},
+			},
+			expErr: "import_requirements: \"unsupported\" is not a valid import_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.",
+		},
+		{
+			description: "import reqs with undiverged, mergeable and approved requirements",
+			input: raw.Project{
+				Dir:                String("."),
+				ImportRequirements: []string{"undiverged", "mergeable", "approved"},
 			},
 			expErr: "",
 		},

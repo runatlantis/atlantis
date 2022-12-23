@@ -117,6 +117,7 @@ const (
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
 	RestrictFileList           = "restrict-file-list"
+	TFDownloadFlag             = "tf-download"
 	TFDownloadURLFlag          = "tf-download-url"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
@@ -151,6 +152,7 @@ const (
 	DefaultRedisTLSEnabled              = false
 	DefaultRedisInsecureSkipVerify      = false
 	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
+	DefaultTFDownload                   = true
 	DefaultTFEHostname                  = "app.terraform.io"
 	DefaultVCSStatusName                = "atlantis"
 	DefaultWebBasicAuth                 = false
@@ -499,6 +501,10 @@ var boolFlags = map[string]boolFlag{
 	SkipCloneNoChanges: {
 		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
 		defaultValue: false,
+	},
+	TFDownloadFlag: {
+		description:  "Allow Atlantis to list & download Terraform versions. Setting this to false can be helpful in air-gapped environments.",
+		defaultValue: DefaultTFDownload,
 	},
 	TFELocalExecutionModeFlag: {
 		description:  "Enable if you're using local execution mode (instead of TFE/C's remote execution mode).",
@@ -999,30 +1005,31 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 // being used. Right now this only applies to flags that have been made obsolete
 // due to server-side config.
 func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
-	var applyReqs []string
+	var commandReqs []string
 	var deprecatedFlags []string
 	if userConfig.RequireApproval {
 		deprecatedFlags = append(deprecatedFlags, RequireApprovalFlag)
-		applyReqs = append(applyReqs, valid.ApprovedApplyReq)
+		commandReqs = append(commandReqs, valid.ApprovedCommandReq)
 	}
 	if userConfig.RequireMergeable {
 		deprecatedFlags = append(deprecatedFlags, RequireMergeableFlag)
-		applyReqs = append(applyReqs, valid.MergeableApplyReq)
+		commandReqs = append(commandReqs, valid.MergeableCommandReq)
 	}
 
 	// Build up strings with what the recommended yaml and json config should
 	// be instead of using the deprecated flags.
 	yamlCfg := "---\nrepos:\n- id: /.*/"
 	jsonCfg := `{"repos":[{"id":"/.*/"`
-	if len(applyReqs) > 0 {
-		yamlCfg += fmt.Sprintf("\n  apply_requirements: [%s]", strings.Join(applyReqs, ", "))
-		jsonCfg += fmt.Sprintf(`, "apply_requirements":["%s"]`, strings.Join(applyReqs, "\", \""))
-
+	if len(commandReqs) > 0 {
+		yamlCfg += fmt.Sprintf("\n  apply_requirements: [%s]", strings.Join(commandReqs, ", "))
+		yamlCfg += fmt.Sprintf("\n  import_requirements: [%s]", strings.Join(commandReqs, ", "))
+		jsonCfg += fmt.Sprintf(`, "apply_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
+		jsonCfg += fmt.Sprintf(`, "import_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
 	}
 	if userConfig.AllowRepoConfig {
 		deprecatedFlags = append(deprecatedFlags, AllowRepoConfigFlag)
-		yamlCfg += "\n  allowed_overrides: [apply_requirements, workflow]\n  allow_custom_workflows: true"
-		jsonCfg += `, "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true`
+		yamlCfg += "\n  allowed_overrides: [apply_requirements, import_requirements, workflow]\n  allow_custom_workflows: true"
+		jsonCfg += `, "allowed_overrides":["apply_requirements","import_requirements","workflow"], "allow_custom_workflows":true`
 	}
 	jsonCfg += "}]}"
 

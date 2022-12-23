@@ -14,59 +14,59 @@ type InstrumentedProjectCommandBuilder struct {
 }
 
 func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
-	timer := b.scope.Timer(metrics.ExecutionTimeMetric).Start()
-	defer timer.Stop()
-
-	executionSuccess := b.scope.Counter(metrics.ExecutionSuccessMetric)
-	executionError := b.scope.Counter(metrics.ExecutionErrorMetric)
-
-	projectCmds, err := b.ProjectCommandBuilder.BuildApplyCommands(ctx, comment)
-
-	if err != nil {
-		executionError.Inc(1)
-		b.Logger.Err("Error building apply commands: %s", err)
-	} else {
-		executionSuccess.Inc(1)
-	}
-
-	return projectCmds, err
-
+	return b.buildAndEmitStats(
+		"apply",
+		func() ([]command.ProjectContext, error) {
+			return b.ProjectCommandBuilder.BuildApplyCommands(ctx, comment)
+		},
+	)
 }
+
 func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
-	timer := b.scope.Timer(metrics.ExecutionTimeMetric).Start()
-	defer timer.Stop()
-
-	executionSuccess := b.scope.Counter(metrics.ExecutionSuccessMetric)
-	executionError := b.scope.Counter(metrics.ExecutionErrorMetric)
-
-	projectCmds, err := b.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
-
-	if err != nil {
-		executionError.Inc(1)
-		b.Logger.Err("Error building auto plan commands: %s", err)
-	} else {
-		executionSuccess.Inc(1)
-	}
-
-	return projectCmds, err
-
+	return b.buildAndEmitStats(
+		"auto plan",
+		func() ([]command.ProjectContext, error) {
+			return b.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
+		},
+	)
 }
+
 func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+	return b.buildAndEmitStats(
+		"plan",
+		func() ([]command.ProjectContext, error) {
+			return b.ProjectCommandBuilder.BuildPlanCommands(ctx, comment)
+		},
+	)
+}
+
+func (b *InstrumentedProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+	return b.buildAndEmitStats(
+		"import",
+		func() ([]command.ProjectContext, error) {
+			return b.ProjectCommandBuilder.BuildImportCommands(ctx, comment)
+		},
+	)
+}
+
+func (b *InstrumentedProjectCommandBuilder) buildAndEmitStats(
+	command string,
+	execute func() ([]command.ProjectContext, error),
+) ([]command.ProjectContext, error) {
 	timer := b.scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
 	executionSuccess := b.scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := b.scope.Counter(metrics.ExecutionErrorMetric)
 
-	projectCmds, err := b.ProjectCommandBuilder.BuildPlanCommands(ctx, comment)
+	projectCmds, err := execute()
 
 	if err != nil {
 		executionError.Inc(1)
-		b.Logger.Err("Error building plan commands: %s", err)
+		b.Logger.Err("Error building %s commands: %s", command, err)
 	} else {
 		executionSuccess.Inc(1)
 	}
 
 	return projectCmds, err
-
 }

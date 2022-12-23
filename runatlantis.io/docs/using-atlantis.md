@@ -63,7 +63,7 @@ atlantis plan -w staging
 * `-d directory` Which directory to run plan in relative to root of repo. Use `.` for root.
     * Ex. `atlantis plan -d child/dir`
 * `-p project` Which project to run plan for. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w` because the project defines this already.
-* `-w workspace` Switch to this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) before planning. Defaults to `default`. If not using Terraform workspaces you can ignore this.
+* `-w workspace` Switch to this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) before planning. Defaults to `default`. Ignore this if Terraform workspaces are unused.
 * `--verbose` Append Atlantis log to comment.
 
 ::: warning NOTE
@@ -72,7 +72,7 @@ A `atlantis plan` (without flags), like autoplans, discards all plans previously
 
 ### Additional Terraform flags
 
-If you need to run `terraform plan` with additional arguments, like `-target=resource` or `-var 'foo-bar'` or `-var-file myfile.tfvars`
+If `terraform plan` requires additional arguments, like `-target=resource` or `-var 'foo=bar'` or `-var-file myfile.tfvars`
 you can append them to the end of the comment after `--`, ex.
 ```
 atlantis plan -d dir -- -var foo='bar'
@@ -110,7 +110,7 @@ atlantis apply -w staging
 ### Options
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use `.` for root.
 * `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w`.
-* `-w workspace` Apply the plan for this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). If not using Terraform workspaces you can ignore this.
+* `-w workspace` Apply the plan for this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
 * `--auto-merge-disabled` Disable [automerge](automerging.html) for this apply command.
 * `--verbose` Append Atlantis log to comment.
 
@@ -123,6 +123,49 @@ Because Atlantis under the hood is running `terraform apply plan.tfplan`, any Te
 
 They're ignored because they can't be specified for an already generated planfile.
 If you would like to specify these flags, do it while running `atlantis plan`.
+
+---
+## atlantis import
+```bash
+atlantis import [options] ADDRESS ID -- [terraform import flags]
+```
+### Explanation
+Runs `terraform import` that matches the directory/project/workspace.
+This command discards the terraform plan result. After an import and before an apply, another `atlantis plan` must be run again.
+
+### Examples
+```bash
+# Runs import
+atlantis import ADDRESS ID
+
+# Runs import in the root directory of the repo with workspace `default`
+atlantis import -d . ADDRESS ID
+
+# Runs import in the `project1` directory of the repo with workspace `default`
+atlantis import -d project1 ADDRESS ID
+
+# Runs import in the root directory of the repo with workspace `staging`
+atlantis import -w staging ADDRESS ID
+```
+
+::: tip
+* If import for_each resources, it requires a single quoted address.
+  * ex. `atlantis import 'aws_instance.example["foo"]' i-1234567890abcdef0`
+:::
+
+### Options
+* `-d directory` Import a resource for this directory, relative to root of repo. Use `.` for root.
+* `-p project` Import a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml`](repo-level-atlantis-yaml.html) repo configuration file. This cannot be used at the same time as `-d` or `-w`.
+* `-w workspace` Import a resource for a specific [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
+
+### Additional Terraform flags
+
+If `terraform import` requires additional arguments, like `-var 'foo=bar'` or `-var-file myfile.tfvars`
+append them to the end of the comment after `--`, e.g.
+```
+atlantis import -d dir 'aws_instance.example["foo"]' i-1234567890abcdef0 -- -var foo='bar'
+```
+If a flag is needed to be always appended, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
 
 ---
 ## atlantis unlock

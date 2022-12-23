@@ -66,8 +66,6 @@ type CommentBuilder interface {
 	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 	// BuildApplyComment builds an apply comment for the specified args.
 	BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string
-	// BuildVersionComment builds a version comment for the specified args.
-	BuildVersionComment(repoRelDir string, workspace string, project string) string
 }
 
 // CommentParser implements CommentParsing
@@ -111,6 +109,7 @@ type CommentParseResult struct {
 // - atlantis unlock
 // - atlantis version
 // - atlantis approve_policies
+// - atlantis import ADDRESS ID
 func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) CommentParseResult {
 	comment := strings.TrimSpace(rawComment)
 
@@ -171,7 +170,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	// Need to have a plan, apply, approve_policy or unlock at this point.
-	if !e.stringInSlice(cmd, []string{command.Plan.String(), command.Apply.String(), command.Unlock.String(), command.ApprovePolicies.String(), command.Version.String()}) {
+	if !e.stringInSlice(cmd, []string{command.Plan.String(), command.Apply.String(), command.Unlock.String(), command.ApprovePolicies.String(), command.Version.String(), command.Import.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", cmd)}
 	}
 
@@ -181,6 +180,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var verbose, autoMergeDisabled bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
+	var requiredCommandArgCount int
 
 	// Set up the flag parsing depending on the command.
 	switch cmd {
@@ -217,6 +217,15 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run version in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Print the version for this project. Refers to the name of the project configured in a repo config file.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+	case command.Import.String():
+		name = command.Import
+		flagSet = pflag.NewFlagSet(command.Import.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before importing.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run import in relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run import for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+		requiredCommandArgCount = 2 // import requires `atlantis import ADDRESS ID` args
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", cmd)}
 	}
@@ -225,7 +234,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	// It's safe to use [2:] because we know there's at least 2 elements in args.
 	err = flagSet.Parse(args[2:])
 	if err == pflag.ErrHelp {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", cmd, flagSet.FlagUsagesWrapped(usagesCols))}
+		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", name.DefaultUsage(), flagSet.FlagUsagesWrapped(usagesCols))}
 	}
 	if err != nil {
 		if cmd == command.Unlock.String() {
@@ -234,20 +243,29 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
 
-	var unusedArgs []string
+	var commandArgs []string // commandArgs are the arguments that are passed before `--` without any parameter flags.
 	if flagSet.ArgsLenAtDash() == -1 {
-		unusedArgs = flagSet.Args()
+		commandArgs = flagSet.Args()
 	} else {
-		unusedArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
+		commandArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
 	}
-	if len(unusedArgs) > 0 {
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(unusedArgs, " ")), cmd, flagSet)}
+	if len(commandArgs) != requiredCommandArgCount {
+		if requiredCommandArgCount > 0 {
+			return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid argument count – %s", strings.Join(commandArgs, " ")), name.DefaultUsage(), flagSet)}
+		}
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(commandArgs, " ")), name.DefaultUsage(), flagSet)}
 	}
 
-	var extraArgs []string
+	var extraArgs []string // command extra_args
 	if flagSet.ArgsLenAtDash() != -1 {
-		extraArgs = flagSet.Args()[flagSet.ArgsLenAtDash():]
+		extraArgs = append(extraArgs, flagSet.Args()[flagSet.ArgsLenAtDash():]...)
 	}
+	// pass commandArgs into extraArgs after extra args.
+	// - after comment_parser, we will use extra_args only.
+	// - terraform command args accept after options like followings
+	//   - from: `atlantis import ADDRESS ID -- -var foo=bar
+	//   - to: `terraform import -var foo=bar ADDRESS ID`
+	extraArgs = append(extraArgs, commandArgs...)
 
 	dir, err = e.validateDir(dir)
 	if err != nil {
@@ -296,12 +314,6 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
 	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled)
 	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Apply.String(), flags)
-}
-
-// BuildVersionComment builds a version comment for the specified args.
-func (e *CommentParser) BuildVersionComment(repoRelDir string, workspace string, project string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, false)
-	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Version.String(), flags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
@@ -411,6 +423,8 @@ Commands:
   approve_policies
            Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
+  import   Runs 'terraform import' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
   help     View help.
 
 Flags:

@@ -1,0 +1,4 @@
+Locks and plans deleted for the projects and workspaces modified in this pull request:
+
+- dir: `dir1` workspace: `default`
+- dir: `dir2` workspace: `default`

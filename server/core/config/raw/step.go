@@ -24,6 +24,7 @@ const (
 	InitStepName        = "init"
 	EnvStepName         = "env"
 	MultiEnvStepName    = "multienv"
+	ImportStepName      = "import"
 )
 
 // Step represents a single action/command to perform. In YAML, it can be set as
@@ -88,7 +89,8 @@ func (s Step) validStepName(stepName string) bool {
 		stepName == EnvStepName ||
 		stepName == MultiEnvStepName ||
 		stepName == ShowStepName ||
-		stepName == PolicyCheckStepName
+		stepName == PolicyCheckStepName ||
+		stepName == ImportStepName
 }
 
 func (s Step) Validate() error {

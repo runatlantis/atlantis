@@ -175,6 +175,7 @@ workflows:
 								},
 							},
 						},
+						Import: valid.DefaultImportStage,
 					},
 				},
 			},
@@ -341,12 +342,7 @@ workflows:
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"default": {
-						Name:        "default",
-						Plan:        valid.DefaultPlanStage,
-						Apply:       valid.DefaultApplyStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"default": defaultWorkflow("default"),
 				},
 			},
 		},
@@ -378,12 +374,7 @@ workflows:
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"myworkflow": {
-						Name:        "myworkflow",
-						Apply:       valid.DefaultApplyStage,
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"myworkflow": defaultWorkflow("myworkflow"),
 				},
 			},
 		},
@@ -417,12 +408,7 @@ workflows:
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"myworkflow": {
-						Name:        "myworkflow",
-						Apply:       valid.DefaultApplyStage,
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"myworkflow": defaultWorkflow("myworkflow"),
 				},
 			},
 		},
@@ -456,12 +442,7 @@ workflows:
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"myworkflow": {
-						Name:        "myworkflow",
-						Apply:       valid.DefaultApplyStage,
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"myworkflow": defaultWorkflow("myworkflow"),
 				},
 			},
 		},
@@ -495,12 +476,7 @@ workflows:
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"myworkflow": {
-						Name:        "myworkflow",
-						Apply:       valid.DefaultApplyStage,
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"myworkflow": defaultWorkflow("myworkflow"),
 				},
 			},
 		},
@@ -534,12 +510,7 @@ workflows:
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"myworkflow": {
-						Name:        "myworkflow",
-						Apply:       valid.DefaultApplyStage,
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"myworkflow": defaultWorkflow("myworkflow"),
 				},
 			},
 		},
@@ -573,12 +544,7 @@ workflows:
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"myworkflow": {
-						Name:        "myworkflow",
-						Apply:       valid.DefaultApplyStage,
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"myworkflow": defaultWorkflow("myworkflow"),
 				},
 			},
 		},
@@ -612,12 +578,7 @@ workflows:
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"myworkflow": {
-						Name:        "myworkflow",
-						Apply:       valid.DefaultApplyStage,
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"myworkflow": defaultWorkflow("myworkflow"),
 				},
 			},
 		},
@@ -651,12 +612,7 @@ workflows:
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"myworkflow": {
-						Name:        "myworkflow",
-						Apply:       valid.DefaultApplyStage,
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"myworkflow": defaultWorkflow("myworkflow"),
 				},
 			},
 		},
@@ -796,6 +752,9 @@ workflows:
       steps:
       - plan # NOTE: we don't validate if they make sense
       - apply
+    import:
+      steps:
+      - import
 `,
 			exp: valid.RepoCfg{
 				Version: 3,
@@ -842,6 +801,13 @@ workflows:
 								},
 							},
 						},
+						Import: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName: "import",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -872,6 +838,10 @@ workflows:
       - plan:
           extra_args: [a, b]
       - apply:
+          extra_args: ["a", "b"]
+    import:
+      steps:
+      - import:
           extra_args: ["a", "b"]
 `,
 			exp: valid.RepoCfg{
@@ -921,6 +891,14 @@ workflows:
 								},
 							},
 						},
+						Import: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:  "import",
+									ExtraArgs: []string{"a", "b"},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -942,6 +920,9 @@ workflows:
     apply:
       steps:
       - run: echo apply "arg 2"
+    import:
+      steps:
+      - run: echo apply "arg 3"
 `,
 			exp: valid.RepoCfg{
 				Version: 3,
@@ -982,6 +963,14 @@ workflows:
 								},
 							},
 						},
+						Import: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:   "run",
+									RunCommand: "echo apply \"arg 3\"",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -1009,6 +998,11 @@ workflows:
       - env:
           name: env_name
           command: command and args
+    import:
+      steps:
+      - env:
+          name: env_name
+          value: env_value
 `,
 			exp: valid.RepoCfg{
 				Version: 3,
@@ -1049,6 +1043,15 @@ workflows:
 									StepName:   "env",
 									EnvVarName: "env_name",
 									RunCommand: "command and args",
+								},
+							},
+						},
+						Import: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:    "env",
+									EnvVarName:  "env_name",
+									EnvVarValue: "env_value",
 								},
 							},
 						},
@@ -1180,6 +1183,17 @@ func TestParseGlobalCfg(t *testing.T) {
 				},
 			},
 		},
+		Import: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:   "run",
+					RunCommand: "custom command",
+				},
+				{
+					StepName: "import",
+				},
+			},
+		},
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
@@ -1235,13 +1249,19 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   allowed_overrides: [invalid]`,
-			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\", \"workflow\", \"delete_source_branch_on_merge\" and \"repo_locking\" are supported.).).",
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\" and \"repo_locking\" are supported.).).",
 		},
 		"invalid apply_requirement": {
 			input: `repos:
 - id: /.*/
   apply_requirements: [invalid]`,
 			expErr: "repos: (0: (apply_requirements: \"invalid\" is not a valid apply_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
+		},
+		"invalid import_requirement": {
+			input: `repos:
+- id: /.*/
+  import_requirements: [invalid]`,
+			expErr: "repos: (0: (import_requirements: \"invalid\" is not a valid import_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
 		},
 		"no workflows key": {
 			input: `repos: []`,
@@ -1259,12 +1279,7 @@ workflows:
 				Repos: defaultCfg.Repos,
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
-					"name": {
-						Name:        "name",
-						Apply:       valid.DefaultApplyStage,
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"name":    defaultWorkflow("name"),
 				},
 			},
 		},
@@ -1274,17 +1289,14 @@ workflows:
   name:
     apply:
     plan:
+    policy_check:
+    import:
 `,
 			exp: valid.GlobalCfg{
 				Repos: defaultCfg.Repos,
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
-					"name": {
-						Name:        "name",
-						Apply:       valid.DefaultApplyStage,
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-					},
+					"name":    defaultWorkflow("name"),
 				},
 			},
 		},
@@ -1295,17 +1307,17 @@ workflows:
     apply:
       steps:
     plan:
-      steps:`,
+      steps:
+    policy_check:
+      steps:
+    import:
+      steps:
+`,
 			exp: valid.GlobalCfg{
 				Repos: defaultCfg.Repos,
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
-					"name": {
-						Name:        "name",
-						Plan:        valid.DefaultPlanStage,
-						PolicyCheck: valid.DefaultPolicyCheckStage,
-						Apply:       valid.DefaultApplyStage,
-					},
+					"name":    defaultWorkflow("name"),
 				},
 			},
 		},
@@ -1320,7 +1332,7 @@ repos:
   workflow: custom1
   post_workflow_hooks:
     - run: custom workflow command
-  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge]
+  allowed_overrides: [apply_requirements, import_requirements, workflow, delete_source_branch_on_merge]
   allow_custom_workflows: true
 - id: /.*/
   branch: /(master|main)/
@@ -1346,6 +1358,10 @@ workflows:
       steps:
       - run: custom command
       - apply
+    import:
+      steps:
+      - run: custom command
+      - import
 policies:
   conftest_version: v1.0.0
   policy_sets:
@@ -1363,7 +1379,7 @@ policies:
 						PreWorkflowHooks:     preWorkflowHooks,
 						Workflow:             &customWorkflow1,
 						PostWorkflowHooks:    postWorkflowHooks,
-						AllowedOverrides:     []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"},
+						AllowedOverrides:     []string{"apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
@@ -1435,14 +1451,17 @@ workflows:
     policy_check:
       steps: []
     apply:
-     steps: []
+      steps: []
+    import:
+      steps: []
 `,
 			exp: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					{
-						IDRegex:           regexp.MustCompile(".*"),
-						BranchRegex:       regexp.MustCompile(".*"),
-						ApplyRequirements: []string{},
+						IDRegex:            regexp.MustCompile(".*"),
+						BranchRegex:        regexp.MustCompile(".*"),
+						ApplyRequirements:  []string{},
+						ImportRequirements: []string{},
 						Workflow: &valid.Workflow{
 							Name: "default",
 							Apply: valid.Stage{
@@ -1458,6 +1477,9 @@ workflows:
 										RunCommand: "custom",
 									},
 								},
+							},
+							Import: valid.Stage{
+								Steps: nil,
 							},
 						},
 						AllowedWorkflows:          []string{},
@@ -1569,6 +1591,14 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				},
 			},
 		},
+		Import: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:   "run",
+					RunCommand: "custom import",
+				},
+			},
+		},
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
@@ -1625,6 +1655,11 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
       "apply": {
         "steps": [
           {"run": "my custom command"}
+        ]
+      },
+      "import": {
+        "steps": [
+          {"run": "custom import"}
         ]
       }
     }
@@ -1790,3 +1825,13 @@ func String(v string) *string { return &v }
 // Bool is a helper routine that allocates a new bool value
 // to store v and returns a pointer to it.
 func Bool(v bool) *bool { return &v }
+
+func defaultWorkflow(name string) valid.Workflow {
+	return valid.Workflow{
+		Name:        name,
+		Apply:       valid.DefaultApplyStage,
+		Plan:        valid.DefaultPlanStage,
+		PolicyCheck: valid.DefaultPolicyCheckStage,
+		Import:      valid.DefaultImportStage,
+	}
+}
