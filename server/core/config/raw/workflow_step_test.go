@@ -1,6 +1,7 @@
 package raw_test
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
@@ -54,7 +55,9 @@ key:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var got raw.WorkflowHook
-			err := yaml.UnmarshalStrict([]byte(c.input), &got)
+			dec := yaml.NewDecoder(bytes.NewBuffer([]byte(c.input)))
+			dec.KnownFields(true)
+			err := dec.Decode(&got)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
@@ -66,7 +69,7 @@ key:
 			Ok(t, err)
 
 			var got2 raw.WorkflowHook
-			err = yaml.UnmarshalStrict([]byte(c.input), &got2)
+			err = dec.Decode(&got2)
 			Ok(t, err)
 			Equals(t, got2, got)
 		})

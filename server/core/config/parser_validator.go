@@ -1,8 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,7 +60,9 @@ func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.Global
 
 func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.GlobalCfg, repoID string, branch string) (valid.RepoCfg, error) {
 	var rawConfig raw.RepoCfg
-	if err := yaml.UnmarshalStrict(repoCfgData, &rawConfig); err != nil {
+	dec := yaml.NewDecoder(bytes.NewBuffer(repoCfgData))
+	dec.KnownFields(true)
+	if err := dec.Decode(&rawConfig); err != nil && err != io.EOF {
 		return valid.RepoCfg{}, err
 	}
 
@@ -115,7 +119,8 @@ func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.Glo
 	}
 
 	var rawCfg raw.GlobalCfg
-	if err := yaml.UnmarshalStrict(configData, &rawCfg); err != nil {
+	dec := yaml.NewDecoder(bytes.NewBuffer(configData))
+	if err := dec.Decode(&rawCfg); err != nil {
 		return valid.GlobalCfg{}, err
 	}
 

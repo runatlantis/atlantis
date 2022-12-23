@@ -1,6 +1,7 @@
 package raw_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -21,8 +22,9 @@ prometheus:
 `
 
 		var result raw.Metrics
-
-		err := yaml.UnmarshalStrict([]byte(rawYaml), &result)
+		dec := yaml.NewDecoder(bytes.NewBuffer([]byte(rawYaml)))
+		dec.KnownFields(true)
+		err := dec.Decode(&result)
 		assert.NoError(t, err)
 	})
 

@@ -1,6 +1,7 @@
 package raw_test
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
@@ -62,7 +63,8 @@ when_modified:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var a raw.Autoplan
-			err := yaml.UnmarshalStrict([]byte(c.input), &a)
+			dec := yaml.NewDecoder(bytes.NewBuffer([]byte(c.input)))
+			err := dec.Decode(&a)
 			Ok(t, err)
 			Equals(t, c.exp, a)
 		})

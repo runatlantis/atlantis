@@ -1,6 +1,7 @@
 package raw_test
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -42,7 +43,9 @@ policy_sets:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var got raw.PolicySets
-			err := yaml.UnmarshalStrict([]byte(c.input), &got)
+			dec := yaml.NewDecoder(bytes.NewBuffer([]byte(c.input)))
+			dec.KnownFields(true)
+			err := dec.Decode(&got)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
@@ -54,7 +57,7 @@ policy_sets:
 			Ok(t, err)
 
 			var got2 raw.PolicySets
-			err = yaml.UnmarshalStrict([]byte(c.input), &got2)
+			err = dec.Decode(&got2)
 			Ok(t, err)
 			Equals(t, got2, got)
 		})

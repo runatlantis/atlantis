@@ -1,6 +1,7 @@
 package raw_test
 
 import (
+	"bytes"
 	"testing"
 
 	validation "github.com/go-ozzo/ozzo-validation"
@@ -106,7 +107,9 @@ apply:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var w raw.Workflow
-			err := yaml.UnmarshalStrict([]byte(c.input), &w)
+			dec := yaml.NewDecoder(bytes.NewBuffer([]byte(c.input)))
+			dec.KnownFields(true)
+			err := dec.Decode(&w)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return

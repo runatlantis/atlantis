@@ -1,6 +1,7 @@
 package raw_test
 
 import (
+	"bytes"
 	"testing"
 
 	validation "github.com/go-ozzo/ozzo-validation"
@@ -186,7 +187,9 @@ allowed_regexp_prefixes:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var conf raw.RepoCfg
-			err := yaml.UnmarshalStrict([]byte(c.input), &conf)
+			dec := yaml.NewDecoder(bytes.NewBuffer([]byte(c.input)))
+			dec.KnownFields(true)
+			err := dec.Decode(&conf)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
