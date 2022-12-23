@@ -639,7 +639,7 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 		return
 	}
 
-	if isAzureDevOpsTestRepoURL(*resource.PullRequest.Repository.URL) {
+	if isAzureDevOpsTestRepoURL(resource.PullRequest.GetRepository()) {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring Azure DevOps Test Event with Repo URL: %v %s", resource.PullRequest.Repository.URL, azuredevopsReqID)
 		return
 	}
@@ -691,7 +691,7 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseW
 		e.respond(w, logging.Error, http.StatusBadRequest, "Event.Resource is nil or received bad event type %v; %s", event.Resource, azuredevopsReqID)
 		return
 	}
-	if isAzureDevOpsTestRepoURL(*resource.Repository.URL) {
+	if isAzureDevOpsTestRepoURL(resource.GetRepository()) {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring Azure DevOps Test Event with Repo URL: %v %s", resource.Repository.URL, azuredevopsReqID)
 		return
 	}
@@ -746,6 +746,9 @@ func (e *VCSEventsController) commentNotAllowlisted(baseRepo models.Repo, pullNu
 	}
 }
 
-func isAzureDevOpsTestRepoURL(URL string) bool {
-	return (URL == "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079")
+func isAzureDevOpsTestRepoURL(repository *azuredevops.GitRepository) bool {
+	if repository == nil {
+		return false
+	}
+	return (repository.GetURL() == "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079")
 }
