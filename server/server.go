@@ -47,7 +47,6 @@ import (
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
 
 	"github.com/runatlantis/atlantis/server/controllers"
@@ -958,7 +957,7 @@ func (s *Server) Start() error {
 
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
 	if err := server.Shutdown(ctx); err != nil {
-		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
+		return fmt.Errorf("while shutting down: %s", err)
 	}
 	return nil
 }
