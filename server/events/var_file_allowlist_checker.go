@@ -2,9 +2,10 @@ package events
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // VarFileAllowlistChecker implements checking if paths are allowlisted to be used with
