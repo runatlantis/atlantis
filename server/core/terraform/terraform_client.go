@@ -17,6 +17,7 @@
 package terraform
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -29,7 +30,7 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver"
-	"github.com/hashicorp/go-getter"
+	"github.com/hashicorp/go-getter/v2"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/mitchellh/go-homedir"
@@ -44,9 +45,6 @@ import (
 )
 
 var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
-
-// Setting the buffer size to 10mb
-const BufioScannerBufferSize = 10 * 1024 * 1024
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_terraform_client.go Client
 
@@ -99,8 +97,8 @@ type DefaultClient struct {
 
 // Downloader is for downloading terraform versions.
 type Downloader interface {
-	GetFile(dst, src string, opts ...getter.ClientOption) error
-	GetAny(dst, src string, opts ...getter.ClientOption) error
+	GetFile(dst, src string) error
+	GetAny(dst, src string) error
 }
 
 // versionRegex extracts the version from `terraform version` output.
@@ -627,11 +625,13 @@ var rcFileContents = `credentials "%s" {
 type DefaultDownloader struct{}
 
 // See go-getter.GetFile.
-func (d *DefaultDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
-	return getter.GetFile(dst, src, opts...)
+func (d *DefaultDownloader) GetFile(dst, src string) error {
+	_, err := getter.GetFile(context.Background(), dst, src)
+	return err
 }
 
 // See go-getter.GetFile.
-func (d *DefaultDownloader) GetAny(dst, src string, opts ...getter.ClientOption) error {
-	return getter.GetAny(dst, src, opts...)
+func (d *DefaultDownloader) GetAny(dst, src string) error {
+	_, err := getter.GetAny(context.Background(), dst, src)
+	return err
 }
