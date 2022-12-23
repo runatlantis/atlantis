@@ -28,7 +28,7 @@ jobs:
   # muffet (https://github.com/raviqqe/muffet) to perform the link check.
   website_link_check:
     docker:
-    - image: cimg/node:18.12.1
+    - image: cimg/node:19.3.0
     environment:
       # renovate: datasource=github-releases depName=raviqqe/muffet
       MUFFET_VERSION: 2.6.2
