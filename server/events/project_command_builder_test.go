@@ -642,9 +642,12 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 	// Since we're focused on autoplanning here, we don't validate all the
 	// fields so the tests are more obvious and targeted.
 	type expCtxFields struct {
-		ProjectName string
-		RepoRelDir  string
-		Workspace   string
+		ProjectName          string
+		RepoRelDir           string
+		Workspace            string
+		Automerge            bool
+		ParallelPlanEnabled  bool
+		ParallelApplyEnabled bool
 	}
 	cases := map[string]struct {
 		DirStructure  map[string]interface{}
@@ -686,19 +689,27 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 			},
 			AtlantisYAML: `
 version: 3
+automerge: true
 parallel_plan: true
+parallel_apply: true
 `,
 			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
 			Exp: []expCtxFields{
 				{
-					ProjectName: "",
-					RepoRelDir:  "project1",
-					Workspace:   "default",
+					ProjectName:          "",
+					RepoRelDir:           "project1",
+					Workspace:            "default",
+					Automerge:            true,
+					ParallelApplyEnabled: true,
+					ParallelPlanEnabled:  true,
 				},
 				{
-					ProjectName: "",
-					RepoRelDir:  "project2",
-					Workspace:   "default",
+					ProjectName:          "",
+					RepoRelDir:           "project2",
+					Workspace:            "default",
+					Automerge:            true,
+					ParallelApplyEnabled: true,
+					ParallelPlanEnabled:  true,
 				},
 			},
 		},
@@ -814,6 +825,8 @@ projects:
 				Equals(t, expCtx.ProjectName, actCtx.ProjectName)
 				Equals(t, expCtx.RepoRelDir, actCtx.RepoRelDir)
 				Equals(t, expCtx.Workspace, actCtx.Workspace)
+				Equals(t, expCtx.ParallelPlanEnabled, actCtx.ParallelPlanEnabled)
+				Equals(t, expCtx.ParallelApplyEnabled, actCtx.ParallelApplyEnabled)
 			}
 		})
 	}
