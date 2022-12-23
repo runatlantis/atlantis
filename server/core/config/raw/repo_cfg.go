@@ -22,6 +22,9 @@ const DefaultParallelPolicyCheck = false
 // DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 const DefaultDeleteSourceBranchOnMerge = false
 
+// DefaultEmojiReaction is the default emoji reaction for repos
+const DefaultEmojiReaction = ""
+
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
 type RepoCfg struct {
 	Version                   *int                `yaml:"version,omitempty"`
@@ -32,6 +35,7 @@ type RepoCfg struct {
 	ParallelApply             *bool               `yaml:"parallel_apply,omitempty"`
 	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
 	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
+	EmojiReaction             *string             `yaml:"emoji_reaction,omitempty"`
 	AllowedRegexpPrefixes     []string            `yaml:"allowed_regexp_prefixes,omitempty"`
 }
 
@@ -79,6 +83,11 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		parallelPlan = *r.ParallelPlan
 	}
 
+	emojiReaction := DefaultEmojiReaction
+	if r.EmojiReaction != nil {
+		emojiReaction = *r.EmojiReaction
+	}
+
 	return valid.RepoCfg{
 		Version:                   *r.Version,
 		Projects:                  validProjects,
@@ -89,5 +98,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		ParallelPolicyCheck:       parallelPlan,
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 		AllowedRegexpPrefixes:     r.AllowedRegexpPrefixes,
+		EmojiReaction:             emojiReaction,
 	}
 }

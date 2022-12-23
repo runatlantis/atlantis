@@ -24,6 +24,7 @@ type RepoCfg struct {
 	ParallelPolicyCheck       bool
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
+	EmojiReaction             string
 	AllowedRegexpPrefixes     []string
 }
 

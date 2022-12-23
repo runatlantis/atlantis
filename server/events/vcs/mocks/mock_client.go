@@ -25,6 +25,21 @@ func NewMockClient(options ...pegomock.Option) *MockClient {
 func (mock *MockClient) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockClient) FailHandler() pegomock.FailHandler      { return mock.fail }
 
+func (mock *MockClient)ReactToComment(repo models.Repo, commentID int64, reaction string) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockClient().")
+	}
+	params := []pegomock.Param{repo, commentID, reaction}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ReactToComment", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+      ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockClient) CreateComment(_param0 models.Repo, _param1 int, _param2 string, _param3 string) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
