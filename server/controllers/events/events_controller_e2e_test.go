@@ -14,7 +14,6 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v48/github"
-	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 
@@ -56,11 +55,11 @@ var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
 
 var mockPostWorkflowHookRunner *runtimemocks.MockPostWorkflowHookRunner
 
-func (m *NoopTFDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
+func (m *NoopTFDownloader) GetFile(dst, src string) error {
 	return nil
 }
 
-func (m *NoopTFDownloader) GetAny(dst, src string, opts ...getter.ClientOption) error {
+func (m *NoopTFDownloader) GetAny(dst, src string) error {
 	return nil
 }
 

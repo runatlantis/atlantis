@@ -12,9 +12,9 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
+	validator "github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	validator "gopkg.in/go-playground/validator.v9"
 )
 
 // maxCommentLength is the maximum number of chars allowed by Bitbucket in a

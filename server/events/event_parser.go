@@ -20,6 +20,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/google/go-github/v48/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
@@ -28,7 +29,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/xanzy/go-gitlab"
-	"gopkg.in/go-playground/validator.v9"
 )
 
 const gitlabPullOpened = "opened"
