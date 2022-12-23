@@ -137,7 +137,7 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultCheckoutStrategy             = "branch"
-	DefaultCheckoutDepth                = 50
+	DefaultCheckoutDepth                = 200
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
 	DefaultExecutableName               = "atlantis"
