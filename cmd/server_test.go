@@ -57,7 +57,7 @@ var testFlags = map[string]interface{}{
 	ADWebhookPasswordFlag:            "ad-wh-pass",
 	ADWebhookUserFlag:                "ad-wh-user",
 	AtlantisURLFlag:                  "url",
-	AllowCommandsFlag:                "plan,apply,unlock,import",
+	AllowCommandsFlag:                "version,plan,unlock,import,approve_policies", // apply is disabled by DisableApply
 	AllowForkPRsFlag:                 true,
 	AllowRepoConfigFlag:              true,
 	AutomergeFlag:                    true,
@@ -869,29 +869,6 @@ func TestExecute_AutoplanFileList(t *testing.T) {
 		} else {
 			Ok(t, err)
 		}
-	}
-}
-
-func TestExecute_SetAllowCommands(t *testing.T) {
-	cases := []struct {
-		enablePolicyCheck bool
-		allowCommands     string
-		expAllowCommands  string
-	}{
-		{true, "", "plan,apply,unlock,approve_policies"},
-		{true, "plan,apply", "plan,apply,approve_policies"},
-		{false, "plan,apply", "plan,apply"},
-	}
-	for _, testCase := range cases {
-		t.Run(fmt.Sprintf("enablePolicyCheck=%t,allowCommands=%s", testCase.enablePolicyCheck, testCase.allowCommands), func(t *testing.T) {
-			c := setupWithDefaults(map[string]interface{}{
-				EnablePolicyChecksFlag: testCase.enablePolicyCheck,
-				AllowCommandsFlag:      testCase.allowCommands,
-			}, t)
-			err := c.Execute()
-			Ok(t, err)
-			Equals(t, testCase.expAllowCommands, passedConfig.AllowCommands)
-		})
 	}
 }
 

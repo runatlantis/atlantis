@@ -133,7 +133,7 @@ atlantis import [options] ADDRESS ID -- [terraform import flags]
 Runs `terraform import` that matches the directory/project/workspace.
 This command discards the terraform plan result. After an import and before an apply, another `atlantis plan` must be run again.
 
-Activate `import` command requires [--allow-commands](/docs/server-configuration.html#allow-commands) configuration.
+To allow the `import` command requires [--allow-commands](/docs/server-configuration.html#allow-commands) configuration.
 
 ### Examples
 ```bash
@@ -189,8 +189,6 @@ atlantis approve_policies
 Approves all current policy checking failures for the PR.
 
 See also [policy checking](/docs/policy-checking.html).
-
-Activate `approve_policies` command requires [--allow-commands](/docs/server-configuration.html#allow-commands) configuration.
 
 ### Options
 * `--verbose` Append Atlantis log to comment.

@@ -123,11 +123,13 @@ type UserConfig struct {
 func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 	var allowCommands []command.Name
 	for _, input := range strings.Split(u.AllowCommands, ",") {
-		cmd, err := command.ParseCommandName(input)
-		if err != nil {
-			return nil, err
+		if input != "" {
+			cmd, err := command.ParseCommandName(input)
+			if err != nil {
+				return nil, err
+			}
+			allowCommands = append(allowCommands, cmd)
 		}
-		allowCommands = append(allowCommands, cmd)
 	}
 	return allowCommands, nil
 }

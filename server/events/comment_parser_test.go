@@ -53,31 +53,12 @@ func TestNewCommentParser(t *testing.T) {
 		want *events.CommentParser
 	}{
 		{
-			name: "full fields",
-			args: args{
-				githubUser:      "github-user",
-				gitlabUser:      "gitlab-user",
-				bitbucketUser:   "bitbucket-user",
-				azureDevopsUser: "azure-devops-user",
-				executableName:  "executable-name",
-				allowCommands:   []command.Name{command.Plan, command.Apply, command.Unlock},
-			},
-			want: &events.CommentParser{
-				GithubUser:      "github-user",
-				GitlabUser:      "gitlab-user",
-				BitbucketUser:   "bitbucket-user",
-				AzureDevopsUser: "azure-devops-user",
-				ExecutableName:  "executable-name",
-				AllowCommands:   []command.Name{command.Version, command.Plan, command.Apply, command.Unlock},
-			},
-		},
-		{
 			name: "duplicate allow commands filtered",
 			args: args{
 				allowCommands: []command.Name{command.Plan, command.Plan, command.Plan},
 			},
 			want: &events.CommentParser{
-				AllowCommands: []command.Name{command.Version, command.Plan},
+				AllowCommands: []command.Name{command.Plan},
 			},
 		},
 		{
@@ -315,7 +296,7 @@ func TestParse_InvalidCommand(t *testing.T) {
 		"azure-devops-user",
 		"atlantis",
 		[]command.Name{
-			// command.Version // version is added by default
+			command.Version,
 			command.Unlock,
 			command.Apply,
 			command.Plan,
@@ -868,6 +849,7 @@ func TestCommentParser_HelpComment(t *testing.T) {
 		{
 			name: "all commands allowed",
 			allowCommands: []command.Name{
+				command.Version,
 				command.Plan,
 				command.Apply,
 				command.Unlock,
@@ -882,8 +864,8 @@ Usage:
   atlantis <command> [options] -- [terraform options]
 
 Examples:
-  # show terraform version
-  atlantis version
+  # show atlantis help
+  atlantis help
 
   # run plan in the root directory passing the -target flag to terraform
   atlantis plan -d . -- -target=resource
@@ -925,11 +907,10 @@ Usage:
   atlantis <command> [options] -- [terraform options]
 
 Examples:
-  # show terraform version
-  atlantis version
+  # show atlantis help
+  atlantis help
 
 Commands:
-  version  Print the output of 'terraform version'
   help     View help.
 
 Flags:
@@ -952,8 +933,8 @@ Usage:
   atlantis <command> [options] -- [terraform options]
 
 Examples:
-  # show terraform version
-  atlantis version
+  # show atlantis help
+  atlantis help
 
   # apply all unapplied plans from this pull request
   atlantis apply
@@ -966,7 +947,6 @@ Commands:
            To only apply a specific plan, use the -d, -w and -p flags.
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
-  version  Print the output of 'terraform version'
   help     View help.
 
 Flags:

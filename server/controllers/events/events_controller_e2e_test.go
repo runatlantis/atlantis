@@ -989,7 +989,14 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		GitlabUser:  "gitlab-user",
 		GitlabToken: "gitlab-token",
 	}
-	allowCommands := []command.Name{command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import}
+	allowCommands := []command.Name{
+		command.Version,
+		command.Plan,
+		command.Apply,
+		command.Unlock,
+		command.ApprovePolicies,
+		command.Import,
+	}
 	if opt.allowCommands != nil {
 		allowCommands = opt.allowCommands
 	}

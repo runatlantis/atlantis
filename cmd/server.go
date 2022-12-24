@@ -137,7 +137,7 @@ const (
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultAllowCommands                = "plan,apply,unlock"
+	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
 	DefaultCheckoutStrategy             = "branch"
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
@@ -187,7 +187,7 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: "dev.azure.com",
 	},
 	AllowCommandsFlag: {
-		description:  "Comma separated list of acceptable atlantis command.",
+		description:  "Comma separated list of acceptable atlantis commands.",
 		defaultValue: DefaultAllowCommands,
 	},
 	AtlantisURLFlag: {
@@ -734,7 +734,6 @@ func (s *ServerCmd) run() error {
 	}
 	s.securityWarnings(&userConfig)
 	s.trimAtSymbolFromUsers(&userConfig)
-	s.setAllowCommands(&userConfig)
 
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
@@ -996,17 +995,6 @@ func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 	userConfig.GitlabUser = strings.TrimPrefix(userConfig.GitlabUser, "@")
 	userConfig.BitbucketUser = strings.TrimPrefix(userConfig.BitbucketUser, "@")
 	userConfig.AzureDevopsUser = strings.TrimPrefix(userConfig.AzureDevopsUser, "@")
-}
-
-// setAllowCommands replace allow commands using other configuration
-func (s *ServerCmd) setAllowCommands(userConfig *server.UserConfig) {
-	if userConfig.EnablePolicyChecksFlag {
-		if userConfig.AllowCommands != "" {
-			userConfig.AllowCommands += fmt.Sprintf(",%s", command.ApprovePolicies.String())
-		} else {
-			userConfig.AllowCommands += command.ApprovePolicies.String()
-		}
-	}
 }
 
 func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {

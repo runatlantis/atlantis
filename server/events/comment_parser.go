@@ -80,8 +80,15 @@ type CommentParser struct {
 
 // NewCommentParser returns a CommentParser
 func NewCommentParser(githubUser, gitlabUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name) *CommentParser {
-	commentAllowCommands := []command.Name{command.Version} // version is always available
-	acceptableCommands := []command.Name{command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import}
+	var commentAllowCommands []command.Name
+	acceptableCommands := []command.Name{
+		command.Version,
+		command.Plan,
+		command.Apply,
+		command.Unlock,
+		command.ApprovePolicies,
+		command.Import,
+	}
 	for _, acceptableCommand := range acceptableCommands {
 		for _, allowCommand := range allowCommands {
 			if acceptableCommand == allowCommand {
@@ -418,12 +425,14 @@ func (e *CommentParser) HelpComment() string {
 	buf := &bytes.Buffer{}
 	var tmpl = template.Must(template.New("").Parse(helpCommentTemplate))
 	if err := tmpl.Execute(buf, struct {
+		AllowVersion         bool
 		AllowPlan            bool
 		AllowApply           bool
 		AllowUnlock          bool
 		AllowApprovePolicies bool
 		AllowImport          bool
 	}{
+		AllowVersion:         e.isAllowedCommand(command.Version.String()),
 		AllowPlan:            e.isAllowedCommand(command.Plan.String()),
 		AllowApply:           e.isAllowedCommand(command.Apply.String()),
 		AllowUnlock:          e.isAllowedCommand(command.Unlock.String()),
@@ -443,8 +452,8 @@ Usage:
   atlantis <command> [options] -- [terraform options]
 
 Examples:
-  # show terraform version
-  atlantis version
+  # show atlantis help
+  atlantis help
 {{- if .AllowPlan }}
 
   # run plan in the root directory passing the -target flag to terraform
@@ -476,7 +485,9 @@ Commands:
   approve_policies
            Approves all current policy checking failures for the PR.
 {{- end }}
+{{- if .AllowVersion }}
   version  Print the output of 'terraform version'
+{{- end }}
 {{- if .AllowImport }}
   import   Runs 'terraform import' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.

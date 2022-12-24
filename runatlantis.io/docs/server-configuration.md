@@ -49,16 +49,15 @@ Values are chosen in this order:
 ## Flags
 ### `--allow-commands`
   ```bash
-  atlantis server --allow-commands=plan,apply,unlock
+  atlantis server --allow-commands=version,plan,apply,unlock,approve_policies
   # or
-  ATLANTIS_ALLOW_COMMANDS='plan,apply,unlock'
+  ATLANTIS_ALLOW_COMMANDS='version,plan,apply,unlock,approve_policies'
   ```
-  Atlantis requires you to specify an allowlist of repositories it will accept webhooks from.
+  List of allowed commands to be run on the Atlantis server, Defaults to `version,plan,apply,unlock,approve_policies`
 
   Notes:
   * Accepts a comma separated list, ex. `command1,command2`.
-  * `plan`, `apply`, `unlock`, `approve_policies` and `import` are available.
-  * When not set, defaults to `plan,apply,unlock`.
+  * `version`, `plan`, `apply`, `unlock`, `approve_policies` and `import` are available.
 
 ### `--allow-draft-prs`
   ```bash
@@ -381,7 +380,6 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_ENABLE_POLICY_CHECKS=true
   ```
   Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](https://www.runatlantis.io/docs/server-side-repo-config.html#reference).
-  When set to `true`, `approve_policies` command is allowed in [`--allow-commands`](#allow-commands).
 
 ### `--enable-regexp-cmd`
   ```bash
