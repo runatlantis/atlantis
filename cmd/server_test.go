@@ -57,6 +57,7 @@ var testFlags = map[string]interface{}{
 	ADWebhookPasswordFlag:            "ad-wh-pass",
 	ADWebhookUserFlag:                "ad-wh-user",
 	AtlantisURLFlag:                  "url",
+	AllowCommandsFlag:                "plan,apply,unlock,import",
 	AllowForkPRsFlag:                 true,
 	AllowRepoConfigFlag:              true,
 	AutomergeFlag:                    true,
@@ -553,6 +554,36 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 	}
 }
 
+func TestExecute_ValidateAllowCommands(t *testing.T) {
+	cases := []struct {
+		name              string
+		allowCommandsFlag string
+		expErr            string
+	}{
+		{
+			name:              "invalid allow commands",
+			allowCommandsFlag: "noallow",
+			expErr:            "invalid --allow-commands: unknown command name: noallow",
+		},
+		{
+			name:              "success with empty allow commands",
+			allowCommandsFlag: "",
+			expErr:            "",
+		},
+	}
+	for _, testCase := range cases {
+		c := setupWithDefaults(map[string]interface{}{
+			AllowCommandsFlag: testCase.allowCommandsFlag,
+		}, t)
+		err := c.Execute()
+		if testCase.expErr != "" {
+			ErrEquals(t, testCase.expErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
 func TestExecute_ExpandHomeInDataDir(t *testing.T) {
 	t.Log("If ~ is used as a data-dir path, should expand to absolute home path")
 	c := setup(map[string]interface{}{
@@ -752,6 +783,16 @@ func TestExecute_BothSilenceAllowAndWhitelistErrors(t *testing.T) {
 	ErrEquals(t, "both --silence-allowlist-errors and --silence-whitelist-errors cannot be set–use --silence-allowlist-errors", err)
 }
 
+func TestExecute_DisableApplyDeprecation(t *testing.T) {
+	c := setupWithDefaults(map[string]interface{}{
+		DisableApplyFlag:  true,
+		AllowCommandsFlag: "plan,apply,unlock",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, "plan,unlock", passedConfig.AllowCommands)
+}
+
 // Test that we set the corresponding allow list values on the userConfig
 // struct if the deprecated whitelist flags are used.
 func TestExecute_RepoWhitelistDeprecation(t *testing.T) {
@@ -828,6 +869,29 @@ func TestExecute_AutoplanFileList(t *testing.T) {
 		} else {
 			Ok(t, err)
 		}
+	}
+}
+
+func TestExecute_SetAllowCommands(t *testing.T) {
+	cases := []struct {
+		enablePolicyCheck bool
+		allowCommands     string
+		expAllowCommands  string
+	}{
+		{true, "", "plan,apply,unlock,approve_policies"},
+		{true, "plan,apply", "plan,apply,approve_policies"},
+		{false, "plan,apply", "plan,apply"},
+	}
+	for _, testCase := range cases {
+		t.Run(fmt.Sprintf("enablePolicyCheck=%t,allowCommands=%s", testCase.enablePolicyCheck, testCase.allowCommands), func(t *testing.T) {
+			c := setupWithDefaults(map[string]interface{}{
+				EnablePolicyChecksFlag: testCase.enablePolicyCheck,
+				AllowCommandsFlag:      testCase.allowCommands,
+			}, t)
+			err := c.Execute()
+			Ok(t, err)
+			Equals(t, testCase.expAllowCommands, passedConfig.AllowCommands)
+		})
 	}
 }
 

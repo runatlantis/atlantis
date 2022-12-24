@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"strings"
 
 	"golang.org/x/text/cases"
@@ -65,4 +66,25 @@ func (c Name) DefaultUsage() string {
 	default:
 		return c.String()
 	}
+}
+
+// ParseCommandName parses raw name into a command name.
+func ParseCommandName(name string) (Name, error) {
+	switch name {
+	case "apply":
+		return Apply, nil
+	case "plan":
+		return Plan, nil
+	case "unlock":
+		return Unlock, nil
+	case "policy_check":
+		return PolicyCheck, nil
+	case "approve_policies":
+		return ApprovePolicies, nil
+	case "version":
+		return Version, nil
+	case "import":
+		return Import, nil
+	}
+	return -1, fmt.Errorf("unknown command name: %s", name)
 }
