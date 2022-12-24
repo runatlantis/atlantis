@@ -48,3 +48,19 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GORELEASER_CURRENT_TAG: ${{ steps.changelog.outputs.RELEASE_TAG }}
+
+  homebrew:
+    name: "Bump Homebrew formula"
+    runs-on: ubuntu-22.04
+    if: (!contains(github.ref, '-pre.'))
+    steps:
+      - uses: mislav/bump-homebrew-formula-action@v2
+        with:
+          # A PR will be sent to github.com/Homebrew/homebrew-core to update this formula:
+          formula-name: atlantis
+          commit-message: |
+            {{formulaName}} {{version}}
+            
+            Created by https://github.com/mislav/bump-homebrew-formula-action
+        env:
+          COMMITTER_TOKEN: ${{ secrets.PUBLIC_REPO_ACCESS_TOKEN }}
