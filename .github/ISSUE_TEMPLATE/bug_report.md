@@ -16,25 +16,31 @@ labels: bug
 
 ---
 
-<!--- When filing a bug, please include the following headings if possible. Any example text in this template can be deleted. --->
+<!---
+When filing a bug, please include the following headings if possible.
+Any example text in this template can be deleted.
+--->
 
 ### Overview of the Issue
 
-<!--- Please describe the issue you are having and how you encountered the problem. --->
+<!---
+Please describe the issue you are having and how you encountered the problem.
+--->
+
 
 ### Reproduction Steps
 
 <!--- 
-
 In order to effectively and quickly resolve the issue, please provide exact steps that allow us the reproduce the problem. If no steps are provided, then it will likely take longer to get the issue resolved.
-  
 --->
+
 
 ### Logs
 
 <!---
-
 Provide log files from Atlantis server
+
+logs can be retrieved by retrieving them from the deployment or from the atlantis comments by adding `--debug`. For example `atlantis plan --debug`
 
 <details>
   <summary>Logs</summary>
@@ -44,15 +50,16 @@ log output
 ```
 
 </details>
-
 --->
+
 
 ### Environment details
 
 <!---
-
 If not already included, please provide the following:
+
 - Atlantis version:
+- Deployment method: ecs/eks/helm/tf module
 - If not running the latest Atlantis version have you tried to reproduce this issue on the latest version: 
 - Atlantis flags:
 
@@ -75,3 +82,4 @@ Any other information you can provide about the environment/deployment.
 <!---
 Additional context on the problem. Docs, links to blogs, or other material that lead you to discover this issue or were helpful in troubleshooting the issue. 
 --->
+
