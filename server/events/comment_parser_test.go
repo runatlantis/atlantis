@@ -226,7 +226,7 @@ func TestParse_DidYouMeanAtlantis(t *testing.T) {
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
-		Assert(t, r.CommentResponse == events.DidYouMeanAtlantisComment,
+		Assert(t, r.CommentResponse == fmt.Sprintf(events.DidYouMeanAtlantisComment, "atlantis"),
 			"For comment %q expected CommentResponse==%q but got %q", c, events.DidYouMeanAtlantisComment, r.CommentResponse)
 	}
 }

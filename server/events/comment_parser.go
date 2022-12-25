@@ -125,8 +125,8 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	// Helpfully warn the user if they're using "terraform" instead of "atlantis"
-	if args[0] == "terraform" {
-		return CommentParseResult{CommentResponse: DidYouMeanAtlantisComment}
+	if args[0] == "terraform" && e.ExecutableName != "terraform" {
+		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName)}
 	}
 
 	// Atlantis can be invoked using the name of the VCS host user we're
@@ -171,7 +171,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 
 	// Need to have a plan, apply, approve_policy or unlock at this point.
 	if !e.stringInSlice(cmd, []string{command.Plan.String(), command.Apply.String(), command.Unlock.String(), command.ApprovePolicies.String(), command.Version.String(), command.Import.String()}) {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", cmd)}
+		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun '%s --help' for usage.\n```", cmd, e.ExecutableName)}
 	}
 
 	var workspace string
@@ -238,7 +238,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 	if err != nil {
 		if cmd == command.Unlock.String() {
-			return CommentParseResult{CommentResponse: UnlockUsage}
+			return CommentParseResult{CommentResponse: fmt.Sprintf(UnlockUsage, e.ExecutableName)}
 		}
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
@@ -382,9 +382,11 @@ func (e *CommentParser) HelpComment(applyDisabled bool) string {
 	buf := &bytes.Buffer{}
 	var tmpl = template.Must(template.New("").Parse(helpCommentTemplate))
 	if err := tmpl.Execute(buf, struct {
-		ApplyDisabled bool
+		ApplyDisabled  bool
+		ExecutableName string
 	}{
-		ApplyDisabled: applyDisabled,
+		ApplyDisabled:  applyDisabled,
+		ExecutableName: e.ExecutableName,
 	}); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
 	}
@@ -397,18 +399,18 @@ var helpCommentTemplate = "```cmake\n" +
 Terraform Pull Request Automation
 
 Usage:
-  atlantis <command> [options] -- [terraform options]
+  {{ .ExecutableName }} <command> [options] -- [terraform options]
 
 Examples:
   # run plan in the root directory passing the -target flag to terraform
-  atlantis plan -d . -- -target=resource
+  {{ .ExecutableName }} plan -d . -- -target=resource
   {{- if not .ApplyDisabled }}
 
   # apply all unapplied plans from this pull request
-  atlantis apply
+  {{ .ExecutableName }} apply
 
   # apply the plan for the root directory and staging workspace
-  atlantis apply -d . -w staging
+  {{ .ExecutableName }} apply -d . -w staging
 {{- end }}
 
 Commands:
@@ -430,18 +432,18 @@ Commands:
 Flags:
   -h, --help   help for atlantis
 
-Use "atlantis [command] --help" for more information about a command.` +
+Use "{{ .ExecutableName }} [command] --help" for more information about a command.` +
 	"\n```"
 
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a command with terraform instead of atlantis.
-var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terraform`?"
+var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `terraform`?"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
 // `atlantis unlock` with flags.
 
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
-	`atlantis unlock
+	`%s unlock
 
   Unlocks the entire PR and discards all plans in this PR.
   Arguments or flags are not supported at the moment.
