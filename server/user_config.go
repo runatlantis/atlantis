@@ -124,17 +124,18 @@ func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 	var allowCommands []command.Name
 	var hasAll bool
 	for _, input := range strings.Split(u.AllowCommands, ",") {
+		if input == "" {
+			continue
+		}
 		if input == "all" {
 			hasAll = true
 			continue
 		}
-		if input != "" {
-			cmd, err := command.ParseCommandName(input)
-			if err != nil {
-				return nil, err
-			}
-			allowCommands = append(allowCommands, cmd)
+		cmd, err := command.ParseCommandName(input)
+		if err != nil {
+			return nil, err
 		}
+		allowCommands = append(allowCommands, cmd)
 	}
 	if hasAll {
 		return command.AllCommentCommands, nil
