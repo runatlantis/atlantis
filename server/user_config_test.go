@@ -25,13 +25,20 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 			},
 		},
 		{
+			name:          "all",
+			allowCommands: "all",
+			want: []command.Name{
+				command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import,
+			},
+		},
+		{
 			name:          "empty",
 			allowCommands: "",
 			want:          nil,
 		},
 		{
 			name:          "invalid command",
-			allowCommands: "plan,invalid",
+			allowCommands: "plan,all,invalid",
 			wantErr:       "unknown command name: invalid",
 		},
 	}

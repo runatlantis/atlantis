@@ -120,13 +120,7 @@ func TestParse_ExecutableName(t *testing.T) {
 
 func TestParse_HelpResponse(t *testing.T) {
 	allowCommandsCases := [][]command.Name{
-		{
-			command.Plan,
-			command.Apply,
-			command.Unlock,
-			command.ApprovePolicies,
-			command.Import,
-		},
+		command.AllCommentCommands,
 		{}, // empty case
 	}
 	helpComments := []string{
@@ -847,15 +841,8 @@ func TestCommentParser_HelpComment(t *testing.T) {
 		expectResult  string
 	}{
 		{
-			name: "all commands allowed",
-			allowCommands: []command.Name{
-				command.Version,
-				command.Plan,
-				command.Apply,
-				command.Unlock,
-				command.ApprovePolicies,
-				command.Import,
-			},
+			name:          "all commands allowed",
+			allowCommands: command.AllCommentCommands,
 			expectResult: "```cmake\n" +
 				`atlantis
 Terraform Pull Request Automation

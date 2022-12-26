@@ -31,6 +31,16 @@ const (
 	// Adding more? Don't forget to update String() below
 )
 
+// AllCommentCommands are list of commands that can be run from a comment.
+var AllCommentCommands = []Name{
+	Version,
+	Plan,
+	Apply,
+	Unlock,
+	ApprovePolicies,
+	Import,
+}
+
 // TitleString returns the string representation in title form.
 // ie. policy_check becomes Policy Check
 func (c Name) TitleString() string {

@@ -81,15 +81,7 @@ type CommentParser struct {
 // NewCommentParser returns a CommentParser
 func NewCommentParser(githubUser, gitlabUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name) *CommentParser {
 	var commentAllowCommands []command.Name
-	acceptableCommands := []command.Name{
-		command.Version,
-		command.Plan,
-		command.Apply,
-		command.Unlock,
-		command.ApprovePolicies,
-		command.Import,
-	}
-	for _, acceptableCommand := range acceptableCommands {
+	for _, acceptableCommand := range command.AllCommentCommands {
 		for _, allowCommand := range allowCommands {
 			if acceptableCommand == allowCommand {
 				commentAllowCommands = append(commentAllowCommands, allowCommand)

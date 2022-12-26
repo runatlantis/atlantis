@@ -57,7 +57,8 @@ Values are chosen in this order:
 
   Notes:
   * Accepts a comma separated list, ex. `command1,command2`.
-  * `version`, `plan`, `apply`, `unlock`, `approve_policies` and `import` are available.
+  * `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import` and `all` are available.
+  * `all` is a special parameter that allows all commands.
 
 ### `--allow-draft-prs`
   ```bash
