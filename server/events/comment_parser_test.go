@@ -270,7 +270,7 @@ func TestParse_DidYouMeanAtlantis(t *testing.T) {
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
-		Assert(t, r.CommentResponse == events.DidYouMeanAtlantisComment,
+		Assert(t, r.CommentResponse == fmt.Sprintf(events.DidYouMeanAtlantisComment, "atlantis"),
 			"For comment %q expected CommentResponse==%q but got %q", c, events.DidYouMeanAtlantisComment, r.CommentResponse)
 	}
 }
@@ -947,7 +947,8 @@ Use "atlantis [command] --help" for more information about a command.` +
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			commentParser := events.CommentParser{
-				AllowCommands: c.allowCommands,
+				ExecutableName: "atlantis",
+				AllowCommands:  c.allowCommands,
 			}
 			Equals(t, commentParser.HelpComment(), c.expectResult)
 		})

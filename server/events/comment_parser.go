@@ -147,8 +147,8 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	// Helpfully warn the user if they're using "terraform" instead of "atlantis"
-	if args[0] == "terraform" {
-		return CommentParseResult{CommentResponse: DidYouMeanAtlantisComment}
+	if args[0] == "terraform" && e.ExecutableName != "terraform" {
+		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName)}
 	}
 
 	// Atlantis can be invoked using the name of the VCS host user we're
@@ -264,7 +264,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 	if err != nil {
 		if cmd == command.Unlock.String() {
-			return CommentParseResult{CommentResponse: UnlockUsage}
+			return CommentParseResult{CommentResponse: fmt.Sprintf(UnlockUsage, e.ExecutableName)}
 		}
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
@@ -417,6 +417,7 @@ func (e *CommentParser) HelpComment() string {
 	buf := &bytes.Buffer{}
 	var tmpl = template.Must(template.New("").Parse(helpCommentTemplate))
 	if err := tmpl.Execute(buf, struct {
+		ExecutableName       string
 		AllowVersion         bool
 		AllowPlan            bool
 		AllowApply           bool
@@ -424,6 +425,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowApprovePolicies bool
 		AllowImport          bool
 	}{
+		ExecutableName:       e.ExecutableName,
 		AllowVersion:         e.isAllowedCommand(command.Version.String()),
 		AllowPlan:            e.isAllowedCommand(command.Plan.String()),
 		AllowApply:           e.isAllowedCommand(command.Apply.String()),
@@ -441,7 +443,7 @@ var helpCommentTemplate = "```cmake\n" +
 Terraform Pull Request Automation
 
 Usage:
-  atlantis <command> [options] -- [terraform options]
+  {{ .ExecutableName }} <command> [options] -- [terraform options]
 
 Examples:
   # show atlantis help
@@ -449,15 +451,15 @@ Examples:
 {{- if .AllowPlan }}
 
   # run plan in the root directory passing the -target flag to terraform
-  atlantis plan -d . -- -target=resource
+  {{ .ExecutableName }} plan -d . -- -target=resource
 {{- end }}
 {{- if .AllowApply }}
 
   # apply all unapplied plans from this pull request
-  atlantis apply
+  {{ .ExecutableName }} apply
 
   # apply the plan for the root directory and staging workspace
-  atlantis apply -d . -w staging
+  {{ .ExecutableName }} apply -d . -w staging
 {{- end }}
 
 Commands:
@@ -489,18 +491,18 @@ Commands:
 Flags:
   -h, --help   help for atlantis
 
-Use "atlantis [command] --help" for more information about a command.` +
+Use "{{ .ExecutableName }} [command] --help" for more information about a command.` +
 	"\n```"
 
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a command with terraform instead of atlantis.
-var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terraform`?"
+var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `terraform`?"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
 // `atlantis unlock` with flags.
 
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
-	`atlantis unlock
+	`%s unlock
 
   Unlocks the entire PR and discards all plans in this PR.
   Arguments or flags are not supported at the moment.
