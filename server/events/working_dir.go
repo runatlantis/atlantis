@@ -14,6 +14,7 @@
 package events
 
 import (
+	"encoding/base32"
 	"fmt"
 	"os"
 	"os/exec"
@@ -40,15 +41,15 @@ type WorkingDir interface {
 	// absolute path to the root of the cloned repo. It also returns
 	// a boolean indicating if we should warn users that the branch we're
 	// merging into has been updated since we cloned it.
-	Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
+	Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string, path string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
-	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
+	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string, path string) (string, error)
 	HasDiverged(log logging.SimpleLogging, cloneDir string) bool
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
-	DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error
+	DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string, path string) error
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -84,8 +85,10 @@ func (w *FileWorkspace) Clone(
 	log logging.SimpleLogging,
 	headRepo models.Repo,
 	p models.PullRequest,
-	workspace string) (string, bool, error) {
-	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
+	workspace string,
+	path string,
+) (string, bool, error) {
+	cloneDir := w.cloneDir(p.BaseRepo, p, workspace, path)
 
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
@@ -300,8 +303,8 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 }
 
 // GetWorkingDir returns the path to the workspace for this repo and pull.
-func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
-	repoDir := w.cloneDir(r, p, workspace)
+func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string, path string) (string, error) {
+	repoDir := w.cloneDir(r, p, workspace, path)
 	if _, err := os.Stat(repoDir); err != nil {
 		return "", errors.Wrap(err, "checking if workspace exists")
 	}
@@ -324,16 +327,16 @@ func (w *FileWorkspace) Delete(r models.Repo, p models.PullRequest) error {
 }
 
 // DeleteForWorkspace deletes the working dir for this workspace.
-func (w *FileWorkspace) DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error {
-	return os.RemoveAll(w.cloneDir(r, p, workspace))
+func (w *FileWorkspace) DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string, path string) error {
+	return os.RemoveAll(w.cloneDir(r, p, workspace, path))
 }
 
 func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string {
 	return filepath.Join(w.DataDir, workingDirPrefix, r.FullName, strconv.Itoa(p.Num))
 }
 
-func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) string {
-	return filepath.Join(w.repoPullDir(r, p), workspace)
+func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string, path string) string {
+	return filepath.Join(w.repoPullDir(r, p), workspace, base32.StdEncoding.EncodeToString([]byte(path)))
 }
 
 // sanitizeGitCredentials replaces any git clone urls that contain credentials

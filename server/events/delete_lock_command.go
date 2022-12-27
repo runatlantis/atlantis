@@ -71,7 +71,7 @@ func (l *DefaultDeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
 	} else {
 		defer unlock()
 		// nolint: vetshadow
-		if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
+		if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path); err != nil {
 			l.Logger.Err("unable to delete workspace: %s", err)
 		}
 	}

@@ -42,45 +42,58 @@ func (p *DefaultPendingPlanFinder) Find(pullDir string) ([]PendingPlan, error) {
 }
 
 func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPlan, []string, error) {
+	var plans []PendingPlan
+	var absPaths []string
+
 	workspaceDirs, err := os.ReadDir(pullDir)
 	if err != nil {
 		return nil, nil, err
 	}
-	var plans []PendingPlan
-	var absPaths []string
+
 	for _, workspaceDir := range workspaceDirs {
 		workspace := workspaceDir.Name()
-		repoDir := filepath.Join(pullDir, workspace)
 
-		// Any generated plans should be untracked by git since Atlantis created
-		// them.
-		lsCmd := exec.Command("git", "ls-files", ".", "--others") // nolint: gosec
-		lsCmd.Dir = repoDir
-		lsOut, err := lsCmd.CombinedOutput()
+		pathDirs, err := os.ReadDir(filepath.Join(pullDir, workspace))
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "running git ls-files . "+
-				"--others: %s", string(lsOut))
+			return nil, nil, err
 		}
-		for _, file := range strings.Split(string(lsOut), "\n") {
-			if filepath.Ext(file) == ".tfplan" {
-				// Ignore .terragrunt-cache dirs (#487)
-				if strings.Contains(file, ".terragrunt-cache/") {
-					continue
-				}
 
-				projectName, err := runtime.ProjectNameFromPlanfile(workspace, filepath.Base(file))
-				if err != nil {
-					return nil, nil, err
+		for _, pathDir := range pathDirs {
+			path := pathDir.Name()
+
+			repoDir := filepath.Join(pullDir, workspace, path)
+
+			// Any generated plans should be untracked by git since Atlantis created
+			// them.
+			lsCmd := exec.Command("git", "ls-files", ".", "--others") // nolint: gosec
+			lsCmd.Dir = repoDir
+			lsOut, err := lsCmd.CombinedOutput()
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "running git ls-files . "+
+					"--others: %s", string(lsOut))
+			}
+			for _, file := range strings.Split(string(lsOut), "\n") {
+				if filepath.Ext(file) == ".tfplan" {
+					// Ignore .terragrunt-cache dirs (#487)
+					if strings.Contains(file, ".terragrunt-cache/") {
+						continue
+					}
+
+					projectName, err := runtime.ProjectNameFromPlanfile(workspace, filepath.Base(file))
+					if err != nil {
+						return nil, nil, err
+					}
+					plans = append(plans, PendingPlan{
+						RepoDir:     repoDir,
+						RepoRelDir:  filepath.Dir(file),
+						Workspace:   workspace,
+						ProjectName: projectName,
+					})
+					absPaths = append(absPaths, filepath.Join(repoDir, file))
 				}
-				plans = append(plans, PendingPlan{
-					RepoDir:     repoDir,
-					RepoRelDir:  filepath.Dir(file),
-					Workspace:   workspace,
-					ProjectName: projectName,
-				})
-				absPaths = append(absPaths, filepath.Join(repoDir, file))
 			}
 		}
+
 	}
 	return plans, absPaths, nil
 }

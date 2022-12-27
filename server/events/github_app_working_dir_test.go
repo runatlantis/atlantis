@@ -48,7 +48,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 	cloneDir, _, err := gwd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
-	}, "default")
+	}, "default", ".")
 	Ok(t, err)
 
 	// Use rev-parse to verify at correct commit.
@@ -86,11 +86,11 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 	modifiedBaseRepo.SanitizedCloneURL = "https://x-access-token:<redacted>@github.com/runatlantis/atlantis.git"
 
 	When(credentials.GetToken()).ThenReturn("token", nil)
-	When(workingDir.Clone(logger, modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")).ThenReturn(
+	When(workingDir.Clone(logger, modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default", ".")).ThenReturn(
 		"", true, nil,
 	)
 
-	_, success, _ := ghAppWorkingDir.Clone(logger, headRepo, models.PullRequest{BaseRepo: baseRepo}, "default")
+	_, success, _ := ghAppWorkingDir.Clone(logger, headRepo, models.PullRequest{BaseRepo: baseRepo}, "default", ".")
 
 	Assert(t, success == true, "clone url mutation error")
 }

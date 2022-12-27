@@ -85,7 +85,7 @@ func TestDeleteLock_Success(t *testing.T) {
 	lock, err := dlc.DeleteLock("id")
 	Ok(t, err)
 	Assert(t, lock != nil, "lock was nil")
-	workingDir.VerifyWasCalledOnce().DeleteForWorkspace(pull.BaseRepo, pull, "workspace")
+	workingDir.VerifyWasCalledOnce().DeleteForWorkspace(pull.BaseRepo, pull, "workspace", "path")
 }
 
 func TestDeleteLocksByPull_LockerErr(t *testing.T) {
