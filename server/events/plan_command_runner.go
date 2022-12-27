@@ -55,19 +55,20 @@ type PlanCommandRunner struct {
 	silenceVCSStatusNoPlans bool
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
-	silenceVCSStatusNoProjects bool
-	commitStatusUpdater        CommitStatusUpdater
-	pendingPlanFinder          PendingPlanFinder
-	workingDir                 WorkingDir
-	prjCmdBuilder              ProjectPlanCommandBuilder
-	prjCmdRunner               ProjectPlanCommandRunner
-	dbUpdater                  *DBUpdater
-	pullUpdater                *PullUpdater
-	policyCheckCommandRunner   *PolicyCheckCommandRunner
-	autoMerger                 *AutoMerger
-	parallelPoolSize           int
-	pullStatusFetcher          PullStatusFetcher
-	lockingLocker              locking.Locker
+	silenceVCSStatusNoProjects    bool
+	commitStatusUpdater           CommitStatusUpdater
+	pendingPlanFinder             PendingPlanFinder
+	workingDir                    WorkingDir
+	prjCmdBuilder                 ProjectPlanCommandBuilder
+	prjCmdRunner                  ProjectPlanCommandRunner
+	dbUpdater                     *DBUpdater
+	pullUpdater                   *PullUpdater
+	policyCheckCommandRunner      *PolicyCheckCommandRunner
+	autoMerger                    *AutoMerger
+	parallelPoolSize              int
+	pullStatusFetcher             PullStatusFetcher
+	lockingLocker                 locking.Locker
+	PreWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {

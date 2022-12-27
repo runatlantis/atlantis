@@ -528,6 +528,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		},
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
+		ParserValidator:     validator,
+		ProjectFinder:       &events.DefaultProjectFinder{},
 	}
 	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
 		VCSClient:        vcsClient,

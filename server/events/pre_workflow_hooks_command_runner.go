@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -33,6 +35,8 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 	PreWorkflowHookRunner runtime.PreWorkflowHookRunner
 	CommitStatusUpdater   CommitStatusUpdater
 	Router                PreWorkflowHookURLGenerator
+	ParserValidator       *config.ParserValidator
+	ProjectFinder         ProjectFinder
 }
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
@@ -74,6 +78,8 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 		escapedArgs = escapeArgs(cmd.Flags)
 	}
 
+	// First we run the hooks on the default workspace since
+	// this is the only one we know exists for sure.
 	err = w.runHooks(
 		models.WorkflowHookCommandContext{
 			BaseRepo:           baseRepo,
@@ -89,6 +95,53 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 
 	if err != nil {
 		return err
+	}
+
+	// Now we run the hooks on every project that is being modified.
+	repoCfgFile := w.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+	hasRepoCfg, err := w.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
+	if err != nil {
+		return errors.Wrapf(err, "looking for %s file in %q", repoCfgFile, repoDir)
+	}
+
+	var repoCfg valid.RepoCfg
+
+	if hasRepoCfg {
+		repoCfg, err = w.ParserValidator.ParseRepoCfg(repoDir, w.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+		if err != nil {
+			return errors.Wrapf(err, "parsing %s", repoCfgFile)
+		}
+		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+	}
+
+	modifiedFiles, err := w.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		return err
+	}
+	matchingProjects, err := w.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
+	if err != nil {
+		return err
+	}
+
+	for _, project := range matchingProjects {
+		projectDir, _, _ := w.WorkingDir.Clone(log, headRepo, pull, project.Workspace, DefaultRepoRelDir)
+
+		err = w.runHooks(
+			models.WorkflowHookCommandContext{
+				BaseRepo:           baseRepo,
+				HeadRepo:           headRepo,
+				Log:                log,
+				Pull:               pull,
+				User:               user,
+				Verbose:            false,
+				EscapedCommentArgs: escapedArgs,
+				HookID:             uuid.NewString(),
+			},
+			preWorkflowHooks, projectDir)
+
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
