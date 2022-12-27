@@ -55,7 +55,7 @@ func (p *InstrumentedProjectCommandRunner) Import(ctx command.ProjectContext) co
 }
 
 func (p *InstrumentedProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("state rm", ctx, p.projectCommandRunner.Import, p.scope)
+	return RunAndEmitStats("state rm", ctx, p.projectCommandRunner.StateRm, p.scope)
 }
 
 func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult, scope tally.Scope) command.ProjectResult {

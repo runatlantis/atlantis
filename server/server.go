@@ -728,6 +728,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		instrumentedProjectCmdRunner,
 	)
 
+	stateCommandRunner := events.NewStateCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		instrumentedProjectCmdRunner,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
@@ -735,6 +741,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
+		command.State:           stateCommandRunner,
 	}
 
 	githubTeamAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)

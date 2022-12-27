@@ -170,11 +170,11 @@ If a flag is needed to be always appended, see [Custom Workflow Use Cases](custo
 ---
 ## atlantis state rm
 ```bash
-atlantis state [options] rm ADDRESS... -- [terraform import flags]
+atlantis state [options] rm ADDRESS... -- [terraform state rm flags]
 ```
 ### Explanation
 Runs `terraform state rm` that matches the directory/project/workspace.
-This command discards the terraform plan result. After an import and before an apply, another `atlantis plan` must be run again.
+This command discards the terraform plan result. After run state rm and before an apply, another `atlantis plan` must be run again.
 
 ### Examples
 ```bash
@@ -192,7 +192,7 @@ atlantis state -w staging rm ADDRESS
 ```
 
 ::: tip
-* If import for_each resources, it requires a single quoted address.
+* If run state rm to for_each resources, it requires a single quoted address.
   * ex. `atlantis state rm 'aws_instance.example["foo"]'`
 :::
 

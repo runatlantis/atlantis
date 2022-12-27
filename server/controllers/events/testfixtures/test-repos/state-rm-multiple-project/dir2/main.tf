@@ -1,4 +1,4 @@
-resource "random_id" "dummy2" {
+resource "random_id" "dummy" {
   keepers     = {}
   byte_length = 1
 }

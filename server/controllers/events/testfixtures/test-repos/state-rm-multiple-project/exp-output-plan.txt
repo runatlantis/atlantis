@@ -5,7 +5,7 @@ Ran Plan for 2 projects:
 
 ### 1. dir: `dir1` workspace: `default`
 ```diff
-random_id.dummy1: Refreshing state... [id=AA]
+random_id.dummy: Refreshing state... [id=AA]
 
 No changes. Your infrastructure matches the configuration.
 
@@ -23,7 +23,7 @@ and found no differences, so no changes are needed.
 ---
 ### 2. dir: `dir2` workspace: `default`
 ```diff
-random_id.dummy2: Refreshing state... [id=BB]
+random_id.dummy: Refreshing state... [id=BB]
 
 No changes. Your infrastructure matches the configuration.
 

@@ -109,6 +109,16 @@ type projectResultTmplData struct {
 	Rendered    string
 }
 
+type importSuccessData struct {
+	Output    string
+	RePlanCmd string
+}
+
+type stateRmSuccessData struct {
+	Output    string
+	RePlanCmd string
+}
+
 // Initialize templates
 func GetMarkdownRenderer(
 	GitlabSupportsCommonMark bool,
@@ -219,22 +229,30 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			}
 		} else if result.VersionSuccess != "" {
 			if m.shouldUseWrappedTmpl(vcsHost, result.VersionSuccess) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{result.VersionSuccess})
+				resultData.Rendered = m.renderTemplate(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{strings.TrimSpace(result.VersionSuccess)})
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("versionUnwrappedSuccess"), struct{ Output string }{result.VersionSuccess})
+				resultData.Rendered = m.renderTemplate(templates.Lookup("versionUnwrappedSuccess"), struct{ Output string }{strings.TrimSpace(result.VersionSuccess)})
 			}
 			numVersionSuccesses++
 		} else if result.ImportSuccess != nil {
+			data := importSuccessData{
+				Output:    strings.TrimSpace(result.ImportSuccess.Output),
+				RePlanCmd: result.ImportSuccess.RePlanCmd,
+			}
 			if m.shouldUseWrappedTmpl(vcsHost, result.ImportSuccess.Output) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("importSuccessWrapped"), result.ImportSuccess)
+				resultData.Rendered = m.renderTemplate(templates.Lookup("importSuccessWrapped"), data)
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
+				resultData.Rendered = m.renderTemplate(templates.Lookup("importSuccessUnwrapped"), data)
 			}
 		} else if result.StateRmSuccess != nil {
+			data := stateRmSuccessData{
+				Output:    strings.TrimSpace(result.StateRmSuccess.Output),
+				RePlanCmd: result.StateRmSuccess.RePlanCmd,
+			}
 			if m.shouldUseWrappedTmpl(vcsHost, result.StateRmSuccess.Output) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("stateRmSuccessWrapped"), result.StateRmSuccess)
+				resultData.Rendered = m.renderTemplate(templates.Lookup("stateRmSuccessWrapped"), data)
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
+				resultData.Rendered = m.renderTemplate(templates.Lookup("stateRmSuccessUnwrapped"), data)
 			}
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"

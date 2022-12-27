@@ -1,17 +1,15 @@
 Ran Import for dir: `dir2` workspace: `default`
 
 ```diff
-random_id.dummy2: Importing from ID "BB"...
-random_id.dummy2: Import prepared!
+random_id.dummy: Importing from ID "BB"...
+random_id.dummy: Import prepared!
   Prepared random_id for import
-random_id.dummy2: Refreshing state... [id=BB]
+random_id.dummy: Refreshing state... [id=BB]
 
 Import successful!
 
 The resources that were imported are shown above. These resources are now in
 your Terraform state and will henceforth be managed by Terraform.
-
-
 ```
 
 * :repeat: To **plan** this project again, comment:

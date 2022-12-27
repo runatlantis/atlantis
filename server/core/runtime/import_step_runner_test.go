@@ -8,9 +8,9 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
+	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
+	tfmatchers "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -49,7 +49,7 @@ func TestImportStepRunner_Run_Success(t *testing.T) {
 		DefaultTFVersion:  tfVersion,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(runtimematchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), tfmatchers.AnyMapOfStringToString(), tfmatchers.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
 	Ok(t, err)

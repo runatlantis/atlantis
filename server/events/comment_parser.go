@@ -27,6 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/spf13/pflag"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -297,13 +298,7 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 			return "", nil, e.errMarkdown("subcommand required", name.String(), flagSet)
 		}
 		subCommand, commandArgs = commandArgs[0], commandArgs[1:]
-		isAvailableSubCommand := false
-		for _, availableSubCommand := range availableSubCommands {
-			if subCommand == availableSubCommand {
-				isAvailableSubCommand = true
-				break
-			}
-		}
+		isAvailableSubCommand := slices.Contains(availableSubCommands, subCommand)
 		if !isAvailableSubCommand {
 			errMsg := fmt.Sprintf("invalid subcommand %s (not %s)", subCommand, strings.Join(availableSubCommands, ", "))
 			return "", nil, e.errMarkdown(errMsg, name.String(), flagSet)

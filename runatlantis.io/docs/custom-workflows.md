@@ -382,12 +382,12 @@ import:
 state_rm:
 ```
 
-| Key      | Type            | Default                   | Required | Description                      |
-|----------|-----------------|---------------------------|----------|----------------------------------|
-| plan     | [Stage](#stage) | `steps: [init, plan]`     | no       | How to plan for this project.    |
-| apply    | [Stage](#stage) | `steps: [apply]`          | no       | How to apply for this project.   |
-| import   | [Stage](#stage) | `steps: [init, import]`   | no       | How to import for this project.  |
-| state_rm | [Stage](#stage) | `steps: [init, state_rm]` | no       | How to import for this project.  |
+| Key      | Type            | Default                   | Required | Description                           |
+|----------|-----------------|---------------------------|----------|---------------------------------------|
+| plan     | [Stage](#stage) | `steps: [init, plan]`     | no       | How to plan for this project.         |
+| apply    | [Stage](#stage) | `steps: [apply]`          | no       | How to apply for this project.        |
+| import   | [Stage](#stage) | `steps: [init, import]`   | no       | How to import for this project.       |
+| state_rm | [Stage](#stage) | `steps: [init, state_rm]` | no       | How to run state rm for this project. |
 
 ### Stage
 ```yaml

@@ -14,8 +14,8 @@ plan. Resource actions are indicated with the following symbols:
 
 Terraform will perform the following actions:
 
-  # random_id.dummy1 will be created
-+ resource "random_id" "dummy1" {
+  # random_id.dummy will be created
++ resource "random_id" "dummy" {
       + b64_std     = (known after apply)
       + b64_url     = (known after apply)
       + byte_length = 1
@@ -50,8 +50,8 @@ plan. Resource actions are indicated with the following symbols:
 
 Terraform will perform the following actions:
 
-  # random_id.dummy2 will be created
-+ resource "random_id" "dummy2" {
+  # random_id.dummy will be created
++ resource "random_id" "dummy" {
       + b64_std     = (known after apply)
       + b64_url     = (known after apply)
       + byte_length = 1

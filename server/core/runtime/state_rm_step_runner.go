@@ -19,10 +19,10 @@ func (p *StateRmStepRunner) Run(ctx command.ProjectContext, extraArgs []string, 
 		tfVersion = ctx.TerraformVersion
 	}
 
-	importCmd := []string{"state", "rm"}
-	importCmd = append(importCmd, extraArgs...)
-	importCmd = append(importCmd, ctx.EscapedCommentArgs...)
-	out, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), importCmd, envs, tfVersion, ctx.Workspace)
+	stateRmCmd := []string{"state", "rm"}
+	stateRmCmd = append(stateRmCmd, extraArgs...)
+	stateRmCmd = append(stateRmCmd, ctx.EscapedCommentArgs...)
+	out, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), stateRmCmd, envs, tfVersion, ctx.Workspace)
 
 	// If the state rm was successful and a plan file exists, delete the plan.
 	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
