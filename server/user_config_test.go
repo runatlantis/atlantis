@@ -32,6 +32,13 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 			},
 		},
 		{
+			name:          "all with others returns same with all result",
+			allowCommands: "all,plan",
+			want: []command.Name{
+				command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import,
+			},
+		},
+		{
 			name:          "empty",
 			allowCommands: "",
 			want:          nil,
@@ -39,6 +46,11 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 		{
 			name:          "invalid command",
 			allowCommands: "plan,all,invalid",
+			wantErr:       "unknown command name: invalid",
+		},
+		{
+			name:          "invalid command",
+			allowCommands: "invalid,plan,all",
 			wantErr:       "unknown command name: invalid",
 		},
 	}
