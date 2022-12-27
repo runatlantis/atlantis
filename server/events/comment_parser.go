@@ -447,7 +447,7 @@ Usage:
 
 Examples:
   # show atlantis help
-  atlantis help
+  {{ .ExecutableName }} help
 {{- if .AllowPlan }}
 
   # run plan in the root directory passing the -target flag to terraform
