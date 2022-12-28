@@ -97,6 +97,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 		return err
 	}
 
+	// Extract all workspaces from the matching projects
 	workspaces, err := w.getWorkspaces(ctx, repoDir)
 	if err != nil {
 		return err
@@ -171,9 +172,8 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 
 func (w *DefaultPreWorkflowHooksCommandRunner) getWorkspaces(
 	ctx *command.Context,
-	repoDir string, // repoDir
+	repoDir string,
 ) (map[string]string, error) {
-	// Extract all workspaces from the matching projects
 	workspaces := make(map[string]string)
 
 	repoCfgFile := w.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
@@ -205,6 +205,13 @@ func (w *DefaultPreWorkflowHooksCommandRunner) getWorkspaces(
 		if workspaces[project.Workspace] == "" {
 			// We have to clone the workspace because at
 			// this point we don't have it cloned
+			unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, project.Workspace, project.Dir)
+			if err != nil {
+				return workspaces, err
+			}
+			ctx.Log.Debug("got workspace lock")
+
+			defer unlockFn()
 			workspaceDir, _, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, project.Workspace, project.Dir)
 			if err != nil {
 				return workspaces, err
