@@ -1,0 +1,5 @@
+```
+Error: unknown command "import".
+Run 'atlantis --help' for usage.
+Available commands(--allow-commands): plan, apply
+```

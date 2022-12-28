@@ -28,6 +28,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -43,6 +44,7 @@ const (
 	ADTokenFlag                      = "azuredevops-token" // nolint: gosec
 	ADUserFlag                       = "azuredevops-user"
 	ADHostnameFlag                   = "azuredevops-hostname"
+	AllowCommandsFlag                = "allow-commands"
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
@@ -135,6 +137,7 @@ const (
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
 	DefaultCheckoutStrategy             = "branch"
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
@@ -182,6 +185,10 @@ var stringFlags = map[string]stringFlag{
 	ADHostnameFlag: {
 		description:  "Azure DevOps hostname to support cloud and self hosted instances.",
 		defaultValue: "dev.azure.com",
+	},
+	AllowCommandsFlag: {
+		description:  "Comma separated list of acceptable atlantis commands.",
+		defaultValue: DefaultAllowCommands,
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
@@ -751,6 +758,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.AutoplanFileList == "" {
 		c.AutoplanFileList = DefaultAutoplanFileList
 	}
+	if c.AllowCommands == "" {
+		c.AllowCommands = DefaultAllowCommands
+	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
 	}
@@ -904,6 +914,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return errors.Wrapf(patternErr, "invalid pattern in --%s, %s", AutoplanFileListFlag, userConfig.AutoplanFileList)
 	}
 
+	if _, err := userConfig.ToAllowCommandNames(); err != nil {
+		return errors.Wrapf(err, "invalid --%s", AllowCommandsFlag)
+	}
+
 	return nil
 }
 
@@ -1014,6 +1028,16 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	if userConfig.RequireMergeable {
 		deprecatedFlags = append(deprecatedFlags, RequireMergeableFlag)
 		commandReqs = append(commandReqs, valid.MergeableCommandReq)
+	}
+	if userConfig.DisableApply {
+		deprecatedFlags = append(deprecatedFlags, DisableApplyFlag)
+		var filtered []string
+		for _, allowCommand := range strings.Split(userConfig.AllowCommands, ",") {
+			if allowCommand != command.Apply.String() {
+				filtered = append(filtered, allowCommand)
+			}
+		}
+		userConfig.AllowCommands = strings.Join(filtered, ",")
 	}
 
 	// Build up strings with what the recommended yaml and json config should
