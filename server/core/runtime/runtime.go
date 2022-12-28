@@ -52,7 +52,7 @@ type StatusUpdater interface {
 
 // Runner mirrors events.StepRunner as a way to bring it into this package
 //
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
+//go:generate pegomock generate -m --package mocks -o mocks/mock_runner.go Runner
 type Runner interface {
 	Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }

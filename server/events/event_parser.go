@@ -153,7 +153,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, ver
 	}
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
+//go:generate pegomock generate -m --package mocks -o mocks/mock_event_parsing.go EventParsing
 
 // EventParsing parses webhook events from different VCS hosts into their
 // respective Atlantis models.

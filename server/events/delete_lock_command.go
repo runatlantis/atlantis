@@ -6,7 +6,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_delete_lock_command.go DeleteLockCommand
+//go:generate pegomock generate -m --package mocks -o mocks/mock_delete_lock_command.go DeleteLockCommand
 
 // DeleteLockCommand is the first step after a command request has been parsed.
 type DeleteLockCommand interface {
