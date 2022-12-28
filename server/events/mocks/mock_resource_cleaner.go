@@ -4,11 +4,10 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	jobs "github.com/runatlantis/atlantis/server/jobs"
+	"reflect"
+	"time"
 )
 
 type MockResourceCleaner struct {

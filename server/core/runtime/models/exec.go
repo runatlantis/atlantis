@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_exec.go Exec
+//go:generate pegomock generate -m --package mocks -o mocks/mock_exec.go Exec
 
 type Exec interface {
 	LookPath(file string) (string, error)

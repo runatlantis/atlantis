@@ -53,7 +53,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 		TerraformExecutor: terraform,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 	Ok(t, err)
@@ -118,7 +118,7 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 		DefaultTFVersion:  tfVersion,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	_, err := s.Run(command.ProjectContext{
 		Log:        logger,
@@ -180,7 +180,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 				DefaultTFVersion:  tfVersion,
 			}
 
-			When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
 			output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
@@ -533,7 +533,7 @@ Terraform will perform the following actions:
 		DefaultTFVersion:  tfVersion,
 	}
 	When(terraform.RunCommandWithVersion(
-		matchers.AnyModelsProjectCommandContext(),
+		matchers.AnyCommandProjectContext(),
 		AnyString(),
 		AnyStringSlice(),
 		matchers2.AnyMapOfStringToString(),
@@ -587,7 +587,7 @@ func TestRun_OutputOnErr(t *testing.T) {
 	expOutput := "expected output"
 	expErrMsg := "error!"
 	When(terraform.RunCommandWithVersion(
-		matchers.AnyModelsProjectCommandContext(),
+		matchers.AnyCommandProjectContext(),
 		AnyString(),
 		AnyStringSlice(),
 		matchers2.AnyMapOfStringToString(),
@@ -646,7 +646,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			terraform := mocks.NewMockClient()
 			When(terraform.RunCommandWithVersion(
-				matchers.AnyModelsProjectCommandContext(),
+				matchers.AnyCommandProjectContext(),
 				AnyString(),
 				AnyStringSlice(),
 				matchers2.AnyMapOfStringToString(),
