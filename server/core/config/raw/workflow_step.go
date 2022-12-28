@@ -72,10 +72,16 @@ func (s WorkflowHook) Validate() error {
 func (s WorkflowHook) ToValid() *valid.WorkflowHook {
 	// This will trigger in case #4 (see WorkflowHook docs).
 	if len(s.StringVal) > 0 {
+		onlyOnce := false
+		if s.StringVal["only_once"] == "true" {
+			onlyOnce = true
+		}
+
 		return &valid.WorkflowHook{
 			StepName:        RunStepName,
 			RunCommand:      s.StringVal["run"],
 			StepDescription: s.StringVal["description"],
+			OnlyOnce:        onlyOnce,
 		}
 	}
 

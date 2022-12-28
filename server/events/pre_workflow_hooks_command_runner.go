@@ -91,41 +91,19 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 			EscapedCommentArgs: escapedArgs,
 			HookID:             uuid.NewString(),
 		},
-		preWorkflowHooks, repoDir)
+		preWorkflowHooks, repoDir, true)
 
 	if err != nil {
 		return err
 	}
 
-	// Now we run the hooks on every project that is being modified.
-	repoCfgFile := w.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-	hasRepoCfg, err := w.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
-	if err != nil {
-		return errors.Wrapf(err, "looking for %s file in %q", repoCfgFile, repoDir)
-	}
-
-	var repoCfg valid.RepoCfg
-
-	if hasRepoCfg {
-		repoCfg, err = w.ParserValidator.ParseRepoCfg(repoDir, w.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
-		if err != nil {
-			return errors.Wrapf(err, "parsing %s", repoCfgFile)
-		}
-		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
-	}
-
-	modifiedFiles, err := w.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
-	if err != nil {
-		return err
-	}
-	matchingProjects, err := w.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
+	workspaces, err := w.getWorkspaces(ctx, repoDir)
 	if err != nil {
 		return err
 	}
 
-	for _, project := range matchingProjects {
-		projectDir, _, _ := w.WorkingDir.Clone(log, headRepo, pull, project.Workspace, DefaultRepoRelDir)
-
+	// Now we run the hooks on every workspace that is being modified.
+	for _, workspaceDir := range workspaces {
 		err = w.runHooks(
 			models.WorkflowHookCommandContext{
 				BaseRepo:           baseRepo,
@@ -137,7 +115,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 				EscapedCommentArgs: escapedArgs,
 				HookID:             uuid.NewString(),
 			},
-			preWorkflowHooks, projectDir)
+			preWorkflowHooks, workspaceDir, false)
 
 		if err != nil {
 			return err
@@ -151,8 +129,13 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 	ctx models.WorkflowHookCommandContext,
 	preWorkflowHooks []*valid.WorkflowHook,
 	repoDir string,
+	firstTime bool,
 ) error {
 	for i, hook := range preWorkflowHooks {
+		if hook.OnlyOnce && !firstTime {
+			continue
+		}
+
 		hookDescription := hook.StepDescription
 		if hookDescription == "" {
 			hookDescription = fmt.Sprintf("Pre workflow hook #%d", i)
@@ -184,4 +167,52 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 	}
 
 	return nil
+}
+
+func (w *DefaultPreWorkflowHooksCommandRunner) getWorkspaces(
+	ctx *command.Context,
+	repoDir string, // repoDir
+) (map[string]string, error) {
+	// Extract all workspaces from the matching projects
+	workspaces := make(map[string]string)
+
+	repoCfgFile := w.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+	hasRepoCfg, err := w.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
+	if err != nil {
+		return workspaces, errors.Wrapf(err, "looking for %s file in %q", repoCfgFile, repoDir)
+	}
+
+	var repoCfg valid.RepoCfg
+
+	if hasRepoCfg {
+		repoCfg, err = w.ParserValidator.ParseRepoCfg(repoDir, w.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+		if err != nil {
+			return workspaces, errors.Wrapf(err, "parsing %s", repoCfgFile)
+		}
+		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+	}
+
+	modifiedFiles, err := w.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		return workspaces, err
+	}
+	matchingProjects, err := w.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
+	if err != nil {
+		return workspaces, err
+	}
+
+	for _, project := range matchingProjects {
+		if workspaces[project.Workspace] == "" {
+			// We have to clone the workspace because at
+			// this point we don't have it cloned
+			workspaceDir, _, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, project.Workspace, project.Dir)
+			if err != nil {
+				return workspaces, err
+			}
+
+			workspaces[project.Workspace] = workspaceDir
+		}
+	}
+
+	return workspaces, nil
 }

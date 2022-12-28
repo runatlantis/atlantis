@@ -102,6 +102,7 @@ type WorkflowHook struct {
 	StepName        string
 	RunCommand      string
 	StepDescription string
+	OnlyOnce        bool
 }
 
 // DefaultApplyStage is the Atlantis default apply stage.
