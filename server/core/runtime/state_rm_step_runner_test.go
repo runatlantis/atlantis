@@ -49,7 +49,7 @@ func TestStateRmStepRunner_Run_Success(t *testing.T) {
 		DefaultTFVersion:  tfVersion,
 	}
 
-	When(terraform.RunCommandWithVersion(runtimematchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), tfmatchers.AnyMapOfStringToString(), tfmatchers.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(runtimematchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), tfmatchers.AnyMapOfStringToString(), tfmatchers.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
 	Ok(t, err)
