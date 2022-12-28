@@ -35,6 +35,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	vcsmatchers "github.com/runatlantis/atlantis/server/events/vcs/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -534,9 +535,9 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
 			}
 		})
 	}
@@ -932,9 +933,9 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
 			}
 		})
 	}
