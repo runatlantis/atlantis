@@ -133,6 +133,8 @@ atlantis import [options] ADDRESS ID -- [terraform import flags]
 Runs `terraform import` that matches the directory/project/workspace.
 This command discards the terraform plan result. After an import and before an apply, another `atlantis plan` must be run again.
 
+To allow the `import` command requires [--allow-commands](/docs/server-configuration.html#allow-commands) configuration.
+
 ### Examples
 ```bash
 # Runs import

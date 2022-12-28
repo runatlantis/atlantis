@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestName_TitleString(t *testing.T) {
@@ -72,6 +73,7 @@ func TestName_DefaultUsage(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 func TestName_SubCommands(t *testing.T) {
 	tests := []struct {
 		c    command.Name
@@ -162,4 +164,31 @@ func TestArgCount_IsMatchCount(t *testing.T) {
 			}
 		})
 	}
+=======
+func TestParseCommandName(t *testing.T) {
+	tests := []struct {
+		exp  command.Name
+		name string
+	}{
+		{command.Apply, "apply"},
+		{command.Plan, "plan"},
+		{command.Unlock, "unlock"},
+		{command.PolicyCheck, "policy_check"},
+		{command.ApprovePolicies, "approve_policies"},
+		{command.Version, "version"},
+		{command.Import, "import"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := command.ParseCommandName(tt.name)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.exp, got)
+		})
+	}
+
+	t.Run("unknown command", func(t *testing.T) {
+		_, err := command.ParseCommandName("unknown")
+		assert.ErrorContains(t, err, "unknown command name: unknown")
+	})
+>>>>>>> main
 }

@@ -47,6 +47,19 @@ Values are chosen in this order:
 
 
 ## Flags
+### `--allow-commands`
+  ```bash
+  atlantis server --allow-commands=version,plan,apply,unlock,approve_policies
+  # or
+  ATLANTIS_ALLOW_COMMANDS='version,plan,apply,unlock,approve_policies'
+  ```
+  List of allowed commands to be run on the Atlantis server, Defaults to `version,plan,apply,unlock,approve_policies`
+
+  Notes:
+  * Accepts a comma separated list, ex. `command1,command2`.
+  * `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import` and `all` are available.
+  * `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
+
 ### `--allow-draft-prs`
   ```bash
   atlantis server --allow-draft-prs
@@ -318,11 +331,14 @@ and set `--autoplan-modules` to `false`.
   if not in `PATH`. See [Terraform Versions](terraform-versions.html) for more details.
 
 ### `--disable-apply`
+  <Badge text="Deprecated" type="warn"/>
   ```bash
   atlantis server --disable-apply
   # or
   ATLANTIS_DISABLE_APPLY=true
   ```
+  Deprecated for `--allow-commands`.
+
   Disable all `atlantis apply` commands, regardless of which flags are passed with it.
 
 ### `--disable-apply-all`
