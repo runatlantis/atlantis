@@ -308,6 +308,7 @@ func TestConfig_ToValid(t *testing.T) {
 						Apply:       nil,
 						PolicyCheck: nil,
 						Import:      nil,
+						StateRm:     nil,
 					},
 				},
 			},
@@ -322,6 +323,7 @@ func TestConfig_ToValid(t *testing.T) {
 						PolicyCheck: valid.DefaultPolicyCheckStage,
 						Apply:       valid.DefaultApplyStage,
 						Import:      valid.DefaultImportStage,
+						StateRm:     valid.DefaultStateRmStage,
 					},
 				},
 			},
@@ -359,6 +361,13 @@ func TestConfig_ToValid(t *testing.T) {
 							Steps: []raw.Step{
 								{
 									Key: String("import"),
+								},
+							},
+						},
+						StateRm: &raw.Stage{
+							Steps: []raw.Step{
+								{
+									Key: String("state_rm"),
 								},
 							},
 						},
@@ -402,6 +411,13 @@ func TestConfig_ToValid(t *testing.T) {
 							Steps: []valid.Step{
 								{
 									StepName: "import",
+								},
+							},
+						},
+						StateRm: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName: "state_rm",
 								},
 							},
 						},

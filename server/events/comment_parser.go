@@ -170,7 +170,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	// Need to have a plan, apply, approve_policy or unlock at this point.
-	if !e.stringInSlice(cmd, []string{command.Plan.String(), command.Apply.String(), command.Unlock.String(), command.ApprovePolicies.String(), command.Version.String(), command.Import.String()}) {
+	if !e.stringInSlice(cmd, []string{command.Plan.String(), command.Apply.String(), command.Unlock.String(), command.ApprovePolicies.String(), command.Version.String(), command.Import.String(), command.State.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun '%s --help' for usage.\n```", cmd, e.ExecutableName)}
 	}
 
@@ -180,7 +180,6 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var verbose, autoMergeDisabled bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
-	var requiredCommandArgCount int
 
 	// Set up the flag parsing depending on the command.
 	switch cmd {
@@ -225,47 +224,22 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run import in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run import for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
-		requiredCommandArgCount = 2 // import requires `atlantis import ADDRESS ID` args
+	case command.State.String():
+		name = command.State
+		flagSet = pflag.NewFlagSet(command.State.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before processing tfstate.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run state command in relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run state command for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", cmd)}
 	}
 
-	// Now parse the flags.
-	// It's safe to use [2:] because we know there's at least 2 elements in args.
-	err = flagSet.Parse(args[2:])
-	if err == pflag.ErrHelp {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", name.DefaultUsage(), flagSet.FlagUsagesWrapped(usagesCols))}
+	subName, extraArgs, errResult := e.parseArgs(name, args, flagSet)
+	if errResult != "" {
+		return CommentParseResult{CommentResponse: errResult}
 	}
-	if err != nil {
-		if cmd == command.Unlock.String() {
-			return CommentParseResult{CommentResponse: fmt.Sprintf(UnlockUsage, e.ExecutableName)}
-		}
-		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
-	}
-
-	var commandArgs []string // commandArgs are the arguments that are passed before `--` without any parameter flags.
-	if flagSet.ArgsLenAtDash() == -1 {
-		commandArgs = flagSet.Args()
-	} else {
-		commandArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
-	}
-	if len(commandArgs) != requiredCommandArgCount {
-		if requiredCommandArgCount > 0 {
-			return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid argument count – %s", strings.Join(commandArgs, " ")), name.DefaultUsage(), flagSet)}
-		}
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(commandArgs, " ")), name.DefaultUsage(), flagSet)}
-	}
-
-	var extraArgs []string // command extra_args
-	if flagSet.ArgsLenAtDash() != -1 {
-		extraArgs = append(extraArgs, flagSet.Args()[flagSet.ArgsLenAtDash():]...)
-	}
-	// pass commandArgs into extraArgs after extra args.
-	// - after comment_parser, we will use extra_args only.
-	// - terraform command args accept after options like followings
-	//   - from: `atlantis import ADDRESS ID -- -var foo=bar
-	//   - to: `terraform import -var foo=bar ADDRESS ID`
-	extraArgs = append(extraArgs, commandArgs...)
 
 	dir, err = e.validateDir(dir)
 	if err != nil {
@@ -290,8 +264,77 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, verbose, autoMergeDisabled, workspace, project),
+		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project),
 	}
+}
+
+func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pflag.FlagSet) (string, []string, string) {
+	// Now parse the flags.
+	// It's safe to use [2:] because we know there's at least 2 elements in args.
+	err := flagSet.Parse(args[2:])
+	if err == pflag.ErrHelp {
+		return "", nil, fmt.Sprintf("```\nUsage of %s:\n%s\n```", name.DefaultUsage(), flagSet.FlagUsagesWrapped(usagesCols))
+	}
+	if err != nil {
+		if name == command.Unlock {
+			return "", nil, fmt.Sprintf(UnlockUsage, e.ExecutableName)
+		}
+		return "", nil, e.errMarkdown(err.Error(), name.String(), flagSet)
+	}
+
+	var commandArgs []string // commandArgs are the arguments that are passed before `--` without any parameter flags.
+	if flagSet.ArgsLenAtDash() == -1 {
+		commandArgs = flagSet.Args()
+	} else {
+		commandArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
+	}
+
+	// If command require subcommand, get it from command args
+	var subCommand string
+	availableSubCommands := name.SubCommands()
+	if len(availableSubCommands) > 0 { // command requires a subcommand
+		if len(commandArgs) < 1 {
+			return "", nil, e.errMarkdown("subcommand required", name.String(), flagSet)
+		}
+		subCommand, commandArgs = commandArgs[0], commandArgs[1:]
+		isAvailableSubCommand := false
+		for _, availableSubCommand := range availableSubCommands {
+			if subCommand == availableSubCommand {
+				isAvailableSubCommand = true
+				break
+			}
+		}
+		if !isAvailableSubCommand {
+			errMsg := fmt.Sprintf("invalid subcommand %s (not %s)", subCommand, strings.Join(availableSubCommands, ", "))
+			return "", nil, e.errMarkdown(errMsg, name.String(), flagSet)
+		}
+	}
+
+	// check command args count requirements
+	commandArgCount, err := name.CommandArgCount(subCommand)
+	if err != nil {
+		return "", nil, e.errMarkdown(err.Error(), name.String(), flagSet)
+	}
+	if !commandArgCount.IsMatchCount(len(commandArgs)) {
+		return "", nil, e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(commandArgs, " ")), name.DefaultUsage(), flagSet)
+	}
+
+	var extraArgs []string // command extra_args
+	if flagSet.ArgsLenAtDash() != -1 {
+		extraArgs = append(extraArgs, flagSet.Args()[flagSet.ArgsLenAtDash():]...)
+	}
+
+	// pass commandArgs into extraArgs after extra args.
+	// - after comment_parser, we will use extra_args only.
+	// - terraform command args accept after options like followings
+	//   - e.g.
+	//     - from: `atlantis import ADDRESS ID -- -var foo=bar
+	//     - to: `terraform import -var foo=bar ADDRESS ID`
+	//   - e.g.
+	//     - from: `atlantis state rm ADDRESS1 ADDRESS2 -- -var foo=bar
+	//     - to: `terraform state rm -var foo=bar ADDRESS1 ADDRESS2` (subcommand=rm)
+	extraArgs = append(extraArgs, commandArgs...)
+	return subCommand, extraArgs, ""
 }
 
 // BuildPlanComment builds a plan comment for the specified args.
@@ -425,8 +468,12 @@ Commands:
   approve_policies
            Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
-  import   Runs 'terraform import' for the changes in this pull request.
-           To plan a specific project, use the -d, -w and -p flags.
+  import ADDRESS ID
+           Runs 'terraform import' for the passed address resource.
+           To import a specific project, use the -d, -w and -p flags.
+  state rm ADDRESS...
+           Runs 'terraform state rm' for the passed address resource.
+           To remove a specific project resource, use the -d, -w and -p flags.
   help     View help.
 
 Flags:

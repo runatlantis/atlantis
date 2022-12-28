@@ -463,6 +463,58 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:   "state rm single project",
+			RepoDir:       "state-rm-single-project",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis import random_id.simple AA",
+				"atlantis import 'random_id.for_each[\"overridden\"]' BB -- -var var=overridden",
+				"atlantis import random_id.count[0] BB",
+				"atlantis plan -- -var var=overridden",
+				"atlantis state rm 'random_id.for_each[\"overridden\"]' -- -lock=false",
+				"atlantis state rm random_id.count[0] random_id.simple",
+				"atlantis plan -- -var var=overridden",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-import-simple.txt"},
+				{"exp-output-import-foreach.txt"},
+				{"exp-output-import-count.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-state-rm-foreach.txt"},
+				{"exp-output-state-rm-multiple.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merged.txt"},
+			},
+		},
+		{
+			Description:   "state rm multiple project",
+			RepoDir:       "state-rm-multiple-project",
+			ModifiedFiles: []string{"dir1/main.tf", "dir2/main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis import -d dir1 random_id.dummy1 AA",
+				"atlantis import -d dir2 random_id.dummy2 BB",
+				"atlantis plan",
+				"atlantis state rm random_id.dummy1 AA",
+				"atlantis state rm -d dir1 random_id.dummy1",
+				"atlantis state -d dir2 rm random_id.dummy2",
+				"atlantis plan",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-import-dummy1.txt"},
+				{"exp-output-import-dummy2.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-state-rm-multiple-projects.txt"},
+				{"exp-output-state-rm-dummy1.txt"},
+				{"exp-output-state-rm-dummy2.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merged.txt"},
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -1102,6 +1154,10 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
 		},
+		StateRmStepRunner: &runtime.StateRmStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTFVersion,
+		},
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFVersion:        defaultTFVersion,
@@ -1209,6 +1265,12 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		projectCommandRunner,
 	)
 
+	stateCommandRunner := events.NewStateCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
@@ -1216,6 +1278,7 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
+		command.State:           stateCommandRunner,
 	}
 
 	commandRunner := &events.DefaultCommandRunner{

@@ -1,0 +1,13 @@
+Ran State `rm` for dir: `.` workspace: `default`
+
+```diff
+Removed random_id.count[0]
+Removed random_id.simple
+Successfully removed 2 resource instance(s).
+
+```
+
+* :repeat: To **plan** this project again, comment:
+  * `atlantis plan -d .`
+
+

@@ -64,7 +64,7 @@ func TestRenderErr(t *testing.T) {
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
-				s := r.Render(res, c.Command, "log", verbose, models.Github)
+				s := r.Render(res, c.Command, "", "log", verbose, models.Github)
 				if !verbose {
 					Equals(t, c.Expected, s)
 				} else {
@@ -109,7 +109,7 @@ func TestRenderFailure(t *testing.T) {
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
-				s := r.Render(res, c.Command, "log", verbose, models.Github)
+				s := r.Render(res, c.Command, "", "log", verbose, models.Github)
 				if !verbose {
 					Equals(t, c.Expected, s)
 				} else {
@@ -126,7 +126,7 @@ func TestRenderErrAndFailure(t *testing.T) {
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-	s := r.Render(res, command.Plan, "", false, models.Github)
+	s := r.Render(res, command.Plan, "", "", false, models.Github)
 	Equals(t, "**Plan Error**\n```\nerror\n```\n", s)
 }
 
@@ -134,6 +134,7 @@ func TestRenderProjectResults(t *testing.T) {
 	cases := []struct {
 		Description    string
 		Command        command.Name
+		SubCommand     string
 		ProjectResults []command.ProjectResult
 		VCSHost        models.VCSHostType
 		Expected       string
@@ -141,6 +142,7 @@ func TestRenderProjectResults(t *testing.T) {
 		{
 			"no projects",
 			command.Plan,
+			"",
 			[]command.ProjectResult{},
 			models.Github,
 			"Ran Plan for 0 projects:\n\n\n\n",
@@ -148,6 +150,7 @@ func TestRenderProjectResults(t *testing.T) {
 		{
 			"single successful plan",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
@@ -183,6 +186,7 @@ $$$
 		{
 			"single successful plan with main ahead",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
@@ -221,6 +225,7 @@ $$$
 		{
 			"single successful plan with project name",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
@@ -257,6 +262,7 @@ $$$
 		{
 			"single successful policy check with project name",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					PolicyCheckSuccess: &models.PolicyCheckSuccess{
@@ -306,6 +312,7 @@ $$$
 		{
 			"single successful import",
 			command.Import,
+			"",
 			[]command.ProjectResult{
 				{
 					ImportSuccess: &models.ImportSuccess{
@@ -331,8 +338,37 @@ $$$
 `,
 		},
 		{
+			"single successful state rm",
+			command.State,
+			"rm",
+			[]command.ProjectResult{
+				{
+					StateRmSuccess: &models.StateRmSuccess{
+						Output:    "state-rm-output",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`Ran State $rm$ for project: $projectname$ dir: $path$ workspace: $workspace$
+
+$$$diff
+state-rm-output
+$$$
+
+* :repeat: To **plan** this project again, comment:
+  * $atlantis plan -d path -w workspace$
+
+
+`,
+		},
+		{
 			"single successful apply",
 			command.Apply,
+			"",
 			[]command.ProjectResult{
 				{
 					ApplySuccess: "success",
@@ -352,6 +388,7 @@ $$$
 		{
 			"single successful apply with project name",
 			command.Apply,
+			"",
 			[]command.ProjectResult{
 				{
 					ApplySuccess: "success",
@@ -372,6 +409,7 @@ $$$
 		{
 			"multiple successful plans",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -434,6 +472,7 @@ $$$
 		{
 			"multiple successful policy checks",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -496,6 +535,7 @@ $$$
 		{
 			"multiple successful applies",
 			command.Apply,
+			"",
 			[]command.ProjectResult{
 				{
 					RepoRelDir:   "path",
@@ -533,6 +573,7 @@ $$$
 		{
 			"single errored plan",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					Error:      errors.New("error"),
@@ -553,6 +594,7 @@ $$$
 		{
 			"single failed plan",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					RepoRelDir: "path",
@@ -570,6 +612,7 @@ $$$
 		{
 			"successful, failed, and errored plan",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -632,6 +675,7 @@ $$$
 		{
 			"successful, failed, and errored policy check",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -698,6 +742,7 @@ $$$
 		{
 			"successful, failed, and errored apply",
 			command.Apply,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:    "workspace",
@@ -745,6 +790,7 @@ $$$
 		{
 			"successful, failed, and errored apply",
 			command.Apply,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:    "workspace",
@@ -799,7 +845,7 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, c.SubCommand, "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
 						Equals(t, expWithBackticks, s)
@@ -958,7 +1004,7 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
 						Equals(t, expWithBackticks, s)
@@ -1110,7 +1156,7 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
 						Equals(t, expWithBackticks, s)
@@ -1154,7 +1200,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 				},
 			},
 		},
-	}, command.PolicyCheck, "log", false, models.Github)
+	}, command.PolicyCheck, "", "log", false, models.Github)
 	fmt.Println(rendered)
 	Equals(t, rendered, "Ran Policy Check for dir: `path` workspace: `workspace`\n\nsomecustometext\n\n\n")
 
@@ -1180,7 +1226,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 				Error:      errors.New(strings.Repeat("line\n", 13)),
 			},
 		},
-	}, command.Plan, "log", false, models.Github)
+	}, command.Plan, "", "log", false, models.Github)
 	Equals(t, false, strings.Contains(rendered, "<details>"))
 }
 
@@ -1270,7 +1316,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 							Error:      errors.New(c.Output),
 						},
 					},
-				}, command.Plan, "log", false, c.VCSHost)
+				}, command.Plan, "", "log", false, c.VCSHost)
 				var exp string
 				if c.ShouldWrap {
 					exp = `Ran Plan for dir: $.$ workspace: $default$
@@ -1401,7 +1447,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 					}
 					rendered := mr.Render(command.Result{
 						ProjectResults: []command.ProjectResult{pr},
-					}, cmd, "log", false, c.VCSHost)
+					}, cmd, "", "log", false, c.VCSHost)
 
 					// Check result.
 					var exp string
@@ -1504,7 +1550,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 				ApplySuccess: tfOut,
 			},
 		},
-	}, command.Apply, "log", false, models.Github)
+	}, command.Apply, "", "log", false, models.Github)
 	exp := `Ran Apply for 2 projects:
 
 1. dir: $.$ workspace: $staging$
@@ -1568,7 +1614,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 				},
 			},
 		},
-	}, command.Plan, "log", false, models.Github)
+	}, command.Plan, "", "log", false, models.Github)
 	exp := `Ran Plan for 2 projects:
 
 1. dir: $.$ workspace: $staging$
@@ -1725,7 +1771,7 @@ This plan was not saved because one or more projects failed and automerge requir
 				false, // EnableDiffMarkdownFormat
 				"",    // MarkdownTemplateOverridesDir
 			)
-			rendered := mr.Render(c.cr, command.Plan, "log", false, models.Github)
+			rendered := mr.Render(c.cr, command.Plan, "", "log", false, models.Github)
 			expWithBackticks := strings.Replace(c.exp, "$", "`", -1)
 			Equals(t, expWithBackticks, rendered)
 		})
@@ -2201,7 +2247,7 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
 						Equals(t, expWithBackticks, s)
@@ -2638,7 +2684,7 @@ Plan: 1 to add, 2 to change, 1 to destroy.
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
 						Equals(t, expWithBackticks, s)

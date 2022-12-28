@@ -34,6 +34,7 @@ type ProjectCommandContextBuilder interface {
 	BuildProjectContext(
 		ctx *command.Context,
 		cmdName command.Name,
+		subCmdName string,
 		prjCfg valid.MergedProjectCfg,
 		commentFlags []string,
 		repoDir string,
@@ -53,6 +54,7 @@ type CommandScopedStatsProjectCommandContextBuilder struct {
 func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 	ctx *command.Context,
 	cmdName command.Name,
+	subCmdName string,
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
@@ -61,7 +63,7 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 	cb.ProjectCounter.Inc(1)
 
 	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
-		ctx, cmdName, prjCfg, commentFlags, repoDir, automerge, parallelApply, parallelPlan, verbose, terraformClient,
+		ctx, cmdName, subCmdName, prjCfg, commentFlags, repoDir, automerge, parallelApply, parallelPlan, verbose, terraformClient,
 	)
 
 	projectCmds = []command.ProjectContext{}
@@ -85,6 +87,7 @@ type DefaultProjectCommandContextBuilder struct {
 func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	ctx *command.Context,
 	cmdName command.Name,
+	subName string,
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
@@ -105,6 +108,15 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		}}
 	case command.Import:
 		steps = prjCfg.Workflow.Import.Steps
+	case command.State:
+		switch subName {
+		case "rm":
+			steps = prjCfg.Workflow.StateRm.Steps
+		default:
+			// comment_parser prevent invalid subcommand, so not need to handle this.
+			// if comes here, state_command_runner will respond on PR, so it's enough to do log only.
+			ctx.Log.Err("unknown import subcommand: %s", subName)
+		}
 	}
 
 	// If TerraformVersion not defined in config file look for a
@@ -143,6 +155,7 @@ type PolicyCheckProjectCommandContextBuilder struct {
 func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	ctx *command.Context,
 	cmdName command.Name,
+	subCmdName string,
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
@@ -159,6 +172,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	projectCmds = cb.ProjectCommandContextBuilder.BuildProjectContext(
 		ctx,
 		cmdName,
+		subCmdName,
 		prjCfg,
 		commentFlags,
 		repoDir,

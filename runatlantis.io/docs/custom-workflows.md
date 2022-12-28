@@ -56,6 +56,11 @@ workflows:
         - init
         - import:
             extra_args: ["-var-file", "production.tfvars"]
+    state_rm:
+      steps:
+        - init
+        - state_rm:
+            extra_args: ["-lock=false"]
 ```
 Then in your repo-level `atlantis.yaml` file, you would reference the workflows:
 ```yaml
@@ -374,13 +379,15 @@ projects:
 plan:
 apply:
 import:
+state_rm:
 ```
 
-| Key    | Type            | Default                 | Required | Description                      |
-|--------|-----------------|-------------------------|----------|----------------------------------|
-| plan   | [Stage](#stage) | `steps: [init, plan]`   | no       | How to plan for this project.    |
-| apply  | [Stage](#stage) | `steps: [apply]`        | no       | How to apply for this project.   |
-| import | [Stage](#stage) | `steps: [init, import]` | no       | How to import for this project.  |
+| Key      | Type            | Default                   | Required | Description                      |
+|----------|-----------------|---------------------------|----------|----------------------------------|
+| plan     | [Stage](#stage) | `steps: [init, plan]`     | no       | How to plan for this project.    |
+| apply    | [Stage](#stage) | `steps: [apply]`          | no       | How to apply for this project.   |
+| import   | [Stage](#stage) | `steps: [init, import]`   | no       | How to import for this project.  |
+| state_rm | [Stage](#stage) | `steps: [init, state_rm]` | no       | How to import for this project.  |
 
 ### Stage
 ```yaml
@@ -403,10 +410,11 @@ Steps can be a single string for a built-in command.
 - plan
 - apply
 - import
+- state_rm
 ```
-| Key                    | Type   | Default | Required | Description                                                                                                      |
-|------------------------|--------|---------|----------|------------------------------------------------------------------------------------------------------------------|
-| init/plan/apply/import | string | none    | no       | Use a built-in command without additional configuration. Only `init`, `plan`, `apply` and `import` are supported |
+| Key                             | Type   | Default | Required | Description                                                                                                                  |
+|---------------------------------|--------|---------|----------|------------------------------------------------------------------------------------------------------------------------------|
+| init/plan/apply/import/state_rm | string | none    | no       | Use a built-in command without additional configuration. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported |
 
 #### Built-In Command With Extra Args
 A map from string to `extra_args` for a built-in command with extra arguments.
@@ -419,10 +427,12 @@ A map from string to `extra_args` for a built-in command with extra arguments.
     extra_args: [arg1, arg2]
 - import:
     extra_args: [arg1, arg2]
+- state_rm:
+    extra_args: [arg1, arg2]
 ```
-| Key                    | Type                               | Default | Required | Description                                                                                                                                                   |
-|------------------------|------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| init/plan/apply/import | map[`extra_args` -> array[string]] | none    | no       | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply` and `import` are supported as keys and only `extra_args` is supported as a value |
+| Key                             | Type                               | Default | Required | Description                                                                                                                                                               |
+|---------------------------------|------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| init/plan/apply/import/state_rm | map[`extra_args` -> array[string]] | none    | no       | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
 
 #### Custom `run` Command
 Or a custom command

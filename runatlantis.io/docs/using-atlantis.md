@@ -168,6 +168,49 @@ atlantis import -d dir 'aws_instance.example["foo"]' i-1234567890abcdef0 -- -var
 If a flag is needed to be always appended, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
 
 ---
+## atlantis state rm
+```bash
+atlantis state [options] rm ADDRESS... -- [terraform import flags]
+```
+### Explanation
+Runs `terraform state rm` that matches the directory/project/workspace.
+This command discards the terraform plan result. After an import and before an apply, another `atlantis plan` must be run again.
+
+### Examples
+```bash
+# Runs state rm
+atlantis state rm ADDRESS1 ADDRESS2
+
+# Runs state rm in the root directory of the repo with workspace `default`
+atlantis state -d . rm ADDRESS
+
+# Runs state rm in the `project1` directory of the repo with workspace `default`
+atlantis state -d project1 rm ADDRESS
+
+# Runs state rm in the root directory of the repo with workspace `staging`
+atlantis state -w staging rm ADDRESS
+```
+
+::: tip
+* If import for_each resources, it requires a single quoted address.
+  * ex. `atlantis state rm 'aws_instance.example["foo"]'`
+:::
+
+### Options
+* `-d directory` Run state rm a resource for this directory, relative to root of repo. Use `.` for root.
+* `-p project` Run state rm a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml`](repo-level-atlantis-yaml.html) repo configuration file. This cannot be used at the same time as `-d` or `-w`.
+* `-w workspace` Run state rm a resource for a specific [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
+
+### Additional Terraform flags
+
+If `terraform state rm` requires additional arguments, like `-lock=false'`
+append them to the end of the comment after `--`, e.g.
+```
+atlantis state -d dir rm 'aws_instance.example["foo"]' -- -lock=false
+```
+If a flag is needed to be always appended, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
+
+---
 ## atlantis unlock
 ```bash
 atlantis unlock

@@ -1,0 +1,1 @@
+**State Failed**: state rm cannot run on multiple projects. please specify one project.

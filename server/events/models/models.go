@@ -419,6 +419,14 @@ type ImportSuccess struct {
 	RePlanCmd string
 }
 
+// StateRmSuccess is the result of a successful state rm run.
+type StateRmSuccess struct {
+	// Output is the output from terraform state rm
+	Output string
+	// RePlanCmd is the command that users should run to re-plan this project.
+	RePlanCmd string
+}
+
 // Summary extracts one line summary of policy check.
 func (p *PolicyCheckSuccess) Summary() string {
 	note := ""
