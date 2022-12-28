@@ -192,11 +192,6 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.HelpComment()}
 	}
 
-<<<<<<< HEAD
-	// Need to have a plan, apply, approve_policy or unlock at this point.
-	if !e.stringInSlice(cmd, []string{command.Plan.String(), command.Apply.String(), command.Unlock.String(), command.ApprovePolicies.String(), command.Version.String(), command.Import.String(), command.State.String()}) {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun '%s --help' for usage.\n```", cmd, e.ExecutableName)}
-=======
 	// Need to have allow commands at this point.
 	if !e.isAllowedCommand(cmd) {
 		var allowCommandList []string
@@ -204,7 +199,6 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 			allowCommandList = append(allowCommandList, allowCommand.String())
 		}
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun '%s --help' for usage.\nAvailable commands(--allow-commands): %s\n```", cmd, e.ExecutableName, strings.Join(allowCommandList, ", "))}
->>>>>>> main
 	}
 
 	var workspace string
@@ -468,6 +462,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowUnlock          bool
 		AllowApprovePolicies bool
 		AllowImport          bool
+		AllowState           bool
 	}{
 		ExecutableName:       e.ExecutableName,
 		AllowVersion:         e.isAllowedCommand(command.Version.String()),
@@ -476,6 +471,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowUnlock:          e.isAllowedCommand(command.Unlock.String()),
 		AllowApprovePolicies: e.isAllowedCommand(command.ApprovePolicies.String()),
 		AllowImport:          e.isAllowedCommand(command.Import.String()),
+		AllowState:           e.isAllowedCommand(command.State.String()),
 	}); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
 	}
@@ -525,20 +521,17 @@ Commands:
 {{- end }}
 {{- if .AllowVersion }}
   version  Print the output of 'terraform version'
-<<<<<<< HEAD
+{{- end }}
+{{- if .AllowImport }}
   import ADDRESS ID
            Runs 'terraform import' for the passed address resource.
            To import a specific project, use the -d, -w and -p flags.
+{{- end }}
+{{- if .AllowState }}
   state rm ADDRESS...
            Runs 'terraform state rm' for the passed address resource.
            To remove a specific project resource, use the -d, -w and -p flags.
-=======
 {{- end }}
-{{- if .AllowImport }}
-  import   Runs 'terraform import' for the changes in this pull request.
-           To plan a specific project, use the -d, -w and -p flags.
-{{- end }}
->>>>>>> main
   help     View help.
 
 Flags:

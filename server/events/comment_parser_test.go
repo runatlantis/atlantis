@@ -29,13 +29,7 @@ var commentParser = events.CommentParser{
 	GithubUser:     "github-user",
 	GitlabUser:     "gitlab-user",
 	ExecutableName: "atlantis",
-	AllowCommands: []command.Name{
-		command.Plan,
-		command.Apply,
-		command.Unlock,
-		command.ApprovePolicies,
-		command.Import,
-	},
+	AllowCommands:  command.AllCommentCommands,
 }
 
 func TestNewCommentParser(t *testing.T) {
@@ -948,18 +942,6 @@ Commands:
            To only apply a specific plan, use the -d, -w and -p flags.
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
-<<<<<<< HEAD
-  approve_policies
-           Approves all current policy checking failures for the PR.
-  version  Print the output of 'terraform version'
-  import ADDRESS ID
-           Runs 'terraform import' for the passed address resource.
-           To import a specific project, use the -d, -w and -p flags.
-  state rm ADDRESS...
-           Runs 'terraform state rm' for the passed address resource.
-           To remove a specific project resource, use the -d, -w and -p flags.
-=======
->>>>>>> main
   help     View help.
 
 Flags:

@@ -33,11 +33,11 @@ const (
 	// Adding more? Don't forget to update String() below
 )
 
-<<<<<<< HEAD
 type ArgCount struct {
 	Min int
 	Max int
-=======
+}
+
 // AllCommentCommands are list of commands that can be run from a comment.
 var AllCommentCommands = []Name{
 	Version,
@@ -46,7 +46,7 @@ var AllCommentCommands = []Name{
 	Unlock,
 	ApprovePolicies,
 	Import,
->>>>>>> main
+	State,
 }
 
 // TitleString returns the string representation in title form.
@@ -90,7 +90,6 @@ func (c Name) DefaultUsage() string {
 	}
 }
 
-<<<<<<< HEAD
 // SubCommands returns the list of sub commands for the command
 func (c Name) SubCommands() []string {
 	switch c {
@@ -129,7 +128,8 @@ func (a ArgCount) IsMatchCount(count int) bool {
 		}
 	}
 	return true
-=======
+}
+
 // ParseCommandName parses raw name into a command name.
 func ParseCommandName(name string) (Name, error) {
 	switch name {
@@ -147,7 +147,8 @@ func ParseCommandName(name string) (Name, error) {
 		return Version, nil
 	case "import":
 		return Import, nil
+	case "state":
+		return State, nil
 	}
 	return -1, fmt.Errorf("unknown command name: %s", name)
->>>>>>> main
 }

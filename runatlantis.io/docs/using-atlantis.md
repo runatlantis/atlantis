@@ -178,6 +178,8 @@ atlantis state [options] rm ADDRESS... -- [terraform state rm flags]
 Runs `terraform state rm` that matches the directory/project/workspace.
 This command discards the terraform plan result. After run state rm and before an apply, another `atlantis plan` must be run again.
 
+To allow the `state` command requires [--allow-commands](/docs/server-configuration.html#allow-commands) configuration.
+
 ### Examples
 ```bash
 # Runs state rm
