@@ -26,7 +26,7 @@ import (
 const SlackKind = "slack"
 const ApplyEvent = "apply"
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_sender.go Sender
+//go:generate pegomock generate -m --package mocks -o mocks/mock_sender.go Sender
 
 // Sender sends webhooks.
 type Sender interface {

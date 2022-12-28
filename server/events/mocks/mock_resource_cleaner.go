@@ -25,11 +25,11 @@ func NewMockResourceCleaner(options ...pegomock.Option) *MockResourceCleaner {
 func (mock *MockResourceCleaner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockResourceCleaner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockResourceCleaner) CleanUp(pullInfo jobs.PullInfo) {
+func (mock *MockResourceCleaner) CleanUp(_param0 jobs.PullInfo) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockResourceCleaner().")
 	}
-	params := []pegomock.Param{pullInfo}
+	params := []pegomock.Param{_param0}
 	pegomock.GetGenericMockFrom(mock).Invoke("CleanUp", params, []reflect.Type{})
 }
 
@@ -70,8 +70,8 @@ type VerifierMockResourceCleaner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockResourceCleaner) CleanUp(pullInfo jobs.PullInfo) *MockResourceCleaner_CleanUp_OngoingVerification {
-	params := []pegomock.Param{pullInfo}
+func (verifier *VerifierMockResourceCleaner) CleanUp(_param0 jobs.PullInfo) *MockResourceCleaner_CleanUp_OngoingVerification {
+	params := []pegomock.Param{_param0}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CleanUp", params, verifier.timeout)
 	return &MockResourceCleaner_CleanUp_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -82,8 +82,8 @@ type MockResourceCleaner_CleanUp_OngoingVerification struct {
 }
 
 func (c *MockResourceCleaner_CleanUp_OngoingVerification) GetCapturedArguments() jobs.PullInfo {
-	pullInfo := c.GetAllCapturedArguments()
-	return pullInfo[len(pullInfo)-1]
+	_param0 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1]
 }
 
 func (c *MockResourceCleaner_CleanUp_OngoingVerification) GetAllCapturedArguments() (_param0 []jobs.PullInfo) {

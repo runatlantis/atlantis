@@ -26,11 +26,11 @@ func NewMockGithubPullRequestGetter(options ...pegomock.Option) *MockGithubPullR
 func (mock *MockGithubPullRequestGetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockGithubPullRequestGetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockGithubPullRequestGetter) GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error) {
+func (mock *MockGithubPullRequestGetter) GetPullRequest(_param0 models.Repo, _param1 int) (*github.PullRequest, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGithubPullRequestGetter().")
 	}
-	params := []pegomock.Param{repo, pullNum}
+	params := []pegomock.Param{_param0, _param1}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetPullRequest", params, []reflect.Type{reflect.TypeOf((**github.PullRequest)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *github.PullRequest
 	var ret1 error
@@ -82,8 +82,8 @@ type VerifierMockGithubPullRequestGetter struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockGithubPullRequestGetter) GetPullRequest(repo models.Repo, pullNum int) *MockGithubPullRequestGetter_GetPullRequest_OngoingVerification {
-	params := []pegomock.Param{repo, pullNum}
+func (verifier *VerifierMockGithubPullRequestGetter) GetPullRequest(_param0 models.Repo, _param1 int) *MockGithubPullRequestGetter_GetPullRequest_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullRequest", params, verifier.timeout)
 	return &MockGithubPullRequestGetter_GetPullRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -94,8 +94,8 @@ type MockGithubPullRequestGetter_GetPullRequest_OngoingVerification struct {
 }
 
 func (c *MockGithubPullRequestGetter_GetPullRequest_OngoingVerification) GetCapturedArguments() (models.Repo, int) {
-	repo, pullNum := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pullNum[len(pullNum)-1]
+	_param0, _param1 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
 func (c *MockGithubPullRequestGetter_GetPullRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int) {

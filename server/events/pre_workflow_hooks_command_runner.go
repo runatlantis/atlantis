@@ -13,14 +13,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
+//go:generate pegomock generate -m --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
 
 // PreWorkflowHookURLGenerator generates urls to view the pre workflow progress.
 type PreWorkflowHookURLGenerator interface {
 	GenerateProjectWorkflowHookURL(hookID string) (string, error)
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
+//go:generate pegomock generate -m --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
 
 type PreWorkflowHooksCommandRunner interface {
 	RunPreHooks(ctx *command.Context, cmd *CommentCommand) error

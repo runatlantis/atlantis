@@ -71,7 +71,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 
 		RegisterMockTestingT(t)
 		terraform := mocks.NewMockClient()
-		When(terraform.EnsureVersion(matchers.AnyPtrToLoggingSimpleLogger(), matchers2.AnyPtrToGoVersionVersion())).
+		When(terraform.EnsureVersion(matchers.AnyLoggingSimpleLogging(), matchers2.AnyPtrToGoVersionVersion())).
 			ThenReturn(nil)
 
 		logger := logging.NewNoopLogger(t)

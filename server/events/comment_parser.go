@@ -49,7 +49,7 @@ const (
 // and pasting GitHub comments.
 var multiLineRegex = regexp.MustCompile(`.*\r?\n[^\r\n]+`)
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_parsing.go CommentParsing
+//go:generate pegomock generate -m --package mocks -o mocks/mock_comment_parsing.go CommentParsing
 
 // CommentParsing handles parsing pull request comments.
 type CommentParsing interface {
@@ -58,7 +58,7 @@ type CommentParsing interface {
 	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_building.go CommentBuilder
+//go:generate pegomock generate -m --package mocks -o mocks/mock_comment_building.go CommentBuilder
 
 // CommentBuilder builds comment commands that can be used on pull requests.
 type CommentBuilder interface {
@@ -74,8 +74,30 @@ type CommentParser struct {
 	GitlabUser      string
 	BitbucketUser   string
 	AzureDevopsUser string
-	ApplyDisabled   bool
 	ExecutableName  string
+	AllowCommands   []command.Name
+}
+
+// NewCommentParser returns a CommentParser
+func NewCommentParser(githubUser, gitlabUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name) *CommentParser {
+	var commentAllowCommands []command.Name
+	for _, acceptableCommand := range command.AllCommentCommands {
+		for _, allowCommand := range allowCommands {
+			if acceptableCommand == allowCommand {
+				commentAllowCommands = append(commentAllowCommands, allowCommand)
+				break // for distinct
+			}
+		}
+	}
+
+	return &CommentParser{
+		GithubUser:      githubUser,
+		GitlabUser:      gitlabUser,
+		BitbucketUser:   bitbucketUser,
+		AzureDevopsUser: azureDevopsUser,
+		ExecutableName:  executableName,
+		AllowCommands:   commentAllowCommands,
+	}
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -160,18 +182,22 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	// If they've just typed the name of the executable then give them the help
 	// output.
 	if len(args) == 1 {
-		return CommentParseResult{CommentResponse: e.HelpComment(e.ApplyDisabled)}
+		return CommentParseResult{CommentResponse: e.HelpComment()}
 	}
 	cmd := args[1]
 
 	// Help output.
 	if e.stringInSlice(cmd, []string{"help", "-h", "--help"}) {
-		return CommentParseResult{CommentResponse: e.HelpComment(e.ApplyDisabled)}
+		return CommentParseResult{CommentResponse: e.HelpComment()}
 	}
 
-	// Need to have a plan, apply, approve_policy or unlock at this point.
-	if !e.stringInSlice(cmd, []string{command.Plan.String(), command.Apply.String(), command.Unlock.String(), command.ApprovePolicies.String(), command.Version.String(), command.Import.String()}) {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun '%s --help' for usage.\n```", cmd, e.ExecutableName)}
+	// Need to have allow commands at this point.
+	if !e.isAllowedCommand(cmd) {
+		var allowCommandList []string
+		for _, allowCommand := range e.AllowCommands {
+			allowCommandList = append(allowCommandList, allowCommand.String())
+		}
+		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun '%s --help' for usage.\nAvailable commands(--allow-commands): %s\n```", cmd, e.ExecutableName, strings.Join(allowCommandList, ", "))}
 	}
 
 	var workspace string
@@ -374,24 +400,42 @@ func (e *CommentParser) stringInSlice(a string, list []string) bool {
 	return false
 }
 
+func (e *CommentParser) isAllowedCommand(cmd string) bool {
+	for _, allowed := range e.AllowCommands {
+		if allowed.String() == cmd {
+			return true
+		}
+	}
+	return false
+}
+
 func (e *CommentParser) errMarkdown(errMsg string, cmd string, flagSet *pflag.FlagSet) string {
 	return fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s```", errMsg, cmd, flagSet.FlagUsagesWrapped(usagesCols))
 }
 
-func (e *CommentParser) HelpComment(applyDisabled bool) string {
+func (e *CommentParser) HelpComment() string {
 	buf := &bytes.Buffer{}
 	var tmpl = template.Must(template.New("").Parse(helpCommentTemplate))
 	if err := tmpl.Execute(buf, struct {
-		ApplyDisabled  bool
-		ExecutableName string
+		ExecutableName       string
+		AllowVersion         bool
+		AllowPlan            bool
+		AllowApply           bool
+		AllowUnlock          bool
+		AllowApprovePolicies bool
+		AllowImport          bool
 	}{
-		ApplyDisabled:  applyDisabled,
-		ExecutableName: e.ExecutableName,
+		ExecutableName:       e.ExecutableName,
+		AllowVersion:         e.isAllowedCommand(command.Version.String()),
+		AllowPlan:            e.isAllowedCommand(command.Plan.String()),
+		AllowApply:           e.isAllowedCommand(command.Apply.String()),
+		AllowUnlock:          e.isAllowedCommand(command.Unlock.String()),
+		AllowApprovePolicies: e.isAllowedCommand(command.ApprovePolicies.String()),
+		AllowImport:          e.isAllowedCommand(command.Import.String()),
 	}); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
 	}
 	return buf.String()
-
 }
 
 var helpCommentTemplate = "```cmake\n" +
@@ -402,9 +446,14 @@ Usage:
   {{ .ExecutableName }} <command> [options] -- [terraform options]
 
 Examples:
+  # show atlantis help
+  {{ .ExecutableName }} help
+{{- if .AllowPlan }}
+
   # run plan in the root directory passing the -target flag to terraform
   {{ .ExecutableName }} plan -d . -- -target=resource
-  {{- if not .ApplyDisabled }}
+{{- end }}
+{{- if .AllowApply }}
 
   # apply all unapplied plans from this pull request
   {{ .ExecutableName }} apply
@@ -414,19 +463,29 @@ Examples:
 {{- end }}
 
 Commands:
+{{- if .AllowPlan }}
   plan     Runs 'terraform plan' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.
-{{- if not .ApplyDisabled }}
+{{- end }}
+{{- if .AllowApply }}
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
 {{- end }}
+{{- if .AllowUnlock }}
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
+{{- end }}
+{{- if .AllowApprovePolicies }}
   approve_policies
            Approves all current policy checking failures for the PR.
+{{- end }}
+{{- if .AllowVersion }}
   version  Print the output of 'terraform version'
+{{- end }}
+{{- if .AllowImport }}
   import   Runs 'terraform import' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.
+{{- end }}
   help     View help.
 
 Flags:

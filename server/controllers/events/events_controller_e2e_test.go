@@ -35,6 +35,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	vcsmatchers "github.com/runatlantis/atlantis/server/events/vcs/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -93,6 +94,8 @@ func TestGitHubWorkflow(t *testing.T) {
 		DisableApply bool
 		// ApplyLock creates an apply lock that temporarily disables apply command
 		ApplyLock bool
+		// AllowCommands flag what kind of atlantis commands are available.
+		AllowCommands []command.Name
 		// ExpAutomerge is true if we expect Atlantis to automerge.
 		ExpAutomerge bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
@@ -107,6 +110,10 @@ func TestGitHubWorkflow(t *testing.T) {
 		// Atlantis writes to the pull request in order. A reply from a parallel operation
 		// will be matched using a substring check.
 		ExpReplies [][]string
+		// ExpAllowResponseCommentBack allow http response content with "Commenting back on pull request"
+		ExpAllowResponseCommentBack bool
+		// ExpParseFailedCount represents how many times test sends invalid commands
+		ExpParseFailedCount int
 	}{
 		{
 			Description:   "simple",
@@ -191,6 +198,19 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-var-all.txt"},
 				{"exp-output-merge-workspaces.txt"},
 			},
+		},
+		{
+			Description:   "simple with allow commands",
+			RepoDir:       "simple",
+			AllowCommands: []command.Name{command.Plan, command.Apply},
+			Comments: []string{
+				"atlantis import ADDRESS ID",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-allow-command-unknown-import.txt"},
+			},
+			ExpAllowResponseCommentBack: true,
+			ExpParseFailedCount:         1,
 		},
 		{
 			Description:   "simple with atlantis.yaml",
@@ -471,7 +491,8 @@ func TestGitHubWorkflow(t *testing.T) {
 			userConfig = server.UserConfig{}
 			userConfig.DisableApply = c.DisableApply
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, c.RepoConfigFile)
+			opt := setupOption{repoConfigFile: c.RepoConfigFile, allowCommands: c.AllowCommands}
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, opt)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
@@ -496,7 +517,11 @@ func TestGitHubWorkflow(t *testing.T) {
 				commentReq := GitHubCommentEvent(t, comment)
 				w = httptest.NewRecorder()
 				ctrl.Post(w, commentReq)
-				ResponseContains(t, w, 200, "Processing...")
+				if c.ExpAllowResponseCommentBack {
+					ResponseContains(t, w, 200, "Commenting back on pull request")
+				} else {
+					ResponseContains(t, w, 200, "Processing...")
+				}
 			}
 
 			// Send the "pull closed" event which would be triggered by the
@@ -506,17 +531,17 @@ func TestGitHubWorkflow(t *testing.T) {
 			ctrl.Post(w, pullClosedReq)
 			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
+			expNumHooks := len(c.Comments) + 1 - c.ExpParseFailedCount
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
-
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
 			// Let's verify the post-workflow hook was called for each comment including the pull request opened event
-			mockPostWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some post dummy command"), AnyString())
+			mockPostWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some post dummy command"), AnyString())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
 			// and apply have 1 for each comment plus one for the locks deleted at the
 			// end.
-			expNumReplies := len(c.Comments) + 1
+			expNumReplies := len(c.Comments) + 1 - c.ExpParseFailedCount
 
 			if c.ExpAutoplan {
 				expNumReplies++
@@ -534,15 +559,15 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
 			}
 		})
 	}
 }
 
-func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
+func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 
 	if testing.Short() {
 		t.SkipNow()
@@ -620,7 +645,7 @@ func TestSimlpleWorkflow_terraformLockFile(t *testing.T) {
 			userConfig = server.UserConfig{}
 			userConfig.DisableApply = true
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, "")
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, setupOption{})
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 
@@ -863,7 +888,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			userConfig.EnablePolicyChecksFlag = true
 			userConfig.QuietPolicyChecks = c.ExpQuietPolicyChecks
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, "")
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, setupOption{})
 
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
@@ -932,15 +957,20 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
 			}
 		})
 	}
 }
 
-func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+type setupOption struct {
+	repoConfigFile string
+	allowCommands  []command.Name
+}
+
+func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	dataDir, binDir, cacheDir := mkSubDirs(t)
 
@@ -960,10 +990,15 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 		GitlabUser:  "gitlab-user",
 		GitlabToken: "gitlab-token",
 	}
+	allowCommands := command.AllCommentCommands
+	if opt.allowCommands != nil {
+		allowCommands = opt.allowCommands
+	}
 	commentParser := &events.CommentParser{
 		GithubUser:     "github-user",
 		GitlabUser:     "gitlab-user",
 		ExecutableName: "atlantis",
+		AllowCommands:  allowCommands,
 	}
 	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, true, false, projectCmdOutputHandler)
 	Ok(t, err)
@@ -988,7 +1023,7 @@ func setupE2E(t *testing.T, repoDir, repoConfigFile string) (events_controllers.
 	parser := &config.ParserValidator{}
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		RepoConfigFile: repoConfigFile,
+		RepoConfigFile: opt.repoConfigFile,
 		AllowRepoCfg:   true,
 		MergeableReq:   false,
 		ApprovedReq:    false,
