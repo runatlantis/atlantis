@@ -2,9 +2,8 @@
 package matchers
 
 import (
-	"reflect"
-
 	"github.com/petergtz/pegomock"
+	"reflect"
 
 	valid "github.com/runatlantis/atlantis/server/core/config/valid"
 )

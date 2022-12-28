@@ -4,12 +4,11 @@
 package mocks
 
 import (
+	pegomock "github.com/petergtz/pegomock"
+	command "github.com/runatlantis/atlantis/server/events/command"
+	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
-
-	pegomock "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/events/command"
-	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
 type MockJobURLSetter struct {

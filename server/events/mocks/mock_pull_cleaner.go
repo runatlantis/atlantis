@@ -4,11 +4,10 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	"reflect"
+	"time"
 )
 
 type MockPullCleaner struct {
@@ -26,11 +25,11 @@ func NewMockPullCleaner(options ...pegomock.Option) *MockPullCleaner {
 func (mock *MockPullCleaner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPullCleaner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPullCleaner) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
+func (mock *MockPullCleaner) CleanUpPull(_param0 models.Repo, _param1 models.PullRequest) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPullCleaner().")
 	}
-	params := []pegomock.Param{repo, pull}
+	params := []pegomock.Param{_param0, _param1}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("CleanUpPull", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -78,8 +77,8 @@ type VerifierMockPullCleaner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockPullCleaner) CleanUpPull(repo models.Repo, pull models.PullRequest) *MockPullCleaner_CleanUpPull_OngoingVerification {
-	params := []pegomock.Param{repo, pull}
+func (verifier *VerifierMockPullCleaner) CleanUpPull(_param0 models.Repo, _param1 models.PullRequest) *MockPullCleaner_CleanUpPull_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CleanUpPull", params, verifier.timeout)
 	return &MockPullCleaner_CleanUpPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -90,8 +89,8 @@ type MockPullCleaner_CleanUpPull_OngoingVerification struct {
 }
 
 func (c *MockPullCleaner_CleanUpPull_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
-	repo, pull := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pull[len(pull)-1]
+	_param0, _param1 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
 func (c *MockPullCleaner_CleanUpPull_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
