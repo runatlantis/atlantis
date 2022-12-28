@@ -4,12 +4,11 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	events "github.com/runatlantis/atlantis/server/events"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	"reflect"
+	"time"
 )
 
 type MockCommentParsing struct {

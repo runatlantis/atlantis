@@ -4,11 +4,10 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	logging "github.com/runatlantis/atlantis/server/logging"
+	"reflect"
+	"time"
 )
 
 type MockSimpleLogging struct {

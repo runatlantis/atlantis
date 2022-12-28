@@ -4,12 +4,11 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	webhooks "github.com/runatlantis/atlantis/server/events/webhooks"
 	logging "github.com/runatlantis/atlantis/server/logging"
+	"reflect"
+	"time"
 )
 
 type MockWebhooksSender struct {

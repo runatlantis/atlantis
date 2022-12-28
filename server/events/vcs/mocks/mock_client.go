@@ -14,21 +14,6 @@ type MockClient struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func (mock *MockClient) DiscardReviews(_param0 models.Repo, _param1 models.PullRequest) error {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockClient().")
-	}
-	params := []pegomock.Param{_param0, _param1}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("DiscardReviews", params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(error)
-		}
-	}
-	return ret0
-}
-
 func NewMockClient(options ...pegomock.Option) *MockClient {
 	mock := &MockClient{}
 	for _, option := range options {
@@ -133,6 +118,21 @@ func (mock *MockClient) UpdateStatus(repo models.Repo, pull models.PullRequest, 
 	}
 	params := []pegomock.Param{repo, pull, state, src, description, url}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdateStatus", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
+func (mock *MockClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockClient().")
+	}
+	params := []pegomock.Param{repo, pull}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("DiscardReviews", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
 		if result[0] != nil {
@@ -502,6 +502,37 @@ func (c *MockClient_UpdateStatus_OngoingVerification) GetAllCapturedArguments() 
 		_param5 = make([]string, len(c.methodInvocations))
 		for u, param := range params[5] {
 			_param5[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockClient) DiscardReviews(repo models.Repo, pull models.PullRequest) *MockClient_DiscardReviews_OngoingVerification {
+	params := []pegomock.Param{repo, pull}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DiscardReviews", params, verifier.timeout)
+	return &MockClient_DiscardReviews_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockClient_DiscardReviews_OngoingVerification struct {
+	mock              *MockClient
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockClient_DiscardReviews_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
+	repo, pull := c.GetAllCapturedArguments()
+	return repo[len(repo)-1], pull[len(pull)-1]
+}
+
+func (c *MockClient_DiscardReviews_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.Repo, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.Repo)
+		}
+		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.PullRequest)
 		}
 	}
 	return

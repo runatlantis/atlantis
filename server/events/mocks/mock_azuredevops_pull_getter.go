@@ -4,12 +4,11 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	"reflect"
+	"time"
 )
 
 type MockAzureDevopsPullGetter struct {

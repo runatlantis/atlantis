@@ -4,11 +4,10 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	valid "github.com/runatlantis/atlantis/server/core/config/valid"
+	"reflect"
+	"time"
 )
 
 type MockSourceResolver struct {

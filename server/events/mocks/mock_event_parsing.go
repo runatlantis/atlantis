@@ -228,12 +228,12 @@ func (mock *MockEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest
 	return ret0
 }
 
-func (mock *MockEventParsing) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFullName string, cloneURL string) (models.Repo, error) {
+func (mock *MockEventParsing) ParseAPIPlanRequest(vcsHostType models.VCSHostType, path string, cloneURL string) (models.Repo, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockEventParsing().")
 	}
-	params := []pegomock.Param{vcsHostType, repoFullName, cloneURL}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseAPIPlanRequest", params, []reflect.Type{reflect.TypeOf((*models.VCSHostType)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem()})
+	params := []pegomock.Param{vcsHostType, path, cloneURL}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseAPIPlanRequest", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.Repo
 	var ret1 error
 	if len(result) != 0 {
@@ -742,6 +742,41 @@ func (c *MockEventParsing_ParseGitlabMergeRequest_OngoingVerification) GetAllCap
 		_param1 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.Repo)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockEventParsing) ParseAPIPlanRequest(vcsHostType models.VCSHostType, path string, cloneURL string) *MockEventParsing_ParseAPIPlanRequest_OngoingVerification {
+	params := []pegomock.Param{vcsHostType, path, cloneURL}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseAPIPlanRequest", params, verifier.timeout)
+	return &MockEventParsing_ParseAPIPlanRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockEventParsing_ParseAPIPlanRequest_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockEventParsing_ParseAPIPlanRequest_OngoingVerification) GetCapturedArguments() (models.VCSHostType, string, string) {
+	vcsHostType, path, cloneURL := c.GetAllCapturedArguments()
+	return vcsHostType[len(vcsHostType)-1], path[len(path)-1], cloneURL[len(cloneURL)-1]
+}
+
+func (c *MockEventParsing_ParseAPIPlanRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []models.VCSHostType, _param1 []string, _param2 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.VCSHostType, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.VCSHostType)
+		}
+		_param1 = make([]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(string)
+		}
+		_param2 = make([]string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
 		}
 	}
 	return

@@ -69,7 +69,6 @@ func (mock *MockWorkingDir) GetWorkingDir(r models.Repo, p models.PullRequest, w
 }
 
 func (mock *MockWorkingDir) HasDiverged(log logging.SimpleLogging, cloneDir string) bool {
-<<<<<<< HEAD
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
 	}
@@ -82,9 +81,6 @@ func (mock *MockWorkingDir) HasDiverged(log logging.SimpleLogging, cloneDir stri
 		}
 	}
 	return ret0
-=======
-	return true
->>>>>>> parent of 485c4b50 (Revert "fix: add path to WorkingDir methods (#2180)" (#2253))
 }
 
 func (mock *MockWorkingDir) GetPullDir(r models.Repo, p models.PullRequest) (string, error) {
@@ -379,13 +375,10 @@ func (c *MockWorkingDir_DeleteForWorkspace_OngoingVerification) GetAllCapturedAr
 		for u, param := range params[2] {
 			_param2[u] = param.(string)
 		}
-<<<<<<< HEAD
-=======
 		_param3 = make([]string, len(c.methodInvocations))
 		for u, param := range params[3] {
 			_param3[u] = param.(string)
 		}
->>>>>>> parent of 485c4b50 (Revert "fix: add path to WorkingDir methods (#2180)" (#2253))
 	}
 	return
 }
