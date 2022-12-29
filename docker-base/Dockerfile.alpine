@@ -26,7 +26,7 @@ ARG TARGETPLATFORM
 
 # Install packages needed for running Atlantis.
 RUN apk add --no-cache \
-        ca-certificates=20220614-r2 \
+        ca-certificates=20220614-r3 \
         curl=7.87.0-r0 \
         git=2.38.2-r0 \
         unzip=6.0-r13 \
