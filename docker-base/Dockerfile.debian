@@ -46,7 +46,7 @@ RUN apt-get update \
         "linux/arm/v7") GIT_LFS_ARCH=arm ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
-    tar -xf git-lfs.tar.gz && \
+    tar --strip-components=1 -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
     git-lfs --version && \
