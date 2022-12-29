@@ -43,6 +43,7 @@ need to be defined.
 :::
 
 ## Example Using All Keys
+
 ```yaml
 version: 3
 automerge: true
@@ -79,6 +80,35 @@ workflows:
 allowed_regexp_prefixes:
 - dev/
 - staging/
+```
+
+## Example of DRYing up projects using YAML anchors
+
+```yaml
+projects:
+  - &template
+    name: template
+    workflow: custom
+    autoplan:
+      enabled: true
+      when_modified:
+        - "./terraform/modules/**/*.tf"
+        - "**/*.tf"
+
+  - <<: *template
+    name: ue1-prod-titan
+    dir: ./terraform/titan
+    workspace: ue1-prod
+
+  - <<: *template
+    name: ue1-stage-titan
+    dir: ./terraform/titan
+    workspace: ue1-stage
+
+  - <<: *template
+    name: ue1-dev-titan
+    dir: ./terraform/titan
+    workspace: ue1-dev
 ```
 
 ## Auto generate projects
