@@ -16,8 +16,8 @@ RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
     chmod g=u /etc/passwd
 
 # Install gosu and git-lfs.
-ENV GIT_LFS_VERSION=3.1.2
 ENV GOSU_VERSION=1.16
+ENV GIT_LFS_VERSION=3.3.0
 
 # Automatically populated with the architecture the image is being built for.
 ARG TARGETPLATFORM
