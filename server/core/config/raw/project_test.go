@@ -70,7 +70,7 @@ execution_order_group: 10`,
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var p raw.Project
-			err := yaml.UnmarshalStrict([]byte(c.input), &p)
+			err := yaml.Unmarshal([]byte(c.input), &p)
 			Ok(t, err)
 			Equals(t, c.exp, p)
 		})

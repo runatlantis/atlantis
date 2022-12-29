@@ -106,7 +106,7 @@ apply:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var w raw.Workflow
-			err := yaml.UnmarshalStrict([]byte(c.input), &w)
+			err := yaml.Unmarshal([]byte(c.input), &w)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return

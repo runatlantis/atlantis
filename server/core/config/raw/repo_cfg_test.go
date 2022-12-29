@@ -43,7 +43,6 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.RepoCfg",
 		},
 		{
 			description: "version set to 2",
@@ -186,7 +185,7 @@ allowed_regexp_prefixes:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var conf raw.RepoCfg
-			err := yaml.UnmarshalStrict([]byte(c.input), &conf)
+			err := yaml.Unmarshal([]byte(c.input), &conf)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return

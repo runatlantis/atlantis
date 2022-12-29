@@ -41,7 +41,7 @@ steps: [step1]
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var a raw.Stage
-			err := yaml.UnmarshalStrict([]byte(c.input), &a)
+			err := yaml.Unmarshal([]byte(c.input), &a)
 			Ok(t, err)
 			Equals(t, c.exp, a)
 		})

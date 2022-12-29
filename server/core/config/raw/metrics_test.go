@@ -22,7 +22,7 @@ prometheus:
 
 		var result raw.Metrics
 
-		err := yaml.UnmarshalStrict([]byte(rawYaml), &result)
+		err := yaml.Unmarshal([]byte(rawYaml), &result)
 		assert.NoError(t, err)
 	})
 

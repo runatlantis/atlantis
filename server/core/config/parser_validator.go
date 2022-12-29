@@ -58,7 +58,7 @@ func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.Global
 
 func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.GlobalCfg, repoID string, branch string) (valid.RepoCfg, error) {
 	var rawConfig raw.RepoCfg
-	if err := yaml.UnmarshalStrict(repoCfgData, &rawConfig); err != nil {
+	if err := yaml.Unmarshal(repoCfgData, &rawConfig); err != nil {
 		return valid.RepoCfg{}, err
 	}
 
@@ -115,7 +115,7 @@ func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.Glo
 	}
 
 	var rawCfg raw.GlobalCfg
-	if err := yaml.UnmarshalStrict(configData, &rawCfg); err != nil {
+	if err := yaml.Unmarshal(configData, &rawCfg); err != nil {
 		return valid.GlobalCfg{}, err
 	}
 

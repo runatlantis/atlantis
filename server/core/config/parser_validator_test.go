@@ -648,8 +648,22 @@ projects:
 			input: `
 version: 3
 projects:
-- unknown: value`,
-			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in type raw.Project",
+- dir: .
+  unknown: value`,
+			exp: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							Enabled:      true,
+						},
+					},
+				},
+				Workflows: map[string]valid.Workflow{},
+			},
 		},
 		{
 			description: "referencing workflow that doesn't exist",
@@ -1208,8 +1222,8 @@ func TestParseGlobalCfg(t *testing.T) {
 			expErr: "file <tmp> was empty",
 		},
 		"invalid fields": {
-			input:  "invalid: key",
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.GlobalCfg",
+			input: "invalid: key",
+			exp:   defaultCfg,
 		},
 		"no id specified": {
 			input: `repos:
