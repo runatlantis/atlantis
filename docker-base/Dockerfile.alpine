@@ -26,19 +26,19 @@ ARG TARGETPLATFORM
 
 # Install packages needed for running Atlantis.
 RUN apk add --no-cache \
-        ca-certificates=20220614-r3 \
-        curl=7.87.0-r0 \
-        git=2.38.2-r0 \
-        unzip=6.0-r13 \
-        bash=5.2.15-r0 \
-        openssh=9.1_p1-r1 \
-        libcap=2.66-r0 \
-        dumb-init=1.2.5-r2 \
-        gcompat=1.1.0-r0 && \
+        ca-certificates~=20220614 \
+        curl~=7.87 \
+        git~=2.38 \
+        unzip~=6.0 \
+        bash~=5.2 \
+        openssh~=9.1_p1 \
+        libcap~=2.66 \
+        dumb-init~=1.2 \
+        gcompat~=1.1 && \
     # Install packages needed for building dependencies.
     apk add --no-cache --virtual .build-deps \
-        gnupg=2.2.40-r0 \
-        openssl=3.0.7-r0 && \
+        gnupg~=2.2 \
+        openssl~=3.0 && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
     # git-lfs
