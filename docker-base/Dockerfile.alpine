@@ -18,19 +18,19 @@ RUN addgroup atlantis && \
     chmod g=u /etc/passwd
 
 # Install gosu and git-lfs.
-ENV GOSU_VERSION=1.14
-ENV GIT_LFS_VERSION=3.1.2
+ENV GOSU_VERSION=1.16
+ENV GIT_LFS_VERSION=3.3.0
 
 # Automatically populated with the architecture the image is being built for.
 ARG TARGETPLATFORM
 
 # Install packages needed for running Atlantis.
 RUN apk add --no-cache \
-        ca-certificates=20220614-r2 \
-        curl=7.86.0-r1 \
+        ca-certificates=20220614-r3 \
+        curl=7.87.0-r0 \
         git=2.38.2-r0 \
         unzip=6.0-r13 \
-        bash=5.2.12-r0 \
+        bash=5.2.15-r0 \
         openssh=9.1_p1-r1 \
         libcap=2.66-r0 \
         dumb-init=1.2.5-r2 \
@@ -48,7 +48,7 @@ RUN apk add --no-cache \
         "linux/arm/v7") GIT_LFS_ARCH=arm ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
-    tar -xf git-lfs.tar.gz && \
+    tar --strip-components=1 -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
     git-lfs --version && \
