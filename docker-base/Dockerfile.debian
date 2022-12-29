@@ -1,7 +1,7 @@
 # This Dockerfile builds our base image with gosu, dumb-init and the atlantis
 # user. We split this from the main Dockerfile because this base doesn't change
 # and also because it kept breaking the build due to flakiness.
-FROM debian:bullseye-20221205-slim
+FROM debian:bullseye-20221219-slim
 
 # We use gosu to step down from root and run as the atlantis user so we need
 # to create that user and group.
