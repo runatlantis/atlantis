@@ -12,6 +12,20 @@ on:
       - 'Dockerfile'
       - '.github/workflows/atlantis-image.yml'
   workflow_dispatch:
+  # The workflow_run method is the ideal method to use but it's complicated due to
+  # the usage of a matrix in the both the base and image workflows. It's possible
+  # that the base debian may finish before the base alpine and that may trigger
+  # both workflows.
+  #
+  # workflow_run:
+  #   workflows: ["atlantis-base"]
+  #   types: [completed]
+  #   branches: [main]
+
+  # For now, a temporary solution is to run the base image an hour before this image
+  schedule:
+    # At 01:00 UTC on every Monday
+    - cron: '0 1 * * 1'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
