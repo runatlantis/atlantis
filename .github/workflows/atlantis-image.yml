@@ -50,6 +50,8 @@ jobs:
       with:
         images: |
           atlantis
+        labels: |
+          org.opencontainers.image.license=Apache-2.0
         tags: |
           type=ref,event=branch
           type=ref,event=pr
