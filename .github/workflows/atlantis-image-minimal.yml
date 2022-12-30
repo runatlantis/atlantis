@@ -1,0 +1,112 @@
+name: atlantis-image-minimal
+
+on:
+  push:
+    branches:
+      - 'main'
+    tags:
+      - v*.*.* # stable release like, v0.19.2
+      - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
+  pull_request:
+    paths:
+      - 'Dockerfile.minimal'
+      - '.github/workflows/atlantis-image-minimal.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        image_type: [alpine, debian]
+    runs-on: ubuntu-22.04
+    env:
+      RELEASE_TYPE: ${{ contains(github.ref, 'pre') && 'pre' || 'stable' }}
+      RELEASE_TAG: ${{ contains(github.ref, 'pre') && 'prerelease-latest' || 'latest' }}
+      IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/atlantis
+      IMAGE_SUFFIX: ${{ matrix.image_type != 'alpine' && format('-{0}', matrix.image_type) || '' }}
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-go@v3
+      with:
+        go-version: 1.19
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      with:
+        image: tonistiigi/binfmt:latest
+        platforms: arm64,arm
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: |
+          atlantis
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+
+    - name: Login to Packages Container registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # Publish dev image to container registry
+    - name: Build and push atlantis:dev-minimal-${{ env.IMAGE_SUFFIX }} image
+      if: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) }}
+      uses: docker/build-push-action@v3
+      with:
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        context: .
+        build-args: ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/atlantis:dev-minimal-${{ env.IMAGE_SUFFIX }}
+          ghcr.io/${{ github.repository_owner }}/atlantis:dev-minimal-${{ matrix.image_type }}
+        labels: ${{ steps.meta.outputs.labels }}
+
+    # Publish release to container registry
+    - name: Populate release version
+      if: |
+        contains(fromJson('["push", "pull_request"]'), github.event_name) &&
+        startsWith(github.ref, 'refs/tags/')
+      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+    - name: "Build and push atlantis:${{ env.RELEASE_VERSION }}-minimal image for ${{ env.RELEASE_TYPE }} release"
+      if: |
+        contains(fromJson('["push", "pull_request"]'), github.event_name) &&
+        startsWith(github.ref, 'refs/tags/')
+      uses: docker/build-push-action@v3
+      with:
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        context: .
+        build-args: ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        push: ${{ github.event_name != 'pull_request' }}
+        # release version is the name of the tag i.e. v0.10.0
+        # release version also has the image type appended i.e. v0.10.0-alpine
+        # release tag is either pre-release or latest i.e. latest
+        # release tag also has the image type appended i.e. latest-alpine
+        # if it's v0.10.0 and alpine, it will do v0.10.0, v0.10.0-alpine, latest, latest-alpine
+        # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
+        tags: |
+          ${{ env.IMAGE_BASE }}:${{ env.RELEASE_VERSION }}${{ env.IMAGE_SUFFIX }}-minimal
+          ${{ env.IMAGE_BASE }}:${{ env.RELEASE_VERSION }}-minimal-${{ matrix.image_type }}
+          ${{ env.IMAGE_BASE }}:${{ env.RELEASE_TAG }}${{ env.IMAGE_SUFFIX }}-minimal
+          ${{ env.IMAGE_BASE }}:${{ env.RELEASE_TAG }}-minimal-${{ matrix.image_type }}
+        labels: ${{ steps.meta.outputs.labels }}
