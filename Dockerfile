@@ -2,6 +2,8 @@ ARG ATLANTIS_BASE=ghcr.io/runatlantis/atlantis-base
 ARG ATLANTIS_BASE_TAG_DATE=2022.12.29
 ARG ATLANTIS_BASE_TAG_TYPE=alpine
 
+LABEL org.opencontainers.image.description "Terraform Pull Request Automation"
+
 # Stage 1: build artifact
 
 FROM golang:1.19.4-alpine AS builder
