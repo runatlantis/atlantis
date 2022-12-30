@@ -225,7 +225,7 @@ and set `--autoplan-modules` to `false`.
   If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure DevOps org. This means that an
   attacker could spoof calls to Atlantis and cause it to perform malicious
-  actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_BASIC_AUTH` environment
+  actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD` environment
   variable.
   :::
 
