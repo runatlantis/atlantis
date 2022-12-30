@@ -3,7 +3,7 @@
 # and also because it kept breaking the build due to flakiness.
 FROM alpine:3.17.0
 LABEL authors="Anubhav Mishra, Luke Kysow" \
-      org.opencontainers.image.description "Terraform Pull Request Automation"
+      org.opencontainers.image.description="Terraform Pull Request Automation"
 
 # We use gosu to step down from root and run as the atlantis user so we need
 # to create that user and group.
