@@ -233,8 +233,8 @@ Values are chosen in this order:
   Terraform binaries here. If Atlantis loses this directory, [locks](locking.html)
   will be lost and unapplied plans will be lost.
 
-  Please note that the atlantis user is restricted to `/home/atlantis/`. 
-  If you set the `--data-dir` flag to a path outside of Atlantis' home directory, ensure that you grant the atlantis user the correct permissions.
+  Note that the atlantis user is restricted to `/home/atlantis/`. 
+  If you set the `--data-dir` flag to a path outside of Atlantis its home directory, ensure that you grant the atlantis user the correct permissions.
 
 ### `--default-tf-version`
   ```bash
