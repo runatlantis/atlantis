@@ -377,7 +377,7 @@ var (
 func (p *PlanSuccess) Summary() string {
 	note := ""
 	if match := reChangesOutside.FindString(p.TerraformOutput); match != "" {
-		note = fmt.Sprintf("\n**%s**\n", match)
+		note = "\n**" + match + "**\n"
 	}
 	if match := rePlanChanges.FindString(p.TerraformOutput); match != "" {
 		return note + match
