@@ -52,7 +52,6 @@ jobs:
   homebrew:
     name: "Bump Homebrew formula"
     runs-on: ubuntu-22.04
-    needs: goreleaser
     if: (!contains(github.ref, '-pre.'))
     steps:
       - uses: mislav/bump-homebrew-formula-action@v2
