@@ -972,6 +972,7 @@ type setupOption struct {
 
 func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
+	discardApprovalOnPlan := true
 	dataDir, binDir, cacheDir := mkSubDirs(t)
 
 	// Mocks.
@@ -1191,6 +1192,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		silenceNoProjects,
 		boltdb,
 		lockingClient,
+		discardApprovalOnPlan,
 	)
 
 	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)

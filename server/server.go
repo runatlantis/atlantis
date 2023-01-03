@@ -684,6 +684,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 		backend,
 		lockingClient,
+		userConfig.DiscardApprovalOnPlanFlag,
 	)
 
 	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)

@@ -70,8 +70,27 @@ var importCommandRunner *events.ImportCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 
-func setup(t *testing.T) *vcsmocks.MockClient {
+type TestConfig struct {
+	parallelPoolSize      int
+	SilenceNoProjects     bool
+	StatusName            string
+	discardApprovalOnPlan bool
+}
+
+func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
+
+	testConfig := &TestConfig{
+		parallelPoolSize:      1,
+		SilenceNoProjects:     false,
+		StatusName:            "atlantis-test",
+		discardApprovalOnPlan: false,
+	}
+
+	for _, op := range options {
+		op(testConfig)
+	}
+
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	eventParsing = mocks.NewMockEventParsing()
 	vcsClient := vcsmocks.NewMockClient()
@@ -107,15 +126,12 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		GlobalAutomerge: false,
 	}
 
-	parallelPoolSize := 1
-	SilenceNoProjects := false
-	StatusName := "atlantis-test"
 	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
 		commitUpdater,
 		projectCommandRunner,
-		parallelPoolSize,
+		testConfig.parallelPoolSize,
 		false,
 		false,
 	)
@@ -133,10 +149,11 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
-		parallelPoolSize,
-		SilenceNoProjects,
+		testConfig.parallelPoolSize,
+		testConfig.SilenceNoProjects,
 		defaultBoltDB,
 		lockingLocker,
+		testConfig.discardApprovalOnPlan,
 	)
 
 	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
@@ -152,10 +169,10 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		pullUpdater,
 		dbUpdater,
 		defaultBoltDB,
-		parallelPoolSize,
-		SilenceNoProjects,
+		testConfig.parallelPoolSize,
+		testConfig.SilenceNoProjects,
 		false,
-		StatusName,
+		testConfig.StatusName,
 		pullReqStatusFetcher,
 	)
 
@@ -165,22 +182,22 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
-		SilenceNoProjects,
+		testConfig.SilenceNoProjects,
 		false,
 	)
 
 	unlockCommandRunner = events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
-		SilenceNoProjects,
+		testConfig.SilenceNoProjects,
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
 		pullUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
-		parallelPoolSize,
-		SilenceNoProjects,
+		testConfig.parallelPoolSize,
+		testConfig.SilenceNoProjects,
 	)
 
 	importCommandRunner = events.NewImportCommandRunner(
@@ -226,6 +243,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              defaultBoltDB,
 	}
+
 	return vcsClient
 }
 
@@ -609,7 +627,8 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 // Test that if one plan fails and we are using automerge, that
 // we delete the plans.
 func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
-	setup(t)
+	vcsClient := setup(t)
+
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
@@ -652,6 +671,35 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	// gets called twice: the first time before the plan starts, the second time after the plan errors
 	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(tmp)
+
+	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())
+}
+
+func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
+	vcsClient := setup(t, func(testConfig *TestConfig) {
+		testConfig.discardApprovalOnPlan = true
+	})
+
+	tmp := t.TempDir()
+	boltDB, err := db.New(tmp)
+	Ok(t, err)
+	dbUpdater.Backend = boltDB
+	applyCommandRunner.Backend = boltDB
+	autoMerger.GlobalAutomerge = true
+	defer func() { autoMerger.GlobalAutomerge = false }()
+
+	When(projectCommandRunner.Plan(matchers.AnyCommandProjectContext())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
+	pull := &github.PullRequest{State: github.String("open")}
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+	fixtures.Pull.BaseRepo = fixtures.GithubRepo
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: command.Plan})
+	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	lockingLocker.VerifyWasCalledOnce().UnlockByPull(fixtures.Pull.BaseRepo.FullName, fixtures.Pull.Num)
+
+	vcsClient.VerifyWasCalledOnce().DiscardReviews(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())
 }
 
 func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
