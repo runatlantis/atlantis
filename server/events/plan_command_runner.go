@@ -43,7 +43,7 @@ func NewPlanCommandRunner(
 		SilenceNoProjects:          SilenceNoProjects,
 		pullStatusFetcher:          pullStatusFetcher,
 		lockingLocker:              lockingLocker,
-		DiscardApprovalOnPlan:   discardApprovalAfterPlan,
+		DiscardApprovalOnPlan:      discardApprovalAfterPlan,
 	}
 }
 
