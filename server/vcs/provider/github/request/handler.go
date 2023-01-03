@@ -47,6 +47,10 @@ type checkSuiteEventHandler interface {
 	Handle(ctx context.Context, e event.CheckSuite) error
 }
 
+type pullRequestReviewEventHandler interface {
+	Handle(ctx context.Context, e event.PullRequestReview, r *http.BufferedRequest) error
+}
+
 // converter interfaces
 type pullEventConverter interface {
 	Convert(event *github.PullRequestEvent) (event.PullRequest, error)
@@ -68,6 +72,10 @@ type checkSuiteEventConverter interface {
 	Convert(event *github.CheckSuiteEvent) (event.CheckSuite, error)
 }
 
+type pullRequestReviewEventConverter interface {
+	Convert(event *github.PullRequestReviewEvent) (event.PullRequestReview, error)
+}
+
 // Matcher matches a provided request against some condition
 type Matcher struct{}
 
@@ -82,6 +90,7 @@ func NewHandler(
 	commentHandler *handlers.CommentEvent,
 	prHandler *handlers.PullRequestEvent,
 	pushHandler pushEventHandler,
+	pullRequestReviewEventHandler pullRequestReviewEventHandler,
 	checkRunHandler checkRunEventHandler,
 	checkSuiteHandler checkSuiteEventHandler,
 	allowDraftPRs bool,
@@ -108,11 +117,15 @@ func NewHandler(
 		pushEventConverter: converter.PushEvent{
 			RepoConverter: repoConverter,
 		},
+		pullRequestReviewEventConverter: converter.PullRequestReviewEvent{
+			RepoConverter: repoConverter,
+		},
 		checkRunEventConverter:   converter.CheckRunEvent{},
 		checkSuiteEventConverter: converter.CheckSuiteEvent{RepoConverter: repoConverter},
 		pushHandler:              pushHandler,
 		checkRunHandler:          checkRunHandler,
 		checkSuiteHandler:        checkSuiteHandler,
+		pullRequestReviewHandler: pullRequestReviewEventHandler,
 		webhookSecret:            webhookSecret,
 		logger:                   logger,
 		scope:                    scope,
@@ -120,21 +133,23 @@ func NewHandler(
 }
 
 type Handler struct {
-	validator                requestValidator
-	commentHandler           commentEventHandler
-	prHandler                prEventHandler
-	pushHandler              pushEventHandler
-	checkRunHandler          checkRunEventHandler
-	checkSuiteHandler        checkSuiteEventHandler
-	parser                   webhookParser
-	pullEventConverter       pullEventConverter
-	commentEventConverter    commentEventConverter
-	pushEventConverter       pushEventConverter
-	checkRunEventConverter   checkRunEventConverter
-	checkSuiteEventConverter checkSuiteEventConverter
-	webhookSecret            []byte
-	logger                   logging.Logger
-	scope                    tally.Scope
+	validator                       requestValidator
+	commentHandler                  commentEventHandler
+	prHandler                       prEventHandler
+	pushHandler                     pushEventHandler
+	checkRunHandler                 checkRunEventHandler
+	checkSuiteHandler               checkSuiteEventHandler
+	pullRequestReviewHandler        pullRequestReviewEventHandler
+	parser                          webhookParser
+	pullEventConverter              pullEventConverter
+	commentEventConverter           commentEventConverter
+	pushEventConverter              pushEventConverter
+	checkRunEventConverter          checkRunEventConverter
+	checkSuiteEventConverter        checkSuiteEventConverter
+	pullRequestReviewEventConverter pullRequestReviewEventConverter
+	webhookSecret                   []byte
+	logger                          logging.Logger
+	scope                           tally.Scope
 
 	Matcher
 }
@@ -197,6 +212,11 @@ func (h *Handler) Handle(r *http.BufferedRequest) error {
 		timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 		defer timer.Stop()
 		err = h.handleCheckRunEvent(ctx, event)
+	case *github.PullRequestReviewEvent:
+		scope = scope.SubScope("pullreview")
+		timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+		defer timer.Stop()
+		err = h.handlePullRequestReviewEvent(ctx, event, r)
 	default:
 		h.logger.WarnContext(ctx, "Ignoring unsupported event")
 	}
@@ -272,4 +292,15 @@ func (h *Handler) handleCheckSuiteEvent(ctx context.Context, e *github.CheckSuit
 	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, checkSuiteEvent.Repo.FullName)
 	ctx = context.WithValue(ctx, contextInternal.SHAKey, checkSuiteEvent.HeadSha)
 	return h.checkSuiteHandler.Handle(ctx, checkSuiteEvent)
+}
+
+func (h *Handler) handlePullRequestReviewEvent(ctx context.Context, e *github.PullRequestReviewEvent, r *http.BufferedRequest) error {
+	pullRequestReviewEvent, err := h.pullRequestReviewEventConverter.Convert(e)
+	if err != nil {
+		return &errors.EventParsingError{Err: err}
+	}
+	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, pullRequestReviewEvent.Repo.FullName)
+	ctx = context.WithValue(ctx, contextInternal.PullNumKey, pullRequestReviewEvent.PRNum)
+	ctx = context.WithValue(ctx, contextInternal.SHAKey, pullRequestReviewEvent.Ref)
+	return h.pullRequestReviewHandler.Handle(ctx, pullRequestReviewEvent, r)
 }

@@ -148,6 +148,8 @@ func NewVCSEventsController(
 		logger,
 	)
 
+	pullRequestReviewHandler := handlers.NewPullRequestReviewEvent()
+
 	// we don't support push events in the atlantis worker and these should never make it in the queue
 	// in the first place, so if it happens, let's return an error and fail fast.
 	pushHandler := unsupportedPushEventHandler{}
@@ -163,6 +165,7 @@ func NewVCSEventsController(
 				commentHandler,
 				prHandler,
 				pushHandler,
+				pullRequestReviewHandler,
 				unsupportedCheckRunEventHandler{},
 				unsupportedCheckSuiteEventHandler{},
 				allowDraftPRs,

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	"net/http"
 
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
@@ -40,7 +41,8 @@ func NewVCSEventsController(
 	featureAllocator feature.Allocator,
 	scheduler scheduler,
 	temporalClient client.Client,
-	rootConfigBuilder *gateway_handlers.RootConfigBuilder) *VCSEventsController {
+	rootConfigBuilder *gateway_handlers.RootConfigBuilder,
+	checkRunFetcher *github.CheckRunsFetcher) *VCSEventsController {
 	pullEventWorkerProxy := gateway_handlers.NewPullEventWorkerProxy(
 		snsWriter, logger,
 	)
@@ -92,6 +94,14 @@ func NewVCSEventsController(
 		RootDeployer: rootDeployer,
 	}
 
+	pullRequestReviewHandler := &gateway_handlers.PullRequestReviewWorkerProxy{
+		Allocator:       featureAllocator,
+		Scheduler:       scheduler,
+		SnsWriter:       snsWriter,
+		Logger:          logger,
+		CheckRunFetcher: checkRunFetcher,
+	}
+
 	// lazy map of resolver providers to their resolver
 	// laziness ensures we only instantiate the providers we support.
 	providerResolverInitializer := map[models.VCSHostType]func() events_controllers.RequestResolver{
@@ -103,6 +113,7 @@ func NewVCSEventsController(
 				commentHandler,
 				prHandler,
 				pushHandler,
+				pullRequestReviewHandler,
 				checkRunHandler,
 				checkSuiteHandler,
 				allowDraftPRs,

@@ -2,9 +2,6 @@ package github
 
 import (
 	"context"
-	"fmt"
-	"net/http"
-
 	gh "github.com/google/go-github/v45/github"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
@@ -26,57 +23,51 @@ func (r *RemoteFileFetcher) GetModifiedFiles(ctx context.Context, repo models.Re
 		return nil, errors.Wrap(err, "creating installation client")
 	}
 
-	var fileFetcher func(ctx context.Context, client *gh.Client, repo models.Repo, fileFetcherOptions FileFetcherOptions, listOptions gh.ListOptions) ([]*gh.CommitFile, *gh.Response, error)
+	var run func(ctx context.Context, nextPage int) ([]*gh.CommitFile, *gh.Response, error)
 	if fileFetcherOptions.Sha != "" {
-		fileFetcher = GetCommit
+		run = GetCommit(client, repo, fileFetcherOptions)
 	} else if fileFetcherOptions.PRNum != 0 {
-		fileFetcher = ListFiles
+		run = ListFiles(client, repo, fileFetcherOptions)
 	} else {
 		return nil, errors.New("invalid fileFetcherOptions")
 	}
 
-	var files []string
-	nextPage := 0
-	for {
+	pageFiles, err := Iterate(ctx, run)
+	if err != nil {
+		return nil, errors.Wrap(err, "iterating through entries")
+	}
+	var renamed []string
+	for _, f := range pageFiles {
+		renamed = append(renamed, f.GetFilename())
+		// If the file was renamed, we'll want to run plan in the directory
+		// it was moved from as well.
+		if f.GetStatus() == "renamed" {
+			renamed = append(renamed, f.GetPreviousFilename())
+		}
+	}
+	return renamed, nil
+}
+
+func GetCommit(client *gh.Client, repo models.Repo, fileFetcherOptions FileFetcherOptions) func(ctx context.Context, nextPage int) ([]*gh.CommitFile, *gh.Response, error) {
+	return func(ctx context.Context, nextPage int) ([]*gh.CommitFile, *gh.Response, error) {
 		listOptions := gh.ListOptions{
-			PerPage: 300,
+			PerPage: 100,
 		}
-		if nextPage != 0 {
-			listOptions.Page = nextPage
+		listOptions.Page = nextPage
+		repositoryCommit, resp, err := client.Repositories.GetCommit(ctx, repo.Owner, repo.Name, fileFetcherOptions.Sha, &listOptions)
+		if repositoryCommit != nil {
+			return repositoryCommit.Files, resp, err
 		}
-
-		pageFiles, resp, err := fileFetcher(ctx, client, repo, fileFetcherOptions, listOptions)
-		if err != nil {
-			return nil, errors.Wrap(err, "error fetching files")
-		}
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("not ok status fetching files: %s", resp.Status)
-		}
-		for _, f := range pageFiles {
-			files = append(files, f.GetFilename())
-
-			// If the file was renamed, we'll want to run plan in the directory
-			// it was moved from as well.
-			if f.GetStatus() == "renamed" {
-				files = append(files, f.GetPreviousFilename())
-			}
-		}
-		if resp.NextPage == 0 {
-			break
-		}
-		nextPage = resp.NextPage
+		return nil, nil, errors.New("unable to retrieve commit files from GH commit")
 	}
-	return files, nil
 }
 
-func GetCommit(ctx context.Context, client *gh.Client, repo models.Repo, fileFetcherOptions FileFetcherOptions, listOptions gh.ListOptions) ([]*gh.CommitFile, *gh.Response, error) {
-	repositoryCommit, resp, err := client.Repositories.GetCommit(ctx, repo.Owner, repo.Name, fileFetcherOptions.Sha, &listOptions)
-	if repositoryCommit != nil {
-		return repositoryCommit.Files, resp, err
+func ListFiles(client *gh.Client, repo models.Repo, fileFetcherOptions FileFetcherOptions) func(ctx context.Context, nextPage int) ([]*gh.CommitFile, *gh.Response, error) {
+	return func(ctx context.Context, nextPage int) ([]*gh.CommitFile, *gh.Response, error) {
+		listOptions := gh.ListOptions{
+			PerPage: 100,
+		}
+		listOptions.Page = nextPage
+		return client.PullRequests.ListFiles(ctx, repo.Owner, repo.Name, fileFetcherOptions.PRNum, &listOptions)
 	}
-	return nil, nil, errors.New("unable to retrieve commit files from GH commit")
-}
-
-func ListFiles(ctx context.Context, client *gh.Client, repo models.Repo, fileFetcherOptions FileFetcherOptions, listOptions gh.ListOptions) ([]*gh.CommitFile, *gh.Response, error) {
-	return client.PullRequests.ListFiles(ctx, repo.Owner, repo.Name, fileFetcherOptions.PRNum, &listOptions)
 }

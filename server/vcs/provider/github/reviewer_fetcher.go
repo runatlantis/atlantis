@@ -2,12 +2,10 @@ package github
 
 import (
 	"context"
-	"fmt"
 	gh "github.com/google/go-github/v45/github"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"net/http"
 )
 
 const ApprovalState = "APPROVED"
@@ -22,30 +20,24 @@ func (r *PRReviewerFetcher) ListApprovalReviewers(ctx context.Context, installat
 		return nil, errors.Wrap(err, "creating installation client")
 	}
 
-	var approvalReviewers []string
-	nextPage := 0
-	for {
+	run := func(ctx context.Context, nextPage int) ([]*gh.PullRequestReview, *gh.Response, error) {
 		listOptions := gh.ListOptions{
 			PerPage: 100,
 		}
 		listOptions.Page = nextPage
+		return client.PullRequests.ListReviews(ctx, repo.Owner, repo.Name, prNum, &listOptions)
+	}
+	reviews, err := Iterate(ctx, run)
+	if err != nil {
+		return nil, errors.Wrap(err, "iterating through entries")
+	}
 
-		reviews, resp, err := client.PullRequests.ListReviews(ctx, repo.Owner, repo.Name, prNum, &listOptions)
-		if err != nil {
-			return nil, errors.Wrap(err, "error fetching pull request reviews")
+	// TODO: look at latest reviews only if user reviewed multiple times
+	var approvalReviewers []string
+	for _, review := range reviews {
+		if review.GetState() == ApprovalState && review.GetUser() != nil {
+			approvalReviewers = append(approvalReviewers, review.GetUser().GetLogin())
 		}
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("not ok status fetching pull request reviews: %s", resp.Status)
-		}
-		for _, review := range reviews {
-			if review.GetState() == ApprovalState && review.GetUser() != nil {
-				approvalReviewers = append(approvalReviewers, review.GetUser().GetLogin())
-			}
-		}
-		if resp.NextPage == 0 {
-			break
-		}
-		nextPage = resp.NextPage
 	}
 	return approvalReviewers, nil
 }

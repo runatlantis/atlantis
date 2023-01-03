@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-github/v45/github"
 	"github.com/runatlantis/atlantis/server/controllers/events/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
+	buffered "github.com/runatlantis/atlantis/server/http"
 	httputils "github.com/runatlantis/atlantis/server/http"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -83,6 +84,15 @@ func (c testPushEventConverter) Convert(_ *github.PushEvent) (event.Push, error)
 	return c.returnedPushEvent, c.returnedParsePushEventError
 }
 
+type testPullRequestReviewEventConverter struct {
+	returnedPullRequestReviewEvent event.PullRequestReview
+	error                          error
+}
+
+func (c testPullRequestReviewEventConverter) Convert(_ *github.PullRequestReviewEvent) (event.PullRequestReview, error) {
+	return c.returnedPullRequestReviewEvent, c.error
+}
+
 type testCheckRunEventConverter struct {
 	returnedCheckRunEvent           event.CheckRun
 	returnedParseCheckRunEventError error
@@ -108,6 +118,16 @@ type testCommentEventConverter struct {
 
 func (c testCommentEventConverter) Convert(_ *github.IssueCommentEvent) (event.Comment, error) {
 	return c.returnedCommentEvent, c.returnedParseIssueCommentEventError
+}
+
+type assertingPullRequestReviewHandler struct {
+	t             *testing.T
+	expectedInput event.PullRequestReview
+}
+
+func (h assertingPullRequestReviewHandler) Handle(_ context.Context, input event.PullRequestReview, _ *buffered.BufferedRequest) error {
+	assert.Equal(h.t, h.expectedInput, input)
+	return nil
 }
 
 type testParser struct {
@@ -564,6 +584,133 @@ func TestHandleCheckRunEvent(t *testing.T) {
 				checkRunEventConverter: testCheckRunEventConverter{
 					returnedCheckRunEvent:           internalEvent,
 					returnedParseCheckRunEventError: c.returnedParseCheckRunEventError,
+				},
+				parser: &testParser{
+					returnedEvent:             event,
+					returnedParseWebhookError: c.returnedParseWebhookError,
+				},
+				Matcher: Matcher{},
+			}
+
+			err = subject.Handle(request)
+			assert.IsType(t, c.expectedErr, err)
+		})
+
+	}
+}
+
+func TestHandlePullRequestReviewEvent(t *testing.T) {
+	payload := []byte("payload")
+	secret := "secret"
+
+	log := logging.NewNoopCtxLogger(t)
+	scope, _, err := metrics.NewLoggingScope(logging.NewNoopCtxLogger(t), "atlantis")
+	assert.NoError(t, err)
+
+	rawRequest, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost, "",
+		bytes.NewBuffer([]byte("body")),
+	)
+	assert.NoError(t, err)
+
+	request, err := httputils.NewBufferedRequest(rawRequest)
+	assert.NoError(t, err)
+
+	internalEvent := event.PullRequestReview{
+		InstallationToken: 123,
+		Repo:              models.Repo{},
+		PRNum:             1,
+		User:              models.User{Username: "username"},
+		Action:            event.Approved,
+		Ref:               "abcd",
+	}
+
+	event := &github.PullRequestReviewEvent{
+		Installation: &github.Installation{
+			ID: github.Int64(123),
+		},
+		Repo: &github.Repository{
+			Name: github.String("repo"),
+		},
+		Sender: &github.User{
+			Login: github.String("username"),
+		},
+		PullRequest: &github.PullRequest{
+			Number: github.Int(1),
+		},
+		Action: github.String(event.Approved),
+		Review: &github.PullRequestReview{
+			CommitID: github.String("abcd"),
+		},
+	}
+
+	t.Run("success", func(t *testing.T) {
+		subject := Handler{
+			logger:        log,
+			scope:         scope,
+			webhookSecret: []byte(secret),
+			pullRequestReviewHandler: assertingPullRequestReviewHandler{
+				expectedInput: internalEvent,
+				t:             t,
+			},
+			validator: testValidator{
+				returnedPayload: payload,
+			},
+			pullRequestReviewEventConverter: testPullRequestReviewEventConverter{
+				returnedPullRequestReviewEvent: internalEvent,
+			},
+			parser: &testParser{
+				returnedEvent: event,
+			},
+			Matcher: Matcher{},
+		}
+
+		err = subject.Handle(request)
+		assert.NoError(t, err)
+	})
+
+	cases := []struct {
+		returnedParseWebhookError  error
+		returnedValidatorError     error
+		returnedParsePRREventError error
+		expectedErr                error
+		description                string
+	}{
+		{
+			description:               "webhook parsing error",
+			returnedParseWebhookError: assert.AnError,
+			expectedErr:               &errors.WebhookParsingError{},
+		},
+		{
+			description:            "validator error",
+			returnedValidatorError: assert.AnError,
+			expectedErr:            &errors.RequestValidationError{},
+		},
+		{
+			description:                "event parsing error",
+			returnedParsePRREventError: assert.AnError,
+			expectedErr:                &errors.EventParsingError{},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			subject := Handler{
+				logger:        log,
+				scope:         scope,
+				webhookSecret: []byte(secret),
+				pullRequestReviewHandler: assertingPullRequestReviewHandler{
+					expectedInput: internalEvent,
+					t:             t,
+				},
+				validator: testValidator{
+					returnedPayload: payload,
+					returnedError:   c.returnedValidatorError,
+				},
+				pullRequestReviewEventConverter: testPullRequestReviewEventConverter{
+					returnedPullRequestReviewEvent: internalEvent,
+					error:                          c.returnedParsePRREventError,
 				},
 				parser: &testParser{
 					returnedEvent:             event,
