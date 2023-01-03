@@ -24,7 +24,7 @@ func NewPlanCommandRunner(
 	SilenceNoProjects bool,
 	pullStatusFetcher PullStatusFetcher,
 	lockingLocker locking.Locker,
-	removeApprovalsAfterPlan bool,
+	discardApprovalOnPlan bool,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -43,7 +43,7 @@ func NewPlanCommandRunner(
 		SilenceNoProjects:          SilenceNoProjects,
 		pullStatusFetcher:          pullStatusFetcher,
 		lockingLocker:              lockingLocker,
-		RemoveApprovalsAfterPlan:   removeApprovalsAfterPlan,
+		DiscardApprovalOnPlan:   discardApprovalAfterPlan,
 	}
 }
 
@@ -70,9 +70,9 @@ type PlanCommandRunner struct {
 	parallelPoolSize           int
 	pullStatusFetcher          PullStatusFetcher
 	lockingLocker              locking.Locker
-	// RemoveApprovalsAfterPlan controls if all already existing approvals should be removed/dismissed before executing
+	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
 	// a plan.
-	RemoveApprovalsAfterPlan bool
+	DiscardApprovalOnPlan bool
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -168,7 +168,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	if p.RemoveApprovalsAfterPlan {
+	if p.DiscardApprovalOnPlan {
 		if err = p.pullUpdater.VCSClient.DiscardReviews(baseRepo, pull); err != nil {
 			ctx.Log.Err("failed to remove approvals: %s", err)
 		}
