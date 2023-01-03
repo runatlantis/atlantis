@@ -23,6 +23,7 @@ import (
 	"net/url"
 	paths "path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -617,4 +618,30 @@ type WorkflowHookCommandContext struct {
 	EscapedCommentArgs []string
 	// UUID for reference
 	HookID string
+}
+
+// PlanSuccessStats holds stats for a plan.
+type PlanSuccessStats struct {
+	Add, Change, Destroy    int
+	Changes, ChangesOutside bool
+}
+
+func NewPlanSuccessStats(output string) PlanSuccessStats {
+	m := rePlanChanges.FindStringSubmatch(output)
+
+	s := PlanSuccessStats{
+		ChangesOutside: reChangesOutside.MatchString(output),
+		Changes:        len(m) > 0,
+	}
+
+	if s.Changes {
+		// We can skip checking the error here as we can assume
+		// Terraform output will always render an integer on these
+		// blocks.
+		s.Add, _ = strconv.Atoi(m[1])
+		s.Change, _ = strconv.Atoi(m[2])
+		s.Destroy, _ = strconv.Atoi(m[3])
+	}
+
+	return s
 }
