@@ -52,7 +52,8 @@ jobs:
   homebrew:
     name: "Bump Homebrew formula"
     runs-on: ubuntu-22.04
-    if: (!contains(github.ref, '-pre.'))
+    if: false
+    # if: (!contains(github.ref, '-pre.'))
     steps:
       - uses: mislav/bump-homebrew-formula-action@v2
         with:
@@ -63,4 +64,4 @@ jobs:
             
             Created by https://github.com/mislav/bump-homebrew-formula-action
         env:
-          COMMITTER_TOKEN: ${{ secrets.PUBLIC_REPO_ACCESS_TOKEN }}
+          COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
