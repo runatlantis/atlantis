@@ -2214,8 +2214,7 @@ $$$
 	}
 }
 
-func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
-	tfOutput := `An execution plan has been generated and is shown below.
+const tfOutput = `An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
 ~ update in-place
 -/+ destroy and then create replacement
@@ -2398,30 +2397,31 @@ Terraform will perform the following actions:
 
 Plan: 1 to add, 2 to change, 1 to destroy.
 `
-	cases := []struct {
-		Description    string
-		Command        command.Name
-		ProjectResults []command.ProjectResult
-		VCSHost        models.VCSHostType
-		Expected       string
-	}{
-		{
-			"single successful plan with diff markdown formatted",
-			command.Plan,
-			[]command.ProjectResult{
-				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: tfOutput,
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-					},
-					Workspace:  "workspace",
-					RepoRelDir: "path",
+
+var cases = []struct {
+	Description    string
+	Command        command.Name
+	ProjectResults []command.ProjectResult
+	VCSHost        models.VCSHostType
+	Expected       string
+}{
+	{
+		"single successful plan with diff markdown formatted",
+		command.Plan,
+		[]command.ProjectResult{
+			{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: tfOutput,
+					LockURL:         "lock-url",
+					RePlanCmd:       "atlantis plan -d path -w workspace",
+					ApplyCmd:        "atlantis apply -d path -w workspace",
 				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
 			},
-			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+		},
+		models.Github,
+		`Ran Plan for dir: $path$ workspace: $workspace$
 
 <details><summary>Show Output</summary>
 
@@ -2619,8 +2619,10 @@ Plan: 1 to add, 2 to change, 1 to destroy.
 
 
 `,
-		},
-	}
+	},
+}
+
+func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 	r := events.GetMarkdownRenderer(
 		false, // GitlabSupportsCommonMark
 		true,  // DisableApplyAll
@@ -2645,6 +2647,39 @@ Plan: 1 to add, 2 to change, 1 to destroy.
 					} else {
 						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
 					}
+				})
+			}
+		})
+	}
+}
+
+var Render string
+
+func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
+	var render string
+
+	r := events.GetMarkdownRenderer(
+		false, // GitlabSupportsCommonMark
+		true,  // DisableApplyAll
+		true,  // DisableApply
+		false, // DisableMarkdownFolding
+		false, // DisableRepoLocking
+		true,  // EnableDiffMarkdownFormat
+		"",    // MarkdownTemplateOverridesDir
+	)
+
+	for _, c := range cases {
+		b.Run(c.Description, func(b *testing.B) {
+			res := command.Result{
+				ProjectResults: c.ProjectResults,
+			}
+			for _, verbose := range []bool{true, false} {
+				b.Run(fmt.Sprintf("verbose %t", verbose), func(b *testing.B) {
+					b.ReportAllocs()
+					for i := 0; i < b.N; i++ {
+						render = r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					}
+					Render = render
 				})
 			}
 		})
