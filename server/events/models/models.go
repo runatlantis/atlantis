@@ -427,6 +427,11 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 	return strings.TrimSpace(formattedTerraformOutput)
 }
 
+// Stats returns plan change stats and contextual information.
+func (p PlanSuccess) Stats() PlanSuccessStats {
+	return NewPlanSuccessStats(p.TerraformOutput)
+}
+
 // PolicyCheckResults is the result of a successful policy check run.
 type PolicyCheckResults struct {
 	// PolicySetResults is the output from policy check binary(conftest|opa)
