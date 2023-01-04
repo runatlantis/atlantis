@@ -21,7 +21,7 @@ ARG TARGETPLATFORM
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.3.6
+ENV DEFAULT_TERRAFORM_VERSION=1.3.7
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
