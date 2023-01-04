@@ -43,7 +43,7 @@ type ApprovePoliciesCommandRunner struct {
 	vcsClient                  vcs.Client
 }
 
-func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
+func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCommand, repoDir string) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 

@@ -28,6 +28,7 @@ type UnlockCommandRunner struct {
 func (u *UnlockCommandRunner) Run(
 	ctx *command.Context,
 	cmd *CommentCommand,
+	repoDir string,
 ) {
 	baseRepo := ctx.Pull.BaseRepo
 	pullNum := ctx.Pull.Num

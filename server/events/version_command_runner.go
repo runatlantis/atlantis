@@ -30,10 +30,10 @@ type VersionCommandRunner struct {
 	silenceVCSStatusNoProjects bool
 }
 
-func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
+func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *CommentCommand, repoDir string) {
 	var err error
 	var projectCmds []command.ProjectContext
-	projectCmds, err = v.prjCmdBuilder.BuildVersionCommands(ctx, cmd)
+	projectCmds, err = v.prjCmdBuilder.BuildVersionCommands(ctx, cmd, repoDir)
 	if err != nil {
 		ctx.Log.Warn("Error %s", err)
 	}

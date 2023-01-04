@@ -44,6 +44,35 @@ type APIRequest struct {
 	}
 }
 
+func (a *APIRequest) getPlanCommand(ctx *command.Context, cmdBuilder func(*command.Context, *events.CommentCommand, string) ([]command.ProjectContext, error)) ([]command.ProjectContext, error) {
+	cc := make([]*events.CommentCommand, 0)
+
+	for _, project := range a.Projects {
+		cc = append(cc, &events.CommentCommand{
+			ProjectName: project,
+		})
+	}
+	for _, path := range a.Paths {
+		cc = append(cc, &events.CommentCommand{
+			RepoRelDir: strings.TrimRight(path.Directory, "/"),
+			Workspace:  path.Workspace,
+		})
+	}
+
+	cmds := make([]command.ProjectContext, 0)
+	for _, commentCommand := range cc {
+		// TODO get repoDir somehow
+		repoDir := ""
+		projectCmds, err := cmdBuilder(ctx, commentCommand, repoDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build command: %v", err)
+		}
+		cmds = append(cmds, projectCmds...)
+	}
+
+	return cmds, nil
+}
+
 func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, error) {
 	cc := make([]*events.CommentCommand, 0)
 
@@ -142,7 +171,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
-	cmds, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildPlanCommands)
+	cmds, err := request.getPlanCommand(ctx, a.ProjectCommandBuilder.BuildPlanCommands)
 	if err != nil {
 		return nil, err
 	}

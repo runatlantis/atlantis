@@ -22,29 +22,29 @@ func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Cont
 	)
 }
 
-func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
+func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context, repoDir string) ([]command.ProjectContext, error) {
 	return b.buildAndEmitStats(
 		"auto plan",
 		func() ([]command.ProjectContext, error) {
-			return b.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
+			return b.ProjectCommandBuilder.BuildAutoplanCommands(ctx, repoDir)
 		},
 	)
 }
 
-func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *CommentCommand, repoDir string) ([]command.ProjectContext, error) {
 	return b.buildAndEmitStats(
 		"plan",
 		func() ([]command.ProjectContext, error) {
-			return b.ProjectCommandBuilder.BuildPlanCommands(ctx, comment)
+			return b.ProjectCommandBuilder.BuildPlanCommands(ctx, comment, repoDir)
 		},
 	)
 }
 
-func (b *InstrumentedProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+func (b *InstrumentedProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, comment *CommentCommand, repoDir string) ([]command.ProjectContext, error) {
 	return b.buildAndEmitStats(
 		"import",
 		func() ([]command.ProjectContext, error) {
-			return b.ProjectCommandBuilder.BuildImportCommands(ctx, comment)
+			return b.ProjectCommandBuilder.BuildImportCommands(ctx, comment, repoDir)
 		},
 	)
 }
