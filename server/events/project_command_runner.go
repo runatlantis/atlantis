@@ -391,8 +391,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	}
 	defer unlockFn()
 
-	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, cloneErr := p.WorkingDir.CreateWorkspaceDirectory(ctx.Workspace, ctx.Pull)
 	if cloneErr != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -418,7 +417,8 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		TerraformOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,
-		HasDiverged:     hasDiverged,
+		// TODO receive this as function arg
+		HasDiverged: false,
 	}, "", nil
 }
 
@@ -495,7 +495,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 
 func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out *models.ImportSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, cloneErr := p.WorkingDir.CreateWorkspaceDirectory(ctx.Workspace, ctx.Pull)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}

@@ -176,7 +176,11 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := c.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	_, _, err = c.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull)
+	if err != nil {
+		return
+	}
+	repoDir, err := c.WorkingDir.CreateWorkspaceDirectory(workspace, ctx.Pull)
 	if err != nil {
 		return
 	}
@@ -314,7 +318,11 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := c.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	_, _, err = c.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull)
+	if err != nil {
+		return
+	}
+	repoDir, err := c.WorkingDir.CreateWorkspaceDirectory(workspace, ctx.Pull)
 	if err != nil {
 		return
 	}

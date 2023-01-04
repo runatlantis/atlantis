@@ -468,8 +468,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	}
 	defer unlockFn()
 
-	ctx.Log.Debug("cloning repository")
-	_, _, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	ctx.Log.Debug("copying repository")
+	_, err = p.WorkingDir.CreateWorkspaceDirectory(workspace, ctx.Pull)
 	if err != nil {
 		return pcc, err
 	}
