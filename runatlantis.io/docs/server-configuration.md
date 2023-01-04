@@ -317,11 +317,11 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_DATA_DIR="path/to/data/dir"
   ```
   Directory where Atlantis will store its data. Will be created if it doesn't exist.
-  Defaults to `/home/atlantis/`. Atlantis will store its database, checked out repos, Terraform plans and downloaded
+  Defaults to `~/atlantis`. Atlantis will store its database, checked out repos, Terraform plans and downloaded
   Terraform binaries here. If Atlantis loses this directory, [locks](locking.html)
   will be lost and unapplied plans will be lost.
 
-  Note that the atlantis user is restricted to `/home/atlantis/`. 
+  Note that the atlantis user is restricted to `~/atlantis`. 
   If you set the `--data-dir` flag to a path outside of Atlantis its home directory, ensure that you grant the atlantis user the correct permissions.
 
 ### `--default-tf-version`
