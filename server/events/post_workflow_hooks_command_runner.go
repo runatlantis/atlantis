@@ -21,7 +21,7 @@ type PostWorkflowHookURLGenerator interface {
 //go:generate pegomock generate -m --package mocks -o mocks/mock_post_workflows_hooks_command_runner.go PostWorkflowHooksCommandRunner
 
 type PostWorkflowHooksCommandRunner interface {
-	RunPostHooks(ctx *command.Context, cmd *CommentCommand) error
+	RunPostHooks(ctx *command.Context, cmd *CommentCommand, repoDir string) error
 }
 
 // DefaultPostWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
@@ -36,9 +36,7 @@ type DefaultPostWorkflowHooksCommandRunner struct {
 }
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
-func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
-	ctx *command.Context, cmd *CommentCommand,
-) error {
+func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Context, cmd *CommentCommand, repoDir string) error {
 	pull := ctx.Pull
 	baseRepo := pull.BaseRepo
 	headRepo := ctx.HeadRepo
@@ -59,24 +57,12 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 
 	log.Debug("post-hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace, DefaultRepoRelDir)
-	if err != nil {
-		return err
-	}
-	log.Debug("got workspace lock")
-	defer unlockFn()
-
-	repoDir, _, err := w.WorkingDir.Clone(log, headRepo, pull, DefaultWorkspace)
-	if err != nil {
-		return err
-	}
-
 	var escapedArgs []string
 	if cmd != nil {
 		escapedArgs = escapeArgs(cmd.Flags)
 	}
 
-	err = w.runHooks(
+	err := w.runHooks(
 		models.WorkflowHookCommandContext{
 			BaseRepo:           baseRepo,
 			HeadRepo:           headRepo,

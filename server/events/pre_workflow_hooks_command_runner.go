@@ -21,7 +21,7 @@ type PreWorkflowHookURLGenerator interface {
 //go:generate pegomock generate -m --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
 
 type PreWorkflowHooksCommandRunner interface {
-	RunPreHooks(ctx *command.Context, cmd *CommentCommand) error
+	RunPreHooks(ctx *command.Context, cmd *CommentCommand, repoDir string) error
 }
 
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
@@ -36,7 +36,7 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 }
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
-func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context, cmd *CommentCommand) error {
+func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context, cmd *CommentCommand, repoDir string) error {
 	pull := ctx.Pull
 	baseRepo := pull.BaseRepo
 	headRepo := ctx.HeadRepo
@@ -57,24 +57,12 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 
 	log.Debug("pre-hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace, DefaultRepoRelDir)
-	if err != nil {
-		return err
-	}
-	log.Debug("got workspace lock")
-	defer unlockFn()
-
-	repoDir, _, err := w.WorkingDir.Clone(log, headRepo, pull, DefaultWorkspace)
-	if err != nil {
-		return err
-	}
-
 	var escapedArgs []string
 	if cmd != nil {
 		escapedArgs = escapeArgs(cmd.Flags)
 	}
 
-	err = w.runHooks(
+	err := w.runHooks(
 		models.WorkflowHookCommandContext{
 			BaseRepo:           baseRepo,
 			HeadRepo:           headRepo,

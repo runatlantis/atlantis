@@ -165,12 +165,6 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, nil)
-
-	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
-	}
-
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
 
@@ -187,11 +181,17 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
+	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, nil, repoDir)
+
+	if err != nil {
+		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
+	}
+
 	autoPlanRunner := buildCommentCommandRunner(c, command.Plan)
 
 	autoPlanRunner.Run(ctx, nil, repoDir)
 
-	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, nil)
+	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, nil, repoDir)
 
 	if err != nil {
 		ctx.Log.Err("Error running post-workflow hooks %s.", err)
@@ -319,7 +319,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd, repoDir)
 
 	if err != nil {
 		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, cmd.Name.String())
@@ -329,7 +329,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	cmdRunner.Run(ctx, cmd, repoDir)
 
-	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd)
+	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd, repoDir)
 
 	if err != nil {
 		ctx.Log.Err("Error running post-workflow hooks %s.", err)
