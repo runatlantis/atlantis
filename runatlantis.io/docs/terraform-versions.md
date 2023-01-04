@@ -1,7 +1,7 @@
 # Terraform Versions
 
 You can customize which version of Terraform Atlantis defaults to by setting
-the `--default-tf-version` flag (ex. `--default-tf-version=v1.3.6`).
+the `--default-tf-version` flag (ex. `--default-tf-version=v1.3.7`).
 
 ## Via `atlantis.yaml`
 If you wish to use a different version than the default for a specific repo or project, you need
