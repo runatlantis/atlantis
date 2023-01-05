@@ -1069,6 +1069,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	silenceNoProjects := false
 
 	commitStatusUpdater := mocks.NewMockCommitStatusUpdater()
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 
 	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
 	preWorkflowHookURLGenerator := mocks.NewMockPreWorkflowHookURLGenerator()
@@ -1139,10 +1140,12 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
 		},
-		PlanStepRunner: &runtime.PlanStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
+		PlanStepRunner: runtime.NewPlanStepRunner(
+			terraformClient,
+			defaultTFVersion,
+			commitStatusUpdater,
+			asyncTfExec,
+		),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
