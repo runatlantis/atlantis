@@ -16,7 +16,7 @@ package main
 import (
 	"context"
 
-	"github.com/google/go-github/v48/github"
+	"github.com/google/go-github/v49/github"
 )
 
 type GithubClient struct {

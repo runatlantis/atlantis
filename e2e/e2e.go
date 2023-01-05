@@ -20,7 +20,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/google/go-github/v48/github"
+	"github.com/google/go-github/v49/github"
 )
 
 type E2ETester struct {
