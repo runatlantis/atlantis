@@ -447,6 +447,21 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 		},
 		{
+			Description: "import workspace",
+			RepoDir:     "import-workspace",
+			Comments: []string{
+				"atlantis import -d dir1 -w ops 'random_id.dummy1[0]' AA",
+				"atlantis import -p dir1-ops 'random_id.dummy2[0]' BB",
+				"atlantis plan -p dir1-ops",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-import-dir1-ops-dummy1.txt"},
+				{"exp-output-import-dir1-ops-dummy2.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
 			Description:   "import single project with -var",
 			RepoDir:       "import-single-project-var",
 			ModifiedFiles: []string{"main.tf"},
