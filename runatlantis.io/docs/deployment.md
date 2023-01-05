@@ -536,6 +536,15 @@ Cloud Storage Backend and TLS certs: [https://github.com/sethvargo/atlantis-on-g
 
 Once you're done, see [Next Steps](#next-steps).
 
+### Google Compute Engine (CCE)
+It's also possible to run Atlantis on Google Compute Engine.
+
+There's a Terraform module available that runs Atlantis as a Docker container on a Compute Engine VM.
+
+The Terraform module features creation of a Cloud load balancer, Container-Optimized OS based VM, a persistent data disk and a managed instance group: [https://github.com/bschaatsbergen/terraform-gce-atlantis](https://github.com/bschaatsbergen/terraform-gce-atlantis).
+
+When you're finished, see [Next Steps](#next-steps).
+
 ### Docker
 Atlantis has an [official](https://ghcr.io/runatlantis/atlantis) Docker image: `ghcr.io/runatlantis/atlantis`.
 
