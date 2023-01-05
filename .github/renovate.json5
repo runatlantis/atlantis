@@ -6,7 +6,7 @@
   automerge: false,
   platformAutomerge: false,
   labels: ["dependencies"],
-  postUpdateOptions: ["gomodTidy", "yarnDedupeHighest"],
+  postUpdateOptions: ["gomodTidy", "gomodUpdateImportPaths", "yarnDedupeHighest"],
   prHourlyLimit: 0,
   prConcurrentLimit: 5,
   packageRules: [
