@@ -1151,10 +1151,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
 		},
-		ImportStepRunner: &runtime.ImportStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
+		ImportStepRunner: runtime.NewImportStepRunner(terraformClient, defaultTFVersion),
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFVersion:        defaultTFVersion,
