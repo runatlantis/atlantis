@@ -172,7 +172,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
 		false,
-		testConfig.StatusName,
 		pullReqStatusFetcher,
 	)
 

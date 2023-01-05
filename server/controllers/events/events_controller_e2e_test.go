@@ -1195,7 +1195,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		discardApprovalOnPlan,
 	)
 
-	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
+	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient, "atlantis-test")
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		e2eVCSClient,
@@ -1211,7 +1211,6 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		parallelPoolSize,
 		silenceNoProjects,
 		false,
-		"atlantis-test",
 		e2ePullReqStatusFetcher,
 	)
 

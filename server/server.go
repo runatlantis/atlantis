@@ -687,7 +687,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DiscardApprovalOnPlanFlag,
 	)
 
-	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
+	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName)
 	applyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,
 		userConfig.DisableApplyAll,
@@ -702,7 +702,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
-		userConfig.VCSStatusName,
 		pullReqStatusFetcher,
 	)
 
