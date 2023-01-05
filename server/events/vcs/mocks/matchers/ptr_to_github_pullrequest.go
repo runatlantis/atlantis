@@ -5,7 +5,7 @@ import (
 	"github.com/petergtz/pegomock"
 	"reflect"
 
-	github "github.com/google/go-github/v48/github"
+	github "github.com/google/go-github/v49/github"
 )
 
 func AnyPtrToGithubPullRequest() *github.PullRequest {
