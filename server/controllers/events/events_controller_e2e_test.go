@@ -1240,6 +1240,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	importCommandRunner := events.NewImportCommandRunner(
 		pullUpdater,
+		e2ePullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
 	)

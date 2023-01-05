@@ -731,6 +731,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	importCommandRunner := events.NewImportCommandRunner(
 		pullUpdater,
+		pullReqStatusFetcher,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 	)

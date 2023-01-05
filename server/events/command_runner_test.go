@@ -23,7 +23,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
@@ -52,6 +51,7 @@ var pendingPlanFinder *mocks.MockPendingPlanFinder
 var drainer *events.Drainer
 var deleteLockCommand *mocks.MockDeleteLockCommand
 var commitUpdater *mocks.MockCommitStatusUpdater
+var pullReqStatusFetcher *vcsmocks.MockPullReqStatusFetcher
 
 // TODO: refactor these into their own unit tests.
 // these were all split out from default command runner in an effort to improve
@@ -102,6 +102,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
+	pullReqStatusFetcher = vcsmocks.NewMockPullReqStatusFetcher()
 	tmp := t.TempDir()
 	defaultBoltDB, err := db.New(tmp)
 	Ok(t, err)
@@ -156,8 +157,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.discardApprovalOnPlan,
 	)
 
-	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
-
 	applyCommandRunner = events.NewApplyCommandRunner(
 		vcsClient,
 		false,
@@ -201,6 +200,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	importCommandRunner = events.NewImportCommandRunner(
 		pullUpdater,
+		pullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
 	)
