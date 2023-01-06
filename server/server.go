@@ -714,6 +714,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		dbUpdater,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoPlans,
+		vcsClient,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(

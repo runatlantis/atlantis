@@ -182,6 +182,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		dbUpdater,
 		testConfig.SilenceNoProjects,
 		false,
+		vcsClient,
 	)
 
 	unlockCommandRunner = events.NewUnlockCommandRunner(

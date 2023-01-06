@@ -5,6 +5,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 func NewApprovePoliciesCommandRunner(
@@ -15,6 +16,7 @@ func NewApprovePoliciesCommandRunner(
 	dbUpdater *DBUpdater,
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
+	vcsClient vcs.Client,
 ) *ApprovePoliciesCommandRunner {
 	return &ApprovePoliciesCommandRunner{
 		commitStatusUpdater:        commitStatusUpdater,
@@ -24,6 +26,7 @@ func NewApprovePoliciesCommandRunner(
 		dbUpdater:                  dbUpdater,
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		vcsClient:                  vcsClient,
 	}
 }
 
@@ -37,6 +40,7 @@ type ApprovePoliciesCommandRunner struct {
 	// are found
 	SilenceNoProjects          bool
 	silenceVCSStatusNoProjects bool
+	vcsClient                  vcs.Client
 }
 
 func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
@@ -91,9 +95,23 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *com
 	// Check if vcs user is in the owner list of the PolicySets. All projects
 	// share the same Owners list at this time so no reason to iterate over each
 	// project.
-	if len(prjCmds) > 0 && !prjCmds[0].PolicySets.IsOwner(ctx.User.Username) {
-		result.Error = fmt.Errorf("contact policy owners to approve failing policies")
-		return
+	if len(prjCmds) > 0 {
+		teams := []string{}
+
+		// Only query the users team membership if any teams have been configured as owners.
+		if prjCmds[0].PolicySets.HasTeamOwners() {
+			userTeams, err := a.vcsClient.GetTeamNamesForUser(ctx.Pull.BaseRepo, ctx.User)
+			if err != nil {
+				ctx.Log.Err("unable to get team membership for user: %s", err)
+				return
+			}
+			teams = append(teams, userTeams...)
+		}
+
+		if !prjCmds[0].PolicySets.IsOwner(ctx.User.Username, teams) {
+			result.Error = fmt.Errorf("contact policy owners to approve failing policies")
+			return
+		}
 	}
 
 	var prjResults []command.ProjectResult

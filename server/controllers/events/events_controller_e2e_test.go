@@ -1222,6 +1222,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		dbUpdater,
 		silenceNoProjects,
 		false,
+		e2eVCSClient,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
