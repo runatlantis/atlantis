@@ -42,8 +42,8 @@ var (
 	templatesFS embed.FS
 )
 
-// markdownRenderer renders responses as markdown.
-type markdownRenderer struct {
+// MarkdownRenderer renders responses as markdown.
+type MarkdownRenderer struct {
 	// gitlabSupportsCommonMark is true if the version of GitLab we're
 	// using supports the CommonMark markdown format.
 	// If we're not configured with a GitLab client, this will be false.
@@ -119,14 +119,14 @@ func NewMarkdownRenderer(
 	enableDiffMarkdownFormat bool,
 	markdownTemplateOverridesDir string,
 	executableName string,
-) *markdownRenderer {
+) *MarkdownRenderer {
 	var templates *template.Template
 	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
 	if overrides, err := templates.ParseGlob(fmt.Sprintf("%s/*.tmpl", markdownTemplateOverridesDir)); err == nil {
 		// doesn't override if templates directory doesn't exist
 		templates = overrides
 	}
-	return &markdownRenderer{
+	return &MarkdownRenderer{
 		gitlabSupportsCommonMark: gitlabSupportsCommonMark,
 		disableApplyAll:          disableApplyAll,
 		disableMarkdownFolding:   disableMarkdownFolding,
@@ -140,7 +140,7 @@ func NewMarkdownRenderer(
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *markdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType) string {
+func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType) string {
 	commandStr := cases.Title(language.English).String(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{
 		Command:                  commandStr,
@@ -165,7 +165,7 @@ func (m *markdownRenderer) Render(res command.Result, cmdName command.Name, log 
 	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
 }
 
-func (m *markdownRenderer) renderProjectResults(results []command.ProjectResult, common commonData, vcsHost models.VCSHostType) string {
+func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult, common commonData, vcsHost models.VCSHostType) string {
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 	numPolicyCheckSuccesses := 0
@@ -277,7 +277,7 @@ func (m *markdownRenderer) renderProjectResults(results []command.ProjectResult,
 // templates that collapse the output to make the comment smaller on initial
 // load. Some VCS providers or versions of VCS providers don't support this
 // syntax.
-func (m *markdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, output string) bool {
+func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, output string) bool {
 	if m.disableMarkdownFolding {
 		return false
 	}
@@ -294,7 +294,7 @@ func (m *markdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, outp
 	return strings.Count(output, "\n") > maxUnwrappedLines
 }
 
-func (m *markdownRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
+func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
 	buf := &bytes.Buffer{}
 	if err := tmpl.Execute(buf, data); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)

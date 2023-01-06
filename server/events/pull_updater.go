@@ -8,7 +8,7 @@ import (
 type PullUpdater struct {
 	HidePrevPlanComments bool
 	VCSClient            vcs.Client
-	MarkdownRenderer     *markdownRenderer
+	MarkdownRenderer     *MarkdownRenderer
 }
 
 func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res command.Result) {
