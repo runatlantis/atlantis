@@ -54,6 +54,7 @@ type markdownRenderer struct {
 	disableRepoLocking       bool
 	enableDiffMarkdownFormat bool
 	markdownTemplates        *template.Template
+	executableName           string
 }
 
 // commonData is data that all responses have.
@@ -66,6 +67,7 @@ type commonData struct {
 	DisableApply             bool
 	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
+	ExecutableName           string
 }
 
 // errData is data about an error response.
@@ -116,6 +118,7 @@ func NewMarkdownRenderer(
 	disableRepoLocking bool,
 	enableDiffMarkdownFormat bool,
 	markdownTemplateOverridesDir string,
+	executableName string,
 ) *markdownRenderer {
 	var templates *template.Template
 	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
@@ -131,6 +134,7 @@ func NewMarkdownRenderer(
 		disableRepoLocking:       disableRepoLocking,
 		enableDiffMarkdownFormat: enableDiffMarkdownFormat,
 		markdownTemplates:        templates,
+		executableName:           executableName,
 	}
 }
 
@@ -147,6 +151,7 @@ func (m *markdownRenderer) Render(res command.Result, cmdName command.Name, log 
 		DisableApply:             m.disableApply,
 		DisableRepoLocking:       m.disableRepoLocking,
 		EnableDiffMarkdownFormat: m.enableDiffMarkdownFormat,
+		ExecutableName:           m.executableName,
 	}
 
 	templates := m.markdownTemplates

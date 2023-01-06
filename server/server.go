@@ -420,6 +420,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DisableRepoLocking,
 		userConfig.EnableDiffMarkdownFormat,
 		userConfig.MarkdownTemplateOverridesDir,
+		userConfig.ExecutableName,
 	)
 
 	var lockingClient locking.Locker
