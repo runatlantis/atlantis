@@ -412,7 +412,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil && flag.Lookup("test.v") == nil {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
-	markdownRenderer := events.GetMarkdownRenderer(
+	markdownRenderer := events.NewMarkdownRenderer(
 		gitlabClient.SupportsCommonMark(),
 		userConfig.DisableApplyAll,
 		userConfig.DisableMarkdownFolding,
@@ -420,6 +420,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DisableRepoLocking,
 		userConfig.EnableDiffMarkdownFormat,
 		userConfig.MarkdownTemplateOverridesDir,
+		userConfig.ExecutableName,
 	)
 
 	var lockingClient locking.Locker
