@@ -203,7 +203,7 @@ func TestApplyLocker(t *testing.T) {
 			Assert(t, !lock.Locked, "exp false")
 		})
 
-		t.Run("can't lock if userConfig.disableApply is set", func(t *testing.T) {
+		t.Run("can't lock if userConfig.DisableApply is set", func(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
 			l := locking.NewApplyClient(backend, true)
@@ -233,12 +233,12 @@ func TestApplyLocker(t *testing.T) {
 			Equals(t, errExpected, err)
 		})
 
-		t.Run("can't unlock if userConfig.disableApply is set", func(t *testing.T) {
+		t.Run("can't unlock if userConfig.DisableApply is set", func(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
 			l := locking.NewApplyClient(backend, true)
 			err := l.UnlockApply()
-			ErrEquals(t, "apply commands are disabled until disableApply flag is unset", err)
+			ErrEquals(t, "apply commands are disabled until DisableApply flag is unset", err)
 
 			backend.VerifyWasCalled(Never()).UnlockCommand(matchers.AnyCommandName())
 		})
@@ -265,7 +265,7 @@ func TestApplyLocker(t *testing.T) {
 			Equals(t, lock.Locked, false)
 		})
 
-		t.Run("when disableApply flag is set always return a lock", func(t *testing.T) {
+		t.Run("when DisableApply flag is set always return a lock", func(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
 			l := locking.NewApplyClient(backend, true)

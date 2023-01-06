@@ -90,7 +90,7 @@ func TestGitHubWorkflow(t *testing.T) {
 		ModifiedFiles []string
 		// Comments are what our mock user writes to the pull request.
 		Comments []string
-		// disableApply flag used by userConfig object when initializing atlantis server.
+		// DisableApply flag used by userConfig object when initializing atlantis server.
 		DisableApply bool
 		// ApplyLock creates an apply lock that temporarily disables apply command
 		ApplyLock bool

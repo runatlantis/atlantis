@@ -31,8 +31,8 @@ type ApplyLocker interface {
 // ApplyCommandLock contains information about apply command lock status.
 type ApplyCommandLock struct {
 	// Locked is true is when apply commands are locked
-	// Either by using disableApply flag or creating a global ApplyCommandLock
-	// disableApply lock take precedence when set
+	// Either by using DisableApply flag or creating a global ApplyCommandLock
+	// DisableApply lock take precedence when set
 	Locked  bool
 	Time    time.Time
 	Failure string
@@ -77,7 +77,7 @@ func (c *ApplyClient) LockApply() (ApplyCommandLock, error) {
 // this function returns an error
 func (c *ApplyClient) UnlockApply() error {
 	if c.disableApplyFlag {
-		return errors.New("apply commands are disabled until disableApply flag is unset")
+		return errors.New("apply commands are disabled until DisableApply flag is unset")
 	}
 
 	err := c.backend.UnlockCommand(command.Apply)
