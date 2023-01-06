@@ -184,21 +184,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			if m.shouldUseWrappedTmpl(vcsHost, result.Error.Error()) {
 				tmpl = templates.Lookup("wrappedErr")
 			}
-			resultData.Rendered = m.renderTemplate(tmpl, struct {
-				Command string
-				Error   string
-			}{
-				Command: common.Command,
-				Error:   result.Error.Error(),
-			})
+			resultData.Rendered = m.renderTemplate(tmpl, errData{result.Error.Error(), common})
 		} else if result.Failure != "" {
-			resultData.Rendered = m.renderTemplate(templates.Lookup("failure"), struct {
-				Command string
-				Failure string
-			}{
-				Command: common.Command,
-				Failure: result.Failure,
-			})
+			resultData.Rendered = m.renderTemplate(templates.Lookup("failure"), failureData{result.Failure, common})
 		} else if result.PlanSuccess != nil {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
 				resultData.Rendered = m.renderTemplate(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
