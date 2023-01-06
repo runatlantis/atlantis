@@ -443,23 +443,23 @@ var helpCommentTemplate = "```cmake\n" +
 Terraform Pull Request Automation
 
 Usage:
-  {{ .ExecutableName }} <command> [options] -- [terraform options]
+  {{ .executableName }} <command> [options] -- [terraform options]
 
 Examples:
   # show atlantis help
-  {{ .ExecutableName }} help
+  {{ .executableName }} help
 {{- if .AllowPlan }}
 
   # run plan in the root directory passing the -target flag to terraform
-  {{ .ExecutableName }} plan -d . -- -target=resource
+  {{ .executableName }} plan -d . -- -target=resource
 {{- end }}
 {{- if .AllowApply }}
 
   # apply all unapplied plans from this pull request
-  {{ .ExecutableName }} apply
+  {{ .executableName }} apply
 
   # apply the plan for the root directory and staging workspace
-  {{ .ExecutableName }} apply -d . -w staging
+  {{ .executableName }} apply -d . -w staging
 {{- end }}
 
 Commands:
@@ -491,7 +491,7 @@ Commands:
 Flags:
   -h, --help   help for atlantis
 
-Use "{{ .ExecutableName }} [command] --help" for more information about a command.` +
+Use "{{ .executableName }} [command] --help" for more information about a command.` +
 	"\n```"
 
 // DidYouMeanAtlantisComment is the comment we add to the pull request when

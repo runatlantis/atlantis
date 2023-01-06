@@ -57,7 +57,7 @@ func TestRenderErr(t *testing.T) {
 		},
 	}
 
-	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "")
 	for _, c := range cases {
 		res := command.Result{
 			Error: c.Error,
@@ -102,7 +102,7 @@ func TestRenderFailure(t *testing.T) {
 		},
 	}
 
-	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "")
 	for _, c := range cases {
 		res := command.Result{
 			Failure: c.Failure,
@@ -121,7 +121,7 @@ func TestRenderFailure(t *testing.T) {
 }
 
 func TestRenderErrAndFailure(t *testing.T) {
-	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "")
 	res := command.Result{
 		Error:   errors.New("error"),
 		Failure: "failure",
@@ -791,7 +791,7 @@ $$$
 		},
 	}
 
-	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "")
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -942,13 +942,13 @@ $$$
 `,
 		},
 	}
-	r := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		true,  // DisableApplyAll
-		false, // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
+	r := events.NewMarkdownRenderer(
+		false, // gitlabSupportsCommonMark
+		true,  // disableApplyAll
+		false, // disableApply
+		false, // disableMarkdownFolding
+		false, // disableRepoLocking
+		false, // enableDiffMarkdownFormat
 		"",    // MarkdownTemplateOverridesDir
 	)
 	for _, c := range cases {
@@ -1094,13 +1094,13 @@ $$$
 		},
 	}
 
-	r := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		true,  // DisableApplyAll
-		true,  // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
+	r := events.NewMarkdownRenderer(
+		false, // gitlabSupportsCommonMark
+		true,  // disableApplyAll
+		true,  // disableApply
+		false, // disableMarkdownFolding
+		false, // disableRepoLocking
+		false, // enableDiffMarkdownFormat
 		"",    // MarkdownTemplateOverridesDir
 	)
 	for _, c := range cases {
@@ -1131,13 +1131,13 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 	Ok(t, err)
 	err = os.WriteFile(filePath, []byte("{{ define \"policyCheckSuccessUnwrapped\" -}}somecustometext{{- end}}\n"), 0600)
 	Ok(t, err)
-	r := events.GetMarkdownRenderer(
-		false,  // GitlabSupportsCommonMark
-		true,   // DisableApplyAll
-		true,   // DisableApply
-		false,  // DisableMarkdownFolding
-		false,  // DisableRepoLocking
-		false,  // EnableDiffMarkdownFormat
+	r := events.NewMarkdownRenderer(
+		false,  // gitlabSupportsCommonMark
+		true,   // disableApplyAll
+		true,   // disableApply
+		false,  // disableMarkdownFolding
+		false,  // disableRepoLocking
+		false,  // enableDiffMarkdownFormat
 		tmpDir, // MarkdownTemplateOverridesDir
 	)
 
@@ -1162,13 +1162,13 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 
 // Test that if folding is disabled that it's not used.
 func TestRenderProjectResults_DisableFolding(t *testing.T) {
-	mr := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		false, // DisableApplyAll
-		false, // DisableApply
-		true,  // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
+	mr := events.NewMarkdownRenderer(
+		false, // gitlabSupportsCommonMark
+		false, // disableApplyAll
+		false, // disableApply
+		true,  // disableMarkdownFolding
+		false, // disableRepoLocking
+		false, // enableDiffMarkdownFormat
 		"",    // MarkdownTemplateOverridesDir
 	)
 
@@ -1252,13 +1252,13 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("%s_%v", c.VCSHost.String(), c.ShouldWrap),
 			func(t *testing.T) {
-				mr := events.GetMarkdownRenderer(
-					c.GitlabCommonMarkSupport, // GitlabSupportsCommonMark
-					false,                     // DisableApplyAll
-					false,                     // DisableApply
-					false,                     // DisableMarkdownFolding
-					false,                     // DisableRepoLocking
-					false,                     // EnableDiffMarkdownFormat
+				mr := events.NewMarkdownRenderer(
+					c.GitlabCommonMarkSupport, // gitlabSupportsCommonMark
+					false,                     // disableApplyAll
+					false,                     // disableApply
+					false,                     // disableMarkdownFolding
+					false,                     // disableRepoLocking
+					false,                     // enableDiffMarkdownFormat
 					"",                        // MarkdownTemplateOverridesDir
 				)
 
@@ -1370,13 +1370,13 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 		for _, cmd := range []command.Name{command.Plan, command.Apply} {
 			t.Run(fmt.Sprintf("%s_%s_%v", c.VCSHost.String(), cmd.String(), c.ShouldWrap),
 				func(t *testing.T) {
-					mr := events.GetMarkdownRenderer(
-						c.GitlabCommonMarkSupport, // GitlabSupportsCommonMark
-						false,                     // DisableApplyAll
-						false,                     // DisableApply
-						false,                     // DisableMarkdownFolding
-						false,                     // DisableRepoLocking
-						false,                     // EnableDiffMarkdownFormat
+					mr := events.NewMarkdownRenderer(
+						c.GitlabCommonMarkSupport, // gitlabSupportsCommonMark
+						false,                     // disableApplyAll
+						false,                     // disableApply
+						false,                     // disableMarkdownFolding
+						false,                     // disableRepoLocking
+						false,                     // enableDiffMarkdownFormat
 						"",                        // MarkdownTemplateOverridesDir
 					)
 					var pr command.ProjectResult
@@ -1481,13 +1481,13 @@ $$$
 }
 
 func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
-	mr := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		false, // DisableApplyAll
-		false, // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
+	mr := events.NewMarkdownRenderer(
+		false, // gitlabSupportsCommonMark
+		false, // disableApplyAll
+		false, // disableApply
+		false, // disableMarkdownFolding
+		false, // disableRepoLocking
+		false, // enableDiffMarkdownFormat
 		"",    // MarkdownTemplateOverridesDir
 	)
 	tfOut := strings.Repeat("line\n", 13)
@@ -1535,13 +1535,13 @@ $$$
 }
 
 func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
-	mr := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		false, // DisableApplyAll
-		false, // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
+	mr := events.NewMarkdownRenderer(
+		false, // gitlabSupportsCommonMark
+		false, // disableApplyAll
+		false, // disableApply
+		false, // disableMarkdownFolding
+		false, // disableRepoLocking
+		false, // enableDiffMarkdownFormat
 		"",    // MarkdownTemplateOverridesDir
 	)
 	tfOut := strings.Repeat("line\n", 13) + "Plan: 1 to add, 0 to change, 0 to destroy."
@@ -1716,13 +1716,13 @@ This plan was not saved because one or more projects failed and automerge requir
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			mr := events.GetMarkdownRenderer(
-				false, // GitlabSupportsCommonMark
-				false, // DisableApplyAll
-				false, // DisableApply
-				false, // DisableMarkdownFolding
-				false, // DisableRepoLocking
-				false, // EnableDiffMarkdownFormat
+			mr := events.NewMarkdownRenderer(
+				false, // gitlabSupportsCommonMark
+				false, // disableApplyAll
+				false, // disableApply
+				false, // disableMarkdownFolding
+				false, // disableRepoLocking
+				false, // enableDiffMarkdownFormat
 				"",    // MarkdownTemplateOverridesDir
 			)
 			rendered := mr.Render(c.cr, command.Plan, "log", false, models.Github)
@@ -2184,16 +2184,16 @@ $$$
 		},
 	}
 
-	r := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		false, // DisableApplyAll
-		false, // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
+	r := events.NewMarkdownRenderer(
+		false, // gitlabSupportsCommonMark
+		false, // disableApplyAll
+		false, // disableApply
+		false, // disableMarkdownFolding
+		false, // disableRepoLocking
+		false, // enableDiffMarkdownFormat
 		"",    // MarkdownTemplateOverridesDir
 	)
-	r.DisableRepoLocking = true
+	r.disableRepoLocking = true
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -2623,13 +2623,13 @@ Plan: 1 to add, 2 to change, 1 to destroy.
 }
 
 func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
-	r := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		true,  // DisableApplyAll
-		true,  // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		true,  // EnableDiffMarkdownFormat
+	r := events.NewMarkdownRenderer(
+		false, // gitlabSupportsCommonMark
+		true,  // disableApplyAll
+		true,  // disableApply
+		false, // disableMarkdownFolding
+		false, // disableRepoLocking
+		true,  // enableDiffMarkdownFormat
 		"",    // MarkdownTemplateOverridesDir
 	)
 
@@ -2658,13 +2658,13 @@ var Render string
 func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 	var render string
 
-	r := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		true,  // DisableApplyAll
-		true,  // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		true,  // EnableDiffMarkdownFormat
+	r := events.NewMarkdownRenderer(
+		false, // gitlabSupportsCommonMark
+		true,  // disableApplyAll
+		true,  // disableApply
+		false, // disableMarkdownFolding
+		false, // disableRepoLocking
+		true,  // enableDiffMarkdownFormat
 		"",    // MarkdownTemplateOverridesDir
 	)
 

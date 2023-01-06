@@ -90,7 +90,7 @@ func TestGitHubWorkflow(t *testing.T) {
 		ModifiedFiles []string
 		// Comments are what our mock user writes to the pull request.
 		Comments []string
-		// DisableApply flag used by userConfig object when initializing atlantis server.
+		// disableApply flag used by userConfig object when initializing atlantis server.
 		DisableApply bool
 		// ApplyLock creates an apply lock that temporarily disables apply command
 		ApplyLock bool
@@ -1157,7 +1157,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	pullUpdater := &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            e2eVCSClient,
-		MarkdownRenderer:     events.GetMarkdownRenderer(false, false, false, false, false, false, ""),
+		MarkdownRenderer:     events.NewMarkdownRenderer(false, false, false, false, false, false, ""),
 	}
 
 	autoMerger := &events.AutoMerger{

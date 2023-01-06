@@ -42,18 +42,18 @@ var (
 	templatesFS embed.FS
 )
 
-// MarkdownRenderer renders responses as markdown.
-type MarkdownRenderer struct {
-	// GitlabSupportsCommonMark is true if the version of GitLab we're
+// markdownRenderer renders responses as markdown.
+type markdownRenderer struct {
+	// gitlabSupportsCommonMark is true if the version of GitLab we're
 	// using supports the CommonMark markdown format.
 	// If we're not configured with a GitLab client, this will be false.
-	GitlabSupportsCommonMark bool
-	DisableApplyAll          bool
-	DisableApply             bool
-	DisableMarkdownFolding   bool
-	DisableRepoLocking       bool
-	EnableDiffMarkdownFormat bool
-	MarkdownTemplates        *template.Template
+	gitlabSupportsCommonMark bool
+	disableApplyAll          bool
+	disableApply             bool
+	disableMarkdownFolding   bool
+	disableRepoLocking       bool
+	enableDiffMarkdownFormat bool
+	markdownTemplates        *template.Template
 }
 
 // commonData is data that all responses have.
@@ -108,48 +108,48 @@ type projectResultTmplData struct {
 }
 
 // Initialize templates
-func GetMarkdownRenderer(
-	GitlabSupportsCommonMark bool,
-	DisableApplyAll bool,
-	DisableApply bool,
-	DisableMarkdownFolding bool,
-	DisableRepoLocking bool,
-	EnableDiffMarkdownFormat bool,
-	MarkdownTemplateOverridesDir string,
-) *MarkdownRenderer {
+func NewMarkdownRenderer(
+	gitlabSupportsCommonMark bool,
+	disableApplyAll bool,
+	disableApply bool,
+	disableMarkdownFolding bool,
+	disableRepoLocking bool,
+	enableDiffMarkdownFormat bool,
+	markdownTemplateOverridesDir string,
+) *markdownRenderer {
 	var templates *template.Template
 	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
-	if overrides, err := templates.ParseGlob(fmt.Sprintf("%s/*.tmpl", MarkdownTemplateOverridesDir)); err == nil {
+	if overrides, err := templates.ParseGlob(fmt.Sprintf("%s/*.tmpl", markdownTemplateOverridesDir)); err == nil {
 		// doesn't override if templates directory doesn't exist
 		templates = overrides
 	}
-	return &MarkdownRenderer{
-		GitlabSupportsCommonMark: GitlabSupportsCommonMark,
-		DisableApplyAll:          DisableApplyAll,
-		DisableMarkdownFolding:   DisableMarkdownFolding,
-		DisableApply:             DisableApply,
-		DisableRepoLocking:       DisableRepoLocking,
-		EnableDiffMarkdownFormat: EnableDiffMarkdownFormat,
-		MarkdownTemplates:        templates,
+	return &markdownRenderer{
+		gitlabSupportsCommonMark: gitlabSupportsCommonMark,
+		disableApplyAll:          disableApplyAll,
+		disableMarkdownFolding:   disableMarkdownFolding,
+		disableApply:             disableApply,
+		disableRepoLocking:       disableRepoLocking,
+		enableDiffMarkdownFormat: enableDiffMarkdownFormat,
+		markdownTemplates:        templates,
 	}
 }
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType) string {
+func (m *markdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType) string {
 	commandStr := cases.Title(language.English).String(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{
 		Command:                  commandStr,
 		Verbose:                  verbose,
 		Log:                      log,
 		PlansDeleted:             res.PlansDeleted,
-		DisableApplyAll:          m.DisableApplyAll || m.DisableApply,
-		DisableApply:             m.DisableApply,
-		DisableRepoLocking:       m.DisableRepoLocking,
-		EnableDiffMarkdownFormat: m.EnableDiffMarkdownFormat,
+		DisableApplyAll:          m.disableApplyAll || m.disableApply,
+		DisableApply:             m.disableApply,
+		DisableRepoLocking:       m.disableRepoLocking,
+		EnableDiffMarkdownFormat: m.enableDiffMarkdownFormat,
 	}
 
-	templates := m.MarkdownTemplates
+	templates := m.markdownTemplates
 
 	if res.Error != nil {
 		return m.renderTemplate(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), common})
@@ -160,13 +160,13 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log 
 	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
 }
 
-func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult, common commonData, vcsHost models.VCSHostType) string {
+func (m *markdownRenderer) renderProjectResults(results []command.ProjectResult, common commonData, vcsHost models.VCSHostType) string {
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 	numPolicyCheckSuccesses := 0
 	numVersionSuccesses := 0
 
-	templates := m.MarkdownTemplates
+	templates := m.markdownTemplates
 
 	for _, result := range results {
 		resultData := projectResultTmplData{
@@ -272,8 +272,8 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 // templates that collapse the output to make the comment smaller on initial
 // load. Some VCS providers or versions of VCS providers don't support this
 // syntax.
-func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, output string) bool {
-	if m.DisableMarkdownFolding {
+func (m *markdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, output string) bool {
+	if m.disableMarkdownFolding {
 		return false
 	}
 
@@ -282,14 +282,14 @@ func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, outp
 		return false
 	}
 
-	if vcsHost == models.Gitlab && !m.GitlabSupportsCommonMark {
+	if vcsHost == models.Gitlab && !m.gitlabSupportsCommonMark {
 		return false
 	}
 
 	return strings.Count(output, "\n") > maxUnwrappedLines
 }
 
-func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
+func (m *markdownRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
 	buf := &bytes.Buffer{}
 	if err := tmpl.Execute(buf, data); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)

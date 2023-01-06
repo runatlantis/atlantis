@@ -31,13 +31,13 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			ExpComment:     "**Error:** Running `atlantis apply` is disabled.",
 		},
 		{
-			Description:    "When no global apply lock is present and DisableApply flag is false IsDisabled returns false",
+			Description:    "When no global apply lock is present and disableApply flag is false IsDisabled returns false",
 			ApplyLocked:    false,
 			ApplyLockError: nil,
 			ExpComment:     "Ran Apply for 0 projects:\n\n\n\n",
 		},
 		{
-			Description:    "If ApplyLockChecker returns an error IsDisabled return value of DisableApply flag",
+			Description:    "If ApplyLockChecker returns an error IsDisabled return value of disableApply flag",
 			ApplyLockError: errors.New("error"),
 			ApplyLocked:    false,
 			ExpComment:     "Ran Apply for 0 projects:\n\n\n\n",
