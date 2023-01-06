@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/alicebob/miniredis/v2 v2.23.1
+	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.1.0
 	github.com/briandowns/spinner v1.20.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
