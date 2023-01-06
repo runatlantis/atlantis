@@ -539,7 +539,7 @@ Once you're done, see [Next Steps](#next-steps).
 ### Google Compute Engine (CCE)
 It's also possible to run Atlantis on Google Compute Engine.
 
-There's a Terraform module available that runs Atlantis as a Docker container on a Compute Engine VM.
+There's a Terraform module available that deploys Atlantis as a Docker container on a managed Compute Engine instance.
 
 The Terraform module features creation of a Cloud load balancer, Container-Optimized OS based VM, a persistent data disk and a managed instance group: [https://github.com/bschaatsbergen/terraform-gce-atlantis](https://github.com/bschaatsbergen/terraform-gce-atlantis).
 
