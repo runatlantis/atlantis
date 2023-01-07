@@ -29,5 +29,5 @@ jobs:
     runs-on: ubuntu-22.04
     container: ghcr.io/runatlantis/testing-env:2023.01.04
     steps:
-      - uses: actions/checkout@v3.3.0
+      - uses: actions/checkout@v3
       - run: make test-all
