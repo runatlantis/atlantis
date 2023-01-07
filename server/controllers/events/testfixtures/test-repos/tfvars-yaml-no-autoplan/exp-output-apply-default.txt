@@ -10,6 +10,4 @@ Outputs:
 
 var = "default"
 workspace = "default"
-
 ```
-

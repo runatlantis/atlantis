@@ -1,13 +1,11 @@
 Ran Plan for dir: `.` workspace: `default`
 
 ```diff
-
 Changes to Outputs:
 + workspace = "default"
 
 You can apply this plan to save these new output values to the Terraform
 state, without changing any real infrastructure.
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:

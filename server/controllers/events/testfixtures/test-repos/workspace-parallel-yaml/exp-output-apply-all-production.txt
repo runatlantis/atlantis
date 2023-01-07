@@ -1,3 +1,9 @@
+Ran Apply for 2 projects:
+
+1. dir: `production` workspace: `production`
+1. dir: `staging` workspace: `staging`
+
+### 1. dir: `production` workspace: `production`
 ```diff
 null_resource.this: Creating...
 null_resource.this: Creation complete after *s [id=*******************]
@@ -7,7 +13,19 @@ Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 Outputs:
 
 workspace = "production"
+```
 
+---
+### 2. dir: `staging` workspace: `staging`
+```diff
+null_resource.this: Creating...
+null_resource.this: Creation complete after *s [id=*******************]
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+workspace = "staging"
 ```
 
 ---

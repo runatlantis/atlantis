@@ -4,10 +4,7 @@ Ran Plan for 2 projects:
 1. dir: `dir2` workspace: `default`
 
 ### 1. dir: `dir1` workspace: `default`
-<details><summary>Show Output</summary>
-
 ```diff
-
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
 + create
@@ -20,8 +17,6 @@ Terraform will perform the following actions:
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
-
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -29,15 +24,10 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * `atlantis plan -d dir1`
-</details>
-Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
 ### 2. dir: `dir2` workspace: `default`
-<details><summary>Show Output</summary>
-
 ```diff
-
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
 + create
@@ -50,8 +40,6 @@ Terraform will perform the following actions:
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
-
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -59,8 +47,6 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * `atlantis plan -d dir2`
-</details>
-Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:

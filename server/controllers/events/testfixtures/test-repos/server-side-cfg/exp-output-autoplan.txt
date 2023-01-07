@@ -27,7 +27,6 @@ Changes to Outputs:
 + workspace = "default"
 
 postplan custom
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -61,7 +60,6 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 Changes to Outputs:
 + workspace = "staging"
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:

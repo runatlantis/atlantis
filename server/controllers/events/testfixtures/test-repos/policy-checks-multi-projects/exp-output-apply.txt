@@ -13,7 +13,6 @@ Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 Outputs:
 
 workspace = "default"
-
 ```
 
 ---
@@ -21,4 +20,3 @@ workspace = "default"
 **Apply Failed**: All policies must pass for project before running apply.
 
 ---
-
