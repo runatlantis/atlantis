@@ -34,13 +34,13 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			Description:    "When no global apply lock is present and DisableApply flag is false IsDisabled returns false",
 			ApplyLocked:    false,
 			ApplyLockError: nil,
-			ExpComment:     "Ran Apply for 0 projects:\n\n\n\n",
+			ExpComment:     "Ran Apply for 0 projects:",
 		},
 		{
 			Description:    "If ApplyLockChecker returns an error IsDisabled return value of DisableApply flag",
 			ApplyLockError: errors.New("error"),
 			ApplyLocked:    false,
-			ExpComment:     "Ran Apply for 0 projects:\n\n\n\n",
+			ExpComment:     "Ran Apply for 0 projects:",
 		},
 	}
 

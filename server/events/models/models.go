@@ -398,7 +398,7 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
 
-	return formattedTerraformOutput
+	return strings.TrimSpace(formattedTerraformOutput)
 }
 
 // PolicyCheckSuccess is the result of a successful policy check run.
