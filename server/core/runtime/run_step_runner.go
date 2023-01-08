@@ -55,6 +55,7 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		"REPO_REL_DIR":               ctx.RepoRelDir,
 		"USER_NAME":                  ctx.User.Username,
 		"WORKSPACE":                  ctx.Workspace,
+		"TF_DATA_DIR":                fmt.Sprintf(".terraform-%s", ctx.Workspace),
 	}
 
 	finalEnvVars := baseEnvVars
