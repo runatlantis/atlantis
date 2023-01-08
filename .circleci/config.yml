@@ -31,7 +31,7 @@ jobs:
     - image: cimg/node:18.12.1
     environment:
       # renovate: datasource=github-releases depName=raviqqe/muffet
-      MUFFET_VERSION: 2.6.2
+      MUFFET_VERSION: 2.6.3
     steps:
     - checkout
     - run: |
