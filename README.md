@@ -1,5 +1,6 @@
 # Atlantis <!-- omit in toc -->
 
+[![Latest Release](https://img.shields.io/github/release/runatlantis/atlantis.svg)](https://github.com/runatlantis/atlantis/releases/latest)
 [![SuperDopeBadge](./runatlantis.io/.vuepress/public/hightower-super-dope.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
 [![Go Report Card](https://goreportcard.com/badge/github.com/runatlantis/atlantis)](https://goreportcard.com/report/github.com/runatlantis/atlantis)
 [![codecov](https://codecov.io/gh/runatlantis/atlantis/branch/main/graph/badge.svg)](https://codecov.io/gh/runatlantis/atlantis)
