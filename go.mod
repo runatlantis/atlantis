@@ -29,7 +29,6 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/moby v20.10.22+incompatible
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
-	github.com/otiai10/copy v1.9.0
 	github.com/petergtz/pegomock v2.9.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/remeh/sizedwaitgroup v1.0.0

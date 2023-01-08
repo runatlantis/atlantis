@@ -26,7 +26,7 @@ type ImportCommandRunner struct {
 	prjCmdRunner         ProjectImportCommandRunner
 }
 
-func (v *ImportCommandRunner) Run(ctx *command.Context, cmd *CommentCommand, repoDir string) {
+func (v *ImportCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	var err error
 	// Get the mergeable status before we set any build statuses of our own.
 	// We do this here because when we set a "Pending" status, if users have
@@ -43,7 +43,7 @@ func (v *ImportCommandRunner) Run(ctx *command.Context, cmd *CommentCommand, rep
 	}
 
 	var projectCmds []command.ProjectContext
-	projectCmds, err = v.prjCmdBuilder.BuildImportCommands(ctx, cmd, repoDir)
+	projectCmds, err = v.prjCmdBuilder.BuildImportCommands(ctx, cmd)
 	if err != nil {
 		ctx.Log.Warn("Error %s", err)
 	}

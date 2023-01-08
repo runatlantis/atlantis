@@ -62,7 +62,7 @@ type ApplyCommandRunner struct {
 	silenceVCSStatusNoProjects bool
 }
 
-func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand, repoDir string) {
+func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull

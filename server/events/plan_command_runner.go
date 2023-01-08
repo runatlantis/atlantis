@@ -75,11 +75,11 @@ type PlanCommandRunner struct {
 	DiscardApprovalOnPlan bool
 }
 
-func (p *PlanCommandRunner) runAutoplan(ctx *command.Context, repoDir string) {
+func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx, repoDir)
+	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
@@ -163,7 +163,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context, repoDir string) {
 	}
 }
 
-func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand, repoDir string) {
+func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
@@ -178,7 +178,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand, repoD
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
-	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd, repoDir)
+	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
 	if err != nil {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
@@ -251,11 +251,11 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand, repoD
 	}
 }
 
-func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand, repoDir string) {
+func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if ctx.Trigger == command.AutoTrigger {
-		p.runAutoplan(ctx, repoDir)
+		p.runAutoplan(ctx)
 	} else {
-		p.run(ctx, cmd, repoDir)
+		p.run(ctx, cmd)
 	}
 }
 

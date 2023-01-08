@@ -72,7 +72,7 @@ type GitlabMergeRequestGetter interface {
 
 // CommentCommandRunner runs individual command workflows.
 type CommentCommandRunner interface {
-	Run(*command.Context, *CommentCommand, string)
+	Run(*command.Context, *CommentCommand)
 }
 
 func buildCommentCommandRunner(
@@ -123,8 +123,6 @@ type DefaultCommandRunner struct {
 	PullStatusFetcher              PullStatusFetcher
 	TeamAllowlistChecker           *TeamAllowlistChecker
 	VarFileAllowlistChecker        *VarFileAllowlistChecker
-	WorkingDir                     WorkingDir
-	WorkingDirLocker               WorkingDirLocker
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -165,27 +163,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	// Need to lock the workspace we're about to clone to.
-	workspace := DefaultWorkspace
-
-	unlockFn, err := c.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
-	if err != nil {
-		ctx.Log.Warn("workspace was locked")
-		return
-	}
-	ctx.Log.Debug("got workspace lock")
-	defer unlockFn()
-
-	_, _, err = c.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull)
-	if err != nil {
-		return
-	}
-	repoDir, err := c.WorkingDir.CreateWorkspaceDirectory(workspace, ctx.Pull)
-	if err != nil {
-		return
-	}
-
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, nil, repoDir)
+	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, nil)
 
 	if err != nil {
 		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
@@ -193,9 +171,9 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	autoPlanRunner := buildCommentCommandRunner(c, command.Plan)
 
-	autoPlanRunner.Run(ctx, nil, repoDir)
+	autoPlanRunner.Run(ctx, nil)
 
-	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, nil, repoDir)
+	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, nil)
 
 	if err != nil {
 		ctx.Log.Err("Error running post-workflow hooks %s.", err)
@@ -307,27 +285,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	// Need to lock the workspace we're about to clone to.
-	workspace := DefaultWorkspace
-
-	unlockFn, err := c.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
-	if err != nil {
-		ctx.Log.Warn("workspace was locked")
-		return
-	}
-	ctx.Log.Debug("got workspace lock")
-	defer unlockFn()
-
-	_, _, err = c.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull)
-	if err != nil {
-		return
-	}
-	repoDir, err := c.WorkingDir.CreateWorkspaceDirectory(workspace, ctx.Pull)
-	if err != nil {
-		return
-	}
-
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd, repoDir)
+	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
 		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, cmd.Name.String())
@@ -335,9 +293,9 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
 
-	cmdRunner.Run(ctx, cmd, repoDir)
+	cmdRunner.Run(ctx, cmd)
 
-	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd, repoDir)
+	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd)
 
 	if err != nil {
 		ctx.Log.Err("Error running post-workflow hooks %s.", err)

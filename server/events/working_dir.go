@@ -25,8 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-
-	cp "github.com/otiai10/copy"
 )
 
 const workingDirPrefix = "repos"
@@ -42,7 +40,7 @@ type WorkingDir interface {
 	// absolute path to the root of the cloned repo. It also returns
 	// a boolean indicating if we should warn users that the branch we're
 	// merging into has been updated since we cloned it.
-	Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest) (string, bool, error)
+	Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
@@ -51,7 +49,6 @@ type WorkingDir interface {
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
 	DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error
-	CreateWorkspaceDirectory(workspace string, p models.PullRequest) (string, error)
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -83,8 +80,12 @@ type FileWorkspace struct {
 // If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
-func (w *FileWorkspace) Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest) (string, bool, error) {
-	cloneDir := w.cloneDir(p.BaseRepo, p, ".atlantis-reserved-workspace")
+func (w *FileWorkspace) Clone(
+	log logging.SimpleLogging,
+	headRepo models.Repo,
+	p models.PullRequest,
+	workspace string) (string, bool, error) {
+	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
 
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
@@ -122,18 +123,6 @@ func (w *FileWorkspace) Clone(log logging.SimpleLogging, headRepo models.Repo, p
 
 	// Otherwise we clone the repo.
 	return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
-}
-
-func (w *FileWorkspace) CreateWorkspaceDirectory(workspace string, p models.PullRequest) (string, error) {
-	srcDir := w.cloneDir(p.BaseRepo, p, ".atlantis-reserved-workspace")
-	dstDir := w.cloneDir(p.BaseRepo, p, workspace)
-
-	err := cp.Copy(srcDir, dstDir)
-	if err != nil {
-		return "", err
-	}
-
-	return dstDir, nil
 }
 
 // warnDiverged returns true if we should warn the user that the branch we're
