@@ -49,6 +49,7 @@ var commandTemplate = `
 | **Command Name**  |  **Status** |  
 | - | - |
 | %s  | {%s}  | 
+
 :information_source: Visit the checkrun for the root in the navigation panel on your left to view logs and details on the operation. 
 
 `
@@ -57,6 +58,9 @@ var commandTemplateWithCount = `
 | **Command Name** | **Num Total** | **Num Success** | **Status** |  
 | - | - | - | - |
 | %s | {%s} | {%s} | {%s} |  
+
+:information_source: Visit the checkrun for the root in the navigation panel on your left to view logs and details on the operation. 
+
 `
 
 // github checks conclusion
