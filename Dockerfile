@@ -1,5 +1,5 @@
 ARG ATLANTIS_BASE=ghcr.io/runatlantis/atlantis-base
-ARG ATLANTIS_BASE_TAG_DATE=2022.12.29
+ARG ATLANTIS_BASE_TAG_DATE=latest
 ARG ATLANTIS_BASE_TAG_TYPE=alpine
 
 # Stage 1: build artifact
@@ -25,7 +25,7 @@ ENV DEFAULT_TERRAFORM_VERSION=1.3.7
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN AVAILABLE_TERRAFORM_VERSIONS="1.0.11 1.1.9 1.2.9 ${DEFAULT_TERRAFORM_VERSION}" && \
+RUN AVAILABLE_TERRAFORM_VERSIONS="${DEFAULT_TERRAFORM_VERSION}" && \
     case "${TARGETPLATFORM}" in \
         "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
         "linux/arm64") TERRAFORM_ARCH=arm64 ;; \
