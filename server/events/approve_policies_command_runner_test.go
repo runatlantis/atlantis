@@ -25,12 +25,12 @@ func TestApproveCommandRunner_IsOwner(t *testing.T) {
 		{
 			Description: "When user is not an owner, approval fails",
 			OwnerUsers:  []string{},
-			ExpComment:  "**Approve Policies Error**\n```\ncontact policy owners to approve failing policies\n```\n",
+			ExpComment:  "**Approve Policies Error**\n```\ncontact policy owners to approve failing policies\n```",
 		},
 		{
 			Description: "When user is an owner, approval succeeds",
 			OwnerUsers:  []string{fixtures.User.Username},
-			ExpComment:  "Approved Policies for 1 projects:\n\n1. dir: `` workspace: ``\n\n\n",
+			ExpComment:  "Approved Policies for 1 projects:\n\n1. dir: `` workspace: ``",
 		},
 	}
 
