@@ -64,20 +64,20 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     # Publish dev image to container registry
-    - name: Build and push atlantis:dev${{ env.IMAGE_SUFFIX }} image
-      if: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) }}
-      uses: docker/build-push-action@v3
-      with:
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        context: .
-        build-args: ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
-        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: |
-          ghcr.io/${{ github.repository_owner }}/atlantis:dev${{ env.IMAGE_SUFFIX }}
-          ghcr.io/${{ github.repository_owner }}/atlantis:dev-${{ matrix.image_type }}
-        labels: ${{ steps.meta.outputs.labels }}
+    # - name: Build and push atlantis:dev${{ env.IMAGE_SUFFIX }} image
+    #   if: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) }}
+    #   uses: docker/build-push-action@v3
+    #   with:
+    #     cache-from: type=gha
+    #     cache-to: type=gha,mode=max
+    #     context: .
+    #     build-args: ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+    #     platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+    #     push: ${{ github.event_name != 'pull_request' }}
+    #     tags: |
+    #       ghcr.io/${{ github.repository_owner }}/atlantis:dev${{ env.IMAGE_SUFFIX }}
+    #       ghcr.io/${{ github.repository_owner }}/atlantis:dev-${{ matrix.image_type }}
+    #     labels: ${{ steps.meta.outputs.labels }}
 
     # Publish release to container registry
     - name: Populate release version
