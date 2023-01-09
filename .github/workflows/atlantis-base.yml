@@ -12,9 +12,6 @@ on:
       - 'docker-base/Dockerfile.*'
       - '.github/workflows/atlantis-base.yml'
   workflow_dispatch:
-  schedule:
-    # At 00:00 on every Monday
-    - cron: '0 0 * * 1'
 
 defaults:
   run:
