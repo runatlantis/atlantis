@@ -100,7 +100,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		postWh.GlobalCfg = globalCfg
 
 		When(postWhWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
-		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
+		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull)).ThenReturn(repoDir, false, nil)
 		When(whPostWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, runtimeDesc, nil)
 
 		err := postWh.RunPostHooks(ctx, nil)
@@ -136,7 +136,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		whPostWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
 		postWhWorkingDirLocker.VerifyWasCalled(Never()).TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, "path")
-		postWhWorkingDir.VerifyWasCalled(Never()).Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)
+		postWhWorkingDir.VerifyWasCalled(Never()).Clone(log, fixtures.GithubRepo, newPull)
 	})
 	t.Run("error locking work dir", func(t *testing.T) {
 		postWorkflowHooksSetup(t)
@@ -159,7 +159,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		err := postWh.RunPostHooks(ctx, nil)
 
 		Assert(t, err != nil, "error not nil")
-		postWhWorkingDir.VerifyWasCalled(Never()).Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)
+		postWhWorkingDir.VerifyWasCalled(Never()).Clone(log, fixtures.GithubRepo, newPull)
 		whPostWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
 	})
 
@@ -185,7 +185,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		postWh.GlobalCfg = globalCfg
 
 		When(postWhWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
-		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, errors.New("some error"))
+		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull)).ThenReturn(repoDir, false, errors.New("some error"))
 
 		err := postWh.RunPostHooks(ctx, nil)
 
@@ -217,7 +217,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		postWh.GlobalCfg = globalCfg
 
 		When(postWhWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
-		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
+		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull)).ThenReturn(repoDir, false, nil)
 		When(whPostWorkflowHookRunner.Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))).ThenReturn(result, runtimeDesc, errors.New("some error"))
 
 		err := postWh.RunPostHooks(ctx, nil)
@@ -255,7 +255,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		postWh.GlobalCfg = globalCfg
 
 		When(postWhWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
-		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
+		When(postWhWorkingDir.Clone(log, fixtures.GithubRepo, newPull)).ThenReturn(repoDir, false, nil)
 		When(whPostWorkflowHookRunner.Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
 		err := postWh.RunPostHooks(ctx, cmd)

@@ -66,7 +66,6 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		matchers.AnyLoggingSimpleLogging(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		AnyString(),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
 		matchers.AnyLoggingSimpleLogging(),
@@ -248,7 +247,7 @@ func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 		WorkingDir: mockWorkingDir,
 	}
 	ctx := command.ProjectContext{}
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn("", os.ErrNotExist)
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull)).ThenReturn("", os.ErrNotExist)
 
 	res := runner.Apply(ctx)
 	ErrEquals(t, "project has not been cloned–did you run plan?", res.Error)
@@ -269,7 +268,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 		ApplyRequirements: []string{"approved"},
 	}
 	tmp := t.TempDir()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Pull request must be approved by at least one person other than the author before running apply.", res.Failure)
@@ -293,7 +292,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 		ApplyRequirements: []string{"mergeable"},
 	}
 	tmp := t.TempDir()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Pull request must be mergeable before running apply.", res.Failure)
@@ -316,7 +315,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 		ApplyRequirements: []string{"undiverged"},
 	}
 	tmp := t.TempDir()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull)).ThenReturn(tmp, nil)
 	When(mockWorkingDir.HasDiverged(log, tmp)).ThenReturn(true)
 
 	res := runner.Apply(ctx)
@@ -434,7 +433,6 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			When(mockWorkingDir.GetWorkingDir(
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
-				AnyString(),
 			)).ThenReturn(repoDir, nil)
 
 			ctx := command.ProjectContext{
@@ -505,7 +503,6 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	When(mockWorkingDir.GetWorkingDir(
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		AnyString(),
 	)).ThenReturn(repoDir, nil)
 
 	ctx := command.ProjectContext{
@@ -562,7 +559,6 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		matchers.AnyLoggingSimpleLogging(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		AnyString(),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
 		matchers.AnyLoggingSimpleLogging(),
@@ -715,7 +711,6 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 				matchers.AnyLoggingSimpleLogging(),
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
-				AnyString(),
 			)).ThenReturn(repoDir, false, nil)
 			if c.setup != nil {
 				c.setup(repoDir, ctx, mockLocker, mockInit, mockImport)
