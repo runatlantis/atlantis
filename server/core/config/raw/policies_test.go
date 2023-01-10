@@ -180,6 +180,9 @@ func TestPolicySets_ToValid(t *testing.T) {
 					Users: []string{
 						"test",
 					},
+					Teams: []string{
+						"testteam",
+					},
 				},
 				PolicySets: []raw.PolicySet{
 					{
@@ -199,6 +202,7 @@ func TestPolicySets_ToValid(t *testing.T) {
 				Version: version,
 				Owners: valid.PolicyOwners{
 					Users: []string{"test"},
+					Teams: []string{"testteam"},
 				},
 				PolicySets: []valid.PolicySet{
 					{
