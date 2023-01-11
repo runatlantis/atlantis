@@ -3,8 +3,6 @@
 # and also because it kept breaking the build due to flakiness.
 FROM debian:bullseye-20221219-slim
 
-LABEL org.opencontainers.image.description "Terraform Pull Request Automation"
-
 # We use gosu to step down from root and run as the atlantis user so we need
 # to create that user and group.
 # We add the atlantis user to the root group and make its home directory
