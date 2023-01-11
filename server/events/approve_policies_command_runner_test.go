@@ -41,21 +41,21 @@ func TestApproveCommandRunner_IsOwner(t *testing.T) {
 			OwnerUsers:  []string{},
 			OwnerTeams:  []string{"SomeTeam"},
 			UserTeams:   []string{"SomeTeam"},
-			ExpComment:  "Approved Policies for 1 projects:\n\n1. dir: `` workspace: ``\n\n\n",
+			ExpComment:  "Approved Policies for 1 projects:\n\n1. dir: `` workspace: ``",
 		},
 		{
 			Description: "When user belongs to a team not configured as a owner, approval fails",
 			OwnerUsers:  []string{},
 			OwnerTeams:  []string{"SomeTeam"},
 			UserTeams:   []string{"SomeOtherTeam}"},
-			ExpComment:  "**Approve Policies Error**\n```\ncontact policy owners to approve failing policies\n```\n",
+			ExpComment:  "**Approve Policies Error**\n```\ncontact policy owners to approve failing policies\n```",
 		},
 		{
 			Description: "When user is an owner but not a team member, approval succeeds",
 			OwnerUsers:  []string{fixtures.User.Username},
 			OwnerTeams:  []string{"SomeTeam"},
 			UserTeams:   []string{"SomeOtherTeam"},
-			ExpComment:  "Approved Policies for 1 projects:\n\n1. dir: `` workspace: ``\n\n\n",
+			ExpComment:  "Approved Policies for 1 projects:\n\n1. dir: `` workspace: ``",
 		},
 	}
 
