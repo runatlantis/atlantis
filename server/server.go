@@ -567,6 +567,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
 		statsScope,
 		logger,
 		terraformClient,
