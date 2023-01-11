@@ -48,8 +48,8 @@ func TestPullRequestReviewWorkerProxy_HandleSuccessWithFailedPolicies(t *testing
 		CheckRunFetcher: mockFetcher,
 	}
 	prrEvent := event.PullRequestReview{
-		Action: event.Approved,
-		Repo:   models.Repo{FullName: repoFullName},
+		State: event.Approved,
+		Repo:  models.Repo{FullName: repoFullName},
 	}
 	err := proxy.Handle(context.Background(), prrEvent, buildRequest(t))
 	assert.NoError(t, err)
@@ -77,8 +77,8 @@ func TestPullRequestReviewWorkerProxy_HandleSuccessNoFailedPolicies(t *testing.T
 		CheckRunFetcher: mockFetcher,
 	}
 	prrEvent := event.PullRequestReview{
-		Action: event.Approved,
-		Repo:   models.Repo{FullName: repoFullName},
+		State: event.Approved,
+		Repo:  models.Repo{FullName: repoFullName},
 	}
 	err := proxy.Handle(context.Background(), prrEvent, buildRequest(t))
 	assert.NoError(t, err)
@@ -106,8 +106,8 @@ func TestPullRequestReviewWorkerProxy_AllocationError(t *testing.T) {
 		CheckRunFetcher: mockFetcher,
 	}
 	prrEvent := event.PullRequestReview{
-		Action: event.Approved,
-		Repo:   models.Repo{FullName: repoFullName},
+		State: event.Approved,
+		Repo:  models.Repo{FullName: repoFullName},
 	}
 	err := proxy.Handle(context.Background(), prrEvent, buildRequest(t))
 	assert.Error(t, err)
@@ -134,8 +134,8 @@ func TestPullRequestReviewWorkerProxy_AllocationFalse(t *testing.T) {
 		CheckRunFetcher: mockFetcher,
 	}
 	prrEvent := event.PullRequestReview{
-		Action: event.Approved,
-		Repo:   models.Repo{FullName: repoFullName},
+		State: event.Approved,
+		Repo:  models.Repo{FullName: repoFullName},
 	}
 	err := proxy.Handle(context.Background(), prrEvent, buildRequest(t))
 	assert.NoError(t, err)
@@ -163,8 +163,8 @@ func TestPullRequestReviewWorkerProxy_NotApprovalEvent(t *testing.T) {
 		CheckRunFetcher: mockFetcher,
 	}
 	prrEvent := event.PullRequestReview{
-		Action: "something else",
-		Repo:   models.Repo{FullName: repoFullName},
+		State: "something else",
+		Repo:  models.Repo{FullName: repoFullName},
 	}
 	err := proxy.Handle(context.Background(), prrEvent, buildRequest(t))
 	assert.NoError(t, err)
@@ -194,8 +194,8 @@ func TestPullRequestReviewWorkerProxy_FetcherError(t *testing.T) {
 		CheckRunFetcher: mockFetcher,
 	}
 	prrEvent := event.PullRequestReview{
-		Action: event.Approved,
-		Repo:   models.Repo{FullName: repoFullName},
+		State: event.Approved,
+		Repo:  models.Repo{FullName: repoFullName},
 	}
 	err := proxy.Handle(context.Background(), prrEvent, buildRequest(t))
 	assert.Error(t, err)
@@ -225,8 +225,8 @@ func TestPullRequestReviewWorkerProxy_SNSError(t *testing.T) {
 		CheckRunFetcher: mockFetcher,
 	}
 	prrEvent := event.PullRequestReview{
-		Action: event.Approved,
-		Repo:   models.Repo{FullName: repoFullName},
+		State: event.Approved,
+		Repo:  models.Repo{FullName: repoFullName},
 	}
 
 	err := proxy.Handle(context.Background(), prrEvent, buildRequest(t))

@@ -119,6 +119,7 @@ func NewHandler(
 		},
 		pullRequestReviewEventConverter: converter.PullRequestReviewEvent{
 			RepoConverter: repoConverter,
+			PullConverter: pullConverter,
 		},
 		checkRunEventConverter:   converter.CheckRunEvent{},
 		checkSuiteEventConverter: converter.CheckSuiteEvent{RepoConverter: repoConverter},
@@ -297,10 +298,11 @@ func (h *Handler) handleCheckSuiteEvent(ctx context.Context, e *github.CheckSuit
 func (h *Handler) handlePullRequestReviewEvent(ctx context.Context, e *github.PullRequestReviewEvent, r *http.BufferedRequest) error {
 	pullRequestReviewEvent, err := h.pullRequestReviewEventConverter.Convert(e)
 	if err != nil {
+		h.logger.ErrorContext(ctx, "error parsing prr event", map[string]interface{}{"err": err.Error()})
 		return &errors.EventParsingError{Err: err}
 	}
 	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, pullRequestReviewEvent.Repo.FullName)
-	ctx = context.WithValue(ctx, contextInternal.PullNumKey, pullRequestReviewEvent.PRNum)
+	ctx = context.WithValue(ctx, contextInternal.PullNumKey, pullRequestReviewEvent.Pull.Num)
 	ctx = context.WithValue(ctx, contextInternal.SHAKey, pullRequestReviewEvent.Ref)
 	return h.pullRequestReviewHandler.Handle(ctx, pullRequestReviewEvent, r)
 }

@@ -11,10 +11,10 @@ import (
 
 const (
 	CompletedStatus  = "completed"
-	FailedConclusion = "failed"
+	FailedConclusion = "failure"
 )
 
-var checkRunRegex = regexp.MustCompile("atlantis/policy_check: .*")
+var checkRunRegex = regexp.MustCompile("atlantis/policy_check.*")
 
 type CheckRunsFetcher struct {
 	ClientCreator githubapp.ClientCreator
