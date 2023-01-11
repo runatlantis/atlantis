@@ -33,13 +33,11 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		{
 			"root directory",
 			map[string]interface{}{
-				"default": map[string]interface{}{
-					"default.tfplan": nil,
-				},
+				"default.tfplan": nil,
 			},
 			[]events.PendingPlan{
 				{
-					RepoDir:    "???/default",
+					RepoDir:    "???",
 					RepoRelDir: ".",
 					Workspace:  "default",
 				},
@@ -48,13 +46,11 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		{
 			"root dir project plan",
 			map[string]interface{}{
-				"default": map[string]interface{}{
-					"projectname-default.tfplan": nil,
-				},
+				"projectname-default.tfplan": nil,
 			},
 			[]events.PendingPlan{
 				{
-					RepoDir:     "???/default",
+					RepoDir:     "???",
 					RepoRelDir:  ".",
 					Workspace:   "default",
 					ProjectName: "projectname",
@@ -64,13 +60,11 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		{
 			"root dir project plan with slashes",
 			map[string]interface{}{
-				"default": map[string]interface{}{
-					"project::name-default.tfplan": nil,
-				},
+				"project::name-default.tfplan": nil,
 			},
 			[]events.PendingPlan{
 				{
-					RepoDir:     "???/default",
+					RepoDir:     "???",
 					RepoRelDir:  ".",
 					Workspace:   "default",
 					ProjectName: "project/name",
@@ -80,23 +74,21 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		{
 			"multiple directories in single workspace",
 			map[string]interface{}{
-				"default": map[string]interface{}{
-					"dir1": map[string]interface{}{
-						"default.tfplan": nil,
-					},
-					"dir2": map[string]interface{}{
-						"default.tfplan": nil,
-					},
+				"dir1": map[string]interface{}{
+					"default.tfplan": nil,
+				},
+				"dir2": map[string]interface{}{
+					"default.tfplan": nil,
 				},
 			},
 			[]events.PendingPlan{
 				{
-					RepoDir:    "???/default",
+					RepoDir:    "???",
 					RepoRelDir: "dir1",
 					Workspace:  "default",
 				},
 				{
-					RepoDir:    "???/default",
+					RepoDir:    "???",
 					RepoRelDir: "dir2",
 					Workspace:  "default",
 				},
@@ -105,21 +97,19 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		{
 			"multiple directories nested within each other",
 			map[string]interface{}{
-				"default": map[string]interface{}{
-					"dir1": map[string]interface{}{
-						"default.tfplan": nil,
-					},
+				"dir1": map[string]interface{}{
 					"default.tfplan": nil,
 				},
+				"default.tfplan": nil,
 			},
 			[]events.PendingPlan{
 				{
-					RepoDir:    "???/default",
+					RepoDir:    "???",
 					RepoRelDir: ".",
 					Workspace:  "default",
 				},
 				{
-					RepoDir:    "???/default",
+					RepoDir:    "???",
 					RepoRelDir: "dir1",
 					Workspace:  "default",
 				},
@@ -128,29 +118,23 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		{
 			"multiple workspaces",
 			map[string]interface{}{
-				"default": map[string]interface{}{
-					"default.tfplan": nil,
-				},
-				"staging": map[string]interface{}{
-					"staging.tfplan": nil,
-				},
-				"production": map[string]interface{}{
-					"production.tfplan": nil,
-				},
+				"default.tfplan":    nil,
+				"staging.tfplan":    nil,
+				"production.tfplan": nil,
 			},
 			[]events.PendingPlan{
 				{
-					RepoDir:    "???/default",
+					RepoDir:    "???",
 					RepoRelDir: ".",
 					Workspace:  "default",
 				},
 				{
-					RepoDir:    "???/production",
+					RepoDir:    "???",
 					RepoRelDir: ".",
 					Workspace:  "production",
 				},
 				{
-					RepoDir:    "???/staging",
+					RepoDir:    "???",
 					RepoRelDir: ".",
 					Workspace:  "staging",
 				},
@@ -159,22 +143,20 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		{
 			".terragrunt-cache",
 			map[string]interface{}{
-				"default": map[string]interface{}{
-					".terragrunt-cache": map[string]interface{}{
-						"N6lY9xk7PivbOAzdsjDL6VUFVYk": map[string]interface{}{
-							"K4xpUZI6HgUF-ip6E1eib4L8mwQ": map[string]interface{}{
-								"app": map[string]interface{}{
-									"default.tfplan": nil,
-								},
+				".terragrunt-cache": map[string]interface{}{
+					"N6lY9xk7PivbOAzdsjDL6VUFVYk": map[string]interface{}{
+						"K4xpUZI6HgUF-ip6E1eib4L8mwQ": map[string]interface{}{
+							"app": map[string]interface{}{
+								"default.tfplan": nil,
 							},
 						},
 					},
-					"default.tfplan": nil,
 				},
+				"default.tfplan": nil,
 			},
 			[]events.PendingPlan{
 				{
-					RepoDir:    "???/default",
+					RepoDir:    "???",
 					RepoRelDir: ".",
 					Workspace:  "default",
 				},
@@ -187,13 +169,7 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		t.Run(c.description, func(t *testing.T) {
 			tmpDir := DirStructure(t, c.files)
 
-			// Create a git repo in each workspace directory.
-			for dirname, contents := range c.files {
-				// If contents is nil then this isn't a directory.
-				if contents != nil {
-					runCmd(t, filepath.Join(tmpDir, dirname), "git", "init")
-				}
-			}
+			runCmd(t, tmpDir, "git", "init")
 
 			actPlans, err := pf.Find(tmpDir)
 			Ok(t, err)
@@ -260,8 +236,8 @@ func TestPendingPlanFinder_DeletePlans(t *testing.T) {
 
 	// First, check the files were deleted.
 	for _, plan := range []string{
-		"default/dir1/default.tfplan",
-		"default/dir2/default.tfplan",
+		"dir1/default.tfplan",
+		"dir2/default.tfplan",
 	} {
 		absPath := filepath.Join(tmp, plan)
 		_, err := os.Stat(absPath)
