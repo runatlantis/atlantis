@@ -2,9 +2,8 @@
 package matchers
 
 import (
-	"reflect"
-
 	"github.com/petergtz/pegomock"
+	"reflect"
 
 	io "io"
 )

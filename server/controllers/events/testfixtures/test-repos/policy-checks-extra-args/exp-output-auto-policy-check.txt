@@ -13,5 +13,3 @@ FAIL - <redacted plan file> - null_resource_policy - WARNING: Null Resource crea
 * :heavy_check_mark: To **approve** failing policies an authorized approver can comment:
     * `atlantis approve_policies`
 * :repeat: Or, address the policy failure by modifying the codebase and re-planning.
-
-

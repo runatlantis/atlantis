@@ -69,7 +69,7 @@ func TestShellCommandRunner_Run(t *testing.T) {
 			output, err = runner.Run(ctx)
 			Ok(t, err)
 			Equals(t, expectedOutput, output)
-			projectCmdOutputHandler.VerifyWasCalled(Never()).Send(matchers.AnyModelsProjectCommandContext(), AnyString(), EqBool(false))
+			projectCmdOutputHandler.VerifyWasCalled(Never()).Send(matchers.AnyCommandProjectContext(), AnyString(), EqBool(false))
 		})
 	}
 }

@@ -14,7 +14,6 @@ Outputs:
 
 var = "fromconfig"
 workspace = "default"
-
 ```
 
 ---
@@ -35,9 +34,8 @@ var = "fromfile"
 workspace = "staging"
 
 postapply
-
 ```
+
 </details>
 
 ---
-

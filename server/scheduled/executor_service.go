@@ -2,13 +2,14 @@ package scheduled
 
 import (
 	"context"
-	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/uber-go/tally"
 )
 
 type ExecutorService struct {

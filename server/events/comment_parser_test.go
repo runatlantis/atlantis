@@ -22,12 +22,61 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 var commentParser = events.CommentParser{
 	GithubUser:     "github-user",
 	GitlabUser:     "gitlab-user",
 	ExecutableName: "atlantis",
+	AllowCommands: []command.Name{
+		command.Plan,
+		command.Apply,
+		command.Unlock,
+		command.ApprovePolicies,
+		command.Import,
+	},
+}
+
+func TestNewCommentParser(t *testing.T) {
+	type args struct {
+		githubUser      string
+		gitlabUser      string
+		bitbucketUser   string
+		azureDevopsUser string
+		executableName  string
+		allowCommands   []command.Name
+	}
+	tests := []struct {
+		name string
+		args args
+		want *events.CommentParser
+	}{
+		{
+			name: "duplicate allow commands filtered",
+			args: args{
+				allowCommands: []command.Name{command.Plan, command.Plan, command.Plan},
+			},
+			want: &events.CommentParser{
+				AllowCommands: []command.Name{command.Plan},
+			},
+		},
+		{
+			name: "comment un-available commands filtered",
+			args: args{
+				// PolicyCheck and Autoplan cannot be used on comment command, so filtered
+				allowCommands: []command.Name{command.Plan, command.Apply, command.Unlock, command.PolicyCheck, command.ApprovePolicies, command.Autoplan, command.Version, command.Import},
+			},
+			want: &events.CommentParser{
+				AllowCommands: []command.Name{command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands), "NewCommentParser(%v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
+		})
+	}
 }
 
 func TestParse_Ignored(t *testing.T) {
@@ -70,6 +119,10 @@ func TestParse_ExecutableName(t *testing.T) {
 }
 
 func TestParse_HelpResponse(t *testing.T) {
+	allowCommandsCases := [][]command.Name{
+		command.AllCommentCommands,
+		{}, // empty case
+	}
 	helpComments := []string{
 		"run",
 		"atlantis",
@@ -80,86 +133,100 @@ func TestParse_HelpResponse(t *testing.T) {
 		"atlantis help something else",
 		"atlantis help plan",
 	}
-	for _, c := range helpComments {
-		r := commentParser.Parse(c, models.Github)
-		Equals(t, commentParser.HelpComment(false), r.CommentResponse)
-	}
-}
-
-func TestParse_HelpResponseWithApplyDisabled(t *testing.T) {
-	helpComments := []string{
-		"run",
-		"atlantis",
-		"@github-user",
-		"atlantis help",
-		"atlantis --help",
-		"atlantis -h",
-		"atlantis help something else",
-		"atlantis help plan",
-	}
-	for _, c := range helpComments {
-		commentParser.ApplyDisabled = true
-		r := commentParser.Parse(c, models.Github)
-		Equals(t, commentParser.HelpComment(true), r.CommentResponse)
+	for _, allowCommandCase := range allowCommandsCases {
+		for _, c := range helpComments {
+			t.Run(fmt.Sprintf("%s with allow commands %v", c, allowCommandCase), func(t *testing.T) {
+				commentParser := events.CommentParser{
+					GithubUser:     "github-user",
+					ExecutableName: "atlantis",
+					AllowCommands:  allowCommandCase,
+				}
+				r := commentParser.Parse(c, models.Github)
+				Equals(t, commentParser.HelpComment(), r.CommentResponse)
+			})
+		}
 	}
 }
 
 func TestParse_UnusedArguments(t *testing.T) {
 	t.Log("if there are unused flags we return an error")
 	cases := []struct {
-		Command command.Name
-		Args    string
-		Unused  string
+		Command    command.Name
+		Args       string
+		Unused     string
+		ExpMessage string
 	}{
 		{
 			command.Plan,
 			"-d . arg",
 			"arg",
+			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"arg -d .",
 			"arg",
+			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"arg",
 			"arg",
+			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"arg arg2",
 			"arg arg2",
+			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"-d . arg -w kjj arg2",
 			"arg arg2",
+			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"-d . arg",
 			"arg",
+			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"arg arg2",
 			"arg arg2",
+			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"arg arg2 -- useful",
 			"arg arg2",
+			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"arg arg2 --",
 			"arg arg2",
+			"unknown argument(s)",
 		},
 		{
 			command.ApprovePolicies,
 			"arg arg2 --",
 			"arg arg2",
+			"unknown argument(s)",
+		},
+		{
+			command.Import,
+			"arg --",
+			"arg",
+			"invalid argument count",
+		},
+		{
+			command.Import,
+			"arg1 arg2 arg3 --",
+			"arg1 arg2 arg3",
+			"invalid argument count",
 		},
 	}
 	for _, c := range cases {
@@ -174,8 +241,10 @@ func TestParse_UnusedArguments(t *testing.T) {
 				usage = ApplyUsage
 			case command.ApprovePolicies:
 				usage = ApprovePolicyUsage
+			case command.Import:
+				usage = ImportUsage
 			}
-			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s.\n%s```", c.Unused, usage), r.CommentResponse)
+			Equals(t, fmt.Sprintf("```\nError: %s – %s.\n%s```", c.ExpMessage, c.Unused, usage), r.CommentResponse)
 		})
 	}
 }
@@ -201,7 +270,7 @@ func TestParse_DidYouMeanAtlantis(t *testing.T) {
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
-		Assert(t, r.CommentResponse == events.DidYouMeanAtlantisComment,
+		Assert(t, r.CommentResponse == fmt.Sprintf(events.DidYouMeanAtlantisComment, "atlantis"),
 			"For comment %q expected CommentResponse==%q but got %q", c, events.DidYouMeanAtlantisComment, r.CommentResponse)
 	}
 }
@@ -214,28 +283,46 @@ func TestParse_InvalidCommand(t *testing.T) {
 		"atlantis Plan",
 		"atlantis appely apply",
 	}
+	cp := events.NewCommentParser(
+		"github-user",
+		"gitlab-user",
+		"bitbucket-user",
+		"azure-devops-user",
+		"atlantis",
+		[]command.Name{
+			command.Version,
+			command.Unlock,
+			command.Apply,
+			command.Plan,
+			command.Apply, // duplicate command is filtered
+		},
+	)
 	for _, c := range comments {
-		r := commentParser.Parse(c, models.Github)
-		exp := fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", strings.Fields(c)[1])
-		Assert(t, r.CommentResponse == exp,
-			"For comment %q expected CommentResponse==%q but got %q", c, exp, r.CommentResponse)
+		r := cp.Parse(c, models.Github)
+		exp := fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\nAvailable commands(--allow-commands): version, plan, apply, unlock\n```", strings.Fields(c)[1])
+		Equals(t, exp, r.CommentResponse)
 	}
 }
 
 func TestParse_SubcommandUsage(t *testing.T) {
 	t.Log("given a comment asking for the usage of a subcommand should " +
 		"return help")
-	comments := []string{
-		"atlantis plan -h",
-		"atlantis plan --help",
-		"atlantis apply -h",
-		"atlantis apply --help",
-		"atlantis approve_policies -h",
-		"atlantis approve_policies --help",
+	tests := []struct {
+		input    string
+		expUsage string
+	}{
+		{"atlantis plan -h", "plan"},
+		{"atlantis plan --help", "plan"},
+		{"atlantis apply -h", "apply"},
+		{"atlantis apply --help", "apply"},
+		{"atlantis approve_policies -h", "approve_policies"},
+		{"atlantis approve_policies --help", "approve_policies"},
+		{"atlantis import -h", "import ADDRESS ID"},
+		{"atlantis import --help", "import ADDRESS ID"},
 	}
-	for _, c := range comments {
-		r := commentParser.Parse(c, models.Github)
-		exp := "Usage of " + strings.Fields(c)[1]
+	for _, c := range tests {
+		r := commentParser.Parse(c.input, models.Github)
+		exp := "Usage of " + c.expUsage
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 		Assert(t, !strings.Contains(r.CommentResponse, "Error:"),
@@ -266,6 +353,10 @@ func TestParse_InvalidFlags(t *testing.T) {
 			"atlantis apply --abc",
 			"Error: unknown flag: --abc",
 		},
+		{
+			"atlantis import --abc",
+			"Error: unknown flag: --abc",
+		},
 	}
 	for _, c := range cases {
 		r := commentParser.Parse(c.comment, models.Github)
@@ -281,13 +372,17 @@ func TestParse_RelativeDirPath(t *testing.T) {
 	comments := []string{
 		"atlantis plan -d ..",
 		"atlantis apply -d ..",
+		"atlantis import -d .. address id",
 		// These won't return an error because we prepend with . when parsing.
 		//"atlantis plan -d /..",
 		//"atlantis apply -d /..",
+		//"atlantis import -d /.. address id",
 		"atlantis plan -d ./..",
 		"atlantis apply -d ./..",
+		"atlantis import -d ./.. address id",
 		"atlantis plan -d a/b/../../..",
 		"atlantis apply -d a/../..",
+		"atlantis import -d a/../.. address id",
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
@@ -331,12 +426,16 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 	comments := []string{
 		"atlantis plan -w ..",
 		"atlantis apply -w ..",
+		"atlantis import -w .. address id",
 		"atlantis plan -w /",
 		"atlantis apply -w /",
+		"atlantis import -w / address id",
 		"atlantis plan -w ..abc",
 		"atlantis apply -w abc..",
+		"atlantis import -w abc.. address id",
 		"atlantis plan -w abc..abc",
 		"atlantis apply -w ../../../etc/passwd",
+		"atlantis import -w ../../../etc/passwd address id",
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
@@ -582,7 +681,7 @@ func TestParse_Parsing(t *testing.T) {
 	}
 
 	for _, test := range cases {
-		for _, cmdName := range []string{"plan", "apply"} {
+		for _, cmdName := range []string{"plan", "apply", "import 'some[\"addr\"]' id"} {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
 			t.Run(comment, func(t *testing.T) {
 				r := commentParser.Parse(comment, models.Github)
@@ -591,15 +690,25 @@ func TestParse_Parsing(t *testing.T) {
 				Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
 				Assert(t, test.expVerbose == r.Command.Verbose, "exp verbose to equal %v but was %v for comment %q", test.expVerbose, r.Command.Verbose, comment)
 				actExtraArgs := strings.Join(r.Command.Flags, " ")
-				Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 				if cmdName == "plan" {
 					Assert(t, r.Command.Name == command.Plan, "did not parse comment %q as plan command", comment)
+					Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 				}
 				if cmdName == "apply" {
 					Assert(t, r.Command.Name == command.Apply, "did not parse comment %q as apply command", comment)
+					Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 				}
 				if cmdName == "approve_policies" {
 					Assert(t, r.Command.Name == command.ApprovePolicies, "did not parse comment %q as approve_policies command", comment)
+					Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
+				}
+				if strings.HasPrefix(cmdName, "import") {
+					expExtraArgs := "some[\"addr\"] id" // import use default args with `some["addr"] id`
+					if test.expExtraArgs != "" {
+						expExtraArgs = fmt.Sprintf("%s %s", test.expExtraArgs, expExtraArgs)
+					}
+					Assert(t, r.Command.Name == command.Import, "did not parse comment %q as import command", comment)
+					Assert(t, expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", expExtraArgs, actExtraArgs, comment)
 				}
 			})
 		}
@@ -719,9 +828,6 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 				case command.Apply:
 					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled)
 					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
-				case command.Version:
-					actComment := commentParser.BuildVersionComment(c.repoRelDir, c.workspace, c.project)
-					Equals(t, fmt.Sprintf("atlantis version %s", c.expVersionFlags), actComment)
 				}
 			}
 		})
@@ -730,11 +836,13 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 
 func TestCommentParser_HelpComment(t *testing.T) {
 	cases := []struct {
-		applyDisabled bool
+		name          string
+		allowCommands []command.Name
 		expectResult  string
 	}{
 		{
-			applyDisabled: false,
+			name:          "all commands allowed",
+			allowCommands: command.AllCommentCommands,
 			expectResult: "```cmake\n" +
 				`atlantis
 Terraform Pull Request Automation
@@ -743,6 +851,9 @@ Usage:
   atlantis <command> [options] -- [terraform options]
 
 Examples:
+  # show atlantis help
+  atlantis help
+
   # run plan in the root directory passing the -target flag to terraform
   atlantis plan -d . -- -target=resource
 
@@ -762,6 +873,8 @@ Commands:
   approve_policies
            Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
+  import   Runs 'terraform import' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
   help     View help.
 
 Flags:
@@ -771,7 +884,8 @@ Use "atlantis [command] --help" for more information about a command.` +
 				"\n```",
 		},
 		{
-			applyDisabled: true,
+			name:          "all commands disallowed",
+			allowCommands: []command.Name{},
 			expectResult: "```cmake\n" +
 				`atlantis
 Terraform Pull Request Automation
@@ -780,17 +894,46 @@ Usage:
   atlantis <command> [options] -- [terraform options]
 
 Examples:
-  # run plan in the root directory passing the -target flag to terraform
-  atlantis plan -d . -- -target=resource
+  # show atlantis help
+  atlantis help
 
 Commands:
-  plan     Runs 'terraform plan' for the changes in this pull request.
-           To plan a specific project, use the -d, -w and -p flags.
+  help     View help.
+
+Flags:
+  -h, --help   help for atlantis
+
+Use "atlantis [command] --help" for more information about a command.` +
+				"\n```",
+		},
+		{
+			name: "partial commands allowed",
+			allowCommands: []command.Name{
+				command.Apply,
+				command.Unlock,
+			},
+			expectResult: "```cmake\n" +
+				`atlantis
+Terraform Pull Request Automation
+
+Usage:
+  atlantis <command> [options] -- [terraform options]
+
+Examples:
+  # show atlantis help
+  atlantis help
+
+  # apply all unapplied plans from this pull request
+  atlantis apply
+
+  # apply the plan for the root directory and staging workspace
+  atlantis apply -d . -w staging
+
+Commands:
+  apply    Runs 'terraform apply' on all unapplied plans from this pull request.
+           To only apply a specific plan, use the -d, -w and -p flags.
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
-  approve_policies
-           Approves all current policy checking failures for the PR.
-  version  Print the output of 'terraform version'
   help     View help.
 
 Flags:
@@ -802,8 +945,12 @@ Use "atlantis [command] --help" for more information about a command.` +
 	}
 
 	for _, c := range cases {
-		t.Run(fmt.Sprintf("ApplyDisabled: %v", c.applyDisabled), func(t *testing.T) {
-			Equals(t, commentParser.HelpComment(c.applyDisabled), c.expectResult)
+		t.Run(c.name, func(t *testing.T) {
+			commentParser := events.CommentParser{
+				ExecutableName: "atlantis",
+				AllowCommands:  c.allowCommands,
+			}
+			Equals(t, commentParser.HelpComment(), c.expectResult)
 		})
 	}
 }
@@ -845,7 +992,7 @@ func TestParse_VCSUsername(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.vcs.String(), func(t *testing.T) {
 			r := cp.Parse(fmt.Sprintf("@%s %s", c.user, "help"), c.vcs)
-			Equals(t, commentParser.HelpComment(false), r.CommentResponse)
+			Equals(t, cp.HelpComment(), r.CommentResponse)
 		})
 	}
 }
@@ -874,6 +1021,7 @@ var ApplyUsage = `Usage of apply:
 var ApprovePolicyUsage = `Usage of approve_policies:
       --verbose   Append Atlantis log to comment.
 `
+
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
 	`atlantis unlock
 
@@ -881,3 +1029,13 @@ var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
   Arguments or flags are not supported at the moment.
   If you need to unlock a specific project please use the atlantis UI.` +
 	"\n```"
+
+var ImportUsage = `Usage of import ADDRESS ID:
+  -d, --dir string         Which directory to run import in relative to root of
+                           repo, ex. 'child/dir'.
+  -p, --project string     Which project to run import for. Refers to the name of
+                           the project configured in a repo config file. Cannot be
+                           used at same time as workspace or dir flags.
+      --verbose            Append Atlantis log to comment.
+  -w, --workspace string   Switch to this Terraform workspace before importing.
+`

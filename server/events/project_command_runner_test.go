@@ -44,32 +44,32 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	realEnv := runtime.EnvStepRunner{}
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
-	mockApplyReqHandler := mocks.NewMockApplyRequirement()
+	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
 
 	runner := events.DefaultProjectCommandRunner{
-		Locker:                     mockLocker,
-		LockURLGenerator:           mockURLGenerator{},
-		InitStepRunner:             mockInit,
-		PlanStepRunner:             mockPlan,
-		ApplyStepRunner:            mockApply,
-		RunStepRunner:              mockRun,
-		EnvStepRunner:              &realEnv,
-		PullApprovedChecker:        nil,
-		WorkingDir:                 mockWorkingDir,
-		Webhooks:                   nil,
-		WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
-		AggregateApplyRequirements: mockApplyReqHandler,
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		InitStepRunner:            mockInit,
+		PlanStepRunner:            mockPlan,
+		ApplyStepRunner:           mockApply,
+		RunStepRunner:             mockRun,
+		EnvStepRunner:             &realEnv,
+		PullApprovedChecker:       nil,
+		WorkingDir:                mockWorkingDir,
+		Webhooks:                  nil,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockCommandRequirementHandler,
 	}
 
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyLoggingSimpleLogging(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyLoggingSimpleLogging(),
 		matchers.AnyModelsPullRequest(),
 		matchers.AnyModelsUser(),
 		AnyString(),
@@ -217,8 +217,8 @@ func TestProjectOutputWrapper(t *testing.T) {
 				expCommitStatus = models.FailedCommitStatus
 			}
 
-			When(mockProjectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(prjResult)
-			When(mockProjectCommandRunner.Apply(matchers.AnyModelsProjectCommandContext())).ThenReturn(prjResult)
+			When(mockProjectCommandRunner.Plan(matchers.AnyCommandProjectContext())).ThenReturn(prjResult)
+			When(mockProjectCommandRunner.Apply(matchers.AnyCommandProjectContext())).ThenReturn(prjResult)
 
 			switch c.CommandName {
 			case command.Plan:
@@ -261,7 +261,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-		AggregateApplyRequirements: &events.AggregateApplyRequirements{
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: mockWorkingDir,
 		},
 	}
@@ -282,7 +282,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-		AggregateApplyRequirements: &events.AggregateApplyRequirements{
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: mockWorkingDir,
 		},
 	}
@@ -306,15 +306,18 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-		AggregateApplyRequirements: &events.AggregateApplyRequirements{
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: mockWorkingDir,
 		},
 	}
+	log := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
+		Log:               log,
 		ApplyRequirements: []string{"undiverged"},
 	}
 	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.HasDiverged(log, tmp)).ThenReturn(true)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
@@ -410,22 +413,22 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
-			applyReqHandler := &events.AggregateApplyRequirements{
+			applyReqHandler := &events.DefaultCommandRequirementHandler{
 				WorkingDir: mockWorkingDir,
 			}
 
 			runner := events.DefaultProjectCommandRunner{
-				Locker:                     mockLocker,
-				LockURLGenerator:           mockURLGenerator{},
-				InitStepRunner:             mockInit,
-				PlanStepRunner:             mockPlan,
-				ApplyStepRunner:            mockApply,
-				RunStepRunner:              mockRun,
-				EnvStepRunner:              mockEnv,
-				WorkingDir:                 mockWorkingDir,
-				Webhooks:                   mockSender,
-				WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
-				AggregateApplyRequirements: applyReqHandler,
+				Locker:                    mockLocker,
+				LockURLGenerator:          mockURLGenerator{},
+				InitStepRunner:            mockInit,
+				PlanStepRunner:            mockPlan,
+				ApplyStepRunner:           mockApply,
+				RunStepRunner:             mockRun,
+				EnvStepRunner:             mockEnv,
+				WorkingDir:                mockWorkingDir,
+				Webhooks:                  mockSender,
+				WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+				CommandRequirementHandler: applyReqHandler,
 			}
 			repoDir := t.TempDir()
 			When(mockWorkingDir.GetWorkingDir(
@@ -485,18 +488,18 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
 	mockSender := mocks.NewMockWebhooksSender()
-	applyReqHandler := &events.AggregateApplyRequirements{
+	applyReqHandler := &events.DefaultCommandRequirementHandler{
 		WorkingDir: mockWorkingDir,
 	}
 
 	runner := events.DefaultProjectCommandRunner{
-		Locker:                     mockLocker,
-		LockURLGenerator:           mockURLGenerator{},
-		ApplyStepRunner:            mockApply,
-		WorkingDir:                 mockWorkingDir,
-		WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
-		AggregateApplyRequirements: applyReqHandler,
-		Webhooks:                   mockSender,
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: applyReqHandler,
+		Webhooks:                  mockSender,
 	}
 	repoDir := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(
@@ -556,13 +559,13 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyLoggingSimpleLogging(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyLoggingSimpleLogging(),
 		matchers.AnyModelsPullRequest(),
 		matchers.AnyModelsUser(),
 		AnyString(),
@@ -616,6 +619,122 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	Equals(t, "var=\n\nvar=value\n\ndynamic_var=dynamic_value\n\ndynamic_var=overridden\n", res.PlanSuccess.TerraformOutput)
+}
+
+// Test that it runs the expected import steps.
+func TestDefaultProjectCommandRunner_Import(t *testing.T) {
+	expEnvs := map[string]string{}
+	cases := []struct {
+		description   string
+		steps         []valid.Step
+		importReqs    []string
+		pullReqStatus models.PullReqStatus
+		setup         func(repoDir string, ctx command.ProjectContext, mockLocker *mocks.MockProjectLocker, mockInit *mocks.MockStepRunner, mockImport *mocks.MockStepRunner)
+
+		expSteps   []string
+		expOut     *models.ImportSuccess
+		expFailure string
+	}{
+		{
+			description: "normal workflow",
+			steps:       valid.DefaultImportStage.Steps,
+			importReqs:  []string{"approved"},
+			pullReqStatus: models.PullReqStatus{
+				ApprovalStatus: models.ApprovalStatus{
+					IsApproved: true,
+				},
+			},
+			setup: func(repoDir string, ctx command.ProjectContext, mockLocker *mocks.MockProjectLocker, mockInit *mocks.MockStepRunner, mockImport *mocks.MockStepRunner) {
+				When(mockLocker.TryLock(
+					matchers.AnyLoggingSimpleLogging(),
+					matchers.AnyModelsPullRequest(),
+					matchers.AnyModelsUser(),
+					AnyString(),
+					matchers.AnyModelsProject(),
+					AnyBool(),
+				)).ThenReturn(&events.TryLockResponse{
+					LockAcquired: true,
+					LockKey:      "lock-key",
+				}, nil)
+
+				When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
+				When(mockImport.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("import", nil)
+			},
+			expSteps: []string{"import"},
+			expOut: &models.ImportSuccess{
+				Output:    "init\nimport",
+				RePlanCmd: "atlantis plan -d .",
+			},
+		},
+		{
+			description: "approval required",
+			steps:       valid.DefaultImportStage.Steps,
+			importReqs:  []string{"approved"},
+			pullReqStatus: models.PullReqStatus{
+				ApprovalStatus: models.ApprovalStatus{
+					IsApproved: false,
+				},
+			},
+			expFailure: "Pull request must be approved by at least one person other than the author before running import.",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockInit := mocks.NewMockStepRunner()
+			mockImport := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+			mockSender := mocks.NewMockWebhooksSender()
+			applyReqHandler := &events.DefaultCommandRequirementHandler{
+				WorkingDir: mockWorkingDir,
+			}
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                    mockLocker,
+				LockURLGenerator:          mockURLGenerator{},
+				InitStepRunner:            mockInit,
+				ImportStepRunner:          mockImport,
+				WorkingDir:                mockWorkingDir,
+				Webhooks:                  mockSender,
+				WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+				CommandRequirementHandler: applyReqHandler,
+			}
+			ctx := command.ProjectContext{
+				Log:                logging.NewNoopLogger(t),
+				Steps:              c.steps,
+				Workspace:          "default",
+				ImportRequirements: c.importReqs,
+				RepoRelDir:         ".",
+				PullReqStatus:      c.pullReqStatus,
+				RePlanCmd:          "atlantis plan -d . -- addr id",
+			}
+			repoDir := t.TempDir()
+			When(mockWorkingDir.Clone(
+				matchers.AnyLoggingSimpleLogging(),
+				matchers.AnyModelsRepo(),
+				matchers.AnyModelsPullRequest(),
+				AnyString(),
+			)).ThenReturn(repoDir, false, nil)
+			if c.setup != nil {
+				c.setup(repoDir, ctx, mockLocker, mockInit, mockImport)
+			}
+
+			res := runner.Import(ctx)
+			Equals(t, c.expOut, res.ImportSuccess)
+			Equals(t, c.expFailure, res.Failure)
+
+			for _, step := range c.expSteps {
+				switch step {
+				case "init":
+					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+				case "import":
+					mockImport.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+				}
+			}
+		})
+	}
 }
 
 type mockURLGenerator struct{}

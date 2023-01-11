@@ -366,33 +366,39 @@ type PlanSuccess struct {
 	HasDiverged bool
 }
 
+// Summary regexes
+var (
+	reChangesOutside = regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
+	rePlanChanges    = regexp.MustCompile(`Plan: \d+ to add, \d+ to change, \d+ to destroy.`)
+	reNoChanges      = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
+)
+
 // Summary extracts one line summary of plan changes from TerraformOutput.
 func (p *PlanSuccess) Summary() string {
 	note := ""
-	r := regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
-	if match := r.FindString(p.TerraformOutput); match != "" {
-		note = fmt.Sprintf("\n**%s**\n", match)
+	if match := reChangesOutside.FindString(p.TerraformOutput); match != "" {
+		note = "\n**" + match + "**\n"
 	}
-
-	r = regexp.MustCompile(`Plan: \d+ to add, \d+ to change, \d+ to destroy.`)
-	if match := r.FindString(p.TerraformOutput); match != "" {
+	if match := rePlanChanges.FindString(p.TerraformOutput); match != "" {
 		return note + match
 	}
-	r = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
-	return note + r.FindString(p.TerraformOutput)
+	return note + reNoChanges.FindString(p.TerraformOutput)
 }
+
+// Diff Markdown regexes
+var (
+	diffKeywordRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s=\s|\s->\s|<<|\{|\(known after apply\)| {2,}[^ ]+:.*)(.*)`)
+	diffListRegex    = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
+	diffTildeRegex   = regexp.MustCompile(`(?m)^~`)
+)
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
-	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s=\s|\s->\s|<<|\{|\(known after apply\)| {2,}[^ ]+:.*)(.*)`)
-	diffListRegex := regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
-	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
-
 	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5")
 	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
 
-	return formattedTerraformOutput
+	return strings.TrimSpace(formattedTerraformOutput)
 }
 
 // PolicyCheckSuccess is the result of a successful policy check run.
@@ -409,6 +415,14 @@ type PolicyCheckSuccess struct {
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
 	HasDiverged bool
+}
+
+// ImportSuccess is the result of a successful import run.
+type ImportSuccess struct {
+	// Output is the output from terraform import
+	Output string
+	// RePlanCmd is the command that users should run to re-plan this project.
+	RePlanCmd string
 }
 
 // Summary extracts one line summary of policy check.

@@ -20,7 +20,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/google/go-github/v48/github"
+	"github.com/go-playground/validator/v10"
+	"github.com/google/go-github/v49/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -28,7 +29,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/xanzy/go-gitlab"
-	"gopkg.in/go-playground/validator.v9"
 )
 
 const gitlabPullOpened = "opened"
@@ -153,7 +153,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, ver
 	}
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
+//go:generate pegomock generate -m --package mocks -o mocks/mock_event_parsing.go EventParsing
 
 // EventParsing parses webhook events from different VCS hosts into their
 // respective Atlantis models.

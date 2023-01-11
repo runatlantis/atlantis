@@ -1,10 +1,11 @@
 # Atlantis <!-- omit in toc -->
 
+[![Latest Release](https://img.shields.io/github/release/runatlantis/atlantis.svg)](https://github.com/runatlantis/atlantis/releases/latest)
 [![SuperDopeBadge](./runatlantis.io/.vuepress/public/hightower-super-dope.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
 [![Go Report Card](https://goreportcard.com/badge/github.com/runatlantis/atlantis)](https://goreportcard.com/report/github.com/runatlantis/atlantis)
 [![codecov](https://codecov.io/gh/runatlantis/atlantis/branch/main/graph/badge.svg)](https://codecov.io/gh/runatlantis/atlantis)
 [![CircleCI](https://circleci.com/gh/runatlantis/atlantis/tree/main.svg?style=shield)](https://circleci.com/gh/runatlantis/atlantis/tree/main)
-[![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://join.slack.com/t/atlantis-community/shared_invite/enQtNzc4NDM3OTA3ODI0LTA5NDQ4YTA3NTAxM2I3ZmIxMGNiYWJhNmY4YjBjZjM3OWMzNGI0NTcxNzY2NjRhODIyODA4YmNjOTBiOThhNTI)
+[![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://join.slack.com/t/atlantis-community/shared_invite/zt-1l35i8t8k-oqnXuIqyeGpGQJVMWzHoDg)
 
 <p align="center">
   <img src="./runatlantis.io/.vuepress/public/hero.png" alt="Atlantis Logo"/><br><br>

@@ -4,11 +4,10 @@
 package mocks
 
 import (
+	pegomock "github.com/petergtz/pegomock"
 	http "net/http"
 	"reflect"
 	"time"
-
-	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockGitlabRequestParserValidator struct {
@@ -26,11 +25,11 @@ func NewMockGitlabRequestParserValidator(options ...pegomock.Option) *MockGitlab
 func (mock *MockGitlabRequestParserValidator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockGitlabRequestParserValidator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockGitlabRequestParserValidator) ParseAndValidate(r *http.Request, secret []byte) (interface{}, error) {
+func (mock *MockGitlabRequestParserValidator) ParseAndValidate(_param0 *http.Request, _param1 []byte) (interface{}, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGitlabRequestParserValidator().")
 	}
-	params := []pegomock.Param{r, secret}
+	params := []pegomock.Param{_param0, _param1}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseAndValidate", params, []reflect.Type{reflect.TypeOf((*interface{})(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 interface{}
 	var ret1 error
@@ -82,8 +81,8 @@ type VerifierMockGitlabRequestParserValidator struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockGitlabRequestParserValidator) ParseAndValidate(r *http.Request, secret []byte) *MockGitlabRequestParserValidator_ParseAndValidate_OngoingVerification {
-	params := []pegomock.Param{r, secret}
+func (verifier *VerifierMockGitlabRequestParserValidator) ParseAndValidate(_param0 *http.Request, _param1 []byte) *MockGitlabRequestParserValidator_ParseAndValidate_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseAndValidate", params, verifier.timeout)
 	return &MockGitlabRequestParserValidator_ParseAndValidate_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -94,8 +93,8 @@ type MockGitlabRequestParserValidator_ParseAndValidate_OngoingVerification struc
 }
 
 func (c *MockGitlabRequestParserValidator_ParseAndValidate_OngoingVerification) GetCapturedArguments() (*http.Request, []byte) {
-	r, secret := c.GetAllCapturedArguments()
-	return r[len(r)-1], secret[len(secret)-1]
+	_param0, _param1 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
 func (c *MockGitlabRequestParserValidator_ParseAndValidate_OngoingVerification) GetAllCapturedArguments() (_param0 []*http.Request, _param1 [][]byte) {

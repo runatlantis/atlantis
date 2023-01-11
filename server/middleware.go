@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/urfave/negroni"
+	"github.com/urfave/negroni/v3"
 )
 
 // NewRequestLogger creates a RequestLogger.

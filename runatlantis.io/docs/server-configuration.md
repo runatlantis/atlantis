@@ -47,6 +47,19 @@ Values are chosen in this order:
 
 
 ## Flags
+### `--allow-commands`
+  ```bash
+  atlantis server --allow-commands=version,plan,apply,unlock,approve_policies
+  # or
+  ATLANTIS_ALLOW_COMMANDS='version,plan,apply,unlock,approve_policies'
+  ```
+  List of allowed commands to be run on the Atlantis server, Defaults to `version,plan,apply,unlock,approve_policies`
+
+  Notes:
+  * Accepts a comma separated list, ex. `command1,command2`.
+  * `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import` and `all` are available.
+  * `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
+
 ### `--allow-draft-prs`
   ```bash
   atlantis server --allow-draft-prs
@@ -212,7 +225,7 @@ and set `--autoplan-modules` to `false`.
   If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure DevOps org. This means that an
   attacker could spoof calls to Atlantis and cause it to perform malicious
-  actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_BASIC_AUTH` environment
+  actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD` environment
   variable.
   :::
 
@@ -308,6 +321,9 @@ and set `--autoplan-modules` to `false`.
   Terraform binaries here. If Atlantis loses this directory, [locks](locking.html)
   will be lost and unapplied plans will be lost.
 
+  Note that the atlantis user is restricted to `~/.atlantis`. 
+  If you set the `--data-dir` flag to a path outside of Atlantis its home directory, ensure that you grant the atlantis user the correct permissions.
+
 ### `--default-tf-version`
   ```bash
   atlantis server --default-tf-version="v0.12.31"
@@ -318,11 +334,14 @@ and set `--autoplan-modules` to `false`.
   if not in `PATH`. See [Terraform Versions](terraform-versions.html) for more details.
 
 ### `--disable-apply`
+  <Badge text="Deprecated" type="warn"/>
   ```bash
   atlantis server --disable-apply
   # or
   ATLANTIS_DISABLE_APPLY=true
   ```
+  Deprecated for `--allow-commands`.
+
   Disable all `atlantis apply` commands, regardless of which flags are passed with it.
 
 ### `--disable-apply-all`
@@ -505,9 +524,9 @@ and set `--autoplan-modules` to `false`.
 
 ### `--gh-team-allowlist`
   ```bash
-  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply"
+  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
   # or
-  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply"
+  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
   ```
   In versions v0.21.0 and later, the GitHub team name can be a name or a slug.
   
@@ -789,7 +808,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_REQUIRE_APPROVAL=true
   ```
   This flag is deprecated. It requires all pull requests to be approved
-  before `atlantis apply` is allowed. See [Apply Requirements](apply-requirements.html) for more details.
+  before `atlantis apply` is allowed. See [Command Requirements](command-requirements.html) for more details.
 
   Instead of using this flag, create a server-side `--repo-config` file:
   ```yaml
@@ -808,7 +827,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_REQUIRE_MERGEABLE=true
   ```
   This flag is deprecated. It causes all pull requests to be mergeable
-  before `atlantis apply` is allowed. See [Apply Requirements](apply-requirements.html) for more details.
+  before `atlantis apply` is allowed. See [Command Requirements](command-requirements.html) for more details.
 
   Instead of using this flag, create a server-side `--repo-config` file:
   ```yaml
@@ -917,6 +936,15 @@ and set `--autoplan-modules` to `false`.
   ```
   Namespace for emitting stats/metrics. See [stats](stats.html) section.
 
+### `--tf--download`
+  ```bash
+  atlantis server --tf-download=false
+  # or
+  ATLANTIS_TF_DOWNLOAD=false
+  ```
+Defaults to `true`. Allow Atlantis to list and download additional versions of Terraform.
+Setting this to `false` can be useful in an air-gapped environment where a download mirror is not available.
+
 ### `--tf-download-url`
   ```bash
   atlantis server --tf-download-url="https://releases.company.com"
@@ -926,6 +954,8 @@ and set `--autoplan-modules` to `false`.
   An alternative URL to download Terraform versions if they are missing. Useful in an airgapped
   environment where releases.hashicorp.com is not available. Directory structure of the custom
   endpoint should match that of releases.hashicorp.com.
+  
+  This has no impact if `--tf-download` is set to `false`.
 
 ### `--tfe-hostname`
   ```bash

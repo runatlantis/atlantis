@@ -49,7 +49,7 @@ const (
 // and pasting GitHub comments.
 var multiLineRegex = regexp.MustCompile(`.*\r?\n[^\r\n]+`)
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_parsing.go CommentParsing
+//go:generate pegomock generate -m --package mocks -o mocks/mock_comment_parsing.go CommentParsing
 
 // CommentParsing handles parsing pull request comments.
 type CommentParsing interface {
@@ -58,7 +58,7 @@ type CommentParsing interface {
 	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_building.go CommentBuilder
+//go:generate pegomock generate -m --package mocks -o mocks/mock_comment_building.go CommentBuilder
 
 // CommentBuilder builds comment commands that can be used on pull requests.
 type CommentBuilder interface {
@@ -66,8 +66,6 @@ type CommentBuilder interface {
 	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 	// BuildApplyComment builds an apply comment for the specified args.
 	BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string
-	// BuildVersionComment builds a version comment for the specified args.
-	BuildVersionComment(repoRelDir string, workspace string, project string) string
 }
 
 // CommentParser implements CommentParsing
@@ -76,8 +74,30 @@ type CommentParser struct {
 	GitlabUser      string
 	BitbucketUser   string
 	AzureDevopsUser string
-	ApplyDisabled   bool
 	ExecutableName  string
+	AllowCommands   []command.Name
+}
+
+// NewCommentParser returns a CommentParser
+func NewCommentParser(githubUser, gitlabUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name) *CommentParser {
+	var commentAllowCommands []command.Name
+	for _, acceptableCommand := range command.AllCommentCommands {
+		for _, allowCommand := range allowCommands {
+			if acceptableCommand == allowCommand {
+				commentAllowCommands = append(commentAllowCommands, allowCommand)
+				break // for distinct
+			}
+		}
+	}
+
+	return &CommentParser{
+		GithubUser:      githubUser,
+		GitlabUser:      gitlabUser,
+		BitbucketUser:   bitbucketUser,
+		AzureDevopsUser: azureDevopsUser,
+		ExecutableName:  executableName,
+		AllowCommands:   commentAllowCommands,
+	}
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -111,6 +131,7 @@ type CommentParseResult struct {
 // - atlantis unlock
 // - atlantis version
 // - atlantis approve_policies
+// - atlantis import ADDRESS ID
 func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) CommentParseResult {
 	comment := strings.TrimSpace(rawComment)
 
@@ -126,8 +147,8 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	// Helpfully warn the user if they're using "terraform" instead of "atlantis"
-	if args[0] == "terraform" {
-		return CommentParseResult{CommentResponse: DidYouMeanAtlantisComment}
+	if args[0] == "terraform" && e.ExecutableName != "terraform" {
+		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName)}
 	}
 
 	// Atlantis can be invoked using the name of the VCS host user we're
@@ -161,18 +182,22 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	// If they've just typed the name of the executable then give them the help
 	// output.
 	if len(args) == 1 {
-		return CommentParseResult{CommentResponse: e.HelpComment(e.ApplyDisabled)}
+		return CommentParseResult{CommentResponse: e.HelpComment()}
 	}
 	cmd := args[1]
 
 	// Help output.
 	if e.stringInSlice(cmd, []string{"help", "-h", "--help"}) {
-		return CommentParseResult{CommentResponse: e.HelpComment(e.ApplyDisabled)}
+		return CommentParseResult{CommentResponse: e.HelpComment()}
 	}
 
-	// Need to have a plan, apply, approve_policy or unlock at this point.
-	if !e.stringInSlice(cmd, []string{command.Plan.String(), command.Apply.String(), command.Unlock.String(), command.ApprovePolicies.String(), command.Version.String()}) {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", cmd)}
+	// Need to have allow commands at this point.
+	if !e.isAllowedCommand(cmd) {
+		var allowCommandList []string
+		for _, allowCommand := range e.AllowCommands {
+			allowCommandList = append(allowCommandList, allowCommand.String())
+		}
+		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun '%s --help' for usage.\nAvailable commands(--allow-commands): %s\n```", cmd, e.ExecutableName, strings.Join(allowCommandList, ", "))}
 	}
 
 	var workspace string
@@ -181,6 +206,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var verbose, autoMergeDisabled bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
+	var requiredCommandArgCount int
 
 	// Set up the flag parsing depending on the command.
 	switch cmd {
@@ -217,6 +243,15 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run version in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Print the version for this project. Refers to the name of the project configured in a repo config file.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+	case command.Import.String():
+		name = command.Import
+		flagSet = pflag.NewFlagSet(command.Import.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before importing.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run import in relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run import for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+		requiredCommandArgCount = 2 // import requires `atlantis import ADDRESS ID` args
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", cmd)}
 	}
@@ -225,29 +260,38 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	// It's safe to use [2:] because we know there's at least 2 elements in args.
 	err = flagSet.Parse(args[2:])
 	if err == pflag.ErrHelp {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", cmd, flagSet.FlagUsagesWrapped(usagesCols))}
+		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", name.DefaultUsage(), flagSet.FlagUsagesWrapped(usagesCols))}
 	}
 	if err != nil {
 		if cmd == command.Unlock.String() {
-			return CommentParseResult{CommentResponse: UnlockUsage}
+			return CommentParseResult{CommentResponse: fmt.Sprintf(UnlockUsage, e.ExecutableName)}
 		}
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
 
-	var unusedArgs []string
+	var commandArgs []string // commandArgs are the arguments that are passed before `--` without any parameter flags.
 	if flagSet.ArgsLenAtDash() == -1 {
-		unusedArgs = flagSet.Args()
+		commandArgs = flagSet.Args()
 	} else {
-		unusedArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
+		commandArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
 	}
-	if len(unusedArgs) > 0 {
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(unusedArgs, " ")), cmd, flagSet)}
+	if len(commandArgs) != requiredCommandArgCount {
+		if requiredCommandArgCount > 0 {
+			return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid argument count – %s", strings.Join(commandArgs, " ")), name.DefaultUsage(), flagSet)}
+		}
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(commandArgs, " ")), name.DefaultUsage(), flagSet)}
 	}
 
-	var extraArgs []string
+	var extraArgs []string // command extra_args
 	if flagSet.ArgsLenAtDash() != -1 {
-		extraArgs = flagSet.Args()[flagSet.ArgsLenAtDash():]
+		extraArgs = append(extraArgs, flagSet.Args()[flagSet.ArgsLenAtDash():]...)
 	}
+	// pass commandArgs into extraArgs after extra args.
+	// - after comment_parser, we will use extra_args only.
+	// - terraform command args accept after options like followings
+	//   - from: `atlantis import ADDRESS ID -- -var foo=bar
+	//   - to: `terraform import -var foo=bar ADDRESS ID`
+	extraArgs = append(extraArgs, commandArgs...)
 
 	dir, err = e.validateDir(dir)
 	if err != nil {
@@ -296,12 +340,6 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
 	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled)
 	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Apply.String(), flags)
-}
-
-// BuildVersionComment builds a version comment for the specified args.
-func (e *CommentParser) BuildVersionComment(repoRelDir string, workspace string, project string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, false)
-	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Version.String(), flags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
@@ -362,22 +400,42 @@ func (e *CommentParser) stringInSlice(a string, list []string) bool {
 	return false
 }
 
+func (e *CommentParser) isAllowedCommand(cmd string) bool {
+	for _, allowed := range e.AllowCommands {
+		if allowed.String() == cmd {
+			return true
+		}
+	}
+	return false
+}
+
 func (e *CommentParser) errMarkdown(errMsg string, cmd string, flagSet *pflag.FlagSet) string {
 	return fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s```", errMsg, cmd, flagSet.FlagUsagesWrapped(usagesCols))
 }
 
-func (e *CommentParser) HelpComment(applyDisabled bool) string {
+func (e *CommentParser) HelpComment() string {
 	buf := &bytes.Buffer{}
 	var tmpl = template.Must(template.New("").Parse(helpCommentTemplate))
 	if err := tmpl.Execute(buf, struct {
-		ApplyDisabled bool
+		ExecutableName       string
+		AllowVersion         bool
+		AllowPlan            bool
+		AllowApply           bool
+		AllowUnlock          bool
+		AllowApprovePolicies bool
+		AllowImport          bool
 	}{
-		ApplyDisabled: applyDisabled,
+		ExecutableName:       e.ExecutableName,
+		AllowVersion:         e.isAllowedCommand(command.Version.String()),
+		AllowPlan:            e.isAllowedCommand(command.Plan.String()),
+		AllowApply:           e.isAllowedCommand(command.Apply.String()),
+		AllowUnlock:          e.isAllowedCommand(command.Unlock.String()),
+		AllowApprovePolicies: e.isAllowedCommand(command.ApprovePolicies.String()),
+		AllowImport:          e.isAllowedCommand(command.Import.String()),
 	}); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
 	}
 	return buf.String()
-
 }
 
 var helpCommentTemplate = "```cmake\n" +
@@ -385,49 +443,66 @@ var helpCommentTemplate = "```cmake\n" +
 Terraform Pull Request Automation
 
 Usage:
-  atlantis <command> [options] -- [terraform options]
+  {{ .ExecutableName }} <command> [options] -- [terraform options]
 
 Examples:
+  # show atlantis help
+  {{ .ExecutableName }} help
+{{- if .AllowPlan }}
+
   # run plan in the root directory passing the -target flag to terraform
-  atlantis plan -d . -- -target=resource
-  {{- if not .ApplyDisabled }}
+  {{ .ExecutableName }} plan -d . -- -target=resource
+{{- end }}
+{{- if .AllowApply }}
 
   # apply all unapplied plans from this pull request
-  atlantis apply
+  {{ .ExecutableName }} apply
 
   # apply the plan for the root directory and staging workspace
-  atlantis apply -d . -w staging
+  {{ .ExecutableName }} apply -d . -w staging
 {{- end }}
 
 Commands:
+{{- if .AllowPlan }}
   plan     Runs 'terraform plan' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.
-{{- if not .ApplyDisabled }}
+{{- end }}
+{{- if .AllowApply }}
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
 {{- end }}
+{{- if .AllowUnlock }}
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
+{{- end }}
+{{- if .AllowApprovePolicies }}
   approve_policies
            Approves all current policy checking failures for the PR.
+{{- end }}
+{{- if .AllowVersion }}
   version  Print the output of 'terraform version'
+{{- end }}
+{{- if .AllowImport }}
+  import   Runs 'terraform import' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
+{{- end }}
   help     View help.
 
 Flags:
   -h, --help   help for atlantis
 
-Use "atlantis [command] --help" for more information about a command.` +
+Use "{{ .ExecutableName }} [command] --help" for more information about a command.` +
 	"\n```"
 
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a command with terraform instead of atlantis.
-var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terraform`?"
+var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `terraform`?"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
 // `atlantis unlock` with flags.
 
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
-	`atlantis unlock
+	`%s unlock
 
   Unlocks the entire PR and discards all plans in this PR.
   Arguments or flags are not supported at the moment.

@@ -468,6 +468,15 @@ func TestStep_ToValid(t *testing.T) {
 			},
 		},
 		{
+			description: "import step",
+			input: raw.Step{
+				Key: String("import"),
+			},
+			exp: valid.Step{
+				StepName: "import",
+			},
+		},
+		{
 			description: "init extra_args",
 			input: raw.Step{
 				Map: MapType{
@@ -520,6 +529,20 @@ func TestStep_ToValid(t *testing.T) {
 			},
 			exp: valid.Step{
 				StepName:  "apply",
+				ExtraArgs: []string{"arg1", "arg2"},
+			},
+		},
+		{
+			description: "import extra_args",
+			input: raw.Step{
+				Map: MapType{
+					"import": {
+						"extra_args": []string{"arg1", "arg2"},
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:  "import",
 				ExtraArgs: []string{"arg1", "arg2"},
 			},
 		},

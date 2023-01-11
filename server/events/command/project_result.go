@@ -15,6 +15,7 @@ type ProjectResult struct {
 	PolicyCheckSuccess *models.PolicyCheckSuccess
 	ApplySuccess       string
 	VersionSuccess     string
+	ImportSuccess      *models.ImportSuccess
 	ProjectName        string
 }
 

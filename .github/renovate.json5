@@ -6,7 +6,7 @@
   automerge: false,
   platformAutomerge: false,
   labels: ["dependencies"],
-  postUpdateOptions: ["gomodTidy", "yarnDedupeHighest"],
+  postUpdateOptions: ["gomodTidy", "gomodUpdateImportPaths", "yarnDedupeHighest"],
   prHourlyLimit: 0,
   prConcurrentLimit: 5,
   packageRules: [
@@ -39,7 +39,7 @@
     {
       // use LTS node version for node docker image
       matchDatasources: ["docker"],
-      matchPackageNames: ["node"],
+      matchPackageNames: ["node", "cimg/node"],
       versioning: "node",
     },
   ],

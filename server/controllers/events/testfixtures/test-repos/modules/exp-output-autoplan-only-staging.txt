@@ -3,7 +3,6 @@ Ran Plan for dir: `staging` workspace: `default`
 <details><summary>Show Output</summary>
 
 ```diff
-
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
 + create
@@ -19,7 +18,6 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 Changes to Outputs:
 + var = "staging"
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:

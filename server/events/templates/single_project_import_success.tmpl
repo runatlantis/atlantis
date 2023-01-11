@@ -1,0 +1,7 @@
+{{ define "singleProjectImport" -}}
+{{ $result := index .Results 0 -}}
+Ran {{ .Command }} for {{ if $result.ProjectName }}project: `{{ $result.ProjectName }}` {{ end }}dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
+
+{{ $result.Rendered }}
+{{- template "log" . -}}
+{{ end -}}

@@ -7,7 +7,6 @@ Ran Plan for 2 projects:
 <details><summary>Show Output</summary>
 
 ```diff
-
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
 + create
@@ -23,7 +22,6 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 Changes to Outputs:
 + var = "staging"
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -39,7 +37,6 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 <details><summary>Show Output</summary>
 
 ```diff
-
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
 + create
@@ -55,7 +52,6 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 Changes to Outputs:
 + var = "production"
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
