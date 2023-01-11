@@ -3,6 +3,7 @@ package events_test
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1130,4 +1131,190 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	Equals(t, "workspace2", ctxs[2].Workspace)
 	Equals(t, "project2", ctxs[3].RepoRelDir)
 	Equals(t, "workspace2", ctxs[3].Workspace)
+}
+
+func TestDefaultProjectCommandBuilder_BuildPolicyCheckCommands(t *testing.T) {
+	testWorkingDirLocker := mockWorkingDirLocker{}
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"workspace1": map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+		},
+	})
+	defer cleanup()
+	// Initialize git repos in each workspace so that the .tfplan files get
+	// picked up.
+	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
+	testWorkingDir := mockWorkingDir{
+		pullDir:    tmpDir,
+		workingDir: tmpDir,
+	}
+	expectedProjects := []command.ProjectContext{
+		{
+			CommandName: command.PolicyCheck,
+		},
+	}
+	testContextBuilder := mockContextBuilder{
+		projects: expectedProjects,
+	}
+	builder := events.DefaultProjectCommandBuilder{
+		ParserValidator:              &config.ParserValidator{},
+		WorkingDir:                   testWorkingDir,
+		WorkingDirLocker:             testWorkingDirLocker,
+		GlobalCfg:                    valid.NewGlobalCfg("somedir"),
+		PendingPlanFinder:            &events.DefaultPendingPlanFinder{},
+		ProjectCommandContextBuilder: testContextBuilder,
+	}
+	commandCtx := &command.Context{
+		Log:        logging.NewNoopCtxLogger(t),
+		Scope:      tally.NewTestScope("atlantis", map[string]string{}),
+		RequestCtx: context.Background(),
+	}
+	projects, err := builder.BuildPolicyCheckCommands(commandCtx)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedProjects, projects)
+}
+
+func TestDefaultProjectCommandBuilder_BuildPolicyCheckCommands_TryLockPullError(t *testing.T) {
+	testWorkingDirLocker := mockWorkingDirLocker{
+		error: assert.AnError,
+	}
+	builder := events.DefaultProjectCommandBuilder{
+		WorkingDirLocker: testWorkingDirLocker,
+	}
+	commandCtx := &command.Context{
+		Log:        logging.NewNoopCtxLogger(t),
+		Scope:      tally.NewTestScope("atlantis", map[string]string{}),
+		RequestCtx: context.Background(),
+	}
+	projects, err := builder.BuildPolicyCheckCommands(commandCtx)
+	assert.ErrorIs(t, err, assert.AnError)
+	assert.Empty(t, projects)
+}
+
+func TestDefaultProjectCommandBuilder_BuildPolicyCheckCommands_GetPullDirError(t *testing.T) {
+	testWorkingDir := mockWorkingDir{
+		pullErr: assert.AnError,
+	}
+	testWorkingDirLocker := mockWorkingDirLocker{}
+	builder := events.DefaultProjectCommandBuilder{
+		WorkingDir:       testWorkingDir,
+		WorkingDirLocker: testWorkingDirLocker,
+	}
+	commandCtx := &command.Context{
+		Log:        logging.NewNoopCtxLogger(t),
+		Scope:      tally.NewTestScope("atlantis", map[string]string{}),
+		RequestCtx: context.Background(),
+	}
+	projects, err := builder.BuildPolicyCheckCommands(commandCtx)
+	assert.ErrorIs(t, err, assert.AnError)
+	assert.Empty(t, projects)
+}
+
+func TestDefaultProjectCommandBuilder_BuildPolicyCheckCommands_FindError(t *testing.T) {
+	testWorkingDir := mockWorkingDir{}
+	testWorkingDirLocker := mockWorkingDirLocker{}
+	builder := events.DefaultProjectCommandBuilder{
+		WorkingDir:        testWorkingDir,
+		WorkingDirLocker:  testWorkingDirLocker,
+		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
+	}
+	commandCtx := &command.Context{
+		Log:        logging.NewNoopCtxLogger(t),
+		Scope:      tally.NewTestScope("atlantis", map[string]string{}),
+		RequestCtx: context.Background(),
+	}
+	projects, err := builder.BuildPolicyCheckCommands(commandCtx)
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	assert.Empty(t, projects)
+}
+
+func TestDefaultProjectCommandBuilder_BuildPolicyCheckCommands_GetWorkingDirErr(t *testing.T) {
+	testWorkingDirLocker := mockWorkingDirLocker{}
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"workspace1": map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+		},
+	})
+	defer cleanup()
+	// Initialize git repos in each workspace so that the .tfplan files get
+	// picked up.
+	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
+	testWorkingDir := mockWorkingDir{
+		pullDir:       tmpDir,
+		workingDirErr: assert.AnError,
+	}
+	builder := events.DefaultProjectCommandBuilder{
+		WorkingDir:        testWorkingDir,
+		WorkingDirLocker:  testWorkingDirLocker,
+		GlobalCfg:         valid.NewGlobalCfg("somedir"),
+		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
+	}
+	commandCtx := &command.Context{
+		Log:        logging.NewNoopCtxLogger(t),
+		Scope:      tally.NewTestScope("atlantis", map[string]string{}),
+		RequestCtx: context.Background(),
+	}
+	projects, err := builder.BuildPolicyCheckCommands(commandCtx)
+	assert.ErrorIs(t, err, assert.AnError)
+	assert.Empty(t, projects)
+}
+
+type mockWorkingDirLocker struct {
+	error error
+}
+
+func (l mockWorkingDirLocker) TryLock(_ string, _ int, _ string) (func(), error) {
+	return func() {}, nil
+}
+
+func (l mockWorkingDirLocker) TryLockPull(_ string, _ int) (func(), error) {
+	if l.error != nil {
+		return func() {}, l.error
+	}
+	return func() {}, nil
+}
+
+type mockContextBuilder struct {
+	projects []command.ProjectContext
+}
+
+func (b mockContextBuilder) BuildProjectContext(_ *command.Context, _ command.Name, _ valid.MergedProjectCfg, _ []string, _ string, _ *command.ContextFlags) []command.ProjectContext {
+	return b.projects
+}
+
+type mockWorkingDir struct {
+	pullDir       string
+	workingDir    string
+	pullErr       error
+	workingDirErr error
+}
+
+func (w mockWorkingDir) GetPullDir(_ models.Repo, _ models.PullRequest) (string, error) {
+	return w.pullDir, w.pullErr
+}
+
+func (w mockWorkingDir) GetWorkingDir(models.Repo, models.PullRequest, string) (string, error) {
+	return w.workingDir, w.workingDirErr
+}
+
+func (w mockWorkingDir) HasDiverged(logging.Logger, string, models.Repo) bool {
+	return false
+}
+
+func (w mockWorkingDir) Delete(models.Repo, models.PullRequest) error {
+	return nil
+}
+
+func (w mockWorkingDir) DeleteForWorkspace(_ models.Repo, _ models.PullRequest, _ string) error {
+	return nil
+}
+
+func (w mockWorkingDir) Clone(_ logging.Logger, _ models.Repo, _ models.PullRequest, _ string) (string, bool, error) {
+	return "", false, nil
 }

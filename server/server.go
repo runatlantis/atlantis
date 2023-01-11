@@ -795,6 +795,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	staleCommandChecker := &events.StaleCommandHandler{
 		StaleStatsScope: cmdStatsScope.SubScope("stale"),
 	}
+	prrPolicyCommandRunner := &events.PRRPolicyCheckCommandRunner{
+		PrjCmdBuilder:            projectCommandBuilder,
+		PolicyCheckCommandRunner: policyCheckCommandRunner,
+	}
+
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                     vcsClient,
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
@@ -807,6 +812,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StaleCommandChecker:           staleCommandChecker,
 		VCSStatusUpdater:              vcsStatusUpdater,
 		Logger:                        ctxLogger,
+		PolicyCommandRunner:           prrPolicyCommandRunner,
 	}
 
 	forceApplyCommandRunner := &events.ForceApplyCommandRunner{

@@ -101,6 +101,7 @@ type ProjectVersionCommandBuilder interface {
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
 	ProjectPlanCommandBuilder
+	ProjectPolicyCheckCommandBuilder
 	ProjectApplyCommandBuilder
 	ProjectApprovePoliciesCommandBuilder
 	ProjectVersionCommandBuilder
@@ -146,6 +147,41 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, c
 	}
 	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
 	return pcc, err
+}
+
+func (p *DefaultProjectCommandBuilder) BuildPolicyCheckCommands(ctx *command.Context) ([]command.ProjectContext, error) {
+	unlockFn, err := p.WorkingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
+	if err != nil {
+		return nil, err
+	}
+	defer unlockFn()
+
+	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		return nil, err
+	}
+
+	plans, err := p.PendingPlanFinder.Find(pullDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return nil, err
+	}
+
+	var cmds []command.ProjectContext
+	for _, plan := range plans {
+		commands, err := p.buildProjectCommandCtx(ctx, command.PolicyCheck, plan.ProjectName, []string{}, defaultRepoDir, plan.RepoRelDir, plan.Workspace, false, "")
+		if err != nil {
+			return nil, errors.Wrapf(err, "building command for dir %q", plan.RepoRelDir)
+		}
+		cmds = append(cmds, commands...)
+	}
+	return cmds, nil
 }
 
 // See ProjectCommandBuilder.BuildApplyCommands.

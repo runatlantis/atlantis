@@ -34,7 +34,7 @@ func (p PullRequestReviewEvent) Convert(e *github.PullRequestReviewEvent) (event
 	}
 
 	if e.GetSender() == nil {
-		return event.PullRequestReview{}, errors.Wrap(err, "sender is nil")
+		return event.PullRequestReview{}, fmt.Errorf("sender is nil")
 	}
 	user := models.User{
 		Username: e.GetSender().GetLogin(),

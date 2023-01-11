@@ -17,6 +17,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/assert"
+	"github.com/uber-go/tally/v4"
 	"regexp"
 	"testing"
 	"time"
@@ -596,4 +598,115 @@ func TestRunAutoplanCommand_DropStaleRequest(t *testing.T) {
 
 	ch.RunAutoplanCommand(ctx, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now(), 0)
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+}
+
+func TestRunPRRCommand_RunPRReviewCommand(t *testing.T) {
+	staleChecker := &testStaleCommandChecker{}
+	policyCommandRunner := &testPolicyCommandRunner{}
+	preWorkflowHooksRunner := &testPreWorkflowHooksRunnerRunner{}
+	ch = events.DefaultCommandRunner{
+		Drainer:                       &events.Drainer{},
+		Logger:                        logging.NewNoopCtxLogger(t),
+		GlobalCfg:                     valid.NewGlobalCfg("somedir"),
+		StatsScope:                    tally.NewTestScope("atlantis", map[string]string{}),
+		PullStatusFetcher:             &testPullStatusFetcher{},
+		StaleCommandChecker:           staleChecker,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksRunner,
+		PolicyCommandRunner:           policyCommandRunner,
+	}
+	ctx := context.Background()
+	ch.RunPRReviewCommand(ctx, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now(), 0)
+	assert.True(t, policyCommandRunner.wasCalled)
+}
+
+func TestRunPRRCommand_RunPRReviewCommand_StaleCommand(t *testing.T) {
+	staleChecker := &testStaleCommandChecker{
+		stale: true,
+	}
+	policyCommandRunner := &testPolicyCommandRunner{}
+	ch = events.DefaultCommandRunner{
+		Drainer:             &events.Drainer{},
+		Logger:              logging.NewNoopCtxLogger(t),
+		GlobalCfg:           valid.NewGlobalCfg("somedir"),
+		StatsScope:          tally.NewTestScope("atlantis", map[string]string{}),
+		PullStatusFetcher:   &testPullStatusFetcher{},
+		StaleCommandChecker: staleChecker,
+		PolicyCommandRunner: policyCommandRunner,
+	}
+	ctx := context.Background()
+	ch.RunPRReviewCommand(ctx, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now(), 0)
+	assert.False(t, policyCommandRunner.wasCalled)
+}
+
+func TestRunPRRCommand_RunPRReviewCommand_HooksError(t *testing.T) {
+	staleChecker := &testStaleCommandChecker{}
+	preWorkflowHooksRunner := &testPreWorkflowHooksRunnerRunner{
+		error: assert.AnError,
+	}
+	policyCommandRunner := &testPolicyCommandRunner{}
+	vcsStatusUpdater := &testVCSStatusUpdater{}
+	ch = events.DefaultCommandRunner{
+		Drainer:                       &events.Drainer{},
+		Logger:                        logging.NewNoopCtxLogger(t),
+		GlobalCfg:                     valid.NewGlobalCfg("somedir"),
+		StatsScope:                    tally.NewTestScope("atlantis", map[string]string{}),
+		PullStatusFetcher:             &testPullStatusFetcher{},
+		StaleCommandChecker:           staleChecker,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksRunner,
+		VCSStatusUpdater:              vcsStatusUpdater,
+		PolicyCommandRunner:           policyCommandRunner,
+	}
+	ctx := context.Background()
+	ch.RunPRReviewCommand(ctx, fixtures.GithubRepo, fixtures.Pull, fixtures.User, time.Now(), 0)
+	assert.False(t, policyCommandRunner.wasCalled)
+}
+
+type testVCSStatusUpdater struct {
+	output string
+	error  error
+}
+
+func (u testVCSStatusUpdater) UpdateCombined(context.Context, models.Repo, models.PullRequest, models.VCSStatus, fmt.Stringer, string, string) (string, error) {
+	return u.output, u.error
+}
+
+func (u testVCSStatusUpdater) UpdateCombinedCount(context.Context, models.Repo, models.PullRequest, models.VCSStatus, fmt.Stringer, int, int, string) (string, error) {
+	return u.output, u.error
+}
+
+func (u testVCSStatusUpdater) UpdateProject(context.Context, command.ProjectContext, fmt.Stringer, models.VCSStatus, string, string) (string, error) {
+	return u.output, u.error
+}
+
+type testPullStatusFetcher struct {
+	error error
+	pull  *models.PullStatus
+}
+
+func (p testPullStatusFetcher) GetPullStatus(_ models.PullRequest) (*models.PullStatus, error) {
+	return p.pull, p.error
+}
+
+type testPreWorkflowHooksRunnerRunner struct {
+	error error
+}
+
+func (h testPreWorkflowHooksRunnerRunner) RunPreHooks(context.Context, *command.Context) error {
+	return h.error
+}
+
+type testStaleCommandChecker struct {
+	stale bool
+}
+
+func (s testStaleCommandChecker) CommandIsStale(_ *command.Context) bool {
+	return s.stale
+}
+
+type testPolicyCommandRunner struct {
+	wasCalled bool
+}
+
+func (r *testPolicyCommandRunner) Run(_ *command.Context) {
+	r.wasCalled = true
 }

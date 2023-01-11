@@ -1,0 +1,96 @@
+{
+  "action": "submitted",
+  "review": {
+    "id": 1241209205,
+    "commit_id": "d1968d00316b3c3f189138dc0e1c7318b2111a87",
+    "submitted_at": "2020-01-09T21:10:40Z",
+    "state": "approved",
+    "html_url": "https://github.com/runatlantis/atlantis-tests/pull/2#pullrequestreview-1241209205",
+    "pull_request_url": "https://api.github.com/repos/runatlantis/atlantis-tests/pull/2",
+    "author_association": "NONE"
+  },
+  "pull_request": {
+    "url": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/2",
+    "html_url": "https://github.com/runatlantis/atlantis-tests/pull/2",
+    "id": 194034250,
+    "number": 2,
+    "state": "open",
+    "locked": false,
+    "title": "branch",
+    "user": {
+      "login": "runatlantis",
+      "id": 1034429
+    },
+    "body": "",
+    "created_at": "2018-06-11T16:22:16Z",
+    "updated_at": "2018-06-11T16:22:16Z",
+    "closed_at": null,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "assignee": null,
+    "assignees": [
+
+    ],
+    "requested_reviewers": [
+
+    ],
+    "requested_teams": [
+
+    ],
+    "labels": [
+
+    ],
+    "head": {
+      "label": "runatlantis:branch",
+      "ref": "branch",
+      "sha": "c31fd9ea6f557ad2ea659944c3844a059b83bc5d",
+      "user": {
+        "login": "runatlantis"
+      },
+      "repo": {
+        "id": 136474117,
+        "node_id": "MDEwOlJlcG9zaXRvcnkxMzY0NzQxMTc=",
+        "clone_url": "https://github.com/runatlantis/atlantis-tests.git",
+        "name": "atlantis-tests",
+        "full_name": "runatlantis/atlantis-tests",
+        "owner": {
+          "login": "runatlantis"
+        }
+      }
+    },
+    "base": {
+      "label": "runatlantis:master",
+      "ref": "master",
+      "sha": "f59a822e83b3cd193142c7624ea635a5d7894388",
+      "user": {
+        "login": "runatlantis"
+      },
+      "repo": {
+        "id": 136474117,
+        "node_id": "MDEwOlJlcG9zaXRvcnkxMzY0NzQxMTc=",
+        "clone_url": "https://github.com/runatlantis/atlantis-tests.git",
+        "name": "atlantis-tests",
+        "full_name": "runatlantis/atlantis-tests",
+        "owner": {
+          "login": "runatlantis"
+        }
+      }
+    }
+  },
+  "repository": {
+    "id": 136474117,
+    "node_id": "MDEwOlJlcG9zaXRvcnkxMzY0NzQxMTc=",
+    "clone_url": "https://github.com/runatlantis/atlantis-tests.git",
+    "name": "atlantis-tests",
+    "full_name": "runatlantis/atlantis-tests",
+    "owner": {
+      "login": "runatlantis"
+    }
+  },
+  "sender": {
+    "login": "runatlantis"
+  },
+  "installation": {
+    "id": 1
+  }
+}

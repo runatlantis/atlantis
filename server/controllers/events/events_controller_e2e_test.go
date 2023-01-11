@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
-	httputil "github.com/runatlantis/atlantis/server/http"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -71,13 +70,6 @@ func (h noopCheckRunEventHandler) Handle(ctx context.Context, event event_types.
 type noopCheckSuiteEventHandler struct{}
 
 func (h noopCheckSuiteEventHandler) Handle(ctx context.Context, event event_types.CheckSuite) error {
-	return nil
-}
-
-type noopPullRequestReviewEventHandler struct {
-}
-
-func (n noopPullRequestReviewEventHandler) Handle(ctx context.Context, e event_types.PullRequestReview, r *httputil.BufferedRequest) error {
 	return nil
 }
 
@@ -456,6 +448,7 @@ policy-v2:
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -469,6 +462,7 @@ policy-v2:
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-failed.txt"},
 				{"exp-output-merge.txt"},
@@ -498,6 +492,7 @@ policy-v2:
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-failed.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -507,13 +502,12 @@ policy-v2:
 			RepoDir:       "policy-checks-diff-owner",
 			ModifiedFiles: []string{"main.tf"},
 			Comments: []string{
-				"atlantis approve_policies",
 				"atlantis apply",
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
-				{"exp-output-approve-policies.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-failed.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -543,6 +537,11 @@ policy-v2:
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
 			ctrl.Post(w, pullOpenedReq)
+			ResponseContains(t, w, 200, "Processing...")
+
+			pullReviewedReq := GitHubPullRequestReviewedEvent(t, headSHA)
+			w = httptest.NewRecorder()
+			ctrl.Post(w, pullReviewedReq)
 			ResponseContains(t, w, 200, "Processing...")
 
 			// Now send any other comments.
@@ -1012,6 +1011,10 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		command.Version:         versionCommandRunner,
 	}
 	staleCommandChecker := &testStaleCommandChecker{}
+	prrPolicyCommandRunner := &events.PRRPolicyCheckCommandRunner{
+		PrjCmdBuilder:            projectCommandBuilder,
+		PolicyCheckCommandRunner: policyCheckCommandRunner,
+	}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                     vcsClient,
 		GlobalCfg:                     globalCfg,
@@ -1022,6 +1025,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		PullStatusFetcher:             boltdb,
 		StaleCommandChecker:           staleCommandChecker,
 		Logger:                        ctxLogger,
+		PolicyCommandRunner:           prrPolicyCommandRunner,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
@@ -1051,6 +1055,10 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 			Logger:      ctxLogger,
 		},
 	)
+
+	prrHandler := handlers.PullRequestReviewEventHandler{
+		PRReviewCommandRunner: commandRunner,
+	}
 
 	commentHandler := handlers.NewCommentEventWithCommandHandler(
 		commentParser,
@@ -1082,7 +1090,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 				commentHandler,
 				prHandler,
 				noopPushEventHandler{},
-				noopPullRequestReviewEventHandler{},
+				prrHandler,
 				noopCheckRunEventHandler{},
 				noopCheckSuiteEventHandler{},
 				false,
@@ -1110,13 +1118,15 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 
 var (
 	// if not for these we'd be doing disk reads for each test
-	readCommentJSON           sync.Once
-	readPullRequestOpenedJSON sync.Once
-	readPullRequestClosedJSON sync.Once
+	readCommentJSON             sync.Once
+	readPullRequestOpenedJSON   sync.Once
+	readPullRequestClosedJSON   sync.Once
+	readPullRequestReviewedJSON sync.Once
 
-	commentJSON           string
-	pullRequestOpenedJSON string
-	pullRequestClosedJSON string
+	commentJSON             string
+	pullRequestOpenedJSON   string
+	pullRequestClosedJSON   string
+	pullRequestReviewedJSON string
 )
 
 func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
@@ -1168,6 +1178,24 @@ func GitHubPullRequestClosedEvent(t *testing.T) *http.Request {
 	Ok(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(githubHeader, "pull_request")
+	return req
+}
+
+func GitHubPullRequestReviewedEvent(t *testing.T, headSHA string) *http.Request {
+	readPullRequestReviewedJSON.Do(
+		func() {
+			jsonBytes, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestReviewedEvent.json"))
+			Ok(t, err)
+
+			pullRequestReviewedJSON = string(jsonBytes)
+		},
+	)
+	// Replace sha with expected sha.
+	requestJSONStr := strings.Replace(pullRequestReviewedJSON, "c31fd9ea6f557ad2ea659944c3844a059b83bc5d", headSHA, -1)
+	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer([]byte(requestJSONStr)))
+	Ok(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(githubHeader, "pull_request_review")
 	return req
 }
 

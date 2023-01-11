@@ -42,6 +42,7 @@ type CommandRunner interface {
 	// and then calling the appropriate services to finish executing the command.
 	RunCommentCommand(ctx context.Context, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, pullNum int, cmd *command.Comment, timestamp time.Time, installationToken int64)
 	RunAutoplanCommand(ctx context.Context, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time, installationToken int64)
+	RunPRReviewCommand(ctx context.Context, repo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time, installationToken int64)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_stale_command_checker.go StaleCommandChecker
@@ -57,6 +58,10 @@ type StaleCommandChecker interface {
 // CommentCommandRunner runs individual command workflows.
 type CommentCommandRunner interface {
 	Run(*command.Context, *command.Comment)
+}
+
+type policyCommandRunner interface {
+	Run(ctx *command.Context)
 }
 
 func buildCommentCommandRunner(
@@ -90,6 +95,7 @@ type DefaultCommandRunner struct {
 	PullStatusFetcher             PullStatusFetcher
 	StaleCommandChecker           StaleCommandChecker
 	Logger                        logging.Logger
+	PolicyCommandRunner           policyCommandRunner
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -221,6 +227,58 @@ func (c *DefaultCommandRunner) RunCommentCommand(ctx context.Context, baseRepo m
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
 
 	cmdRunner.Run(cmdCtx, cmd)
+}
+
+// RunPRReviewCommand executes the policy check command.
+func (c *DefaultCommandRunner) RunPRReviewCommand(ctx context.Context, repo models.Repo, pull models.PullRequest, user models.User, timestamp time.Time, installationToken int64) {
+	if opStarted := c.Drainer.StartOp(); !opStarted {
+		if commentErr := c.VCSClient.CreateComment(repo, pull.Num, ShutdownComment, ""); commentErr != nil {
+			c.Logger.ErrorContext(ctx, commentErr.Error())
+		}
+		return
+	}
+	defer c.Drainer.OpDone()
+	scope := c.StatsScope.SubScope("pr_approval")
+	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer timer.Stop()
+
+	// only log error here, like with Atlantis autoplans/commands
+	status, err := c.PullStatusFetcher.GetPullStatus(pull)
+	if err != nil {
+		c.Logger.ErrorContext(ctx, err.Error())
+	}
+
+	cmdCtx := &command.Context{
+		User:              user,
+		Log:               c.Logger,
+		Pull:              pull,
+		PullStatus:        status,
+		HeadRepo:          repo,
+		Trigger:           command.AutoTrigger,
+		Scope:             scope,
+		TriggerTimestamp:  timestamp,
+		RequestCtx:        ctx,
+		InstallationToken: installationToken,
+	}
+	if !c.validateCtxAndComment(cmdCtx) {
+		return
+	}
+
+	// Drop request if a more recent VCS event updated Atlantis state
+	if c.StaleCommandChecker.CommandIsStale(cmdCtx) {
+		return
+	}
+
+	if err := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmdCtx); err != nil {
+		c.Logger.ErrorContext(ctx, "Error running pre-workflow hooks", fields.PullRequestWithErr(pull, err))
+		_, err := c.VCSStatusUpdater.UpdateCombined(ctx, cmdCtx.HeadRepo, cmdCtx.Pull, models.FailedVCSStatus, command.PolicyCheck, "", err.Error())
+		if err != nil {
+			c.Logger.ErrorContext(ctx, err.Error())
+		}
+		return
+	}
+	// run policy check command runner
+	c.PolicyCommandRunner.Run(cmdCtx)
 }
 
 func (c *DefaultCommandRunner) validateCtxAndComment(cmdCtx *command.Context) bool {
