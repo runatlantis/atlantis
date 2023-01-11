@@ -79,7 +79,7 @@ func TestRun_Success(t *testing.T) {
 func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	// When running for a project, the planfile has a different name.
 	tmpDir := t.TempDir()
-	planPath := filepath.Join(tmpDir, "projectname-default.tfplan")
+	planPath := filepath.Join(tmpDir, "projectname::default.tfplan")
 	err := os.WriteFile(planPath, nil, 0600)
 
 	logger := logging.NewNoopLogger(t)

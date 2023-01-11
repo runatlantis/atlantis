@@ -79,10 +79,7 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 				continue
 			}
 
-			// Fix: This will return an invalid workspace if
-			// either the project name or workspace has a '-'.
-			workspace := strings.Split(filepath.Base(file), ".")[0]
-
+			workspace := runtime.WorkspaceNameFromPlanfile(filepath.Base(file))
 			projectName, err := runtime.ProjectNameFromPlanfile(workspace, filepath.Base(file))
 			if err != nil {
 				return nil, nil, err

@@ -125,7 +125,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		"-input=false",
 		"-refresh",
 		"-out",
-		"\"/path/projectname-default.tfplan\"",
+		"\"/path/projectname::default.tfplan\"",
 		"-var",
 		"atlantis_user=\"username\"",
 		"-var",

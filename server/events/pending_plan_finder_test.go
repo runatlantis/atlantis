@@ -46,7 +46,7 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		{
 			"root dir project plan",
 			map[string]interface{}{
-				"projectname-default.tfplan": nil,
+				"projectname::default.tfplan": nil,
 			},
 			[]events.PendingPlan{
 				{
@@ -60,7 +60,7 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		{
 			"root dir project plan with slashes",
 			map[string]interface{}{
-				"project::name-default.tfplan": nil,
+				"project::name::default.tfplan": nil,
 			},
 			[]events.PendingPlan{
 				{
@@ -188,13 +188,11 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 // If a planfile is checked in to git, we shouldn't use it.
 func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
 	tmpDir := DirStructure(t, map[string]interface{}{
-		"default": map[string]interface{}{
-			"default.tfplan": nil,
-		},
+		"default.tfplan": nil,
 	})
 
 	// Add that file to git.
-	repoDir := filepath.Join(tmpDir, "default")
+	repoDir := tmpDir
 	runCmd(t, repoDir, "git", "init")
 	runCmd(t, repoDir, "touch", ".gitkeep")
 	runCmd(t, repoDir, "git", "add", ".")
@@ -212,24 +210,16 @@ func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
 // Test that it deletes pending plans.
 func TestPendingPlanFinder_DeletePlans(t *testing.T) {
 	files := map[string]interface{}{
-		"default": map[string]interface{}{
-			"dir1": map[string]interface{}{
-				"default.tfplan": nil,
-			},
-			"dir2": map[string]interface{}{
-				"default.tfplan": nil,
-			},
+		"dir1": map[string]interface{}{
+			"default.tfplan": nil,
+		},
+		"dir2": map[string]interface{}{
+			"default.tfplan": nil,
 		},
 	}
 	tmp := DirStructure(t, files)
 
-	// Create a git repo in each workspace directory.
-	for dirname, contents := range files {
-		// If contents is nil then this isn't a directory.
-		if contents != nil {
-			runCmd(t, filepath.Join(tmp, dirname), "git", "init")
-		}
-	}
+	runCmd(t, tmp, "git", "init")
 
 	pf := &events.DefaultPendingPlanFinder{}
 	Ok(t, pf.DeletePlans(tmp))

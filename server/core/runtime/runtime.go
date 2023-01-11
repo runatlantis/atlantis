@@ -5,6 +5,7 @@ package runtime
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -91,7 +92,7 @@ func GetPlanFilename(workspace string, projName string) string {
 		return fmt.Sprintf("%s.tfplan", workspace)
 	}
 	projName = strings.Replace(projName, "/", planfileSlashReplace, -1)
-	return fmt.Sprintf("%s-%s.tfplan", projName, workspace)
+	return fmt.Sprintf("%s::%s.tfplan", projName, workspace)
 }
 
 // isRemotePlan returns true if planContents are from a plan that was generated
@@ -107,7 +108,7 @@ func IsRemotePlan(planContents []byte) bool {
 // filename is for. If filename is for a project without a name then it will
 // return an empty string. workspace is the workspace this project is in.
 func ProjectNameFromPlanfile(workspace string, filename string) (string, error) {
-	r, err := regexp.Compile(fmt.Sprintf(`(.*?)-%s\.tfplan`, workspace))
+	r, err := regexp.Compile(fmt.Sprintf(`(.*?)::%s\.tfplan`, workspace))
 	if err != nil {
 		return "", errors.Wrap(err, "compiling project name regex, this is a bug")
 	}
@@ -117,4 +118,11 @@ func ProjectNameFromPlanfile(workspace string, filename string) (string, error) 
 	}
 	rawProjName := projMatch[0][1]
 	return strings.Replace(rawProjName, planfileSlashReplace, "/", -1), nil
+}
+
+func WorkspaceNameFromPlanfile(filename string) string {
+	projectWorkspace := strings.Split(filepath.Base(filename), ".")[0]
+	workspaceSlice := strings.Split(filepath.Base(projectWorkspace), "::")
+
+	return workspaceSlice[len(workspaceSlice)-1]
 }

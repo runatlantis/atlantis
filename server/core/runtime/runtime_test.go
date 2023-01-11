@@ -22,22 +22,22 @@ func TestGetPlanFilename(t *testing.T) {
 		{
 			"workspace",
 			"project",
-			"project-workspace.tfplan",
+			"project::workspace.tfplan",
 		},
 		{
 			"workspace",
 			"project/with/slash",
-			"project::with::slash-workspace.tfplan",
+			"project::with::slash::workspace.tfplan",
 		},
 		{
 			"workspace",
 			"project with space",
-			"project with space-workspace.tfplan",
+			"project with space::workspace.tfplan",
 		},
 		{
 			"workspace😀",
 			"project😀",
-			"project😀-workspace😀.tfplan",
+			"project😀::workspace😀.tfplan",
 		},
 		// Previously we replaced invalid chars with -'s, however we now
 		// rely on validation of the atlantis.yaml file to ensure the name's
@@ -46,7 +46,7 @@ func TestGetPlanFilename(t *testing.T) {
 		{
 			"default",
 			`all.invalid.chars \/"*?<>`,
-			"all.invalid.chars \\::\"*?<>-default.tfplan",
+			"all.invalid.chars \\::\"*?<>::default.tfplan",
 		},
 	}
 
@@ -70,17 +70,17 @@ func TestProjectNameFromPlanfile(t *testing.T) {
 		},
 		{
 			"workspace",
-			"project-workspace.tfplan",
+			"project::workspace.tfplan",
 			"project",
 		},
 		{
 			"workspace",
-			"project-workspace-workspace.tfplan",
-			"project-workspace",
+			"project::workspace::workspace.tfplan",
+			"project/workspace",
 		},
 		{
 			"workspace",
-			"project::with::slashes::-workspace.tfplan",
+			"project::with::slashes::::workspace.tfplan",
 			"project/with/slashes/",
 		},
 	}
