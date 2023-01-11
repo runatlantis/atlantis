@@ -27,7 +27,7 @@ jobs:
     if: github.event.pull_request.draft == false
     name: runner / gotest
     runs-on: ubuntu-22.04
-    container: ghcr.io/runatlantis/testing-env:2023.01.04
+    container: ghcr.io/runatlantis/testing-env:latest
     steps:
       - uses: actions/checkout@v3
       - run: make test-all
