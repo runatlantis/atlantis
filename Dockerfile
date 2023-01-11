@@ -4,7 +4,7 @@ ARG ATLANTIS_BASE_TAG_TYPE=alpine
 
 # Stage 1: build artifact
 
-FROM golang:1.19.4-alpine AS builder
+FROM golang:1.19.5-alpine AS builder
 
 WORKDIR /app
 COPY . /app
