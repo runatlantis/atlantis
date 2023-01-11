@@ -566,7 +566,11 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 			}
 		}
 		if len(projectsCfg) == 0 {
-			err = fmt.Errorf("no project with name %q is defined in %s", projectName, repoCfgFile)
+			if p.SilenceNoProjects && len(repoConfig.Projects) > 0 {
+				ctx.Log.Debug("no project with name %q found but silencing the error", projectName)
+			} else {
+				err = fmt.Errorf("no project with name %q is defined in %s", projectName, repoCfgFile)
+			}
 			return
 		}
 		return
@@ -725,6 +729,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	} else {
 		// Ignore the project if silenced with projects set in the repo config
 		if p.SilenceNoProjects && repoCfgPtr != nil && len(repoCfgPtr.Projects) > 0 {
+			ctx.Log.Debug("silencing is in effect, project will be ignored")
 			return []command.ProjectContext{}, nil
 		}
 

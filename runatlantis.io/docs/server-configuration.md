@@ -873,8 +873,10 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_SILENCE_NO_PROJECTS=true
   ```
   `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a project defined in the `atlantis.yaml` file.
-  It has no effect if no projects are defined.
-  The flag also silences targeted commands (eg. `atlantis plan -d ...`).
+  It has no effect if no projects are defined at the repo level.
+  The flag also silences and disables targeted commands (eg. `atlantis plan -d mydir` or `atlantis apply -p myproj`) if the project is not in the repo config.
+
+  In effect this makes sure an Atlantis server only responds to its explicitly declared projects.
 
   This is useful when running multiple Atlantis servers against a single repository so you can
   delegate work to each Atlantis server. Also useful when used with pre_workflow_hooks to dynamically generate an `atlantis.yaml` file.
