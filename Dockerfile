@@ -16,8 +16,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile
 FROM ${ATLANTIS_BASE}:${ATLANTIS_BASE_TAG_DATE}-${ATLANTIS_BASE_TAG_TYPE} AS base
 
-LABEL org.opencontainers.image.description="Terraform Pull Request Automation"
-
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM
 
