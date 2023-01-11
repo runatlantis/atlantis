@@ -43,7 +43,7 @@ func TestRun(t *testing.T) {
 	}
 
 	executorWorkflow := mocks.NewMockVersionedExecutorWorkflow()
-	s := &PolicyCheckStepRunner{
+	s := &policyCheckStepRunner{
 		versionEnsurer: executorWorkflow,
 		executor:       executorWorkflow,
 	}

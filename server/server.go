@@ -598,12 +598,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-		PlanStepRunner: &runtime.PlanStepRunner{
-			TerraformExecutor:   terraformClient,
-			DefaultTFVersion:    defaultTfVersion,
-			CommitStatusUpdater: commitStatusUpdater,
-			AsyncTFExec:         terraformClient,
-		},
+		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfVersion, commitStatusUpdater, terraformClient),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckStepRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
@@ -623,10 +618,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-		ImportStepRunner: &runtime.ImportStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTfVersion,
-		},
+		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfVersion),
 		WorkingDir:                workingDir,
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,

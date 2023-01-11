@@ -447,6 +447,21 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 		},
 		{
+			Description: "import workspace",
+			RepoDir:     "import-workspace",
+			Comments: []string{
+				"atlantis import -d dir1 -w ops 'random_id.dummy1[0]' AA",
+				"atlantis import -p dir1-ops 'random_id.dummy2[0]' BB",
+				"atlantis plan -p dir1-ops",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-import-dir1-ops-dummy1.txt"},
+				{"exp-output-import-dir1-ops-dummy2.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
 			Description:   "import single project with -var",
 			RepoDir:       "import-single-project-var",
 			ModifiedFiles: []string{"main.tf"},
@@ -1054,6 +1069,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	silenceNoProjects := false
 
 	commitStatusUpdater := mocks.NewMockCommitStatusUpdater()
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 
 	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
 	preWorkflowHookURLGenerator := mocks.NewMockPreWorkflowHookURLGenerator()
@@ -1124,19 +1140,18 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
 		},
-		PlanStepRunner: &runtime.PlanStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
+		PlanStepRunner: runtime.NewPlanStepRunner(
+			terraformClient,
+			defaultTFVersion,
+			commitStatusUpdater,
+			asyncTfExec,
+		),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
 		},
-		ImportStepRunner: &runtime.ImportStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
+		ImportStepRunner: runtime.NewImportStepRunner(terraformClient, defaultTFVersion),
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFVersion:        defaultTFVersion,
