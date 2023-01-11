@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-    - image: ghcr.io/runatlantis/testing-env:2023.01.04
+    - image: ghcr.io/runatlantis/testing-env:latest
     steps:
     - checkout
     - run: make check-fmt

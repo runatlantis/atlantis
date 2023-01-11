@@ -521,7 +521,8 @@ If you set a workflow with the key `default`, it will override this.
 ### Owners
 | Key         | Type              | Default | Required   | Description                                             |
 |-------------|-------------------|---------|------------|---------------------------------------------------------|
-| users       | []string          | none    | yes        | list of github users that can approve failing policies  |
+| users       | []string          | none    | no         | list of github users that can approve failing policies  |
+| teams       | []string          | none    | no         | list of github teams that can approve failing policies  |
 
 ### PolicySet
 

@@ -4,7 +4,7 @@ ARG ATLANTIS_BASE_TAG_TYPE=alpine
 
 # Stage 1: build artifact
 
-FROM golang:1.19.4-alpine AS builder
+FROM golang:1.19.5-alpine AS builder
 
 WORKDIR /app
 COPY . /app
@@ -45,7 +45,7 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="1.0.11 1.1.9 1.2.9 ${DEFAULT_TERRAFORM_VERSION
     ln -s "/usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform" /usr/local/bin/terraform
 
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV DEFAULT_CONFTEST_VERSION=0.37.0
+ENV DEFAULT_CONFTEST_VERSION=0.38.0
 
 RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
     case ${TARGETPLATFORM} in \
