@@ -38,13 +38,13 @@ func TestRenderErr(t *testing.T) {
 			"apply error",
 			command.Apply,
 			err,
-			"**Apply Error**\n```\nerr\n```\n",
+			"**Apply Error**\n```\nerr\n```",
 		},
 		{
 			"plan error",
 			command.Plan,
 			err,
-			"**Plan Error**\n```\nerr\n```\n",
+			"**Plan Error**\n```\nerr\n```",
 		},
 		{
 			"policy check error",
@@ -53,7 +53,7 @@ func TestRenderErr(t *testing.T) {
 			"**Policy Check Error**\n```\nerr\n```" +
 				"\n* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:\n" +
 				"    * `atlantis approve_policies`\n" +
-				"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.\n\n",
+				"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.",
 		},
 	}
 
@@ -66,9 +66,9 @@ func TestRenderErr(t *testing.T) {
 			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
 				s := r.Render(res, c.Command, "log", verbose, models.Github)
 				if !verbose {
-					Equals(t, c.Expected, s)
+					Equals(t, strings.TrimSpace(c.Expected), strings.TrimSpace(s))
 				} else {
-					Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+					Equals(t, c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 				}
 			})
 		}
@@ -111,9 +111,9 @@ func TestRenderFailure(t *testing.T) {
 			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
 				s := r.Render(res, c.Command, "log", verbose, models.Github)
 				if !verbose {
-					Equals(t, c.Expected, s)
+					Equals(t, strings.TrimSpace(c.Expected), strings.TrimSpace(s))
 				} else {
-					Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+					Equals(t, c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 				}
 			})
 		}
@@ -127,7 +127,7 @@ func TestRenderErrAndFailure(t *testing.T) {
 		Failure: "failure",
 	}
 	s := r.Render(res, command.Plan, "", false, models.Github)
-	Equals(t, "**Plan Error**\n```\nerror\n```\n", s)
+	Equals(t, "**Plan Error**\n```\nerror\n```", s)
 }
 
 func TestRenderProjectResults(t *testing.T) {
@@ -143,7 +143,7 @@ func TestRenderProjectResults(t *testing.T) {
 			command.Plan,
 			[]command.ProjectResult{},
 			models.Github,
-			"Ran Plan for 0 projects:\n\n\n\n",
+			"Ran Plan for 0 projects:\n\n\n",
 		},
 		{
 			"single successful plan",
@@ -325,10 +325,7 @@ import-output
 $$$
 
 * :repeat: To **plan** this project again, comment:
-  * $atlantis plan -d path -w workspace$
-
-
-`,
+  * $atlantis plan -d path -w workspace$`,
 		},
 		{
 			"single successful apply",
@@ -345,9 +342,7 @@ $$$
 
 $$$diff
 success
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"single successful apply with project name",
@@ -365,9 +360,7 @@ $$$
 
 $$$diff
 success
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"multiple successful plans",
@@ -527,7 +520,6 @@ success2
 $$$
 
 ---
-
 `,
 		},
 		{
@@ -546,9 +538,7 @@ $$$
 **Plan Error**
 $$$
 error
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"single failed plan",
@@ -563,9 +553,7 @@ $$$
 			models.Github,
 			`Ran Plan for dir: $path$ workspace: $workspace$
 
-**Plan Failed**: failure
-
-`,
+**Plan Failed**: failure`,
 		},
 		{
 			"successful, failed, and errored plan",
@@ -687,7 +675,6 @@ $$$
     * $atlantis approve_policies$
 * :repeat: Or, address the policy failure by modifying the codebase and re-planning.
 
-
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
@@ -739,7 +726,6 @@ error
 $$$
 
 ---
-
 `,
 		},
 		{
@@ -786,7 +772,6 @@ error
 $$$
 
 ---
-
 `,
 		},
 	}
@@ -802,9 +787,9 @@ $$$
 					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, expWithBackticks, s)
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
 					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 					}
 				})
 			}
@@ -848,8 +833,6 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
-
-
 `,
 		},
 		{
@@ -880,8 +863,6 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
-
-
 `,
 		},
 		{
@@ -938,7 +919,6 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path2 -w workspace$
 
-
 `,
 		},
 	}
@@ -962,9 +942,9 @@ $$$
 					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, expWithBackticks, s)
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
 					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 					}
 				})
 			}
@@ -1006,8 +986,6 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
-
-
 `,
 		},
 		{
@@ -1036,8 +1014,6 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
-
-
 `,
 		},
 		{
@@ -1090,7 +1066,6 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path2 -w workspace$
 
-
 `,
 		},
 	}
@@ -1115,9 +1090,9 @@ $$$
 					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, expWithBackticks, s)
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
 					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 					}
 				})
 			}
@@ -1158,9 +1133,8 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 			},
 		},
 	}, command.PolicyCheck, "log", false, models.Github)
-	fmt.Println(rendered)
-	Equals(t, rendered, "Ran Policy Check for dir: `path` workspace: `workspace`\n\nsomecustometext\n\n\n")
-
+	exp := "Ran Policy Check for dir: `path` workspace: `workspace`\n\nsomecustometext"
+	Equals(t, exp, rendered)
 }
 
 // Test that if folding is disabled that it's not used.
@@ -1185,7 +1159,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 			},
 		},
 	}, command.Plan, "log", false, models.Github)
-	Equals(t, false, strings.Contains(rendered, "<details>"))
+	Equals(t, false, strings.Contains(rendered, "\n<details>"))
 }
 
 // Test that if the output is longer than 12 lines, it gets wrapped on the right
@@ -1286,18 +1260,14 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 $$$
 ` + c.Output + `
 $$$
-</details>
-
-`
+</details>`
 				} else {
 					exp = `Ran Plan for dir: $.$ workspace: $default$
 
 **Plan Error**
 $$$
 ` + c.Output + `
-$$$
-
-`
+$$$`
 				}
 
 				expWithBackticks := strings.Replace(exp, "$", "`", -1)
@@ -1419,7 +1389,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 <details><summary>Show Output</summary>
 
 $$$diff
-` + c.Output + `
+` + strings.TrimSpace(c.Output) + `
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -1434,13 +1404,12 @@ No changes. Infrastructure is up-to-date.
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * $atlantis unlock$
-`
+    * $atlantis unlock$`
 						} else {
 							exp = `Ran Plan for dir: $.$ workspace: $default$
 
 $$$diff
-` + c.Output + `
+` + strings.TrimSpace(c.Output) + `
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -1453,8 +1422,7 @@ $$$
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * $atlantis unlock$
-`
+    * $atlantis unlock$`
 						}
 					case command.Apply:
 						if c.ShouldWrap {
@@ -1463,19 +1431,16 @@ $$$
 <details><summary>Show Output</summary>
 
 $$$diff
-` + c.Output + `
+` + strings.TrimSpace(c.Output) + `
 $$$
-</details>
 
-`
+</details>`
 						} else {
 							exp = `Ran Apply for dir: $.$ workspace: $default$
 
 $$$diff
-` + c.Output + `
-$$$
-
-`
+` + strings.TrimSpace(c.Output) + `
+$$$`
 						}
 					}
 
@@ -1521,8 +1486,9 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 <details><summary>Show Output</summary>
 
 $$$diff
-` + tfOut + `
+` + strings.TrimSpace(tfOut) + `
 $$$
+
 </details>
 
 ---
@@ -1530,13 +1496,12 @@ $$$
 <details><summary>Show Output</summary>
 
 $$$diff
-` + tfOut + `
+` + strings.TrimSpace(tfOut) + `
 $$$
+
 </details>
 
----
-
-`
+---`
 	expWithBackticks := strings.Replace(exp, "$", "`", -1)
 	Equals(t, expWithBackticks, rendered)
 }
@@ -1617,8 +1582,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * $atlantis unlock$
-`
+    * $atlantis unlock$`
 	expWithBackticks := strings.Replace(exp, "$", "`", -1)
 	Equals(t, expWithBackticks, rendered)
 }
@@ -1643,9 +1607,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 			},
 			exp: `Ran Plan for dir: $.$ workspace: $staging$
 
-**Plan Failed**: failure
-
-`,
+**Plan Failed**: failure`,
 		},
 		"two failures": {
 			cr: command.Result{
@@ -1675,9 +1637,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 ### 2. dir: $.$ workspace: $production$
 **Plan Failed**: failure
 
----
-
-`,
+---`,
 		},
 		"one failure, one success": {
 			cr: command.Result{
@@ -1716,9 +1676,7 @@ $$$
 
 This plan was not saved because one or more projects failed and automerge requires all plans pass.
 
----
-
-`,
+---`,
 		},
 	}
 
@@ -1755,7 +1713,7 @@ func TestRenderProjectResultsWithRepoLockingDisabled(t *testing.T) {
 			command.Plan,
 			[]command.ProjectResult{},
 			models.Github,
-			"Ran Plan for 0 projects:\n\n\n\n",
+			"Ran Plan for 0 projects:\n\n\n",
 		},
 		{
 			"single successful plan",
@@ -1878,9 +1836,7 @@ $$$
 
 $$$diff
 success
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"single successful apply with project name",
@@ -1898,9 +1854,7 @@ $$$
 
 $$$diff
 success
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"multiple successful plans",
@@ -1996,7 +1950,6 @@ success2
 $$$
 
 ---
-
 `,
 		},
 		{
@@ -2015,9 +1968,7 @@ $$$
 **Plan Error**
 $$$
 error
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"single failed plan",
@@ -2032,9 +1983,7 @@ $$$
 			models.Github,
 			`Ran Plan for dir: $path$ workspace: $workspace$
 
-**Plan Failed**: failure
-
-`,
+**Plan Failed**: failure`,
 		},
 		{
 			"successful, failed, and errored plan",
@@ -2141,7 +2090,6 @@ error
 $$$
 
 ---
-
 `,
 		},
 		{
@@ -2188,7 +2136,6 @@ error
 $$$
 
 ---
-
 `,
 		},
 	}
@@ -2213,9 +2160,9 @@ $$$
 					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, expWithBackticks, s)
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
 					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 					}
 				})
 			}
@@ -2617,7 +2564,6 @@ Terraform will perform the following actions:
   }
 
 Plan: 1 to add, 2 to change, 1 to destroy.
-
 $$$
 
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
@@ -2625,8 +2571,6 @@ $$$
     * $atlantis plan -d path -w workspace$
 </details>
 Plan: 1 to add, 2 to change, 1 to destroy.
-
-
 `,
 	},
 }
@@ -2653,9 +2597,9 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, expWithBackticks, s)
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
 					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 					}
 				})
 			}

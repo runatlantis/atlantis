@@ -1,3 +1,10 @@
 {{ define "multiProjectVersion" -}}
-{{ template "multiProjectApply" . }}
-{{- end }}
+{{ template "multiProjectHeader" . }}
+{{ range $i, $result := .Results -}}
+### {{ add $i 1 }}. {{ if $result.ProjectName }}project: `{{ $result.ProjectName }}` {{ end }}dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
+{{ $result.Rendered}}
+
+---
+{{ end -}}
+{{- template "log" . -}}
+{{ end -}}

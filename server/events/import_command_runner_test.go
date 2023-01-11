@@ -29,7 +29,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 				Mergeable:      true,
 			},
 			projectCmds: []command.ProjectContext{},
-			expComment:  "Ran Import for 0 projects:\n\n\n\n",
+			expComment:  "Ran Import for 0 projects:",
 		},
 		{
 			name: "failure with multiple projects",
@@ -38,7 +38,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 				Mergeable:      true,
 			},
 			projectCmds: []command.ProjectContext{{}, {}},
-			expComment:  "**Import Failed**: import cannot run on multiple projects. please specify one project.\n",
+			expComment:  "**Import Failed**: import cannot run on multiple projects. please specify one project.",
 		},
 	}
 	for _, tt := range tests {

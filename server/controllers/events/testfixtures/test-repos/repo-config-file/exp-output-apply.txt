@@ -9,8 +9,6 @@ null_resource.production[0]: Creating...
 null_resource.production[0]: Creation complete after *s [id=*******************]
 
 Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
-
-
 ```
 
 ---
@@ -20,9 +18,6 @@ null_resource.staging[0]: Creating...
 null_resource.staging[0]: Creation complete after *s [id=*******************]
 
 Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
-
-
 ```
 
 ---
-
