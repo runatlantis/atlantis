@@ -140,6 +140,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 		VCSHost: VCSHost{
 			Type:     vcsHostType,
 			Hostname: cloneURLParsed.Hostname(),
+			VcsToken: vcsToken,
 		},
 	}, nil
 }
@@ -289,6 +290,9 @@ type VCSHost struct {
 
 	// Type is which type of VCS host this is, ex. GitHub or GitLab.
 	Type VCSHostType
+
+	// Pat token for DevOps as can't be included in repo URL
+	VcsToken string
 }
 
 type VCSHostType int

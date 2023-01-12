@@ -14,6 +14,7 @@
 package events
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -231,6 +232,10 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	if w.TestingOverrideBaseCloneURL != "" {
 		baseCloneURL = w.TestingOverrideBaseCloneURL
 	}
+	
+	auth := fmt.Sprintf(":%s", headRepo.VCSHost.VcsToken)
+	authBase64Token := base64.StdEncoding.EncodeToString([]byte(auth))
+	headerCmd := []string{"-c", fmt.Sprintf(`http.extraHeader=Authorization: Basic %s`,authBase64Token)}
 
 	var cmds [][]string
 	if w.CheckoutMerge {
@@ -245,15 +250,9 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 			fetchRemote = "origin"
 		}
 		cmds = [][]string{
-			{
-				"git", "clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir,
-			},
-			{
-				"git", "remote", "add", "head", headCloneURL,
-			},
-			{
-				"git", "fetch", fetchRemote, fetchRef,
-			},
+			append(append([]string{"git"}, headerCmd...), []string{"clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir}...),
+			append(append([]string{"git"}, headerCmd...), []string{"remote", "add", "head", headCloneURL}...),
+			append(append([]string{"git"}, headerCmd...), []string{"fetch", fetchRemote, fetchRef}...),
 		}
 		if w.GpgNoSigningEnabled {
 			cmds = append(cmds, []string{
@@ -271,9 +270,7 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 		})
 	} else {
 		cmds = [][]string{
-			{
-				"git", "clone", "--branch", p.HeadBranch, "--depth=1", "--single-branch", headCloneURL, cloneDir,
-			},
+			append(append([]string{"git"}, headerCmd...), []string{"clone", "--branch", p.HeadBranch, "--depth=1", "--single-branch", headCloneURL, cloneDir}...),
 		}
 	}
 
