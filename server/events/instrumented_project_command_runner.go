@@ -46,7 +46,7 @@ func (p *InstrumentedProjectCommandRunner) Apply(ctx command.ProjectContext) com
 }
 
 func (p *InstrumentedProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("approve policies", ctx, p.projectCommandRunner.Apply, p.scope)
+	return RunAndEmitStats("approve policies", ctx, p.projectCommandRunner.ApprovePolicies, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) Import(ctx command.ProjectContext) command.ProjectResult {
