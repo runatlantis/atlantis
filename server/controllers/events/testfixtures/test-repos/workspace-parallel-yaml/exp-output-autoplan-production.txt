@@ -1,9 +1,9 @@
 Ran Plan for 2 projects:
 
-1. dir: `production` workspace: `production`
-1. dir: `staging` workspace: `staging`
+1. dir: `.` workspace: `production`
+1. dir: `.` workspace: `staging`
 
-### 1. dir: `production` workspace: `production`
+### 1. dir: `.` workspace: `production`
 <details><summary>Show Output</summary>
 
 ```diff
@@ -25,15 +25,15 @@ Changes to Outputs:
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d production -w production`
+    * `atlantis apply -w production`
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -d production -w production`
+    * `atlantis plan -w production`
 </details>
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
-### 2. dir: `staging` workspace: `staging`
+### 2. dir: `.` workspace: `staging`
 <details><summary>Show Output</summary>
 
 ```diff
@@ -55,10 +55,10 @@ Changes to Outputs:
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d staging -w staging`
+    * `atlantis apply -w staging`
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -d staging -w staging`
+    * `atlantis plan -w staging`
 </details>
 Plan: 1 to add, 0 to change, 0 to destroy.
 

@@ -14,7 +14,6 @@ workflows:
   default:
     plan:
       steps:
-      - run: rm -rf .terraform
       - init:
           extra_args: [-backend-config=default.backend.tfvars]
       - plan:
@@ -22,7 +21,7 @@ workflows:
   staging:
     plan:
       steps:
-      - run: rm -rf .terraform
+      - run: rm -rf .default
       - init:
           extra_args: [-backend-config=staging.backend.tfvars]
       - plan:
