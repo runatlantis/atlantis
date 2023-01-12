@@ -26,7 +26,7 @@ type PolicySet struct {
 	Source string
 	Path   string
 	Name   string
-	Owners PolicyOwners
+	Owner  string
 }
 
 func (p *PolicySets) HasPolicies() bool {

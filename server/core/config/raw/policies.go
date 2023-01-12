@@ -52,16 +52,16 @@ func (o PolicyOwners) ToValid() valid.PolicyOwners {
 }
 
 type PolicySet struct {
-	Path   string       `yaml:"path" json:"path"`
-	Source string       `yaml:"source" json:"source"`
-	Name   string       `yaml:"name" json:"name"`
-	Owners PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
+	Path   string `yaml:"path" json:"path"`
+	Source string `yaml:"source" json:"source"`
+	Name   string `yaml:"name" json:"name"`
+	Owner  string `yaml:"owner,omitempty" json:"owner,omitempty"`
 }
 
 func (p PolicySet) Validate() error {
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Name, validation.Required.Error("is required")),
-		validation.Field(&p.Owners),
+		validation.Field(&p.Owner, validation.Required.Error("is required")),
 		validation.Field(&p.Path, validation.Required.Error("is required")),
 		validation.Field(&p.Source, validation.In(valid.LocalPolicySet, valid.GithubPolicySet).Error("only 'local' and 'github' source types are supported")),
 	)
@@ -73,7 +73,7 @@ func (p PolicySet) ToValid() valid.PolicySet {
 	policySet.Name = p.Name
 	policySet.Path = p.Path
 	policySet.Source = p.Source
-	policySet.Owners = p.Owners.ToValid()
+	policySet.Owner = p.Owner
 
 	return policySet
 }

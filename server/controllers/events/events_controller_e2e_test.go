@@ -836,17 +836,19 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	// swapping out version cache to something that always returns local contest
 	// binary
 	conftextExec.VersionCache = conftestCache
+
+	reviewFetcher := &mockReviewFetcher{
+		approvers: []string{},
+	}
+	teamFetcher := &mockTeamFetcher{
+		members: []string{},
+	}
 	conftestExecutor := &policy.ConfTestExecutor{
 		SourceResolver: &policy.SourceResolverProxy{
 			LocalSourceResolver: &policy.LocalSourceResolver{},
 		},
-		Exec: runtime_models.LocalExec{},
-		PolicyFilter: &events.ApprovedPolicyFilter{
-			GlobalCfg: globalCfg,
-			PRReviewsFetcher: &mockReviewFetcher{
-				approvers: []string{},
-			},
-		},
+		Exec:         runtime_models.LocalExec{},
+		PolicyFilter: events.NewApprovedPolicyFilter(reviewFetcher, teamFetcher),
 	}
 	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
 		conftestVersion,
@@ -1433,6 +1435,17 @@ type mockReviewFetcher struct {
 func (f *mockReviewFetcher) ListApprovalReviewers(_ context.Context, _ int64, _ models.Repo, _ int) ([]string, error) {
 	f.isCalled = true
 	return f.approvers, f.error
+}
+
+type mockTeamFetcher struct {
+	members  []string
+	error    error
+	isCalled bool
+}
+
+func (t *mockTeamFetcher) ListTeamMembers(_ context.Context, _ int64, _ string) ([]string, error) {
+	t.isCalled = true
+	return t.members, t.error
 }
 
 type testGithubClient struct {
