@@ -38,7 +38,7 @@ jobs:
       - name: failure run notification
         if: ${{ github.ref == 'refs/heads/main' && failure() }}
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_LAUNCHING_CHANNEL_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_CONTRIBUTORS_CHANNEL_WEBHOOK }}
         uses: Ilshidur/action-slack@2.1.0
         with:
           args: |
