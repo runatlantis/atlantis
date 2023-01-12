@@ -14,5 +14,3 @@ your Terraform state and will henceforth be managed by Terraform.
 
 * :repeat: To **plan** this project again, comment:
   * `atlantis plan -p dir1-ops`
-
-
