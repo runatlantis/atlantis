@@ -232,10 +232,16 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	if w.TestingOverrideBaseCloneURL != "" {
 		baseCloneURL = w.TestingOverrideBaseCloneURL
 	}
-	
-	auth := fmt.Sprintf(":%s", headRepo.VCSHost.VcsToken)
-	authBase64Token := base64.StdEncoding.EncodeToString([]byte(auth))
-	headerCmd := []string{"-c", fmt.Sprintf(`http.extraHeader=Authorization: Basic %s`,authBase64Token)}
+
+	var headerCmd []string
+
+	if headRepo.VCSHost.VcsToken != "" {
+		auth := fmt.Sprintf(":%s", headRepo.VCSHost.VcsToken)
+		authBase64Token := base64.StdEncoding.EncodeToString([]byte(auth))
+		headerCmd = []string{"-c", fmt.Sprintf(`http.extraHeader=Authorization: Basic %s`, authBase64Token)}
+	} else {
+		headerCmd = []string{}
+	}
 
 	var cmds [][]string
 	if w.CheckoutMerge {

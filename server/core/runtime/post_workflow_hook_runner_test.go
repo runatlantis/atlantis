@@ -88,7 +88,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 				},
 				HeadRepo: models.Repo{
 					Name:  "headname",
-					Owner: "headowner",
+					Owner: "headowner",					
 				},
 				Pull: models.PullRequest{
 					Num:        2,

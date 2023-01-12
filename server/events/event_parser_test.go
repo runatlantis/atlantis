@@ -1215,6 +1215,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 		VCSHost: models.VCSHost{
 			Hostname: "dev.azure.com",
 			Type:     models.AzureDevops,
+			VcsToken: "azuredevops-token",
 		},
 	}, r)
 
@@ -1232,6 +1233,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 		VCSHost: models.VCSHost{
 			Hostname: "dev.azure.com",
 			Type:     models.AzureDevops,
+			VcsToken: "azuredevops-token",
 		},
 	}, r)
 
@@ -1249,6 +1251,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 		VCSHost: models.VCSHost{
 			Hostname: "owner.visualstudio.com",
 			Type:     models.AzureDevops,
+			VcsToken: "azuredevops-token",
 		},
 	}, r)
 
@@ -1266,6 +1269,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 		VCSHost: models.VCSHost{
 			Hostname: "dev.azure.com",
 			Type:     models.AzureDevops,
+			VcsToken: "azuredevops-token",
 		},
 	}, r)
 }
@@ -1308,6 +1312,7 @@ func TestParseAzureDevopsPullEvent(t *testing.T) {
 		VCSHost: models.VCSHost{
 			Hostname: "dev.azure.com",
 			Type:     models.AzureDevops,
+			VcsToken: "azuredevops-token",
 		},
 	}
 	Equals(t, expBaseRepo, actBaseRepo)
@@ -1410,6 +1415,7 @@ func TestParseAzureDevopsPull(t *testing.T) {
 		VCSHost: models.VCSHost{
 			Hostname: "dev.azure.com",
 			Type:     models.AzureDevops,
+			VcsToken: "azuredevops-token",
 		},
 	}
 	Equals(t, models.PullRequest{
@@ -1441,6 +1447,7 @@ func TestParseAzureDevopsSelfHostedRepo(t *testing.T) {
 		VCSHost: models.VCSHost{
 			Hostname: "devops.abc.com",
 			Type:     models.AzureDevops,
+			VcsToken: "azuredevops-token",
 		},
 	}, r)
 
@@ -1484,6 +1491,7 @@ func TestParseAzureDevopsSelfHostedPullEvent(t *testing.T) {
 		VCSHost: models.VCSHost{
 			Hostname: "devops.abc.com",
 			Type:     models.AzureDevops,
+			VcsToken: "azuredevops-token",
 		},
 	}
 	Equals(t, expBaseRepo, actBaseRepo)
@@ -1586,6 +1594,7 @@ func TestParseAzureSelfHostedDevopsPull(t *testing.T) {
 		VCSHost: models.VCSHost{
 			Hostname: "devops.abc.com",
 			Type:     models.AzureDevops,
+			VcsToken: "azuredevops-token",
 		},
 	}
 	Equals(t, models.PullRequest{

@@ -131,6 +131,11 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 		return Repo{}, fmt.Errorf("invalid repo format %q, repo %q should not contain any /'s", repoFullName, owner)
 	}
 
+	azuredevopsVcsToken := ""
+	if vcsHostType == AzureDevops {
+		azuredevopsVcsToken = vcsToken
+	}
+
 	return Repo{
 		FullName:          repoFullName,
 		Owner:             owner,
@@ -140,7 +145,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 		VCSHost: VCSHost{
 			Type:     vcsHostType,
 			Hostname: cloneURLParsed.Hostname(),
-			VcsToken: vcsToken,
+			VcsToken: azuredevopsVcsToken,
 		},
 	}, nil
 }
