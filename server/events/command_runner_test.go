@@ -16,6 +16,7 @@ package events_test
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -70,11 +71,18 @@ var importCommandRunner *events.ImportCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 
+func AnyRepo() models.Repo {
+	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.Repo{})))
+	return models.Repo{}
+}
+
 type TestConfig struct {
-	parallelPoolSize      int
-	SilenceNoProjects     bool
-	StatusName            string
-	discardApprovalOnPlan bool
+	parallelPoolSize           int
+	SilenceNoProjects          bool
+	silenceVCSStatusNoPlans    bool
+	silenceVCSStatusNoProjects bool
+	StatusName                 string
+	discardApprovalOnPlan      bool
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -133,13 +141,13 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		commitUpdater,
 		projectCommandRunner,
 		testConfig.parallelPoolSize,
-		false,
+		testConfig.silenceVCSStatusNoProjects,
 		false,
 	)
 
 	planCommandRunner = events.NewPlanCommandRunner(
-		false,
-		false,
+		testConfig.silenceVCSStatusNoPlans,
+		testConfig.silenceVCSStatusNoProjects,
 		vcsClient,
 		pendingPlanFinder,
 		workingDir,
@@ -171,7 +179,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		defaultBoltDB,
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
-		false,
+		testConfig.silenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
 	)
 
@@ -182,7 +190,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		pullUpdater,
 		dbUpdater,
 		testConfig.SilenceNoProjects,
-		false,
+		testConfig.silenceVCSStatusNoProjects,
 		vcsClient,
 	)
 

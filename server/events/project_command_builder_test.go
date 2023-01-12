@@ -196,6 +196,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 		Description      string
 		AtlantisYAML     string
 		Cmd              events.CommentCommand
+		Silenced         bool
 		ExpCommentArgs   []string
 		ExpWorkspace     string
 		ExpDir           string
@@ -204,6 +205,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 		ExpApplyReqs     []string
 		ExpParallelApply bool
 		ExpParallelPlan  bool
+		ExpNoProjects    bool
 	}{
 		{
 			Description: "no atlantis.yaml",
@@ -368,6 +370,22 @@ projects:
 			ExpErr: "no project with name \"notconfigured\" is defined in atlantis.yaml",
 		},
 		{
+			Description: "atlantis.yaml with project flag not matching but silenced",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				RepoRelDir:  ".",
+				Workspace:   "default",
+				ProjectName: "notconfigured",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- dir: .
+`,
+			Silenced:      true,
+			ExpNoProjects: true,
+		},
+		{
 			Description: "atlantis.yaml with ParallelPlan Set to true",
 			Cmd: events.CommentCommand{
 				Name:        command.Plan,
@@ -439,7 +457,7 @@ projects:
 					"",
 					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 					false,
-					false,
+					c.Silenced,
 					scope,
 					logger,
 					terraformClient,
@@ -461,6 +479,10 @@ projects:
 					return
 				}
 				Ok(t, err)
+				if c.ExpNoProjects {
+					Equals(t, 0, len(actCtxs))
+					return
+				}
 				Equals(t, 1, len(actCtxs))
 				actCtx := actCtxs[0]
 				Equals(t, c.ExpDir, actCtx.RepoRelDir)
