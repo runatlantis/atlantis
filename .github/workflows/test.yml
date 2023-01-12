@@ -31,3 +31,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: make test-all
+
+      ###########################################################
+      # Notifying #contributors about test failure on main branch
+      ###########################################################
+      - name: failure run notification
+        if: ${{ github.ref == 'refs/heads/main' && failure() }}
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_LAUNCHING_CHANNEL_WEBHOOK }}
+        uses: Ilshidur/action-slack@2.1.0
+        with:
+          args: |
+            :scream: :scream: :scream: gotest job <https://github.com/runatlantis/atlantis/actions/runs/${{github.run_id}}|#${{github.run_number}}> failed!
