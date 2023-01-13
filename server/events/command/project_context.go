@@ -23,6 +23,9 @@ type ProjectContext struct {
 	// ApplyCmd is the command that users should run to apply this plan. If
 	// this is an apply then this will be empty.
 	ApplyCmd string
+	// PlanRequirements is the list of requirements that must be satisfied
+	// before we will run the plan stage.
+	PlanRequirements []string
 	// ApplyRequirements is the list of requirements that must be satisfied
 	// before we will run the apply stage.
 	ApplyRequirements []string

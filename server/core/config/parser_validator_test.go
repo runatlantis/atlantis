@@ -1249,7 +1249,13 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   allowed_overrides: [invalid]`,
-			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\" and \"repo_locking\" are supported.).).",
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"plan_requirements\", \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\" and \"repo_locking\" are supported.).).",
+		},
+		"invalid plan_requirement": {
+			input: `repos:
+- id: /.*/
+  plan_requirements: [invalid]`,
+			expErr: "repos: (0: (plan_requirements: \"invalid\" is not a valid plan_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
 		},
 		"invalid apply_requirement": {
 			input: `repos:
@@ -1332,7 +1338,7 @@ repos:
   workflow: custom1
   post_workflow_hooks:
     - run: custom workflow command
-  allowed_overrides: [apply_requirements, import_requirements, workflow, delete_source_branch_on_merge]
+  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, delete_source_branch_on_merge]
   allow_custom_workflows: true
 - id: /.*/
   branch: /(master|main)/
@@ -1379,7 +1385,7 @@ policies:
 						PreWorkflowHooks:     preWorkflowHooks,
 						Workflow:             &customWorkflow1,
 						PostWorkflowHooks:    postWorkflowHooks,
-						AllowedOverrides:     []string{"apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge"},
+						AllowedOverrides:     []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
@@ -1460,6 +1466,7 @@ workflows:
 					{
 						IDRegex:            regexp.MustCompile(".*"),
 						BranchRegex:        regexp.MustCompile(".*"),
+						PlanRequirements:   []string{},
 						ApplyRequirements:  []string{},
 						ImportRequirements: []string{},
 						Workflow: &valid.Workflow{

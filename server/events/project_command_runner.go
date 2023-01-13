@@ -404,6 +404,11 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
+	failure, err := p.CommandRequirementHandler.ValidatePlanProject(repoDir, ctx)
+	if failure != "" || err != nil {
+		return nil, failure, err
+	}
+
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 
 	if err != nil {

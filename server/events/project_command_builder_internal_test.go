@@ -76,6 +76,7 @@ workflows:
 				},
 				Pull:               pull,
 				ProjectName:        "",
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{},
 				ImportRequirements: []string{},
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
@@ -131,6 +132,7 @@ projects:
 				},
 				Pull:               pull,
 				ProjectName:        "",
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{},
 				ImportRequirements: []string{},
 				RepoConfigVersion:  3,
@@ -153,6 +155,7 @@ projects:
 repos:
 - id: /.*/
   workflow: default
+  plan_requirements: [approved, mergeable]
   apply_requirements: [approved, mergeable]
   import_requirements: [approved, mergeable]
 workflows:
@@ -189,6 +192,7 @@ projects:
 				},
 				Pull:               pull,
 				ProjectName:        "",
+				PlanRequirements:   []string{"approved", "mergeable"},
 				ApplyRequirements:  []string{"approved", "mergeable"},
 				ImportRequirements: []string{"approved", "mergeable"},
 				RepoConfigVersion:  3,
@@ -213,6 +217,7 @@ repos:
   workflow: default
 - id: github.com/owner/repo
   workflow: specific
+  plan_requirements: [approved]
   apply_requirements: [approved]
   import_requirements: [approved]
 workflows:
@@ -255,6 +260,7 @@ projects:
 				},
 				Pull:               pull,
 				ProjectName:        "",
+				PlanRequirements:   []string{"approved"},
 				ApplyRequirements:  []string{"approved"},
 				ImportRequirements: []string{"approved"},
 				RepoConfigVersion:  3,
@@ -409,6 +415,7 @@ workflows:
 				},
 				Pull:               pull,
 				ProjectName:        "",
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{},
 				ImportRequirements: []string{},
 				RepoConfigVersion:  3,
@@ -470,6 +477,7 @@ projects:
 				},
 				Pull:               pull,
 				ProjectName:        "",
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{},
 				ImportRequirements: []string{},
 				RepoConfigVersion:  3,
@@ -534,6 +542,7 @@ workflows:
 				},
 				Pull:               pull,
 				ProjectName:        "",
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{},
 				ImportRequirements: []string{},
 				RepoConfigVersion:  3,
@@ -554,6 +563,7 @@ workflows:
 			globalCfg: `
 repos:
 - id: /.*/
+  plan_requirements: [approved]
   apply_requirements: [approved]
   import_requirements: [approved]
 - id: github.com/owner/repo
@@ -583,6 +593,7 @@ projects:
 				},
 				Pull:               pull,
 				ProjectName:        "",
+				PlanRequirements:   []string{"approved"},
 				ApplyRequirements:  []string{"approved"},
 				ImportRequirements: []string{"approved"},
 				RepoConfigVersion:  3,
@@ -793,6 +804,7 @@ projects:
 				},
 				Pull:               pull,
 				ProjectName:        "myproject_1",
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{},
 				ImportRequirements: []string{},
 				RepoConfigVersion:  3,
@@ -967,6 +979,7 @@ repos:
 				},
 				Pull:               pull,
 				ProjectName:        "",
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{},
 				ImportRequirements: []string{},
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
@@ -1027,6 +1040,7 @@ workflows:
 				},
 				Pull:               pull,
 				ProjectName:        "",
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{},
 				ImportRequirements: []string{},
 				RepoConfigVersion:  3,
