@@ -43,14 +43,9 @@ require (
 	github.com/xanzy/go-gitlab v0.77.0
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.24.0
-<<<<<<< HEAD
-	golang.org/x/exp v0.0.0-20221217163422-3c43f8badb15
-	golang.org/x/term v0.3.0
-	golang.org/x/text v0.5.0
-=======
+	golang.org/x/exp v0.0.0-20230113152452-c42ee1cf562e
 	golang.org/x/term v0.4.0
 	golang.org/x/text v0.6.0
->>>>>>> main
 	gopkg.in/yaml.v2 v2.4.0
 )
 

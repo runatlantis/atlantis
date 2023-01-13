@@ -126,13 +126,8 @@ func TestRenderErrAndFailure(t *testing.T) {
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-<<<<<<< HEAD
 	s := r.Render(res, command.Plan, "", "", false, models.Github)
-	Equals(t, "**Plan Error**\n```\nerror\n```\n", s)
-=======
-	s := r.Render(res, command.Plan, "", false, models.Github)
 	Equals(t, "**Plan Error**\n```\nerror\n```", s)
->>>>>>> main
 }
 
 func TestRenderProjectResults(t *testing.T) {
@@ -363,8 +358,6 @@ $$$
 
 * :repeat: To **plan** this project again, comment:
   * $atlantis plan -d path -w workspace$
-
-
 `,
 		},
 		{
@@ -1183,16 +1176,9 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 				},
 			},
 		},
-<<<<<<< HEAD
 	}, command.PolicyCheck, "", "log", false, models.Github)
-	fmt.Println(rendered)
-	Equals(t, rendered, "Ran Policy Check for dir: `path` workspace: `workspace`\n\nsomecustometext\n\n\n")
-
-=======
-	}, command.PolicyCheck, "log", false, models.Github)
 	exp := "Ran Policy Check for dir: `path` workspace: `workspace`\n\nsomecustometext"
 	Equals(t, exp, rendered)
->>>>>>> main
 }
 
 // Test that if folding is disabled that it's not used.
@@ -1216,13 +1202,8 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 				Error:      errors.New(strings.Repeat("line\n", 13)),
 			},
 		},
-<<<<<<< HEAD
 	}, command.Plan, "", "log", false, models.Github)
-	Equals(t, false, strings.Contains(rendered, "<details>"))
-=======
-	}, command.Plan, "log", false, models.Github)
 	Equals(t, false, strings.Contains(rendered, "\n<details>"))
->>>>>>> main
 }
 
 // Test that if the output is longer than 12 lines, it gets wrapped on the right
@@ -2695,7 +2676,7 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 				b.Run(fmt.Sprintf("verbose %t", verbose), func(b *testing.B) {
 					b.ReportAllocs()
 					for i := 0; i < b.N; i++ {
-						render = r.Render(res, c.Command, "log", verbose, c.VCSHost)
+						render = r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
 					}
 					Render = render
 				})

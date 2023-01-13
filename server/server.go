@@ -618,18 +618,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-<<<<<<< HEAD
-		ImportStepRunner: &runtime.ImportStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTfVersion,
-		},
+		ImportStepRunner: runtime.NewImportStepRunner(terraformClient, defaultTfVersion),
 		StateRmStepRunner: &runtime.StateRmStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-=======
-		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfVersion),
->>>>>>> main
 		WorkingDir:                workingDir,
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,

@@ -8,5 +8,3 @@ Successfully removed 2 resource instance(s).
 
 * :repeat: To **plan** this project again, comment:
   * `atlantis plan -d .`
-
-

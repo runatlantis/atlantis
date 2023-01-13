@@ -224,33 +224,6 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyUnwrappedSuccess"), struct{ Output string }{output})
 			}
 		} else if result.VersionSuccess != "" {
-<<<<<<< HEAD
-			if m.shouldUseWrappedTmpl(vcsHost, result.VersionSuccess) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{strings.TrimSpace(result.VersionSuccess)})
-			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("versionUnwrappedSuccess"), struct{ Output string }{strings.TrimSpace(result.VersionSuccess)})
-			}
-			numVersionSuccesses++
-		} else if result.ImportSuccess != nil {
-			data := importSuccessData{
-				Output:    strings.TrimSpace(result.ImportSuccess.Output),
-				RePlanCmd: result.ImportSuccess.RePlanCmd,
-			}
-			if m.shouldUseWrappedTmpl(vcsHost, result.ImportSuccess.Output) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("importSuccessWrapped"), data)
-			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("importSuccessUnwrapped"), data)
-			}
-		} else if result.StateRmSuccess != nil {
-			data := stateRmSuccessData{
-				Output:    strings.TrimSpace(result.StateRmSuccess.Output),
-				RePlanCmd: result.StateRmSuccess.RePlanCmd,
-			}
-			if m.shouldUseWrappedTmpl(vcsHost, result.StateRmSuccess.Output) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("stateRmSuccessWrapped"), data)
-			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("stateRmSuccessUnwrapped"), data)
-=======
 			output := strings.TrimSpace(result.VersionSuccess)
 			if m.shouldUseWrappedTmpl(vcsHost, output) {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{output})
@@ -264,7 +237,16 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessWrapped"), result.ImportSuccess)
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
->>>>>>> main
+			}
+		} else if result.StateRmSuccess != nil {
+			data := stateRmSuccessData{
+				Output:    strings.TrimSpace(result.StateRmSuccess.Output),
+				RePlanCmd: result.StateRmSuccess.RePlanCmd,
+			}
+			if m.shouldUseWrappedTmpl(vcsHost, result.StateRmSuccess.Output) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessWrapped"), data)
+			} else {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), data)
 			}
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"

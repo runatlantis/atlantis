@@ -12,7 +12,6 @@ Successfully removed 1 resource instance(s).
 * :repeat: To **plan** this project again, comment:
   * `atlantis plan -d dir1`
 
-
 ---
 ### 2. dir: `dir2` workspace: `default`
 ```diff
@@ -22,6 +21,5 @@ Successfully removed 1 resource instance(s).
 
 * :repeat: To **plan** this project again, comment:
   * `atlantis plan -d dir2`
-
 
 ---
