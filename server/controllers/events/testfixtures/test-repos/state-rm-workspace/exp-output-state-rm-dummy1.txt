@@ -5,5 +5,5 @@ Removed random_id.dummy1[0]
 Successfully removed 1 resource instance(s).
 ```
 
-* :repeat: To **plan** this project again, comment:
+* :warning: plan file was discarded, to **plan** this project again, comment:
   * `atlantis plan -p dir1-ops`
