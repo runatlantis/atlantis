@@ -1,8 +1,18 @@
-module.exports = {
+import { googleAnalyticsPlugin } from '@vuepress/plugin-google-analytics'
+import { docsearchPlugin } from '@vuepress/plugin-docsearch'
+import { defaultTheme } from '@vuepress/theme-default'
+
+export default {
     title: 'Atlantis',
     description: 'Atlantis: Terraform Pull Request Automation',
     plugins: [
-        ['@vuepress/google-analytics', { ga: "UA-6850151-3", }]
+        googleAnalyticsPlugin({
+            id: 'UA-6850151-3',
+        }),
+        docsearchPlugin({
+            apiKey: '3b733dff1539ca3a210775860301fa86',
+            indexName: 'runatlantis',
+        }),
     ],
     head: [
         ['link', { rel: 'icon', type: 'image/png', href: '/favicon-196x196.png', sizes: '196x196' }],
@@ -18,28 +28,26 @@ module.exports = {
         ['link', { rel: 'apple-touch-icon-precomposed', sizes: '120x120', href: '/apple-touch-icon-120x120.png' }],
         ['link', { rel: 'apple-touch-icon-precomposed', sizes: '76x76', href: '/apple-touch-icon-76x76.png' }],
         ['link', { rel: 'apple-touch-icon-precomposed', sizes: '152x152', href: '/apple-touch-icon-152x152.png' }],
-        ['meta', {name: 'msapplication-TileColor', content: '#FFFFFF' }],
-        ['meta', {name: 'msapplication-TileImage', content: '/mstile-144x144.png' }],
-        ['meta', {name: 'msapplication-square70x70logo', content: '/mstile-70x70.png' }],
-        ['meta', {name: 'msapplication-square150x150logo', content: '/mstile-150x150.png' }],
-        ['meta', {name: 'msapplication-wide310x150logo', content: '/mstile-310x150.png' }],
-        ['meta', {name: 'msapplication-square310x310logo', content: '/mstile-310x310.png' }],
+        ['meta', { name: 'msapplication-TileColor', content: '#FFFFFF' }],
+        ['meta', { name: 'msapplication-TileImage', content: '/mstile-144x144.png' }],
+        ['meta', { name: 'msapplication-square70x70logo', content: '/mstile-70x70.png' }],
+        ['meta', { name: 'msapplication-square150x150logo', content: '/mstile-150x150.png' }],
+        ['meta', { name: 'msapplication-wide310x150logo', content: '/mstile-310x150.png' }],
+        ['meta', { name: 'msapplication-square310x310logo', content: '/mstile-310x310.png' }],
         ['link', { rel: 'stylesheet', sizes: '152x152', href: 'https://fonts.googleapis.com/css?family=Lato:400,900' }],
-        ['meta', {name: 'google-site-verification', content: 'kTnsDBpHqtTNY8oscYxrQeeiNml2d2z-03Ct9wqeCeE' }]
+        ['meta', { name: 'google-site-verification', content: 'kTnsDBpHqtTNY8oscYxrQeeiNml2d2z-03Ct9wqeCeE' }],
     ],
-    themeConfig: {
-        docsBranch: "main",
+    themePlugins: {
         activeHeaderLinks: false,
-        algolia: {
-          apiKey: '3b733dff1539ca3a210775860301fa86',
-          indexName: 'runatlantis'
-        },
+    },
+    theme: defaultTheme({
+        docsBranch: "main",
         logo: '/hero.png',
-        nav: [
-            {text: 'Home', link: '/'},
-            {text: 'Guide', link: '/guide/'},
-            {text: 'Docs', link: '/docs/'},
-            {text: 'Blog', link: 'https://medium.com/runatlantis'}
+        navbar: [
+            { text: 'Home', link: '/' },
+            { text: 'Guide', link: '/guide/' },
+            { text: 'Docs', link: '/docs/' },
+            { text: 'Blog', link: 'https://medium.com/runatlantis' },
         ],
         sidebar: {
             '/guide/': [
@@ -49,8 +57,8 @@ module.exports = {
             ],
             '/docs/': [
                 {
-                    title: 'Installing Atlantis',
-                    collapsable: true,
+                    text: 'Installing Atlantis',
+                    collapsible: true,
                     children: [
                         'installation-guide',
                         'requirements',
@@ -58,12 +66,12 @@ module.exports = {
                         'webhook-secrets',
                         'deployment',
                         'configuring-webhooks',
-                        'provider-credentials'
+                        'provider-credentials',
                     ]
                 },
                 {
-                    title: 'Configuring Atlantis',
-                    collapsable: true,
+                    text: 'Configuring Atlantis',
+                    collapsible: true,
                     children: [
                         ['configuring-atlantis', 'Overview'],
                         'server-configuration',
@@ -80,37 +88,37 @@ module.exports = {
                         'terraform-cloud',
                         'using-slack-hooks',
                         'stats',
-                        'faq'
+                        'faq',
                     ]
                 },
                 {
-                    title: 'Using Atlantis',
-                    collapsable: true,
+                    text: 'Using Atlantis',
+                    collapsible: true,
                     children: [
-                        ['using-atlantis', 'Overview']
+                        'using-atlantis',
                     ]
                 },
                 {
-                    title: 'How Atlantis Works',
-                    collapsable: true,
+                    text: 'How Atlantis Works',
+                    collapsible: true,
                     children: [
-                        ['how-atlantis-works', 'Overview'],
+                        'how-atlantis-works',
                         'locking',
                         'autoplanning',
                         'automerging',
-                        'security'
+                        'security',
                     ]
                 },
                 {
-                    title: 'Real-time Terraform Logs',
-                    collapsable: true,
+                    text: 'Real-time Terraform Logs',
+                    collapsible: true,
                     children: [
-                        'streaming-logs'
+                        'streaming-logs',
                     ]
                 },
                 {
-                    title: 'Troubleshooting',
-                    collapsable: true,
+                    text: 'Troubleshooting',
+                    collapsible: true,
                     children: [
                         'troubleshooting-https',
                     ]
@@ -119,6 +127,6 @@ module.exports = {
         },
         repo: 'runatlantis/atlantis',
         docsDir: 'runatlantis.io',
-        editLinks: true,
-    }
+        editLink: true,
+    })
 }
