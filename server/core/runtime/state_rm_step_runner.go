@@ -8,13 +8,21 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
-type StateRmStepRunner struct {
-	TerraformExecutor TerraformExec
-	DefaultTFVersion  *version.Version
+type stateRmStepRunner struct {
+	terraformExecutor TerraformExec
+	defaultTFVersion  *version.Version
 }
 
-func (p *StateRmStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	tfVersion := p.DefaultTFVersion
+func NewStateRmStepRunner(terraformExecutor TerraformExec, defaultTfVersion *version.Version) Runner {
+	runner := &stateRmStepRunner{
+		terraformExecutor: terraformExecutor,
+		defaultTFVersion:  defaultTfVersion,
+	}
+	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfVersion, runner)
+}
+
+func (p *stateRmStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	tfVersion := p.defaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}
@@ -22,7 +30,7 @@ func (p *StateRmStepRunner) Run(ctx command.ProjectContext, extraArgs []string, 
 	stateRmCmd := []string{"state", "rm"}
 	stateRmCmd = append(stateRmCmd, extraArgs...)
 	stateRmCmd = append(stateRmCmd, ctx.EscapedCommentArgs...)
-	out, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), stateRmCmd, envs, tfVersion, ctx.Workspace)
+	out, err := p.terraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), stateRmCmd, envs, tfVersion, ctx.Workspace)
 
 	// If the state rm was successful and a plan file exists, delete the plan.
 	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))

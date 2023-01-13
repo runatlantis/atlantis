@@ -524,6 +524,23 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 		},
 		{
+			Description: "state rm workspace",
+			RepoDir:     "state-rm-workspace",
+			Comments: []string{
+				"atlantis import -p dir1-ops 'random_id.dummy1[0]' AA",
+				"atlantis plan -p dir1-ops",
+				"atlantis state rm -p dir1-ops 'random_id.dummy1[0]'",
+				"atlantis plan -p dir1-ops",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-import-dummy1.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-state-rm-dummy1.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
 			Description:   "state rm multiple project",
 			RepoDir:       "state-rm-multiple-project",
 			ModifiedFiles: []string{"dir1/main.tf", "dir2/main.tf"},
@@ -1199,11 +1216,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
 		},
-		ImportStepRunner: runtime.NewImportStepRunner(terraformClient, defaultTFVersion),
-		StateRmStepRunner: &runtime.StateRmStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
+		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFVersion),
+		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFVersion),
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFVersion:        defaultTFVersion,

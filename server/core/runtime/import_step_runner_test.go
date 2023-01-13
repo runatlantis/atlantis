@@ -65,7 +65,7 @@ func TestImportStepRunner_Run_Workspace(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	s := NewImportStepRunner(terraform, tfVersion)
 
-	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(runtimematchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), runtimematchers.AnyMapOfStringToString(), runtimematchers.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
 	Ok(t, err)
