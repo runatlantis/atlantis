@@ -16,7 +16,6 @@ var = "fromfile"
 workspace = "staging"
 
 postapply
-
 ```
-</details>
 
+</details>

@@ -21,7 +21,6 @@ func NewApplyCommandRunner(
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
-	VCSStatusName string,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
@@ -38,7 +37,6 @@ func NewApplyCommandRunner(
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
-		VCSStatusName:              VCSStatusName,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 	}
 }
@@ -61,7 +59,6 @@ type ApplyCommandRunner struct {
 	SilenceNoProjects bool
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
-	VCSStatusName              string
 	silenceVCSStatusNoProjects bool
 }
 
@@ -105,7 +102,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	// required the Atlantis status checks to pass, then we've now changed
 	// the mergeability status of the pull request.
 	// This sets the approved, mergeable, and sqlocked status in the context.
-	ctx.PullRequestStatus, err = a.pullReqStatusFetcher.FetchPullStatus(baseRepo, pull, a.VCSStatusName)
+	ctx.PullRequestStatus, err = a.pullReqStatusFetcher.FetchPullStatus(pull)
 	if err != nil {
 		// On error we continue the request with mergeable assumed false.
 		// We want to continue because not all apply's will need this status,

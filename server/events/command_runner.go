@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v48/github"
+	"github.com/google/go-github/v49/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -156,7 +156,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		PullStatus: status,
 		Trigger:    command.AutoTrigger,
 	}
-	if !c.validateCtxAndComment(ctx) {
+	if !c.validateCtxAndComment(ctx, command.Autoplan) {
 		return
 	}
 	if c.DisableAutoplan {
@@ -281,7 +281,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		Trigger:    command.CommentTrigger,
 	}
 
-	if !c.validateCtxAndComment(ctx) {
+	if !c.validateCtxAndComment(ctx, cmd.Name) {
 		return
 	}
 
@@ -391,7 +391,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	return
 }
 
-func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context) bool {
+func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, commandName command.Name) bool {
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
 		if c.SilenceForkPRErrors {
 			return false
@@ -403,7 +403,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context) bool 
 		return false
 	}
 
-	if ctx.Pull.State != models.OpenPullState {
+	if ctx.Pull.State != models.OpenPullState && commandName != command.Unlock {
 		ctx.Log.Info("command was run on closed pull request")
 		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)

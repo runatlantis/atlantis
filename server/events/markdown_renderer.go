@@ -45,16 +45,17 @@ var (
 
 // MarkdownRenderer renders responses as markdown.
 type MarkdownRenderer struct {
-	// GitlabSupportsCommonMark is true if the version of GitLab we're
+	// gitlabSupportsCommonMark is true if the version of GitLab we're
 	// using supports the CommonMark markdown format.
 	// If we're not configured with a GitLab client, this will be false.
-	GitlabSupportsCommonMark bool
-	DisableApplyAll          bool
-	DisableApply             bool
-	DisableMarkdownFolding   bool
-	DisableRepoLocking       bool
-	EnableDiffMarkdownFormat bool
-	MarkdownTemplates        *template.Template
+	gitlabSupportsCommonMark bool
+	disableApplyAll          bool
+	disableApply             bool
+	disableMarkdownFolding   bool
+	disableRepoLocking       bool
+	enableDiffMarkdownFormat bool
+	markdownTemplates        *template.Template
+	executableName           string
 }
 
 // commonData is data that all responses have.
@@ -68,6 +69,7 @@ type commonData struct {
 	DisableApply             bool
 	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
+	ExecutableName           string
 }
 
 // errData is data about an error response.
@@ -120,29 +122,31 @@ type stateRmSuccessData struct {
 }
 
 // Initialize templates
-func GetMarkdownRenderer(
-	GitlabSupportsCommonMark bool,
-	DisableApplyAll bool,
-	DisableApply bool,
-	DisableMarkdownFolding bool,
-	DisableRepoLocking bool,
-	EnableDiffMarkdownFormat bool,
-	MarkdownTemplateOverridesDir string,
+func NewMarkdownRenderer(
+	gitlabSupportsCommonMark bool,
+	disableApplyAll bool,
+	disableApply bool,
+	disableMarkdownFolding bool,
+	disableRepoLocking bool,
+	enableDiffMarkdownFormat bool,
+	markdownTemplateOverridesDir string,
+	executableName string,
 ) *MarkdownRenderer {
 	var templates *template.Template
 	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
-	if overrides, err := templates.ParseGlob(fmt.Sprintf("%s/*.tmpl", MarkdownTemplateOverridesDir)); err == nil {
+	if overrides, err := templates.ParseGlob(fmt.Sprintf("%s/*.tmpl", markdownTemplateOverridesDir)); err == nil {
 		// doesn't override if templates directory doesn't exist
 		templates = overrides
 	}
 	return &MarkdownRenderer{
-		GitlabSupportsCommonMark: GitlabSupportsCommonMark,
-		DisableApplyAll:          DisableApplyAll,
-		DisableMarkdownFolding:   DisableMarkdownFolding,
-		DisableApply:             DisableApply,
-		DisableRepoLocking:       DisableRepoLocking,
-		EnableDiffMarkdownFormat: EnableDiffMarkdownFormat,
-		MarkdownTemplates:        templates,
+		gitlabSupportsCommonMark: gitlabSupportsCommonMark,
+		disableApplyAll:          disableApplyAll,
+		disableMarkdownFolding:   disableMarkdownFolding,
+		disableApply:             disableApply,
+		disableRepoLocking:       disableRepoLocking,
+		enableDiffMarkdownFormat: enableDiffMarkdownFormat,
+		markdownTemplates:        templates,
+		executableName:           executableName,
 	}
 }
 
@@ -156,19 +160,20 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subC
 		Verbose:                  verbose,
 		Log:                      log,
 		PlansDeleted:             res.PlansDeleted,
-		DisableApplyAll:          m.DisableApplyAll || m.DisableApply,
-		DisableApply:             m.DisableApply,
-		DisableRepoLocking:       m.DisableRepoLocking,
-		EnableDiffMarkdownFormat: m.EnableDiffMarkdownFormat,
+		DisableApplyAll:          m.disableApplyAll || m.disableApply,
+		DisableApply:             m.disableApply,
+		DisableRepoLocking:       m.disableRepoLocking,
+		EnableDiffMarkdownFormat: m.enableDiffMarkdownFormat,
+		ExecutableName:           m.executableName,
 	}
 
-	templates := m.MarkdownTemplates
+	templates := m.markdownTemplates
 
 	if res.Error != nil {
-		return m.renderTemplate(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), common})
+		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), common})
 	}
 	if res.Failure != "" {
-		return m.renderTemplate(templates.Lookup("failureWithLog"), failureData{res.Failure, common})
+		return m.renderTemplateTrimSpace(templates.Lookup("failureWithLog"), failureData{res.Failure, common})
 	}
 	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
 }
@@ -179,7 +184,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 	numPolicyCheckSuccesses := 0
 	numVersionSuccesses := 0
 
-	templates := m.MarkdownTemplates
+	templates := m.markdownTemplates
 
 	for _, result := range results {
 		resultData := projectResultTmplData{
@@ -192,42 +197,34 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			if m.shouldUseWrappedTmpl(vcsHost, result.Error.Error()) {
 				tmpl = templates.Lookup("wrappedErr")
 			}
-			resultData.Rendered = m.renderTemplate(tmpl, struct {
-				Command string
-				Error   string
-			}{
-				Command: common.Command,
-				Error:   result.Error.Error(),
-			})
+			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), common})
 		} else if result.Failure != "" {
-			resultData.Rendered = m.renderTemplate(templates.Lookup("failure"), struct {
-				Command string
-				Failure string
-			}{
-				Command: common.Command,
-				Failure: result.Failure,
-			})
+			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, common})
 		} else if result.PlanSuccess != nil {
+			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("planSuccessUnwrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			}
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
+			result.PolicyCheckSuccess.PolicyCheckOutput = strings.TrimSpace(result.PolicyCheckSuccess.PolicyCheckOutput)
 			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckSuccess.PolicyCheckOutput) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("policyCheckSuccessUnwrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessUnwrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
 			}
 			numPolicyCheckSuccesses++
 		} else if result.ApplySuccess != "" {
+			output := strings.TrimSpace(result.ApplySuccess)
 			if m.shouldUseWrappedTmpl(vcsHost, result.ApplySuccess) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("applyWrappedSuccess"), struct{ Output string }{result.ApplySuccess})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyWrappedSuccess"), struct{ Output string }{output})
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("applyUnwrappedSuccess"), struct{ Output string }{result.ApplySuccess})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyUnwrappedSuccess"), struct{ Output string }{output})
 			}
 		} else if result.VersionSuccess != "" {
+<<<<<<< HEAD
 			if m.shouldUseWrappedTmpl(vcsHost, result.VersionSuccess) {
 				resultData.Rendered = m.renderTemplate(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{strings.TrimSpace(result.VersionSuccess)})
 			} else {
@@ -253,6 +250,21 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				resultData.Rendered = m.renderTemplate(templates.Lookup("stateRmSuccessWrapped"), data)
 			} else {
 				resultData.Rendered = m.renderTemplate(templates.Lookup("stateRmSuccessUnwrapped"), data)
+=======
+			output := strings.TrimSpace(result.VersionSuccess)
+			if m.shouldUseWrappedTmpl(vcsHost, output) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{output})
+			} else {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionUnwrappedSuccess"), struct{ Output string }{output})
+			}
+			numVersionSuccesses++
+		} else if result.ImportSuccess != nil {
+			result.ImportSuccess.Output = strings.TrimSpace(result.ImportSuccess.Output)
+			if m.shouldUseWrappedTmpl(vcsHost, result.ImportSuccess.Output) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessWrapped"), result.ImportSuccess)
+			} else {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
+>>>>>>> main
 			}
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
@@ -306,7 +318,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 	default:
 		return fmt.Sprintf("no template matched–this is a bug: command=%s", common.Command)
 	}
-	return m.renderTemplate(tmpl, resultData{resultsTmplData, common})
+	return m.renderTemplateTrimSpace(tmpl, resultData{resultsTmplData, common})
 }
 
 // shouldUseWrappedTmpl returns true if we should use the wrapped markdown
@@ -314,7 +326,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 // load. Some VCS providers or versions of VCS providers don't support this
 // syntax.
 func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, output string) bool {
-	if m.DisableMarkdownFolding {
+	if m.disableMarkdownFolding {
 		return false
 	}
 
@@ -323,17 +335,17 @@ func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, outp
 		return false
 	}
 
-	if vcsHost == models.Gitlab && !m.GitlabSupportsCommonMark {
+	if vcsHost == models.Gitlab && !m.gitlabSupportsCommonMark {
 		return false
 	}
 
 	return strings.Count(output, "\n") > maxUnwrappedLines
 }
 
-func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
+func (m *MarkdownRenderer) renderTemplateTrimSpace(tmpl *template.Template, data interface{}) string {
 	buf := &bytes.Buffer{}
 	if err := tmpl.Execute(buf, data); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
 	}
-	return buf.String()
+	return strings.TrimSpace(buf.String())
 }

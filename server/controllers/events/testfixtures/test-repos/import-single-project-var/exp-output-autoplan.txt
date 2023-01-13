@@ -3,7 +3,6 @@ Ran Plan for dir: `.` workspace: `default`
 <details><summary>Show Output</summary>
 
 ```diff
-
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
 + create
@@ -33,8 +32,6 @@ Terraform will perform the following actions:
     }
 
 Plan: 2 to add, 0 to change, 0 to destroy.
-
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:

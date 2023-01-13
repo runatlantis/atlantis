@@ -11,7 +11,6 @@ No changes. Your infrastructure matches the configuration.
 
 Terraform has compared your real infrastructure against your configuration
 and found no differences, so no changes are needed.
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -25,7 +24,6 @@ and found no differences, so no changes are needed.
 <details><summary>Show Output</summary>
 
 ```diff
-
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
 + create
@@ -44,8 +42,6 @@ Terraform will perform the following actions:
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
-
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:

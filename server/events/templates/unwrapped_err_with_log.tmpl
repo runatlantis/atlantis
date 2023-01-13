@@ -1,3 +1,4 @@
 {{ define "unwrappedErrWithLog" -}}
-{{ template "unwrappedErr" . }}{{ template "log" . }}
-{{ end }}
+{{ template "unwrappedErr" . }}
+{{- template "log" . -}}
+{{ end -}}

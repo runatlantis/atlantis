@@ -16,7 +16,6 @@ Outputs:
 
 var = "new_workspace"
 workspace = "new_workspace"
-
 ```
-</details>
 
+</details>

@@ -9,7 +9,6 @@ Checking plan against the following policies:
   test_policy
 
 1 test, 1 passed, 0 warnings, 0 failures, 0 exceptions
-
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -33,7 +32,6 @@ FAIL - <redacted plan file> - main - WARNING: Forbidden Resource creation is pro
 * :heavy_check_mark: To **approve** failing policies an authorized approver can comment:
     * `atlantis approve_policies`
 * :repeat: Or, address the policy failure by modifying the codebase and re-planning.
-
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:

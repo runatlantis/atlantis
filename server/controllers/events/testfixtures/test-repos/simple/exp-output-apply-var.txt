@@ -16,7 +16,6 @@ Outputs:
 
 var = "overridden"
 workspace = "default"
-
 ```
-</details>
 
+</details>

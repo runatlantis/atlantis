@@ -5,29 +5,33 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
+//go:generate pegomock generate -m --package mocks -o mocks/mock_pull_req_status_fetcher.go PullReqStatusFetcher
+
 type PullReqStatusFetcher interface {
-	FetchPullStatus(repo models.Repo, pull models.PullRequest, vcsstatusname string) (models.PullReqStatus, error)
+	FetchPullStatus(pull models.PullRequest) (models.PullReqStatus, error)
 }
 
 type pullReqStatusFetcher struct {
-	client Client
+	client        Client
+	vcsStatusName string
 }
 
-func NewPullReqStatusFetcher(client Client) PullReqStatusFetcher {
+func NewPullReqStatusFetcher(client Client, vcsStatusName string) PullReqStatusFetcher {
 	return &pullReqStatusFetcher{
-		client: client,
+		client:        client,
+		vcsStatusName: vcsStatusName,
 	}
 }
 
-func (f *pullReqStatusFetcher) FetchPullStatus(repo models.Repo, pull models.PullRequest, vcsstatusname string) (pullStatus models.PullReqStatus, err error) {
-	approvalStatus, err := f.client.PullIsApproved(repo, pull)
+func (f *pullReqStatusFetcher) FetchPullStatus(pull models.PullRequest) (pullStatus models.PullReqStatus, err error) {
+	approvalStatus, err := f.client.PullIsApproved(pull.BaseRepo, pull)
 	if err != nil {
-		return pullStatus, errors.Wrapf(err, "fetching pull approval status for repo: %s, and pull number: %d", repo.FullName, pull.Num)
+		return pullStatus, errors.Wrapf(err, "fetching pull approval status for repo: %s, and pull number: %d", pull.BaseRepo.FullName, pull.Num)
 	}
 
-	mergeable, err := f.client.PullIsMergeable(repo, pull, vcsstatusname)
+	mergeable, err := f.client.PullIsMergeable(pull.BaseRepo, pull, f.vcsStatusName)
 	if err != nil {
-		return pullStatus, errors.Wrapf(err, "fetching mergeability status for repo: %s, and pull number: %d", repo.FullName, pull.Num)
+		return pullStatus, errors.Wrapf(err, "fetching mergeability status for repo: %s, and pull number: %d", pull.BaseRepo.FullName, pull.Num)
 	}
 
 	return models.PullReqStatus{

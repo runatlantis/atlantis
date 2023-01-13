@@ -225,7 +225,7 @@ and set `--autoplan-modules` to `false`.
   If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure DevOps org. This means that an
   attacker could spoof calls to Atlantis and cause it to perform malicious
-  actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_BASIC_AUTH` environment
+  actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD` environment
   variable.
   :::
 
@@ -320,6 +320,9 @@ and set `--autoplan-modules` to `false`.
   Defaults to `~/.atlantis`. Atlantis will store its database, checked out repos, Terraform plans and downloaded
   Terraform binaries here. If Atlantis loses this directory, [locks](locking.html)
   will be lost and unapplied plans will be lost.
+
+  Note that the atlantis user is restricted to `~/.atlantis`. 
+  If you set the `--data-dir` flag to a path outside of Atlantis its home directory, ensure that you grant the atlantis user the correct permissions.
 
 ### `--default-tf-version`
   ```bash

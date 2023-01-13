@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v48/github"
+	"github.com/google/go-github/v49/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 
@@ -443,6 +443,21 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-no-projects.txt"},
 				{"exp-output-import-dummy2.txt"},
 				{"exp-output-plan-again.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description: "import workspace",
+			RepoDir:     "import-workspace",
+			Comments: []string{
+				"atlantis import -d dir1 -w ops 'random_id.dummy1[0]' AA",
+				"atlantis import -p dir1-ops 'random_id.dummy2[0]' BB",
+				"atlantis plan -p dir1-ops",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-import-dir1-ops-dummy1.txt"},
+				{"exp-output-import-dir1-ops-dummy2.txt"},
+				{"exp-output-plan.txt"},
 				{"exp-output-merge.txt"},
 			},
 		},
@@ -1020,6 +1035,7 @@ type setupOption struct {
 
 func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
+	discardApprovalOnPlan := true
 	dataDir, binDir, cacheDir := mkSubDirs(t)
 
 	// Mocks.
@@ -1101,6 +1117,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	silenceNoProjects := false
 
 	commitStatusUpdater := mocks.NewMockCommitStatusUpdater()
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 
 	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
 	preWorkflowHookURLGenerator := mocks.NewMockPreWorkflowHookURLGenerator()
@@ -1171,15 +1188,18 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
 		},
-		PlanStepRunner: &runtime.PlanStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
+		PlanStepRunner: runtime.NewPlanStepRunner(
+			terraformClient,
+			defaultTFVersion,
+			commitStatusUpdater,
+			asyncTfExec,
+		),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
 		},
+<<<<<<< HEAD
 		ImportStepRunner: &runtime.ImportStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
@@ -1188,6 +1208,9 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
 		},
+=======
+		ImportStepRunner: runtime.NewImportStepRunner(terraformClient, defaultTFVersion),
+>>>>>>> main
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFVersion:        defaultTFVersion,
@@ -1208,7 +1231,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	pullUpdater := &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            e2eVCSClient,
-		MarkdownRenderer:     events.GetMarkdownRenderer(false, false, false, false, false, false, ""),
+		MarkdownRenderer:     events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis"),
 	}
 
 	autoMerger := &events.AutoMerger{
@@ -1243,9 +1266,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		silenceNoProjects,
 		boltdb,
 		lockingClient,
+		discardApprovalOnPlan,
 	)
 
-	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
+	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient, "atlantis-test")
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		e2eVCSClient,
@@ -1261,7 +1285,6 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		parallelPoolSize,
 		silenceNoProjects,
 		false,
-		"atlantis-test",
 		e2ePullReqStatusFetcher,
 	)
 
@@ -1273,6 +1296,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		dbUpdater,
 		silenceNoProjects,
 		false,
+		e2eVCSClient,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
@@ -1291,6 +1315,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	importCommandRunner := events.NewImportCommandRunner(
 		pullUpdater,
+		e2ePullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
 	)

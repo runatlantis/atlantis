@@ -8,13 +8,21 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
-type ImportStepRunner struct {
-	TerraformExecutor TerraformExec
-	DefaultTFVersion  *version.Version
+type importStepRunner struct {
+	terraformExecutor TerraformExec
+	defaultTFVersion  *version.Version
 }
 
-func (p *ImportStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	tfVersion := p.DefaultTFVersion
+func NewImportStepRunner(terraformExecutor TerraformExec, defaultTfVersion *version.Version) Runner {
+	runner := &importStepRunner{
+		terraformExecutor: terraformExecutor,
+		defaultTFVersion:  defaultTfVersion,
+	}
+	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfVersion, runner)
+}
+
+func (p *importStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	tfVersion := p.defaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}
@@ -22,7 +30,7 @@ func (p *ImportStepRunner) Run(ctx command.ProjectContext, extraArgs []string, p
 	importCmd := []string{"import"}
 	importCmd = append(importCmd, extraArgs...)
 	importCmd = append(importCmd, ctx.EscapedCommentArgs...)
-	out, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), importCmd, envs, tfVersion, ctx.Workspace)
+	out, err := p.terraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), importCmd, envs, tfVersion, ctx.Workspace)
 
 	// If the import was successful and a plan file exists, delete the plan.
 	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))

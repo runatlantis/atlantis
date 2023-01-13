@@ -1,7 +1,8 @@
 {{ define "approveAllProjects" -}}
 Approved Policies for {{ len .Results }} projects:
 
-{{ range $result := .Results }}1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`
-{{end}}
-{{ template "log" . }}
+{{ range $result := .Results -}}
+1. {{ if $result.ProjectName }}project: `{{ $result.ProjectName }}` {{ end }}dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
+{{ end -}}
+{{- template "log" . -}}
 {{ end }}
