@@ -12,7 +12,7 @@ export default {
         '/es/': {
             lang: 'es-ES',
             title: 'Atlántida',
-            description: 'Atlántida: Terraform Pull Request Automatización',
+            description: 'Automatización de Pull Requests para Terraform',
         },
     },
     plugins: [
