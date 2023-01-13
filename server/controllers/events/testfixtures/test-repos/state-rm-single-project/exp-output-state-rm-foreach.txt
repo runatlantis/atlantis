@@ -5,5 +5,5 @@ Removed random_id.for_each["overridden"]
 Successfully removed 1 resource instance(s).
 ```
 
-* :warning: plan file was discarded, to **plan** this project again, comment:
+* :repeat: plan file was discarded, to **plan** this project again, comment:
   * `atlantis plan -d .`

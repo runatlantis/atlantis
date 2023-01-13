@@ -331,7 +331,7 @@ $$$diff
 import-output
 $$$
 
-* :warning: plan file was discarded, to **plan** this project again, comment:
+* :repeat: plan file was discarded, to **plan** this project again, comment:
   * $atlantis plan -d path -w workspace$`,
 		},
 		{
@@ -356,7 +356,7 @@ $$$diff
 state-rm-output
 $$$
 
-* :warning: plan file was discarded, to **plan** this project again, comment:
+* :repeat: plan file was discarded, to **plan** this project again, comment:
   * $atlantis plan -d path -w workspace$
 `,
 		},
