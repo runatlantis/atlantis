@@ -111,16 +111,6 @@ type projectResultTmplData struct {
 	Rendered    string
 }
 
-type importSuccessData struct {
-	Output    string
-	RePlanCmd string
-}
-
-type stateRmSuccessData struct {
-	Output    string
-	RePlanCmd string
-}
-
 // Initialize templates
 func NewMarkdownRenderer(
 	gitlabSupportsCommonMark bool,
@@ -239,14 +229,11 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
 			}
 		} else if result.StateRmSuccess != nil {
-			data := stateRmSuccessData{
-				Output:    strings.TrimSpace(result.StateRmSuccess.Output),
-				RePlanCmd: result.StateRmSuccess.RePlanCmd,
-			}
+			result.StateRmSuccess.Output = strings.TrimSpace(result.StateRmSuccess.Output)
 			if m.shouldUseWrappedTmpl(vcsHost, result.StateRmSuccess.Output) {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessWrapped"), data)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessWrapped"), result.StateRmSuccess)
 			} else {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), data)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
 			}
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
