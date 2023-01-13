@@ -16,6 +16,7 @@ atlantis
 .devcontainer
 atlantis.env
 *.act
+package-lock.json
 
 # gitreleaser
 dist/

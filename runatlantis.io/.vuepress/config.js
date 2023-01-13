@@ -3,8 +3,18 @@ import { docsearchPlugin } from '@vuepress/plugin-docsearch'
 import { defaultTheme } from '@vuepress/theme-default'
 
 export default {
-    title: 'Atlantis',
-    description: 'Atlantis: Terraform Pull Request Automation',
+    locales: {
+        '/': {
+            lang: 'en-US',
+            title: 'Atlantis',
+            description: 'Atlantis: Terraform Pull Request Automation',
+        },
+        '/es/': {
+            lang: 'es-ES',
+            title: 'Atlántida',
+            description: 'Atlántida: Terraform Pull Request Automatización',
+        },
+    },
     plugins: [
         googleAnalyticsPlugin({
             id: 'UA-6850151-3',
@@ -43,12 +53,26 @@ export default {
     theme: defaultTheme({
         docsBranch: "main",
         logo: '/hero.png',
-        navbar: [
-            { text: 'Home', link: '/' },
-            { text: 'Guide', link: '/guide/' },
-            { text: 'Docs', link: '/docs/' },
-            { text: 'Blog', link: 'https://medium.com/runatlantis' },
-        ],
+        locales: {
+            '/': {
+                selectLanguageName: 'English',
+                navbar: [
+                    { text: 'Home', link: '/' },
+                    { text: 'Guide', link: '/guide/' },
+                    { text: 'Docs', link: '/docs/' },
+                    { text: 'Blog', link: 'https://medium.com/runatlantis' },
+                ],
+            },
+            '/es/': {
+                selectLanguageName: 'Spanish',
+                navbar: [
+                    { text: 'Home', link: '/es/' },
+                    { text: 'Guide', link: '/es/guide/' },
+                    { text: 'Docs', link: '/es/docs/' },
+                    { text: 'Blog', link: 'https://medium.com/runatlantis' },
+                ],
+            },
+        },
         sidebar: {
             '/guide/': [
                 '',
