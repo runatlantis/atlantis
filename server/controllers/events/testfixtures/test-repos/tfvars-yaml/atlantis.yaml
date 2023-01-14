@@ -11,15 +11,14 @@ workflows:
     plan:
       steps:
       - init:
-          extra_args: [-backend-config=default.backend.tfvars]
+          extra_args: [-reconfigure, -backend-config=default.backend.tfvars]
       - plan:
           extra_args: [-var-file=default.tfvars]
       - run: echo workspace=$WORKSPACE
   staging:
     plan:
       steps:
-      - run: rm -rf .default
       - init:
-          extra_args: [-backend-config=staging.backend.tfvars]
+          extra_args: [-reconfigure, -backend-config=staging.backend.tfvars]
       - plan:
           extra_args: [-var-file, staging.tfvars]
