@@ -1,9 +1,9 @@
 Ran Apply for 2 projects:
 
-1. dir: `dir1` workspace: `default`
-1. dir: `dir2` workspace: `default`
+1. project: `dir1` dir: `dir1` workspace: `default`
+1. project: `dir2` dir: `dir2` workspace: `default`
 
-### 1. dir: `dir1` workspace: `default`
+### 1. project: `dir1` dir: `dir1` workspace: `default`
 ```diff
 null_resource.simple:
 null_resource.simple:
@@ -17,7 +17,7 @@ workspace = "default"
 ```
 
 ---
-### 2. dir: `dir2` workspace: `default`
+### 2. project: `dir2` dir: `dir2` workspace: `default`
 **Apply Failed**: All policies must pass for project before running apply
 
 ---

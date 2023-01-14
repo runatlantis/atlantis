@@ -51,7 +51,7 @@ type ConftestTestCommandArgs struct {
 }
 
 func (c ConftestTestCommandArgs) build() ([]string, error) {
-
+	// TODO: remove check when legacy contest client is depreccated
 	if len(c.PolicyArgs) == 0 {
 		return []string{}, errors.New("no policies specified")
 	}

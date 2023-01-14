@@ -1,4 +1,4 @@
-Ran Apply for dir: `.` workspace: `default`
+Ran Apply for dir: `staging` workspace: `staging`
 
 ```diff
 atlantis apply is disabled for this project. Please track the deployment when the PR is merged. 

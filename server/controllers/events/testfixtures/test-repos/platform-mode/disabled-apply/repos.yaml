@@ -3,6 +3,6 @@ repos:
 policies:
   policy_sets:
     - name: test_policy
-      owner: runatlantis
+      owner: someoneelse
       paths:
         - ../policies/policy.rego

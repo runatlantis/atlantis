@@ -1,9 +1,9 @@
 Ran Policy Check for 2 projects:
 
-1. dir: `dir1` workspace: `default`
-1. dir: `dir2` workspace: `default`
+1. project: `dir1` dir: `dir1` workspace: `default`
+1. project: `dir2` dir: `dir2` workspace: `default`
 
-### 1. dir: `dir1` workspace: `default`
+### 1. project: `dir1` dir: `dir1` workspace: `default`
 ```diff
 Checking plan against the following policies: 
   test_policy
@@ -12,14 +12,9 @@ Checking plan against the following policies:
 
 ```
 
-* :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d dir1`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
-* :repeat: To re-run policies **plan** this project again by commenting:
-    * `atlantis plan -d dir1`
 
 ---
-### 2. dir: `dir2` workspace: `default`
+### 2. project: `dir2` dir: `dir2` workspace: `default`
 **Policy Check Failed**
 ```
 exit status 1

@@ -37,6 +37,26 @@ policy_sets:
 				},
 			},
 		},
+		{
+			description: "valid yaml with multiple paths",
+			input: `
+conftest_version: v1.0.0
+policy_sets:
+- name: policy-name
+  source: "local"
+  paths: ["rel/path/to/policy-set", "rel/path/to/another/policy-set"]
+`,
+			exp: raw.PolicySets{
+				Version: String("v1.0.0"),
+				PolicySets: []raw.PolicySet{
+					{
+						Name:   "policy-name",
+						Source: valid.LocalPolicySet,
+						Paths:  []string{"rel/path/to/policy-set", "rel/path/to/another/policy-set"},
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -85,6 +105,12 @@ func TestPolicySets_Validate(t *testing.T) {
 						Path:   "rel/path/to/source",
 						Source: valid.GithubPolicySet,
 					},
+					{
+						Name:   "policy-name-3",
+						Owner:  "owner3",
+						Paths:  []string{"rel/path/to/source", "rel/diff/path/to/source"},
+						Source: valid.LocalPolicySet,
+					},
 				},
 			},
 			expErr: "",
@@ -98,13 +124,13 @@ func TestPolicySets_Validate(t *testing.T) {
 		},
 
 		{
-			description: "missing policy name and source path",
+			description: "missing policy name",
 			input: raw.PolicySets{
 				PolicySets: []raw.PolicySet{
 					{},
 				},
 			},
-			expErr: "policy_sets: (0: (name: is required; owner: is required; path: is required.).).",
+			expErr: "policy_sets: (0: (name: is required; owner: is required.).).",
 		},
 		{
 			description: "invalid source type",
@@ -220,6 +246,37 @@ func TestPolicySets_ToValid(t *testing.T) {
 					{
 						Name:   "good-policy",
 						Path:   "rel/path/to/source",
+						Source: "local",
+					},
+				},
+			},
+		},
+		{
+			description: "valid policies with multiple paths",
+			input: raw.PolicySets{
+				Version: String("v1.0.0"),
+				Owners: raw.PolicyOwners{
+					Users: []string{
+						"test",
+					},
+				},
+				PolicySets: []raw.PolicySet{
+					{
+						Name:   "good-policy",
+						Paths:  []string{"rel/path/to/source", "rel/path/to/source2"},
+						Source: valid.LocalPolicySet,
+					},
+				},
+			},
+			exp: valid.PolicySets{
+				Version: version,
+				Owners: valid.PolicyOwners{
+					Users: []string{"test"},
+				},
+				PolicySets: []valid.PolicySet{
+					{
+						Name:   "good-policy",
+						Paths:  []string{"rel/path/to/source", "rel/path/to/source2"},
 						Source: "local",
 					},
 				},

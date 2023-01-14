@@ -23,10 +23,11 @@ type PolicyOwners struct {
 }
 
 type PolicySet struct {
-	Source string
-	Path   string
+	Source string // TODO: seems unused, remove when legacy policy checks are deprecated
+	Path   string // TODO: replaced by Paths, remove when legacy policy checks are deprecated
 	Name   string
 	Owner  string
+	Paths  []string
 }
 
 func (p *PolicySets) HasPolicies() bool {

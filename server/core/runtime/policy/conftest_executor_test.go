@@ -17,6 +17,7 @@ import (
 
 const (
 	path           = "/path/to/some/place"
+	path2          = "/path/to/another/place"
 	output         = "test output"
 	workDir        = "workDir"
 	executablePath = "executablepath"
@@ -48,178 +49,118 @@ func buildTestTitle(policySets []valid.PolicySet) string {
 }
 
 func TestConfTestExecutor_PolicySuccess(t *testing.T) {
-	sourceResolver := &mockSourceResolver{path: path}
 	exec := &mockExec{
 		output: output,
 	}
 	policyFilter := &mockPolicyFilter{}
 	executor := policy.ConfTestExecutor{
-		SourceResolver: sourceResolver,
-		Exec:           exec,
-		PolicyFilter:   policyFilter,
+		Exec:         exec,
+		PolicyFilter: policyFilter,
 	}
 	var args []string
 	policySets := []valid.PolicySet{
-		{Name: policyA},
-		{Name: policyB},
+		{Name: policyA, Paths: []string{path, path2}},
+		{Name: policyB, Paths: []string{path, path2}},
 	}
 	prjCtx := buildTestProjectCtx(t, policySets)
 	expectedTitle := buildTestTitle(policySets)
 	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	assert.NoError(t, err)
-	assert.True(t, sourceResolver.isCalled)
-	assert.True(t, exec.isCalled)
+	assert.Equal(t, exec.numCalls, 2)
 	assert.True(t, policyFilter.isCalled)
 	assert.Contains(t, cmdOutput, expectedTitle)
 	assert.Contains(t, cmdOutput, output)
 }
 
 func TestConfTestExecutor_PolicySuccess_FilteredFailures(t *testing.T) {
-	sourceResolver := &mockSourceResolver{path: path}
 	exec := &mockExec{
 		output: output,
 		error:  assert.AnError,
 	}
 	policyFilter := &mockPolicyFilter{}
 	executor := policy.ConfTestExecutor{
-		SourceResolver: sourceResolver,
-		Exec:           exec,
-		PolicyFilter:   policyFilter,
+		Exec:         exec,
+		PolicyFilter: policyFilter,
 	}
 	var args []string
 	policySets := []valid.PolicySet{
-		{Name: policyA},
-		{Name: policyB},
+		{Name: policyA, Paths: []string{path}},
+		{Name: policyB, Paths: []string{path2}},
 	}
 	prjCtx := buildTestProjectCtx(t, policySets)
 	expectedTitle := buildTestTitle(policySets)
 	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	assert.NoError(t, err)
-	assert.True(t, sourceResolver.isCalled)
-	assert.True(t, exec.isCalled)
+	assert.Equal(t, exec.numCalls, 2)
 	assert.True(t, policyFilter.isCalled)
 	assert.Contains(t, cmdOutput, expectedTitle)
 	assert.Contains(t, cmdOutput, output)
 }
 
 func TestConfTestExecutor_PolicyFailure_NotFiltered(t *testing.T) {
-	sourceResolver := &mockSourceResolver{path: path}
 	exec := &mockExec{
 		output: output,
 		error:  assert.AnError,
 	}
 	policySets := []valid.PolicySet{
-		{Name: policyA},
-		{Name: policyB},
+		{Name: policyA, Paths: []string{path}},
+		{Name: policyB, Paths: []string{path2}},
 	}
 	policyFilter := &mockPolicyFilter{
 		policies: policySets,
 	}
 	executor := policy.ConfTestExecutor{
-		SourceResolver: sourceResolver,
-		Exec:           exec,
-		PolicyFilter:   policyFilter,
+		Exec:         exec,
+		PolicyFilter: policyFilter,
 	}
 	var args []string
 	prjCtx := buildTestProjectCtx(t, policySets)
 	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	expectedTitle := buildTestTitle(policySets)
 	assert.Error(t, err)
-	assert.True(t, sourceResolver.isCalled)
-	assert.True(t, exec.isCalled)
+	assert.Equal(t, exec.numCalls, 2)
 	assert.True(t, policyFilter.isCalled)
 	assert.Contains(t, cmdOutput, expectedTitle)
 	assert.Contains(t, cmdOutput, output)
 }
 
-func TestConfTestExecutor_BuildArgError(t *testing.T) {
-	sourceResolver := &mockSourceResolver{path: path}
-	exec := &mockExec{
-		output: output,
-	}
-	policyFilter := &mockPolicyFilter{}
-	executor := policy.ConfTestExecutor{
-		SourceResolver: sourceResolver,
-		Exec:           exec,
-		PolicyFilter:   policyFilter,
-	}
-	var args []string
-	var policySets []valid.PolicySet
-	prjCtx := buildTestProjectCtx(t, policySets)
-	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
-	assert.Error(t, err)
-	assert.False(t, sourceResolver.isCalled)
-	assert.False(t, exec.isCalled)
-	assert.False(t, policyFilter.isCalled)
-	assert.Empty(t, cmdOutput)
-}
-
-func TestConfTestExecutor_SourceResolverError(t *testing.T) {
-	sourceResolver := &mockSourceResolver{error: assert.AnError}
-	exec := &mockExec{
-		output: output,
-	}
-	policyFilter := &mockPolicyFilter{}
-	executor := policy.ConfTestExecutor{
-		SourceResolver: sourceResolver,
-		Exec:           exec,
-		PolicyFilter:   policyFilter,
-	}
-	var args []string
-	policySets := []valid.PolicySet{
-		{Name: policyA},
-	}
-	prjCtx := buildTestProjectCtx(t, policySets)
-	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
-	assert.Error(t, err)
-	assert.True(t, sourceResolver.isCalled)
-	assert.False(t, exec.isCalled)
-	assert.False(t, policyFilter.isCalled)
-	assert.Empty(t, cmdOutput)
-}
-
 func TestConfTestExecutor_FilterFailure(t *testing.T) {
-	sourceResolver := &mockSourceResolver{path: path}
 	exec := &mockExec{
 		output: output,
 	}
 	policySets := []valid.PolicySet{
-		{Name: policyA},
-		{Name: policyB},
+		{Name: policyA, Paths: []string{path}},
+		{Name: policyB, Paths: []string{path2}},
 	}
 	policyFilter := &mockPolicyFilter{error: assert.AnError}
 	executor := policy.ConfTestExecutor{
-		SourceResolver: sourceResolver,
-		Exec:           exec,
-		PolicyFilter:   policyFilter,
+		Exec:         exec,
+		PolicyFilter: policyFilter,
 	}
 	var args []string
 	prjCtx := buildTestProjectCtx(t, policySets)
 	expectedTitle := buildTestTitle(policySets)
 	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	assert.Error(t, err)
-	assert.True(t, sourceResolver.isCalled)
-	assert.True(t, exec.isCalled)
+	assert.Equal(t, exec.numCalls, 2)
 	assert.True(t, policyFilter.isCalled)
 	assert.Contains(t, cmdOutput, expectedTitle)
 	assert.Contains(t, cmdOutput, output)
 }
 
 func TestConfTestExecutor_MissingInstallationToken(t *testing.T) {
-	sourceResolver := &mockSourceResolver{path: path}
 	exec := &mockExec{
 		output: output,
 	}
 	policyFilter := &mockPolicyFilter{}
 	executor := policy.ConfTestExecutor{
-		SourceResolver: sourceResolver,
-		Exec:           exec,
-		PolicyFilter:   policyFilter,
+		Exec:         exec,
+		PolicyFilter: policyFilter,
 	}
 	var args []string
 	policySets := []valid.PolicySet{
-		{Name: policyA},
-		{Name: policyB},
+		{Name: policyA, Paths: []string{path}},
+		{Name: policyB, Paths: []string{path2}},
 	}
 	prjCtx := command.ProjectContext{
 		PolicySets: valid.PolicySets{
@@ -234,22 +175,10 @@ func TestConfTestExecutor_MissingInstallationToken(t *testing.T) {
 	expectedTitle := buildTestTitle(policySets)
 	cmdOutput, err := executor.Run(context.Background(), prjCtx, executablePath, map[string]string{}, workDir, args)
 	assert.Error(t, err)
-	assert.True(t, sourceResolver.isCalled)
-	assert.True(t, exec.isCalled)
+	assert.Equal(t, exec.numCalls, 2)
 	assert.False(t, policyFilter.isCalled)
 	assert.Contains(t, cmdOutput, expectedTitle)
 	assert.Contains(t, cmdOutput, output)
-}
-
-type mockSourceResolver struct {
-	isCalled bool
-	path     string
-	error    error
-}
-
-func (r *mockSourceResolver) Resolve(_ valid.PolicySet) (string, error) {
-	r.isCalled = true
-	return r.path, r.error
 }
 
 type mockPolicyFilter struct {
@@ -264,12 +193,12 @@ func (r *mockPolicyFilter) Filter(_ context.Context, _ int64, _ models.Repo, _ i
 }
 
 type mockExec struct {
-	isCalled bool
+	numCalls int
 	output   string
 	error    error
 }
 
 func (r *mockExec) CombinedOutput(_ []string, _ map[string]string, _ string) (string, error) {
-	r.isCalled = true
+	r.numCalls++
 	return r.output, r.error
 }

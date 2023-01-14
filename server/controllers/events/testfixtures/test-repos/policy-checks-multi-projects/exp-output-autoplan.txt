@@ -1,9 +1,9 @@
 Ran Plan for 2 projects:
 
-1. dir: `dir1` workspace: `default`
-1. dir: `dir2` workspace: `default`
+1. project: `dir1` dir: `dir1` workspace: `default`
+1. project: `dir2` dir: `dir2` workspace: `default`
 
-### 1. dir: `dir1` workspace: `default`
+### 1. project: `dir1` dir: `dir1` workspace: `default`
 <details><summary>Show Output</summary>
 
 ```diff
@@ -27,15 +27,16 @@ Changes to Outputs:
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d dir1`
+    * `atlantis apply -p dir1`
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -d dir1`
+    * `atlantis plan -p dir1`
 </details>
 Plan: 1 to add, 0 to change, 0 to destroy.
 
+
 ---
-### 2. dir: `dir2` workspace: `default`
+### 2. project: `dir2` dir: `dir2` workspace: `default`
 <details><summary>Show Output</summary>
 
 ```diff
@@ -59,12 +60,13 @@ Changes to Outputs:
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d dir2`
+    * `atlantis apply -p dir2`
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -d dir2`
+    * `atlantis plan -p dir2`
 </details>
 Plan: 1 to add, 0 to change, 0 to destroy.
+
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:

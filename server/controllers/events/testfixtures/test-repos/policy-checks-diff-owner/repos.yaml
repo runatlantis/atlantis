@@ -1,10 +1,9 @@
 repos:
   - id: /.*/
 policies:
-  owners:
-    users:
-      - someoneelse
   policy_sets:
     - name: test_policy
-      path: policies/policy.rego
+      owner: someoneelse
+      paths:
+        - policies/policy.rego
       source: local

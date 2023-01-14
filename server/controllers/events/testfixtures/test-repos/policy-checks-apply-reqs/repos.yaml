@@ -2,11 +2,9 @@ repos:
 - id: /.*/
   apply_requirements: [approved]
 policies:
-  owners:
-    users:
-      - runatlantis
   policy_sets:
     - name: test_policy
       path: policies/policy.rego
-      source: local
-        
+      owner: runatlantis
+      paths:
+        - policies/policy.rego
