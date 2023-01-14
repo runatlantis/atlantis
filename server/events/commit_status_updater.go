@@ -16,6 +16,7 @@ package events
 import (
 	"fmt"
 
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -45,6 +46,10 @@ type DefaultCommitStatusUpdater struct {
 	// StatusName is the name used to identify Atlantis when creating PR statuses.
 	StatusName string
 }
+
+// ensure DefaultCommitStatusUpdater implements runtime.StatusUpdater interface
+// cause runtime.StatusUpdater is extracted for resolving circular dependency
+var _ runtime.StatusUpdater = (*DefaultCommitStatusUpdater)(nil)
 
 func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name) error {
 	src := fmt.Sprintf("%s/%s", d.StatusName, cmdName.String())
