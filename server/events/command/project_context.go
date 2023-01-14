@@ -20,6 +20,8 @@ const (
 // be executed for a project.
 type ProjectContext struct {
 	CommandName Name
+	// CommandResult represent the Terraform outputs after the command execution.
+	CommandResult ProjectResult
 	// ApplyCmd is the command that users should run to apply this plan. If
 	// this is an apply then this will be empty.
 	ApplyCmd string

@@ -173,6 +173,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 
 	// ensures we are differentiating between project level command and overall command
 	result := execute(ctx)
+	ctx.CommandResult = result
 
 	if result.Error != nil || result.Failure != "" {
 		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus); err != nil {
