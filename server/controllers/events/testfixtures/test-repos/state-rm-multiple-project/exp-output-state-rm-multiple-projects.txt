@@ -9,7 +9,9 @@ Removed random_id.dummy
 Successfully removed 1 resource instance(s).
 ```
 
-* :repeat: plan file was discarded, to **plan** this project again, comment:
+:put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
+
+* :repeat: To **plan** this project again, comment:
   * `atlantis plan -d dir1`
 
 ---
@@ -19,7 +21,9 @@ Removed random_id.dummy
 Successfully removed 1 resource instance(s).
 ```
 
-* :repeat: plan file was discarded, to **plan** this project again, comment:
+:put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
+
+* :repeat: To **plan** this project again, comment:
   * `atlantis plan -d dir2`
 
 ---

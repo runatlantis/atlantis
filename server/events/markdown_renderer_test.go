@@ -331,7 +331,9 @@ $$$diff
 import-output
 $$$
 
-* :repeat: plan file was discarded, to **plan** this project again, comment:
+:put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
+
+* :repeat: To **plan** this project again, comment:
   * $atlantis plan -d path -w workspace$`,
 		},
 		{
@@ -356,7 +358,9 @@ $$$diff
 state-rm-output
 $$$
 
-* :repeat: plan file was discarded, to **plan** this project again, comment:
+:put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
+
+* :repeat: To **plan** this project again, comment:
   * $atlantis plan -d path -w workspace$
 `,
 		},
