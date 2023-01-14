@@ -58,6 +58,7 @@ export default {
                     { text: 'Blog', link: 'https://medium.com/runatlantis' },
                 ],
             },
+/*
             '/es/': {
                 selectLanguageName: 'Spanish',
                 navbar: [
@@ -67,6 +68,7 @@ export default {
                     { text: 'Blog', link: 'https://medium.com/runatlantis' },
                 ],
             },
+*/
         },
         sidebar: {
             '/guide/': [
