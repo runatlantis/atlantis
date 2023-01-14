@@ -9,11 +9,6 @@ export default {
             title: 'Atlantis',
             description: 'Atlantis: Terraform Pull Request Automation',
         },
-        '/es/': {
-            lang: 'es-ES',
-            title: 'Atlantis',
-            description: 'Atlantis: Automatización de Pull Requests para Terraform',
-        },
     },
     plugins: [
         googleAnalyticsPlugin({
