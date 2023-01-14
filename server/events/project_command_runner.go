@@ -134,7 +134,7 @@ type ProjectCommandRunner interface {
 type JobURLSetter interface {
 	// SetJobURLWithStatus sets the commit status for the project represented by
 	// ctx and updates the status with and url to a job.
-	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus) error
+	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, result *command.ProjectResult) error
 }
 
 //go:generate pegomock generate -m --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
@@ -167,23 +167,22 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	// Create a PR status to track project's plan status. The status will
 	// include a link to view the progress of atlantis plan command in real
 	// time
-	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus); err != nil {
+	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus, nil); err != nil {
 		ctx.Log.Err("updating project PR status", err)
 	}
 
 	// ensures we are differentiating between project level command and overall command
 	result := execute(ctx)
-	ctx.CommandResult = result
 
 	if result.Error != nil || result.Failure != "" {
-		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus); err != nil {
+		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus, &result); err != nil {
 			ctx.Log.Err("updating project PR status", err)
 		}
 
 		return result
 	}
 
-	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus); err != nil {
+	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus, &result); err != nil {
 		ctx.Log.Err("updating project PR status", err)
 	}
 

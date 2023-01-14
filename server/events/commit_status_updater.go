@@ -34,9 +34,6 @@ type CommitStatusUpdater interface {
 	// UpdateCombinedCount updates the combined status to reflect the
 	// numSuccess out of numTotal.
 	UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error
-	// UpdateProject sets the commit status for the project represented by
-	// ctx.
-	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error
 
 	UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
 	UpdatePostWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
@@ -79,7 +76,7 @@ func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull 
 	return d.Client.UpdateStatus(repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error {
+func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectResult) error {
 	projectID := ctx.ProjectName
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
@@ -92,8 +89,8 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, c
 	case models.FailedCommitStatus:
 		descripWords = genProjectStatusDescription(cmdName.String(), "failed.")
 	case models.SuccessCommitStatus:
-		if ctx.CommandResult.PlanSuccess != nil {
-			descripWords = ctx.CommandResult.PlanSuccess.Summary()
+		if result != nil && result.PlanSuccess != nil {
+			descripWords = result.PlanSuccess.Summary()
 		} else {
 			descripWords = genProjectStatusDescription(cmdName.String(), "succeeded.")
 		}
