@@ -1068,6 +1068,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	parallelPoolSize := 1
 	silenceNoProjects := false
 
+	statusUpdater := runtimemocks.NewMockStatusUpdater()
 	commitStatusUpdater := mocks.NewMockCommitStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 
@@ -1143,7 +1144,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		PlanStepRunner: runtime.NewPlanStepRunner(
 			terraformClient,
 			defaultTFVersion,
-			commitStatusUpdater,
+			statusUpdater,
 			asyncTfExec,
 		),
 		ShowStepRunner:        showStepRunner,
