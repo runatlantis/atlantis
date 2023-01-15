@@ -12,11 +12,11 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/command"
-	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -241,7 +241,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	RegisterMockTestingT(t)
 	tfOut := fmt.Sprintf(preConfirmOutFmt, planFileContents) + postConfirmOut
 	tfExec := &remoteApplyMock{LinesToSend: tfOut, DoneCh: make(chan bool)}
-	updater := mocks2.NewMockCommitStatusUpdater()
+	updater := runtimemocks.NewMockStatusUpdater()
 	o := runtime.ApplyStepRunner{
 		AsyncTFExec:         tfExec,
 		CommitStatusUpdater: updater,
@@ -273,8 +273,8 @@ Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
 
 	// Check that the status was updated with the run url.
 	runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test-dir2/runs/run-PiDsRYKGcerTttV2"
-	updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Apply, models.PendingCommitStatus, runURL)
-	updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Apply, models.SuccessCommitStatus, runURL)
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Apply, models.PendingCommitStatus, runURL, nil)
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Apply, models.SuccessCommitStatus, runURL, nil)
 }
 
 // Test that if the plan is different, we error out.
@@ -304,7 +304,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	}
 	o := runtime.ApplyStepRunner{
 		AsyncTFExec:         tfExec,
-		CommitStatusUpdater: mocks2.NewMockCommitStatusUpdater(),
+		CommitStatusUpdater: runtimemocks.NewMockStatusUpdater(),
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 
