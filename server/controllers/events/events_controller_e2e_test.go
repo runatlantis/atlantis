@@ -81,7 +81,7 @@ func TestGitHubWorkflow(t *testing.T) {
 
 	cases := []struct {
 		Description string
-		// RepoDir is relative to testfixtures/test-repos.
+		// RepoDir is relative to testdata/test-repos.
 		RepoDir string
 		// RepoConfigFile is path for atlantis.yaml
 		RepoConfigFile string
@@ -592,7 +592,7 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 
 	cases := []struct {
 		Description string
-		// RepoDir is relative to testfixtures/test-repos.
+		// RepoDir is relative to testdata/test-repos.
 		RepoDir string
 		// ModifiedFiles are the list of files that have been modified in this
 		// pull request.
@@ -664,7 +664,7 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 
-			oldLockFilePath, err := filepath.Abs(filepath.Join("testfixtures", "null_provider_lockfile_old_version"))
+			oldLockFilePath, err := filepath.Abs(filepath.Join("testdata", "null_provider_lockfile_old_version"))
 			Ok(t, err)
 			oldLockFileContent, err := os.ReadFile(oldLockFilePath)
 			Ok(t, err)
@@ -759,7 +759,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 	cases := []struct {
 		Description string
-		// RepoDir is relative to testfixtures/test-repos.
+		// RepoDir is relative to testdata/test-repos.
 		RepoDir string
 		// ModifiedFiles are the list of files that have been modified in this
 		// pull request.
@@ -1330,7 +1330,7 @@ func (w *mockWebhookSender) Send(log logging.SimpleLogging, result webhooks.Appl
 }
 
 func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
-	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testdata", "githubIssueCommentEvent.json"))
 	Ok(t, err)
 	escapedComment, err := json.Marshal(comment)
 	Ok(t, err)
@@ -1343,7 +1343,7 @@ func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
 }
 
 func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
-	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestOpenedEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testdata", "githubPullRequestOpenedEvent.json"))
 	Ok(t, err)
 	// Replace sha with expected sha.
 	requestJSONStr := strings.Replace(string(requestJSON), "c31fd9ea6f557ad2ea659944c3844a059b83bc5d", headSHA, -1)
@@ -1355,7 +1355,7 @@ func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
 }
 
 func GitHubPullRequestClosedEvent(t *testing.T) *http.Request {
-	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestClosedEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testdata", "githubPullRequestClosedEvent.json"))
 	Ok(t, err)
 	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
 	Ok(t, err)
@@ -1396,12 +1396,12 @@ func GitHubPullRequestParsed(headSHA string) *github.PullRequest {
 
 // absRepoPath returns the absolute path to the test repo under dir repoDir.
 func absRepoPath(t *testing.T, repoDir string) string {
-	path, err := filepath.Abs(filepath.Join("testfixtures", "test-repos", repoDir))
+	path, err := filepath.Abs(filepath.Join("testdata", "test-repos", repoDir))
 	Ok(t, err)
 	return path
 }
 
-// initializeRepo copies the repo data from testfixtures and initializes a new
+// initializeRepo copies the repo data from testdata and initializes a new
 // git repo in a temp directory. It returns that directory and a function
 // to run in a defer that will delete the dir.
 // The purpose of this function is to create a real git repository with a branch
