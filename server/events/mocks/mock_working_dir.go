@@ -64,6 +64,21 @@ func (mock *MockWorkingDir) Delete(_param0 models.Repo, _param1 models.PullReque
 	return ret0
 }
 
+func (mock *MockWorkingDir) DeleteWorkspaceForPath(_param0 models.Repo, _param1 models.PullRequest, _param2 string, _param3 string) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+	}
+	params := []pegomock.Param{_param0, _param1, _param2, _param3}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteWorkspaceForPath", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockWorkingDir) GetPullDir(_param0 models.Repo, _param1 models.PullRequest) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
@@ -215,6 +230,45 @@ func (c *MockWorkingDir_Delete_OngoingVerification) GetAllCapturedArguments() (_
 		_param1 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWorkingDir) DeleteWorkspaceForPath(_param0 models.Repo, _param1 models.PullRequest, _param2 string, _param3 string) *MockWorkingDir_DeleteWorkspaceForPath_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1, _param2, _param3}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeleteWorkspaceForPath", params, verifier.timeout)
+	return &MockWorkingDir_DeleteWorkspaceForPath_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDir_DeleteWorkspaceForPath_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDir_DeleteWorkspaceForPath_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string, string) {
+	_param0, _param1, _param2, _param3 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1], _param3[len(_param3)-1]
+}
+
+func (c *MockWorkingDir_DeleteWorkspaceForPath_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string, _param3 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.Repo, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.Repo)
+		}
+		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.PullRequest)
+		}
+		_param2 = make([]string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
+		}
+		_param3 = make([]string, len(c.methodInvocations))
+		for u, param := range params[3] {
+			_param3[u] = param.(string)
 		}
 	}
 	return

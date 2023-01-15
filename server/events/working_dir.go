@@ -48,6 +48,7 @@ type WorkingDir interface {
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
+	DeleteWorkspaceForPath(r models.Repo, p models.PullRequest, path string, workspace string) error
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -319,6 +320,26 @@ func (w *FileWorkspace) GetPullDir(r models.Repo, p models.PullRequest) (string,
 // Delete deletes the workspace for this repo and pull.
 func (w *FileWorkspace) Delete(r models.Repo, p models.PullRequest) error {
 	return os.RemoveAll(w.repoPullDir(r, p))
+}
+
+func (w *FileWorkspace) DeleteWorkspaceForPath(r models.Repo, p models.PullRequest, path string, workspace string) error {
+	// Find planfile for all projects in this workspace.
+	files, err := filepath.Glob(fmt.Sprintf("%s/%s/*::%s.tfplan", w.cloneDir(r, p), path, workspace))
+	if err != nil {
+		return err
+	}
+
+	// Remove all projects planfiles.
+	for _, f := range files {
+		if err := os.Remove(f); err != nil {
+			return err
+		}
+	}
+
+	// Remove TF_DATA_DIR for the workspace.
+	os.RemoveAll(fmt.Sprintf("%s/%s/.terraform-%s", w.cloneDir(r, p), path, workspace))
+
+	return nil
 }
 
 func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string {

@@ -70,6 +70,10 @@ func (l *DefaultDeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
 		l.Logger.Err("unable to obtain working dir lock when trying to delete old plans: %s", err)
 	} else {
 		defer unlock()
+		// nolint: vetshadow
+		if err := l.WorkingDir.DeleteWorkspaceForPath(lock.Pull.BaseRepo, lock.Pull, lock.Project.Path, lock.Workspace); err != nil {
+			l.Logger.Err("unable to delete workspace: %s", err)
+		}
 	}
 	if err := l.Backend.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
 		l.Logger.Err("unable to delete project status: %s", err)
