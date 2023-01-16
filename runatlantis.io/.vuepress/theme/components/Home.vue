@@ -174,6 +174,7 @@
     }
 </script>
 
+<!--
 <style lang="stylus">
   // colors
   $accentColor = #3eaf7c
@@ -396,3 +397,4 @@
         h2
           font-size 1.25rem
 </style>
+-->

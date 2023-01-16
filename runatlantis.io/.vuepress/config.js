@@ -1,8 +1,14 @@
 import { googleAnalyticsPlugin } from '@vuepress/plugin-google-analytics'
 import { docsearchPlugin } from '@vuepress/plugin-docsearch'
-import { defaultTheme } from '@vuepress/theme-default'
+import { getDirname, path } from '@vuepress/utils'
+import { defaultTheme, defineUserConfig } from 'vuepress'
 
-export default {
+const __dirname = getDirname(import.meta.url)
+
+export default defineUserConfig({
+    alias: {
+        '@theme/Home.vue': path.resolve(__dirname, './theme/components/Home.vue'),
+    },
     locales: {
         '/': {
             lang: 'en-US',
@@ -169,4 +175,4 @@ export default {
         docsDir: 'runatlantis.io',
         editLink: true,
     })
-}
+})
