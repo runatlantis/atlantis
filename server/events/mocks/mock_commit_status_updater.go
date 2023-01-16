@@ -86,21 +86,6 @@ func (mock *MockCommitStatusUpdater) UpdatePreWorkflowHook(_param0 models.PullRe
 	return ret0
 }
 
-func (mock *MockCommitStatusUpdater) UpdateProject(_param0 command.ProjectContext, _param1 command.Name, _param2 models.CommitStatus, _param3 string) error {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockCommitStatusUpdater().")
-	}
-	params := []pegomock.Param{_param0, _param1, _param2, _param3}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdateProject", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(error)
-		}
-	}
-	return ret0
-}
-
 func (mock *MockCommitStatusUpdater) VerifyWasCalledOnce() *VerifierMockCommitStatusUpdater {
 	return &VerifierMockCommitStatusUpdater{
 		mock:                   mock,
@@ -305,45 +290,6 @@ func (c *MockCommitStatusUpdater_UpdatePreWorkflowHook_OngoingVerification) GetA
 		_param4 = make([]string, len(c.methodInvocations))
 		for u, param := range params[4] {
 			_param4[u] = param.(string)
-		}
-	}
-	return
-}
-
-func (verifier *VerifierMockCommitStatusUpdater) UpdateProject(_param0 command.ProjectContext, _param1 command.Name, _param2 models.CommitStatus, _param3 string) *MockCommitStatusUpdater_UpdateProject_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2, _param3}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateProject", params, verifier.timeout)
-	return &MockCommitStatusUpdater_UpdateProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
-
-type MockCommitStatusUpdater_UpdateProject_OngoingVerification struct {
-	mock              *MockCommitStatusUpdater
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *MockCommitStatusUpdater_UpdateProject_OngoingVerification) GetCapturedArguments() (command.ProjectContext, command.Name, models.CommitStatus, string) {
-	_param0, _param1, _param2, _param3 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1], _param3[len(_param3)-1]
-}
-
-func (c *MockCommitStatusUpdater_UpdateProject_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []command.Name, _param2 []models.CommitStatus, _param3 []string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(command.ProjectContext)
-		}
-		_param1 = make([]command.Name, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(command.Name)
-		}
-		_param2 = make([]models.CommitStatus, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.(models.CommitStatus)
-		}
-		_param3 = make([]string, len(c.methodInvocations))
-		for u, param := range params[3] {
-			_param3[u] = param.(string)
 		}
 	}
 	return

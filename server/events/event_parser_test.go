@@ -27,7 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	. "github.com/runatlantis/atlantis/server/events/vcs/fixtures"
+	. "github.com/runatlantis/atlantis/server/events/vcs/testdata"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
 )

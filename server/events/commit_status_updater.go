@@ -16,6 +16,7 @@ package events
 import (
 	"fmt"
 
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -34,9 +35,6 @@ type CommitStatusUpdater interface {
 	// UpdateCombinedCount updates the combined status to reflect the
 	// numSuccess out of numTotal.
 	UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error
-	// UpdateProject sets the commit status for the project represented by
-	// ctx.
-	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error
 
 	UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
 	UpdatePostWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
@@ -49,19 +47,22 @@ type DefaultCommitStatusUpdater struct {
 	StatusName string
 }
 
+// ensure DefaultCommitStatusUpdater implements runtime.StatusUpdater interface
+// cause runtime.StatusUpdater is extracted for resolving circular dependency
+var _ runtime.StatusUpdater = (*DefaultCommitStatusUpdater)(nil)
+
 func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name) error {
 	src := fmt.Sprintf("%s/%s", d.StatusName, cmdName.String())
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
-		descripWords = "in progress..."
+		descripWords = genProjectStatusDescription(cmdName.String(), "in progress...")
 	case models.FailedCommitStatus:
-		descripWords = "failed."
+		descripWords = genProjectStatusDescription(cmdName.String(), "failed.")
 	case models.SuccessCommitStatus:
-		descripWords = "succeeded."
+		descripWords = genProjectStatusDescription(cmdName.String(), "succeeded.")
 	}
-	descrip := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), descripWords)
-	return d.Client.UpdateStatus(repo, pull, status, src, descrip, "")
+	return d.Client.UpdateStatus(repo, pull, status, src, descripWords, "")
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
@@ -80,7 +81,7 @@ func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull 
 	return d.Client.UpdateStatus(repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string) error {
+func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectResult) error {
 	projectID := ctx.ProjectName
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
@@ -89,15 +90,21 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, c
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
-		descripWords = "in progress..."
+		descripWords = genProjectStatusDescription(cmdName.String(), "in progress...")
 	case models.FailedCommitStatus:
-		descripWords = "failed."
+		descripWords = genProjectStatusDescription(cmdName.String(), "failed.")
 	case models.SuccessCommitStatus:
-		descripWords = "succeeded."
+		if result != nil && result.PlanSuccess != nil {
+			descripWords = result.PlanSuccess.Summary()
+		} else {
+			descripWords = genProjectStatusDescription(cmdName.String(), "succeeded.")
+		}
 	}
+	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descripWords, url)
+}
 
-	descrip := fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName.String()), descripWords)
-	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
+func genProjectStatusDescription(cmdName, description string) string {
+	return fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName), description)
 }
 
 func (d *DefaultCommitStatusUpdater) UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {

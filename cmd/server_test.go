@@ -27,7 +27,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
+	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -427,7 +427,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		{
 			"just github app key set",
 			map[string]interface{}{
-				GHAppKeyFlag: fixtures.GithubPrivateKey,
+				GHAppKeyFlag: testdata.GithubPrivateKey,
 			},
 			true,
 		},
@@ -496,7 +496,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"github app and key set and should be successful",
 			map[string]interface{}{
 				GHAppIDFlag:  "1",
-				GHAppKeyFlag: fixtures.GithubPrivateKey,
+				GHAppKeyFlag: testdata.GithubPrivateKey,
 			},
 			false,
 		},
@@ -631,7 +631,7 @@ func TestExecute_GithubUser(t *testing.T) {
 func TestExecute_GithubApp(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
 	c := setup(map[string]interface{}{
-		GHAppKeyFlag:      fixtures.GithubPrivateKey,
+		GHAppKeyFlag:      testdata.GithubPrivateKey,
 		GHAppIDFlag:       "1",
 		RepoAllowlistFlag: "*",
 	}, t)
