@@ -221,7 +221,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 	isPipelineSkipped := mr.HeadPipeline.Status == "skipped"
 	allowSkippedPipeline := project.AllowMergeOnSkippedPipeline && isPipelineSkipped
-	if mr.MergeStatus == "can_be_merged" &&
+	if mr.DetailedMergeStatus == "mergeable" &&
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
 		!mr.WorkInProgress &&
