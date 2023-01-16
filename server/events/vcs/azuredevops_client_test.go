@@ -14,7 +14,7 @@ import (
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
+	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -262,7 +262,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 			switch r.RequestURI {
 			// The first request should hit this URL.
 			case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
-				w.Write([]byte(fixtures.ADPullJSON)) // nolint: errcheck
+				w.Write([]byte(testdata.ADPullJSON)) // nolint: errcheck
 			// The second should hit this URL.
 			case "/owner/project/_apis/git/repositories/repo/diffs/commits?api-version=5.1&baseVersion=new_feature&targetVersion=npaulk/my_work":
 				// We write a header that means there's an additional page.
@@ -362,10 +362,10 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 		},
 	}
 
-	jsonPullRequestBytes, err := os.ReadFile("fixtures/azuredevops-pr.json")
+	jsonPullRequestBytes, err := os.ReadFile("testdata/azuredevops-pr.json")
 	Ok(t, err)
 
-	jsonPolicyEvaluationBytes, err := os.ReadFile("fixtures/azuredevops-policyevaluations.json")
+	jsonPolicyEvaluationBytes, err := os.ReadFile("testdata/azuredevops-policyevaluations.json")
 	Ok(t, err)
 
 	pullRequestBody := string(jsonPullRequestBytes)
@@ -466,7 +466,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 		},
 	}
 
-	jsBytes, err := os.ReadFile("fixtures/azuredevops-pr.json")
+	jsBytes, err := os.ReadFile("testdata/azuredevops-pr.json")
 	Ok(t, err)
 
 	json := string(jsBytes)
@@ -517,7 +517,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 
 func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 	// Use a real Azure DevOps json response and edit the mergeable_state field.
-	jsBytes, err := os.ReadFile("fixtures/azuredevops-pr.json")
+	jsBytes, err := os.ReadFile("testdata/azuredevops-pr.json")
 	Ok(t, err)
 	response := string(jsBytes)
 

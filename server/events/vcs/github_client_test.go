@@ -514,12 +514,12 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	}
 
 	// Use a real GitHub json response and edit the mergeable_state field.
-	jsBytes, err := os.ReadFile("fixtures/github-pull-request.json")
+	jsBytes, err := os.ReadFile("testdata/github-pull-request.json")
 	Ok(t, err)
 	prJSON := string(jsBytes)
 
 	// Status Check Response
-	jsBytes, err = os.ReadFile("fixtures/github-commit-status-full.json")
+	jsBytes, err = os.ReadFile("testdata/github-commit-status-full.json")
 	Ok(t, err)
 	commitJSON := string(jsBytes)
 
@@ -651,22 +651,22 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 	}
 
 	// Use a real GitHub json response and edit the mergeable_state field.
-	jsBytes, err := os.ReadFile("fixtures/github-pull-request.json")
+	jsBytes, err := os.ReadFile("testdata/github-pull-request.json")
 	Ok(t, err)
 	prJSON := string(jsBytes)
 
 	// Status Check Response
-	jsBytes, err = os.ReadFile("fixtures/github-commit-status-full.json")
+	jsBytes, err = os.ReadFile("testdata/github-commit-status-full.json")
 	Ok(t, err)
 	commitJSON := string(jsBytes)
 
 	// Branch protection Response
-	jsBytes, err = os.ReadFile("fixtures/github-branch-protection-required-checks.json")
+	jsBytes, err = os.ReadFile("testdata/github-branch-protection-required-checks.json")
 	Ok(t, err)
 	branchProtectionJSON := string(jsBytes)
 
 	// List check suites Response
-	jsBytes, err = os.ReadFile("fixtures/github-commit-check-suites.json")
+	jsBytes, err = os.ReadFile("testdata/github-commit-check-suites.json")
 	Ok(t, err)
 	checkSuites := string(jsBytes)
 
@@ -762,7 +762,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 		},
 	}
 
-	jsBytes, err := os.ReadFile("fixtures/github-repo.json")
+	jsBytes, err := os.ReadFile("testdata/github-repo.json")
 	Ok(t, err)
 
 	for _, c := range cases {
@@ -872,7 +872,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			// Modify response.
-			jsBytes, err := os.ReadFile("fixtures/github-repo.json")
+			jsBytes, err := os.ReadFile("testdata/github-repo.json")
 			Ok(t, err)
 			resp := string(jsBytes)
 			resp = strings.Replace(resp,
