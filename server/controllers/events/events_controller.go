@@ -44,7 +44,7 @@ const bitbucketServerRequestIDHeader = "X-Request-ID"
 const bitbucketServerSignatureHeader = "X-Hub-Signature"
 
 // The URL used for Azure DevOps test webhooks
-const azuredevopsTestUrl = "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079"
+const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079"
 
 // VCSEventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
@@ -753,5 +753,5 @@ func isAzureDevOpsTestRepoURL(repository *azuredevops.GitRepository) bool {
 	if repository == nil {
 		return false
 	}
-	return (repository.GetURL() == azuredevopsTestUrl)
+	return (repository.GetURL() == azuredevopsTestURL)
 }
