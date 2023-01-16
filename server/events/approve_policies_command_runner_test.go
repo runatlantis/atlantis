@@ -9,7 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/models/fixtures"
+	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 )
@@ -32,7 +32,7 @@ func TestApproveCommandRunner_IsOwner(t *testing.T) {
 		},
 		{
 			Description: "When user is an owner, approval succeeds",
-			OwnerUsers:  []string{fixtures.User.Username},
+			OwnerUsers:  []string{testdata.User.Username},
 			OwnerTeams:  []string{},
 			ExpComment:  "Approved Policies for 1 projects:\n\n1. dir: `` workspace: ``",
 		},
@@ -52,7 +52,7 @@ func TestApproveCommandRunner_IsOwner(t *testing.T) {
 		},
 		{
 			Description: "When user is an owner but not a team member, approval succeeds",
-			OwnerUsers:  []string{fixtures.User.Username},
+			OwnerUsers:  []string{testdata.User.Username},
 			OwnerTeams:  []string{"SomeTeam"},
 			UserTeams:   []string{"SomeOtherTeam"},
 			ExpComment:  "Approved Policies for 1 projects:\n\n1. dir: `` workspace: ``",
@@ -65,14 +65,14 @@ func TestApproveCommandRunner_IsOwner(t *testing.T) {
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
-			modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
 			ctx := &command.Context{
-				User:     fixtures.User,
+				User:     testdata.User,
 				Log:      logging.NewNoopLogger(t),
 				Scope:    scopeNull,
 				Pull:     modelPull,
-				HeadRepo: fixtures.GithubRepo,
+				HeadRepo: testdata.GithubRepo,
 				Trigger:  command.CommentTrigger,
 			}
 
@@ -87,11 +87,11 @@ func TestApproveCommandRunner_IsOwner(t *testing.T) {
 					},
 				},
 			}, nil)
-			When(vcsClient.GetTeamNamesForUser(fixtures.GithubRepo, fixtures.User)).ThenReturn(c.UserTeams, nil)
+			When(vcsClient.GetTeamNamesForUser(testdata.GithubRepo, testdata.User)).ThenReturn(c.UserTeams, nil)
 
 			approvePoliciesCommandRunner.Run(ctx, &events.CommentCommand{Name: command.ApprovePolicies})
 
-			vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, c.ExpComment, "approve_policies")
+			vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, modelPull.Num, c.ExpComment, "approve_policies")
 		})
 	}
 }

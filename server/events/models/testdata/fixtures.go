@@ -11,7 +11,7 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package fixtures
+package testdata
 
 import (
 	"fmt"
