@@ -101,7 +101,10 @@ export default {
                     text: 'Configuring Atlantis',
                     collapsible: true,
                     children: [
-                        ['configuring-atlantis', 'Overview'],
+                        {
+                            text: 'Overview',
+                            link: 'configuring-atlantis',
+                        },
                         'server-configuration',
                         'server-side-repo-config',
                         'pre-workflow-hooks',
@@ -123,14 +126,20 @@ export default {
                     text: 'Using Atlantis',
                     collapsible: true,
                     children: [
-                        'using-atlantis',
+                        {
+                            text: 'Overview',
+                            link: 'using-atlantis',
+                        },
                     ]
                 },
                 {
                     text: 'How Atlantis Works',
                     collapsible: true,
                     children: [
-                        'how-atlantis-works',
+                        {
+                            text: 'Overview',
+                            link: 'how-atlantis-works',
+                        },
                         'locking',
                         'autoplanning',
                         'automerging',
