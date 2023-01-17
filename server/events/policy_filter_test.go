@@ -45,9 +45,7 @@ func TestFilter_ApprovedCacheMiss(t *testing.T) {
 		members: team,
 	}
 	policyFilter := NewApprovedPolicyFilter(reviewFetcher, teamFetcher)
-	policyFilter.owners = map[string][]string{
-		policyOwner: team,
-	}
+	policyFilter.owners.Store(policyOwner, team)
 	failedPolicies := []valid.PolicySet{
 		{Name: policyName, Owner: policyOwner},
 	}

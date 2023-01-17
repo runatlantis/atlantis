@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"sync"
 )
 
 type prReviewsFetcher interface {
@@ -16,7 +17,7 @@ type teamMemberFetcher interface {
 }
 
 type ApprovedPolicyFilter struct {
-	owners map[string][]string //cache
+	owners sync.Map //cache
 
 	prReviewsFetcher  prReviewsFetcher
 	teamMemberFetcher teamMemberFetcher
@@ -26,7 +27,7 @@ func NewApprovedPolicyFilter(prReviewsFetcher prReviewsFetcher, teamMemberFetche
 	return &ApprovedPolicyFilter{
 		prReviewsFetcher:  prReviewsFetcher,
 		teamMemberFetcher: teamMemberFetcher,
-		owners:            make(map[string][]string),
+		owners:            sync.Map{},
 	}
 }
 
@@ -73,7 +74,11 @@ func (p *ApprovedPolicyFilter) policyApproved(ctx context.Context, installationT
 
 func (p *ApprovedPolicyFilter) ownersContainsPolicy(approvedReviewers []string, failedPolicy valid.PolicySet) bool {
 	// Check if any reviewer is an owner of the failed policy set
-	for _, owner := range p.owners[failedPolicy.Owner] {
+	owners, ok := p.owners.Load(failedPolicy.Owner)
+	if !ok {
+		return false
+	}
+	for _, owner := range owners.([]string) {
 		for _, reviewer := range approvedReviewers {
 			if reviewer == owner {
 				return true
@@ -88,6 +93,6 @@ func (p *ApprovedPolicyFilter) getOwners(ctx context.Context, installationToken 
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch GH team members")
 	}
-	p.owners[policy.Owner] = members
+	p.owners.Store(policy.Owner, members)
 	return nil
 }
