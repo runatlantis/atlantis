@@ -2,11 +2,14 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@vuepress/plugin-docsearch": "^2.0.0-beta.60",
-    "@vuepress/plugin-google-analytics": "^2.0.0-beta.60",
+    "@vuepress/plugin-google-analytics": "^1.9.8",
     "vuepress": "^2.0.0-beta.60"
   },
   "scripts": {
     "website:dev": "vuepress dev runatlantis.io",
     "website:build": "NODE_OPTIONS=--openssl-legacy-provider vuepress build runatlantis.io"
+  },
+  "dependencies": {
+    "vuepress-vite": "^2.0.0-beta.45"
   }
 }
