@@ -20,6 +20,7 @@ const (
 	// PolicyCheck is a command to run conftest test.
 	PolicyCheck
 	// ApprovePolicies is a command to approve policies with owner check
+	// TODO: remove ApprovePolicies with policy v2
 	ApprovePolicies
 	// Autoplan is a command to run terrafor plan on PR open/update if autoplan is enabled
 	Autoplan

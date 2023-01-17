@@ -65,6 +65,10 @@ func (c *ConfTestExecutor) Run(_ context.Context, prjCtx command.ProjectContext,
 
 	for _, policySet := range prjCtx.PolicySets.PolicySets {
 		var policyArgs []Arg
+		// TODO: remove when policy v2 rollout is complete
+		if len(policySet.Paths) == 0 {
+			continue
+		}
 		for _, path := range policySet.Paths {
 			policyArgs = append(policyArgs, NewPolicyArg(path))
 		}

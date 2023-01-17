@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/stretchr/testify/assert"
 	"github.com/uber-go/tally/v4"
 	"regexp"
@@ -134,18 +135,13 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		parallelPoolSize,
 		pullReqStatusFetcher,
 	)
+	featureAllocator, featureAllocatorErr := feature.NewStringSourcedAllocator(logger)
+	assert.NoError(t, featureAllocatorErr)
 
-	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
-		vcsUpdater,
-		projectCommandBuilder,
-		projectCommandRunner,
-		pullUpdater,
-		dbUpdater,
-		&policies.CommandOutputGenerator{
-			PrjCommandRunner:  projectCommandRunner,
-			PrjCommandBuilder: projectCommandBuilder,
-		},
-	)
+	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(vcsUpdater, projectCommandBuilder, projectCommandRunner, pullUpdater, dbUpdater, &policies.CommandOutputGenerator{
+		PrjCommandRunner:  projectCommandRunner,
+		PrjCommandBuilder: projectCommandBuilder,
+	}, featureAllocator)
 
 	unlockCommandRunner = events.NewUnlockCommandRunner(
 		deleteLockCommand,

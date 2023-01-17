@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/lyft/feature"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -11,6 +12,7 @@ type commandOutputGenerator interface {
 	GeneratePolicyCheckOutputStore(ctx *command.Context, cmd *command.Comment) (command.PolicyCheckOutputStore, error)
 }
 
+// TODO: delete entire approve policies workflow when policy v2 rollout is complete
 func NewApprovePoliciesCommandRunner(
 	vcsStatusUpdater VCSStatusUpdater,
 	prjCommandBuilder ProjectApprovePoliciesCommandBuilder,
@@ -18,7 +20,7 @@ func NewApprovePoliciesCommandRunner(
 	outputUpdater OutputUpdater,
 	dbUpdater *DBUpdater,
 	policyCheckOutputGenerator commandOutputGenerator,
-) *ApprovePoliciesCommandRunner {
+	allocator feature.Allocator) *ApprovePoliciesCommandRunner {
 	return &ApprovePoliciesCommandRunner{
 		vcsStatusUpdater:           vcsStatusUpdater,
 		prjCmdBuilder:              prjCommandBuilder,
@@ -26,6 +28,7 @@ func NewApprovePoliciesCommandRunner(
 		outputUpdater:              outputUpdater,
 		dbUpdater:                  dbUpdater,
 		policyCheckOutputGenerator: policyCheckOutputGenerator,
+		allocator:                  allocator,
 	}
 }
 
@@ -36,11 +39,22 @@ type ApprovePoliciesCommandRunner struct {
 	prjCmdBuilder              ProjectApprovePoliciesCommandBuilder
 	prjCmdRunner               ProjectApprovePoliciesCommandRunner
 	policyCheckOutputGenerator commandOutputGenerator
+	allocator                  feature.Allocator
 }
 
 func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *command.Comment) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+	shouldAllocate, err := a.allocator.ShouldAllocate(feature.PolicyV2, feature.FeatureContext{
+		RepoName: baseRepo.FullName,
+	})
+	if err != nil {
+		ctx.Log.ErrorContext(ctx.RequestCtx, "unable to allocate policy v2, continuing with legacy mode")
+	}
+	if shouldAllocate {
+		ctx.Log.ErrorContext(ctx.RequestCtx, "policy v2 mode doesn't support atlantis approve_policies command")
+		return
+	}
 
 	statusID, err := a.vcsStatusUpdater.UpdateCombined(ctx.RequestCtx, baseRepo, pull, models.PendingVCSStatus, command.PolicyCheck, "", "")
 	if err != nil {

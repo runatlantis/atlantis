@@ -763,6 +763,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		checksOutputUpdater,
 		dbUpdater,
 		&policyCheckOutputGenerator,
+		featureAllocator,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
