@@ -166,7 +166,8 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 	return nil
 }
 
-// Delete previous command comment
+// DeletePrevCommandComments will deleted old comments left from previous runs to reduce
+// clutter in a pull/merge request. This will DELETE the comment
 func (g *GitlabClient) DeletePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	comments, _, err := g.Client.Notes.ListMergeRequestNotes(repo.FullName, pullNum, &gitlab.ListMergeRequestNotesOptions{})
 

@@ -28,7 +28,8 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 			ctx.Log.Err("unable to hide old comments: %s", err)
 		}
 	}
-
+	//DeletePrevCommandComments will deleted old comments left from previous runs to reduce
+	// clutter in a pull/merge request. This will DELETE the comment
 	if c.DeletePrevComments {
 		if err := c.VCSClient.DeletePrevCommandComments(ctx.Pull.BaseRepo, ctx.Pull.Num, cmd.CommandName().TitleString()); err != nil {
 			ctx.Log.Err("Unable to delete old comments: %s", err)
