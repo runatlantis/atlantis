@@ -7,6 +7,7 @@ import (
 
 type PullUpdater struct {
 	HidePrevPlanComments bool
+	DeletePrevComments   bool
 	VCSClient            vcs.Client
 	MarkdownRenderer     *MarkdownRenderer
 }
@@ -26,6 +27,13 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 		if err := c.VCSClient.HidePrevCommandComments(ctx.Pull.BaseRepo, ctx.Pull.Num, cmd.CommandName().TitleString()); err != nil {
 			ctx.Log.Err("unable to hide old comments: %s", err)
 		}
+	}
+
+	if c.DeletePrevComments {
+		if err := c.VCSClient.DeletePrevCommandComments(ctx.Pull.BaseRepo, ctx.Pull.Num, cmd.CommandName().TitleString()); err != nil {
+			ctx.Log.Err("Unable to delete old comments: %s", err)
+		}
+
 	}
 
 	comment := c.MarkdownRenderer.Render(res, cmd.CommandName(), ctx.Log.GetHistory(), cmd.IsVerbose(), ctx.Pull.BaseRepo.VCSHost.Type)

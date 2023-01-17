@@ -60,6 +60,7 @@ const (
 	CheckoutStrategyFlag             = "checkout-strategy"
 	DataDirFlag                      = "data-dir"
 	DefaultTFVersionFlag             = "default-tf-version"
+	DeletePrevComments               = "delete-prev-command-comments"
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableApplyFlag                 = "disable-apply"
 	DisableAutoplanFlag              = "disable-autoplan"
@@ -407,6 +408,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	AutomergeFlag: {
 		description:  "Automatically merge pull requests when all plans are successfully applied.",
+		defaultValue: false,
+	},
+	DeletePrevComments: {
+		description:  "Automatically delete previous commands comments from merge request",
 		defaultValue: false,
 	},
 	DisableApplyAllFlag: {

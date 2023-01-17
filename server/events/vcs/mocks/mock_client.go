@@ -150,6 +150,11 @@ func (mock *MockClient) HidePrevCommandComments(_param0 models.Repo, _param1 int
 	return ret0
 }
 
+func (g *MockClient) DeletePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	return nil
+}
+
+
 func (mock *MockClient) MarkdownPullLink(_param0 models.PullRequest) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")

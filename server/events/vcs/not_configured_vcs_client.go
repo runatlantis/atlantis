@@ -35,6 +35,9 @@ func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, co
 func (a *NotConfiguredVCSClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	return nil
 }
+func (g *NotConfiguredVCSClient) DeletePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	return nil
+}
 func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	return models.ApprovalStatus{}, a.err()
 }

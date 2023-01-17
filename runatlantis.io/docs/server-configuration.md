@@ -607,6 +607,14 @@ and set `--autoplan-modules` to `false`.
   Hide previous plan comments to declutter PRs. This is only supported in
   GitHub currently. This is not enabled by default.
 
+### `--delete-prev-command-comments`
+  ```bash
+  atlantis server --delete-prev-command-comments
+  # or
+  ATLANTIS_DELETE_PREV_COMMAND_COMMENTS
+  ```
+  Deletes previous command comments to declutter the merge request. This is only supported in Gitlab currently. Github users should use `--hide-prev-plan-comments`. 
+  This is not enabled by default
 ### `--locking-db-type`
   ```bash
   atlantis server --locking-db-type="<boltdb|redis>"

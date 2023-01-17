@@ -258,6 +258,10 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 	return nil
 }
 
+func (g *GithubClient) DeletePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	return nil
+}
+
 // getPRReviews Retrieves PR reviews for a pull request on a specific repository.
 // The reviews are being retrieved using pages with the size of 10 reviews.
 func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (GithubPRReviewSummary, error) {

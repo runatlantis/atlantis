@@ -104,6 +104,10 @@ func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command 
 	return nil
 }
 
+func (g *Client) DeletePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	return nil
+}
+
 // PullIsApproved returns true if the merge request was approved.
 func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d", b.BaseURL, repo.FullName, pull.Num)

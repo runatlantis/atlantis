@@ -64,6 +64,10 @@ func (d *ClientProxy) HidePrevCommandComments(repo models.Repo, pullNum int, com
 	return d.clients[repo.VCSHost.Type].HidePrevCommandComments(repo, pullNum, command)
 }
 
+func (d *ClientProxy) DeletePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	return d.clients[repo.VCSHost.Type].DeletePrevCommandComments(repo, pullNum, command)
+}
+
 func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	return d.clients[repo.VCSHost.Type].PullIsApproved(repo, pull)
 }

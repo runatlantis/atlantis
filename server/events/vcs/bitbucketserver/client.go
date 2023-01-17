@@ -149,6 +149,10 @@ func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command 
 	return nil
 }
 
+func (g *Client) DeletePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	return nil
+}
+
 // postComment actually posts the comment. It's a helper for CreateComment().
 func (b *Client) postComment(repo models.Repo, pullNum int, comment string) error {
 	bodyBytes, err := json.Marshal(map[string]string{"text": comment})

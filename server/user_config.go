@@ -30,6 +30,7 @@ type UserConfig struct {
 	BitbucketWebhookSecret          string `mapstructure:"bitbucket-webhook-secret"`
 	CheckoutStrategy                string `mapstructure:"checkout-strategy"`
 	DataDir                         string `mapstructure:"data-dir"`
+	DeletePrevComments              bool   `mapstructure:"delete-prev-command-comments"`
 	DisableApplyAll                 bool   `mapstructure:"disable-apply-all"`
 	DisableApply                    bool   `mapstructure:"disable-apply"`
 	DisableAutoplan                 bool   `mapstructure:"disable-autoplan"`

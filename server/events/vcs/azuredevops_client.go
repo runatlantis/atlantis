@@ -134,6 +134,10 @@ func (g *AzureDevopsClient) HidePrevCommandComments(repo models.Repo, pullNum in
 	return nil
 }
 
+func (g *AzureDevopsClient) DeletePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	return nil
+}
+
 // PullIsApproved returns true if the merge request was approved by another reviewer.
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
 func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {

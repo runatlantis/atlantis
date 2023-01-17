@@ -166,6 +166,30 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 	return nil
 }
 
+// Delete previous command comment
+func (g *GitlabClient) DeletePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	comments, _, err := g.Client.Notes.ListMergeRequestNotes(repo.FullName, pullNum, &gitlab.ListMergeRequestNotesOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	for _, comment := range comments {
+		body := strings.Split(comment.Body, "\n")
+		if len(body) == 0 {
+			continue
+		}
+		firstLine := strings.ToLower(body[0])
+
+		if strings.Contains(firstLine, strings.ToLower(fmt.Sprintf("Ran %v for", command))) || strings.Contains(firstLine, fmt.Sprintf("atlantis %s", strings.ToLower(command))) {
+			g.Client.Notes.DeleteMergeRequestNote(repo.FullName, pullNum, comment.ID)
+		}
+
+		continue
+	}
+	return nil
+}
+
 // PullIsApproved returns true if the merge request was approved.
 func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	approvals, _, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)
