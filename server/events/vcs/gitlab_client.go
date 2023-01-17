@@ -182,7 +182,7 @@ func (g *GitlabClient) DeletePrevCommandComments(repo models.Repo, pullNum int, 
 		}
 		firstLine := strings.ToLower(body[0])
 
-		if strings.Contains(firstLine, strings.ToLower(fmt.Sprintf("Ran %v for", command))) || strings.Contains(firstLine, fmt.Sprintf("atlantis %s", strings.ToLower(command))) {
+		if strings.Contains(firstLine, strings.ToLower(fmt.Sprintf("Ran %v for", command))) {
 			g.Client.Notes.DeleteMergeRequestNote(repo.FullName, pullNum, comment.ID)
 		}
 
