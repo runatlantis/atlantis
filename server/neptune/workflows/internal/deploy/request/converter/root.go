@@ -15,8 +15,10 @@ func Root(external request.Root) terraform.Root {
 		Plan: terraform.PlanJob{
 			Job: execute.Job{
 				Steps: steps(external.Plan.Steps)},
-			Mode:     mode(external.PlanMode),
-			Approval: terraform.PlanApprovalType(external.PlanApprovalType),
+			Mode: mode(external.PlanMode),
+			Approval: terraform.PlanApproval{
+				Type: terraform.PlanApprovalType(external.PlanApproval.Type),
+			},
 		},
 		Path:      external.RepoRelPath,
 		TfVersion: external.TfVersion,

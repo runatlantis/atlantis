@@ -25,7 +25,7 @@ func NewValidationError(msg string, format ...interface{}) *ValidationError {
 }
 
 type terraformWorkflowRunner interface {
-	Run(ctx workflow.Context, deploymentInfo terraformWorkflow.DeploymentInfo) error
+	Run(ctx workflow.Context, deploymentInfo terraformWorkflow.DeploymentInfo, diffDirection activities.DiffDirection) error
 }
 
 type dbActivities interface {
@@ -71,7 +71,7 @@ func (p *Deployer) Deploy(ctx workflow.Context, requestedDeployment terraformWor
 	}
 
 	// don't wrap this err as it's not necessary and will mess with any err type assertions we might need to do
-	err = p.TerraformWorkflowRunner.Run(ctx, requestedDeployment)
+	err = p.TerraformWorkflowRunner.Run(ctx, requestedDeployment, commitDirection)
 
 	// No need to persist deployment if it's a PlanRejectionError
 	if _, ok := err.(*terraformWorkflow.PlanRejectionError); ok {

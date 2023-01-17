@@ -31,7 +31,9 @@ func testReviewWorkflow(ctx workflow.Context, r req) (res, error) {
 
 	status := review.Await(ctx, terraform.Root{
 		Plan: terraform.PlanJob{
-			Approval: terraform.ManualApproval,
+			Approval: terraform.PlanApproval{
+				Type: terraform.ManualApproval,
+			},
 		},
 	}, r.PlanSummary)
 

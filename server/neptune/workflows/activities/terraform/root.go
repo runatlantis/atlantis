@@ -18,6 +18,11 @@ type Root struct {
 	Rerun     bool
 }
 
+func (r Root) WithPlanApprovalOverride(a PlanApproval) Root {
+	r.Plan.Approval = a
+	return r
+}
+
 type Trigger string
 
 const (

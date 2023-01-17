@@ -4,11 +4,16 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/execute"
 )
 
-type PlanApprovalType string
+type PlanApproval struct {
+	Type   PlanApprovalType
+	Reason string
+}
+
+type PlanApprovalType int
 
 const (
-	ManualApproval PlanApprovalType = "manual"
-	AutoApproval   PlanApprovalType = "auto"
+	AutoApproval PlanApprovalType = iota
+	ManualApproval
 )
 
 type PlanMode string
@@ -20,7 +25,7 @@ func NewDestroyPlanMode() *PlanMode {
 
 type PlanJob struct {
 	Mode     *PlanMode
-	Approval PlanApprovalType
+	Approval PlanApproval
 	execute.Job
 }
 

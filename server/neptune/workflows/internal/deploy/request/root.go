@@ -14,18 +14,27 @@ const (
 	ManualTrigger Trigger = "manual"
 )
 
-type PlanApprovalType string
+type PlanApproval struct {
+	Type PlanApprovalType
+}
+
+type PlanApprovalType int64
+
+const (
+	AutoApproval PlanApprovalType = iota
+	ManualApproval
+)
 
 type Root struct {
-	Name             string
-	Apply            Job
-	Plan             Job
-	RepoRelPath      string
-	TfVersion        string
-	PlanMode         PlanMode
-	PlanApprovalType string
-	Trigger          Trigger
-	Rerun            bool
+	Name         string
+	Apply        Job
+	Plan         Job
+	RepoRelPath  string
+	TfVersion    string
+	PlanMode     PlanMode
+	PlanApproval PlanApproval
+	Trigger      Trigger
+	Rerun        bool
 }
 
 type Job struct {

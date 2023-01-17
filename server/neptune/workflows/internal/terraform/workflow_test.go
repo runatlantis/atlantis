@@ -47,6 +47,9 @@ var testLocalRoot = &terraformModel.LocalRoot{
 					},
 				},
 			},
+			Approval: terraformModel.PlanApproval{
+				Type: terraformModel.ManualApproval,
+			},
 		},
 		Apply: execute.Job{
 			Steps: []execute.Step{

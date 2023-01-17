@@ -33,7 +33,7 @@ type testTerraformWorkflowRunner struct {
 	expectedErrorType  ErrorType
 }
 
-func (r testTerraformWorkflowRunner) Run(ctx workflow.Context, deploymentInfo terraform.DeploymentInfo) error {
+func (r testTerraformWorkflowRunner) Run(ctx workflow.Context, deploymentInfo terraform.DeploymentInfo, diffDirection activities.DiffDirection) error {
 	if r.expectedErrorType == PlanRejectionError {
 		return terraform.NewPlanRejectionError("plan rejected")
 	} else if r.expectedErrorType == TerraformClientError {

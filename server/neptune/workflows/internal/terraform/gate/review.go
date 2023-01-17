@@ -41,7 +41,7 @@ func (r *Review) Await(ctx workflow.Context, root terraform.Root, planSummary te
 		r.MetricsHandler.Timer(PlanReviewTimerStat).Record(time.Since(waitStartTime))
 	}()
 
-	if root.Plan.Approval == terraform.AutoApproval || planSummary.IsEmpty() {
+	if root.Plan.Approval.Type == terraform.AutoApproval || planSummary.IsEmpty() {
 		return Approved
 	}
 

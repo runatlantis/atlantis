@@ -4,12 +4,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	internalTerraform "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
@@ -57,6 +60,8 @@ func testTerraformWorkflow(ctx workflow.Context, request terraformWorkflow.Reque
 
 type request struct {
 	PlanRejectionErr bool
+	DiffDirection    activities.DiffDirection
+	Info             internalTerraform.DeploymentInfo
 }
 
 type response struct {
@@ -76,18 +81,7 @@ func parentWorkflow(ctx workflow.Context, r request) (response, error) {
 		runner.Workflow = testTerraformWorkflow
 	}
 
-	uuid, err := sideeffect.GenerateUUID(ctx)
-
-	if err != nil {
-		return response{}, nil
-	}
-
-	if err := runner.Run(ctx, internalTerraform.DeploymentInfo{
-		ID:         uuid,
-		Revision:   "1234",
-		CheckRunID: 1,
-		Root:       terraform.Root{},
-	}); err != nil {
+	if err := runner.Run(ctx, r.Info, r.DiffDirection); err != nil {
 		if _, ok := err.(internalTerraform.PlanRejectionError); ok {
 			return response{
 				PlanRejection: true,
@@ -101,13 +95,30 @@ func parentWorkflow(ctx workflow.Context, r request) (response, error) {
 	}, nil
 }
 
+func buildDeploymentInfo(t *testing.T) internalTerraform.DeploymentInfo {
+	uuid := uuid.New()
+
+	return internalTerraform.DeploymentInfo{
+		ID:         uuid,
+		Revision:   "1234",
+		CheckRunID: 1,
+		Root: terraform.Root{
+			Name: "some-root",
+			Plan: terraform.PlanJob{},
+		},
+		Repo: github.Repo{},
+	}
+}
+
 func TestWorkflowRunner_Run(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 
 	env.RegisterWorkflow(testTerraformWorkflow)
 
-	env.ExecuteWorkflow(parentWorkflow, request{})
+	env.ExecuteWorkflow(parentWorkflow, request{
+		Info: buildDeploymentInfo(t),
+	})
 
 	var resp response
 	err := env.GetWorkflowResult(&resp)
@@ -122,6 +133,43 @@ func TestWorkflowRunner_Run(t *testing.T) {
 	}
 }
 
+func TestWorkflowRunner_RunWithDivergedCommit(t *testing.T) {
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestWorkflowEnvironment()
+
+	env.RegisterWorkflow(testTerraformWorkflow)
+
+	r := request{
+		Info:          buildDeploymentInfo(t),
+		DiffDirection: activities.DirectionDiverged,
+	}
+
+	env.OnWorkflow(testTerraformWorkflow, mock.Anything, terraformWorkflow.Request{
+		Root: terraform.Root{
+			Name: r.Info.Root.Name,
+			Plan: terraform.PlanJob{
+				Approval: terraform.PlanApproval{
+					Type:   terraform.ManualApproval,
+					Reason: ":warning: Requested Revision is not ahead of deployed revision, please confirm the changes described in the plan.",
+				},
+			},
+		},
+		Repo:         r.Info.Repo,
+		DeploymentID: r.Info.ID.String(),
+		Revision:     r.Info.Revision,
+	}).Return(func(ctx workflow.Context, request terraformWorkflow.Request) error {
+		return nil
+	})
+
+	env.ExecuteWorkflow(parentWorkflow, r)
+
+	env.AssertExpectations(t)
+
+	var resp response
+	err := env.GetWorkflowResult(&resp)
+	assert.NoError(t, err)
+}
+
 func TestWorkflowRunner_PlanRejected(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
@@ -130,6 +178,7 @@ func TestWorkflowRunner_PlanRejected(t *testing.T) {
 
 	env.ExecuteWorkflow(parentWorkflow, request{
 		PlanRejectionErr: true,
+		Info:             buildDeploymentInfo(t),
 	})
 
 	var resp response

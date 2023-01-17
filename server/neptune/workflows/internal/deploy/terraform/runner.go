@@ -2,6 +2,8 @@ package terraform
 
 import (
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
+	terraformActivities "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"go.temporal.io/sdk/temporal"
@@ -42,7 +44,7 @@ type WorkflowRunner struct {
 	Workflow      Workflow
 }
 
-func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo) error {
+func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo, diffDirection activities.DiffDirection) error {
 	id := deploymentInfo.ID
 	ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 		WorkflowID: id.String(),
@@ -56,14 +58,23 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 			"atlantis_revision":   deploymentInfo.Revision,
 		},
 	})
-	terraformWorkflowRequest := terraform.Request{
-		Root:         deploymentInfo.Root,
+
+	request := terraform.Request{
 		Repo:         deploymentInfo.Repo,
+		Root:         deploymentInfo.Root,
 		DeploymentID: id.String(),
 		Revision:     deploymentInfo.Revision,
 	}
 
-	future := workflow.ExecuteChildWorkflow(ctx, r.Workflow, terraformWorkflowRequest)
+	// force plan reviews if we have diverged
+	if diffDirection == activities.DirectionDiverged {
+		request.Root = request.Root.WithPlanApprovalOverride(terraformActivities.PlanApproval{
+			Type:   terraformActivities.ManualApproval,
+			Reason: ":warning: Requested Revision is not ahead of deployed revision, please confirm the changes described in the plan.",
+		})
+	}
+
+	future := workflow.ExecuteChildWorkflow(ctx, r.Workflow, request)
 	return r.awaitWorkflow(ctx, future, deploymentInfo)
 }
 

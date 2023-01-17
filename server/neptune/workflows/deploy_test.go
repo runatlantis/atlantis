@@ -98,10 +98,7 @@ func signalWorkflow(env *testsuite.TestWorkflowEnvironment) {
 			},
 			RepoRelPath: "terraform/mytestroot",
 			PlanMode:    workflows.NormalPlanMode,
-
-			// auto approve since we are testing
-			PlanApprovalType: "auto",
-			Trigger:          workflows.MergeTrigger,
+			Trigger:     workflows.MergeTrigger,
 		},
 		Repo: workflows.Repo{
 			FullName: "nish/repo",
