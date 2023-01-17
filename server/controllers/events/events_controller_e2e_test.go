@@ -1190,6 +1190,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		userConfig.QuietPolicyChecks,
 	)
 
+	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient, "atlantis-test")
+
 	planCommandRunner := events.NewPlanCommandRunner(
 		false,
 		false,
@@ -1208,9 +1210,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		boltdb,
 		lockingClient,
 		discardApprovalOnPlan,
+		e2ePullReqStatusFetcher,
 	)
-
-	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient, "atlantis-test")
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		e2eVCSClient,

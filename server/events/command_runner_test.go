@@ -155,6 +155,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		defaultBoltDB,
 		lockingLocker,
 		testConfig.discardApprovalOnPlan,
+		pullReqStatusFetcher,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
