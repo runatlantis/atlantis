@@ -298,7 +298,6 @@ func (h *Handler) handleCheckSuiteEvent(ctx context.Context, e *github.CheckSuit
 func (h *Handler) handlePullRequestReviewEvent(ctx context.Context, e *github.PullRequestReviewEvent, r *http.BufferedRequest) error {
 	pullRequestReviewEvent, err := h.pullRequestReviewEventConverter.Convert(e)
 	if err != nil {
-		h.logger.ErrorContext(ctx, "error parsing prr event", map[string]interface{}{"err": err.Error()})
 		return &errors.EventParsingError{Err: err}
 	}
 	ctx = context.WithValue(ctx, contextInternal.RepositoryKey, pullRequestReviewEvent.Repo.FullName)
