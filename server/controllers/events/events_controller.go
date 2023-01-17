@@ -753,5 +753,5 @@ func isAzureDevOpsTestRepoURL(repository *azuredevops.GitRepository) bool {
 	if repository == nil {
 		return false
 	}
-	return (repository.GetURL() == azuredevopsTestURL)
+	return repository.GetURL() == azuredevopsTestURL
 }
