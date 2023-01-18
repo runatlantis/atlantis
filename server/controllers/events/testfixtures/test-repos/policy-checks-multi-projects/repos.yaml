@@ -6,3 +6,7 @@ policies:
       owner: runatlantis
       paths:
         - ../policies/policy.rego
+    - name: test_policy_2
+      owner: runatlantis
+      paths:
+        - ../policies/policy.rego

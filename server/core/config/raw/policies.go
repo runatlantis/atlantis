@@ -8,9 +8,10 @@ import (
 
 // PolicySets is the raw schema for repo-level atlantis.yaml config.
 type PolicySets struct {
-	Version    *string      `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
-	Owners     PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
-	PolicySets []PolicySet  `yaml:"policy_sets" json:"policy_sets"`
+	Version      *string      `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
+	Owners       PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
+	PolicySets   []PolicySet  `yaml:"policy_sets" json:"policy_sets"`
+	Organization string       `yaml:"organization" json:"organization"`
 }
 
 func (p PolicySets) Validate() error {
@@ -28,6 +29,7 @@ func (p PolicySets) ToValid() valid.PolicySets {
 	}
 
 	policySets.Owners = p.Owners.ToValid()
+	policySets.Organization = p.Organization
 
 	validPolicySets := make([]valid.PolicySet, 0)
 	for _, rawPolicySet := range p.PolicySets {

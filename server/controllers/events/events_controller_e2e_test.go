@@ -439,7 +439,7 @@ policy-v2:
 		ExpReplies [][]string
 	}{
 		{
-			Description:   "1 failing policy and 1 passing policy ",
+			Description:   "1 failing project and 1 passing project ",
 			RepoDir:       "policy-checks-multi-projects",
 			ModifiedFiles: []string{"dir1/main.tf,", "dir2/main.tf"},
 			Comments: []string{

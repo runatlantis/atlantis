@@ -21,13 +21,15 @@ func TestPolicySetsConfig_YAMLMarshalling(t *testing.T) {
 			description: "valid yaml",
 			input: `
 conftest_version: v1.0.0
+organization: org
 policy_sets:
 - name: policy-name
   source: "local"
   path: "rel/path/to/policy-set"
 `,
 			exp: raw.PolicySets{
-				Version: String("v1.0.0"),
+				Organization: "org",
+				Version:      String("v1.0.0"),
 				PolicySets: []raw.PolicySet{
 					{
 						Name:   "policy-name",
@@ -41,13 +43,15 @@ policy_sets:
 			description: "valid yaml with multiple paths",
 			input: `
 conftest_version: v1.0.0
+organization: org
 policy_sets:
 - name: policy-name
   source: "local"
   paths: ["rel/path/to/policy-set", "rel/path/to/another/policy-set"]
 `,
 			exp: raw.PolicySets{
-				Version: String("v1.0.0"),
+				Organization: "org",
+				Version:      String("v1.0.0"),
 				PolicySets: []raw.PolicySet{
 					{
 						Name:   "policy-name",
@@ -91,7 +95,8 @@ func TestPolicySets_Validate(t *testing.T) {
 		{
 			description: "policies",
 			input: raw.PolicySets{
-				Version: String("v1.0.0"),
+				Organization: "org",
+				Version:      String("v1.0.0"),
 				PolicySets: []raw.PolicySet{
 					{
 						Name:   "policy-name-1",
@@ -200,7 +205,8 @@ func TestPolicySets_ToValid(t *testing.T) {
 		{
 			description: "valid policies with owners",
 			input: raw.PolicySets{
-				Version: String("v1.0.0"),
+				Organization: "org",
+				Version:      String("v1.0.0"),
 				Owners: raw.PolicyOwners{
 					Users: []string{
 						"test",
@@ -215,7 +221,8 @@ func TestPolicySets_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.PolicySets{
-				Version: version,
+				Organization: "org",
+				Version:      version,
 				Owners: valid.PolicyOwners{
 					Users: []string{"test"},
 				},
@@ -231,7 +238,8 @@ func TestPolicySets_ToValid(t *testing.T) {
 		{
 			description: "valid policies without owners",
 			input: raw.PolicySets{
-				Version: String("v1.0.0"),
+				Organization: "org",
+				Version:      String("v1.0.0"),
 				PolicySets: []raw.PolicySet{
 					{
 						Name:   "good-policy",
@@ -241,7 +249,8 @@ func TestPolicySets_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.PolicySets{
-				Version: version,
+				Organization: "org",
+				Version:      version,
 				PolicySets: []valid.PolicySet{
 					{
 						Name:   "good-policy",
@@ -254,7 +263,8 @@ func TestPolicySets_ToValid(t *testing.T) {
 		{
 			description: "valid policies with multiple paths",
 			input: raw.PolicySets{
-				Version: String("v1.0.0"),
+				Organization: "org",
+				Version:      String("v1.0.0"),
 				Owners: raw.PolicyOwners{
 					Users: []string{
 						"test",
@@ -269,7 +279,8 @@ func TestPolicySets_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.PolicySets{
-				Version: version,
+				Organization: "org",
+				Version:      version,
 				Owners: valid.PolicyOwners{
 					Users: []string{"test"},
 				},
