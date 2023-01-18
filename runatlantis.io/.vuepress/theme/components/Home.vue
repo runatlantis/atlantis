@@ -106,7 +106,7 @@
               <ul>
                 <li><img class="checkmark" src="/checkmark.svg">Used by one of the world's top companies to manage over 600 Terraform repos with 300 developers.
                 </li>
-                <li><img class="checkmark" src="/checkmark.svg">In production use for over 2 years.
+                <li><img class="checkmark" src="/checkmark.svg">In production use since 2017.
                 </li>
               </ul>
             </div>
