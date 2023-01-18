@@ -1,41 +1,61 @@
 {
   extends: [
     "config:base",
-    "schedule:earlyMondays"
+    "schedule:earlyMondays",
   ],
+  commitMessageSuffix: " in {{packageFile}}",
+  dependencyDashboardAutoclose: true,
   automerge: false,
   platformAutomerge: false,
   labels: ["dependencies"],
-  postUpdateOptions: ["gomodTidy", "gomodUpdateImportPaths", "yarnDedupeHighest"],
-  prHourlyLimit: 0,
-  prConcurrentLimit: 5,
+  postUpdateOptions: [
+    "gomodTidy",
+    "gomodUpdateImportPaths",
+    "yarnDedupeHighest",
+  ],
+  // needed so e2e tests do not stomp over each other
+  prHourlyLimit: 1,
+  lockFileMaintenance: {
+    enabled: true,
+  },
+  vulnerabilityAlerts: {
+    enabled: true,
+    labels: [
+      "security",
+    ],
+  },
   packageRules: [
     // e2e test depends on testing/Dockefile testing-image which has conftest specific version.
     // to upgrade conftest versions, we need following PRs.
     // 1. update testing/Dockerfile conftest version
     // 2. update testing-env tag
     // 3. update e2e conftest version
-    // this settings allow to create only testing/Dockefile contest version update PR which uses branch prefix.
+    // This will allow conftest version updates in testing/Dockefile
     {
       matchPaths: ["testing/**"],
       matchPackagePatterns: ["conftest"],
       additionalBranchPrefix: "{{baseDir}}-",
       groupName: "conftest-testing",
+      /*
       prBodyNotes: [
-        ":warning: You need to upgrade testing-env conftest firstly, then upgrade other conftest versions for e2e :warning:",
+        ":warning: Upgrade testing-env conftest and then upgrade other conftest versions for e2e :warning:",
       ],
+      */
     },
     {
       ignorePaths: ["testing/**"],
       matchPackagePatterns: ["github-actions"],
       groupName: "github-",
     },
+    /*
+    // This tag is currently latest so we can skip this check for now unless we need to pin it again.
     {
       // we need to upgrade testing-env on ci quickly
       matchPackageNames: ["ghcr.io/runatlantis/testing-env"],
       groupName: "testing-env-ci-test",
       schedule: ["every 1 hour after 00:00 and before 23:59 every day"],
     },
+    */
     {
       // use LTS node version for node docker image
       matchDatasources: ["docker"],

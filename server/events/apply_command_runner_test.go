@@ -10,7 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/models/fixtures"
+	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 )
@@ -53,23 +53,23 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			pull := &github.PullRequest{
 				State: github.String("open"),
 			}
-			modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
-			When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 			ctx := &command.Context{
-				User:     fixtures.User,
+				User:     testdata.User,
 				Log:      logging.NewNoopLogger(t),
 				Scope:    scopeNull,
 				Pull:     modelPull,
-				HeadRepo: fixtures.GithubRepo,
+				HeadRepo: testdata.GithubRepo,
 				Trigger:  command.CommentTrigger,
 			}
 
 			When(applyLockChecker.CheckApplyLock()).ThenReturn(locking.ApplyCommandLock{Locked: c.ApplyLocked}, c.ApplyLockError)
 			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
 
-			vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, c.ExpComment, "apply")
+			vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, modelPull.Num, c.ExpComment, "apply")
 		})
 	}
 }
