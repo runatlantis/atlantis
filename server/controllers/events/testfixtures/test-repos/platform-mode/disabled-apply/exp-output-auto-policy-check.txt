@@ -5,6 +5,8 @@ Ran Policy Check for dir: `staging` workspace: `staging`
 exit status 1
 Checking plan against the following policies: 
   test_policy
+
+test_policy:
 FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions

@@ -92,7 +92,7 @@ func (c *ConfTestExecutor) Run(_ context.Context, prjCtx command.ProjectContext,
 			policyErr = cmdErr
 			failedPolicies = append(failedPolicies, policySet)
 		}
-		totalCmdOutput = append(totalCmdOutput, cmdOutput)
+		totalCmdOutput = append(totalCmdOutput, c.processOutput(cmdOutput, policySet, cmdErr))
 	}
 
 	title := c.buildTitle(policyNames)
@@ -119,9 +119,17 @@ func (c *ConfTestExecutor) Run(_ context.Context, prjCtx command.ProjectContext,
 }
 
 func (c *ConfTestExecutor) buildTitle(policySetNames []string) string {
-	return fmt.Sprintf("Checking plan against the following policies: \n  %s\n", strings.Join(policySetNames, "\n  "))
+	return fmt.Sprintf("Checking plan against the following policies: \n  %s\n\n", strings.Join(policySetNames, "\n  "))
 }
 
 func (c *ConfTestExecutor) sanitizeOutput(inputFile string, output string) string {
 	return strings.Replace(output, inputFile, "<redacted plan file>", -1)
+}
+
+func (c *ConfTestExecutor) processOutput(output string, policySet valid.PolicySet, err error) string {
+	// errored results need an extra newline
+	if err != nil {
+		return policySet.Name + ":\n" + output
+	}
+	return policySet.Name + ":" + output
 }

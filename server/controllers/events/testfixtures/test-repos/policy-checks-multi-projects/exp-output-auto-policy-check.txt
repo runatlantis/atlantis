@@ -8,6 +8,7 @@ Ran Policy Check for 2 projects:
 Checking plan against the following policies: 
   test_policy
 
+test_policy:
 1 test, 1 passed, 0 warnings, 0 failures, 0 exceptions
 
 ```
@@ -20,6 +21,8 @@ Checking plan against the following policies:
 exit status 1
 Checking plan against the following policies: 
   test_policy
+
+test_policy:
 FAIL - <redacted plan file> - main - WARNING: Forbidden Resource creation is prohibited.
 
 1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions
