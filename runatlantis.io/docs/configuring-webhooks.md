@@ -31,10 +31,10 @@ If installing on a single repository, navigate to the repository home page and c
   - **NOTE** If you're adding a webhook to multiple repositories, each repository will need to use the **same** secret.
 - select **Let me select individual events**
 - check the boxes
-	- **Pull request reviews**
-	- **Pushes**
-	- **Issue comments**
-	- **Pull requests**
+  - **Pull request reviews**
+  - **Pushes**
+  - **Issue comments**
+  - **Pull requests**
 - leave **Active** checked
 - click **Add webhook**
 - See [Next Steps](#next-steps)
@@ -93,8 +93,8 @@ Webhooks are installed at the [team project](https://docs.microsoft.com/en-us/az
 - Select **Project settings** in the lower-left corner
 - Select **Service hooks**
   - If you see the message "You do not have sufficient permissions to view or configure subscriptions." you need to ensure your user is a member of either the organization's "Project Collection Administrators" group or the project's "Project Administrators" group.
-  - To add your user to the Project Collection Build Administrators group, navigate to the organization level, click **Organization Settings** and then click **Permissions**. You should be at `https://dev.azure.com/<organization>/_settings/groups`. Now click on the **<organization>/Project Collection Administrators** group and add your user as a member.
-  - To add your user to the Project Administrators group, navigate to the project level, click **Project Settings** and then click **Permissions**. You should be at `https://dev.azure.com/<organization>/<project>/_settings/permissions`. Now click on the **[<project>]/Project Administrators** group and add your user as a member.
+  - To add your user to the Project Collection Build Administrators group, navigate to the organization level, click **Organization Settings** and then click **Permissions**. You should be at `https://dev.azure.com/<organization>/_settings/groups`. Now click on the **\<organization\>/Project Collection Administrators** group and add your user as a member.
+  - To add your user to the Project Administrators group, navigate to the project level, click **Project Settings** and then click **Permissions**. You should be at `https://dev.azure.com/<organization>/<project>/_settings/permissions`. Now click on the **\<project\>/Project Administrators** group and add your user as a member.
 - Click **Create subscription** or the green plus icon to add a new webhook
 - Scroll to the bottom of the list and select **Web Hooks**
 - Click **Next**
@@ -117,7 +117,6 @@ Repeat the process above until you have webhook subscriptions for the following 
 - See [Next Steps](#next-steps)
 
 ## Next Steps
-* To verify that Atlantis is receiving your webhooks, create a test pull request
-  to your repo.
+* To verify that Atlantis is receiving your webhooks, create a test pull request to your repo.
 * You should see the request show up in the Atlantis logs at an `INFO` level.
 * You'll now need to configure Atlantis to add your [Provider Credentials](provider-credentials.md)
