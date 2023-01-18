@@ -6,7 +6,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
-const DefaultTaskqueue = "deploy"
+const DefaultTaskqueue = "terraform"
 
 type Temporal struct {
 	Port               string `yaml:"port" json:"port"`

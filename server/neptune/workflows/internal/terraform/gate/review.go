@@ -3,6 +3,7 @@ package gate
 import (
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/context"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
@@ -33,17 +34,22 @@ const (
 type Review struct {
 	MetricsHandler client.MetricsHandler
 	Timeout        time.Duration
+	Client         ActionsClient
 }
 
-func (r *Review) Await(ctx workflow.Context, root terraform.Root, planSummary terraform.PlanSummary) PlanStatus {
+type ActionsClient interface {
+	UpdateApprovalActions(approval terraform.PlanApproval) error
+}
+
+func (r *Review) Await(ctx workflow.Context, root terraform.Root, planSummary terraform.PlanSummary) (PlanStatus, error) {
+	if root.Plan.Approval.Type == terraform.AutoApproval || planSummary.IsEmpty() {
+		return Approved, nil
+	}
+
 	waitStartTime := time.Now()
 	defer func() {
 		r.MetricsHandler.Timer(PlanReviewTimerStat).Record(time.Since(waitStartTime))
 	}()
-
-	if root.Plan.Approval.Type == terraform.AutoApproval || planSummary.IsEmpty() {
-		return Approved
-	}
 
 	ch := workflow.GetSignalChannel(ctx, PlanReviewSignalName)
 	selector := temporal.SelectorWithTimeout{
@@ -63,11 +69,16 @@ func (r *Review) Await(ctx workflow.Context, root terraform.Root, planSummary te
 		timedOut = true
 	})
 
+	err := r.Client.UpdateApprovalActions(root.Plan.Approval)
+	if err != nil {
+		return Rejected, errors.Wrap(err, "updating approval actions")
+	}
+
 	selector.Select(ctx)
 
 	if timedOut {
-		return Rejected
+		return Rejected, nil
 	}
 
-	return planReview.Status
+	return planReview.Status, nil
 }

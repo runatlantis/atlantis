@@ -64,11 +64,10 @@ func (n *StateReceiver) updateCheckRun(ctx workflow.Context, workflowState *stat
 		Summary: summary,
 	}
 
-	if workflowState.Plan != nil && workflowState.Plan.Status == state.SuccessJobStatus &&
-		workflowState.Apply != nil && workflowState.Apply.Status == state.WaitingJobStatus {
-		request.Actions = []github.CheckRunAction{
-			github.CreatePlanReviewAction(github.Approve),
-			github.CreatePlanReviewAction(github.Reject),
+	if workflowState.Apply != nil {
+		// add any actions pertaining to the apply job
+		for _, a := range workflowState.Apply.GetActions().Actions {
+			request.Actions = append(request.Actions, a.ToGithubCheckRunAction())
 		}
 	}
 

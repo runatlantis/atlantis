@@ -16,12 +16,13 @@ var checkrunTemplateStr string
 var checkrunTemplate = template.Must(template.New("").Parse(checkrunTemplateStr))
 
 type checkrunTemplateData struct {
-	PlanStatus    string
-	PlanLogURL    string
-	ApplyStatus   string
-	ApplyLogURL   string
-	InternalError bool
-	TimedOut      bool
+	ApplyActionsSummary string
+	PlanStatus          string
+	PlanLogURL          string
+	ApplyStatus         string
+	ApplyLogURL         string
+	InternalError       bool
+	TimedOut            bool
 }
 
 func RenderWorkflowStateTmpl(workflowState *state.Workflow) string {
@@ -33,13 +34,19 @@ func RenderWorkflowStateTmpl(workflowState *state.Workflow) string {
 	internalError := workflowState.Result.Reason == state.InternalServiceError
 	timedOut := workflowState.Result.Reason == state.TimedOutError
 
+	var applyActionsSummary string
+
+	if workflowState.Apply != nil {
+		applyActionsSummary = workflowState.Apply.GetActions().Summary
+	}
 	return renderTemplate(checkrunTemplate, checkrunTemplateData{
-		PlanStatus:    planStatus,
-		PlanLogURL:    planLogURL,
-		ApplyStatus:   applyStatus,
-		ApplyLogURL:   applyLogURL,
-		InternalError: internalError,
-		TimedOut:      timedOut,
+		PlanStatus:          planStatus,
+		PlanLogURL:          planLogURL,
+		ApplyStatus:         applyStatus,
+		ApplyLogURL:         applyLogURL,
+		InternalError:       internalError,
+		TimedOut:            timedOut,
+		ApplyActionsSummary: applyActionsSummary,
 	})
 }
 

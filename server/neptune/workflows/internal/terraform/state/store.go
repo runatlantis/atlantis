@@ -10,6 +10,11 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 )
 
+const (
+	ConfirmAction = "Confirm"
+	RejectAction  = "Reject"
+)
+
 type urlGenerator interface {
 	Generate(jobID fmt.Stringer, BaseURL fmt.Stringer) (*url.URL, error)
 }
@@ -23,9 +28,10 @@ type WorkflowStore struct {
 }
 
 type UpdateOptions struct {
-	PlanSummary terraform.PlanSummary
-	StartTime   time.Time
-	EndTime     time.Time
+	PlanSummary  terraform.PlanSummary
+	PlanApproval terraform.PlanApproval
+	StartTime    time.Time
+	EndTime      time.Time
 }
 
 func NewWorkflowStoreWithGenerator(notifier UpdateNotifier, g urlGenerator) *WorkflowStore {
@@ -63,6 +69,32 @@ func (s *WorkflowStore) InitPlanJob(jobID fmt.Stringer, serverURL fmt.Stringer) 
 	return s.notifier(s.state)
 }
 
+func convertApprovalToActions(approval terraform.PlanApproval) JobActions {
+	if approval.Type == terraform.AutoApproval {
+		return JobActions{}
+	}
+
+	return JobActions{
+		Actions: []JobAction{
+			{
+				ID:   ConfirmAction,
+				Info: "Confirm this plan to proceed to apply",
+			},
+			{
+				ID:   RejectAction,
+				Info: "Reject this plan to prevent the apply",
+			},
+		},
+		Summary: approval.Reason,
+	}
+}
+
+func (s *WorkflowStore) UpdateApprovalActions(approval terraform.PlanApproval) error {
+	s.state.Apply.OnWaitingActions = convertApprovalToActions(approval)
+
+	return s.notifier(s.state)
+}
+
 func (s *WorkflowStore) InitApplyJob(jobID fmt.Stringer, serverURL fmt.Stringer) error {
 	outputURL, err := s.outputURLGenerator.Generate(jobID, serverURL)
 
@@ -90,10 +122,11 @@ func (s *WorkflowStore) UpdatePlanJobWithStatus(status JobStatus, options ...Upd
 }
 
 func (s *WorkflowStore) UpdateApplyJobWithStatus(status JobStatus, options ...UpdateOptions) error {
-	// Add start and end time for apply job
-	if status == InProgressJobStatus {
+	switch status {
+	case InProgressJobStatus:
 		s.state.Apply.StartTime = getStartTimeFromOpts(options...)
-	} else if status == FailedJobStatus || status == SuccessJobStatus {
+
+	case FailedJobStatus, SuccessJobStatus:
 		s.state.Apply.EndTime = getEndTimeFromOpts(options...)
 	}
 

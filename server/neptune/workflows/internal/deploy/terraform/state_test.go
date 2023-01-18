@@ -138,12 +138,22 @@ func TestStateReceive(t *testing.T) {
 				Apply: &state.Job{
 					Output: jobOutput,
 					Status: state.WaitingJobStatus,
+					OnWaitingActions: state.JobActions{
+						Actions: []state.JobAction{
+							{
+								ID:   "Confirm",
+								Info: "confirm",
+							},
+						},
+					},
 				},
 			},
 			ExpectedCheckRunState: github.CheckRunPending,
 			ExpectedActions: []github.CheckRunAction{
-				github.CreatePlanReviewAction(github.Approve),
-				github.CreatePlanReviewAction(github.Reject),
+				{
+					Label:       "Confirm",
+					Description: "confirm",
+				},
 			},
 		},
 		{

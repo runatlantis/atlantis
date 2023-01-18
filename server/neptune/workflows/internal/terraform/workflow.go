@@ -83,10 +83,19 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 			metrics.RootTag: request.Root.Name,
 		})
 
+	// We have critical things relying on this notification so this workflow provides guarantees around this. (ie. compliance auditing)  There should
+	// be no situation where we are deploying while this is failing.
+	store := state.NewWorkflowStore(
+		func(s *state.Workflow) error {
+			return workflow.SignalExternalWorkflow(ctx, parent.ID, parent.RunID, state.WorkflowStateChangeSignal, s).Get(ctx, nil)
+		},
+	)
+
 	return &Runner{
 		ReviewGate: &gate.Review{
 			MetricsHandler: metricsHandler,
 			Timeout:        ReviewGateTimeout,
+			Client:         store,
 		},
 		GithubActivities:    ga,
 		TerraformActivities: ta,
@@ -104,13 +113,7 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 			Ta:      ta,
 		},
 		MetricsHandler: metricsHandler,
-		// We have critical things relying on this notification so this workflow provides guarantees around this. (ie. compliance auditing)  There should
-		// be no situation where we are deploying while this is failing.
-		Store: state.NewWorkflowStore(
-			func(s *state.Workflow) error {
-				return workflow.SignalExternalWorkflow(ctx, parent.ID, parent.RunID, state.WorkflowStateChangeSignal, s).Get(ctx, nil)
-			},
-		),
+		Store:          store,
 	}
 }
 
@@ -160,7 +163,11 @@ func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverUR
 		return errors.Wrap(err, "initializing job")
 	}
 
-	planStatus := r.ReviewGate.Await(ctx, root.Root, planResponse.Summary)
+	planStatus, err := r.ReviewGate.Await(ctx, root.Root, planResponse.Summary)
+	if err != nil {
+		logger.Error(ctx, "error waiting for plan review.", key.ErrKey, err)
+		return newPlanRejectedError()
+	}
 
 	if planStatus == gate.Rejected {
 		if err := r.Store.UpdateApplyJobWithStatus(state.RejectedJobStatus); err != nil {

@@ -1,3 +1,12 @@
+{{ if .ApplyActionsSummary }}
+## Required Actions :heavy_exclamation_mark:
+
+Github Actions are blocking this deployment from proceeding.
+
+### Summary
+{{ .ApplyActionsSummary }} 
+{{end}}
+
 | Operation | **Status** | **Logs** |  
 | - | - | - |
 | Plan | {{ if .PlanStatus }}`{{.PlanStatus}}`{{else}}N/A{{end}} |{{ if .PlanLogURL }}[Click Here]({{.PlanLogURL}}){{else}}N/A{{end}} |

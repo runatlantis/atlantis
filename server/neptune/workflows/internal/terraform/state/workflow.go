@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 )
 
@@ -41,12 +42,42 @@ type JobOutput struct {
 	Summary terraform.PlanSummary
 }
 
+type JobAction struct {
+	ID string
+
+	// Info gives additional info about the action that can be used in things like tooltips
+	Info string
+}
+
+func (a JobAction) ToGithubCheckRunAction() github.CheckRunAction {
+	return github.CheckRunAction{
+		Description: a.Info,
+		Label:       a.ID,
+	}
+}
+
+type JobActions struct {
+	Actions []JobAction
+
+	// Provides a form for messaging around the set actions
+	Summary string
+}
+
 type Job struct {
-	ID        string
-	Output    *JobOutput
-	Status    JobStatus
-	StartTime time.Time
-	EndTime   time.Time
+	ID               string
+	Output           *JobOutput
+	OnWaitingActions JobActions
+	Status           JobStatus
+	StartTime        time.Time
+	EndTime          time.Time
+}
+
+func (j Job) GetActions() JobActions {
+	if j.Status == WaitingJobStatus {
+		return j.OnWaitingActions
+	}
+
+	return JobActions{}
 }
 
 type WorkflowResult struct {

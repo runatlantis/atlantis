@@ -121,14 +121,21 @@ func NewServer(config *config.Config) (*Server, error) {
 		Logger:      config.CtxLogger,
 	}
 
-	session, err := aws.NewSession()
-	if err != nil {
-		return nil, errors.Wrap(err, "initializing new aws session")
-	}
-
-	snsWriter := &sns.Writer{
-		Client:   awsSns.New(session),
-		TopicArn: &config.LyftAuditJobsSnsTopicArn,
+	//TODO: move this within the activity construction
+	// we only initialize the AWS session if we have a topic, otherwise we just drop the message,
+	// for now this is how we get around local testing without aws resources.
+	var snsWriter io.Writer
+	if config.LyftAuditJobsSnsTopicArn != "" {
+		session, err := aws.NewSession()
+		if err != nil {
+			return nil, errors.Wrap(err, "initializing new aws session")
+		}
+		snsWriter = &sns.Writer{
+			Client:   awsSns.New(session),
+			TopicArn: &config.LyftAuditJobsSnsTopicArn,
+		}
+	} else {
+		snsWriter = io.Discard
 	}
 	deployActivities, err := activities.NewDeploy(config.DeploymentConfig, snsWriter)
 	if err != nil {
@@ -269,6 +276,8 @@ func (s Server) shutdown() {
 	s.TemporalClient.Close()
 }
 
+// TODO: consider building these before initializing the server so that the server is just responsible
+// for running the workers and has no knowledge of their dependencies.
 func (s Server) buildDeployWorker() worker.Worker {
 	// pass the underlying client otherwise this will panic()
 	deployWorker := worker.New(s.TemporalClient.Client, workflows.DeployTaskQueue, worker.Options{

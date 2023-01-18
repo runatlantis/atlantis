@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,6 +22,59 @@ func (n *testNotifier) notify(state *state.Workflow) error {
 	n.called = true
 	assert.Equal(n.t, n.expectedState, state)
 	return nil
+}
+
+func TestUpdateApprovalActions(t *testing.T) {
+	route := &mux.Route{}
+	route.Path("/jobs/{job-id}")
+
+	exoectedURL, err := url.Parse("www.test.com/jobs/1234")
+	assert.NoError(t, err)
+
+	jobID := bytes.NewBufferString("1234")
+	notifier := &testNotifier{
+		expectedState: &state.Workflow{
+			Apply: &state.Job{
+				Status: state.WaitingJobStatus,
+				Output: &state.JobOutput{
+					URL: exoectedURL,
+				},
+				ID: jobID.String(),
+			},
+		},
+		t: t,
+	}
+
+	subject := state.NewWorkflowStore(
+		notifier.notify,
+	)
+
+	baseURL := bytes.NewBufferString("www.test.com")
+
+	// init and then update actions
+	err = subject.InitApplyJob(jobID, baseURL)
+	assert.NoError(t, err)
+
+	notifier.expectedState.Apply.OnWaitingActions = state.JobActions{
+		Actions: []state.JobAction{
+			{
+				ID:   state.ConfirmAction,
+				Info: "Confirm this plan to proceed to apply",
+			},
+			{
+				ID:   state.RejectAction,
+				Info: "Reject this plan to prevent the apply",
+			},
+		},
+		Summary: "some reason",
+	}
+
+	err = subject.UpdateApprovalActions(terraform.PlanApproval{
+		Type:   terraform.ManualApproval,
+		Reason: "some reason",
+	})
+
+	assert.NoError(t, err)
 }
 
 func TestInitPlanJob(t *testing.T) {
