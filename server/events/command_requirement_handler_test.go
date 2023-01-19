@@ -64,15 +64,6 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 			wantErr:     assert.NoError,
 		},
 		{
-			name: "fail by no policy passed",
-			ctx: command.ProjectContext{
-				PlanRequirements:  []string{valid.PoliciesPassedCommandReq},
-				ProjectPlanStatus: models.ErroredPolicyCheckStatus,
-			},
-			wantFailure: "All policies must pass for project before running plan.",
-			wantErr:     assert.NoError,
-		},
-		{
 			name: "fail by no mergeable",
 			ctx: command.ProjectContext{
 				PlanRequirements: []string{raw.MergeableRequirement},

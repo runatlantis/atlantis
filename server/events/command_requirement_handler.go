@@ -25,11 +25,6 @@ func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, c
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
 				return "Pull request must be approved by at least one person other than the author before running plan.", nil
 			}
-		// this should come before mergeability check since mergeability is a superset of this check.
-		case valid.PoliciesPassedCommandReq:
-			if ctx.ProjectPlanStatus == models.ErroredPolicyCheckStatus {
-				return "All policies must pass for project before running plan.", nil
-			}
 		case raw.MergeableRequirement:
 			if !ctx.PullReqStatus.Mergeable {
 				return "Pull request must be mergeable before running plan.", nil
