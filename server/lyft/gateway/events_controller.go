@@ -39,7 +39,8 @@ func NewVCSEventsController(
 	pullConverter converters.PullConverter,
 	githubClient converters.PullGetter,
 	featureAllocator feature.Allocator,
-	scheduler scheduler,
+	syncScheduler scheduler,
+	asyncScheduler scheduler,
 	temporalClient client.Client,
 	rootConfigBuilder *gateway_handlers.RootConfigBuilder,
 	checkRunFetcher *github.CheckRunsFetcher) *VCSEventsController {
@@ -48,7 +49,7 @@ func NewVCSEventsController(
 	)
 
 	asyncAutoplannerWorkerProxy := gateway_handlers.NewAutoplannerValidatorProxy(
-		autoplanValidator, logger, pullEventWorkerProxy, scheduler,
+		autoplanValidator, logger, pullEventWorkerProxy, asyncScheduler,
 	)
 
 	prHandler := handlers.NewPullRequestEventWithEventTypeHandlers(
@@ -70,13 +71,13 @@ func NewVCSEventsController(
 		commentParser,
 		repoAllowlistChecker,
 		vcsClient,
-		gateway_handlers.NewCommentEventWorkerProxy(logger, snsWriter, featureAllocator, scheduler, rootDeployer, vcsClient),
+		gateway_handlers.NewCommentEventWorkerProxy(logger, snsWriter, featureAllocator, asyncScheduler, rootDeployer, vcsClient),
 		logger,
 	)
 
 	pushHandler := &gateway_handlers.PushHandler{
 		Allocator:    featureAllocator,
-		Scheduler:    scheduler,
+		Scheduler:    asyncScheduler,
 		Logger:       logger,
 		RootDeployer: rootDeployer,
 	}
@@ -84,19 +85,20 @@ func NewVCSEventsController(
 	checkRunHandler := &gateway_handlers.CheckRunHandler{
 		Logger:            logger,
 		RootConfigBuilder: rootConfigBuilder,
-		Scheduler:         scheduler,
+		SyncScheduler:     syncScheduler,
+		AsyncScheduler:    asyncScheduler,
 		DeploySignaler:    deploySignaler,
 	}
 
 	checkSuiteHandler := &gateway_handlers.CheckSuiteHandler{
 		Logger:       logger,
-		Scheduler:    scheduler,
+		Scheduler:    asyncScheduler,
 		RootDeployer: rootDeployer,
 	}
 
 	pullRequestReviewHandler := &gateway_handlers.PullRequestReviewWorkerProxy{
 		Allocator:       featureAllocator,
-		Scheduler:       scheduler,
+		Scheduler:       asyncScheduler,
 		SnsWriter:       snsWriter,
 		Logger:          logger,
 		CheckRunFetcher: checkRunFetcher,

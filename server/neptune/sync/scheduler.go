@@ -23,13 +23,11 @@ type AsyncScheduler struct {
 	wg        sync.WaitGroup
 }
 
-func NewAsyncScheduler(logger logging.Logger) *AsyncScheduler {
+func NewAsyncScheduler(logger logging.Logger, delegate *SynchronousScheduler) *AsyncScheduler {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &AsyncScheduler{
-		delegate: &SynchronousScheduler{
-			Logger: logger,
-		},
+		delegate:  delegate,
 		poolCtx:   ctx,
 		cancelCtx: cancel,
 	}

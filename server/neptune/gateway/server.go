@@ -233,7 +233,10 @@ func NewServer(config Config) (*Server, error) {
 		config.MaxProjectsPerPR,
 	)
 
-	asyncScheduler := sync.NewAsyncScheduler(ctxLogger)
+	syncScheduler := &sync.SynchronousScheduler{
+		Logger: ctxLogger,
+	}
+	asyncScheduler := sync.NewAsyncScheduler(ctxLogger, syncScheduler)
 
 	gatewaySnsWriter := sns.NewWriterWithStats(session, config.SNSTopicArn, statsScope.SubScope("aws.sns.gateway"))
 	autoplanValidator := &lyft_gateway.AutoplanValidator{
@@ -316,6 +319,7 @@ func NewServer(config Config) (*Server, error) {
 		pullConverter,
 		vcsClient,
 		featureAllocator,
+		syncScheduler,
 		asyncScheduler,
 		temporalClient,
 		rootConfigBuilder,

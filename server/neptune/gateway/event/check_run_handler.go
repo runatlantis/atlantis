@@ -55,7 +55,8 @@ type CheckRun struct {
 type CheckRunHandler struct {
 	Logger            logging.Logger
 	RootConfigBuilder rootConfigBuilder
-	Scheduler         scheduler
+	SyncScheduler     scheduler
+	AsyncScheduler    scheduler
 	DeploySignaler    deploySignaler
 }
 
@@ -75,9 +76,12 @@ func (h *CheckRunHandler) Handle(ctx context.Context, event CheckRun) error {
 	// we only handle requested/re-requested action types
 	switch event.Action.GetType() {
 	case RequestedActionType:
-		return h.handleRequestedAction(ctx, event, rootName)
+		// wrap this in a scheduler for consistent err handling (ie. logging)
+		return h.SyncScheduler.Schedule(ctx, func(ctx context.Context) error {
+			return h.handleRequestedAction(ctx, event, rootName)
+		})
 	case ReRequestedActionType:
-		return h.Scheduler.Schedule(ctx, func(ctx context.Context) error {
+		return h.AsyncScheduler.Schedule(ctx, func(ctx context.Context) error {
 			return h.handleReRequestedRun(ctx, event, rootName)
 		})
 	}
@@ -102,7 +106,7 @@ func (h *CheckRunHandler) handleRequestedAction(ctx context.Context, event Check
 	switch action.Identifier {
 	case "Unlock":
 		return h.signalUnlockWorkflowChannel(ctx, event, rootName)
-	case "Approve":
+	case "Confirm":
 		return h.signalPlanReviewWorkflowChannel(ctx, event, workflows.ApprovedPlanReviewStatus)
 	case "Reject":
 		return h.signalPlanReviewWorkflowChannel(ctx, event, workflows.RejectedPlanReviewStatus)

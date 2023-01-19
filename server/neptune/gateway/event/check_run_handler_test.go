@@ -20,8 +20,11 @@ func TestCheckRunHandler(t *testing.T) {
 		subject := event.CheckRunHandler{
 			Logger:            logging.NewNoopCtxLogger(t),
 			RootConfigBuilder: &mockRootConfigBuilder{},
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    &mockDeploySignaler{},
+
+			// both are synchronous to keep our tests predictable
+			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
+			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler: &mockDeploySignaler{},
 		}
 		e := event.CheckRun{
 			Name: "something",
@@ -37,8 +40,10 @@ func TestCheckRunHandler(t *testing.T) {
 		subject := event.CheckRunHandler{
 			Logger:            logging.NewNoopCtxLogger(t),
 			RootConfigBuilder: &mockRootConfigBuilder{},
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    signaler,
+			// both are synchronous to keep our tests predictable
+			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
+			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler: signaler,
 		}
 		e := event.CheckRun{
 			Action: event.WrappedCheckRunAction("test"),
@@ -72,8 +77,10 @@ func TestCheckRunHandler(t *testing.T) {
 		subject := event.CheckRunHandler{
 			Logger:            logging.NewNoopCtxLogger(t),
 			RootConfigBuilder: rootConfigBuilder,
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    signaler,
+			// both are synchronous to keep our tests predictable
+			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
+			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler: signaler,
 		}
 		e := event.CheckRun{
 			Action: event.WrappedCheckRunAction("test"),
@@ -92,8 +99,10 @@ func TestCheckRunHandler(t *testing.T) {
 		subject := event.CheckRunHandler{
 			Logger:            logging.NewNoopCtxLogger(t),
 			RootConfigBuilder: &mockRootConfigBuilder{},
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    signaler,
+			// both are synchronous to keep our tests predictable
+			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
+			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler: signaler,
 		}
 		e := event.CheckRun{
 			Action: event.WrappedCheckRunAction("test"),
@@ -112,8 +121,10 @@ func TestCheckRunHandler(t *testing.T) {
 		subject := event.CheckRunHandler{
 			Logger:            logging.NewNoopCtxLogger(t),
 			RootConfigBuilder: &mockRootConfigBuilder{},
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    signaler,
+			// both are synchronous to keep our tests predictable
+			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
+			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler: signaler,
 		}
 		e := event.CheckRun{
 			Action: event.WrappedCheckRunAction("requested_action"),
@@ -130,8 +141,10 @@ func TestCheckRunHandler(t *testing.T) {
 		subject := event.CheckRunHandler{
 			Logger:            logging.NewNoopCtxLogger(t),
 			RootConfigBuilder: &mockRootConfigBuilder{},
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    signaler,
+			// both are synchronous to keep our tests predictable
+			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
+			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler: signaler,
 		}
 		e := event.CheckRun{
 			Action: event.RequestedActionChecksAction{
@@ -152,12 +165,14 @@ func TestCheckRunHandler(t *testing.T) {
 		subject := event.CheckRunHandler{
 			Logger:            logging.NewNoopCtxLogger(t),
 			RootConfigBuilder: &mockRootConfigBuilder{},
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    signaler,
+			// both are synchronous to keep our tests predictable
+			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
+			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler: signaler,
 		}
 		e := event.CheckRun{
 			Action: event.RequestedActionChecksAction{
-				Identifier: "Approve",
+				Identifier: "Confirm",
 			},
 			ExternalID: workflowID,
 			User:       user,
@@ -176,8 +191,10 @@ func TestCheckRunHandler(t *testing.T) {
 		subject := event.CheckRunHandler{
 			Logger:            logging.NewNoopCtxLogger(t),
 			RootConfigBuilder: &mockRootConfigBuilder{},
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    signaler,
+			// both are synchronous to keep our tests predictable
+			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
+			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler: signaler,
 		}
 		e := event.CheckRun{
 			Action: event.RequestedActionChecksAction{
@@ -220,12 +237,14 @@ func TestCheckRunHandler(t *testing.T) {
 		subject := event.CheckRunHandler{
 			Logger:            logging.NewNoopCtxLogger(t),
 			RootConfigBuilder: &mockRootConfigBuilder{},
-			Scheduler:         &sync.SynchronousScheduler{Logger: logger},
-			DeploySignaler:    signaler,
+			// both are synchronous to keep our tests predictable
+			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
+			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
+			DeploySignaler: signaler,
 		}
 		e := event.CheckRun{
 			Action: event.RequestedActionChecksAction{
-				Identifier: "Approve",
+				Identifier: "Confirm",
 			},
 			ExternalID: workflowID,
 			User:       user,
