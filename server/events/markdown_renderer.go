@@ -34,6 +34,7 @@ var (
 	approvePoliciesCommandTitle = command.ApprovePolicies.TitleString()
 	versionCommandTitle         = command.Version.TitleString()
 	importCommandTitle          = command.Import.TitleString()
+	stateCommandTitle           = command.State.TitleString()
 	// maxUnwrappedLines is the maximum number of lines the Terraform output
 	// can be before we wrap it in an expandable template.
 	maxUnwrappedLines = 12
@@ -60,6 +61,7 @@ type MarkdownRenderer struct {
 // commonData is data that all responses have.
 type commonData struct {
 	Command                  string
+	SubCommand               string
 	Verbose                  bool
 	Log                      string
 	PlansDeleted             bool
@@ -140,10 +142,11 @@ func NewMarkdownRenderer(
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType) string {
+func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subCmd, log string, verbose bool, vcsHost models.VCSHostType) string {
 	commandStr := cases.Title(language.English).String(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{
 		Command:                  commandStr,
+		SubCommand:               subCmd,
 		Verbose:                  verbose,
 		Log:                      log,
 		PlansDeleted:             res.PlansDeleted,
@@ -157,10 +160,10 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log 
 	templates := m.markdownTemplates
 
 	if res.Error != nil {
-		return m.renderTemplate(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), common})
+		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), common})
 	}
 	if res.Failure != "" {
-		return m.renderTemplate(templates.Lookup("failureWithLog"), failureData{res.Failure, common})
+		return m.renderTemplateTrimSpace(templates.Lookup("failureWithLog"), failureData{res.Failure, common})
 	}
 	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
 }
@@ -184,41 +187,53 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			if m.shouldUseWrappedTmpl(vcsHost, result.Error.Error()) {
 				tmpl = templates.Lookup("wrappedErr")
 			}
-			resultData.Rendered = m.renderTemplate(tmpl, errData{result.Error.Error(), common})
+			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), common})
 		} else if result.Failure != "" {
-			resultData.Rendered = m.renderTemplate(templates.Lookup("failure"), failureData{result.Failure, common})
+			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, common})
 		} else if result.PlanSuccess != nil {
+			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("planSuccessUnwrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			}
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
+			result.PolicyCheckSuccess.PolicyCheckOutput = strings.TrimSpace(result.PolicyCheckSuccess.PolicyCheckOutput)
 			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckSuccess.PolicyCheckOutput) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("policyCheckSuccessUnwrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessUnwrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
 			}
 			numPolicyCheckSuccesses++
 		} else if result.ApplySuccess != "" {
+			output := strings.TrimSpace(result.ApplySuccess)
 			if m.shouldUseWrappedTmpl(vcsHost, result.ApplySuccess) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("applyWrappedSuccess"), struct{ Output string }{result.ApplySuccess})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyWrappedSuccess"), struct{ Output string }{output})
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("applyUnwrappedSuccess"), struct{ Output string }{result.ApplySuccess})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyUnwrappedSuccess"), struct{ Output string }{output})
 			}
 		} else if result.VersionSuccess != "" {
-			if m.shouldUseWrappedTmpl(vcsHost, result.VersionSuccess) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{result.VersionSuccess})
+			output := strings.TrimSpace(result.VersionSuccess)
+			if m.shouldUseWrappedTmpl(vcsHost, output) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{output})
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("versionUnwrappedSuccess"), struct{ Output string }{result.VersionSuccess})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionUnwrappedSuccess"), struct{ Output string }{output})
 			}
 			numVersionSuccesses++
 		} else if result.ImportSuccess != nil {
+			result.ImportSuccess.Output = strings.TrimSpace(result.ImportSuccess.Output)
 			if m.shouldUseWrappedTmpl(vcsHost, result.ImportSuccess.Output) {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("importSuccessWrapped"), result.ImportSuccess)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessWrapped"), result.ImportSuccess)
 			} else {
-				resultData.Rendered = m.renderTemplate(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
+			}
+		} else if result.StateRmSuccess != nil {
+			result.StateRmSuccess.Output = strings.TrimSpace(result.StateRmSuccess.Output)
+			if m.shouldUseWrappedTmpl(vcsHost, result.StateRmSuccess.Output) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessWrapped"), result.StateRmSuccess)
+			} else {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
 			}
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
@@ -244,6 +259,13 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		tmpl = templates.Lookup("singleProjectApply")
 	case len(resultsTmplData) == 1 && common.Command == importCommandTitle:
 		tmpl = templates.Lookup("singleProjectImport")
+	case len(resultsTmplData) == 1 && common.Command == stateCommandTitle:
+		switch common.SubCommand {
+		case "rm":
+			tmpl = templates.Lookup("singleProjectStateRm")
+		default:
+			return fmt.Sprintf("no template matched–this is a bug: command=%s, subcommand=%s", common.Command, common.SubCommand)
+		}
 	case common.Command == planCommandTitle,
 		common.Command == policyCheckCommandTitle:
 		tmpl = templates.Lookup("multiProjectPlan")
@@ -255,10 +277,17 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		tmpl = templates.Lookup("multiProjectVersion")
 	case common.Command == importCommandTitle:
 		tmpl = templates.Lookup("multiProjectImport")
+	case common.Command == stateCommandTitle:
+		switch common.SubCommand {
+		case "rm":
+			tmpl = templates.Lookup("multiProjectStateRm")
+		default:
+			return fmt.Sprintf("no template matched–this is a bug: command=%s, subcommand=%s", common.Command, common.SubCommand)
+		}
 	default:
-		return "no template matched–this is a bug"
+		return fmt.Sprintf("no template matched–this is a bug: command=%s", common.Command)
 	}
-	return m.renderTemplate(tmpl, resultData{resultsTmplData, common})
+	return m.renderTemplateTrimSpace(tmpl, resultData{resultsTmplData, common})
 }
 
 // shouldUseWrappedTmpl returns true if we should use the wrapped markdown
@@ -282,10 +311,10 @@ func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, outp
 	return strings.Count(output, "\n") > maxUnwrappedLines
 }
 
-func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
+func (m *MarkdownRenderer) renderTemplateTrimSpace(tmpl *template.Template, data interface{}) string {
 	buf := &bytes.Buffer{}
 	if err := tmpl.Execute(buf, data); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
 	}
-	return buf.String()
+	return strings.TrimSpace(buf.String())
 }

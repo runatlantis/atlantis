@@ -242,7 +242,6 @@ type LockDetailData struct {
 	PullRequestLink string
 	LockedBy        string
 	Workspace       string
-	Time            time.Time
 	AtlantisVersion string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
 	// not using a path-based proxy, this will be an empty string. Never ends

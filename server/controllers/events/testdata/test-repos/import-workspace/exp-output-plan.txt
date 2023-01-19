@@ -1,0 +1,20 @@
+Ran Plan for project: `dir1-ops` dir: `dir1` workspace: `ops`
+
+```diff
+No changes. Your infrastructure matches the configuration.
+
+Terraform has compared your real infrastructure against your configuration
+and found no differences, so no changes are needed.
+```
+
+* :arrow_forward: To **apply** this plan, comment:
+    * `atlantis apply -p dir1-ops`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * `atlantis plan -p dir1-ops`
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * `atlantis apply`
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * `atlantis unlock`

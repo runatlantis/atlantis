@@ -8,7 +8,7 @@ output
 .cover
 .terraform/
 node_modules/
-**/.vuepress/dist
+**/.vuepress/*
 helm/test-values.yaml
 *.swp
 golangci-lint
@@ -16,6 +16,7 @@ atlantis
 .devcontainer
 atlantis.env
 *.act
+package-lock.json
 
 # gitreleaser
 dist/

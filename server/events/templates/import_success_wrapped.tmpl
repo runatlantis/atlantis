@@ -1,9 +1,11 @@
 {{ define "importSuccessWrapped" -}}
 <details><summary>Show Output</summary>
 ```diff
-{{.Output}}
+{{ .Output }}
 ```
 </details>
+:put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
+
 * :repeat: To **plan** this project again, comment:
-  * `{{.RePlanCmd}}`
-{{ end }}
+  * `{{ .RePlanCmd }}`
+{{ end -}}

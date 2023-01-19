@@ -15,7 +15,7 @@ require (
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/go-test/deep v1.1.0
 	github.com/golang-jwt/jwt/v4 v4.4.3
-	github.com/google/go-github/v49 v49.0.0
+	github.com/google/go-github/v49 v49.1.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
@@ -40,9 +40,10 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/urfave/negroni/v3 v3.0.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
-	github.com/xanzy/go-gitlab v0.77.0
+	github.com/xanzy/go-gitlab v0.78.0
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.24.0
+	golang.org/x/exp v0.0.0-20230113152452-c42ee1cf562e
 	golang.org/x/term v0.4.0
 	golang.org/x/text v0.6.0
 	gopkg.in/yaml.v2 v2.4.0

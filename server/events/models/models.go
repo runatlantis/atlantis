@@ -373,16 +373,21 @@ var (
 	reNoChanges      = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 )
 
-// Summary extracts one line summary of plan changes from TerraformOutput.
+// Summary extracts summaries of plan changes from TerraformOutput.
 func (p *PlanSuccess) Summary() string {
 	note := ""
 	if match := reChangesOutside.FindString(p.TerraformOutput); match != "" {
 		note = "\n**" + match + "**\n"
 	}
+	return note + p.DiffSummary()
+}
+
+// DiffSummary extracts one line summary of plan changes from TerraformOutput.
+func (p *PlanSuccess) DiffSummary() string {
 	if match := rePlanChanges.FindString(p.TerraformOutput); match != "" {
-		return note + match
+		return match
 	}
-	return note + reNoChanges.FindString(p.TerraformOutput)
+	return reNoChanges.FindString(p.TerraformOutput)
 }
 
 // Diff Markdown regexes
@@ -398,7 +403,7 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
 
-	return formattedTerraformOutput
+	return strings.TrimSpace(formattedTerraformOutput)
 }
 
 // PolicyCheckSuccess is the result of a successful policy check run.
@@ -420,6 +425,14 @@ type PolicyCheckSuccess struct {
 // ImportSuccess is the result of a successful import run.
 type ImportSuccess struct {
 	// Output is the output from terraform import
+	Output string
+	// RePlanCmd is the command that users should run to re-plan this project.
+	RePlanCmd string
+}
+
+// StateRmSuccess is the result of a successful state rm run.
+type StateRmSuccess struct {
+	// Output is the output from terraform state rm
 	Output string
 	// RePlanCmd is the command that users should run to re-plan this project.
 	RePlanCmd string

@@ -7,7 +7,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/models/fixtures"
+	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
@@ -29,7 +29,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 				Mergeable:      true,
 			},
 			projectCmds: []command.ProjectContext{},
-			expComment:  "Ran Import for 0 projects:\n\n\n\n",
+			expComment:  "Ran Import for 0 projects:",
 		},
 		{
 			name: "failure with multiple projects",
@@ -38,7 +38,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 				Mergeable:      true,
 			},
 			projectCmds: []command.ProjectContext{{}, {}},
-			expComment:  "**Import Failed**: import cannot run on multiple projects. please specify one project.\n",
+			expComment:  "**Import Failed**: import cannot run on multiple projects. please specify one project.",
 		},
 	}
 	for _, tt := range tests {
@@ -46,13 +46,13 @@ func TestImportCommandRunner_Run(t *testing.T) {
 			vcsClient := setup(t)
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
-			modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			ctx := &command.Context{
-				User:     fixtures.User,
+				User:     testdata.User,
 				Log:      logging.NewNoopLogger(t),
 				Scope:    scopeNull,
 				Pull:     modelPull,
-				HeadRepo: fixtures.GithubRepo,
+				HeadRepo: testdata.GithubRepo,
 				Trigger:  command.CommentTrigger,
 			}
 			cmd := &events.CommentCommand{Name: command.Import}
@@ -63,7 +63,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 			importCommandRunner.Run(ctx, cmd)
 
 			Assert(t, ctx.PullRequestStatus.Mergeable == true, "PullRequestStatus must be set for import_requirements")
-			vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, tt.expComment, "import")
+			vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, modelPull.Num, tt.expComment, "import")
 		})
 	}
 }

@@ -45,7 +45,7 @@ func newReporter(cfg valid.Metrics, logger logging.SimpleLogging) (tally.BaseSta
 
 	// return statsd metrics if configured
 	if cfg.Statsd != nil {
-		return newStatsReporter(cfg, logger)
+		return newStatsReporter(cfg)
 	}
 
 	// return prometheus metrics if configured
@@ -58,7 +58,7 @@ func newReporter(cfg valid.Metrics, logger logging.SimpleLogging) (tally.BaseSta
 
 }
 
-func newStatsReporter(cfg valid.Metrics, logger logging.SimpleLogging) (tally.StatsReporter, error) {
+func newStatsReporter(cfg valid.Metrics) (tally.StatsReporter, error) {
 
 	statsdCfg := cfg.Statsd
 

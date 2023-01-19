@@ -81,7 +81,7 @@ func TestGitHubWorkflow(t *testing.T) {
 
 	cases := []struct {
 		Description string
-		// RepoDir is relative to testfixtures/test-repos.
+		// RepoDir is relative to testdata/test-repos.
 		RepoDir string
 		// RepoConfigFile is path for atlantis.yaml
 		RepoConfigFile string
@@ -447,6 +447,21 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 		},
 		{
+			Description: "import workspace",
+			RepoDir:     "import-workspace",
+			Comments: []string{
+				"atlantis import -d dir1 -w ops 'random_id.dummy1[0]' AA",
+				"atlantis import -p dir1-ops 'random_id.dummy2[0]' BB",
+				"atlantis plan -p dir1-ops",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-import-dir1-ops-dummy1.txt"},
+				{"exp-output-import-dir1-ops-dummy2.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
 			Description:   "import single project with -var",
 			RepoDir:       "import-single-project-var",
 			ModifiedFiles: []string{"main.tf"},
@@ -480,6 +495,71 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-import-dummy1.txt"},
 				{"exp-output-plan-again.txt"},
 				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "state rm single project",
+			RepoDir:       "state-rm-single-project",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis import random_id.simple AA",
+				"atlantis import 'random_id.for_each[\"overridden\"]' BB -- -var var=overridden",
+				"atlantis import random_id.count[0] BB",
+				"atlantis plan -- -var var=overridden",
+				"atlantis state rm 'random_id.for_each[\"overridden\"]' -- -lock=false",
+				"atlantis state rm random_id.count[0] random_id.simple",
+				"atlantis plan -- -var var=overridden",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-import-simple.txt"},
+				{"exp-output-import-foreach.txt"},
+				{"exp-output-import-count.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-state-rm-foreach.txt"},
+				{"exp-output-state-rm-multiple.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merged.txt"},
+			},
+		},
+		{
+			Description: "state rm workspace",
+			RepoDir:     "state-rm-workspace",
+			Comments: []string{
+				"atlantis import -p dir1-ops 'random_id.dummy1[0]' AA",
+				"atlantis plan -p dir1-ops",
+				"atlantis state rm -p dir1-ops 'random_id.dummy1[0]'",
+				"atlantis plan -p dir1-ops",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-import-dummy1.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-state-rm-dummy1.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "state rm multiple project",
+			RepoDir:       "state-rm-multiple-project",
+			ModifiedFiles: []string{"dir1/main.tf", "dir2/main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis import -d dir1 random_id.dummy AA",
+				"atlantis import -d dir2 random_id.dummy BB",
+				"atlantis plan",
+				"atlantis state rm random_id.dummy",
+				"atlantis plan",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-import-dummy1.txt"},
+				{"exp-output-import-dummy2.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-state-rm-multiple-projects.txt"},
+				{"exp-output-plan-again.txt"},
+				{"exp-output-merged.txt"},
 			},
 		},
 	}
@@ -577,7 +657,7 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 
 	cases := []struct {
 		Description string
-		// RepoDir is relative to testfixtures/test-repos.
+		// RepoDir is relative to testdata/test-repos.
 		RepoDir string
 		// ModifiedFiles are the list of files that have been modified in this
 		// pull request.
@@ -649,7 +729,7 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 
-			oldLockFilePath, err := filepath.Abs(filepath.Join("testfixtures", "null_provider_lockfile_old_version"))
+			oldLockFilePath, err := filepath.Abs(filepath.Join("testdata", "null_provider_lockfile_old_version"))
 			Ok(t, err)
 			oldLockFileContent, err := os.ReadFile(oldLockFilePath)
 			Ok(t, err)
@@ -744,7 +824,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 	cases := []struct {
 		Description string
-		// RepoDir is relative to testfixtures/test-repos.
+		// RepoDir is relative to testdata/test-repos.
 		RepoDir string
 		// ModifiedFiles are the list of files that have been modified in this
 		// pull request.
@@ -1053,7 +1133,9 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	parallelPoolSize := 1
 	silenceNoProjects := false
 
+	statusUpdater := runtimemocks.NewMockStatusUpdater()
 	commitStatusUpdater := mocks.NewMockCommitStatusUpdater()
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 
 	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
 	preWorkflowHookURLGenerator := mocks.NewMockPreWorkflowHookURLGenerator()
@@ -1124,19 +1206,19 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
 		},
-		PlanStepRunner: &runtime.PlanStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
+		PlanStepRunner: runtime.NewPlanStepRunner(
+			terraformClient,
+			defaultTFVersion,
+			statusUpdater,
+			asyncTfExec,
+		),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
 		},
-		ImportStepRunner: &runtime.ImportStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-		},
+		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFVersion),
+		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFVersion),
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFVersion:        defaultTFVersion,
@@ -1222,6 +1304,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		dbUpdater,
 		silenceNoProjects,
 		false,
+		e2eVCSClient,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
@@ -1245,6 +1328,12 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		projectCommandRunner,
 	)
 
+	stateCommandRunner := events.NewStateCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
@@ -1252,6 +1341,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
+		command.State:           stateCommandRunner,
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
@@ -1313,7 +1403,7 @@ func (w *mockWebhookSender) Send(log logging.SimpleLogging, result webhooks.Appl
 }
 
 func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
-	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testdata", "githubIssueCommentEvent.json"))
 	Ok(t, err)
 	escapedComment, err := json.Marshal(comment)
 	Ok(t, err)
@@ -1326,7 +1416,7 @@ func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
 }
 
 func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
-	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestOpenedEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testdata", "githubPullRequestOpenedEvent.json"))
 	Ok(t, err)
 	// Replace sha with expected sha.
 	requestJSONStr := strings.Replace(string(requestJSON), "c31fd9ea6f557ad2ea659944c3844a059b83bc5d", headSHA, -1)
@@ -1338,7 +1428,7 @@ func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
 }
 
 func GitHubPullRequestClosedEvent(t *testing.T) *http.Request {
-	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubPullRequestClosedEvent.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testdata", "githubPullRequestClosedEvent.json"))
 	Ok(t, err)
 	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
 	Ok(t, err)
@@ -1379,12 +1469,12 @@ func GitHubPullRequestParsed(headSHA string) *github.PullRequest {
 
 // absRepoPath returns the absolute path to the test repo under dir repoDir.
 func absRepoPath(t *testing.T, repoDir string) string {
-	path, err := filepath.Abs(filepath.Join("testfixtures", "test-repos", repoDir))
+	path, err := filepath.Abs(filepath.Join("testdata", "test-repos", repoDir))
 	Ok(t, err)
 	return path
 }
 
-// initializeRepo copies the repo data from testfixtures and initializes a new
+// initializeRepo copies the repo data from testdata and initializes a new
 // git repo in a temp directory. It returns that directory and a function
 // to run in a defer that will delete the dir.
 // The purpose of this function is to create a real git repository with a branch
