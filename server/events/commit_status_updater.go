@@ -95,7 +95,7 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, c
 		descripWords = genProjectStatusDescription(cmdName.String(), "failed.")
 	case models.SuccessCommitStatus:
 		if result != nil && result.PlanSuccess != nil {
-			descripWords = result.PlanSuccess.Summary()
+			descripWords = result.PlanSuccess.DiffSummary()
 		} else {
 			descripWords = genProjectStatusDescription(cmdName.String(), "succeeded.")
 		}
