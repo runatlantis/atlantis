@@ -8,16 +8,14 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
-	"github.com/runatlantis/atlantis/server/events/command"
-	eventsmocks "github.com/runatlantis/atlantis/server/events/mocks"
-
 	. "github.com/petergtz/pegomock"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -29,7 +27,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	// Test that if env/workspace.tfvars file exists we use -var-file option.
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
-	commitStatusUpdater := eventsmocks.NewMockCommitStatusUpdater()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 
 	// Create the env/workspace.tfvars file.
@@ -98,7 +96,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	// file.
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
-	commitStatusUpdater := eventsmocks.NewMockCommitStatusUpdater()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger(t)
@@ -178,7 +176,7 @@ Terraform will perform the following actions:
 `
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
-	commitStatusUpdater := eventsmocks.NewMockCommitStatusUpdater()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 	tfVersion, _ := version.NewVersion("0.10.0")
 	s := runtime.NewPlanStepRunner(terraform, tfVersion, commitStatusUpdater, asyncTfExec)
@@ -229,7 +227,7 @@ Terraform will perform the following actions:
 func TestRun_OutputOnErr(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
-	commitStatusUpdater := eventsmocks.NewMockCommitStatusUpdater()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 	tfVersion, _ := version.NewVersion("0.10.0")
 	s := runtime.NewPlanStepRunner(terraform, tfVersion, commitStatusUpdater, asyncTfExec)
@@ -294,7 +292,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			terraform := mocks.NewMockClient()
-			commitStatusUpdater := eventsmocks.NewMockCommitStatusUpdater()
+			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 			asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 			When(terraform.RunCommandWithVersion(
 				matchers.AnyCommandProjectContext(),
@@ -392,7 +390,7 @@ locally at this time.
 			}
 			RegisterMockTestingT(t)
 			terraform := mocks.NewMockClient()
-			commitStatusUpdater := eventsmocks.NewMockCommitStatusUpdater()
+			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			asyncTf := &remotePlanMock{}
 			s := runtime.NewPlanStepRunner(terraform, tfVersion, commitStatusUpdater, asyncTf)
@@ -471,8 +469,8 @@ Plan: 0 to add, 0 to change, 1 to destroy.`), "expect plan success")
 
 			// Ensure that the status was updated with the runURL.
 			runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
-			commitStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.PendingCommitStatus, runURL)
-			commitStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.SuccessCommitStatus, runURL)
+			commitStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.PendingCommitStatus, runURL, nil)
+			commitStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.SuccessCommitStatus, runURL, nil)
 		})
 	}
 }

@@ -4,14 +4,14 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
+	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 	defer disableSSLVerification()()
-	testServer, err := fixtures.GithubAppTestServer(t)
+	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
 
 	anonCreds := &vcs.GithubAnonymousCredentials{}
@@ -22,7 +22,7 @@ func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 
 	appCreds := &vcs.GithubAppCredentials{
 		AppID:    tempSecrets.ID,
-		Key:      []byte(fixtures.GithubPrivateKey),
+		Key:      []byte(testdata.GithubPrivateKey),
 		Hostname: testServer,
 		AppSlug:  "some-app",
 	}
@@ -35,7 +35,7 @@ func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 
 func TestGithubClient_AppAuthentication(t *testing.T) {
 	defer disableSSLVerification()()
-	testServer, err := fixtures.GithubAppTestServer(t)
+	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
 
 	anonCreds := &vcs.GithubAnonymousCredentials{}
@@ -46,7 +46,7 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 
 	appCreds := &vcs.GithubAppCredentials{
 		AppID:    tempSecrets.ID,
-		Key:      []byte(fixtures.GithubPrivateKey),
+		Key:      []byte(testdata.GithubPrivateKey),
 		Hostname: testServer,
 	}
 	_, err = vcs.NewGithubClient(testServer, appCreds, vcs.GithubConfig{}, logging.NewNoopLogger(t))
