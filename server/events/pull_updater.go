@@ -28,7 +28,7 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 		}
 	}
 
-	comment := c.MarkdownRenderer.Render(res, cmd.CommandName(), ctx.Log.GetHistory(), cmd.IsVerbose(), ctx.Pull.BaseRepo.VCSHost.Type)
+	comment := c.MarkdownRenderer.Render(res, cmd.CommandName(), cmd.SubCommandName(), ctx.Log.GetHistory(), cmd.IsVerbose(), ctx.Pull.BaseRepo.VCSHost.Type)
 	if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, comment, cmd.CommandName().String()); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)
 	}

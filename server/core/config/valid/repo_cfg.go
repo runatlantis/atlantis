@@ -171,4 +171,5 @@ type Workflow struct {
 	Plan        Stage
 	PolicyCheck Stage
 	Import      Stage
+	StateRm     Stage
 }

@@ -153,6 +153,18 @@ var DefaultImportStage = Stage{
 	},
 }
 
+// DefaultStateRmStage is the Atlantis default state_rm stage.
+var DefaultStateRmStage = Stage{
+	Steps: []Step{
+		{
+			StepName: "init",
+		},
+		{
+			StepName: "state_rm",
+		},
+	},
+}
+
 // Deprecated: use NewGlobalCfgFromArgs
 func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq bool, unDivergedReq bool, preWorkflowHooks []*WorkflowHook, postWorkflowHooks []*WorkflowHook) GlobalCfg {
 	return NewGlobalCfgFromArgs(GlobalCfgArgs{
@@ -198,6 +210,7 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 		Plan:        DefaultPlanStage,
 		PolicyCheck: DefaultPolicyCheckStage,
 		Import:      DefaultImportStage,
+		StateRm:     DefaultStateRmStage,
 	}
 	// Must construct slices here instead of using a `var` declaration because
 	// we treat nil slices differently.

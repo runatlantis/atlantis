@@ -34,6 +34,7 @@ var (
 	approvePoliciesCommandTitle = command.ApprovePolicies.TitleString()
 	versionCommandTitle         = command.Version.TitleString()
 	importCommandTitle          = command.Import.TitleString()
+	stateCommandTitle           = command.State.TitleString()
 	// maxUnwrappedLines is the maximum number of lines the Terraform output
 	// can be before we wrap it in an expandable template.
 	maxUnwrappedLines = 12
@@ -60,6 +61,7 @@ type MarkdownRenderer struct {
 // commonData is data that all responses have.
 type commonData struct {
 	Command                  string
+	SubCommand               string
 	Verbose                  bool
 	Log                      string
 	PlansDeleted             bool
@@ -140,10 +142,11 @@ func NewMarkdownRenderer(
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, log string, verbose bool, vcsHost models.VCSHostType) string {
+func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subCmd, log string, verbose bool, vcsHost models.VCSHostType) string {
 	commandStr := cases.Title(language.English).String(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{
 		Command:                  commandStr,
+		SubCommand:               subCmd,
 		Verbose:                  verbose,
 		Log:                      log,
 		PlansDeleted:             res.PlansDeleted,
@@ -225,6 +228,13 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
 			}
+		} else if result.StateRmSuccess != nil {
+			result.StateRmSuccess.Output = strings.TrimSpace(result.StateRmSuccess.Output)
+			if m.shouldUseWrappedTmpl(vcsHost, result.StateRmSuccess.Output) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessWrapped"), result.StateRmSuccess)
+			} else {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
+			}
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
@@ -249,6 +259,13 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		tmpl = templates.Lookup("singleProjectApply")
 	case len(resultsTmplData) == 1 && common.Command == importCommandTitle:
 		tmpl = templates.Lookup("singleProjectImport")
+	case len(resultsTmplData) == 1 && common.Command == stateCommandTitle:
+		switch common.SubCommand {
+		case "rm":
+			tmpl = templates.Lookup("singleProjectStateRm")
+		default:
+			return fmt.Sprintf("no template matched–this is a bug: command=%s, subcommand=%s", common.Command, common.SubCommand)
+		}
 	case common.Command == planCommandTitle,
 		common.Command == policyCheckCommandTitle:
 		tmpl = templates.Lookup("multiProjectPlan")
@@ -260,8 +277,15 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		tmpl = templates.Lookup("multiProjectVersion")
 	case common.Command == importCommandTitle:
 		tmpl = templates.Lookup("multiProjectImport")
+	case common.Command == stateCommandTitle:
+		switch common.SubCommand {
+		case "rm":
+			tmpl = templates.Lookup("multiProjectStateRm")
+		default:
+			return fmt.Sprintf("no template matched–this is a bug: command=%s, subcommand=%s", common.Command, common.SubCommand)
+		}
 	default:
-		return "no template matched–this is a bug"
+		return fmt.Sprintf("no template matched–this is a bug: command=%s", common.Command)
 	}
 	return m.renderTemplateTrimSpace(tmpl, resultData{resultsTmplData, common})
 }
