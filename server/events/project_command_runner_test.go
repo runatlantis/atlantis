@@ -686,6 +686,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			RegisterMockTestingT(t)
 			mockInit := mocks.NewMockStepRunner()
 			mockImport := mocks.NewMockStepRunner()
+			mockStateRm := mocks.NewMockStepRunner()
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
@@ -698,6 +699,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 				LockURLGenerator:          mockURLGenerator{},
 				InitStepRunner:            mockInit,
 				ImportStepRunner:          mockImport,
+				StateRmStepRunner:         mockStateRm,
 				WorkingDir:                mockWorkingDir,
 				Webhooks:                  mockSender,
 				WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),

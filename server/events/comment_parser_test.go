@@ -29,13 +29,7 @@ var commentParser = events.CommentParser{
 	GithubUser:     "github-user",
 	GitlabUser:     "gitlab-user",
 	ExecutableName: "atlantis",
-	AllowCommands: []command.Name{
-		command.Plan,
-		command.Apply,
-		command.Unlock,
-		command.ApprovePolicies,
-		command.Import,
-	},
+	AllowCommands:  command.AllCommentCommands,
 }
 
 func TestNewCommentParser(t *testing.T) {
@@ -151,82 +145,69 @@ func TestParse_HelpResponse(t *testing.T) {
 func TestParse_UnusedArguments(t *testing.T) {
 	t.Log("if there are unused flags we return an error")
 	cases := []struct {
-		Command    command.Name
-		Args       string
-		Unused     string
-		ExpMessage string
+		Command command.Name
+		Args    string
+		Unused  string
 	}{
 		{
 			command.Plan,
 			"-d . arg",
 			"arg",
-			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"arg -d .",
 			"arg",
-			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"arg",
 			"arg",
-			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"arg arg2",
 			"arg arg2",
-			"unknown argument(s)",
 		},
 		{
 			command.Plan,
 			"-d . arg -w kjj arg2",
 			"arg arg2",
-			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"-d . arg",
 			"arg",
-			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"arg arg2",
 			"arg arg2",
-			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"arg arg2 -- useful",
 			"arg arg2",
-			"unknown argument(s)",
 		},
 		{
 			command.Apply,
 			"arg arg2 --",
 			"arg arg2",
-			"unknown argument(s)",
 		},
 		{
 			command.ApprovePolicies,
 			"arg arg2 --",
 			"arg arg2",
-			"unknown argument(s)",
 		},
 		{
 			command.Import,
 			"arg --",
 			"arg",
-			"invalid argument count",
 		},
 		{
 			command.Import,
 			"arg1 arg2 arg3 --",
 			"arg1 arg2 arg3",
-			"invalid argument count",
 		},
 	}
 	for _, c := range cases {
@@ -244,7 +225,7 @@ func TestParse_UnusedArguments(t *testing.T) {
 			case command.Import:
 				usage = ImportUsage
 			}
-			Equals(t, fmt.Sprintf("```\nError: %s – %s.\n%s```", c.ExpMessage, c.Unused, usage), r.CommentResponse)
+			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s.\n%s```", c.Unused, usage), r.CommentResponse)
 		})
 	}
 }
@@ -319,6 +300,8 @@ func TestParse_SubcommandUsage(t *testing.T) {
 		{"atlantis approve_policies --help", "approve_policies"},
 		{"atlantis import -h", "import ADDRESS ID"},
 		{"atlantis import --help", "import ADDRESS ID"},
+		{"atlantis state -h", "state [rm ADDRESS...]"},
+		{"atlantis state --help", "state [rm ADDRESS...]"},
 	}
 	for _, c := range tests {
 		r := commentParser.Parse(c.input, models.Github)
@@ -357,6 +340,10 @@ func TestParse_InvalidFlags(t *testing.T) {
 			"atlantis import --abc",
 			"Error: unknown flag: --abc",
 		},
+		{
+			"atlantis state rm --abc",
+			"Error: unknown flag: --abc",
+		},
 	}
 	for _, c := range cases {
 		r := commentParser.Parse(c.comment, models.Github)
@@ -373,16 +360,20 @@ func TestParse_RelativeDirPath(t *testing.T) {
 		"atlantis plan -d ..",
 		"atlantis apply -d ..",
 		"atlantis import -d .. address id",
+		"atlantis state -d .. rm address",
 		// These won't return an error because we prepend with . when parsing.
 		//"atlantis plan -d /..",
 		//"atlantis apply -d /..",
 		//"atlantis import -d /.. address id",
+		//"atlantis state rm -d /.. address",
 		"atlantis plan -d ./..",
 		"atlantis apply -d ./..",
 		"atlantis import -d ./.. address id",
+		"atlantis state -d ./.. rm address",
 		"atlantis plan -d a/b/../../..",
 		"atlantis apply -d a/../..",
 		"atlantis import -d a/../.. address id",
+		"atlantis state -d a/../.. rm address id",
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
@@ -427,15 +418,19 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 		"atlantis plan -w ..",
 		"atlantis apply -w ..",
 		"atlantis import -w .. address id",
+		"atlantis import -w .. rm address",
 		"atlantis plan -w /",
 		"atlantis apply -w /",
 		"atlantis import -w / address id",
+		"atlantis state -w / rm address",
 		"atlantis plan -w ..abc",
 		"atlantis apply -w abc..",
 		"atlantis import -w abc.. address id",
+		"atlantis state -w abc.. rm address",
 		"atlantis plan -w abc..abc",
 		"atlantis apply -w ../../../etc/passwd",
 		"atlantis import -w ../../../etc/passwd address id",
+		"atlantis state -w ../../../etc/passwd rm address",
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, models.Github)
@@ -681,7 +676,7 @@ func TestParse_Parsing(t *testing.T) {
 	}
 
 	for _, test := range cases {
-		for _, cmdName := range []string{"plan", "apply", "import 'some[\"addr\"]' id"} {
+		for _, cmdName := range []string{"plan", "apply", "import 'some[\"addr\"]' id", "state rm 'some[\"addr\"]'"} {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
 			t.Run(comment, func(t *testing.T) {
 				r := commentParser.Parse(comment, models.Github)
@@ -708,6 +703,15 @@ func TestParse_Parsing(t *testing.T) {
 						expExtraArgs = fmt.Sprintf("%s %s", test.expExtraArgs, expExtraArgs)
 					}
 					Assert(t, r.Command.Name == command.Import, "did not parse comment %q as import command", comment)
+					Assert(t, expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", expExtraArgs, actExtraArgs, comment)
+				}
+				if strings.HasPrefix(cmdName, "state rm") {
+					expExtraArgs := "some[\"addr\"]" // state rm use default args with `some["addr"]`
+					if test.expExtraArgs != "" {
+						expExtraArgs = fmt.Sprintf("%s %s", test.expExtraArgs, expExtraArgs)
+					}
+					Assert(t, r.Command.Name == command.State, "did not parse comment %q as state command", comment)
+					Assert(t, r.Command.SubName == "rm", "did not parse comment %q as state rm subcommand", comment)
 					Assert(t, expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", expExtraArgs, actExtraArgs, comment)
 				}
 			})
@@ -873,8 +877,12 @@ Commands:
   approve_policies
            Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
-  import   Runs 'terraform import' for the changes in this pull request.
-           To plan a specific project, use the -d, -w and -p flags.
+  import ADDRESS ID
+           Runs 'terraform import' for the passed address resource.
+           To import a specific project, use the -d, -w and -p flags.
+  state rm ADDRESS...
+           Runs 'terraform state rm' for the passed address resource.
+           To remove a specific project resource, use the -d, -w and -p flags.
   help     View help.
 
 Flags:

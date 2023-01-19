@@ -7,6 +7,7 @@ import (
 // ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {
 	Command            Name
+	SubCommand         string
 	RepoRelDir         string
 	Workspace          string
 	Error              error
@@ -16,6 +17,7 @@ type ProjectResult struct {
 	ApplySuccess       string
 	VersionSuccess     string
 	ImportSuccess      *models.ImportSuccess
+	StateRmSuccess     *models.StateRmSuccess
 	ProjectName        string
 }
 

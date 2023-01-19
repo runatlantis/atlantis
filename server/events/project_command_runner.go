@@ -118,6 +118,11 @@ type ProjectImportCommandRunner interface {
 	Import(ctx command.ProjectContext) command.ProjectResult
 }
 
+type ProjectStateCommandRunner interface {
+	// StateRm runs terraform state rm for the project described by ctx.
+	StateRm(ctx command.ProjectContext) command.ProjectResult
+}
+
 // ProjectCommandRunner runs project commands. A project command is a command
 // for a specific TF project.
 type ProjectCommandRunner interface {
@@ -127,6 +132,7 @@ type ProjectCommandRunner interface {
 	ProjectApprovePoliciesCommandRunner
 	ProjectVersionCommandRunner
 	ProjectImportCommandRunner
+	ProjectStateCommandRunner
 }
 
 //go:generate pegomock generate -m --package mocks -o mocks/mock_job_url_setter.go JobURLSetter
@@ -200,6 +206,7 @@ type DefaultProjectCommandRunner struct {
 	PolicyCheckStepRunner     StepRunner
 	VersionStepRunner         StepRunner
 	ImportStepRunner          StepRunner
+	StateRmStepRunner         StepRunner
 	RunStepRunner             CustomStepRunner
 	EnvStepRunner             EnvStepRunner
 	MultiEnvStepRunner        MultiEnvStepRunner
@@ -289,6 +296,21 @@ func (p *DefaultProjectCommandRunner) Import(ctx command.ProjectContext) command
 		RepoRelDir:    ctx.RepoRelDir,
 		Workspace:     ctx.Workspace,
 		ProjectName:   ctx.ProjectName,
+	}
+}
+
+// StateRm runs terraform state rm for the project described by ctx.
+func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectResult {
+	stateRmSuccess, failure, err := p.doStateRm(ctx)
+	return command.ProjectResult{
+		Command:        command.State,
+		SubCommand:     "rm",
+		StateRmSuccess: stateRmSuccess,
+		Error:          err,
+		Failure:        failure,
+		RepoRelDir:     ctx.RepoRelDir,
+		Workspace:      ctx.Workspace,
+		ProjectName:    ctx.ProjectName,
 	}
 }
 
@@ -544,6 +566,47 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	}, "", nil
 }
 
+func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out *models.StateRmSuccess, failure string, err error) {
+	// Clone is idempotent so okay to run even if the repo was already cloned.
+	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	if cloneErr != nil {
+		return nil, "", cloneErr
+	}
+	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
+		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	}
+
+	// Acquire Atlantis lock for this repo/dir/workspace.
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir), ctx.RepoLocking)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "acquiring lock")
+	}
+	if !lockAttempt.LockAcquired {
+		return nil, lockAttempt.LockFailureReason, nil
+	}
+	ctx.Log.Debug("acquired lock for project")
+
+	// Acquire internal lock for the directory we're going to operate in.
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlockFn()
+
+	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
+	if err != nil {
+		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+	}
+
+	// after state rm, re-plan command is required without state rm args
+	rePlanCmd := strings.TrimSpace(strings.Split(ctx.RePlanCmd, "--")[0])
+	return &models.StateRmSuccess{
+		Output:    strings.Join(outputs, "\n"),
+		RePlanCmd: rePlanCmd,
+	}, "", nil
+}
+
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.ProjectContext, absPath string) ([]string, error) {
 	var outputs []string
 
@@ -566,6 +629,8 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "import":
 			out, err = p.ImportStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "state_rm":
+			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
 			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs, true)
 		case "env":

@@ -206,7 +206,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 			cmd:    command.Plan,
 			result: &command.ProjectResult{
 				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: "aaa\nPlan: 1 to add, 2 to change, 3 to destroy.\nbbb",
+					TerraformOutput: "aaa\nNote: Objects have changed outside of Terraform\nbbb\nPlan: 1 to add, 2 to change, 3 to destroy.\nbbb",
 				},
 			},
 			expDescrip: "Plan: 1 to add, 2 to change, 3 to destroy.",
