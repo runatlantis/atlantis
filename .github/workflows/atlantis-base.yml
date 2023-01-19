@@ -7,10 +7,10 @@ on:
       - '.github/workflows/atlantis-base.yml'
     branches:
       - "main"
-  pull_request:
-    paths:
-      - 'docker-base/Dockerfile.*'
-      - '.github/workflows/atlantis-base.yml'
+  # pull_request:
+  #   paths:
+  #     - 'docker-base/Dockerfile.*'
+  #     - '.github/workflows/atlantis-base.yml'
   workflow_dispatch:
 
 defaults:
@@ -35,11 +35,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-      with:
-        image: tonistiigi/binfmt:latest
-        platforms: arm64,arm
+    # - name: Set up QEMU
+    #   uses: docker/setup-qemu-action@v2
+    #   with:
+    #     image: tonistiigi/binfmt:latest
+    #     platforms: arm64,arm
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
@@ -76,7 +76,8 @@ jobs:
         context: docker-base
         build-args: ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
         file: docker-base/${{ env.DOCKERFILE }}
-        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        #platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        platforms: linux/amd64
         push: ${{ github.event_name != 'pull_request' }}
         # release version is the YYYYMMDD date of the build i.e. 20301210
         # release version also has the image type appended i.e. 20301210-alpine
