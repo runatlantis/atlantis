@@ -305,7 +305,7 @@ var stringFlags = map[string]stringFlag{
 			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
 	},
 	APISecretFlag: {
-		description: "Secret to validate requests made to the API",
+		description: "Secret used to validate requests made to the /api/* endpoints",
 	},
 	LockingDBType: {
 		description:  "The locking database type to use for storing plan and apply locks.",

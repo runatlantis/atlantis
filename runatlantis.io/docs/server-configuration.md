@@ -112,6 +112,14 @@ Values are chosen in this order:
   Only enable in trusted settings.
   :::
 
+### `--api-secret`
+  ```bash
+  atlantis server --api-secret="secret"
+  # or (recommended)
+  ATLANTIS_API_SECRET="secret"
+  ```
+  Secret used to validate requests made to the /api/* endpoints. If not present, the api endpoints will not be accessible.
+
 ### `--atlantis-url`
   ```bash
   atlantis server --atlantis-url="https://my-domain.com:9090/basepath"
