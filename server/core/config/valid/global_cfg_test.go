@@ -55,6 +55,16 @@ func TestNewGlobalCfg(t *testing.T) {
 				},
 			},
 		},
+		StateRm: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "init",
+				},
+				{
+					StepName: "state_rm",
+				},
+			},
+		},
 	}
 	baseCfg := valid.GlobalCfg{
 		Repos: []valid.Repo{
@@ -631,6 +641,7 @@ policies:
 					Plan:        valid.DefaultPlanStage,
 					PolicyCheck: valid.DefaultPolicyCheckStage,
 					Import:      valid.DefaultImportStage,
+					StateRm:     valid.DefaultStateRmStage,
 				},
 				PolicySets: valid.PolicySets{
 					Version: nil,
@@ -675,6 +686,7 @@ policies:
 					Plan:        valid.DefaultPlanStage,
 					PolicyCheck: valid.DefaultPolicyCheckStage,
 					Import:      valid.DefaultImportStage,
+					StateRm:     valid.DefaultStateRmStage,
 				},
 				PolicySets: valid.PolicySets{
 					Version: version,
@@ -736,6 +748,7 @@ func TestGlobalCfg_MergeProjectCfg(t *testing.T) {
 		PolicyCheck: valid.DefaultPolicyCheckStage,
 		Plan:        valid.DefaultPlanStage,
 		Import:      valid.DefaultImportStage,
+		StateRm:     valid.DefaultStateRmStage,
 	}
 	cases := map[string]struct {
 		gCfg          string
@@ -774,7 +787,8 @@ workflows:
 							},
 						},
 					},
-					Import: valid.DefaultImportStage,
+					Import:  valid.DefaultImportStage,
+					StateRm: valid.DefaultStateRmStage,
 				},
 				RepoRelDir:      ".",
 				Workspace:       "default",

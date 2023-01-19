@@ -40,11 +40,20 @@ func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Conte
 	)
 }
 
-func (b *InstrumentedProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+func (b *InstrumentedProjectCommandBuilder) BuildImportCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
 	return b.buildAndEmitStats(
 		"import",
 		func() ([]command.ProjectContext, error) {
 			return b.ProjectCommandBuilder.BuildImportCommands(ctx, comment)
+		},
+	)
+}
+
+func (b *InstrumentedProjectCommandBuilder) BuildStateRmCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+	return b.buildAndEmitStats(
+		"state rm",
+		func() ([]command.ProjectContext, error) {
+			return b.ProjectCommandBuilder.BuildStateRmCommands(ctx, comment)
 		},
 	)
 }

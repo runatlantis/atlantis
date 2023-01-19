@@ -100,6 +100,21 @@ func (mock *MockProjectCommandRunner) PolicyCheck(_param0 command.ProjectContext
 	return ret0
 }
 
+func (mock *MockProjectCommandRunner) StateRm(_param0 command.ProjectContext) command.ProjectResult {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
+	}
+	params := []pegomock.Param{_param0}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("StateRm", params, []reflect.Type{reflect.TypeOf((*command.ProjectResult)(nil)).Elem()})
+	var ret0 command.ProjectResult
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(command.ProjectResult)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockProjectCommandRunner) Version(_param0 command.ProjectContext) command.ProjectResult {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
@@ -277,6 +292,33 @@ func (c *MockProjectCommandRunner_PolicyCheck_OngoingVerification) GetCapturedAr
 }
 
 func (c *MockProjectCommandRunner_PolicyCheck_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(command.ProjectContext)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockProjectCommandRunner) StateRm(_param0 command.ProjectContext) *MockProjectCommandRunner_StateRm_OngoingVerification {
+	params := []pegomock.Param{_param0}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "StateRm", params, verifier.timeout)
+	return &MockProjectCommandRunner_StateRm_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandRunner_StateRm_OngoingVerification struct {
+	mock              *MockProjectCommandRunner
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandRunner_StateRm_OngoingVerification) GetCapturedArguments() command.ProjectContext {
+	_param0 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1]
+}
+
+func (c *MockProjectCommandRunner_StateRm_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]command.ProjectContext, len(c.methodInvocations))

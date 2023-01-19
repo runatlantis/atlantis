@@ -1,0 +1,18 @@
+Ran Import for dir: `dir1` workspace: `default`
+
+```diff
+random_id.dummy: Importing from ID "AA"...
+random_id.dummy: Import prepared!
+  Prepared random_id for import
+random_id.dummy: Refreshing state... [id=AA]
+
+Import successful!
+
+The resources that were imported are shown above. These resources are now in
+your Terraform state and will henceforth be managed by Terraform.
+```
+
+:put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
+
+* :repeat: To **plan** this project again, comment:
+  * `atlantis plan -d dir1`
