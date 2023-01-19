@@ -2,6 +2,7 @@ package valid
 
 import (
 	"fmt"
+	"golang.org/x/exp/slices"
 	"regexp"
 	"strings"
 
@@ -388,14 +389,6 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 // on our global config.
 func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 
-	sliceContainsF := func(slc []string, str string) bool {
-		for _, s := range slc {
-			if s == str {
-				return true
-			}
-		}
-		return false
-	}
 	mapContainsF := func(m map[string]Workflow, key string) bool {
 		for k := range m {
 			if k == key {
@@ -415,22 +408,22 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		}
 	}
 	for _, p := range rCfg.Projects {
-		if p.WorkflowName != nil && !sliceContainsF(allowedOverrides, WorkflowKey) {
+		if p.WorkflowName != nil && !slices.Contains(allowedOverrides, WorkflowKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", WorkflowKey, AllowedOverridesKey, WorkflowKey)
 		}
-		if p.ApplyRequirements != nil && !sliceContainsF(allowedOverrides, ApplyRequirementsKey) {
+		if p.ApplyRequirements != nil && !slices.Contains(allowedOverrides, ApplyRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ApplyRequirementsKey, AllowedOverridesKey, ApplyRequirementsKey)
 		}
-		if p.PlanRequirements != nil && !sliceContainsF(allowedOverrides, PlanRequirementsKey) {
+		if p.PlanRequirements != nil && !slices.Contains(allowedOverrides, PlanRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", PlanRequirementsKey, AllowedOverridesKey, PlanRequirementsKey)
 		}
-		if p.ImportRequirements != nil && !sliceContainsF(allowedOverrides, ImportRequirementsKey) {
+		if p.ImportRequirements != nil && !slices.Contains(allowedOverrides, ImportRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ImportRequirementsKey, AllowedOverridesKey, ImportRequirementsKey)
 		}
-		if p.DeleteSourceBranchOnMerge != nil && !sliceContainsF(allowedOverrides, DeleteSourceBranchOnMergeKey) {
+		if p.DeleteSourceBranchOnMerge != nil && !slices.Contains(allowedOverrides, DeleteSourceBranchOnMergeKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", DeleteSourceBranchOnMergeKey, AllowedOverridesKey, DeleteSourceBranchOnMergeKey)
 		}
-		if p.RepoLocking != nil && !sliceContainsF(allowedOverrides, RepoLockingKey) {
+		if p.RepoLocking != nil && !slices.Contains(allowedOverrides, RepoLockingKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", RepoLockingKey, AllowedOverridesKey, RepoLockingKey)
 		}
 	}
@@ -481,7 +474,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 				}
 			}
 
-			if !sliceContainsF(allowedWorkflows, name) {
+			if !slices.Contains(allowedWorkflows, name) {
 				return fmt.Errorf("workflow '%s' is not allowed for this repo", name)
 			}
 		}
