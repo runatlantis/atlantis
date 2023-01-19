@@ -373,16 +373,21 @@ var (
 	reNoChanges      = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 )
 
-// Summary extracts one line summary of plan changes from TerraformOutput.
+// Summary extracts summaries of plan changes from TerraformOutput.
 func (p *PlanSuccess) Summary() string {
 	note := ""
 	if match := reChangesOutside.FindString(p.TerraformOutput); match != "" {
 		note = "\n**" + match + "**\n"
 	}
+	return note + p.DiffSummary()
+}
+
+// DiffSummary extracts one line summary of plan changes from TerraformOutput.
+func (p *PlanSuccess) DiffSummary() string {
 	if match := rePlanChanges.FindString(p.TerraformOutput); match != "" {
-		return note + match
+		return match
 	}
-	return note + reNoChanges.FindString(p.TerraformOutput)
+	return reNoChanges.FindString(p.TerraformOutput)
 }
 
 // Diff Markdown regexes
