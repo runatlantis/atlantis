@@ -1,0 +1,11 @@
+Ran State `rm` for dir: `.` workspace: `default`
+
+```diff
+Removed random_id.for_each["overridden"]
+Successfully removed 1 resource instance(s).
+```
+
+:put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
+
+* :repeat: To **plan** this project again, comment:
+  * `atlantis plan -d .`
