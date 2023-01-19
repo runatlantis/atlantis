@@ -20,12 +20,12 @@ Execute [atlantis plan](using-atlantis.html#atlantis-plan) on the specified repo
 
 #### Parameters
 
-| Name       | Type              | Required | Description                              |
-|------------|-------------------|----------|------------------------------------------|
-| Repository | string            | Yes      | Name of the Terraform repository         |
-| Ref        | string            | Yes      | Git reference, like a branch name        |
-| Type       | string            | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Paths      | [ [Path](#Path) ] | Yes      | Paths to the projects to run the plan    |
+| Name       | Type                                | Required | Description                              |
+|------------|-------------------------------------|----------|------------------------------------------|
+| Repository | string                              | Yes      | Name of the Terraform repository         |
+| Ref        | string                              | Yes      | Git reference, like a branch name        |
+| Type       | string                              | Yes      | Type of the VCS provider (Github/Gitlab) |
+| Paths      | [ [Path](api-endpoints.html#path) ] | Yes      | Paths to the projects to run the plan    |
 
 ##### Path
 
@@ -92,12 +92,12 @@ Execute [atlantis apply](using-atlantis.html#atlantis-apply) on the specified re
 
 #### Parameters
 
-| Name       | Type              | Required | Description                              |
-|------------|-------------------|----------|------------------------------------------|
-| Repository | string            | Yes      | Name of the Terraform repository         |
-| Ref        | string            | Yes      | Git reference, like a branch name        |
-| Type       | string            | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Paths      | [ [Path](#Path) ] | Yes      | Paths to the projects to run the apply   |
+| Name       | Type                                  | Required | Description                              |
+|------------|---------------------------------------|----------|------------------------------------------|
+| Repository | string                                | Yes      | Name of the Terraform repository         |
+| Ref        | string                                | Yes      | Git reference, like a branch name        |
+| Type       | string                                | Yes      | Type of the VCS provider (Github/Gitlab) |
+| Paths      | [ [Path](api-endpoints.html#path-1) ] | Yes      | Paths to the projects to run the apply   |
 
 ##### Path
 
