@@ -141,6 +141,30 @@ func TestProject_Validate(t *testing.T) {
 			expErr: "",
 		},
 		{
+			description: "plan reqs with approved requirement",
+			input: raw.Project{
+				Dir:              String("."),
+				PlanRequirements: []string{"approved"},
+			},
+			expErr: "",
+		},
+		{
+			description: "plan reqs with mergeable requirement",
+			input: raw.Project{
+				Dir:              String("."),
+				PlanRequirements: []string{"mergeable"},
+			},
+			expErr: "",
+		},
+		{
+			description: "plan reqs with mergeable and approved requirements",
+			input: raw.Project{
+				Dir:              String("."),
+				PlanRequirements: []string{"mergeable", "approved"},
+			},
+			expErr: "",
+		},
+		{
 			description: "apply reqs with unsupported",
 			input: raw.Project{
 				Dir:               String("."),
