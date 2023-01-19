@@ -25,7 +25,8 @@ jobs:
   build:
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        #image_type: [alpine, debian]
+        image_type: [alpine]
     runs-on: ubuntu-22.04
     env:
       DOCKERFILE: "Dockerfile.${{ matrix.image_type }}"

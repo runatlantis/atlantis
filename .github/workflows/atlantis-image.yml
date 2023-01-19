@@ -21,7 +21,8 @@ jobs:
   build:
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        #image_type: [alpine, debian]
+        image_type: [alpine]
     runs-on: ubuntu-22.04
     env:
       RELEASE_TYPE: ${{ contains(github.ref, 'pre') && 'pre' || 'stable' }}
