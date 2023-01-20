@@ -415,8 +415,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	markdownRenderer := events.NewMarkdownRenderer(
 		gitlabClient.SupportsCommonMark(),
 		userConfig.DisableApplyAll,
-		userConfig.DisableMarkdownFolding,
 		disableApply,
+		userConfig.DisableMarkdownFolding,
 		userConfig.DisableRepoLocking,
 		userConfig.EnableDiffMarkdownFormat,
 		userConfig.MarkdownTemplateOverridesDir,
