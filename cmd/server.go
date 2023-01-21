@@ -81,6 +81,7 @@ const (
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
+	EnableReversedPRComments         = "enable-reversed-pr-comments"
 	ExecutableName                   = "executable-name"
 	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
@@ -472,6 +473,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	FailOnPreWorkflowHookError: {
 		description:  "Fail and do not run the requested Atlantis command if any of the pre workflow hooks error.",
+		defaultValue: false,
+	},
+	EnableReversedPRComments: {
+		description:  "Enable Atlantis to reverse the order of comments posted back to a Pull Request",
 		defaultValue: false,
 	},
 	GHAllowMergeableBypassApply: {

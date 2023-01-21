@@ -43,3 +43,12 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// ReverseComments reverses the order of the slice of comments
+func ReverseComments(comments []string) {
+	size := len(comments)
+	for i := 0; i < size/2; i++ {
+		otherIndex := size - i - 1
+		comments[i], comments[otherIndex] = comments[otherIndex], comments[i]
+	}
+}

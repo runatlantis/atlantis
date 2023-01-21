@@ -137,6 +137,11 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, co
 	sepEnd := "\n```\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n```diff\n"
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+
+	// begin reverse the array
+	common.ReverseComments(comments)
+	// end reverse the array
+
 	for _, c := range comments {
 		if err := b.postComment(repo, pullNum, c); err != nil {
 			return err

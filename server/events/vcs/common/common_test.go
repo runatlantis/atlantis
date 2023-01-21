@@ -61,6 +61,13 @@ func TestSplitComment_FourComments(t *testing.T) {
 		sepStart + comment[expMax*3:]}, split)
 }
 
+// Reverse the slice of comments
+func TestReverseComments(t *testing.T) {
+	comments := []string{"one", "two", "three", "four"}
+	common.ReverseComments(comments)
+	Equals(t, []string{"four", "three", "two", "one"}, comments)
+}
+
 func TestAutomergeCommitMsg(t *testing.T) {
 	tests := []struct {
 		name    string
