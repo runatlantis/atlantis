@@ -33,7 +33,7 @@ jobs:
       if: contains(github.ref, '-pre.')
       id: changelog
       run: |
-        echo "{RELEASE_TAG}=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         gh api repos/$GITHUB_REPOSITORY/releases/generate-notes \
           -f tag_name="${GITHUB_REF#refs/tags/}" \
           -f target_commitish=main \
