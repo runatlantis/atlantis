@@ -126,6 +126,7 @@ type Project struct {
 	WorkflowName              *string
 	TerraformVersion          *version.Version
 	Autoplan                  Autoplan
+	PlanRequirements          []string
 	ApplyRequirements         []string
 	ImportRequirements        []string
 	DeleteSourceBranchOnMerge *bool
