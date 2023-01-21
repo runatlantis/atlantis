@@ -1,7 +1,11 @@
 name: "Pull Request Labeler"
 
 on:
-- pull_request_target
+  pull_request_target:
+    types:
+      - opened
+    branches:
+      - main
 
 jobs:
   triage:
