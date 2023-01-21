@@ -1,0 +1,9 @@
+build:
+  - Dockerfile*
+
+docs:
+  - runatlantis.io/**
+  - README.md
+
+github-actions:
+  - .github/**
