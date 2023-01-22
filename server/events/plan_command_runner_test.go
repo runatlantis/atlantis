@@ -8,7 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/models/fixtures"
+	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 )
@@ -57,7 +57,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 			})
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
-			modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
 			cmd := &events.CommentCommand{Name: command.Plan}
 			if c.Targeted {
@@ -65,11 +65,11 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 			}
 
 			ctx := &command.Context{
-				User:     fixtures.User,
+				User:     testdata.User,
 				Log:      logging.NewNoopLogger(t),
 				Scope:    scopeNull,
 				Pull:     modelPull,
-				HeadRepo: fixtures.GithubRepo,
+				HeadRepo: testdata.GithubRepo,
 				Trigger:  command.CommentTrigger,
 			}
 

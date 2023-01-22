@@ -123,9 +123,9 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 			pull := &github.PullRequest{
 				State: github.String("open"),
 			}
-			modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
-			When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 			cmd := &events.CommentCommand{Name: command.Apply}
 			if c.Targeted {
@@ -133,11 +133,11 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 			}
 
 			ctx := &command.Context{
-				User:     fixtures.User,
+				User:     testdata.User,
 				Log:      logging.NewNoopLogger(t),
 				Scope:    scopeNull,
 				Pull:     modelPull,
-				HeadRepo: fixtures.GithubRepo,
+				HeadRepo: testdata.GithubRepo,
 				Trigger:  command.CommentTrigger,
 			}
 

@@ -1282,7 +1282,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							Mergeable: true,
 						},
-					}, cmd, "", []string{}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true)
 					Equals(t, c.expLen, len(ctxs))
 					Ok(t, err)
 				})
