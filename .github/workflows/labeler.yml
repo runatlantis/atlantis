@@ -2,12 +2,6 @@ name: "Pull Request Labeler"
 
 on:
   pull_request_target:
-    types:
-      - opened
-      - synchronize
-      - reopened
-    branches:
-      - main
 
 jobs:
   triage:
