@@ -1,19 +1,13 @@
 name: "Pull Request Labeler"
 
 on:
-  pull_request:
+  pull_request_target:
     types:
       - opened
       - synchronize
       - reopened
     branches:
       - main
-
-permissions:
-  # All other permissions are set to none
-  checks: write
-  contents: read
-  pull-requests: write
 
 jobs:
   triage:
