@@ -56,7 +56,6 @@ workflows:
     - e2e:
         context:
           - atlantis-e2e-tests
-        requires: [test]
         filters:
           branches:
             # Ignore fork PRs since they don't have access to
