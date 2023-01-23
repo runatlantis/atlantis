@@ -32,3 +32,4 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: make test-all
+      - run: make check-fmt
