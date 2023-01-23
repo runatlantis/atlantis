@@ -509,10 +509,10 @@ to all steps defined **below** the `multienv` step.
 ```yaml
 - multienv: custom-command
 ```
-| Key      | Type   | Default | Required | Description                                   |
-|----------|--------|---------|----------|-----------------------------------------------|
-| multienv | string | none    | no       | Run a custom command and add set              |
-|          |        |         |          | environment variables according to the result |
+| Key      | Type   | Default | Required | Description                                                                    |
+|----------|--------|---------|----------|--------------------------------------------------------------------------------|
+| multienv | string | none    | no       | Run a custom command and add set environment variables according to the result |
+
 The result of the executed command must have a fixed format:
 EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3
 
