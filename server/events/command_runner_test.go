@@ -23,6 +23,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -83,16 +84,23 @@ type TestConfig struct {
 	silenceVCSStatusNoProjects bool
 	StatusName                 string
 	discardApprovalOnPlan      bool
+	backend                    locking.Backend
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
+
+	// create an empty DB
+	tmp := t.TempDir()
+	defaultBoltDB, err := db.New(tmp)
+	Ok(t, err)
 
 	testConfig := &TestConfig{
 		parallelPoolSize:      1,
 		SilenceNoProjects:     false,
 		StatusName:            "atlantis-test",
 		discardApprovalOnPlan: false,
+		backend:               defaultBoltDB,
 	}
 
 	for _, op := range options {
@@ -111,9 +119,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
 	pullReqStatusFetcher = vcsmocks.NewMockPullReqStatusFetcher()
-	tmp := t.TempDir()
-	defaultBoltDB, err := db.New(tmp)
-	Ok(t, err)
 
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
@@ -121,7 +126,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	lockingLocker = lockingmocks.NewMockLocker()
 
 	dbUpdater = &events.DBUpdater{
-		Backend: defaultBoltDB,
+		Backend: testConfig.backend,
 	}
 
 	pullUpdater = &events.PullUpdater{
@@ -160,7 +165,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		autoMerger,
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
-		defaultBoltDB,
+		testConfig.backend,
 		lockingLocker,
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
@@ -176,7 +181,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		defaultBoltDB,
+		testConfig.backend,
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
 		testConfig.silenceVCSStatusNoProjects,
@@ -251,7 +256,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              defaultBoltDB,
+		PullStatusFetcher:              testConfig.backend,
 	}
 
 	return vcsClient
@@ -393,6 +398,7 @@ func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 }
 
 func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
+	// TODO
 	t.Log("if a plan command is run against a project and SilenceNoProjects is enabled, we are silencing all comments if the project is not in the repo config")
 	vcsClient := setup(t)
 	planCommandRunner.SilenceNoProjects = true
@@ -403,13 +409,13 @@ func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "meow"})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
-	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		matchers.AnyModelsCommitStatus(),
-		matchers.AnyCommandName(),
-		AnyInt(),
-		AnyInt(),
+		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
+		matchers.EqCommandName(command.Plan),
+		EqInt(0),
+		EqInt(0),
 	)
 }
 

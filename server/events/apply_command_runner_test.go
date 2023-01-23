@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-github/v49/github"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -14,6 +15,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestApplyCommandRunner_IsLocked(t *testing.T) {
@@ -79,53 +81,73 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	cases := []struct {
-		Description      string
-		Matched          bool
-		Targeted         bool
-		VCSStatusSilence bool
-		ExpVCSZeroed     bool
-		ExpSilenced      bool
+		Description       string
+		Matched           bool
+		Targeted          bool
+		VCSStatusSilence  bool
+		PrevApplyStored   bool // stores a 1/1 passing apply in the backend
+		ExpVCSStatusSet   bool
+		ExpVCSStatusTotal int
+		ExpVCSStatusSucc  int
+		ExpSilenced       bool
 	}{
 		{
-			Description:  "When applying, don't comment but set the 0/0 VCS status",
-			ExpVCSZeroed: true,
-			ExpSilenced:  true,
+			Description:     "When applying, don't comment but set the 0/0 VCS status",
+			ExpVCSStatusSet: true,
+			ExpSilenced:     true,
 		},
 		{
-			Description:  "When applying with unmatched target, don't comment or set the 0/0 VCS status",
-			Targeted:     true,
-			ExpVCSZeroed: false,
-			ExpSilenced:  true,
+			Description:     "When applying with any previous apply's, don't comment but set the 0/0 VCS status",
+			PrevApplyStored: true,
+			ExpVCSStatusSet: true,
+			ExpSilenced:     true,
+		},
+		{
+			Description:     "When applying with unmatched target, don't comment but set the 0/0 VCS status",
+			Targeted:        true,
+			ExpVCSStatusSet: true,
+			ExpSilenced:     true,
+		},
+		{
+			Description:       "When applying with unmatched target and any previous apply's, don't comment and maintain VCS status",
+			Targeted:          true,
+			PrevApplyStored:   true,
+			ExpVCSStatusSet:   true,
+			ExpSilenced:       true,
+			ExpVCSStatusSucc:  1,
+			ExpVCSStatusTotal: 1,
 		},
 		{
 			Description:      "When applying with silenced VCS status, don't do anything",
 			VCSStatusSilence: true,
-			ExpVCSZeroed:     false,
+			ExpVCSStatusSet:  false,
 			ExpSilenced:      true,
 		},
 		{
-			Description:  "When applying with matching projects, comment as usual",
-			Matched:      true,
-			ExpVCSZeroed: false,
-			ExpSilenced:  false,
+			Description:       "When applying with matching projects, comment as usual",
+			Matched:           true,
+			ExpVCSStatusSet:   true,
+			ExpSilenced:       false,
+			ExpVCSStatusSucc:  1,
+			ExpVCSStatusTotal: 1,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
+			// create an empty DB
+			tmp := t.TempDir()
+			db, err := db.New(tmp)
+			Ok(t, err)
+
 			vcsClient := setup(t, func(tc *TestConfig) {
 				tc.SilenceNoProjects = true
 				tc.silenceVCSStatusNoProjects = c.VCSStatusSilence
+				tc.backend = db
 			})
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
-
-			pull := &github.PullRequest{
-				State: github.String("open"),
-			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-			When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 			cmd := &events.CommentCommand{Name: command.Apply}
 			if c.Targeted {
@@ -140,33 +162,53 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				HeadRepo: testdata.GithubRepo,
 				Trigger:  command.CommentTrigger,
 			}
+			if c.PrevApplyStored {
+				db.UpdatePullWithResults(modelPull, []command.ProjectResult{
+					{
+						Command:    command.Apply,
+						RepoRelDir: "prevdir",
+						Workspace:  "default",
+					},
+				})
+			}
 
 			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
 				if c.Matched {
-					return ReturnValues{[]command.ProjectContext{{CommandName: command.Apply}}, nil}
+					return ReturnValues{[]command.ProjectContext{{
+						CommandName:       command.Apply,
+						ProjectPlanStatus: models.PlannedPlanStatus,
+					}}, nil}
 				}
 				return ReturnValues{[]command.ProjectContext{}, nil}
 			})
 
 			applyCommandRunner.Run(ctx, cmd)
 
-			timesComment, timesVCS := 1, 0
+			timesComment := 1
 			if c.ExpSilenced {
 				timesComment = 0
 			}
-			if c.ExpVCSZeroed {
-				timesVCS = 1
-			}
 
 			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
-			commitUpdater.VerifyWasCalled(Times(timesVCS)).UpdateCombinedCount(
-				matchers.AnyModelsRepo(),
-				matchers.AnyModelsPullRequest(),
-				matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-				matchers.EqCommandName(command.Apply),
-				EqInt(0),
-				EqInt(0),
-			)
+			if c.ExpVCSStatusSet {
+				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+					matchers.AnyModelsRepo(),
+					matchers.AnyModelsPullRequest(),
+					matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
+					matchers.EqCommandName(command.Apply),
+					EqInt(c.ExpVCSStatusSucc),
+					EqInt(c.ExpVCSStatusTotal),
+				)
+			} else {
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+					matchers.AnyModelsRepo(),
+					matchers.AnyModelsPullRequest(),
+					matchers.AnyModelsCommitStatus(),
+					matchers.EqCommandName(command.Apply),
+					AnyInt(),
+					AnyInt(),
+				)
+			}
 		})
 	}
 }

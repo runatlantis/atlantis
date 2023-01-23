@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
@@ -11,49 +12,76 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	cases := []struct {
-		Description      string
-		Matched          bool
-		Targeted         bool
-		VCSStatusSilence bool
-		ExpVCSZeroed     bool
-		ExpSilenced      bool
+		Description       string
+		Matched           bool
+		Targeted          bool
+		VCSStatusSilence  bool
+		PrevPlanStored    bool // stores a 1/1 passing plan in the backend
+		ExpVCSStatusSet   bool
+		ExpVCSStatusTotal int
+		ExpVCSStatusSucc  int
+		ExpSilenced       bool
 	}{
 		{
-			Description:  "When planning, don't comment but set the 0/0 VCS status",
-			ExpVCSZeroed: true,
-			ExpSilenced:  true,
+			Description:     "When planning, don't comment but set the 0/0 VCS status",
+			ExpVCSStatusSet: true,
+			ExpSilenced:     true,
 		},
 		{
-			Description:  "When planning with unmatched target, don't comment or set the 0/0 VCS status",
-			Targeted:     true,
-			ExpVCSZeroed: false,
-			ExpSilenced:  true,
+			Description:     "When planning with any previous plans, don't comment but set the 0/0 VCS status",
+			PrevPlanStored:  true,
+			ExpVCSStatusSet: true,
+			ExpSilenced:     true,
+		},
+		{
+			Description:     "When planning with unmatched target, don't comment but set the 0/0 VCS status",
+			Targeted:        true,
+			ExpVCSStatusSet: true,
+			ExpSilenced:     true,
+		},
+		{
+			Description:       "When planning with unmatched target and any previous plans, don't comment and maintain VCS status",
+			Targeted:          true,
+			PrevPlanStored:    true,
+			ExpVCSStatusSet:   true,
+			ExpSilenced:       true,
+			ExpVCSStatusSucc:  1,
+			ExpVCSStatusTotal: 1,
 		},
 		{
 			Description:      "When planning with silenced VCS status, don't do anything",
 			VCSStatusSilence: true,
-			ExpVCSZeroed:     false,
+			ExpVCSStatusSet:  false,
 			ExpSilenced:      true,
 		},
 		{
-			Description:  "When planning with matching projects, comment as usual",
-			Matched:      true,
-			ExpVCSZeroed: false,
-			ExpSilenced:  false,
+			Description:       "When planning with matching projects, comment as usual",
+			Matched:           true,
+			ExpVCSStatusSet:   true,
+			ExpSilenced:       false,
+			ExpVCSStatusSucc:  1,
+			ExpVCSStatusTotal: 1,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
+			// create an empty DB
+			tmp := t.TempDir()
+			db, err := db.New(tmp)
+			Ok(t, err)
+
 			vcsClient := setup(t, func(tc *TestConfig) {
 				tc.SilenceNoProjects = true
 				tc.silenceVCSStatusNoProjects = c.VCSStatusSilence
+				tc.backend = db
 			})
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
@@ -72,6 +100,16 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				HeadRepo: testdata.GithubRepo,
 				Trigger:  command.CommentTrigger,
 			}
+			if c.PrevPlanStored {
+				db.UpdatePullWithResults(modelPull, []command.ProjectResult{
+					{
+						Command:     command.Plan,
+						RepoRelDir:  "prevdir",
+						Workspace:   "default",
+						PlanSuccess: &models.PlanSuccess{},
+					},
+				})
+			}
 
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
 				if c.Matched {
@@ -82,23 +120,31 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 
 			planCommandRunner.Run(ctx, cmd)
 
-			timesComment, timesVCS := 1, 0
+			timesComment := 1
 			if c.ExpSilenced {
 				timesComment = 0
 			}
-			if c.ExpVCSZeroed {
-				timesVCS = 1
-			}
 
 			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
-			commitUpdater.VerifyWasCalled(Times(timesVCS)).UpdateCombinedCount(
-				matchers.AnyModelsRepo(),
-				matchers.AnyModelsPullRequest(),
-				matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-				matchers.EqCommandName(command.Plan),
-				EqInt(0),
-				EqInt(0),
-			)
+			if c.ExpVCSStatusSet {
+				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+					matchers.AnyModelsRepo(),
+					matchers.AnyModelsPullRequest(),
+					matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
+					matchers.EqCommandName(command.Plan),
+					EqInt(c.ExpVCSStatusSucc),
+					EqInt(c.ExpVCSStatusTotal),
+				)
+			} else {
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+					matchers.AnyModelsRepo(),
+					matchers.AnyModelsPullRequest(),
+					matchers.AnyModelsCommitStatus(),
+					matchers.EqCommandName(command.Plan),
+					AnyInt(),
+					AnyInt(),
+				)
+			}
 		})
 	}
 }
