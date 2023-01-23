@@ -6,17 +6,18 @@ on:
       - "main"
     paths-ignore:
       - 'runatlantis.io/**'
+      - '.github/**'
   pull_request:
     types:
       - opened
       - reopened
       - synchronize
       - ready_for_review
-
     branches:
       - "main"
     paths-ignore:
       - 'runatlantis.io/**'
+      - '.github/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}

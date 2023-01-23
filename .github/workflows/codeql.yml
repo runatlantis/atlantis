@@ -14,9 +14,13 @@ name: "CodeQL"
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - '.github/**'
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ "main" ]
+    paths-ignore:
+      - '.github/**'
   schedule:
     - cron: '17 9 * * 5'
 
@@ -24,6 +28,7 @@ jobs:
   analyze:
     if: github.event.pull_request.draft == false
     name: Analyze
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       actions: read
