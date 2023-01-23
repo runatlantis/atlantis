@@ -3,7 +3,6 @@ package event
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"time"
 
@@ -59,7 +58,6 @@ func (p *PullRequestReviewWorkerProxy) handle(ctx context.Context, event PullReq
 
 	// Ignore non-approval events
 	if event.State != Approved {
-		p.Logger.InfoContext(ctx, fmt.Sprintf("not an approval event: %s", event.State))
 		return nil
 	}
 
@@ -70,7 +68,6 @@ func (p *PullRequestReviewWorkerProxy) handle(ctx context.Context, event PullReq
 		return err
 	}
 	if len(failedPolicyCheckRuns) == 0 {
-		p.Logger.InfoContext(ctx, "no failed policies, skipping event")
 		return nil
 	}
 	// Forward to SNS to further process in the worker
