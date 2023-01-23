@@ -1,35 +1,35 @@
 build:
-  - Dockerfile*
+  - 'Dockerfile*'
 
 dependencies:
-  - yarn.lock
-  - go.*
+  - 'yarn.lock'
+  - 'go.*'
 
 docs:
-  - runatlantis.io/**/*.md
-  - README.md
+  - 'runatlantis.io/**/*.md'
+  - 'README.md'
 
 github-actions:
-  - .github/**
+  - '.github/**'
 
 go:
-  - *.go
+  - '**/*.go'
 
 provider/azuredevops:
-  - server/**/*azuredevops*.go
+  - 'server/**/*azuredevops*.go'
 
 provider/bitbucket:
-  - server/**/*bitbucket*.go
-  - server/events/vcs/bitbucketcloud/*.go
-  - server/events/vcs/bitbucketserver/*.go
+  - 'server/**/*bitbucket*.go'
+  - 'server/events/vcs/bitbucketcloud/*.go'
+  - 'server/events/vcs/bitbucketserver/*.go'
 
 provider/github:
-  - server/**/*github*.go
+  - 'server/**/*github*.go'
 
 provider/gitlab:
-  - server/**/*gitlab*.go
+  - 'server/**/*gitlab*.go'
 
 website:
-  - runatlantis.io/.vuepress/**/*
-  - package.json
-  - yarn.lock
+  - 'runatlantis.io/.vuepress/**/*'
+  - 'package.json'
+  - 'yarn.lock'
