@@ -12,6 +12,7 @@ on:
 jobs:
   triage:
     permissions:
+      checks: write
       contents: read
       pull-requests: write
     if: github.event.pull_request.draft == false
