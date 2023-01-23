@@ -57,7 +57,7 @@ jobs:
         images: |
           ${{ env.DOCKER_REPO }}
         labels: |
-          authors="Anubhav Mishra, Luke Kysow"
+          org.opencontainers.image.authors="Anubhav Mishra, Luke Kysow"
           org.opencontainers.image.licenses=Apache-2.0
         tags: |
           # semver
