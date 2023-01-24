@@ -48,7 +48,9 @@ release:
   prerelease: auto
 
 signs:
-  - artifacts: all
+  # https://goreleaser.com/customization/sign/
+  -
+    artifacts: all
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
