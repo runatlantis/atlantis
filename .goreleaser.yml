@@ -47,5 +47,8 @@ release:
   # Default is false.
   prerelease: auto
 
+signs:
+  - artifacts: all
+
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
