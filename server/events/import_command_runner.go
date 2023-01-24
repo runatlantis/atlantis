@@ -10,12 +10,14 @@ func NewImportCommandRunner(
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	prjCmdBuilder ProjectImportCommandBuilder,
 	prjCmdRunner ProjectImportCommandRunner,
+	SilenceNoProjects bool,
 ) *ImportCommandRunner {
 	return &ImportCommandRunner{
 		pullUpdater:          pullUpdater,
 		pullReqStatusFetcher: pullReqStatusFetcher,
 		prjCmdBuilder:        prjCmdBuilder,
 		prjCmdRunner:         prjCmdRunner,
+		SilenceNoProjects:    SilenceNoProjects,
 	}
 }
 
@@ -24,6 +26,7 @@ type ImportCommandRunner struct {
 	pullReqStatusFetcher vcs.PullReqStatusFetcher
 	prjCmdBuilder        ProjectImportCommandBuilder
 	prjCmdRunner         ProjectImportCommandRunner
+	SilenceNoProjects    bool
 }
 
 func (v *ImportCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
@@ -48,6 +51,10 @@ func (v *ImportCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		ctx.Log.Warn("Error %s", err)
 	}
 
+	if len(projectCmds) == 0 && v.SilenceNoProjects {
+		ctx.Log.Info("determined there was no project to run import in.")
+		return
+	}
 	var result command.Result
 	if len(projectCmds) > 1 {
 		// There is no usecase to kick terraform import into multiple projects.

@@ -202,12 +202,32 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	if len(projectCmds) == 0 && p.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")
 		if !p.silenceVCSStatusNoProjects {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects planned successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
-				ctx.Log.Warn("unable to update commit status: %s", err)
+			if cmd.IsForSpecificProject() {
+				// With a specific plan, just reset the status so it's not stuck in pending state
+				pullStatus, err := p.pullStatusFetcher.GetPullStatus(pull)
+				if err != nil {
+					ctx.Log.Warn("unable to fetch pull status: %s", err)
+					return
+				}
+				if pullStatus == nil {
+					// default to 0/0
+					ctx.Log.Debug("setting VCS status to 0/0 success as no previous state was found")
+					if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+						ctx.Log.Warn("unable to update commit status: %s", err)
+					}
+					return
+				}
+				ctx.Log.Debug("resetting VCS status")
+				p.updateCommitStatus(ctx, *pullStatus)
+			} else {
+				// With a generic plan, we set successful commit statuses
+				// with 0/0 projects planned successfully because some users require
+				// the Atlantis status to be passing for all pull requests.
+				// Does not apply to skipped runs for specific projects
+				ctx.Log.Debug("setting VCS status to success with no projects found")
+				if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+					ctx.Log.Warn("unable to update commit status: %s", err)
+				}
 			}
 		}
 		return

@@ -53,6 +53,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	RestrictFileList bool,
+	SilenceNoProjects bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 	terraformClient terraform.Client,
@@ -79,6 +80,7 @@ func NewInstrumentedProjectCommandBuilder(
 			AutoDetectModuleFiles,
 			AutoplanFileList,
 			RestrictFileList,
+			SilenceNoProjects,
 			scope,
 			logger,
 			terraformClient,
@@ -103,6 +105,7 @@ func NewProjectCommandBuilder(
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	RestrictFileList bool,
+	SilenceNoProjects bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 	terraformClient terraform.Client,
@@ -120,6 +123,7 @@ func NewProjectCommandBuilder(
 		AutoDetectModuleFiles: AutoDetectModuleFiles,
 		AutoplanFileList:      AutoplanFileList,
 		RestrictFileList:      RestrictFileList,
+		SilenceNoProjects:     SilenceNoProjects,
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
@@ -202,6 +206,7 @@ type DefaultProjectCommandBuilder struct {
 	AutoplanFileList             string
 	EnableDiffMarkdownFormat     bool
 	RestrictFileList             bool
+	SilenceNoProjects            bool
 	TerraformExecutor            terraform.Client
 }
 
@@ -561,7 +566,11 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 			}
 		}
 		if len(projectsCfg) == 0 {
-			err = fmt.Errorf("no project with name %q is defined in %s", projectName, repoCfgFile)
+			if p.SilenceNoProjects && len(repoConfig.Projects) > 0 {
+				ctx.Log.Debug("no project with name %q found but silencing the error", projectName)
+			} else {
+				err = fmt.Errorf("no project with name %q is defined in %s", projectName, repoCfgFile)
+			}
 			return
 		}
 		return
@@ -718,6 +727,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				)...)
 		}
 	} else {
+		// Ignore the project if silenced with projects set in the repo config
+		if p.SilenceNoProjects && repoCfgPtr != nil && len(repoCfgPtr.Projects) > 0 {
+			ctx.Log.Debug("silencing is in effect, project will be ignored")
+			return []command.ProjectContext{}, nil
+		}
+
 		projCfg = p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), repoRelDir, workspace)
 		projCtxs = append(projCtxs,
 			p.ProjectCommandContextBuilder.BuildProjectContext(

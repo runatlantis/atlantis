@@ -18,9 +18,11 @@ func TestImportCommandRunner_Run(t *testing.T) {
 
 	tests := []struct {
 		name          string
+		silenced      bool
 		pullReqStatus models.PullReqStatus
 		projectCmds   []command.ProjectContext
 		expComment    string
+		expNoComment  bool
 	}{
 		{
 			name: "success with zero projects",
@@ -40,10 +42,22 @@ func TestImportCommandRunner_Run(t *testing.T) {
 			projectCmds: []command.ProjectContext{{}, {}},
 			expComment:  "**Import Failed**: import cannot run on multiple projects. please specify one project.",
 		},
+		{
+			name: "no comment with zero projects and silencing",
+			pullReqStatus: models.PullReqStatus{
+				ApprovalStatus: models.ApprovalStatus{IsApproved: true},
+				Mergeable:      true,
+			},
+			projectCmds:  []command.ProjectContext{},
+			silenced:     true,
+			expNoComment: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vcsClient := setup(t)
+			vcsClient := setup(t, func(tc *TestConfig) {
+				tc.SilenceNoProjects = tt.silenced
+			})
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
@@ -63,7 +77,11 @@ func TestImportCommandRunner_Run(t *testing.T) {
 			importCommandRunner.Run(ctx, cmd)
 
 			Assert(t, ctx.PullRequestStatus.Mergeable == true, "PullRequestStatus must be set for import_requirements")
-			vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, modelPull.Num, tt.expComment, "import")
+			if tt.expNoComment {
+				vcsClient.VerifyWasCalled(Never()).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
+			} else {
+				vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, modelPull.Num, tt.expComment, "import")
+			}
 		})
 	}
 }
