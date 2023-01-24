@@ -81,10 +81,6 @@ repos:
   post_workflow_hooks: 
     - run: my-post-workflow-hook-command arg1
 
-  # api-secret defines the secret used to pass to the /api/plan and /api/apply endpoints
-  # if not present the api endpoints will not be accesible.
-  api-secret: "myapisecret"
-
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
 
@@ -488,7 +484,6 @@ If you set a workflow with the key `default`, it will override this.
 | allow_custom_workflows        | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                                                                                        |
 | delete_source_branch_on_merge | bool     | false   | no       | Whether or not to delete the source branch on merge (only AzureDevOps and GitLab support)                                                                                                                                                                                                                 |
 | repo_locking                  | bool     | false   | no       | Whether or not to get a lock                                                                                                                                                                                                                                                                              |
-| api-secret                    | string   | none    | no       | Api secret key for the /api/plan and /api/apply api endpoints. if not set the /api/* endpoints are disable by default.  |
 
 
 :::tip Notes
