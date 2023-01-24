@@ -1,12 +1,5 @@
 version: 2
 jobs:
-  test:
-    docker:
-    - image: ghcr.io/runatlantis/testing-env:latest
-    steps:
-    - checkout
-    - run: make check-fmt
-    - run: make check-lint
   e2e:
     docker:
     - image: cimg/go:1.19 # If you update this, update it in the Makefile too
@@ -60,14 +53,9 @@ workflows:
   version: 2
   branch:
     jobs:
-    - test:
-        filters:
-          branches:
-            ignore: /docs\/./
     - e2e:
         context:
           - atlantis-e2e-tests
-        requires: [test]
         filters:
           branches:
             # Ignore fork PRs since they don't have access to
