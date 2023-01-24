@@ -121,6 +121,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 			"repository_hooks": "write",
 			"statuses":         "write",
 			"administration":   "read",
+			"members":          "read",
 		},
 	}
 

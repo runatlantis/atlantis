@@ -1,0 +1,23 @@
+Ran Apply for 2 projects:
+
+1. dir: `infrastructure/production` workspace: `default`
+1. dir: `infrastructure/staging` workspace: `default`
+
+### 1. dir: `infrastructure/production` workspace: `default`
+```diff
+null_resource.production[0]: Creating...
+null_resource.production[0]: Creation complete after *s [id=*******************]
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+```
+
+---
+### 2. dir: `infrastructure/staging` workspace: `default`
+```diff
+null_resource.staging[0]: Creating...
+null_resource.staging[0]: Creation complete after *s [id=*******************]
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+```
+
+---

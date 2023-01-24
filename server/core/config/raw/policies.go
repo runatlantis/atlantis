@@ -40,6 +40,7 @@ func (p PolicySets) ToValid() valid.PolicySets {
 
 type PolicyOwners struct {
 	Users []string `yaml:"users,omitempty" json:"users,omitempty"`
+	Teams []string `yaml:"teams,omitempty" json:"teams,omitempty"`
 }
 
 func (o PolicyOwners) ToValid() valid.PolicyOwners {
@@ -47,6 +48,10 @@ func (o PolicyOwners) ToValid() valid.PolicyOwners {
 
 	if len(o.Users) > 0 {
 		policyOwners.Users = o.Users
+	}
+
+	if len(o.Teams) > 0 {
+		policyOwners.Teams = o.Teams
 	}
 	return policyOwners
 }

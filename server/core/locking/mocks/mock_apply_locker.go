@@ -25,6 +25,25 @@ func NewMockApplyLocker(options ...pegomock.Option) *MockApplyLocker {
 func (mock *MockApplyLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockApplyLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
+func (mock *MockApplyLocker) CheckApplyLock() (locking.ApplyCommandLock, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockApplyLocker().")
+	}
+	params := []pegomock.Param{}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("CheckApplyLock", params, []reflect.Type{reflect.TypeOf((*locking.ApplyCommandLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 locking.ApplyCommandLock
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(locking.ApplyCommandLock)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockApplyLocker) LockApply() (locking.ApplyCommandLock, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockApplyLocker().")
@@ -57,25 +76,6 @@ func (mock *MockApplyLocker) UnlockApply() error {
 		}
 	}
 	return ret0
-}
-
-func (mock *MockApplyLocker) CheckApplyLock() (locking.ApplyCommandLock, error) {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockApplyLocker().")
-	}
-	params := []pegomock.Param{}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("CheckApplyLock", params, []reflect.Type{reflect.TypeOf((*locking.ApplyCommandLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 locking.ApplyCommandLock
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(locking.ApplyCommandLock)
-		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
-		}
-	}
-	return ret0, ret1
 }
 
 func (mock *MockApplyLocker) VerifyWasCalledOnce() *VerifierMockApplyLocker {
@@ -115,6 +115,23 @@ type VerifierMockApplyLocker struct {
 	timeout                time.Duration
 }
 
+func (verifier *VerifierMockApplyLocker) CheckApplyLock() *MockApplyLocker_CheckApplyLock_OngoingVerification {
+	params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CheckApplyLock", params, verifier.timeout)
+	return &MockApplyLocker_CheckApplyLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockApplyLocker_CheckApplyLock_OngoingVerification struct {
+	mock              *MockApplyLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockApplyLocker_CheckApplyLock_OngoingVerification) GetCapturedArguments() {
+}
+
+func (c *MockApplyLocker_CheckApplyLock_OngoingVerification) GetAllCapturedArguments() {
+}
+
 func (verifier *VerifierMockApplyLocker) LockApply() *MockApplyLocker_LockApply_OngoingVerification {
 	params := []pegomock.Param{}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "LockApply", params, verifier.timeout)
@@ -147,21 +164,4 @@ func (c *MockApplyLocker_UnlockApply_OngoingVerification) GetCapturedArguments()
 }
 
 func (c *MockApplyLocker_UnlockApply_OngoingVerification) GetAllCapturedArguments() {
-}
-
-func (verifier *VerifierMockApplyLocker) CheckApplyLock() *MockApplyLocker_CheckApplyLock_OngoingVerification {
-	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CheckApplyLock", params, verifier.timeout)
-	return &MockApplyLocker_CheckApplyLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
-
-type MockApplyLocker_CheckApplyLock_OngoingVerification struct {
-	mock              *MockApplyLocker
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *MockApplyLocker_CheckApplyLock_OngoingVerification) GetCapturedArguments() {
-}
-
-func (c *MockApplyLocker_CheckApplyLock_OngoingVerification) GetAllCapturedArguments() {
 }

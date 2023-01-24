@@ -4,11 +4,10 @@
 package mocks
 
 import (
+	pegomock "github.com/petergtz/pegomock"
 	http "net/http"
 	"reflect"
 	"time"
-
-	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockGithubCredentials struct {

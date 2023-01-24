@@ -175,7 +175,8 @@ workflows:
 								},
 							},
 						},
-						Import: valid.DefaultImportStage,
+						Import:  valid.DefaultImportStage,
+						StateRm: valid.DefaultStateRmStage,
 					},
 				},
 			},
@@ -755,6 +756,9 @@ workflows:
     import:
       steps:
       - import
+    state_rm:
+      steps:
+      - state_rm
 `,
 			exp: valid.RepoCfg{
 				Version: 3,
@@ -808,6 +812,13 @@ workflows:
 								},
 							},
 						},
+						StateRm: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName: "state_rm",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -842,6 +853,10 @@ workflows:
     import:
       steps:
       - import:
+          extra_args: ["a", "b"]
+    state_rm:
+      steps:
+      - state_rm:
           extra_args: ["a", "b"]
 `,
 			exp: valid.RepoCfg{
@@ -899,6 +914,14 @@ workflows:
 								},
 							},
 						},
+						StateRm: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:  "state_rm",
+									ExtraArgs: []string{"a", "b"},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -923,6 +946,9 @@ workflows:
     import:
       steps:
       - run: echo apply "arg 3"
+    state_rm:
+      steps:
+      - run: echo apply "arg 4"
 `,
 			exp: valid.RepoCfg{
 				Version: 3,
@@ -971,6 +997,14 @@ workflows:
 								},
 							},
 						},
+						StateRm: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:   "run",
+									RunCommand: "echo apply \"arg 4\"",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -999,6 +1033,11 @@ workflows:
           name: env_name
           command: command and args
     import:
+      steps:
+      - env:
+          name: env_name
+          value: env_value
+    state_rm:
       steps:
       - env:
           name: env_name
@@ -1047,6 +1086,15 @@ workflows:
 							},
 						},
 						Import: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:    "env",
+									EnvVarName:  "env_name",
+									EnvVarValue: "env_value",
+								},
+							},
+						},
+						StateRm: valid.Stage{
 							Steps: []valid.Step{
 								{
 									StepName:    "env",
@@ -1194,6 +1242,17 @@ func TestParseGlobalCfg(t *testing.T) {
 				},
 			},
 		},
+		StateRm: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:   "run",
+					RunCommand: "custom command",
+				},
+				{
+					StepName: "state_rm",
+				},
+			},
+		},
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
@@ -1249,7 +1308,13 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   allowed_overrides: [invalid]`,
-			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\" and \"repo_locking\" are supported.).).",
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"plan_requirements\", \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\" and \"repo_locking\" are supported.).).",
+		},
+		"invalid plan_requirement": {
+			input: `repos:
+- id: /.*/
+  plan_requirements: [invalid]`,
+			expErr: "repos: (0: (plan_requirements: \"invalid\" is not a valid plan_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
 		},
 		"invalid apply_requirement": {
 			input: `repos:
@@ -1291,6 +1356,7 @@ workflows:
     plan:
     policy_check:
     import:
+    state_rm:
 `,
 			exp: valid.GlobalCfg{
 				Repos: defaultCfg.Repos,
@@ -1312,6 +1378,8 @@ workflows:
       steps:
     import:
       steps:
+    state_rm:
+      steps:
 `,
 			exp: valid.GlobalCfg{
 				Repos: defaultCfg.Repos,
@@ -1332,7 +1400,7 @@ repos:
   workflow: custom1
   post_workflow_hooks:
     - run: custom workflow command
-  allowed_overrides: [apply_requirements, import_requirements, workflow, delete_source_branch_on_merge]
+  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, delete_source_branch_on_merge]
   allow_custom_workflows: true
 - id: /.*/
   branch: /(master|main)/
@@ -1362,6 +1430,10 @@ workflows:
       steps:
       - run: custom command
       - import
+    state_rm:
+      steps:
+      - run: custom command
+      - state_rm
 policies:
   conftest_version: v1.0.0
   policy_sets:
@@ -1379,7 +1451,7 @@ policies:
 						PreWorkflowHooks:     preWorkflowHooks,
 						Workflow:             &customWorkflow1,
 						PostWorkflowHooks:    postWorkflowHooks,
-						AllowedOverrides:     []string{"apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge"},
+						AllowedOverrides:     []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
@@ -1454,12 +1526,15 @@ workflows:
       steps: []
     import:
       steps: []
+    state_rm:
+      steps: []
 `,
 			exp: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					{
 						IDRegex:            regexp.MustCompile(".*"),
 						BranchRegex:        regexp.MustCompile(".*"),
+						PlanRequirements:   []string{},
 						ApplyRequirements:  []string{},
 						ImportRequirements: []string{},
 						Workflow: &valid.Workflow{
@@ -1479,6 +1554,9 @@ workflows:
 								},
 							},
 							Import: valid.Stage{
+								Steps: nil,
+							},
+							StateRm: valid.Stage{
 								Steps: nil,
 							},
 						},
@@ -1599,6 +1677,14 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				},
 			},
 		},
+		StateRm: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:   "run",
+					RunCommand: "custom state_rm",
+				},
+			},
+		},
 	}
 
 	conftestVersion, _ := version.NewVersion("v1.0.0")
@@ -1660,6 +1746,11 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
       "import": {
         "steps": [
           {"run": "custom import"}
+        ]
+      },
+      "state_rm": {
+        "steps": [
+          {"run": "custom state_rm"}
         ]
       }
     }
@@ -1833,5 +1924,6 @@ func defaultWorkflow(name string) valid.Workflow {
 		Plan:        valid.DefaultPlanStage,
 		PolicyCheck: valid.DefaultPolicyCheckStage,
 		Import:      valid.DefaultImportStage,
+		StateRm:     valid.DefaultStateRmStage,
 	}
 }

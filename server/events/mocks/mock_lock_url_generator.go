@@ -4,10 +4,9 @@
 package mocks
 
 import (
+	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 	"time"
-
-	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockLockURLGenerator struct {
@@ -25,11 +24,11 @@ func NewMockLockURLGenerator(options ...pegomock.Option) *MockLockURLGenerator {
 func (mock *MockLockURLGenerator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockLockURLGenerator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockLockURLGenerator) GenerateLockURL(lockID string) string {
+func (mock *MockLockURLGenerator) GenerateLockURL(_param0 string) string {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockLockURLGenerator().")
 	}
-	params := []pegomock.Param{lockID}
+	params := []pegomock.Param{_param0}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GenerateLockURL", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem()})
 	var ret0 string
 	if len(result) != 0 {
@@ -77,8 +76,8 @@ type VerifierMockLockURLGenerator struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockLockURLGenerator) GenerateLockURL(lockID string) *MockLockURLGenerator_GenerateLockURL_OngoingVerification {
-	params := []pegomock.Param{lockID}
+func (verifier *VerifierMockLockURLGenerator) GenerateLockURL(_param0 string) *MockLockURLGenerator_GenerateLockURL_OngoingVerification {
+	params := []pegomock.Param{_param0}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GenerateLockURL", params, verifier.timeout)
 	return &MockLockURLGenerator_GenerateLockURL_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -89,8 +88,8 @@ type MockLockURLGenerator_GenerateLockURL_OngoingVerification struct {
 }
 
 func (c *MockLockURLGenerator_GenerateLockURL_OngoingVerification) GetCapturedArguments() string {
-	lockID := c.GetAllCapturedArguments()
-	return lockID[len(lockID)-1]
+	_param0 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1]
 }
 
 func (c *MockLockURLGenerator_GenerateLockURL_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {

@@ -33,7 +33,7 @@ func TestRunDelegate(t *testing.T) {
 	mockDefaultRunner := mocks.NewMockRunner()
 	mockRemoteRunner := mocks.NewMockRunner()
 
-	subject := &PlanTypeStepRunnerDelegate{
+	subject := &planTypeStepRunnerDelegate{
 		defaultRunner:    mockDefaultRunner,
 		remotePlanRunner: mockRemoteRunner,
 	}

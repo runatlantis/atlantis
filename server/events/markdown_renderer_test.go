@@ -38,13 +38,13 @@ func TestRenderErr(t *testing.T) {
 			"apply error",
 			command.Apply,
 			err,
-			"**Apply Error**\n```\nerr\n```\n",
+			"**Apply Error**\n```\nerr\n```",
 		},
 		{
 			"plan error",
 			command.Plan,
 			err,
-			"**Plan Error**\n```\nerr\n```\n",
+			"**Plan Error**\n```\nerr\n```",
 		},
 		{
 			"policy check error",
@@ -53,22 +53,22 @@ func TestRenderErr(t *testing.T) {
 			"**Policy Check Error**\n```\nerr\n```" +
 				"\n* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:\n" +
 				"    * `atlantis approve_policies`\n" +
-				"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.\n\n",
+				"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.",
 		},
 	}
 
-	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis")
 	for _, c := range cases {
 		res := command.Result{
 			Error: c.Error,
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
-				s := r.Render(res, c.Command, "log", verbose, models.Github)
+				s := r.Render(res, c.Command, "", "log", verbose, models.Github)
 				if !verbose {
-					Equals(t, c.Expected, s)
+					Equals(t, strings.TrimSpace(c.Expected), strings.TrimSpace(s))
 				} else {
-					Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+					Equals(t, c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 				}
 			})
 		}
@@ -102,18 +102,18 @@ func TestRenderFailure(t *testing.T) {
 		},
 	}
 
-	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis")
 	for _, c := range cases {
 		res := command.Result{
 			Failure: c.Failure,
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
-				s := r.Render(res, c.Command, "log", verbose, models.Github)
+				s := r.Render(res, c.Command, "", "log", verbose, models.Github)
 				if !verbose {
-					Equals(t, c.Expected, s)
+					Equals(t, strings.TrimSpace(c.Expected), strings.TrimSpace(s))
 				} else {
-					Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+					Equals(t, c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 				}
 			})
 		}
@@ -121,19 +121,20 @@ func TestRenderFailure(t *testing.T) {
 }
 
 func TestRenderErrAndFailure(t *testing.T) {
-	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis")
 	res := command.Result{
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-	s := r.Render(res, command.Plan, "", false, models.Github)
-	Equals(t, "**Plan Error**\n```\nerror\n```\n", s)
+	s := r.Render(res, command.Plan, "", "", false, models.Github)
+	Equals(t, "**Plan Error**\n```\nerror\n```", s)
 }
 
 func TestRenderProjectResults(t *testing.T) {
 	cases := []struct {
 		Description    string
 		Command        command.Name
+		SubCommand     string
 		ProjectResults []command.ProjectResult
 		VCSHost        models.VCSHostType
 		Expected       string
@@ -141,13 +142,15 @@ func TestRenderProjectResults(t *testing.T) {
 		{
 			"no projects",
 			command.Plan,
+			"",
 			[]command.ProjectResult{},
 			models.Github,
-			"Ran Plan for 0 projects:\n\n\n\n",
+			"Ran Plan for 0 projects:\n\n\n",
 		},
 		{
 			"single successful plan",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
@@ -183,6 +186,7 @@ $$$
 		{
 			"single successful plan with main ahead",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
@@ -221,6 +225,7 @@ $$$
 		{
 			"single successful plan with project name",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
@@ -257,6 +262,7 @@ $$$
 		{
 			"single successful policy check with project name",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					PolicyCheckSuccess: &models.PolicyCheckSuccess{
@@ -306,6 +312,7 @@ $$$
 		{
 			"single successful import",
 			command.Import,
+			"",
 			[]command.ProjectResult{
 				{
 					ImportSuccess: &models.ImportSuccess{
@@ -324,15 +331,43 @@ $$$diff
 import-output
 $$$
 
+:put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
+
+* :repeat: To **plan** this project again, comment:
+  * $atlantis plan -d path -w workspace$`,
+		},
+		{
+			"single successful state rm",
+			command.State,
+			"rm",
+			[]command.ProjectResult{
+				{
+					StateRmSuccess: &models.StateRmSuccess{
+						Output:    "state-rm-output",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`Ran State $rm$ for project: $projectname$ dir: $path$ workspace: $workspace$
+
+$$$diff
+state-rm-output
+$$$
+
+:put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
+
 * :repeat: To **plan** this project again, comment:
   * $atlantis plan -d path -w workspace$
-
-
 `,
 		},
 		{
 			"single successful apply",
 			command.Apply,
+			"",
 			[]command.ProjectResult{
 				{
 					ApplySuccess: "success",
@@ -345,13 +380,12 @@ $$$
 
 $$$diff
 success
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"single successful apply with project name",
 			command.Apply,
+			"",
 			[]command.ProjectResult{
 				{
 					ApplySuccess: "success",
@@ -365,13 +399,12 @@ $$$
 
 $$$diff
 success
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"multiple successful plans",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -434,6 +467,7 @@ $$$
 		{
 			"multiple successful policy checks",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -496,6 +530,7 @@ $$$
 		{
 			"multiple successful applies",
 			command.Apply,
+			"",
 			[]command.ProjectResult{
 				{
 					RepoRelDir:   "path",
@@ -527,12 +562,12 @@ success2
 $$$
 
 ---
-
 `,
 		},
 		{
 			"single errored plan",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					Error:      errors.New("error"),
@@ -546,13 +581,12 @@ $$$
 **Plan Error**
 $$$
 error
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"single failed plan",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					RepoRelDir: "path",
@@ -563,13 +597,12 @@ $$$
 			models.Github,
 			`Ran Plan for dir: $path$ workspace: $workspace$
 
-**Plan Failed**: failure
-
-`,
+**Plan Failed**: failure`,
 		},
 		{
 			"successful, failed, and errored plan",
 			command.Plan,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -632,6 +665,7 @@ $$$
 		{
 			"successful, failed, and errored policy check",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -687,7 +721,6 @@ $$$
     * $atlantis approve_policies$
 * :repeat: Or, address the policy failure by modifying the codebase and re-planning.
 
-
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
@@ -698,6 +731,7 @@ $$$
 		{
 			"successful, failed, and errored apply",
 			command.Apply,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:    "workspace",
@@ -739,12 +773,12 @@ error
 $$$
 
 ---
-
 `,
 		},
 		{
 			"successful, failed, and errored apply",
 			command.Apply,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:    "workspace",
@@ -786,12 +820,11 @@ error
 $$$
 
 ---
-
 `,
 		},
 	}
 
-	r := events.GetMarkdownRenderer(false, false, false, false, false, false, "")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis")
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -799,12 +832,12 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, c.SubCommand, "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, expWithBackticks, s)
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
 					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 					}
 				})
 			}
@@ -848,8 +881,6 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
-
-
 `,
 		},
 		{
@@ -880,8 +911,6 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
-
-
 `,
 		},
 		{
@@ -938,18 +967,18 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path2 -w workspace$
 
-
 `,
 		},
 	}
-	r := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		true,  // DisableApplyAll
-		false, // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
-		"",    // MarkdownTemplateOverridesDir
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		true,       // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // MarkdownTemplateOverridesDir
+		"atlantis", // executableName
 	)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -958,12 +987,12 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, expWithBackticks, s)
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
 					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 					}
 				})
 			}
@@ -1005,8 +1034,6 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
-
-
 `,
 		},
 		{
@@ -1035,8 +1062,6 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
-
-
 `,
 		},
 		{
@@ -1089,19 +1114,19 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path2 -w workspace$
 
-
 `,
 		},
 	}
 
-	r := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		true,  // DisableApplyAll
-		true,  // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
-		"",    // MarkdownTemplateOverridesDir
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		true,       // disableApplyAll
+		true,       // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // MarkdownTemplateOverridesDir
+		"atlantis", // executableName
 	)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -1110,12 +1135,12 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, expWithBackticks, s)
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
 					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 					}
 				})
 			}
@@ -1131,14 +1156,15 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 	Ok(t, err)
 	err = os.WriteFile(filePath, []byte("{{ define \"policyCheckSuccessUnwrapped\" -}}somecustometext{{- end}}\n"), 0600)
 	Ok(t, err)
-	r := events.GetMarkdownRenderer(
-		false,  // GitlabSupportsCommonMark
-		true,   // DisableApplyAll
-		true,   // DisableApply
-		false,  // DisableMarkdownFolding
-		false,  // DisableRepoLocking
-		false,  // EnableDiffMarkdownFormat
-		tmpDir, // MarkdownTemplateOverridesDir
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		true,       // disableApplyAll
+		true,       // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		tmpDir,     // MarkdownTemplateOverridesDir
+		"atlantis", // executableName
 	)
 
 	rendered := r.Render(command.Result{
@@ -1154,22 +1180,22 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 				},
 			},
 		},
-	}, command.PolicyCheck, "log", false, models.Github)
-	fmt.Println(rendered)
-	Equals(t, rendered, "Ran Policy Check for dir: `path` workspace: `workspace`\n\nsomecustometext\n\n\n")
-
+	}, command.PolicyCheck, "", "log", false, models.Github)
+	exp := "Ran Policy Check for dir: `path` workspace: `workspace`\n\nsomecustometext"
+	Equals(t, exp, rendered)
 }
 
 // Test that if folding is disabled that it's not used.
 func TestRenderProjectResults_DisableFolding(t *testing.T) {
-	mr := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		false, // DisableApplyAll
-		false, // DisableApply
-		true,  // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
-		"",    // MarkdownTemplateOverridesDir
+	mr := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		true,       // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // MarkdownTemplateOverridesDir
+		"atlantis", // executableName
 	)
 
 	rendered := mr.Render(command.Result{
@@ -1180,8 +1206,8 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 				Error:      errors.New(strings.Repeat("line\n", 13)),
 			},
 		},
-	}, command.Plan, "log", false, models.Github)
-	Equals(t, false, strings.Contains(rendered, "<details>"))
+	}, command.Plan, "", "log", false, models.Github)
+	Equals(t, false, strings.Contains(rendered, "\n<details>"))
 }
 
 // Test that if the output is longer than 12 lines, it gets wrapped on the right
@@ -1252,14 +1278,15 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("%s_%v", c.VCSHost.String(), c.ShouldWrap),
 			func(t *testing.T) {
-				mr := events.GetMarkdownRenderer(
-					c.GitlabCommonMarkSupport, // GitlabSupportsCommonMark
-					false,                     // DisableApplyAll
-					false,                     // DisableApply
-					false,                     // DisableMarkdownFolding
-					false,                     // DisableRepoLocking
-					false,                     // EnableDiffMarkdownFormat
+				mr := events.NewMarkdownRenderer(
+					c.GitlabCommonMarkSupport, // gitlabSupportsCommonMark
+					false,                     // disableApplyAll
+					false,                     // disableApply
+					false,                     // disableMarkdownFolding
+					false,                     // disableRepoLocking
+					false,                     // enableDiffMarkdownFormat
 					"",                        // MarkdownTemplateOverridesDir
+					"atlantis",                // executableName
 				)
 
 				rendered := mr.Render(command.Result{
@@ -1270,7 +1297,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 							Error:      errors.New(c.Output),
 						},
 					},
-				}, command.Plan, "log", false, c.VCSHost)
+				}, command.Plan, "", "log", false, c.VCSHost)
 				var exp string
 				if c.ShouldWrap {
 					exp = `Ran Plan for dir: $.$ workspace: $default$
@@ -1281,18 +1308,14 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 $$$
 ` + c.Output + `
 $$$
-</details>
-
-`
+</details>`
 				} else {
 					exp = `Ran Plan for dir: $.$ workspace: $default$
 
 **Plan Error**
 $$$
 ` + c.Output + `
-$$$
-
-`
+$$$`
 				}
 
 				expWithBackticks := strings.Replace(exp, "$", "`", -1)
@@ -1370,14 +1393,15 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 		for _, cmd := range []command.Name{command.Plan, command.Apply} {
 			t.Run(fmt.Sprintf("%s_%s_%v", c.VCSHost.String(), cmd.String(), c.ShouldWrap),
 				func(t *testing.T) {
-					mr := events.GetMarkdownRenderer(
-						c.GitlabCommonMarkSupport, // GitlabSupportsCommonMark
-						false,                     // DisableApplyAll
-						false,                     // DisableApply
-						false,                     // DisableMarkdownFolding
-						false,                     // DisableRepoLocking
-						false,                     // EnableDiffMarkdownFormat
+					mr := events.NewMarkdownRenderer(
+						c.GitlabCommonMarkSupport, // gitlabSupportsCommonMark
+						false,                     // disableApplyAll
+						false,                     // disableApply
+						false,                     // disableMarkdownFolding
+						false,                     // disableRepoLocking
+						false,                     // enableDiffMarkdownFormat
 						"",                        // MarkdownTemplateOverridesDir
+						"atlantis",                // executableName
 					)
 					var pr command.ProjectResult
 					switch cmd {
@@ -1401,7 +1425,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 					}
 					rendered := mr.Render(command.Result{
 						ProjectResults: []command.ProjectResult{pr},
-					}, cmd, "log", false, c.VCSHost)
+					}, cmd, "", "log", false, c.VCSHost)
 
 					// Check result.
 					var exp string
@@ -1413,7 +1437,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 <details><summary>Show Output</summary>
 
 $$$diff
-` + c.Output + `
+` + strings.TrimSpace(c.Output) + `
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -1428,13 +1452,12 @@ No changes. Infrastructure is up-to-date.
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * $atlantis unlock$
-`
+    * $atlantis unlock$`
 						} else {
 							exp = `Ran Plan for dir: $.$ workspace: $default$
 
 $$$diff
-` + c.Output + `
+` + strings.TrimSpace(c.Output) + `
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -1447,8 +1470,7 @@ $$$
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * $atlantis unlock$
-`
+    * $atlantis unlock$`
 						}
 					case command.Apply:
 						if c.ShouldWrap {
@@ -1457,19 +1479,16 @@ $$$
 <details><summary>Show Output</summary>
 
 $$$diff
-` + c.Output + `
+` + strings.TrimSpace(c.Output) + `
 $$$
-</details>
 
-`
+</details>`
 						} else {
 							exp = `Ran Apply for dir: $.$ workspace: $default$
 
 $$$diff
-` + c.Output + `
-$$$
-
-`
+` + strings.TrimSpace(c.Output) + `
+$$$`
 						}
 					}
 
@@ -1481,14 +1500,15 @@ $$$
 }
 
 func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
-	mr := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		false, // DisableApplyAll
-		false, // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
-		"",    // MarkdownTemplateOverridesDir
+	mr := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // MarkdownTemplateOverridesDir
+		"atlantis", // executableName
 	)
 	tfOut := strings.Repeat("line\n", 13)
 	rendered := mr.Render(command.Result{
@@ -1504,7 +1524,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 				ApplySuccess: tfOut,
 			},
 		},
-	}, command.Apply, "log", false, models.Github)
+	}, command.Apply, "", "log", false, models.Github)
 	exp := `Ran Apply for 2 projects:
 
 1. dir: $.$ workspace: $staging$
@@ -1514,8 +1534,9 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 <details><summary>Show Output</summary>
 
 $$$diff
-` + tfOut + `
+` + strings.TrimSpace(tfOut) + `
 $$$
+
 </details>
 
 ---
@@ -1523,26 +1544,26 @@ $$$
 <details><summary>Show Output</summary>
 
 $$$diff
-` + tfOut + `
+` + strings.TrimSpace(tfOut) + `
 $$$
+
 </details>
 
----
-
-`
+---`
 	expWithBackticks := strings.Replace(exp, "$", "`", -1)
 	Equals(t, expWithBackticks, rendered)
 }
 
 func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
-	mr := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		false, // DisableApplyAll
-		false, // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
-		"",    // MarkdownTemplateOverridesDir
+	mr := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // MarkdownTemplateOverridesDir
+		"atlantis", // executableName
 	)
 	tfOut := strings.Repeat("line\n", 13) + "Plan: 1 to add, 0 to change, 0 to destroy."
 	rendered := mr.Render(command.Result{
@@ -1568,7 +1589,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 				},
 			},
 		},
-	}, command.Plan, "log", false, models.Github)
+	}, command.Plan, "", "log", false, models.Github)
 	exp := `Ran Plan for 2 projects:
 
 1. dir: $.$ workspace: $staging$
@@ -1609,8 +1630,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * $atlantis unlock$
-`
+    * $atlantis unlock$`
 	expWithBackticks := strings.Replace(exp, "$", "`", -1)
 	Equals(t, expWithBackticks, rendered)
 }
@@ -1635,9 +1655,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 			},
 			exp: `Ran Plan for dir: $.$ workspace: $staging$
 
-**Plan Failed**: failure
-
-`,
+**Plan Failed**: failure`,
 		},
 		"two failures": {
 			cr: command.Result{
@@ -1667,9 +1685,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 ### 2. dir: $.$ workspace: $production$
 **Plan Failed**: failure
 
----
-
-`,
+---`,
 		},
 		"one failure, one success": {
 			cr: command.Result{
@@ -1708,24 +1724,23 @@ $$$
 
 This plan was not saved because one or more projects failed and automerge requires all plans pass.
 
----
-
-`,
+---`,
 		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			mr := events.GetMarkdownRenderer(
-				false, // GitlabSupportsCommonMark
-				false, // DisableApplyAll
-				false, // DisableApply
-				false, // DisableMarkdownFolding
-				false, // DisableRepoLocking
-				false, // EnableDiffMarkdownFormat
-				"",    // MarkdownTemplateOverridesDir
+			mr := events.NewMarkdownRenderer(
+				false,      // gitlabSupportsCommonMark
+				false,      // disableApplyAll
+				false,      // disableApply
+				false,      // disableMarkdownFolding
+				false,      // disableRepoLocking
+				false,      // enableDiffMarkdownFormat
+				"",         // MarkdownTemplateOverridesDir
+				"atlantis", // executableName
 			)
-			rendered := mr.Render(c.cr, command.Plan, "log", false, models.Github)
+			rendered := mr.Render(c.cr, command.Plan, "", "log", false, models.Github)
 			expWithBackticks := strings.Replace(c.exp, "$", "`", -1)
 			Equals(t, expWithBackticks, rendered)
 		})
@@ -1746,7 +1761,7 @@ func TestRenderProjectResultsWithRepoLockingDisabled(t *testing.T) {
 			command.Plan,
 			[]command.ProjectResult{},
 			models.Github,
-			"Ran Plan for 0 projects:\n\n\n\n",
+			"Ran Plan for 0 projects:\n\n\n",
 		},
 		{
 			"single successful plan",
@@ -1869,9 +1884,7 @@ $$$
 
 $$$diff
 success
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"single successful apply with project name",
@@ -1889,9 +1902,7 @@ $$$
 
 $$$diff
 success
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"multiple successful plans",
@@ -1987,7 +1998,6 @@ success2
 $$$
 
 ---
-
 `,
 		},
 		{
@@ -2006,9 +2016,7 @@ $$$
 **Plan Error**
 $$$
 error
-$$$
-
-`,
+$$$`,
 		},
 		{
 			"single failed plan",
@@ -2023,9 +2031,7 @@ $$$
 			models.Github,
 			`Ran Plan for dir: $path$ workspace: $workspace$
 
-**Plan Failed**: failure
-
-`,
+**Plan Failed**: failure`,
 		},
 		{
 			"successful, failed, and errored plan",
@@ -2132,7 +2138,6 @@ error
 $$$
 
 ---
-
 `,
 		},
 		{
@@ -2179,21 +2184,20 @@ error
 $$$
 
 ---
-
 `,
 		},
 	}
 
-	r := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		false, // DisableApplyAll
-		false, // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		false, // EnableDiffMarkdownFormat
-		"",    // MarkdownTemplateOverridesDir
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		true,       // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // MarkdownTemplateOverridesDir
+		"atlantis", // executableName
 	)
-	r.DisableRepoLocking = true
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -2201,12 +2205,12 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, expWithBackticks, s)
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
 					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 					}
 				})
 			}
@@ -2214,8 +2218,7 @@ $$$
 	}
 }
 
-func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
-	tfOutput := `An execution plan has been generated and is shown below.
+const tfOutput = `An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
 ~ update in-place
 -/+ destroy and then create replacement
@@ -2398,30 +2401,31 @@ Terraform will perform the following actions:
 
 Plan: 1 to add, 2 to change, 1 to destroy.
 `
-	cases := []struct {
-		Description    string
-		Command        command.Name
-		ProjectResults []command.ProjectResult
-		VCSHost        models.VCSHostType
-		Expected       string
-	}{
-		{
-			"single successful plan with diff markdown formatted",
-			command.Plan,
-			[]command.ProjectResult{
-				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: tfOutput,
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-					},
-					Workspace:  "workspace",
-					RepoRelDir: "path",
+
+var cases = []struct {
+	Description    string
+	Command        command.Name
+	ProjectResults []command.ProjectResult
+	VCSHost        models.VCSHostType
+	Expected       string
+}{
+	{
+		"single successful plan with diff markdown formatted",
+		command.Plan,
+		[]command.ProjectResult{
+			{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: tfOutput,
+					LockURL:         "lock-url",
+					RePlanCmd:       "atlantis plan -d path -w workspace",
+					ApplyCmd:        "atlantis apply -d path -w workspace",
 				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
 			},
-			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+		},
+		models.Github,
+		`Ran Plan for dir: $path$ workspace: $workspace$
 
 <details><summary>Show Output</summary>
 
@@ -2608,7 +2612,6 @@ Terraform will perform the following actions:
   }
 
 Plan: 1 to add, 2 to change, 1 to destroy.
-
 $$$
 
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
@@ -2616,19 +2619,20 @@ $$$
     * $atlantis plan -d path -w workspace$
 </details>
 Plan: 1 to add, 2 to change, 1 to destroy.
-
-
 `,
-		},
-	}
-	r := events.GetMarkdownRenderer(
-		false, // GitlabSupportsCommonMark
-		true,  // DisableApplyAll
-		true,  // DisableApply
-		false, // DisableMarkdownFolding
-		false, // DisableRepoLocking
-		true,  // EnableDiffMarkdownFormat
-		"",    // MarkdownTemplateOverridesDir
+	},
+}
+
+func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		true,       // disableApplyAll
+		true,       // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		true,       // enableDiffMarkdownFormat
+		"",         // MarkdownTemplateOverridesDir
+		"atlantis", // executableName
 	)
 
 	for _, c := range cases {
@@ -2638,13 +2642,47 @@ Plan: 1 to add, 2 to change, 1 to destroy.
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, expWithBackticks, s)
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
 					} else {
-						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
 					}
+				})
+			}
+		})
+	}
+}
+
+var Render string
+
+func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
+	var render string
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		true,       // disableApplyAll
+		true,       // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		true,       // enableDiffMarkdownFormat
+		"",         // MarkdownTemplateOverridesDir
+		"atlantis", // executableName
+	)
+
+	for _, c := range cases {
+		b.Run(c.Description, func(b *testing.B) {
+			res := command.Result{
+				ProjectResults: c.ProjectResults,
+			}
+			for _, verbose := range []bool{true, false} {
+				b.Run(fmt.Sprintf("verbose %t", verbose), func(b *testing.B) {
+					b.ReportAllocs()
+					for i := 0; i < b.N; i++ {
+						render = r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+					}
+					Render = render
 				})
 			}
 		})

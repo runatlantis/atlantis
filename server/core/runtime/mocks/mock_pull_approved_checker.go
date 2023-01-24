@@ -4,11 +4,10 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	"reflect"
+	"time"
 )
 
 type MockPullApprovedChecker struct {
@@ -26,11 +25,11 @@ func NewMockPullApprovedChecker(options ...pegomock.Option) *MockPullApprovedChe
 func (mock *MockPullApprovedChecker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPullApprovedChecker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPullApprovedChecker) PullIsApproved(baseRepo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
+func (mock *MockPullApprovedChecker) PullIsApproved(_param0 models.Repo, _param1 models.PullRequest) (models.ApprovalStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPullApprovedChecker().")
 	}
-	params := []pegomock.Param{baseRepo, pull}
+	params := []pegomock.Param{_param0, _param1}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("PullIsApproved", params, []reflect.Type{reflect.TypeOf((*models.ApprovalStatus)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.ApprovalStatus
 	var ret1 error
@@ -82,8 +81,8 @@ type VerifierMockPullApprovedChecker struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockPullApprovedChecker) PullIsApproved(baseRepo models.Repo, pull models.PullRequest) *MockPullApprovedChecker_PullIsApproved_OngoingVerification {
-	params := []pegomock.Param{baseRepo, pull}
+func (verifier *VerifierMockPullApprovedChecker) PullIsApproved(_param0 models.Repo, _param1 models.PullRequest) *MockPullApprovedChecker_PullIsApproved_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "PullIsApproved", params, verifier.timeout)
 	return &MockPullApprovedChecker_PullIsApproved_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -94,8 +93,8 @@ type MockPullApprovedChecker_PullIsApproved_OngoingVerification struct {
 }
 
 func (c *MockPullApprovedChecker_PullIsApproved_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
-	baseRepo, pull := c.GetAllCapturedArguments()
-	return baseRepo[len(baseRepo)-1], pull[len(pull)-1]
+	_param0, _param1 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
 func (c *MockPullApprovedChecker_PullIsApproved_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
