@@ -64,16 +64,18 @@ If not already included, please provide the following:
 - Atlantis flags:
 
 Atlantis server-side config file:
-```
+
+```yaml
 # config file
 ```
 
 Repo `atlantis.yaml` file:
-```
+
+```yaml
 # config file
 ```
 
-Any other information you can provide about the environment/deployment.
+Any other information you can provide about the environment/deployment (efs/nfs, aws/gcp, k8s/fargate, etc)
 --->
 
 
@@ -81,5 +83,7 @@ Any other information you can provide about the environment/deployment.
 
 <!---
 Additional context on the problem. Docs, links to blogs, or other material that lead you to discover this issue or were helpful in troubleshooting the issue. 
+
+Use a bulleted list to link to tickets
 --->
 
