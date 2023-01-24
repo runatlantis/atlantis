@@ -4,11 +4,10 @@
 package mocks
 
 import (
+	pegomock "github.com/petergtz/pegomock"
 	io "io"
 	"reflect"
 	"time"
-
-	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockTemplateWriter struct {
@@ -26,11 +25,11 @@ func NewMockTemplateWriter(options ...pegomock.Option) *MockTemplateWriter {
 func (mock *MockTemplateWriter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockTemplateWriter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockTemplateWriter) Execute(wr io.Writer, data interface{}) error {
+func (mock *MockTemplateWriter) Execute(_param0 io.Writer, _param1 interface{}) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockTemplateWriter().")
 	}
-	params := []pegomock.Param{wr, data}
+	params := []pegomock.Param{_param0, _param1}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Execute", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -78,8 +77,8 @@ type VerifierMockTemplateWriter struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockTemplateWriter) Execute(wr io.Writer, data interface{}) *MockTemplateWriter_Execute_OngoingVerification {
-	params := []pegomock.Param{wr, data}
+func (verifier *VerifierMockTemplateWriter) Execute(_param0 io.Writer, _param1 interface{}) *MockTemplateWriter_Execute_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Execute", params, verifier.timeout)
 	return &MockTemplateWriter_Execute_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -90,8 +89,8 @@ type MockTemplateWriter_Execute_OngoingVerification struct {
 }
 
 func (c *MockTemplateWriter_Execute_OngoingVerification) GetCapturedArguments() (io.Writer, interface{}) {
-	wr, data := c.GetAllCapturedArguments()
-	return wr[len(wr)-1], data[len(data)-1]
+	_param0, _param1 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
 func (c *MockTemplateWriter_Execute_OngoingVerification) GetAllCapturedArguments() (_param0 []io.Writer, _param1 []interface{}) {

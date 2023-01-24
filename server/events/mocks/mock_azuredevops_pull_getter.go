@@ -4,12 +4,11 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	"reflect"
+	"time"
 )
 
 type MockAzureDevopsPullGetter struct {
@@ -27,11 +26,11 @@ func NewMockAzureDevopsPullGetter(options ...pegomock.Option) *MockAzureDevopsPu
 func (mock *MockAzureDevopsPullGetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockAzureDevopsPullGetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockAzureDevopsPullGetter) GetPullRequest(repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error) {
+func (mock *MockAzureDevopsPullGetter) GetPullRequest(_param0 models.Repo, _param1 int) (*azuredevops.GitPullRequest, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockAzureDevopsPullGetter().")
 	}
-	params := []pegomock.Param{repo, pullNum}
+	params := []pegomock.Param{_param0, _param1}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetPullRequest", params, []reflect.Type{reflect.TypeOf((**azuredevops.GitPullRequest)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *azuredevops.GitPullRequest
 	var ret1 error
@@ -83,8 +82,8 @@ type VerifierMockAzureDevopsPullGetter struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockAzureDevopsPullGetter) GetPullRequest(repo models.Repo, pullNum int) *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification {
-	params := []pegomock.Param{repo, pullNum}
+func (verifier *VerifierMockAzureDevopsPullGetter) GetPullRequest(_param0 models.Repo, _param1 int) *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullRequest", params, verifier.timeout)
 	return &MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -95,8 +94,8 @@ type MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification struct {
 }
 
 func (c *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification) GetCapturedArguments() (models.Repo, int) {
-	repo, pullNum := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pullNum[len(pullNum)-1]
+	_param0, _param1 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
 func (c *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int) {

@@ -3,7 +3,7 @@ module github.com/runatlantis/atlantis/e2e
 go 1.19
 
 require (
-	github.com/google/go-github/v48 v48.2.0
+	github.com/google/go-github/v49 v49.1.0
 	github.com/hashicorp/go-multierror v1.1.1
 )
 

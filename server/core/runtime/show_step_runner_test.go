@@ -31,9 +31,9 @@ func TestShowStepRunnner(t *testing.T) {
 
 	mockExecutor := mocks.NewMockClient()
 
-	subject := ShowStepRunner{
-		TerraformExecutor: mockExecutor,
-		DefaultTFVersion:  tfVersion,
+	subject := showStepRunner{
+		terraformExecutor: mockExecutor,
+		defaultTFVersion:  tfVersion,
 	}
 
 	t.Run("success", func(t *testing.T) {

@@ -22,6 +22,7 @@ type PolicySets struct {
 
 type PolicyOwners struct {
 	Users []string
+	Teams []string
 }
 
 type PolicySet struct {
@@ -35,10 +36,22 @@ func (p *PolicySets) HasPolicies() bool {
 	return len(p.PolicySets) > 0
 }
 
-func (p *PolicySets) IsOwner(username string) bool {
+func (p *PolicySets) HasTeamOwners() bool {
+	return len(p.Owners.Teams) > 0
+}
+
+func (p *PolicySets) IsOwner(username string, userTeams []string) bool {
 	for _, uname := range p.Owners.Users {
 		if strings.EqualFold(uname, username) {
 			return true
+		}
+	}
+
+	for _, orgTeamName := range p.Owners.Teams {
+		for _, userTeamName := range userTeams {
+			if strings.EqualFold(orgTeamName, userTeamName) {
+				return true
+			}
 		}
 	}
 

@@ -1,3 +1,35 @@
+# v0.22.3
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.22.3
+
+# v0.22.2
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.22.2
+
+# v0.22.1
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.22.1
+
+# v0.22.0
+
+Bugfixes and new Features
+
+## What's Changed
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.22.0
+
 # v0.21.0
 
 Bugfixes and new Features

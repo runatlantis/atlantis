@@ -43,6 +43,7 @@ need to be defined.
 :::
 
 ## Example Using All Keys
+
 ```yaml
 version: 3
 automerge: true
@@ -60,6 +61,7 @@ projects:
   autoplan:
     when_modified: ["*.tf", "../modules/**/*.tf"]
     enabled: true
+  plan_requirements: [mergeable, approved, undiverged]
   apply_requirements: [mergeable, approved, undiverged]
   import_requirements: [mergeable, approved, undiverged]
   workflow: myworkflow
@@ -79,6 +81,35 @@ workflows:
 allowed_regexp_prefixes:
 - dev/
 - staging/
+```
+
+## Example of DRYing up projects using YAML anchors
+
+```yaml
+projects:
+  - &template
+    name: template
+    workflow: custom
+    autoplan:
+      enabled: true
+      when_modified:
+        - "./terraform/modules/**/*.tf"
+        - "**/*.tf"
+
+  - <<: *template
+    name: ue1-prod-titan
+    dir: ./terraform/titan
+    workspace: ue1-prod
+
+  - <<: *template
+    name: ue1-stage-titan
+    dir: ./terraform/titan
+    workspace: ue1-stage
+
+  - <<: *template
+    name: ue1-dev-titan
+    dir: ./terraform/titan
+    workspace: ue1-dev
 ```
 
 ## Auto generate projects
@@ -215,11 +246,12 @@ version: 3
 projects:
 - dir: staging
 - dir: production
+  plan_requirements: [approved]
   apply_requirements: [approved]
   import_requirements: [approved]
 ```
 :::warning
-`apply_requirements` and `import_requirements` are restricted keys so this repo will need to be configured
+`plan_requirements`, `apply_requirements` and `import_requirements` are restricted keys so this repo will need to be configured
 to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-side-repo-config.html#repos-can-set-their-own-apply-an-applicable-subcommand).
 :::
 
@@ -270,6 +302,7 @@ delete_source_branch_on_merge: false
 repo_locking: true
 autoplan:
 terraform_version: 0.11.0
+plan_requirements: ["approved"]
 apply_requirements: ["approved"]
 import_requirements: ["approved"]
 workflow: myworkflow
@@ -286,6 +319,7 @@ workflow: myworkflow
 | repo_locking                             | bool                  | `true`      | no       | Get a repository lock in this project when plan.                                                                                                                                                                                          |
 | autoplan                                 | [Autoplan](#autoplan) | none        | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.html).                                                                                                                   |
 | terraform_version                        | string                | none        | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                                              |
+| plan_requirements<br />*(restricted)*   | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.  |
 | apply_requirements<br />*(restricted)*   | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.  |
 | import_requirements<br />*(restricted)*  | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details. |
 | workflow <br />*(restricted)*            | string                | none        | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                                              |

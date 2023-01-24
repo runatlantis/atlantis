@@ -207,7 +207,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 		RepoAllowlistChecker:         &events.RepoAllowlistChecker{},
 		VCSClient:                    vcsClient,
 	}
-	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notAllowlisted.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testdata", "gitlabMergeCommentEvent_notAllowlisted.json"))
 	Ok(t, err)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	req.Header.Set(gitlabHeader, "Note Hook")
@@ -239,7 +239,7 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 		VCSClient:                    vcsClient,
 		SilenceAllowlistErrors:       true,
 	}
-	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notAllowlisted.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testdata", "gitlabMergeCommentEvent_notAllowlisted.json"))
 	Ok(t, err)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	req.Header.Set(gitlabHeader, "Note Hook")
@@ -270,7 +270,7 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 		RepoAllowlistChecker:   &events.RepoAllowlistChecker{},
 		VCSClient:              vcsClient,
 	}
-	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent_notAllowlisted.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testdata", "githubIssueCommentEvent_notAllowlisted.json"))
 	Ok(t, err)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	req.Header.Set("Content-Type", "application/json")
@@ -303,7 +303,7 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 		VCSClient:              vcsClient,
 		SilenceAllowlistErrors: true,
 	}
-	requestJSON, err := os.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent_notAllowlisted.json"))
+	requestJSON, err := os.ReadFile(filepath.Join("testdata", "githubIssueCommentEvent_notAllowlisted.json"))
 	Ok(t, err)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	req.Header.Set("Content-Type", "application/json")
@@ -709,7 +709,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			}
 
 			// Build HTTP request.
-			requestBytes, err := os.ReadFile(filepath.Join("testfixtures", "bb-server-pull-deleted-event.json"))
+			requestBytes, err := os.ReadFile(filepath.Join("testdata", "bb-server-pull-deleted-event.json"))
 			// Replace the eventKey field with our event type.
 			requestJSON := strings.Replace(string(requestBytes), `"eventKey":"pr:deleted",`, fmt.Sprintf(`"eventKey":"%s",`, c.header), -1)
 			Ok(t, err)

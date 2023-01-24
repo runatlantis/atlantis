@@ -1,7 +1,7 @@
 # This Dockerfile builds our base image with gosu, dumb-init and the atlantis
 # user. We split this from the main Dockerfile because this base doesn't change
 # and also because it kept breaking the build due to flakiness.
-FROM alpine:3.17.0
+FROM alpine:3.17.1
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # We use gosu to step down from root and run as the atlantis user so we need
@@ -18,27 +18,27 @@ RUN addgroup atlantis && \
     chmod g=u /etc/passwd
 
 # Install gosu and git-lfs.
-ENV GOSU_VERSION=1.14
-ENV GIT_LFS_VERSION=3.1.2
+ENV GOSU_VERSION=1.16
+ENV GIT_LFS_VERSION=3.3.0
 
 # Automatically populated with the architecture the image is being built for.
 ARG TARGETPLATFORM
 
 # Install packages needed for running Atlantis.
-RUN apk add --no-cache \
-        ca-certificates=20220614-r2 \
-        curl=7.86.0-r1 \
-        git=2.38.2-r0 \
-        unzip=6.0-r13 \
-        bash=5.2.12-r0 \
-        openssh=9.1_p1-r1 \
-        libcap=2.66-r0 \
-        dumb-init=1.2.5-r2 \
-        gcompat=1.1.0-r0 && \
+RUN apk add git~=2.39 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main/ && \
+    apk add --no-cache \
+        ca-certificates~=20220614 \
+        curl~=7.87 \
+        unzip~=6.0 \
+        bash~=5.2 \
+        openssh~=9.1_p1 \
+        libcap~=2.66 \
+        dumb-init~=1.2 \
+        gcompat~=1.1 && \
     # Install packages needed for building dependencies.
     apk add --no-cache --virtual .build-deps \
-        gnupg=2.2.40-r0 \
-        openssl=3.0.7-r0 && \
+        gnupg~=2.2 \
+        openssl~=3.0 && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
     # git-lfs
@@ -48,7 +48,7 @@ RUN apk add --no-cache \
         "linux/arm/v7") GIT_LFS_ARCH=arm ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
-    tar -xf git-lfs.tar.gz && \
+    tar --strip-components=1 -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
     git-lfs --version && \

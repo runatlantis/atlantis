@@ -1,0 +1,59 @@
+Ran Plan for 2 projects:
+
+1. dir: `dir1` workspace: `default`
+1. dir: `dir2` workspace: `default`
+
+### 1. dir: `dir1` workspace: `default`
+```diff
+random_id.dummy1: Refreshing state... [id=AA]
+
+No changes. Your infrastructure matches the configuration.
+
+Terraform has compared your real infrastructure against your configuration
+and found no differences, so no changes are needed.
+```
+
+* :arrow_forward: To **apply** this plan, comment:
+    * `atlantis apply -d dir1`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * `atlantis plan -d dir1`
+
+---
+### 2. dir: `dir2` workspace: `default`
+<details><summary>Show Output</summary>
+
+```diff
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
++ create
+
+Terraform will perform the following actions:
+
+  # random_id.dummy2 will be created
++ resource "random_id" "dummy2" {
+      + b64_std     = (known after apply)
+      + b64_url     = (known after apply)
+      + byte_length = 1
+      + dec         = (known after apply)
+      + hex         = (known after apply)
+      + id          = (known after apply)
+      + keepers     = {}
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+```
+
+* :arrow_forward: To **apply** this plan, comment:
+    * `atlantis apply -d dir2`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * `atlantis plan -d dir2`
+</details>
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * `atlantis apply`
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * `atlantis unlock`

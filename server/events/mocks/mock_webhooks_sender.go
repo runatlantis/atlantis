@@ -4,12 +4,11 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	webhooks "github.com/runatlantis/atlantis/server/events/webhooks"
 	logging "github.com/runatlantis/atlantis/server/logging"
+	"reflect"
+	"time"
 )
 
 type MockWebhooksSender struct {
@@ -27,11 +26,11 @@ func NewMockWebhooksSender(options ...pegomock.Option) *MockWebhooksSender {
 func (mock *MockWebhooksSender) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockWebhooksSender) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockWebhooksSender) Send(log logging.SimpleLogging, res webhooks.ApplyResult) error {
+func (mock *MockWebhooksSender) Send(_param0 logging.SimpleLogging, _param1 webhooks.ApplyResult) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWebhooksSender().")
 	}
-	params := []pegomock.Param{log, res}
+	params := []pegomock.Param{_param0, _param1}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Send", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -79,8 +78,8 @@ type VerifierMockWebhooksSender struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockWebhooksSender) Send(log logging.SimpleLogging, res webhooks.ApplyResult) *MockWebhooksSender_Send_OngoingVerification {
-	params := []pegomock.Param{log, res}
+func (verifier *VerifierMockWebhooksSender) Send(_param0 logging.SimpleLogging, _param1 webhooks.ApplyResult) *MockWebhooksSender_Send_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Send", params, verifier.timeout)
 	return &MockWebhooksSender_Send_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -91,8 +90,8 @@ type MockWebhooksSender_Send_OngoingVerification struct {
 }
 
 func (c *MockWebhooksSender_Send_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, webhooks.ApplyResult) {
-	log, res := c.GetAllCapturedArguments()
-	return log[len(log)-1], res[len(res)-1]
+	_param0, _param1 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1]
 }
 
 func (c *MockWebhooksSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []webhooks.ApplyResult) {

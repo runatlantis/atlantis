@@ -70,12 +70,12 @@ Set the `mergeable` requirement by:
      apply_requirements: [mergeable]
    ```
 
-1. Or by allowing an `atlantis.yaml` file to specify `apply_requirements` and `import_requirements` keys in the `repos.yaml` config:
+1. Or by allowing an `atlantis.yaml` file to specify `plan_requirements`, `apply_requirements` and `import_requirements` keys in the `repos.yaml` config:
     #### repos.yaml
     ```yaml
     repos:
     - id: /.*/
-      allowed_overrides: [apply_requirements, import_requirements]
+      allowed_overrides: [plan_requirements, apply_requirements, import_requirements]
     ```
 
     #### atlantis.yaml
@@ -83,6 +83,7 @@ Set the `mergeable` requirement by:
     version: 3
     projects:
     - dir: .
+      plan_requirements: [mergeable]
       apply_requirements: [mergeable]
       import_requirements: [mergeable]
     ```
@@ -153,19 +154,20 @@ Applies to `merge` checkout strategy only.
 
 #### Usage
 You can set the `undiverged` requirement by:
-1. Creating a `repos.yaml` file with `apply_requirements` and `import_requirements` keys:
+1. Creating a `repos.yaml` file with `plan_requirements`, `apply_requirements` and `import_requirements` keys:
    ```yaml
    repos:
    - id: /.*/
+     plan_requirements: [undiverged]
      apply_requirements: [undiverged]
      import_requirements: [undiverged]
    ```
-1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` and `import_requirements` keys in your `repos.yaml` config:
+1. Or by allowing an `atlantis.yaml` file to specify the `plan_requirements`, `apply_requirements` and `import_requirements` keys in your `repos.yaml` config:
    #### repos.yaml
     ```yaml
     repos:
     - id: /.*/
-      allowed_overrides: [apply_requirements, import_requirements]
+      allowed_overrides: [plan_requirements, apply_requirements, import_requirements]
     ```
 
    #### atlantis.yaml
@@ -173,6 +175,7 @@ You can set the `undiverged` requirement by:
     version: 3
     projects:
     - dir: .
+      plan_requirements: [undiverged]
       apply_requirements: [undiverged]
       import_requirements: [undiverged]
     ```
@@ -199,15 +202,18 @@ If you only want some projects/repos to have apply requirements, then you must
    ```yaml
    repos:
    - id: /.*/
+     plan_requirements: [approved]
      apply_requirements: [approved]
      import_requirements: [approved]
    # Regex that defaults all repos to requiring approval
    - id: /github.com/runatlantis/.*/
      # Regex to match any repo under the atlantis namespace, and not require approval
      # except for repos that might match later in the chain
+     plan_requirements: []
      apply_requirements: []
      import_requirements: []
    - id: github.com/runatlantis/atlantis
+     plan_requirements: [approved]
      apply_requirements: [approved]
      import_requirements: [approved]
      # Exact string match of the github.com/runatlantis/atlantis repo
@@ -215,7 +221,7 @@ If you only want some projects/repos to have apply requirements, then you must
    ```
 
 1. Specify which projects have which requirements via an `atlantis.yaml` file, and allowing
-   `apply_requirements` and `import_requirements` to be set in `atlantis.yaml` by the server side `repos.yaml`
+   `plan_requirements`, `apply_requirements` and `import_requirements` to be set in `atlantis.yaml` by the server side `repos.yaml`
    config.
 
    For example if I have two directories, `staging` and `production`, I might use:
@@ -223,7 +229,7 @@ If you only want some projects/repos to have apply requirements, then you must
    ```yaml
    repos:
    - id: /.*/
-     allowed_overrides: [apply_requirements, import_requirements]
+     allowed_overrides: [plan_requirements, apply_requirements, import_requirements]
      # Allow any repo to specify apply_requirements in atlantis.yaml
    ```
 
@@ -232,13 +238,15 @@ If you only want some projects/repos to have apply requirements, then you must
    version: 3
    projects:
    - dir: staging
-     # By default, apply_requirements and import_requirements are empty so this
+     # By default, plan_requirements, apply_requirements and import_requirements are empty so this
      # isn't strictly necessary.
+     plan_requirements: []
      apply_requirements: []
      import_requirements: []
    - dir: production
      # This requirement will only apply to the
      # production directory.
+     plan_requirements: [mergeable]
      apply_requirements: [mergeable]
      import_requirements: [mergeable]
    ```

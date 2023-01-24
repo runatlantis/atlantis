@@ -1,6 +1,7 @@
 {{ define "multiProjectHeader" -}}
 Ran {{.Command}} for {{ len .Results }} projects:
 
-{{ range $result := .Results }}1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`
-{{end}}
-{{- end }}
+{{ range $result := .Results -}}
+1. {{ if $result.ProjectName }}project: `{{ $result.ProjectName }}` {{ end }}dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
+{{ end -}}
+{{ end -}}

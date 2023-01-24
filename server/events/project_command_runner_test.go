@@ -63,13 +63,13 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyLoggingSimpleLogging(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyLoggingSimpleLogging(),
 		matchers.AnyModelsPullRequest(),
 		matchers.AnyModelsUser(),
 		AnyString(),
@@ -217,8 +217,8 @@ func TestProjectOutputWrapper(t *testing.T) {
 				expCommitStatus = models.FailedCommitStatus
 			}
 
-			When(mockProjectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(prjResult)
-			When(mockProjectCommandRunner.Apply(matchers.AnyModelsProjectCommandContext())).ThenReturn(prjResult)
+			When(mockProjectCommandRunner.Plan(matchers.AnyCommandProjectContext())).ThenReturn(prjResult)
+			When(mockProjectCommandRunner.Apply(matchers.AnyCommandProjectContext())).ThenReturn(prjResult)
 
 			switch c.CommandName {
 			case command.Plan:
@@ -227,8 +227,8 @@ func TestProjectOutputWrapper(t *testing.T) {
 				runner.Apply(ctx)
 			}
 
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus)
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus)
+			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus, nil)
+			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
 
 			switch c.CommandName {
 			case command.Plan:
@@ -546,26 +546,28 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	}
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
+	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
 
 	runner := events.DefaultProjectCommandRunner{
-		Locker:           mockLocker,
-		LockURLGenerator: mockURLGenerator{},
-		RunStepRunner:    &run,
-		EnvStepRunner:    &env,
-		WorkingDir:       mockWorkingDir,
-		Webhooks:         nil,
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		RunStepRunner:             &run,
+		EnvStepRunner:             &env,
+		WorkingDir:                mockWorkingDir,
+		Webhooks:                  nil,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockCommandRequirementHandler,
 	}
 
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyLoggingSimpleLogging(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyLoggingSimpleLogging(),
 		matchers.AnyModelsPullRequest(),
 		matchers.AnyModelsUser(),
 		AnyString(),
@@ -646,7 +648,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			},
 			setup: func(repoDir string, ctx command.ProjectContext, mockLocker *mocks.MockProjectLocker, mockInit *mocks.MockStepRunner, mockImport *mocks.MockStepRunner) {
 				When(mockLocker.TryLock(
-					matchers.AnyPtrToLoggingSimpleLogger(),
+					matchers.AnyLoggingSimpleLogging(),
 					matchers.AnyModelsPullRequest(),
 					matchers.AnyModelsUser(),
 					AnyString(),
@@ -684,6 +686,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			RegisterMockTestingT(t)
 			mockInit := mocks.NewMockStepRunner()
 			mockImport := mocks.NewMockStepRunner()
+			mockStateRm := mocks.NewMockStepRunner()
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
@@ -696,6 +699,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 				LockURLGenerator:          mockURLGenerator{},
 				InitStepRunner:            mockInit,
 				ImportStepRunner:          mockImport,
+				StateRmStepRunner:         mockStateRm,
 				WorkingDir:                mockWorkingDir,
 				Webhooks:                  mockSender,
 				WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
@@ -712,7 +716,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			}
 			repoDir := t.TempDir()
 			When(mockWorkingDir.Clone(
-				matchers.AnyPtrToLoggingSimpleLogger(),
+				matchers.AnyLoggingSimpleLogging(),
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
 				AnyString(),
