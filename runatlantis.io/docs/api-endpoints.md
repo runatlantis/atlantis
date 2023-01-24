@@ -1,16 +1,17 @@
 # API Endpoints
 
 Aside from interacting via pull request comments, Atlantis could respond to a limited number of API endpoints.
-The API endpoints are disabled by default, since the API endpoint could change the infrastructure directly.
-To enable API endpoints, `api-secret` should be configured.
+
+## Main Endpoints
+
+The API endpoints in this section are disabled by default, since these API endpoints could change the infrastructure directly.
+To enable the API endpoints, `api-secret` should be configured.
 
 :::tip Prerequisites
 
-* set `api-secret` as part of the [Server Configuration](server-configuration.html#api-secret)
-* You have pass `X-Atlantis-Token` with the same secret in the request header
+* Set `api-secret` as part of the [Server Configuration](server-configuration.html#api-secret)
+* Pass `X-Atlantis-Token` with the same secret in the request header
   :::
-
-## Endpoints
 
 ### POST /api/plan
 
@@ -38,20 +39,21 @@ At least one of `Directory` or `Workspace` should be specified.
 | Directory | string | No       | Which directory to run plan in relative to root of repo                                                                                                   |
 | Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
 
-#### Sample Request Body
+#### Sample Request
 
-```json
-{
-  "Repository": "repo-name",
-  "Ref": "main",
-  "Type": "Github",
-  "Paths": [
-    {
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "Repository": "repo-name",
+    "Ref": "main",
+    "Type": "Github",
+    "Paths": [{
       "Directory": ".",
       "Workspace": "default"
-    }
-  ]
-}
+    }]
+}'
 ```
 
 #### Sample Response
@@ -110,20 +112,21 @@ At least one of `Directory` or `Workspace` should be specified.
 | Directory | string | No       | Which directory to run apply in relative to root of repo                                                                                                  |
 | Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
 
-#### Sample Request Body
+#### Sample Request
 
-```json
-{
-  "Repository": "repo-name",
-  "Ref": "main",
-  "Type": "Github",
-  "Paths": [
-    {
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "Repository": "repo-name",
+    "Ref": "main",
+    "Type": "Github",
+    "Paths": [{
       "Directory": ".",
       "Workspace": "default"
-    }
-  ]
-}
+    }]
+}'
 ```
 
 #### Sample Response
@@ -147,5 +150,51 @@ At least one of `Directory` or `Workspace` should be specified.
     }
   ],
   "PlansDeleted": false
+}
+```
+
+## Other Endpoints
+
+The endpoints listed in this section are non-destructive and therefore don't require authentication nor special secret token.
+
+### GET /status
+
+#### Description
+
+Return the status of the Atlantis server.
+
+#### Sample Request
+
+```shell
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/status'
+```
+
+#### Sample Response
+
+```json
+{
+  "shutting_down": false,
+  "in_progress_operations": 0,
+  "version": "0.22.3"
+}
+```
+
+### GET /healthz
+
+#### Description
+
+Serves as the health-check endpoint for a containerized Atlantis server.
+
+#### Sample Request
+
+```shell
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/healthz'
+```
+
+#### Sample Response
+
+```json
+{
+  "status": "ok"
 }
 ```
