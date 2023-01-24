@@ -101,7 +101,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 			if c.PrevPlanStored {
-				db.UpdatePullWithResults(modelPull, []command.ProjectResult{
+				_, err = db.UpdatePullWithResults(modelPull, []command.ProjectResult{
 					{
 						Command:     command.Plan,
 						RepoRelDir:  "prevdir",
@@ -109,6 +109,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 						PlanSuccess: &models.PlanSuccess{},
 					},
 				})
+				Ok(t, err)
 			}
 
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {

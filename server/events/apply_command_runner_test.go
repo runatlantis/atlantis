@@ -163,13 +163,14 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 			if c.PrevApplyStored {
-				db.UpdatePullWithResults(modelPull, []command.ProjectResult{
+				_, err = db.UpdatePullWithResults(modelPull, []command.ProjectResult{
 					{
 						Command:    command.Apply,
 						RepoRelDir: "prevdir",
 						Workspace:  "default",
 					},
 				})
+				Ok(t, err)
 			}
 
 			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
