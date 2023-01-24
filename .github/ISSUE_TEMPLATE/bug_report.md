@@ -40,7 +40,7 @@ In order to effectively and quickly resolve the issue, please provide exact step
 <!---
 Provide log files from Atlantis server
 
-logs can be retrieved by retrieving them from the deployment or from the atlantis comments by adding `--debug`. For example `atlantis plan --debug`
+logs can be retrieved from the deployment or from atlantis comments by adding `--debug` such as `atlantis plan --debug`
 
 <details>
   <summary>Logs</summary>
