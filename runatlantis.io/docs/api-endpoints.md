@@ -6,7 +6,7 @@ To enable API endpoints, `api-secret` should be configured.
 
 :::tip Prerequisites
 
-* You have set `api-secret` as part of the [Server Configuration](server-configuration.html#api-secret)
+* set `api-secret` as part of the [Server Configuration](server-configuration.html#api-secret)
 * You have pass `X-Atlantis-Token` with the same secret in the request header
   :::
 

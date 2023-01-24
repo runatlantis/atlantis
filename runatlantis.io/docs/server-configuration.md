@@ -118,7 +118,7 @@ Values are chosen in this order:
   # or (recommended)
   ATLANTIS_API_SECRET="secret"
   ```
-  Secret used to validate requests made to the [API endpoints](api-endpoints.html). If not present, the api endpoints will not be accessible.
+  Required secret used to validate requests made to the [`/api/*` endpoints](api-endpoints.html).
 
 ### `--atlantis-url`
   ```bash
