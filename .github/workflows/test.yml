@@ -37,11 +37,10 @@ jobs:
   website_link_check:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
-    container: ghcr.io/runatlantis/testing-env:latest
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v3
         with:
           node-version-file: .node-version
 
@@ -50,6 +49,7 @@ jobs:
           # renovate: datasource=github-releases depName=raviqqe/muffet
           MUFFET_VERSION: 2.6.3
         run: |
+          npm install -g yarn
           # http-server is used to serve the website locally as muffet checks it.
           yarn global add http-server
           # install raviqqe/muffet to check for broken links.
