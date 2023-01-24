@@ -6,7 +6,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/runatlantis/atlantis.svg)](https://pkg.go.dev/github.com/runatlantis/atlantis)
 [![codecov](https://codecov.io/gh/runatlantis/atlantis/branch/main/graph/badge.svg)](https://codecov.io/gh/runatlantis/atlantis)
 [![CircleCI](https://circleci.com/gh/runatlantis/atlantis/tree/main.svg?style=shield)](https://circleci.com/gh/runatlantis/atlantis/tree/main)
-[![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://join.slack.com/t/atlantis-community/shared_invite/zt-1l35i8t8k-oqnXuIqyeGpGQJVMWzHoDg)
+[![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://join.slack.com/t/atlantis-community/shared_invite/zt-1nt7yx7uq-AnVRc_JItF1CDwZtfqv_OA)
 
 <p align="center">
   <img src="./runatlantis.io/.vuepress/public/hero.png" alt="Atlantis Logo"/><br><br>
