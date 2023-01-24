@@ -57,6 +57,8 @@ GitHub App needs these permissions. These are automatically set when a GitHub ap
 
 ::: tip NOTE
 Since v0.19.7, a new permission for `Administration` has been added. If you have already created a GitHub app, updating Atlantis to v0.19.7 will not automatically add this permission, so you will need to set it manually.
+
+Since v0.22.3, a new permission for `Members` has been added, which is required for features that apply permissions to an organizations team members rather than individual users. Like the `Administration` permission above, updating Atlantis will not automatically add this permission, so if you wish to use features that rely on checking team membership you will need to add this manually.
 :::
 
 | Type            | Access              | 
@@ -69,6 +71,7 @@ Since v0.19.7, a new permission for `Administration` has been added. If you have
 | Metadata        | Read-only (default) | 
 | Pull requests   | Read and write      | 
 | Webhooks        | Read and write      | 
+| Members         | Read-only           | 
 
 ### GitLab
 - Follow: [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)

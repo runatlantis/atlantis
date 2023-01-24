@@ -47,6 +47,19 @@ Values are chosen in this order:
 
 
 ## Flags
+### `--allow-commands`
+  ```bash
+  atlantis server --allow-commands=version,plan,apply,unlock,approve_policies
+  # or
+  ATLANTIS_ALLOW_COMMANDS='version,plan,apply,unlock,approve_policies'
+  ```
+  List of allowed commands to be run on the Atlantis server, Defaults to `version,plan,apply,unlock,approve_policies`
+
+  Notes:
+  * Accepts a comma separated list, ex. `command1,command2`.
+  * `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state` and `all` are available.
+  * `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
+
 ### `--allow-draft-prs`
   ```bash
   atlantis server --allow-draft-prs
@@ -212,7 +225,7 @@ and set `--autoplan-modules` to `false`.
   If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure DevOps org. This means that an
   attacker could spoof calls to Atlantis and cause it to perform malicious
-  actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_BASIC_AUTH` environment
+  actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD` environment
   variable.
   :::
 
@@ -308,6 +321,9 @@ and set `--autoplan-modules` to `false`.
   Terraform binaries here. If Atlantis loses this directory, [locks](locking.html)
   will be lost and unapplied plans will be lost.
 
+  Note that the atlantis user is restricted to `~/.atlantis`. 
+  If you set the `--data-dir` flag to a path outside of Atlantis its home directory, ensure that you grant the atlantis user the correct permissions.
+
 ### `--default-tf-version`
   ```bash
   atlantis server --default-tf-version="v0.12.31"
@@ -318,11 +334,14 @@ and set `--autoplan-modules` to `false`.
   if not in `PATH`. See [Terraform Versions](terraform-versions.html) for more details.
 
 ### `--disable-apply`
+  <Badge text="Deprecated" type="warn"/>
   ```bash
   atlantis server --disable-apply
   # or
   ATLANTIS_DISABLE_APPLY=true
   ```
+  Deprecated for `--allow-commands`.
+
   Disable all `atlantis apply` commands, regardless of which flags are passed with it.
 
 ### `--disable-apply-all`
@@ -375,6 +394,8 @@ and set `--autoplan-modules` to `false`.
   Enable Atlantis to use regular expressions to run plan/apply commands against defined project names when `-p` flag is passed with it.
   
   This can be used to run all defined projects (with the `name` key) in `atlantis.yaml` using `atlantis plan -p .*`.
+  
+  The flag will only allow the regexes listed in the [`allowed_regexp_prefixes`](https://www.runatlantis.io/docs/repo-level-atlantis-yaml.html#reference) key defined in the repo `atlantis.yaml` file. If the key is undefined, its value defaults to `[]` which will allow any regex.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 

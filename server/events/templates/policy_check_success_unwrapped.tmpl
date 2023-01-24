@@ -1,11 +1,12 @@
 {{ define "policyCheckSuccessUnwrapped" -}}
 ```diff
-{{.PolicyCheckOutput}}
+{{ .PolicyCheckOutput }}
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `{{.ApplyCmd}}`
-* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})
+    * `{{ .ApplyCmd }}`
+* :put_litter_in_its_place: To **delete** this plan click [here]({{ .LockURL }})
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * `{{.RePlanCmd}}`{{ template "diverged" . }}
-{{- end }}
+    * `{{ .RePlanCmd }}`
+{{ template "diverged" . }}
+{{ end -}}

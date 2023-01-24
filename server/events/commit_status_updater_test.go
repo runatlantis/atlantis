@@ -175,10 +175,7 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 				ProjectName: c.projectName,
 				RepoRelDir:  c.repoRelDir,
 				Workspace:   c.workspace,
-			},
-				command.Plan,
-				models.PendingCommitStatus,
-				"url")
+			}, command.Plan, models.PendingCommitStatus, "url", nil)
 			Ok(t, err)
 			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, models.PendingCommitStatus, c.expSrc, "Plan in progress...", "url")
 		})
@@ -191,37 +188,46 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 	cases := []struct {
 		status     models.CommitStatus
 		cmd        command.Name
+		result     *command.ProjectResult
 		expDescrip string
 	}{
 		{
-			models.PendingCommitStatus,
-			command.Plan,
-			"Plan in progress...",
+			status:     models.PendingCommitStatus,
+			cmd:        command.Plan,
+			expDescrip: "Plan in progress...",
 		},
 		{
-			models.FailedCommitStatus,
-			command.Plan,
-			"Plan failed.",
+			status:     models.FailedCommitStatus,
+			cmd:        command.Plan,
+			expDescrip: "Plan failed.",
 		},
 		{
-			models.SuccessCommitStatus,
-			command.Plan,
-			"Plan succeeded.",
+			status: models.SuccessCommitStatus,
+			cmd:    command.Plan,
+			result: &command.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "aaa\nNote: Objects have changed outside of Terraform\nbbb\nPlan: 1 to add, 2 to change, 3 to destroy.\nbbb",
+				},
+			},
+			expDescrip: "Plan: 1 to add, 2 to change, 3 to destroy.",
 		},
 		{
-			models.PendingCommitStatus,
-			command.Apply,
-			"Apply in progress...",
+			status:     models.PendingCommitStatus,
+			cmd:        command.Apply,
+			expDescrip: "Apply in progress...",
 		},
 		{
-			models.FailedCommitStatus,
-			command.Apply,
-			"Apply failed.",
+			status:     models.FailedCommitStatus,
+			cmd:        command.Apply,
+			expDescrip: "Apply failed.",
 		},
 		{
-			models.SuccessCommitStatus,
-			command.Apply,
-			"Apply succeeded.",
+			status: models.SuccessCommitStatus,
+			cmd:    command.Apply,
+			result: &command.ProjectResult{
+				ApplySuccess: "success",
+			},
+			expDescrip: "Apply succeeded.",
 		},
 	}
 
@@ -232,10 +238,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 			err := s.UpdateProject(command.ProjectContext{
 				RepoRelDir: ".",
 				Workspace:  "default",
-			},
-				c.cmd,
-				c.status,
-				"url")
+			}, c.cmd, c.status, "url", c.result)
 			Ok(t, err)
 			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, fmt.Sprintf("atlantis/%s: ./default", c.cmd.String()), c.expDescrip, "url")
 		})
@@ -250,10 +253,7 @@ func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) 
 	err := s.UpdateProject(command.ProjectContext{
 		RepoRelDir: ".",
 		Workspace:  "default",
-	},
-		command.Apply,
-		models.SuccessCommitStatus,
-		"url")
+	}, command.Apply, models.SuccessCommitStatus, "url", nil)
 	Ok(t, err)
 	client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{},
 		models.SuccessCommitStatus, "custom/apply: ./default", "Apply succeeded.", "url")

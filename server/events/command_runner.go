@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v48/github"
+	"github.com/google/go-github/v49/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -35,7 +35,7 @@ const (
 	ShutdownComment = "Atlantis server is shutting down, please try again later."
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
+//go:generate pegomock generate -m --package mocks -o mocks/mock_command_runner.go CommandRunner
 
 // CommandRunner is the first step after a command request has been parsed.
 type CommandRunner interface {
@@ -46,7 +46,7 @@ type CommandRunner interface {
 	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
+//go:generate pegomock generate -m --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
 
 // GithubPullGetter makes API calls to get pull requests.
 type GithubPullGetter interface {
@@ -54,7 +54,7 @@ type GithubPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
+//go:generate pegomock generate -m --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
 
 // AzureDevopsPullGetter makes API calls to get pull requests.
 type AzureDevopsPullGetter interface {
@@ -62,7 +62,7 @@ type AzureDevopsPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error)
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
+//go:generate pegomock generate -m --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
 // GitlabMergeRequestGetter makes API calls to get merge requests.
 type GitlabMergeRequestGetter interface {
@@ -156,7 +156,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		PullStatus: status,
 		Trigger:    command.AutoTrigger,
 	}
-	if !c.validateCtxAndComment(ctx) {
+	if !c.validateCtxAndComment(ctx, command.Autoplan) {
 		return
 	}
 	if c.DisableAutoplan {
@@ -281,7 +281,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		Trigger:    command.CommentTrigger,
 	}
 
-	if !c.validateCtxAndComment(ctx) {
+	if !c.validateCtxAndComment(ctx, cmd.Name) {
 		return
 	}
 
@@ -391,7 +391,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	return
 }
 
-func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context) bool {
+func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, commandName command.Name) bool {
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
 		if c.SilenceForkPRErrors {
 			return false
@@ -403,7 +403,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context) bool 
 		return false
 	}
 
-	if ctx.Pull.State != models.OpenPullState {
+	if ctx.Pull.State != models.OpenPullState && commandName != command.Unlock {
 		ctx.Log.Info("command was run on closed pull request")
 		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)

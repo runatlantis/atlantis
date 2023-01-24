@@ -25,23 +25,27 @@ var (
 	minusDiffRegex = regexp.MustCompile(`(?m)^ {2}-`)
 )
 
-type PlanStepRunner struct {
+type planStepRunner struct {
 	TerraformExecutor   TerraformExec
 	DefaultTFVersion    *version.Version
 	CommitStatusUpdater StatusUpdater
 	AsyncTFExec         AsyncTFExec
 }
 
-func (p *PlanStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec) Runner {
+	runner := &planStepRunner{
+		TerraformExecutor:   terraformExecutor,
+		DefaultTFVersion:    defaultTfVersion,
+		CommitStatusUpdater: commitStatusUpdater,
+		AsyncTFExec:         asyncTFExec,
+	}
+	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfVersion, runner)
+}
+
+func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	tfVersion := p.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
-	}
-
-	// We only need to switch workspaces in version 0.9.*. In older versions,
-	// there is no such thing as a workspace so we don't need to do anything.
-	if err := p.switchWorkspace(ctx, path, tfVersion, envs); err != nil {
-		return "", err
 	}
 
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
@@ -59,7 +63,7 @@ func (p *PlanStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 
 // isRemoteOpsErr returns true if there was an error caused due to this
 // project using TFE remote operations.
-func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
+func (p *planStepRunner) isRemoteOpsErr(output string, err error) bool {
 	if err == nil {
 		return false
 	}
@@ -68,7 +72,7 @@ func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
 
 // remotePlan runs a terraform plan command compatible with TFE remote
 // operations.
-func (p *PlanStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []string, path string, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
+func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []string, path string, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
 	argList := [][]string{
 		{"plan", "-input=false", "-refresh", "-no-color"},
 		extraArgs,
@@ -100,59 +104,7 @@ func (p *PlanStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 	return p.fmtPlanOutput(output, tfVersion), nil
 }
 
-// switchWorkspace changes the terraform workspace if necessary and will create
-// it if it doesn't exist. It handles differences between versions.
-func (p *PlanStepRunner) switchWorkspace(ctx command.ProjectContext, path string, tfVersion *version.Version, envs map[string]string) error {
-	// In versions less than 0.9 there is no support for workspaces.
-	noWorkspaceSupport := MustConstraint("<0.9").Check(tfVersion)
-	// If the user tried to set a specific workspace in the comment but their
-	// version of TF doesn't support workspaces then error out.
-	if noWorkspaceSupport && ctx.Workspace != defaultWorkspace {
-		return fmt.Errorf("terraform version %s does not support workspaces", tfVersion)
-	}
-	if noWorkspaceSupport {
-		return nil
-	}
-
-	// In version 0.9.* the workspace command was called env.
-	workspaceCmd := "workspace"
-	runningZeroPointNine := MustConstraint(">=0.9,<0.10").Check(tfVersion)
-	if runningZeroPointNine {
-		workspaceCmd = "env"
-	}
-
-	// Use `workspace show` to find out what workspace we're in now. If we're
-	// already in the right workspace then no need to switch. This will save us
-	// about ten seconds. This command is only available in > 0.10.
-	if !runningZeroPointNine {
-		workspaceShowOutput, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "show"}, envs, tfVersion, ctx.Workspace)
-		if err != nil {
-			return err
-		}
-		// If `show` says we're already on this workspace then we're done.
-		if strings.TrimSpace(workspaceShowOutput) == ctx.Workspace {
-			return nil
-		}
-	}
-
-	// Finally we'll have to select the workspace. We need to figure out if this
-	// workspace exists so we can create it if it doesn't.
-	// To do this we can either select and catch the error or use list and then
-	// look for the workspace. Both commands take the same amount of time so
-	// that's why we're running select here.
-	_, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "select", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
-	if err != nil {
-		// If terraform workspace select fails we run terraform workspace
-		// new to create a new workspace automatically.
-		out, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "new", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
-		if err != nil {
-			return fmt.Errorf("%s: %s", err, out)
-		}
-	}
-	return nil
-}
-
-func (p *PlanStepRunner) buildPlanCmd(ctx command.ProjectContext, extraArgs []string, path string, tfVersion *version.Version, planFile string) []string {
+func (p *planStepRunner) buildPlanCmd(ctx command.ProjectContext, extraArgs []string, path string, tfVersion *version.Version, planFile string) []string {
 	tfVars := p.tfVars(ctx, tfVersion)
 
 	// Check if env/{workspace}.tfvars exist and include it. This is a use-case
@@ -186,7 +138,7 @@ func (p *PlanStepRunner) buildPlanCmd(ctx command.ProjectContext, extraArgs []st
 // those versions don't allow setting -var flags for any variables that aren't
 // actually used in the configuration. Since there's no way for us to detect
 // if the configuration is using those variables, we don't set them.
-func (p *PlanStepRunner) tfVars(ctx command.ProjectContext, tfVersion *version.Version) []string {
+func (p *planStepRunner) tfVars(ctx command.ProjectContext, tfVersion *version.Version) []string {
 	if tfVersion.GreaterThanOrEqual(version.Must(version.NewVersion("0.12.0"))) {
 		return nil
 	}
@@ -209,7 +161,7 @@ func (p *PlanStepRunner) tfVars(ctx command.ProjectContext, tfVersion *version.V
 	}
 }
 
-func (p *PlanStepRunner) flatten(slices [][]string) []string {
+func (p *planStepRunner) flatten(slices [][]string) []string {
 	var flattened []string
 	for _, v := range slices {
 		flattened = append(flattened, v...)
@@ -223,7 +175,7 @@ func (p *PlanStepRunner) flatten(slices [][]string) []string {
 // "- aws_security_group_rule.allow_all"
 // We do it for +, ~ and -.
 // It also removes the "Refreshing..." preamble.
-func (p *PlanStepRunner) fmtPlanOutput(output string, tfVersion *version.Version) string {
+func (p *planStepRunner) fmtPlanOutput(output string, tfVersion *version.Version) string {
 	output = StripRefreshingFromPlanOutput(output, tfVersion)
 	output = plusDiffRegex.ReplaceAllString(output, "+")
 	output = tildeDiffRegex.ReplaceAllString(output, "~")
@@ -237,7 +189,7 @@ func (p *PlanStepRunner) fmtPlanOutput(output string, tfVersion *version.Version
 // from the in-progress command can be viewed.
 // cmdArgs is the args to terraform to execute.
 // path is the path to where we need to execute.
-func (p *PlanStepRunner) runRemotePlan(
+func (p *planStepRunner) runRemotePlan(
 	ctx command.ProjectContext,
 	cmdArgs []string,
 	path string,
@@ -246,7 +198,7 @@ func (p *PlanStepRunner) runRemotePlan(
 
 	// updateStatusF will update the commit status and log any error.
 	updateStatusF := func(status models.CommitStatus, url string) {
-		if err := p.CommitStatusUpdater.UpdateProject(ctx, command.Plan, status, url); err != nil {
+		if err := p.CommitStatusUpdater.UpdateProject(ctx, command.Plan, status, url, nil); err != nil {
 			ctx.Log.Err("unable to update status: %s", err)
 		}
 	}

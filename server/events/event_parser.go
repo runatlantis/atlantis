@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v48/github"
+	"github.com/google/go-github/v49/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -38,6 +38,8 @@ const usagesCols = 90
 type PullCommand interface {
 	// CommandName is the name of the command we're running.
 	CommandName() command.Name
+	// SubCommandName is the subcommand name of the command we're running.
+	SubCommandName() string
 	// IsVerbose is true if the output of this command should be verbose.
 	IsVerbose() bool
 	// IsAutoplan is true if this is an autoplan command vs. a comment command.
@@ -51,6 +53,11 @@ type PolicyCheckCommand struct{}
 // CommandName is policy_check.
 func (c PolicyCheckCommand) CommandName() command.Name {
 	return command.PolicyCheck
+}
+
+// SubCommandName is a subcommand for policy_check.
+func (c PolicyCheckCommand) SubCommandName() string {
+	return ""
 }
 
 // IsVerbose is false for policy_check commands.
@@ -70,6 +77,11 @@ type AutoplanCommand struct{}
 // CommandName is plan.
 func (c AutoplanCommand) CommandName() command.Name {
 	return command.Plan
+}
+
+// SubCommandName is a subcommand for auto plan.
+func (c AutoplanCommand) SubCommandName() string {
+	return ""
 }
 
 // IsVerbose is false for autoplan commands.
@@ -92,6 +104,8 @@ type CommentCommand struct {
 	Flags []string
 	// Name is the name of the command the comment specified.
 	Name command.Name
+	// SubName is the name of the sub command the comment specified.
+	SubName string
 	// AutoMergeDisabled is true if the command should not automerge after apply.
 	AutoMergeDisabled bool
 	// Verbose is true if the command should output verbosely.
@@ -117,6 +131,11 @@ func (c CommentCommand) CommandName() command.Name {
 	return c.Name
 }
 
+// SubCommandName returns the name of this subcommand.
+func (c CommentCommand) SubCommandName() string {
+	return c.SubName
+}
+
 // IsVerbose is true if the command should give verbose output.
 func (c CommentCommand) IsVerbose() bool {
 	return c.Verbose
@@ -133,7 +152,7 @@ func (c CommentCommand) String() string {
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name command.Name, verbose, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -146,6 +165,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, ver
 		RepoRelDir:        repoRelDir,
 		Flags:             flags,
 		Name:              name,
+		SubName:           subName,
 		Verbose:           verbose,
 		Workspace:         workspace,
 		AutoMergeDisabled: autoMergeDisabled,
@@ -153,7 +173,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, ver
 	}
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
+//go:generate pegomock generate -m --package mocks -o mocks/mock_event_parsing.go EventParsing
 
 // EventParsing parses webhook events from different VCS hosts into their
 // respective Atlantis models.

@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_template_writer.go TemplateWriter
+//go:generate pegomock generate -m --package mocks -o mocks/mock_template_writer.go TemplateWriter
 
 // TemplateWriter is an interface over html/template that's used to enable
 // mocking.
@@ -242,7 +242,6 @@ type LockDetailData struct {
 	PullRequestLink string
 	LockedBy        string
 	Workspace       string
-	Time            time.Time
 	AtlantisVersion string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
 	// not using a path-based proxy, this will be an empty string. Never ends

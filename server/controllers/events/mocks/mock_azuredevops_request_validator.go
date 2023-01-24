@@ -4,11 +4,10 @@
 package mocks
 
 import (
+	pegomock "github.com/petergtz/pegomock"
 	http "net/http"
 	"reflect"
 	"time"
-
-	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockAzureDevopsRequestValidator struct {
@@ -26,11 +25,11 @@ func NewMockAzureDevopsRequestValidator(options ...pegomock.Option) *MockAzureDe
 func (mock *MockAzureDevopsRequestValidator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockAzureDevopsRequestValidator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockAzureDevopsRequestValidator) Validate(r *http.Request, user []byte, pass []byte) ([]byte, error) {
+func (mock *MockAzureDevopsRequestValidator) Validate(_param0 *http.Request, _param1 []byte, _param2 []byte) ([]byte, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockAzureDevopsRequestValidator().")
 	}
-	params := []pegomock.Param{r, user, pass}
+	params := []pegomock.Param{_param0, _param1, _param2}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Validate", params, []reflect.Type{reflect.TypeOf((*[]byte)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 []byte
 	var ret1 error
@@ -82,8 +81,8 @@ type VerifierMockAzureDevopsRequestValidator struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockAzureDevopsRequestValidator) Validate(r *http.Request, user []byte, pass []byte) *MockAzureDevopsRequestValidator_Validate_OngoingVerification {
-	params := []pegomock.Param{r, user, pass}
+func (verifier *VerifierMockAzureDevopsRequestValidator) Validate(_param0 *http.Request, _param1 []byte, _param2 []byte) *MockAzureDevopsRequestValidator_Validate_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1, _param2}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Validate", params, verifier.timeout)
 	return &MockAzureDevopsRequestValidator_Validate_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -94,8 +93,8 @@ type MockAzureDevopsRequestValidator_Validate_OngoingVerification struct {
 }
 
 func (c *MockAzureDevopsRequestValidator_Validate_OngoingVerification) GetCapturedArguments() (*http.Request, []byte, []byte) {
-	r, user, pass := c.GetAllCapturedArguments()
-	return r[len(r)-1], user[len(user)-1], pass[len(pass)-1]
+	_param0, _param1, _param2 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
 }
 
 func (c *MockAzureDevopsRequestValidator_Validate_OngoingVerification) GetAllCapturedArguments() (_param0 []*http.Request, _param1 [][]byte, _param2 [][]byte) {

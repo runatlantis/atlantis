@@ -26,7 +26,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 	expectedOut := "some valid output from delegate"
 
 	t.Run("default version success", func(t *testing.T) {
-		subject := &MinimumVersionStepRunnerDelegate{
+		subject := &minimumVersionStepRunnerDelegate{
 			defaultTfVersion: tfVersion12,
 			minimumVersion:   tfVersion12,
 			delegate:         mockDelegate,
@@ -48,7 +48,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 	})
 
 	t.Run("ctx version success", func(t *testing.T) {
-		subject := &MinimumVersionStepRunnerDelegate{
+		subject := &minimumVersionStepRunnerDelegate{
 			defaultTfVersion: tfVersion11,
 			minimumVersion:   tfVersion12,
 			delegate:         mockDelegate,
@@ -72,7 +72,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 	})
 
 	t.Run("default version failure", func(t *testing.T) {
-		subject := &MinimumVersionStepRunnerDelegate{
+		subject := &minimumVersionStepRunnerDelegate{
 			defaultTfVersion: tfVersion11,
 			minimumVersion:   tfVersion12,
 			delegate:         mockDelegate,
@@ -94,7 +94,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 	})
 
 	t.Run("ctx version failure", func(t *testing.T) {
-		subject := &MinimumVersionStepRunnerDelegate{
+		subject := &minimumVersionStepRunnerDelegate{
 			defaultTfVersion: tfVersion12,
 			minimumVersion:   tfVersion12,
 			delegate:         mockDelegate,

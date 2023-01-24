@@ -27,7 +27,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
+	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -57,6 +57,7 @@ var testFlags = map[string]interface{}{
 	ADWebhookPasswordFlag:            "ad-wh-pass",
 	ADWebhookUserFlag:                "ad-wh-user",
 	AtlantisURLFlag:                  "url",
+	AllowCommandsFlag:                "version,plan,unlock,import,approve_policies", // apply is disabled by DisableApply
 	AllowForkPRsFlag:                 true,
 	AllowRepoConfigFlag:              true,
 	AutomergeFlag:                    true,
@@ -426,7 +427,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		{
 			"just github app key set",
 			map[string]interface{}{
-				GHAppKeyFlag: fixtures.GithubPrivateKey,
+				GHAppKeyFlag: testdata.GithubPrivateKey,
 			},
 			true,
 		},
@@ -495,7 +496,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"github app and key set and should be successful",
 			map[string]interface{}{
 				GHAppIDFlag:  "1",
-				GHAppKeyFlag: fixtures.GithubPrivateKey,
+				GHAppKeyFlag: testdata.GithubPrivateKey,
 			},
 			false,
 		},
@@ -553,6 +554,36 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 	}
 }
 
+func TestExecute_ValidateAllowCommands(t *testing.T) {
+	cases := []struct {
+		name              string
+		allowCommandsFlag string
+		expErr            string
+	}{
+		{
+			name:              "invalid allow commands",
+			allowCommandsFlag: "noallow",
+			expErr:            "invalid --allow-commands: unknown command name: noallow",
+		},
+		{
+			name:              "success with empty allow commands",
+			allowCommandsFlag: "",
+			expErr:            "",
+		},
+	}
+	for _, testCase := range cases {
+		c := setupWithDefaults(map[string]interface{}{
+			AllowCommandsFlag: testCase.allowCommandsFlag,
+		}, t)
+		err := c.Execute()
+		if testCase.expErr != "" {
+			ErrEquals(t, testCase.expErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
 func TestExecute_ExpandHomeInDataDir(t *testing.T) {
 	t.Log("If ~ is used as a data-dir path, should expand to absolute home path")
 	c := setup(map[string]interface{}{
@@ -600,7 +631,7 @@ func TestExecute_GithubUser(t *testing.T) {
 func TestExecute_GithubApp(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
 	c := setup(map[string]interface{}{
-		GHAppKeyFlag:      fixtures.GithubPrivateKey,
+		GHAppKeyFlag:      testdata.GithubPrivateKey,
 		GHAppIDFlag:       "1",
 		RepoAllowlistFlag: "*",
 	}, t)
@@ -750,6 +781,16 @@ func TestExecute_BothSilenceAllowAndWhitelistErrors(t *testing.T) {
 	}, t)
 	err := c.Execute()
 	ErrEquals(t, "both --silence-allowlist-errors and --silence-whitelist-errors cannot be set–use --silence-allowlist-errors", err)
+}
+
+func TestExecute_DisableApplyDeprecation(t *testing.T) {
+	c := setupWithDefaults(map[string]interface{}{
+		DisableApplyFlag:  true,
+		AllowCommandsFlag: "plan,apply,unlock",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, "plan,unlock", passedConfig.AllowCommands)
 }
 
 // Test that we set the corresponding allow list values on the userConfig

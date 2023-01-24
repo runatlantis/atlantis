@@ -27,6 +27,7 @@ func TestProject_UnmarshalYAML(t *testing.T) {
 				Workflow:           nil,
 				TerraformVersion:   nil,
 				Autoplan:           nil,
+				PlanRequirements:   nil,
 				ApplyRequirements:  nil,
 				ImportRequirements: nil,
 				Name:               nil,
@@ -45,6 +46,8 @@ terraform_version: v0.11.0
 autoplan:
   when_modified: []
   enabled: false
+plan_requirements:
+- mergeable
 apply_requirements:
 - mergeable
 import_requirements:
@@ -61,6 +64,7 @@ execution_order_group: 10`,
 					WhenModified: []string{},
 					Enabled:      Bool(false),
 				},
+				PlanRequirements:    []string{"mergeable"},
 				ApplyRequirements:   []string{"mergeable"},
 				ImportRequirements:  []string{"mergeable"},
 				ExecutionOrderGroup: Int(10),
@@ -122,6 +126,46 @@ func TestProject_Validate(t *testing.T) {
 				Dir:    String("."),
 			},
 			expErr: "branch: parsing: /(text/: error parsing regexp: missing closing ): `(text`.",
+		},
+		{
+			description: "plan reqs with unsupported",
+			input: raw.Project{
+				Dir:              String("."),
+				PlanRequirements: []string{"unsupported"},
+			},
+			expErr: "plan_requirements: \"unsupported\" is not a valid plan_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.",
+		},
+		{
+			description: "plan reqs with undiverged, mergeable and approved requirements",
+			input: raw.Project{
+				Dir:              String("."),
+				PlanRequirements: []string{"undiverged", "mergeable", "approved"},
+			},
+			expErr: "",
+		},
+		{
+			description: "plan reqs with approved requirement",
+			input: raw.Project{
+				Dir:              String("."),
+				PlanRequirements: []string{"approved"},
+			},
+			expErr: "",
+		},
+		{
+			description: "plan reqs with mergeable requirement",
+			input: raw.Project{
+				Dir:              String("."),
+				PlanRequirements: []string{"mergeable"},
+			},
+			expErr: "",
+		},
+		{
+			description: "plan reqs with mergeable and approved requirements",
+			input: raw.Project{
+				Dir:              String("."),
+				PlanRequirements: []string{"mergeable", "approved"},
+			},
+			expErr: "",
 		},
 		{
 			description: "apply reqs with unsupported",

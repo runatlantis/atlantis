@@ -24,6 +24,8 @@ func NewPlanCommandRunner(
 	SilenceNoProjects bool,
 	pullStatusFetcher PullStatusFetcher,
 	lockingLocker locking.Locker,
+	discardApprovalOnPlan bool,
+	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -42,6 +44,8 @@ func NewPlanCommandRunner(
 		SilenceNoProjects:          SilenceNoProjects,
 		pullStatusFetcher:          pullStatusFetcher,
 		lockingLocker:              lockingLocker,
+		DiscardApprovalOnPlan:      discardApprovalOnPlan,
+		pullReqStatusFetcher:       pullReqStatusFetcher,
 	}
 }
 
@@ -68,6 +72,10 @@ type PlanCommandRunner struct {
 	parallelPoolSize           int
 	pullStatusFetcher          PullStatusFetcher
 	lockingLocker              locking.Locker
+	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
+	// a plan.
+	DiscardApprovalOnPlan bool
+	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -163,8 +171,19 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	if err = p.pullUpdater.VCSClient.DiscardReviews(baseRepo, pull); err != nil {
-		ctx.Log.Err("failed to remove approvals: %s", err)
+	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(pull)
+	if err != nil {
+		// On error we continue the request with mergeable assumed false.
+		// We want to continue because not all apply's will need this status,
+		// only if they rely on the mergeability requirement.
+		// All PullRequestStatus fields are set to false by default when error.
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+	}
+
+	if p.DiscardApprovalOnPlan {
+		if err = p.pullUpdater.VCSClient.DiscardReviews(baseRepo, pull); err != nil {
+			ctx.Log.Err("failed to remove approvals: %s", err)
+		}
 	}
 
 	if err = p.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, command.Plan); err != nil {
