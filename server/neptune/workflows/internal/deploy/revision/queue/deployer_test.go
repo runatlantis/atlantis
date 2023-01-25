@@ -52,11 +52,11 @@ func (t *testDeployActivity) StoreLatestDeployment(ctx context.Context, deployer
 	return nil
 }
 
-func (t *testDeployActivity) CompareCommit(ctx context.Context, deployerRequest activities.CompareCommitRequest) (activities.CompareCommitResponse, error) {
+func (t *testDeployActivity) GithubCompareCommit(ctx context.Context, deployerRequest activities.CompareCommitRequest) (activities.CompareCommitResponse, error) {
 	return activities.CompareCommitResponse{}, nil
 }
 
-func (t *testDeployActivity) UpdateCheckRun(ctx context.Context, deployerRequest activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error) {
+func (t *testDeployActivity) GithubUpdateCheckRun(ctx context.Context, deployerRequest activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error) {
 	return activities.UpdateCheckRunResponse{}, nil
 }
 
@@ -218,7 +218,7 @@ func TestDeployer_CompareCommit_DeployAhead(t *testing.T) {
 		CommitComparison: activities.DirectionAhead,
 	}
 
-	env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
+	env.OnActivity(da.GithubCompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, storeDeploymentRequest).Return(nil)
 
 	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
@@ -290,7 +290,7 @@ func TestDeployer_CompareCommit_Identical(t *testing.T) {
 		CommitComparison: activities.DirectionIdentical,
 	}
 
-	env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
+	env.OnActivity(da.GithubCompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
 	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
 		Info:         deploymentInfo,
 		LatestDeploy: latestDeployedRevision,
@@ -372,8 +372,8 @@ func TestDeployer_CompareCommit_SkipDeploy(t *testing.T) {
 			ID: updateCheckRunRequest.ID,
 		}
 
-		env.OnActivity(da.UpdateCheckRun, mock.Anything, updateCheckRunRequest).Return(updateCheckRunResponse, nil)
-		env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
+		env.OnActivity(da.GithubUpdateCheckRun, mock.Anything, updateCheckRunRequest).Return(updateCheckRunResponse, nil)
+		env.OnActivity(da.GithubCompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
 
 		env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
 			Info:         deploymentInfo,
@@ -416,8 +416,8 @@ func TestDeployer_CompareCommit_SkipDeploy(t *testing.T) {
 				ID: updateCheckRunRequest.ID,
 			}
 
-			env.OnActivity(da.UpdateCheckRun, mock.Anything, updateCheckRunRequest).Return(updateCheckRunResponse, nil)
-			env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
+			env.OnActivity(da.GithubUpdateCheckRun, mock.Anything, updateCheckRunRequest).Return(updateCheckRunResponse, nil)
+			env.OnActivity(da.GithubCompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
 
 			env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
 				Info:         deploymentInfo,
@@ -494,7 +494,7 @@ func TestDeployer_CompareCommit_DeployDiverged(t *testing.T) {
 		CommitComparison: activities.DirectionDiverged,
 	}
 
-	env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
+	env.OnActivity(da.GithubCompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, storeDeploymentRequest).Return(nil)
 
 	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
@@ -569,7 +569,7 @@ func TestDeployer_WorkflowFailure_PlanRejection_SkipUpdateLatestDeployment(t *te
 		CommitComparison: activities.DirectionAhead,
 	}
 
-	env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
+	env.OnActivity(da.GithubCompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
 
 	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{
 		Info:         deploymentInfo,
@@ -655,7 +655,7 @@ func TestDeployer_TerraformClientError_UpdateLatestDeployment(t *testing.T) {
 		},
 	}
 
-	env.OnActivity(da.CompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
+	env.OnActivity(da.GithubCompareCommit, mock.Anything, compareCommitRequest).Return(compareCommitResponse, nil)
 	env.OnActivity(da.StoreLatestDeployment, mock.Anything, storeDeploymentRequest).Return(nil)
 
 	env.ExecuteWorkflow(testDeployerWorkflow, deployerRequest{

@@ -28,7 +28,7 @@ func (u *LockStateUpdater) UpdateQueuedRevisions(ctx workflow.Context, queue *De
 	}
 
 	for _, i := range infos {
-		err := workflow.ExecuteActivity(ctx, u.Activities.UpdateCheckRun, activities.UpdateCheckRunRequest{
+		err := workflow.ExecuteActivity(ctx, u.Activities.GithubUpdateCheckRun, activities.UpdateCheckRunRequest{
 			Title:   terraform.BuildCheckRunTitle(i.Root.Name),
 			State:   github.CheckRunQueued,
 			Repo:    i.Repo,

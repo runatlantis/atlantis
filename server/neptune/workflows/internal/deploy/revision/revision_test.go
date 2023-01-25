@@ -63,7 +63,7 @@ type response struct {
 
 type testActivities struct{}
 
-func (a *testActivities) CreateCheckRun(ctx context.Context, request activities.CreateCheckRunRequest) (activities.CreateCheckRunResponse, error) {
+func (a *testActivities) GithubCreateCheckRun(ctx context.Context, request activities.CreateCheckRunRequest) (activities.CreateCheckRunResponse, error) {
 	return activities.CreateCheckRunResponse{}, nil
 }
 
@@ -129,7 +129,7 @@ func TestEnqueue(t *testing.T) {
 
 	id := uuid.Must(uuid.NewUUID())
 
-	env.OnActivity(a.CreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
+	env.OnActivity(a.GithubCreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
 		Title:      "atlantis/deploy: root",
 		Sha:        rev,
 		Repo:       github.Repo{Name: "nish"},
@@ -185,7 +185,7 @@ func TestEnqueue_ManualTrigger(t *testing.T) {
 
 	id := uuid.Must(uuid.NewUUID())
 
-	env.OnActivity(a.CreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
+	env.OnActivity(a.GithubCreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
 		Title:      "atlantis/deploy: root",
 		Sha:        rev,
 		Repo:       github.Repo{Name: "nish"},
@@ -242,7 +242,7 @@ func TestEnqueue_ManualTrigger_QueueAlreadyLocked(t *testing.T) {
 
 	id := uuid.Must(uuid.NewUUID())
 
-	env.OnActivity(a.CreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
+	env.OnActivity(a.GithubCreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
 		Title:      "atlantis/deploy: root",
 		Sha:        rev,
 		Repo:       github.Repo{Name: "nish"},
@@ -304,7 +304,7 @@ func TestEnqueue_MergeTrigger_QueueAlreadyLocked(t *testing.T) {
 
 	id := uuid.Must(uuid.NewUUID())
 
-	env.OnActivity(a.CreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
+	env.OnActivity(a.GithubCreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
 		Title:      "atlantis/deploy: root",
 		Sha:        rev,
 		Repo:       github.Repo{Name: "nish"},

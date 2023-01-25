@@ -74,7 +74,7 @@ func (g *testURLGenerator) Generate(jobID fmt.Stringer, BaseURL fmt.Stringer) (*
 
 type githubActivities struct{}
 
-func (a *githubActivities) FetchRoot(_ context.Context, _ activities.FetchRootRequest) (activities.FetchRootResponse, error) {
+func (a *githubActivities) GithubFetchRoot(_ context.Context, _ activities.FetchRootRequest) (activities.FetchRootResponse, error) {
 	return activities.FetchRootResponse{
 		LocalRoot:       testLocalRoot,
 		DeployDirectory: DeployDir,
@@ -251,7 +251,7 @@ func TestSuccess(t *testing.T) {
 	assert.NoError(t, err)
 
 	// set activity expectations
-	env.OnActivity(ga.FetchRoot, mock.Anything, activities.FetchRootRequest{
+	env.OnActivity(ga.GithubFetchRoot, mock.Anything, activities.FetchRootRequest{
 		Repo:         testGithubRepo,
 		Root:         testLocalRoot.Root,
 		DeploymentID: testDeploymentID,
@@ -446,7 +446,7 @@ func TestUpdateJobError(t *testing.T) {
 	assert.NoError(t, err)
 
 	// set activity expectations
-	env.OnActivity(ga.FetchRoot, mock.Anything, activities.FetchRootRequest{
+	env.OnActivity(ga.GithubFetchRoot, mock.Anything, activities.FetchRootRequest{
 		Repo:         testGithubRepo,
 		Root:         testLocalRoot.Root,
 		DeploymentID: testDeploymentID,
@@ -492,7 +492,7 @@ func TestPlanRejection(t *testing.T) {
 	assert.NoError(t, err)
 
 	// set activity expectations
-	env.OnActivity(ga.FetchRoot, mock.Anything, activities.FetchRootRequest{
+	env.OnActivity(ga.GithubFetchRoot, mock.Anything, activities.FetchRootRequest{
 		Repo:         testGithubRepo,
 		Root:         testLocalRoot.Root,
 		DeploymentID: testDeploymentID,
@@ -655,7 +655,7 @@ func TestFetchRootError(t *testing.T) {
 	env.RegisterActivity(ta)
 
 	// set activity expectations
-	env.OnActivity(ga.FetchRoot, mock.Anything, activities.FetchRootRequest{
+	env.OnActivity(ga.GithubFetchRoot, mock.Anything, activities.FetchRootRequest{
 		Repo:         testGithubRepo,
 		Root:         testLocalRoot.Root,
 		DeploymentID: testDeploymentID,

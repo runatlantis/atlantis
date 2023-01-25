@@ -81,7 +81,7 @@ type UpdateCheckRunResponse struct {
 	ID int64
 }
 
-func (a *githubActivities) UpdateCheckRun(ctx context.Context, request UpdateCheckRunRequest) (UpdateCheckRunResponse, error) {
+func (a *githubActivities) GithubUpdateCheckRun(ctx context.Context, request UpdateCheckRunRequest) (UpdateCheckRunResponse, error) {
 	output := github.CheckRunOutput{
 		Title:   &request.Title,
 		Text:    &request.Title,
@@ -125,7 +125,7 @@ func (a *githubActivities) UpdateCheckRun(ctx context.Context, request UpdateChe
 	}, nil
 }
 
-func (a *githubActivities) CreateCheckRun(ctx context.Context, request CreateCheckRunRequest) (CreateCheckRunResponse, error) {
+func (a *githubActivities) GithubCreateCheckRun(ctx context.Context, request CreateCheckRunRequest) (CreateCheckRunResponse, error) {
 	output := github.CheckRunOutput{
 		Title:   &request.Title,
 		Text:    &request.Title,
@@ -211,7 +211,7 @@ type FetchRootResponse struct {
 
 // FetchRoot fetches a link to the archive URL using the GH client, processes that URL into a download URL that the
 // go-getter library can use, and then go-getter to download/extract files/subdirs within the root path to the destinationPath.
-func (a *githubActivities) FetchRoot(ctx context.Context, request FetchRootRequest) (FetchRootResponse, error) {
+func (a *githubActivities) GithubFetchRoot(ctx context.Context, request FetchRootRequest) (FetchRootResponse, error) {
 	cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
 	defer cancel()
 
@@ -260,7 +260,7 @@ type CompareCommitResponse struct {
 	CommitComparison DiffDirection
 }
 
-func (a *githubActivities) CompareCommit(ctx context.Context, request CompareCommitRequest) (CompareCommitResponse, error) {
+func (a *githubActivities) GithubCompareCommit(ctx context.Context, request CompareCommitRequest) (CompareCommitResponse, error) {
 	comparison, resp, err := a.Client.CompareCommits(internal.ContextWithInstallationToken(ctx, request.Repo.Credentials.InstallationToken), request.Repo.Owner, request.Repo.Name, request.LatestDeployedRevision, request.DeployRequestRevision, &github.ListOptions{})
 
 	if err != nil {

@@ -34,8 +34,8 @@ type dbActivities interface {
 }
 
 type githubActivities interface {
-	CompareCommit(ctx context.Context, request activities.CompareCommitRequest) (activities.CompareCommitResponse, error)
-	UpdateCheckRun(ctx context.Context, request activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error)
+	GithubCompareCommit(ctx context.Context, request activities.CompareCommitRequest) (activities.CompareCommitResponse, error)
+	GithubUpdateCheckRun(ctx context.Context, request activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error)
 }
 
 type deployerActivities interface {
@@ -107,7 +107,7 @@ func (p *Deployer) getDeployRequestCommitDirection(ctx workflow.Context, deployR
 		return activities.DirectionAhead, nil
 	}
 	var compareCommitResp activities.CompareCommitResponse
-	err := workflow.ExecuteActivity(ctx, p.Activities.CompareCommit, activities.CompareCommitRequest{
+	err := workflow.ExecuteActivity(ctx, p.Activities.GithubCompareCommit, activities.CompareCommitRequest{
 		DeployRequestRevision:  deployRequest.Revision,
 		LatestDeployedRevision: latestDeployment.Revision,
 		Repo:                   deployRequest.Repo,
@@ -123,7 +123,7 @@ func (p *Deployer) updateCheckRun(ctx workflow.Context, deployRequest terraformW
 	ctx = workflow.WithRetryPolicy(ctx, temporal.RetryPolicy{
 		MaximumAttempts: UpdateCheckRunRetryCount,
 	})
-	err := workflow.ExecuteActivity(ctx, p.Activities.UpdateCheckRun, activities.UpdateCheckRunRequest{
+	err := workflow.ExecuteActivity(ctx, p.Activities.GithubUpdateCheckRun, activities.UpdateCheckRunRequest{
 		Title:   terraformWorkflow.BuildCheckRunTitle(deployRequest.Root.Name),
 		State:   state,
 		Repo:    deployRequest.Repo,

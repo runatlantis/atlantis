@@ -41,7 +41,7 @@ type DeploymentStore interface {
 }
 
 type Activities interface {
-	CreateCheckRun(ctx context.Context, request activities.CreateCheckRunRequest) (activities.CreateCheckRunResponse, error)
+	GithubCreateCheckRun(ctx context.Context, request activities.CreateCheckRunRequest) (activities.CreateCheckRunResponse, error)
 }
 
 func NewReceiver(ctx workflow.Context, queue Queue, activities Activities, generator idGenerator, worker DeploymentStore) *Receiver {
@@ -125,7 +125,7 @@ func (n *Receiver) createCheckRun(ctx workflow.Context, id, revision string, roo
 	}
 
 	var resp activities.CreateCheckRunResponse
-	err := workflow.ExecuteActivity(ctx, n.activities.CreateCheckRun, activities.CreateCheckRunRequest{
+	err := workflow.ExecuteActivity(ctx, n.activities.GithubCreateCheckRun, activities.CreateCheckRunRequest{
 		Title:      terraform.BuildCheckRunTitle(root.Name),
 		Sha:        revision,
 		Repo:       repo,

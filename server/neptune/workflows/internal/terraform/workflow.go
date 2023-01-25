@@ -23,7 +23,7 @@ import (
 )
 
 type githubActivities interface {
-	FetchRoot(ctx context.Context, request activities.FetchRootRequest) (activities.FetchRootResponse, error)
+	GithubFetchRoot(ctx context.Context, request activities.FetchRootRequest) (activities.FetchRootResponse, error)
 }
 
 type terraformActivities interface {

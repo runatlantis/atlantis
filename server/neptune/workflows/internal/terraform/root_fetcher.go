@@ -16,7 +16,7 @@ type RootFetcher struct {
 // Fetch returns a local root and a cleanup function
 func (r *RootFetcher) Fetch(ctx workflow.Context) (*terraform.LocalRoot, func(workflow.Context) error, error) {
 	var fetchRootResponse activities.FetchRootResponse
-	err := workflow.ExecuteActivity(ctx, r.Ga.FetchRoot, activities.FetchRootRequest{
+	err := workflow.ExecuteActivity(ctx, r.Ga.GithubFetchRoot, activities.FetchRootRequest{
 		Repo:         r.Request.Repo,
 		Root:         r.Request.Root,
 		DeploymentID: r.Request.DeploymentID,

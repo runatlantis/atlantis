@@ -48,7 +48,7 @@ func TestLockStateUpdater_unlocked(t *testing.T) {
 		ID: updateCheckRunRequest.ID,
 	}
 
-	env.OnActivity(a.UpdateCheckRun, mock.Anything, updateCheckRunRequest).Return(updateCheckRunResponse, nil)
+	env.OnActivity(a.GithubUpdateCheckRun, mock.Anything, updateCheckRunRequest).Return(updateCheckRunResponse, nil)
 
 	env.ExecuteWorkflow(testUpdaterWorkflow, updaterReq{
 		Queue: []terraform.DeploymentInfo{info},
@@ -95,7 +95,7 @@ func TestLockStateUpdater_locked(t *testing.T) {
 		ID: updateCheckRunRequest.ID,
 	}
 
-	env.OnActivity(a.UpdateCheckRun, mock.Anything, updateCheckRunRequest).Return(updateCheckRunResponse, nil)
+	env.OnActivity(a.GithubUpdateCheckRun, mock.Anything, updateCheckRunRequest).Return(updateCheckRunResponse, nil)
 
 	env.ExecuteWorkflow(testUpdaterWorkflow, updaterReq{
 		Queue: []terraform.DeploymentInfo{info},

@@ -23,7 +23,7 @@ import (
 type testActivities struct {
 }
 
-func (a *testActivities) UpdateCheckRun(ctx context.Context, request activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error) {
+func (a *testActivities) GithubUpdateCheckRun(ctx context.Context, request activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error) {
 	return activities.UpdateCheckRunResponse{}, nil
 }
 
@@ -291,7 +291,7 @@ func TestStateReceive(t *testing.T) {
 			var a = &testActivities{}
 			env.RegisterActivity(a)
 
-			env.OnActivity(a.UpdateCheckRun, mock.Anything, activities.UpdateCheckRunRequest{
+			env.OnActivity(a.GithubUpdateCheckRun, mock.Anything, activities.UpdateCheckRunRequest{
 				Title: "atlantis/deploy: root",
 				State: c.ExpectedCheckRunState,
 				Repo: github.Repo{

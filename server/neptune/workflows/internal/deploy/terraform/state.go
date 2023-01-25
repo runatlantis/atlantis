@@ -23,7 +23,7 @@ type auditActivities interface {
 
 type receiverActivities interface {
 	auditActivities
-	UpdateCheckRun(ctx context.Context, request activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error)
+	GithubUpdateCheckRun(ctx context.Context, request activities.UpdateCheckRunRequest) (activities.UpdateCheckRunResponse, error)
 }
 
 type StateReceiver struct {
@@ -79,7 +79,7 @@ func (n *StateReceiver) updateCheckRun(ctx workflow.Context, workflowState *stat
 	}
 
 	// TODO: should we block here? maybe we can just make this async
-	return workflow.ExecuteActivity(ctx, n.Activity.UpdateCheckRun, request).Get(ctx, nil)
+	return workflow.ExecuteActivity(ctx, n.Activity.GithubUpdateCheckRun, request).Get(ctx, nil)
 }
 
 func (n *StateReceiver) emitApplyEvents(ctx workflow.Context, jobState *state.Job, deploymentInfo DeploymentInfo) error {
