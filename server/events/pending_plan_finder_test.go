@@ -7,23 +7,21 @@ import (
 	"strings"
 	"testing"
 
+	. "github.com/petergtz/pegomock"
+	lockingMocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	. "github.com/runatlantis/atlantis/testing"
 )
-
-// If the dir doesn't exist should get an error.
-func TestPendingPlanFinder_FindNoDir(t *testing.T) {
-	pf := &events.DefaultPendingPlanFinder{}
-	_, err := pf.Find("/doesntexist")
-	ErrEquals(t, "open /doesntexist: no such file or directory", err)
-}
 
 // Test different directory structures.
 func TestPendingPlanFinder_Find(t *testing.T) {
 	cases := []struct {
-		description string
-		files       map[string]interface{}
-		expPlans    []events.PendingPlan
+		description   string
+		projectStatus []models.ProjectStatus
+		expPlans      []events.PendingPlan
 	}{
 		{
 			"no plans",
@@ -32,8 +30,12 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"root directory",
-			map[string]interface{}{
-				"default.tfplan": nil,
+			[]models.ProjectStatus{
+				{
+					RepoRelDir: ".",
+					Workspace:  "default",
+					Status:     models.PlannedPlanStatus,
+				},
 			},
 			[]events.PendingPlan{
 				{
@@ -45,8 +47,13 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"root dir project plan",
-			map[string]interface{}{
-				"projectname::default.tfplan": nil,
+			[]models.ProjectStatus{
+				{
+					RepoRelDir:  ".",
+					Workspace:   "default",
+					ProjectName: "projectname",
+					Status:      models.PlannedPlanStatus,
+				},
 			},
 			[]events.PendingPlan{
 				{
@@ -59,8 +66,13 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"root dir project plan with slashes",
-			map[string]interface{}{
-				"project::name::default.tfplan": nil,
+			[]models.ProjectStatus{
+				{
+					RepoRelDir:  ".",
+					Workspace:   "default",
+					ProjectName: "project/name",
+					Status:      models.PlannedPlanStatus,
+				},
 			},
 			[]events.PendingPlan{
 				{
@@ -73,12 +85,16 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"multiple directories in single workspace",
-			map[string]interface{}{
-				"dir1": map[string]interface{}{
-					"default.tfplan": nil,
+			[]models.ProjectStatus{
+				{
+					RepoRelDir: "dir1",
+					Workspace:  "default",
+					Status:     models.PlannedPlanStatus,
 				},
-				"dir2": map[string]interface{}{
-					"default.tfplan": nil,
+				{
+					RepoRelDir: "dir2",
+					Workspace:  "default",
+					Status:     models.PlannedPlanStatus,
 				},
 			},
 			[]events.PendingPlan{
@@ -96,11 +112,17 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"multiple directories nested within each other",
-			map[string]interface{}{
-				"dir1": map[string]interface{}{
-					"default.tfplan": nil,
+			[]models.ProjectStatus{
+				{
+					RepoRelDir: ".",
+					Workspace:  "default",
+					Status:     models.PlannedPlanStatus,
 				},
-				"default.tfplan": nil,
+				{
+					RepoRelDir: "dir1",
+					Workspace:  "default",
+					Status:     models.PlannedPlanStatus,
+				},
 			},
 			[]events.PendingPlan{
 				{
@@ -117,10 +139,22 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"multiple workspaces",
-			map[string]interface{}{
-				"default.tfplan":    nil,
-				"staging.tfplan":    nil,
-				"production.tfplan": nil,
+			[]models.ProjectStatus{
+				{
+					RepoRelDir: ".",
+					Workspace:  "default",
+					Status:     models.PlannedPlanStatus,
+				},
+				{
+					RepoRelDir: ".",
+					Workspace:  "production",
+					Status:     models.PlannedPlanStatus,
+				},
+				{
+					RepoRelDir: ".",
+					Workspace:  "staging",
+					Status:     models.PlannedPlanStatus,
+				},
 			},
 			[]events.PendingPlan{
 				{
@@ -140,38 +174,35 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 				},
 			},
 		},
-		{
-			".terragrunt-cache",
-			map[string]interface{}{
-				".terragrunt-cache": map[string]interface{}{
-					"N6lY9xk7PivbOAzdsjDL6VUFVYk": map[string]interface{}{
-						"K4xpUZI6HgUF-ip6E1eib4L8mwQ": map[string]interface{}{
-							"app": map[string]interface{}{
-								"default.tfplan": nil,
-							},
-						},
-					},
-				},
-				"default.tfplan": nil,
-			},
-			[]events.PendingPlan{
-				{
-					RepoDir:    "???",
-					RepoRelDir: ".",
-					Workspace:  "default",
-				},
-			},
-		},
 	}
 
-	pf := &events.DefaultPendingPlanFinder{}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			tmpDir := DirStructure(t, c.files)
+			tmpDir := t.TempDir()
 
-			runCmd(t, tmpDir, "git", "init")
+			backend := lockingMocks.NewMockBackend()
+			workingDir := mocks.NewMockWorkingDir()
 
-			actPlans, err := pf.Find(tmpDir)
+			modelPull := models.PullRequest{
+				BaseRepo: testdata.GithubRepo,
+				State:    models.OpenPullState,
+				Num:      testdata.Pull.Num,
+			}
+
+			pullStatusMock := models.PullStatus{
+				Projects: c.projectStatus,
+				Pull:     modelPull,
+			}
+
+			When(backend.GetPullStatus(modelPull)).ThenReturn(&pullStatusMock, nil)
+			When(workingDir.GetPullDir(modelPull.BaseRepo, modelPull)).ThenReturn(tmpDir, nil)
+
+			pf := &events.DefaultPendingPlanFinder{
+				backend,
+				workingDir,
+			}
+
+			actPlans, err := pf.Find(modelPull)
 			Ok(t, err)
 
 			// Replace the actual dir with ??? to allow for comparison.
@@ -183,28 +214,6 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 			Equals(t, c.expPlans, actPlansComparable)
 		})
 	}
-}
-
-// If a planfile is checked in to git, we shouldn't use it.
-func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
-	tmpDir := DirStructure(t, map[string]interface{}{
-		"default.tfplan": nil,
-	})
-
-	// Add that file to git.
-	repoDir := tmpDir
-	runCmd(t, repoDir, "git", "init")
-	runCmd(t, repoDir, "touch", ".gitkeep")
-	runCmd(t, repoDir, "git", "add", ".")
-	runCmd(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
-	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
-	runCmd(t, repoDir, "git", "config", "--local", "commit.gpgsign", "false")
-	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
-
-	pf := &events.DefaultPendingPlanFinder{}
-	actPlans, err := pf.Find(tmpDir)
-	Ok(t, err)
-	Equals(t, 0, len(actPlans))
 }
 
 // Test that it deletes pending plans.
@@ -221,8 +230,37 @@ func TestPendingPlanFinder_DeletePlans(t *testing.T) {
 
 	runCmd(t, tmp, "git", "init")
 
-	pf := &events.DefaultPendingPlanFinder{}
-	Ok(t, pf.DeletePlans(tmp))
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+	backend := lockingMocks.NewMockBackend()
+	workingDir := mocks.NewMockWorkingDir()
+
+	pendingPlans := models.PullStatus{
+		Projects: []models.ProjectStatus{
+			{
+				RepoRelDir:  "dir1",
+				Workspace:   "default",
+				ProjectName: "",
+				Status:      models.PlannedPlanStatus,
+			},
+			{
+				RepoRelDir:  "dir2",
+				Workspace:   "default",
+				ProjectName: "",
+				Status:      models.PlannedPlanStatus,
+			},
+		},
+		Pull: modelPull,
+	}
+
+	When(backend.GetPullStatus(modelPull)).ThenReturn(&pendingPlans, nil)
+	When(workingDir.GetPullDir(modelPull.BaseRepo, modelPull)).ThenReturn(tmp, nil)
+
+	pf := &events.DefaultPendingPlanFinder{
+		Backend:    backend,
+		WorkingDir: workingDir,
+	}
+	Ok(t, pf.DeletePlans(modelPull))
 
 	// First, check the files were deleted.
 	for _, plan := range []string{
@@ -233,11 +271,6 @@ func TestPendingPlanFinder_DeletePlans(t *testing.T) {
 		_, err := os.Stat(absPath)
 		ErrContains(t, "no such file or directory", err)
 	}
-
-	// Double check by using Find().
-	foundPlans, err := pf.Find(tmp)
-	Ok(t, err)
-	Equals(t, 0, len(foundPlans))
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {

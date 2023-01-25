@@ -324,7 +324,7 @@ func (w *FileWorkspace) Delete(r models.Repo, p models.PullRequest) error {
 
 func (w *FileWorkspace) DeleteWorkspaceForPath(r models.Repo, p models.PullRequest, path string, workspace string) error {
 	// Find planfile for all projects in this workspace.
-	files, err := filepath.Glob(fmt.Sprintf("%s/%s/*::%s.tfplan", w.cloneDir(r, p), path, workspace))
+	files, err := filepath.Glob(fmt.Sprintf("%s/%s/*-%s.tfplan", w.cloneDir(r, p), path, workspace))
 	if err != nil {
 		return err
 	}

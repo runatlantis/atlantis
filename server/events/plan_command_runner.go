@@ -288,11 +288,7 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 
 // deletePlans deletes all plans generated in this ctx.
 func (p *PlanCommandRunner) deletePlans(ctx *command.Context) {
-	pullDir, err := p.workingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
-	if err != nil {
-		ctx.Log.Err("getting pull dir: %s", err)
-	}
-	if err := p.pendingPlanFinder.DeletePlans(pullDir); err != nil {
+	if err := p.pendingPlanFinder.DeletePlans(ctx.Pull); err != nil {
 		ctx.Log.Err("deleting pending plans: %s", err)
 	}
 }

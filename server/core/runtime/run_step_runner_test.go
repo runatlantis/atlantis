@@ -68,7 +68,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 		{
 			Command:     "echo workspace=$WORKSPACE version=$ATLANTIS_TERRAFORM_VERSION dir=$DIR planfile=$PLANFILE showfile=$SHOWFILE project=$PROJECT_NAME",
 			ProjectName: "my/project/name",
-			ExpOut:      "workspace=myworkspace version=0.11.0 dir=$DIR planfile=$DIR/my::project::name::myworkspace.tfplan showfile=$DIR/my::project::name-myworkspace.json project=my/project/name\n",
+			ExpOut:      "workspace=myworkspace version=0.11.0 dir=$DIR planfile=$DIR/my::project::name-myworkspace.tfplan showfile=$DIR/my::project::name-myworkspace.json project=my/project/name\n",
 		},
 		{
 			Command: "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME head_commit=$HEAD_COMMIT base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_author=$PULL_AUTHOR repo_rel_dir=$REPO_REL_DIR",

@@ -1105,7 +1105,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		workingDir,
 		locker,
 		globalCfg,
-		&events.DefaultPendingPlanFinder{},
+		&events.DefaultPendingPlanFinder{
+			Backend:    backend,
+			WorkingDir: workingDir,
+		},
 		commentParser,
 		false,
 		false,
@@ -1195,7 +1198,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		false,
 		false,
 		e2eVCSClient,
-		&events.DefaultPendingPlanFinder{},
+		&events.DefaultPendingPlanFinder{
+			Backend:    backend,
+			WorkingDir: workingDir,
+		},
 		workingDir,
 		e2eStatusUpdater,
 		projectCommandBuilder,

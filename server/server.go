@@ -517,7 +517,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		allowCommands,
 	)
 	defaultTfVersion := terraformClient.DefaultVersion()
-	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
+	pendingPlanFinder := &events.DefaultPendingPlanFinder{
+		Backend:    backend,
+		WorkingDir: workingDir,
+	}
 	runStepRunner := &runtime.RunStepRunner{
 		TerraformExecutor:       terraformClient,
 		DefaultTFVersion:        defaultTfVersion,

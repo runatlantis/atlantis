@@ -600,7 +600,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(testdata.Pull)
 	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 }
 
@@ -622,7 +622,7 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(modelPull)
 	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 }
 
@@ -640,7 +640,7 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "default"})
-	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(testdata.Pull)
 }
 
 // Test that if one plan fails and we are using automerge, that
@@ -689,7 +689,7 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	// gets called twice: the first time before the plan starts, the second time after the plan errors
-	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(testdata.Pull)
 
 	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())
 }
@@ -715,7 +715,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(modelPull)
 	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 
 	vcsClient.VerifyWasCalledOnce().DiscardReviews(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())

@@ -1,1 +1,7 @@
-Ran Apply for 0 projects:
+Ran Apply for dir: `.` workspace: `default`
+
+**Apply Error**
+```
+no plan found at path "." and workspace "default"–did you run plan?
+
+```

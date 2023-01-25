@@ -6,6 +6,7 @@ package mocks
 import (
 	pegomock "github.com/petergtz/pegomock"
 	events "github.com/runatlantis/atlantis/server/events"
+	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
 )
@@ -25,7 +26,7 @@ func NewMockPendingPlanFinder(options ...pegomock.Option) *MockPendingPlanFinder
 func (mock *MockPendingPlanFinder) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPendingPlanFinder) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPendingPlanFinder) DeletePlans(_param0 string) error {
+func (mock *MockPendingPlanFinder) DeletePlans(_param0 models.PullRequest) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPendingPlanFinder().")
 	}
@@ -40,7 +41,7 @@ func (mock *MockPendingPlanFinder) DeletePlans(_param0 string) error {
 	return ret0
 }
 
-func (mock *MockPendingPlanFinder) Find(_param0 string) ([]events.PendingPlan, error) {
+func (mock *MockPendingPlanFinder) Find(_param0 models.PullRequest) ([]events.PendingPlan, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPendingPlanFinder().")
 	}
@@ -96,7 +97,7 @@ type VerifierMockPendingPlanFinder struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockPendingPlanFinder) DeletePlans(_param0 string) *MockPendingPlanFinder_DeletePlans_OngoingVerification {
+func (verifier *VerifierMockPendingPlanFinder) DeletePlans(_param0 models.PullRequest) *MockPendingPlanFinder_DeletePlans_OngoingVerification {
 	params := []pegomock.Param{_param0}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeletePlans", params, verifier.timeout)
 	return &MockPendingPlanFinder_DeletePlans_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -107,23 +108,23 @@ type MockPendingPlanFinder_DeletePlans_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockPendingPlanFinder_DeletePlans_OngoingVerification) GetCapturedArguments() string {
+func (c *MockPendingPlanFinder_DeletePlans_OngoingVerification) GetCapturedArguments() models.PullRequest {
 	_param0 := c.GetAllCapturedArguments()
 	return _param0[len(_param0)-1]
 }
 
-func (c *MockPendingPlanFinder_DeletePlans_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+func (c *MockPendingPlanFinder_DeletePlans_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
+		_param0 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(string)
+			_param0[u] = param.(models.PullRequest)
 		}
 	}
 	return
 }
 
-func (verifier *VerifierMockPendingPlanFinder) Find(_param0 string) *MockPendingPlanFinder_Find_OngoingVerification {
+func (verifier *VerifierMockPendingPlanFinder) Find(_param0 models.PullRequest) *MockPendingPlanFinder_Find_OngoingVerification {
 	params := []pegomock.Param{_param0}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Find", params, verifier.timeout)
 	return &MockPendingPlanFinder_Find_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -134,17 +135,17 @@ type MockPendingPlanFinder_Find_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockPendingPlanFinder_Find_OngoingVerification) GetCapturedArguments() string {
+func (c *MockPendingPlanFinder_Find_OngoingVerification) GetCapturedArguments() models.PullRequest {
 	_param0 := c.GetAllCapturedArguments()
 	return _param0[len(_param0)-1]
 }
 
-func (c *MockPendingPlanFinder_Find_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+func (c *MockPendingPlanFinder_Find_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
+		_param0 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(string)
+			_param0[u] = param.(models.PullRequest)
 		}
 	}
 	return

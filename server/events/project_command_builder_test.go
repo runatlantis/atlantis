@@ -849,9 +849,30 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 			"workspace2.tfplan": nil,
 		},
 	})
-	// Initialize git repos in each workspace so that the .tfplan files get
-	// picked up.
-	runCmd(t, tmpDir, "git", "init")
+
+	pendingPlanFinder := mocks.NewMockPendingPlanFinder()
+	When(pendingPlanFinder.Find(matchers.AnyModelsPullRequest())).ThenReturn([]events.PendingPlan{
+		{
+			RepoDir:    tmpDir,
+			RepoRelDir: "project1",
+			Workspace:  "workspace1",
+		},
+		{
+			RepoDir:    tmpDir,
+			RepoRelDir: "project1",
+			Workspace:  "workspace2",
+		},
+		{
+			RepoDir:    tmpDir,
+			RepoRelDir: "project2",
+			Workspace:  "workspace1",
+		},
+		{
+			RepoDir:    tmpDir,
+			RepoRelDir: "project2",
+			Workspace:  "workspace2",
+		},
+	}, nil)
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.GetPullDir(
@@ -880,7 +901,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
-		&events.DefaultPendingPlanFinder{},
+		pendingPlanFinder,
 		&events.CommentParser{ExecutableName: "atlantis"},
 		false,
 		false,
@@ -1416,9 +1437,30 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 			"workspace2.tfplan": nil,
 		},
 	})
-	// Initialize git repos in each workspace so that the .tfplan files get
-	// picked up.
-	runCmd(t, tmpDir, "git", "init")
+
+	pendingPlanFinder := mocks.NewMockPendingPlanFinder()
+	When(pendingPlanFinder.Find(matchers.AnyModelsPullRequest())).ThenReturn([]events.PendingPlan{
+		{
+			RepoDir:    tmpDir,
+			RepoRelDir: "project1",
+			Workspace:  "workspace1",
+		},
+		{
+			RepoDir:    tmpDir,
+			RepoRelDir: "project1",
+			Workspace:  "workspace2",
+		},
+		{
+			RepoDir:    tmpDir,
+			RepoRelDir: "project2",
+			Workspace:  "workspace1",
+		},
+		{
+			RepoDir:    tmpDir,
+			RepoRelDir: "project2",
+			Workspace:  "workspace2",
+		},
+	}, nil)
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.GetPullDir(
@@ -1446,7 +1488,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
-		&events.DefaultPendingPlanFinder{},
+		pendingPlanFinder,
 		&events.CommentParser{ExecutableName: "atlantis"},
 		false,
 		false,

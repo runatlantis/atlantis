@@ -46,7 +46,7 @@ func NewInstrumentedProjectCommandBuilder(
 	workingDir WorkingDir,
 	workingDirLocker WorkingDirLocker,
 	globalCfg valid.GlobalCfg,
-	pendingPlanFinder *DefaultPendingPlanFinder,
+	pendingPlanFinder PendingPlanFinder,
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
@@ -96,7 +96,7 @@ func NewProjectCommandBuilder(
 	workingDir WorkingDir,
 	workingDirLocker WorkingDirLocker,
 	globalCfg valid.GlobalCfg,
-	pendingPlanFinder *DefaultPendingPlanFinder,
+	pendingPlanFinder PendingPlanFinder,
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
@@ -186,7 +186,7 @@ type DefaultProjectCommandBuilder struct {
 	WorkingDir                   WorkingDir
 	WorkingDirLocker             WorkingDirLocker
 	GlobalCfg                    valid.GlobalCfg
-	PendingPlanFinder            *DefaultPendingPlanFinder
+	PendingPlanFinder            PendingPlanFinder
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	SkipCloneNoChanges           bool
 	EnableRegExpCmd              bool
@@ -571,12 +571,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	}
 	defer unlockFn()
 
-	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
-	if err != nil {
-		return nil, err
-	}
-
-	plans, err := p.PendingPlanFinder.Find(pullDir)
+	plans, err := p.PendingPlanFinder.Find(ctx.Pull)
 	if err != nil {
 		return nil, err
 	}

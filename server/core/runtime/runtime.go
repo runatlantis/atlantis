@@ -5,12 +5,9 @@ package runtime
 import (
 	"bytes"
 	"fmt"
-	"path/filepath"
-	"regexp"
 	"strings"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -94,7 +91,7 @@ func GetPlanFilename(workspace string, projName string) string {
 		return fmt.Sprintf("%s.tfplan", workspace)
 	}
 	projName = strings.Replace(projName, "/", planfileSlashReplace, -1)
-	return fmt.Sprintf("%s::%s.tfplan", projName, workspace)
+	return fmt.Sprintf("%s-%s.tfplan", projName, workspace)
 }
 
 // isRemotePlan returns true if planContents are from a plan that was generated
@@ -104,27 +101,4 @@ func IsRemotePlan(planContents []byte) bool {
 	// detect that they're remote in the apply phase.
 	remoteOpsHeaderBytes := []byte(remoteOpsHeader)
 	return bytes.Equal(planContents[:len(remoteOpsHeaderBytes)], remoteOpsHeaderBytes)
-}
-
-// ProjectNameFromPlanfile returns the project name that a planfile with name
-// filename is for. If filename is for a project without a name then it will
-// return an empty string. workspace is the workspace this project is in.
-func ProjectNameFromPlanfile(workspace string, filename string) (string, error) {
-	r, err := regexp.Compile(fmt.Sprintf(`(.*?)::%s\.tfplan`, workspace))
-	if err != nil {
-		return "", errors.Wrap(err, "compiling project name regex, this is a bug")
-	}
-	projMatch := r.FindAllStringSubmatch(filename, 1)
-	if projMatch == nil {
-		return "", nil
-	}
-	rawProjName := projMatch[0][1]
-	return strings.Replace(rawProjName, planfileSlashReplace, "/", -1), nil
-}
-
-func WorkspaceNameFromPlanfile(filename string) string {
-	projectWorkspace := strings.Split(filepath.Base(filename), ".")[0]
-	workspaceSlice := strings.Split(filepath.Base(projectWorkspace), "::")
-
-	return workspaceSlice[len(workspaceSlice)-1]
 }

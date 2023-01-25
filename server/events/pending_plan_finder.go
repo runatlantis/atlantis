@@ -1,24 +1,27 @@
 package events
 
 import (
+	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 //go:generate pegomock generate -m --package mocks -o mocks/mock_pending_plan_finder.go PendingPlanFinder
 
 type PendingPlanFinder interface {
-	Find(pullDir string) ([]PendingPlan, error)
-	DeletePlans(pullDir string) error
+	Find(pullRequest models.PullRequest) ([]PendingPlan, error)
+	DeletePlans(pullRequest models.PullRequest) error
 }
 
 // DefaultPendingPlanFinder finds unapplied plans.
-type DefaultPendingPlanFinder struct{}
+type DefaultPendingPlanFinder struct {
+	Backend    locking.Backend
+	WorkingDir WorkingDir
+}
 
 // PendingPlan is a plan that has not been applied.
 type PendingPlan struct {
@@ -36,63 +39,68 @@ type PendingPlan struct {
 // Find finds all pending plans in pullDir. pullDir should be the working
 // directory where Atlantis will operate on this pull request. It's one level
 // up from where Atlantis clones the repo for each workspace.
-func (p *DefaultPendingPlanFinder) Find(pullDir string) ([]PendingPlan, error) {
-	plans, _, err := p.findWithAbsPaths(pullDir)
+func (p *DefaultPendingPlanFinder) Find(pullRequest models.PullRequest) ([]PendingPlan, error) {
+	plans, err := p.findWithAbsPaths(pullRequest)
 	return plans, err
 }
 
 // deletePlans deletes all plans in pullDir.
-func (p *DefaultPendingPlanFinder) DeletePlans(pullDir string) error {
-	_, absPaths, err := p.findWithAbsPaths(pullDir)
+func (p *DefaultPendingPlanFinder) DeletePlans(pullRequest models.PullRequest) error {
+	plans, err := p.findWithAbsPaths(pullRequest)
 	if err != nil {
 		return err
 	}
-	for _, path := range absPaths {
+
+	for _, plan := range plans {
+		path := fmt.Sprintf(
+			"%s/%s/%s",
+			plan.RepoDir,
+			plan.RepoRelDir,
+			runtime.GetPlanFilename(plan.Workspace, plan.ProjectName),
+		)
+
 		if err := os.Remove(path); err != nil {
 			return errors.Wrapf(err, "delete plan at %s", path)
 		}
+
 	}
+
 	return nil
 }
 
-func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPlan, []string, error) {
+func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullRequest models.PullRequest) ([]PendingPlan, error) {
 	var plans []PendingPlan
-	var absPaths []string
 
-	_, err := os.ReadDir(pullDir)
+	pullDir, err := p.WorkingDir.GetPullDir(pullRequest.BaseRepo, pullRequest)
 	if err != nil {
-		return nil, nil, err
+		return plans, err
 	}
 
-	lsCmd := exec.Command("git", "ls-files", ".", "--others") // nolint: gosec
-	lsCmd.Dir = pullDir
-	lsOut, err := lsCmd.CombinedOutput()
+	// TODO: ensure this returns an empty list
+	// instead of nil if there's no pending plans
+	status, err := p.Backend.GetPullStatus(pullRequest)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "running git ls-files . "+
-			"--others: %s", string(lsOut))
+		return plans, err
 	}
 
-	for _, file := range strings.Split(string(lsOut), "\n") {
-		if filepath.Ext(file) == ".tfplan" {
-			// Ignore .terragrunt-cache dirs (#487)
-			if strings.Contains(file, ".terragrunt-cache/") {
-				continue
-			}
+	// TODO: remove this when we always have a list
+	if status == nil {
+		return plans, nil
+	}
 
-			workspace := runtime.WorkspaceNameFromPlanfile(filepath.Base(file))
-			projectName, err := runtime.ProjectNameFromPlanfile(workspace, filepath.Base(file))
-			if err != nil {
-				return nil, nil, err
-			}
-			plans = append(plans, PendingPlan{
-				RepoDir:     pullDir,
-				RepoRelDir:  filepath.Dir(file),
-				Workspace:   workspace,
-				ProjectName: projectName,
-			})
-			absPaths = append(absPaths, filepath.Join(pullDir, file))
+	for _, project := range status.Projects {
+		// TODO this should be more simple
+		if project.Status != models.PlannedPlanStatus && project.Status != models.PassedPolicyCheckStatus && project.Status != models.ErroredPolicyCheckStatus {
+			continue
 		}
+
+		plans = append(plans, PendingPlan{
+			RepoDir:     pullDir,
+			RepoRelDir:  project.RepoRelDir,
+			Workspace:   project.Workspace,
+			ProjectName: project.ProjectName,
+		})
 	}
 
-	return plans, absPaths, nil
+	return plans, nil
 }

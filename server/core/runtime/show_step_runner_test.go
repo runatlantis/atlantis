@@ -39,7 +39,7 @@ func TestShowStepRunnner(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 
 		When(mockExecutor.RunCommandWithVersion(
-			context, path, []string{"show", "-json", filepath.Join(path, "test::default.tfplan")}, envs, tfVersion, context.Workspace,
+			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
 		)).ThenReturn("success", nil)
 
 		r, err := subject.Run(context, []string{}, path, envs)
@@ -66,7 +66,7 @@ func TestShowStepRunnner(t *testing.T) {
 		}
 
 		When(mockExecutor.RunCommandWithVersion(
-			contextWithVersionOverride, path, []string{"show", "-json", filepath.Join(path, "test::default.tfplan")}, envs, v, context.Workspace,
+			contextWithVersionOverride, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, v, context.Workspace,
 		)).ThenReturn("success", nil)
 
 		r, err := subject.Run(contextWithVersionOverride, []string{}, path, envs)
@@ -83,7 +83,7 @@ func TestShowStepRunnner(t *testing.T) {
 
 	t.Run("failure running command", func(t *testing.T) {
 		When(mockExecutor.RunCommandWithVersion(
-			context, path, []string{"show", "-json", filepath.Join(path, "test::default.tfplan")}, envs, tfVersion, context.Workspace,
+			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
 		)).ThenReturn("success", errors.New("error"))
 
 		_, err := subject.Run(context, []string{}, path, envs)
