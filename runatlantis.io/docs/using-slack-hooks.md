@@ -20,16 +20,16 @@ For this you'll need to:
 * Select your Slack workspace
 * Click `Create App`
 * On the left go to `oAuth & Permissions`
-* Copy the `Bot User OAuth Token` and provide it to Atlantis by using `--slack-token=xoxb-xxxxxxxxxxx` or via the environment `ATLANTIS_SLACK_TOKEN=xoxb-xxxxxxxxxxx`.
-* Scroll down to scopes and add the following:
+* Scroll down to Scopes | Bot Token Scopes and add the following OAuth scopes:
   * `channels:read`
   * `chat:write`
   * `groups:read`
   * `incoming-webhook`
   * `mpim:read`
 * Install the app onto your Slack workspace
+* Copy the `Bot User OAuth Token` and provide it to Atlantis by using `--slack-token=xoxb-xxxxxxxxxxx` or via the environment `ATLANTIS_SLACK_TOKEN=xoxb-xxxxxxxxxxx`.
 * Create a channel in your Slack workspace (e.g. `my-channel`) or use existing
-* Add the app to Created channel or existing channel ( cklick channel name then tab integrations, there Click "Add apps"
+* Add the app to Created channel or existing channel ( click channel name then tab integrations, there Click "Add apps"
 
 ## Configuring Atlantis
 
