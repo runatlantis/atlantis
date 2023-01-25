@@ -150,6 +150,7 @@ export default defineUserConfig({
                             text: 'Overview',
                             link: 'using-atlantis',
                         },
+                        'api-endpoints',
                     ]
                 },
                 {
