@@ -25,10 +25,6 @@ changelog:
   skip: true
 
 release:
-  github:
-    owner: runatlantis
-    name: atlantis
-
   # If set to true, will not auto-publish the release.
   # Default is false.
   draft: false
