@@ -76,8 +76,7 @@ jobs:
 
     # Publish dev image to container registry
     - name: Build and push atlantis:dev${{ env.IMAGE_SUFFIX }} image
-      if: false
-      # if: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) }}
+      if: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) }}
       uses: docker/build-push-action@v3
       with:
         cache-from: type=gha
@@ -85,7 +84,7 @@ jobs:
         context: .
         build-args: |
           ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
-          ATLANTIS_VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+          ATLANTIS_VERSION=dev
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
@@ -113,7 +112,11 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         context: .
-        build-args: ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+        build-args: |
+          ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+          ATLANTIS_VERSION=dev
+          ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+          ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: ${{ github.event_name != 'pull_request' }}
         # release version is the name of the tag i.e. v0.10.0
