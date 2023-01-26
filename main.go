@@ -33,12 +33,12 @@ var (
 )
 
 func main() {
-	fmt.Printf("atlantis %s, commit %s, built at %s", version, commit, date)
 
 	v := viper.New()
 
 	logger, err := logging.NewStructuredLogger()
 
+	logger.Debug("atlantis %s, commit %s, built at %s\n", version, commit, date)
 	if err != nil {
 		panic(fmt.Sprintf("unable to initialize logger. %s", err.Error()))
 	}
