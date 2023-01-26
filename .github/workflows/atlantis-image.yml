@@ -28,6 +28,7 @@ jobs:
       RELEASE_TAG: ${{ contains(github.ref, 'pre') && 'prerelease-latest' || 'latest' }}
       IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/atlantis
       IMAGE_SUFFIX: ${{ matrix.image_type != 'alpine' && format('-{0}', matrix.image_type) || '' }}
+
     steps:
     - uses: actions/checkout@v3
 
@@ -76,7 +77,11 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         context: .
-        build-args: ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+        build-args: |
+          ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+          ATLANTIS_VERSION=dev
+          ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+          ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
@@ -100,7 +105,11 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         context: .
-        build-args: ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+        build-args: |
+          ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+          ATLANTIS_VERSION=${{ env.RELEASE_VERSION }}
+          ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+          ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: ${{ github.event_name != 'pull_request' }}
         # release version is the name of the tag i.e. v0.10.0
