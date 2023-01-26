@@ -21,7 +21,7 @@ jobs:
   build:
     strategy:
       matrix:
-        image_type: [alpine] # , debian]
+        image_type: [alpine, debian]
     runs-on: ubuntu-22.04
     env:
       RELEASE_TYPE: ${{ contains(github.ref, 'pre') && 'pre' || 'stable' }}
@@ -57,7 +57,6 @@ jobs:
         labels: |
           org.opencontainers.image.licenses=Apache-2.0
         tags: |
-          type=raw,value=dev
           type=ref,event=branch
           type=ref,event=pr
           type=semver,pattern={{version}}
@@ -108,7 +107,7 @@ jobs:
         context: .
         build-args: |
           ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
-          ATLANTIS_VERSION=dev
+          ATLANTIS_VERSION=${{ env.RELEASE_VERSION }}
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
