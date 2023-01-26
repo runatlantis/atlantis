@@ -17,6 +17,7 @@ archives:
     format: zip
     files:
       - none*
+    rlcp: true
 
 checksum:
   name_template: 'checksums.txt'
