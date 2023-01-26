@@ -16,6 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	internalTerraform "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -131,9 +132,9 @@ func testWorkerWorkflow(ctx workflow.Context, r workerRequest) (workerResponse, 
 	}
 
 	worker := queue.Worker{
-		Queue:          q,
-		Deployer:       deployer,
-		MetricsHandler: client.MetricsNopHandler,
+		Queue:    q,
+		Deployer: deployer,
+		Scope:    metrics.NewNullableScope(),
 	}
 
 	err := workflow.SetQueryHandler(ctx, "queue", func() (queueAndState, error) {
@@ -393,7 +394,7 @@ func TestNewWorker(t *testing.T) {
 			ScheduleToCloseTimeout: 5 * time.Second,
 		})
 		q := queue.NewQueue(noopCallback, client.MetricsNopHandler)
-		_, err := queue.NewWorker(ctx, q, client.MetricsNopHandler, &testDeployActivity{}, emptyWorkflow, "nish/repo", "root")
+		_, err := queue.NewWorker(ctx, q, metrics.NewNullableScope(), &testDeployActivity{}, emptyWorkflow, "nish/repo", "root")
 		return res{
 			Lock: q.GetLockState(),
 		}, err

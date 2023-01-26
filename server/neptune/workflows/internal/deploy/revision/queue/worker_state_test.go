@@ -10,12 +10,12 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/stretchr/testify/assert"
-	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	internalTerraform "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 )
 
 type testBlockingDeployer struct{}
@@ -60,9 +60,9 @@ func testStateWorkflow(ctx workflow.Context, r workerRequest) (workerResponse, e
 	})
 
 	worker := queue.Worker{
-		Queue:          q,
-		Deployer:       &testBlockingDeployer{},
-		MetricsHandler: client.MetricsNopHandler,
+		Queue:    q,
+		Deployer: &testBlockingDeployer{},
+		Scope:    metrics.NewNullableScope(),
 	}
 
 	err := workflow.SetQueryHandler(ctx, "queue", func() (queueAndState, error) {

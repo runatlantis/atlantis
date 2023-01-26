@@ -11,6 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	workflowMetrics "github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/sideeffect"
 	temporalInternal "github.com/runatlantis/atlantis/server/neptune/workflows/internal/temporal"
 	"go.temporal.io/sdk/temporal"
@@ -90,6 +91,7 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 		metrics.RepoTag: request.Repo.FullName,
 		metrics.RootTag: request.Root.Name,
 	})
+	scope := workflowMetrics.NewScope(metricsHandler, "workflow", "deploy")
 
 	lockStateUpdater := queue.LockStateUpdater{
 		Activities: a,
@@ -98,7 +100,7 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 		lockStateUpdater.UpdateQueuedRevisions(ctx, d)
 	}, metricsHandler)
 
-	worker, err := queue.NewWorker(ctx, revisionQueue, metricsHandler, a, tfWorkflow, request.Repo.FullName, request.Root.Name)
+	worker, err := queue.NewWorker(ctx, revisionQueue, scope, a, tfWorkflow, request.Repo.FullName, request.Root.Name)
 	if err != nil {
 		return nil, err
 	}
