@@ -4,7 +4,11 @@ import (
 	"strings"
 
 	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/workflow"
+)
+
+const (
+	SignalNameTag       = "signal_name"
+	SignalReceiveMetric = "signal_receive"
 )
 
 const delim = "."
@@ -16,8 +20,8 @@ const delim = "."
 type Scope interface {
 	SubScope(namespace ...string) Scope
 	SubScopeWithTags(tags map[string]string) Scope
-	Counter(ctx workflow.Context, name string) client.MetricsCounter
-	Gauge(ctx workflow.Context, name string) client.MetricsGauge
+	Counter(name string) client.MetricsCounter
+	Gauge(name string) client.MetricsGauge
 }
 
 type WorkflowScope struct {
@@ -53,11 +57,11 @@ func (s *WorkflowScope) SubScopeWithTags(tags map[string]string) Scope {
 	}
 }
 
-func (s *WorkflowScope) Counter(ctx workflow.Context, name string) client.MetricsCounter {
+func (s *WorkflowScope) Counter(name string) client.MetricsCounter {
 	return s.handler.Counter(join(s.namespace, name))
 }
 
-func (s *WorkflowScope) Gauge(ctx workflow.Context, name string) client.MetricsGauge {
+func (s *WorkflowScope) Gauge(name string) client.MetricsGauge {
 	return s.handler.Gauge(join(s.namespace, name))
 }
 

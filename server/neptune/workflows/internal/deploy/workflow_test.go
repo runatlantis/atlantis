@@ -1,12 +1,12 @@
 package deploy_test
 
 import (
-	"go.temporal.io/sdk/client"
 	"testing"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
@@ -77,7 +77,7 @@ func testWorkflow(ctx workflow.Context, r request) (response, error) {
 		QueueWorker:              worker,
 		RevisionReceiver:         receiver,
 		NewRevisionSignalChannel: workflow.GetSignalChannel(ctx, testSignalID),
-		MetricsHandler:           client.MetricsNopHandler,
+		Scope:                    metrics.NewNullableScope(),
 	}
 
 	workflow.Go(ctx, func(ctx workflow.Context) {

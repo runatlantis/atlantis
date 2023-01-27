@@ -20,7 +20,7 @@ import (
 
 type testBlockingDeployer struct{}
 
-func (d *testBlockingDeployer) Deploy(ctx workflow.Context, requestedDeployment internalTerraform.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
+func (d *testBlockingDeployer) Deploy(ctx workflow.Context, requestedDeployment internalTerraform.DeploymentInfo, latestDeployment *deployment.Info, _ metrics.Scope) (*deployment.Info, error) {
 	ch := workflow.GetSignalChannel(ctx, "unblock-deploy")
 	selector := workflow.NewSelector(ctx)
 

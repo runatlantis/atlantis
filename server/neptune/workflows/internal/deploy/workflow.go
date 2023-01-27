@@ -2,7 +2,6 @@ package deploy
 
 import (
 	"github.com/runatlantis/atlantis/server/events/metrics"
-	"go.temporal.io/sdk/client"
 	"time"
 
 	"github.com/pkg/errors"
@@ -24,8 +23,9 @@ const (
 	// signals
 	NewRevisionSignalID = "new-revision"
 
-	RevisionReceiveTimeout   = 60 * time.Minute
-	ActiveDeployWorkflowStat = "workflow.deploy.active"
+	RevisionReceiveTimeout    = 60 * time.Minute
+	ActiveDeployWorkflowStat  = "active"
+	SuccessDeployWorkflowStat = "success"
 )
 
 type workerActivities struct {
@@ -77,7 +77,7 @@ type Runner struct {
 	QueueWorker              QueueWorker
 	RevisionReceiver         SignalReceiver
 	NewRevisionSignalChannel workflow.ReceiveChannel
-	MetricsHandler           client.MetricsHandler
+	Scope                    workflowMetrics.Scope
 }
 
 func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workflow) (*Runner, error) {
@@ -98,14 +98,17 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 	}
 	revisionQueue := queue.NewQueue(func(ctx workflow.Context, d *queue.Deploy) {
 		lockStateUpdater.UpdateQueuedRevisions(ctx, d)
-	}, metricsHandler)
+	}, scope)
 
 	worker, err := queue.NewWorker(ctx, revisionQueue, scope, a, tfWorkflow, request.Repo.FullName, request.Root.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, a, sideeffect.GenerateUUID, worker)
+	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, a, sideeffect.GenerateUUID, worker,
+		scope.SubScopeWithTags(map[string]string{
+			workflowMetrics.SignalNameTag: NewRevisionSignalID,
+		}))
 
 	return &Runner{
 		Queue:                    revisionQueue,
@@ -113,13 +116,19 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 		QueueWorker:              worker,
 		RevisionReceiver:         revisionReceiver,
 		NewRevisionSignalChannel: workflow.GetSignalChannel(ctx, NewRevisionSignalID),
-		MetricsHandler:           metricsHandler,
+		Scope:                    scope,
 	}, nil
 }
 
+func (r *Runner) shutdown() {
+	r.Scope.Gauge(ActiveDeployWorkflowStat).Update(0)
+	r.Scope.Counter(SuccessDeployWorkflowStat).Inc(1)
+}
+
 func (r *Runner) Run(ctx workflow.Context) error {
-	r.MetricsHandler.Gauge(ActiveDeployWorkflowStat).Update(1)
-	defer r.MetricsHandler.Gauge(ActiveDeployWorkflowStat).Update(0)
+	r.Scope.Gauge(ActiveDeployWorkflowStat).Update(1)
+	defer r.shutdown()
+
 	var action RunnerAction
 	workerCtx, shutdownWorker := workflow.WithCancel(ctx)
 

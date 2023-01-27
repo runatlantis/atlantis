@@ -12,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
 	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -54,17 +55,19 @@ const (
 	UpdateCheckRunRetryCount = 5
 )
 
-func (p *Deployer) Deploy(ctx workflow.Context, requestedDeployment terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
-	commitDirection, err := p.getDeployRequestCommitDirection(ctx, requestedDeployment, latestDeployment)
+func (p *Deployer) Deploy(ctx workflow.Context, requestedDeployment terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info, scope metrics.Scope) (*deployment.Info, error) {
+	commitDirection, err := p.getDeployRequestCommitDirection(ctx, requestedDeployment, latestDeployment, scope)
 	if err != nil {
 		return nil, err
 	}
 	if commitDirection == activities.DirectionBehind {
+		scope.Counter("invalid_commit_direction_err").Inc(1)
 		// always returns error for caller to skip revision
 		p.updateCheckRun(ctx, requestedDeployment, github.CheckRunFailure, DirectionBehindSummary, nil)
 		return nil, NewValidationError("requested revision %s is behind latest deployed revision %s", requestedDeployment.Revision, latestDeployment.Revision)
 	}
 	if requestedDeployment.Root.Rerun && commitDirection != activities.DirectionIdentical {
+		scope.Counter("invalid_rerun_err").Inc(1)
 		// always returns error for caller to skip revision
 		p.updateCheckRun(ctx, requestedDeployment, github.CheckRunFailure, RerunNotIdenticalSummary, nil)
 		return nil, NewValidationError("requested revision %s is a re-run attempt but not identical to the latest deployed revision %s", requestedDeployment.Revision, latestDeployment.Revision)
@@ -101,9 +104,10 @@ func (p *Deployer) FetchLatestDeployment(ctx workflow.Context, repoName, rootNam
 	return resp.DeploymentInfo, nil
 }
 
-func (p *Deployer) getDeployRequestCommitDirection(ctx workflow.Context, deployRequest terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info) (activities.DiffDirection, error) {
+func (p *Deployer) getDeployRequestCommitDirection(ctx workflow.Context, deployRequest terraformWorkflow.DeploymentInfo, latestDeployment *deployment.Info, scope metrics.Scope) (activities.DiffDirection, error) {
 	// this means we are deploying this root for the first time
 	if latestDeployment == nil {
+		scope.Counter("first_deployment").Inc(1)
 		return activities.DirectionAhead, nil
 	}
 	var compareCommitResp activities.CompareCommitResponse

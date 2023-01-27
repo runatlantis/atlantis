@@ -13,6 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github/markdown"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	internalTerraform "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -44,6 +45,7 @@ func testStateReceiveWorkflow(ctx workflow.Context, r stateReceiveRequest) error
 
 	receiver := &internalTerraform.StateReceiver{
 		Activity: &testActivities{},
+		Scope:    metrics.NewNullableScope(),
 	}
 
 	workflow.Go(ctx, func(ctx workflow.Context) {

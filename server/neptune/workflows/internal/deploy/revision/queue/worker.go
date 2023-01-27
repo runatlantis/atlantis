@@ -26,7 +26,7 @@ type queue interface {
 }
 
 type deployer interface {
-	Deploy(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error)
+	Deploy(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo, latestDeployment *deployment.Info, scope metrics.Scope) (*deployment.Info, error)
 }
 
 type workerActivities interface {
@@ -42,7 +42,6 @@ const (
 	CompleteWorkerState WorkerState = "complete"
 
 	UnlockSignalName = "unlock"
-	SignalNameTag    = "signal_name"
 )
 
 type UnlockSignalRequest struct {
@@ -88,7 +87,7 @@ func NewWorker(
 	tfWorkflow terraform.Workflow,
 	repoName, rootName string,
 ) (*Worker, error) {
-	tfWorkflowRunner := terraform.NewWorkflowRunner(a, tfWorkflow)
+	tfWorkflowRunner := terraform.NewWorkflowRunner(a, tfWorkflow, scope)
 	deployer := &Deployer{
 		Activities:              a,
 		TerraformWorkflowRunner: tfWorkflowRunner,
@@ -167,8 +166,8 @@ func (w *Worker) Work(ctx workflow.Context) {
 			logger.Info(ctx, "Processing... ")
 		case receive:
 			logger.Info(ctx, "Received unlock signal... ")
-			w.Scope.SubScopeWithTags(map[string]string{SignalNameTag: UnlockSignalName}).
-				Counter(ctx, "signal_receive").
+			w.Scope.SubScopeWithTags(map[string]string{metrics.SignalNameTag: UnlockSignalName}).
+				Counter(metrics.SignalReceiveMetric).
 				Inc(1)
 			w.Queue.SetLockForMergedItems(ctx, LockState{
 				Status: UnlockedStatus,
@@ -189,11 +188,11 @@ func (w *Worker) Work(ctx workflow.Context) {
 		scope := addRevisionSubscope(w.Scope, msg)
 
 		//TODO: pass this scope further down the code
-		currentDeployment, err = w.deploy(ctx, msg, w.latestDeployment)
+		currentDeployment, err = w.deploy(ctx, msg, w.latestDeployment, scope)
 
 		// since there was no error we can safely count this as our latest deploy
 		if err == nil {
-			scope.Counter(ctx, "success").Inc(1)
+			scope.Counter("success").Inc(1)
 			w.latestDeployment = currentDeployment
 			selector.AddFuture(w.awaitWork(ctx), callback)
 			continue
@@ -219,7 +218,7 @@ func (w *Worker) Work(ctx workflow.Context) {
 			logger.Error(ctx, "failed to deploy revision, moving to next one", key.ErrKey, err)
 		}
 
-		scope.SubScopeWithTags(map[string]string{"error_type": readableErr}).Counter(ctx, "failure")
+		scope.SubScopeWithTags(map[string]string{"error_type": readableErr}).Counter("failure")
 
 		selector.AddFuture(w.awaitWork(ctx), callback)
 	}
@@ -251,7 +250,7 @@ func (w *Worker) awaitWork(ctx workflow.Context) workflow.Future {
 	return future
 }
 
-func (w *Worker) deploy(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
+func (w *Worker) deploy(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo, latestDeployment *deployment.Info, scope metrics.Scope) (*deployment.Info, error) {
 	w.setCurrentDeploymentState(CurrentDeployment{
 		Deployment: requestedDeployment,
 		Status:     InProgressStatus,
@@ -264,7 +263,7 @@ func (w *Worker) deploy(ctx workflow.Context, requestedDeployment terraform.Depl
 	ctx = workflow.WithValue(ctx, internalContext.SHAKey, requestedDeployment.Revision)
 	ctx = workflow.WithValue(ctx, internalContext.DeploymentIDKey, requestedDeployment.ID)
 
-	result, err := w.Deployer.Deploy(ctx, requestedDeployment, latestDeployment)
+	result, err := w.Deployer.Deploy(ctx, requestedDeployment, latestDeployment, scope)
 
 	return result, err
 }
@@ -272,10 +271,13 @@ func (w *Worker) deploy(ctx workflow.Context, requestedDeployment terraform.Depl
 func addRevisionSubscope(s metrics.Scope, msg terraform.DeploymentInfo) metrics.Scope {
 	scope := s.SubScope("revision")
 	tags := make(map[string]string)
-	if msg.Root.Trigger == tfModel.ManualTrigger {
-		tags["workflow_trigger"] = "manual"
+
+	tags["workflow_trigger"] = string(msg.Root.Trigger)
+
+	if msg.Root.Plan.Mode != nil {
+		tags["plan_mode"] = string(*msg.Root.Plan.Mode)
 	} else {
-		tags["workflow_trigger"] = "merge"
+		tags["plan_mode"] = "default"
 	}
 
 	if msg.Root.Rerun {

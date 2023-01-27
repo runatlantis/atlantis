@@ -3,10 +3,10 @@ package queue
 import (
 	"container/list"
 	"fmt"
-	"go.temporal.io/sdk/client"
 
 	activity "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -27,17 +27,17 @@ const (
 type Deploy struct {
 	queue              *priority
 	lockStatusCallback func(workflow.Context, *Deploy)
-	metricsHandler     client.MetricsHandler
+	scope              metrics.Scope
 
 	// mutable: default is unlocked
 	lock LockState
 }
 
-func NewQueue(callback func(workflow.Context, *Deploy), metricsHandler client.MetricsHandler) *Deploy {
+func NewQueue(callback func(workflow.Context, *Deploy), scope metrics.Scope) *Deploy {
 	return &Deploy{
 		queue:              newPriorityQueue(),
 		lockStatusCallback: callback,
-		metricsHandler:     metricsHandler,
+		scope:              scope,
 	}
 
 }
@@ -56,7 +56,7 @@ func (q *Deploy) CanPop() bool {
 }
 
 func (q *Deploy) Pop() (terraform.DeploymentInfo, error) {
-	defer q.metricsHandler.Gauge(QueueDepthStat).Update(float64(q.queue.Size()))
+	defer q.scope.Gauge(QueueDepthStat).Update(float64(q.queue.Size()))
 	return q.queue.Pop()
 }
 
@@ -73,7 +73,7 @@ func (q *Deploy) IsEmpty() bool {
 }
 
 func (q *Deploy) Push(msg terraform.DeploymentInfo) {
-	defer q.metricsHandler.Gauge(QueueDepthStat).Update(float64(q.queue.Size()))
+	defer q.scope.Gauge(QueueDepthStat).Update(float64(q.queue.Size()))
 	if msg.Root.Trigger == activity.ManualTrigger {
 		q.queue.Push(msg, High)
 		return

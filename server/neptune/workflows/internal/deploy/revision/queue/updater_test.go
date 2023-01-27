@@ -1,7 +1,6 @@
 package queue_test
 
 import (
-	"go.temporal.io/sdk/client"
 	"testing"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	tfActivity "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/testsuite"
@@ -127,7 +127,7 @@ func testUpdaterWorkflow(ctx workflow.Context, r updaterReq) error {
 		Activities: a,
 	}
 
-	q := queue.NewQueue(noopCallback, client.MetricsNopHandler)
+	q := queue.NewQueue(noopCallback, metrics.NewNullableScope())
 	for _, i := range r.Queue {
 		q.Push(i)
 	}

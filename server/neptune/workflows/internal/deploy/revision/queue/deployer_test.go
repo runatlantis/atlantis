@@ -14,6 +14,7 @@ import (
 	model "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/temporal"
@@ -86,7 +87,7 @@ func testDeployerWorkflow(ctx workflow.Context, r deployerRequest) (*deployment.
 		},
 	}
 
-	return deployer.Deploy(ctx, r.Info, r.LatestDeploy)
+	return deployer.Deploy(ctx, r.Info, r.LatestDeploy, metrics.NewNullableScope())
 }
 
 func TestDeployer_FirstDeploy(t *testing.T) {

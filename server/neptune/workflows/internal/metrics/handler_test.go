@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/test"
 	"go.temporal.io/sdk/client"
 	"gopkg.in/go-playground/assert.v1"
 )
@@ -55,14 +54,14 @@ func TestScope(t *testing.T) {
 		}
 		_ = metrics.NewScope(handler, "some", "namespace").
 			SubScope("nish").
-			Counter(test.Background(), "hi")
+			Counter("hi")
 	})
 	t.Run("gauge", func(t *testing.T) {
 		handler := testHandler{
 			expectedNamespace: "nish.hi",
 		}
 		_ = metrics.NewScope(handler, "nish").
-			Gauge(test.Background(), "hi")
+			Gauge("hi")
 	})
 
 	t.Run("tags", func(t *testing.T) {
@@ -72,6 +71,6 @@ func TestScope(t *testing.T) {
 		}
 		_ = metrics.NewScope(handler, "nish").
 			SubScopeWithTags(map[string]string{"hello": "world"}).
-			Gauge(test.Background(), "hi")
+			Gauge("hi")
 	})
 }

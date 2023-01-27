@@ -15,6 +15,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request/converter"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -44,13 +45,14 @@ type Activities interface {
 	GithubCreateCheckRun(ctx context.Context, request activities.CreateCheckRunRequest) (activities.CreateCheckRunResponse, error)
 }
 
-func NewReceiver(ctx workflow.Context, queue Queue, activities Activities, generator idGenerator, worker DeploymentStore) *Receiver {
+func NewReceiver(ctx workflow.Context, queue Queue, activities Activities, generator idGenerator, worker DeploymentStore, scope metrics.Scope) *Receiver {
 	return &Receiver{
 		queue:       queue,
 		ctx:         ctx,
 		activities:  activities,
 		idGenerator: generator,
 		worker:      worker,
+		scope:       scope,
 	}
 }
 
@@ -60,6 +62,7 @@ type Receiver struct {
 	activities  Activities
 	idGenerator idGenerator
 	worker      DeploymentStore
+	scope       metrics.Scope
 }
 
 func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
@@ -70,6 +73,8 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 
 	var request NewRevisionRequest
 	c.Receive(n.ctx, &request)
+
+	n.scope.Counter(metrics.SignalReceiveMetric).Inc(1)
 
 	root := converter.Root(request.Root)
 	repo := converter.Repo(request.Repo)

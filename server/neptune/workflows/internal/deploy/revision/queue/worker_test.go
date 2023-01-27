@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"go.temporal.io/sdk/client"
-
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/deployment"
@@ -87,7 +85,7 @@ type testDeployer struct {
 	count int
 }
 
-func (d *testDeployer) Deploy(ctx workflow.Context, requestedDeployment internalTerraform.DeploymentInfo, latestDeployment *deployment.Info) (*deployment.Info, error) {
+func (d *testDeployer) Deploy(ctx workflow.Context, requestedDeployment internalTerraform.DeploymentInfo, latestDeployment *deployment.Info, _ metrics.Scope) (*deployment.Info, error) {
 	d.capturedLatestDeployments = append(d.capturedLatestDeployments, latestDeployment)
 	info := d.expectedRevisions[d.count]
 
@@ -393,7 +391,7 @@ func TestNewWorker(t *testing.T) {
 		ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 			ScheduleToCloseTimeout: 5 * time.Second,
 		})
-		q := queue.NewQueue(noopCallback, client.MetricsNopHandler)
+		q := queue.NewQueue(noopCallback, metrics.NewNullableScope())
 		_, err := queue.NewWorker(ctx, q, metrics.NewNullableScope(), &testDeployActivity{}, emptyWorkflow, "nish/repo", "root")
 		return res{
 			Lock: q.GetLockState(),
