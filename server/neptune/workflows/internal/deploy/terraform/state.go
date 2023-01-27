@@ -120,7 +120,7 @@ func (n *StateReceiver) emitApplyEvents(ctx workflow.Context, jobState *state.Jo
 		State:          atlantisJobState,
 		StartTime:      startTime,
 		EndTime:        endTime,
-		IsForceApply:   deploymentInfo.Root.Trigger == terraform.ManualTrigger,
+		IsForceApply:   deploymentInfo.Root.Trigger == terraform.ManualTrigger && !deploymentInfo.Root.Rerun,
 	}
 
 	return workflow.ExecuteActivity(ctx, n.Activity.AuditJob, auditJobReq).Get(ctx, nil)
