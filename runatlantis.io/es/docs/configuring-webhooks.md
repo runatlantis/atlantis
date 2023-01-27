@@ -69,7 +69,7 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - Under **Issues** leave everything **un**checked
 - Under **Pull Request**, select: Created, Updated, Merged, Declined and Comment created
 - Click **Save**
-<img src="./guia/images/bitbucket-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px">
+<img src="../guia/images/bitbucket-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px">
 - See [Next Steps](#next-steps)
 
 ## Bitbucket Server (aka Stash)
@@ -83,7 +83,7 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - Set **Secret** to the Webhook Secret you generated previously
   - **NOTE** If you're adding a webhook to multiple repositories, each repository will need to use the **same** secret.
 - Under **Pull Request**, select: Opened, Source branch updated, Merged, Declined, Deleted and Comment added
-- Click **Save**<img src="./guia/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 600px;">
+- Click **Save**<img src="../guia/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 600px;">
 - See [Next Steps](#next-steps)
 
 ## Azure DevOps
