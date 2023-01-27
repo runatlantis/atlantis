@@ -518,6 +518,14 @@ func (p ProjectPlanStatus) String() string {
 	}
 }
 
+func (p ProjectPlanStatus) IsPlanned() bool {
+	if p == PlannedPlanStatus || p == PassedPolicyCheckStatus || p == ErroredPolicyCheckStatus {
+		return true
+	}
+
+	return false
+}
+
 // WorkflowHookCommandContext defines the context for a pre and post worklfow_hooks that will
 // be executed before workflows.
 type WorkflowHookCommandContext struct {

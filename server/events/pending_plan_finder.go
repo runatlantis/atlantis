@@ -76,21 +76,13 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullRequest models.PullReque
 		return plans, err
 	}
 
-	// TODO: ensure this returns an empty list
-	// instead of nil if there's no pending plans
 	status, err := p.Backend.GetPullStatus(pullRequest)
-	if err != nil {
+	if err != nil || status == nil {
 		return plans, err
 	}
 
-	// TODO: remove this when we always have a list
-	if status == nil {
-		return plans, nil
-	}
-
 	for _, project := range status.Projects {
-		// TODO this should be more simple
-		if project.Status != models.PlannedPlanStatus && project.Status != models.PassedPolicyCheckStatus && project.Status != models.ErroredPolicyCheckStatus {
+		if !project.Status.IsPlanned() {
 			continue
 		}
 
