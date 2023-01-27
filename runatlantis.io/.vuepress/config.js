@@ -15,13 +15,11 @@ export default defineUserConfig({
             title: 'Atlantis',
             description: 'Atlantis: Terraform Pull Request Automation',
         },
-
         '/es/': {
             lang: 'es-ES',
             title: 'Atlantis',
             description: 'Atlantis: Automatización de Pull Requests para Terraform',
         },
-
     },
     plugins: [
         googleAnalyticsPlugin({
@@ -175,7 +173,7 @@ export default defineUserConfig({
                 selectLanguageName: 'Spanish',
                 navbar: [
                     { text: 'Home', link: '/es/' },
-                    { text: 'Guia', link: '/es/guide/' },
+                    { text: 'Guia', link: '/es/guia/' },
                     { text: 'Documentos', link: '/es/docs/' },
                     { text: 'Blog', link: 'https://medium.com/runatlantis' },
                 ],
