@@ -124,14 +124,34 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	// If there are no projects to apply, don't respond to the PR and ignore
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
-		ctx.Log.Info("determined there was no project to run apply in.")
+		ctx.Log.Info("determined there was no project to run plan in")
 		if !a.silenceVCSStatusNoProjects {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects applied successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := a.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
-				ctx.Log.Warn("unable to update commit status: %s", err)
+			if cmd.IsForSpecificProject() {
+				// With a specific apply, just reset the status so it's not stuck in pending state
+				pullStatus, err := a.Backend.GetPullStatus(pull)
+				if err != nil {
+					ctx.Log.Warn("unable to fetch pull status: %s", err)
+					return
+				}
+				if pullStatus == nil {
+					// default to 0/0
+					ctx.Log.Debug("setting VCS status to 0/0 success as no previous state was found")
+					if err := a.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+						ctx.Log.Warn("unable to update commit status: %s", err)
+					}
+					return
+				}
+				ctx.Log.Debug("resetting VCS status")
+				a.updateCommitStatus(ctx, *pullStatus)
+			} else {
+				// With a generic apply, we set successful commit statuses
+				// with 0/0 projects planned successfully because some users require
+				// the Atlantis status to be passing for all pull requests.
+				// Does not apply to skipped runs for specific projects
+				ctx.Log.Debug("setting VCS status to success with no projects found")
+				if err := a.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+					ctx.Log.Warn("unable to update commit status: %s", err)
+				}
 			}
 		}
 		return

@@ -1,0 +1,41 @@
+.theme-container {
+	&.home-custom {
+		.hero {
+			h1 {
+				font-size: 64px;
+				font-family: Lato, sans-serif;
+				font-weight: 900;
+				color: #222;
+			}
+			img {
+				height: 200px;
+			}
+		}
+		p {
+			&.description {
+				position: relative;
+				&:before {
+					position: absolute;
+					content: '';
+					width: 40px;
+					height: 3px;
+					top: -19px;
+					left: 50%;
+					margin-left: -20px;
+					background: #f36;
+				}
+			}
+		}
+		.feature {
+			h2 {
+				color: #222;
+			}
+			p {
+				color: #222;
+			}
+		}
+	}
+}
+.sidebar-heading {
+	font-size: inherit;
+}

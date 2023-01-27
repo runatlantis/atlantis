@@ -39,6 +39,9 @@ repos:
   # By default, atlantis.yaml is used.
   repo_config_file: path/to/atlantis.yaml
 
+  # plan_requirements sets the Plan Requirements for all repos that match.
+  plan_requirements: [approved, mergeable, undiverged]
+
   # apply_requirements sets the Apply Requirements for all repos that match.
   apply_requirements: [approved, mergeable, undiverged]
 
@@ -78,10 +81,6 @@ repos:
   post_workflow_hooks: 
     - run: my-post-workflow-hook-command arg1
 
-  # api-secret defines the secret used to pass to the /api/plan and /api/apply endpoints
-  # if not present the api endpoints will not be accesible.
-  api-secret: "myapisecret"
-
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
 
@@ -106,13 +105,14 @@ Here are some of the reasons you might want to use a repo config.
 
 ### Requiring PR Is Approved Before an applicable subcommand
 If you want to require that all (or specific) repos must have pull requests
-approved before Atlantis will allow running `apply` or `import`, use the `apply_requirements` or `import_requirements` keys.
+approved before Atlantis will allow running `apply` or `import`, use the `plan_requirements`, `apply_requirements` or `import_requirements` keys.
 
 For all repos:
 ```yaml
 # repos.yaml
 repos:
 - id: /.*/
+  plan_requirements: [approved]
   apply_requirements: [approved]
   import_requirements: [approved]
 ```
@@ -122,6 +122,7 @@ For a specific repo:
 # repos.yaml
 repos:
 - id: github.com/myorg/myrepo
+  plan_requirements: [approved]
   apply_requirements: [approved]
   import_requirements: [approved]
 ```
@@ -130,13 +131,14 @@ See [Command Requirements](command-requirements.html) for more details.
 
 ### Requiring PR Is "Mergeable" Before Apply or Import
 If you want to require that all (or specific) repos must have pull requests
-in a mergeable state before Atlantis will allow running `apply` or `import`, use the `apply_requirements` or `import_requirements` keys.
+in a mergeable state before Atlantis will allow running `apply` or `import`, use the `plan_requirements`, `apply_requirements` or `import_requirements` keys.
 
 For all repos:
 ```yaml
 # repos.yaml
 repos:
 - id: /.*/
+  plan_requirements: [mergeable]
   apply_requirements: [mergeable]
   import_requirements: [mergeable]
 ```
@@ -146,6 +148,7 @@ For a specific repo:
 # repos.yaml
 repos:
 - id: github.com/myorg/myrepo
+  plan_requirements: [mergeable]
   apply_requirements: [mergeable]
   import_requirements: [mergeable]
 ```
@@ -162,11 +165,12 @@ To allow all repos to override the default:
 repos:
 - id: /.*/
   # The default will be approved.
+  plan_requirements: [approved]
   apply_requirements: [approved]
   import_requirements: [approved]
 
   # But all repos can set their own using atlantis.yaml
-  allowed_overrides: [apply_requirements, import_requirements]
+  allowed_overrides: [plan_requirements, apply_requirements, import_requirements]
 ```
 To allow only a specific repo to override the default:
 ```yaml
@@ -174,21 +178,23 @@ To allow only a specific repo to override the default:
 repos:
 # Set a default for all repos.
 - id: /.*/
+  plan_requirements: [approved]
   apply_requirements: [approved]
   import_requirements: [approved]
 
 # Allow a specific repo to override.
 - id: github.com/myorg/myrepo
-  allowed_overrides: [apply_requirements, import_requirements]
+  allowed_overrides: [plan_requirements, apply_requirements, import_requirements]
 ```
 
 Then each allowed repo can have an `atlantis.yaml` file that
-sets `apply_requirements` or `import_requirements` to an empty array (disabling the requirement).
+sets `plan_requirements`, `apply_requirements` or `import_requirements` to an empty array (disabling the requirement).
 ```yaml
 # atlantis.yaml in the repo root or set repo_config_file in repos.yaml
 version: 3
 projects:
 - dir: .
+  plan_requirements: []
   apply_requirements: []
   import_requirements: []
 ```
@@ -440,6 +446,7 @@ Each servers handle different repository config files.
 repos:
 - id: /.*/
   branch: /.*/
+  plan_requirements: []
   apply_requirements: []
   import_requirements: []
   workflow: default
@@ -468,7 +475,8 @@ If you set a workflow with the key `default`, it will override this.
 | id                            | string   | none    | yes      | Value can be a regular expression when specified as /&lt;regex&gt;/ or an exact string match. Repo IDs are of the form `{vcs hostname}/{org}/{name}`, ex. `github.com/owner/repo`. Hostname is specified without scheme or port. For Bitbucket Server, {org} is the **name** of the project, not the key. |
 | branch                        | string   | none    | no       | An regex matching pull requests by base branch (the branch the pull request is getting merged into). By default, all branches are matched                                                                                                                                                                 |
 | repo_config_file              | string   | none    | no       | Repo config file path in this repo. By default, use `atlantis.yaml` which is located on repository root. When multiple atlantis servers work with the same repo, please set different file names.                                                                                                         |
-| workflow                      | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                        |
+| workflow                      | string   | none    | no       | A custom workflow.                                                                                                                                                                                             
+| plan_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.                                                                  |                                                                                           |
 | apply_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.                                                                  |
 | import_requirements           | []string | none    | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.                                                                 |
 | allowed_overrides             | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge` and `repo_locking`                                                                                                                       |
@@ -476,7 +484,6 @@ If you set a workflow with the key `default`, it will override this.
 | allow_custom_workflows        | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                                                                                        |
 | delete_source_branch_on_merge | bool     | false   | no       | Whether or not to delete the source branch on merge (only AzureDevOps and GitLab support)                                                                                                                                                                                                                 |
 | repo_locking                  | bool     | false   | no       | Whether or not to get a lock                                                                                                                                                                                                                                                                              |
-| api-secret                    | string   | none    | no       | Api secret key for the /api/plan and /api/apply api endpoints. if not set the /api/* endpoints are disable by default.  |
 
 
 :::tip Notes
