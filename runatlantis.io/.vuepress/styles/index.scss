@@ -1,41 +1,243 @@
+// https://v2.vuepress.vuejs.org/reference/default-theme/styles.html#style-file
+
+// colors
+$textColor: var(--c-text);
+$borderColor: var(--c-border);
+$buttonTextColor: var(--c-badge-danger-text);
+$buttonColor: var(--c-brand);
+$buttonHoverColor: var(--c-brand-light);
+$darkBackground: var(--c-bg-light);
+$darkBackgroundBorder: var(--c-border-dark);
+
+// layout
+$navbarHeight: 3.6rem;
+$sidebarWidth: 20rem;
+$contentWidth: 740px;
+
+// responsive breakpoints
+$MQNarrow: 959px;
+$MQMobile: 719px;
+$MQMobileNarrow: 419px;
+
+$homeWidth: 960px;
+
+.container {
+  padding-top: 3.6rem;
+}
+
+.home {
+  padding: 0 2rem;
+  max-width: $homeWidth;
+  margin: 0px auto 80px;
+  .hero {
+    text-align: center;
+    img {
+      max-height: 280px;
+      display: block;
+      margin: 3rem auto 1.5rem;
+    }
+    h1 {
+      font-size: 3rem;
+    }
+    h1, .description, .action {
+      margin: 1.8rem auto;
+    }
+    .description {
+      max-width: 35rem;
+      font-family: Lato, sans-serif;
+      font-size: 1.9rem;
+      line-height: 1.3;
+    }
+    .action {
+      display: inline;
+    }
+    .action-button {
+      display: inline-block;
+      font-size: 1.2rem;
+      color: $buttonTextColor;
+      cursor: pointer;
+      background-color: $buttonColor;
+      padding: 0.8rem 1.6rem;
+      border-radius: 4px;
+      transition: background-color .1s ease;
+      box-sizing: border-box;
+      margin: 0 10px;
+      &:hover {
+        background-color: $buttonHoverColor;
+      }
+    }
+  }
+  h2 {
+    border-bottom: none;
+  }
+  .features {
+    border-top: 1px solid $borderColor;
+    padding: 1.2rem 0;
+    margin-top: 0;
+  }
+  .footer {
+    padding: 2.5rem;
+    border-top: 1px solid $borderColor;
+    text-align: center;
+  }
+}
+
+.getting-started-footer {
+  padding: 2.5rem 0;
+  margin: 0 auto;
+}
+
+.workflow-container {
+  border-top: 2px solid $borderColor;
+}
+
+.workflow {
+  text-align: center;
+  margin: 80px auto;
+  max-width: $homeWidth;
+  img {
+    width: 100%;
+  }
+  .mobile {
+    display: none;
+  }
+}
+
+.benefits-container {
+   border-top: 1px solid $darkBackgroundBorder;
+  .benefit-container {
+    border-bottom: 1px solid $darkBackgroundBorder;
+    .title {
+      padding-top: 40px;
+      text-align: center;
+    }
+    &.-dark {
+      background-color: $darkBackground;
+    }
+    .benefit {
+      max-width: $homeWidth;
+      margin: 0 auto;
+      display: flex;
+      flex-flow: row wrap;
+      align-items: center;
+      .item {
+        flex-basis: 50%;
+        flex-grow: 1;
+        min-width: 250px;
+        .image {
+          padding: 40px;
+          text-align: center;
+          img {
+            max-height: 200px;
+          }
+        }
+      }
+      .description {
+        padding: 40px;
+        h2 {
+          border: none;
+        }
+        ul {
+          list-style-type: none;
+          padding-left: 0;
+        }
+        li {
+          display: flex;
+          align-items: center;
+          line-height: 25px;
+          margin-bottom: 20px;
+        }
+        .checkmark {
+          width: 20px;
+          margin-right: 10px;
+          vertical-align: middle;
+          align-self: baseline;
+          padding-top: 5px;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: $MQMobile) {
+  .workflow {
+    .mobile {
+      display: block;
+    }
+    .desktop {
+      display: none;
+    }
+  }
+
+  .benefits-container {
+    .benefit-container {
+      .benefit {
+        flex-direction: column;
+        .item {
+          &.image {
+            order: -1;
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: $MQMobileNarrow) {
+  .home {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    .hero {
+      img {
+        max-height: 210px;
+        margin: 2rem auto 1.2rem;
+      }
+      h1 {
+        font-size: 2rem;
+      }
+      h1, .description, .action {
+        margin: 1.2rem auto;
+      }
+      .description {
+        font-size: 1.2rem;
+      }
+      .action-button {
+        font-size: 1rem;
+        padding: 0.6rem 1.2rem;
+      }
+    }
+  }
+}
+
 .theme-container {
-	&.home-custom {
-		.hero {
-			h1 {
-				font-size: 64px;
-				font-family: Lato, sans-serif;
-				font-weight: 900;
-				color: #222;
-			}
-			img {
-				height: 200px;
-			}
-		}
-		p {
-			&.description {
-				position: relative;
-				&:before {
-					position: absolute;
-					content: '';
-					width: 40px;
-					height: 3px;
-					top: -19px;
-					left: 50%;
-					margin-left: -20px;
-					background: #f36;
-				}
-			}
-		}
-		.feature {
-			h2 {
-				color: #222;
-			}
-			p {
-				color: #222;
-			}
-		}
-	}
+  &.home-custom {
+    .hero {
+      h1 {
+        font-size: 64px;
+        font-family: Lato, sans-serif;
+        font-weight: 900;
+      }
+      img {
+        height: 200px;
+      }
+    }
+    p {
+      &.description {
+        position: relative;
+        &:before {
+          position: absolute;
+          content: '';
+          width: 40px;
+          height: 3px;
+          top: -19px;
+          left: 50%;
+          margin-left: -20px;
+          background: #f36;
+        }
+      }
+    }
+  }
 }
 .sidebar-heading {
-	font-size: inherit;
+  font-size: inherit;
 }

@@ -18,6 +18,11 @@ on:
       - '.github/**'
   pull_request:
     # The branches below must be a subset of the branches above
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
     branches: [ "main" ]
     paths-ignore:
       - '.github/**'
