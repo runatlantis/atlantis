@@ -174,7 +174,7 @@ export default defineUserConfig({
                 navbar: [
                     { text: 'Home', link: '/es/' },
                     { text: 'Guia', link: '/es/guia/' },
-                    { text: 'Documentos', link: '/es/docs/' },
+                    { text: 'Documentos', link: '/es/documentos/' },
                     { text: 'Blog', link: 'https://medium.com/runatlantis' },
                 ],
                 sidebar: {
