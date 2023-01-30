@@ -12,7 +12,7 @@ require (
 	github.com/elazarl/go-bindata-assetfs v1.0.1
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-playground/validator/v10 v10.11.1
-	github.com/go-redis/redis/v9 v9.0.0-rc.2
+	github.com/go-redis/redis/v9 v9.0.1
 	github.com/go-test/deep v1.1.0
 	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/google/go-github/v49 v49.1.0
