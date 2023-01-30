@@ -30,7 +30,7 @@ func SplitComment(comment string, maxSize int, sepEnd string, sepStart string) [
 		if i > 0 {
 			portion = sepStart + portion
 		}
-		comments = append(comments, portion)
+		comments = append([]string{portion}, comments...)
 	}
 	return comments
 }
