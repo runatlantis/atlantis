@@ -43,7 +43,7 @@ require (
 	github.com/xanzy/go-gitlab v0.79.0
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.24.0
-	golang.org/x/exp v0.0.0-20230126173853-a67bb567ff2e
+	golang.org/x/exp v0.0.0-20230129154200-a960b3787bd2
 	golang.org/x/term v0.4.0
 	golang.org/x/text v0.6.0
 	gopkg.in/yaml.v2 v2.4.0
