@@ -41,8 +41,8 @@ func TestSplitComment_TwoComments(t *testing.T) {
 	expFirstComment := comment[:expCommentLen]
 	expSecondComment := comment[expCommentLen:]
 	Equals(t, 2, len(split))
-	Equals(t, expFirstComment+sepEnd, split[0])
-	Equals(t, sepStart+expSecondComment, split[1])
+	Equals(t, sepStart+expSecondComment, split[0])
+	Equals(t, expFirstComment+sepEnd, split[1])
 }
 
 // If the comment needs to be split into 4 we should do the split and add the
@@ -56,8 +56,8 @@ func TestSplitComment_FourComments(t *testing.T) {
 
 	expMax := len(comment) / 4
 	Equals(t, []string{
-		comment[:expMax] + sepEnd,
-		sepStart + comment[expMax:expMax*2] + sepEnd,
+		sepStart + comment[expMax*3:],
 		sepStart + comment[expMax*2:expMax*3] + sepEnd,
-		sepStart + comment[expMax*3:]}, split)
+		sepStart + comment[expMax:expMax*2] + sepEnd,
+		comment[:expMax] + sepEnd}, split)
 }
