@@ -1024,9 +1024,9 @@ func TestGithubClient_SplitComments(t *testing.T) {
 	err = client.CreateComment(repo, pull.Num, comment, "")
 	Ok(t, err)
 
-	body := strings.Split(githubComments[1].Body, "\n")
+	body := strings.Split(githubComments[0].Body, "\n")
 	firstSplit := strings.ToLower(body[0])
-	body = strings.Split(githubComments[3].Body, "\n")
+	body = strings.Split(githubComments[2].Body, "\n")
 	secondSplit := strings.ToLower(body[0])
 
 	Equals(t, 4, len(githubComments))
