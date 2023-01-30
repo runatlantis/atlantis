@@ -5,6 +5,7 @@ on:
     tags:
       - v*.*.* # stable release like, v0.19.2
       - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
+  workflow_dispatch:
 
 jobs:
   goreleaser:
@@ -18,11 +19,11 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19
+        go-version-file: go.mod
 
     - name: Run GoReleaser for stable release
       uses: goreleaser/goreleaser-action@v4
-      if: (!contains(github.ref, '-pre.'))
+      if: (!contains(github.ref, 'pre'))
       with:
         version: v0.183.0
         args: release --rm-dist
@@ -30,7 +31,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Generate changelog for pre release
-      if: contains(github.ref, '-pre.')
+      if: contains(github.ref, 'pre')
       id: changelog
       run: |
         echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
@@ -43,7 +44,7 @@ jobs:
 
     - name: Run GoReleaser for pre-release
       uses: goreleaser/goreleaser-action@v4
-      if: contains(github.ref, '-pre.')
+      if: contains(github.ref, 'pre')
       with:
         version: v0.183.0
         args: release --rm-dist --release-notes=tmp-CHANGELOG.md
@@ -55,7 +56,7 @@ jobs:
     name: "Bump Homebrew formula"
     runs-on: ubuntu-22.04
     if: false
-    # if: (!contains(github.ref, '-pre.'))
+    # if: (!contains(github.ref, 'pre'))
     steps:
       - uses: mislav/bump-homebrew-formula-action@v2
         with:

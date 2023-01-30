@@ -6,11 +6,19 @@ ARG ATLANTIS_BASE_TAG_TYPE=alpine
 
 FROM golang:1.19.5-alpine AS builder
 
+ARG ATLANTIS_VERSION=dev
+ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
+ARG ATLANTIS_COMMIT=none
+ENV ATLANTIS_COMMIT=${ATLANTIS_COMMIT}
+ARG ATLANTIS_DATE=unknown
+ENV ATLANTIS_DATE=${ATLANTIS_DATE}
+
 WORKDIR /app
 COPY . /app
+
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -v -o atlantis .
+    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
 # Stage 2
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile
@@ -48,20 +56,20 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="1.0.11 1.1.9 1.2.9 ${DEFAULT_TERRAFORM_VERSION
 ENV DEFAULT_CONFTEST_VERSION=0.38.0
 
 RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
-    case ${TARGETPLATFORM} in \
+    case "${TARGETPLATFORM}" in \
         "linux/amd64") CONFTEST_ARCH=x86_64 ;; \
         "linux/arm64") CONFTEST_ARCH=arm64 ;; \
         # There is currently no compiled version of conftest for armv7
         "linux/arm/v7") CONFTEST_ARCH=x86_64 ;; \
     esac && \
     for VERSION in ${AVAILABLE_CONFTEST_VERSIONS}; do \
-        curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz && \
-        curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/checksums.txt && \
+        curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
+        curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/checksums.txt" && \
         sed -n "/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz/p" checksums.txt | sha256sum -c && \
-        mkdir -p /usr/local/bin/cft/versions/${VERSION} && \
-        tar -C /usr/local/bin/cft/versions/${VERSION} -xzf conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz && \
-        ln -s /usr/local/bin/cft/versions/${VERSION}/conftest /usr/local/bin/conftest${VERSION} && \
-        rm conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz && \
+        mkdir -p "/usr/local/bin/cft/versions/${VERSION}" && \
+        tar -C "/usr/local/bin/cft/versions/${VERSION}" -xzf "conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
+        ln -s "/usr/local/bin/cft/versions/${VERSION}/conftest" "/usr/local/bin/conftest${VERSION}" && \
+        rm "conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
         rm checksums.txt; \
     done
 

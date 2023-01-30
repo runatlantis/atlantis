@@ -24,7 +24,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20221020162138-81db043ad408
 	github.com/mcdafydd/go-azuredevops v0.12.1
-	github.com/microcosm-cc/bluemonday v1.0.21
+	github.com/microcosm-cc/bluemonday v1.0.22
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/moby v20.10.23+incompatible
@@ -43,7 +43,7 @@ require (
 	github.com/xanzy/go-gitlab v0.79.0
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.24.0
-	golang.org/x/exp v0.0.0-20230124195608-d38c7dcee874
+	golang.org/x/exp v0.0.0-20230129154200-a960b3787bd2
 	golang.org/x/term v0.4.0
 	golang.org/x/text v0.6.0
 	gopkg.in/yaml.v2 v2.4.0
