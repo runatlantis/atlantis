@@ -237,6 +237,11 @@ func (i *clientMetricsOutboundInterceptor) QueryWorkflow(ctx context.Context, in
 }
 
 func addTags(ctx context.Context, scope tally.Scope) tally.Scope {
+	tags := getOptionalTags(ctx)
+	return scope.Tagged(tags)
+}
+
+func getOptionalTags(ctx contextInternal.KVStore) map[string]string {
 	tags := make(map[string]string)
 	if ctx.Value(contextInternal.ProjectKey) != nil {
 		tags[metrics.RootTag] = ctx.Value(contextInternal.ProjectKey).(string)
@@ -244,5 +249,6 @@ func addTags(ctx context.Context, scope tally.Scope) tally.Scope {
 	if ctx.Value(contextInternal.RepositoryKey) != nil {
 		tags[metrics.RepoTag] = ctx.Value(contextInternal.RepositoryKey).(string)
 	}
-	return scope.Tagged(tags)
+
+	return tags
 }

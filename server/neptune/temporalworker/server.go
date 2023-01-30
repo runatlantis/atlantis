@@ -33,6 +33,7 @@ import (
 	"github.com/runatlantis/atlantis/server/static"
 	"github.com/uber-go/tally/v4"
 	"github.com/urfave/negroni"
+	"go.temporal.io/sdk/interceptor"
 	"go.temporal.io/sdk/worker"
 )
 
@@ -282,6 +283,9 @@ func (s Server) buildDeployWorker() worker.Worker {
 	// pass the underlying client otherwise this will panic()
 	deployWorker := worker.New(s.TemporalClient.Client, workflows.DeployTaskQueue, worker.Options{
 		WorkerStopTimeout: TemporalWorkerTimeout,
+		Interceptors: []interceptor.WorkerInterceptor{
+			temporal.NewWorkerInterceptor(),
+		},
 	})
 	deployWorker.RegisterActivity(s.DeployActivities)
 	deployWorker.RegisterActivity(s.GithubActivities)
@@ -295,6 +299,9 @@ func (s Server) buildTerraformWorker() worker.Worker {
 	// pass the underlying client otherwise this will panic()
 	terraformWorker := worker.New(s.TemporalClient.Client, s.TerraformTaskQueue, worker.Options{
 		WorkerStopTimeout: TemporalWorkerTimeout,
+		Interceptors: []interceptor.WorkerInterceptor{
+			temporal.NewWorkerInterceptor(),
+		},
 	})
 	terraformWorker.RegisterActivity(s.TerraformActivities)
 	terraformWorker.RegisterActivity(s.GithubActivities)
