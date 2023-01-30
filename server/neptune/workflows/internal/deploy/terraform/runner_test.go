@@ -210,6 +210,47 @@ func TestWorkflowRunner_RunWithManuallyTriggeredRoot(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestWorkflowRunner_RunWithRootWithRerunEnabled(t *testing.T) {
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestWorkflowEnvironment()
+
+	env.RegisterWorkflow(testTerraformWorkflow)
+
+	r := request{
+		Info:          buildDeploymentInfo(t),
+		DiffDirection: activities.DirectionAhead,
+	}
+
+	r.Info.Root.Trigger = terraform.ManualTrigger
+	r.Info.Root.Rerun = true
+
+	env.OnWorkflow(testTerraformWorkflow, mock.Anything, terraformWorkflow.Request{
+		Root: terraform.Root{
+			Name:    r.Info.Root.Name,
+			Trigger: terraform.ManualTrigger,
+			Plan: terraform.PlanJob{
+				Approval: terraform.PlanApproval{
+					Type: terraform.AutoApproval,
+				},
+			},
+			Rerun: true,
+		},
+		Repo:         r.Info.Repo,
+		DeploymentID: r.Info.ID.String(),
+		Revision:     r.Info.Revision,
+	}).Return(func(ctx workflow.Context, request terraformWorkflow.Request) error {
+		return nil
+	})
+
+	env.ExecuteWorkflow(parentWorkflow, r)
+
+	env.AssertExpectations(t)
+
+	var resp response
+	err := env.GetWorkflowResult(&resp)
+	assert.NoError(t, err)
+}
+
 func TestWorkflowRunner_PlanRejected(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
