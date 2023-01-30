@@ -67,6 +67,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		Any[models.Repo](),
 		Any[models.PullRequest](),
 		Any[string](),
+		Any[[]string](),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
 		Any[logging.SimpleLogging](),
@@ -564,6 +565,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		Any[models.Repo](),
 		Any[models.PullRequest](),
 		Any[string](),
+		Any[[]string](),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
 		Any[logging.SimpleLogging](),
@@ -718,6 +720,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 				Any[models.Repo](),
 				Any[models.PullRequest](),
 				Any[string](),
+				Any[[]string](),
 			)).ThenReturn(repoDir, false, nil)
 			if c.setup != nil {
 				c.setup(repoDir, ctx, mockLocker, mockInit, mockImport)

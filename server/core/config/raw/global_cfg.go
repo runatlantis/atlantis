@@ -37,6 +37,7 @@ type Repo struct {
 	PolicyCheck               *bool          `yaml:"policy_check,omitempty" json:"policy_check,omitempty"`
 	CustomPolicyCheck         *bool          `yaml:"custom_policy_check,omitempty" json:"custom_policy_check,omitempty"`
 	AutoDiscover              *AutoDiscover  `yaml:"autodiscover,omitempty" json:"autodiscover,omitempty"`
+	ConfigSourceBranch        *string        `yaml:"config_source_branch,omitempty" json:"config_source_branch,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -349,5 +350,6 @@ OuterGlobalImportReqs:
 		PolicyCheck:               r.PolicyCheck,
 		CustomPolicyCheck:         r.CustomPolicyCheck,
 		AutoDiscover:              autoDiscover,
+		ConfigSourceBranch:        r.ConfigSourceBranch,
 	}
 }

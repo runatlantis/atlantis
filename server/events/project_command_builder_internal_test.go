@@ -630,7 +630,7 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string](), Any[[]string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
@@ -844,7 +844,7 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string](), Any[[]string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
@@ -1089,7 +1089,7 @@ workflows:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string](), Any[[]string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
@@ -1243,7 +1243,7 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string](), Any[[]string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
@@ -1382,7 +1382,7 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string](), Any[[]string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.modifiedFiles, nil)
 

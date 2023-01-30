@@ -41,7 +41,7 @@ type WorkingDir interface {
 	// absolute path to the root of the cloned repo. It also returns
 	// a boolean indicating if we should warn users that the branch we're
 	// merging into has been updated since we cloned it.
-	Clone(headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
+	Clone(headRepo models.Repo, p models.PullRequest, workspace string, additionalBranches []string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
@@ -95,10 +95,14 @@ type FileWorkspace struct {
 // If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
+//
+// By default, our clone is shallow. If you wish to access resources from
+// commits other than the pulls base, then provide them as additionalBranches.
 func (w *FileWorkspace) Clone(
 	headRepo models.Repo,
 	p models.PullRequest,
-	workspace string) (string, bool, error) {
+	workspace string,
+	additionalBranches []string) (string, bool, error) {
 	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
 	defer func() { w.CheckForUpstreamChanges = false }()
 
@@ -141,8 +145,34 @@ func (w *FileWorkspace) Clone(
 		// We'll fall through to re-clone.
 	}
 
+	if err := w.forceClone(c); err != nil {
+		return cloneDir, false, err
+	}
+
+	for _, branch := range additionalBranches {
+		if _, err := w.fetchBranch(cloneDir, branch); err != nil {
+			return cloneDir, false, err
+		}
+	}
+
 	// Otherwise we clone the repo.
-	return cloneDir, false, w.forceClone(c)
+	return cloneDir, false, nil
+}
+
+// fetchBranch causes the repository to fetch the most recent version of the given branch
+// in a shallow fashion. This ensures we can access files from this branch, enabling later
+// reading of files from this revision.
+func (w *FileWorkspace) fetchBranch(cloneDir, branch string) (string, error) {
+	w.Logger.Debug("fetching branch %s into repository %s", branch, cloneDir)
+
+	fetchCmd := exec.Command("git", "fetch", "--depth=1", "origin", fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", branch, branch)) // nolint: gosec
+	fetchCmd.Dir = cloneDir
+	output, err := fetchCmd.CombinedOutput()
+	if err != nil {
+		err = errors.Wrapf(err, "failed to fetch base branch %s: %s", branch, string(output))
+	}
+
+	return cloneDir, err
 }
 
 // recheckDiverged returns true if the branch we're merging into has diverged
