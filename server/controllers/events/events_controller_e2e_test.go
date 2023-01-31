@@ -1063,6 +1063,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	// Real dependencies.
+	logging.SuppressDefaultLogging()
 	logger := logging.NewNoopLogger(t)
 
 	eventParser := &events.EventParser{
