@@ -89,9 +89,8 @@ func (c *AsyncClient) RunCommand(ctx context.Context, request *RunCommandRequest
 		}
 	}
 
-	envVars := cmd.Env
 	for key, val := range request.AdditionalEnvVars {
-		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, val))
 	}
 
 	if err := cmd.Run(); err != nil {

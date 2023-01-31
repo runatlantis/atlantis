@@ -114,6 +114,47 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	assert.Equal(t, "stderr\n", out)
 }
 
+func TestDefaultClient_RunCommandAsync_EnvValues(t *testing.T) {
+	ts := testsuite.WorkflowTestSuite{}
+	env := ts.NewTestActivityEnvironment()
+
+	path := "some/path"
+	echoCommand := exec.Command("sh", "-c", "echo $env_key")
+
+	cmd := NewSubCommand(Plan)
+	testCommandBuilder := &testCommandBuilder{
+		t:          t,
+		version:    nil,
+		path:       path,
+		subCommand: cmd,
+		resp:       echoCommand,
+		err:        nil,
+	}
+	client := &AsyncClient{
+		CommandBuilder: testCommandBuilder,
+	}
+	testFunc := func(ctx context.Context) (string, error) {
+		buf := &bytes.Buffer{}
+		r := &RunCommandRequest{
+			RootPath:          path,
+			SubCommand:        cmd,
+			AdditionalEnvVars: map[string]string{"env_key": "env_val"},
+		}
+		err := client.RunCommand(ctx, r, RunOptions{
+			StdOut: buf,
+			StdErr: buf,
+		})
+		return buf.String(), err
+	}
+	env.RegisterActivity(testFunc)
+	resp, err := env.ExecuteActivity(testFunc)
+	assert.NoError(t, err)
+
+	var out string
+	assert.Nil(t, resp.Get(&out))
+	assert.Equal(t, "env_val\n", out)
+}
+
 func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestActivityEnvironment()
