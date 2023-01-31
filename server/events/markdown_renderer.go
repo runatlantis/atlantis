@@ -78,7 +78,14 @@ type errData struct {
 	commonData
 }
 
-// failureData is data about a failure response.
+// policyFailureData is data about a failing
+type policyCheckFailureData struct {
+    Failure string
+    commonData
+    models.PolicyCheckSuccess
+}
+
+// failureData is data about a generic failure response.
 type failureData struct {
 	Failure string
 	commonData
@@ -189,7 +196,11 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			}
 			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), common})
 		} else if result.Failure != "" {
-			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, common})
+		    if common.Command == "PolicyCheck" {
+		        resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), policyCheckFailureData{result.Failure, common, *result.PolicyCheckSuccess})
+		    } else {
+		        resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, common})
+		    }
 		} else if result.PlanSuccess != nil {
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
@@ -199,12 +210,12 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			}
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
-			result.PolicyCheckSuccess.PolicyCheckOutput = strings.TrimSpace(result.PolicyCheckSuccess.PolicyCheckOutput)
-			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckSuccess.PolicyCheckOutput) {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
-			} else {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessUnwrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
-			}
+//			result.PolicyCheckSuccess.PolicySetResults = strings.TrimSpace(string(result.PolicyCheckSuccess.PolicySetResults))
+//			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckSuccess.PolicySetResults) {
+//				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
+//			} else {
+			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessUnwrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
+//			}
 			numPolicyCheckSuccesses++
 		} else if result.ApplySuccess != "" {
 			output := strings.TrimSpace(result.ApplySuccess)

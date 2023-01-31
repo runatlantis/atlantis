@@ -3,7 +3,7 @@ package valid
 import (
 	"strings"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
 )
 
 const (
@@ -15,9 +15,10 @@ const (
 // PolicySet objects. PolicySets struct is used by PolicyCheck workflow to build
 // context to enforce policies.
 type PolicySets struct {
-	Version    *version.Version
-	Owners     PolicyOwners
-	PolicySets []PolicySet
+	Version     *version.Version
+	Owners      PolicyOwners
+	ReviewCount int
+	PolicySets  []PolicySet
 }
 
 type PolicyOwners struct {
@@ -26,10 +27,11 @@ type PolicyOwners struct {
 }
 
 type PolicySet struct {
-	Source string
-	Path   string
-	Name   string
-	Owners PolicyOwners
+	Source      string
+	Path        string
+	Name        string
+	ReviewCount int
+	Owners      PolicyOwners
 }
 
 func (p *PolicySets) HasPolicies() bool {

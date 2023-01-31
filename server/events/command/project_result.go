@@ -6,19 +6,20 @@ import (
 
 // ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {
-	Command            Name
-	SubCommand         string
-	RepoRelDir         string
-	Workspace          string
-	Error              error
-	Failure            string
-	PlanSuccess        *models.PlanSuccess
-	PolicyCheckSuccess *models.PolicyCheckSuccess
-	ApplySuccess       string
-	VersionSuccess     string
-	ImportSuccess      *models.ImportSuccess
-	StateRmSuccess     *models.StateRmSuccess
-	ProjectName        string
+	Command              Name
+	SubCommand           string
+	RepoRelDir           string
+	Workspace            string
+	Error                error
+	Failure              string
+	PlanSuccess          *models.PlanSuccess
+	PolicyCheckSuccess   *models.PolicyCheckSuccess
+	PolicyCheckApprovals []models.PolicySetApproval
+	ApplySuccess         string
+	VersionSuccess       string
+	ImportSuccess        *models.ImportSuccess
+	StateRmSuccess       *models.StateRmSuccess
+	ProjectName          string
 }
 
 // CommitStatus returns the vcs commit status of this project result.

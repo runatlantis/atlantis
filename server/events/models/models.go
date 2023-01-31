@@ -366,6 +366,12 @@ type PlanSuccess struct {
 	HasDiverged bool
 }
 
+type PolicySetResult struct {
+	PolicySetName   string
+	PolicySetOutput string
+	Passed          bool
+}
+
 // Summary regexes
 var (
 	reChangesOutside = regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
@@ -409,7 +415,7 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 // PolicyCheckSuccess is the result of a successful policy check run.
 type PolicyCheckSuccess struct {
 	// PolicyCheckOutput is the output from policy check binary(conftest|opa)
-	PolicyCheckOutput string
+	PolicySetResults []PolicySetResult
 	// LockURL is the full URL to the lock held by this policy check.
 	LockURL string
 	// RePlanCmd is the command that users should run to re-plan this project.
@@ -441,11 +447,11 @@ type StateRmSuccess struct {
 // Summary extracts one line summary of policy check.
 func (p *PolicyCheckSuccess) Summary() string {
 	note := ""
-
-	r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
-	if match := r.FindString(p.PolicyCheckOutput); match != "" {
-		return note + match
-	}
+	//
+	//r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
+	//if match := r.FindString(p.PolicyCheckOutput); match != "" {
+	//	return note + match
+	//}
 	return note
 }
 
@@ -472,11 +478,19 @@ func (p PullStatus) StatusCount(status ProjectPlanStatus) int {
 	return c
 }
 
+// PolicySetApprovalStatus tracks the number of approvals a given PolicySet has received.
+type PolicySetApproval struct {
+	PolicySetName string
+	Approvals     int
+}
+
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
 	Workspace   string
 	RepoRelDir  string
 	ProjectName string
+	// PolicySetApprovals tracks the approval status of every PolicySet for a Project.
+	PolicyStatus []PolicySetApproval
 	// Status is the status of where this project is at in the planning cycle.
 	Status ProjectPlanStatus
 }

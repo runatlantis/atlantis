@@ -357,6 +357,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 						res.ProjectName == proj.ProjectName {
 
 						proj.Status = res.PlanStatus()
+						proj.PolicyStatus = res.PolicyCheckApprovals
 						updatedExisting = true
 						break
 					}
@@ -483,9 +484,10 @@ func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.
 
 func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
 	return models.ProjectStatus{
-		Workspace:   p.Workspace,
-		RepoRelDir:  p.RepoRelDir,
-		ProjectName: p.ProjectName,
-		Status:      p.PlanStatus(),
+		Workspace:    p.Workspace,
+		RepoRelDir:   p.RepoRelDir,
+		ProjectName:  p.ProjectName,
+		PolicyStatus: p.PolicyCheckApprovals,
+		Status:       p.PlanStatus(),
 	}
 }

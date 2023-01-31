@@ -26,6 +26,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/hashicorp/go-multierror"
+	"encoding/json"
 )
 
 const OperationComplete = true
@@ -234,9 +236,22 @@ func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.P
 // PolicyCheck evaluates policies defined with Rego for the project described by ctx.
 func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
+	var policyCheckApprovals []models.PolicySetApproval
+	for _, ps := range policySuccess.PolicySetResults {
+	    approvals := 0
+	    if !ps.Passed {
+	        for _, cps := range ctx.PolicySets.PolicySets {
+	            if ps.PolicySetName == cps.Name {
+	                approvals = 0 - cps.ReviewCount
+	            }
+	       }
+	    }
+	    policyCheckApprovals = append(policyCheckApprovals, models.PolicySetApproval{PolicySetName: ps.PolicySetName, Approvals: approvals})
+	}
 	return command.ProjectResult{
 		Command:            command.PolicyCheck,
 		PolicyCheckSuccess: policySuccess,
+		PolicyCheckApprovals: policyCheckApprovals,
 		Error:              err,
 		Failure:            failure,
 		RepoRelDir:         ctx.RepoRelDir,
@@ -320,7 +335,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	// without checking some sort of state that the policy check has indeed passed this is likely to cause issues
 
 	return &models.PolicyCheckSuccess{
-		PolicyCheckOutput: "Policies approved",
+//		PolicyCheckOutput: "Policies approved",
 	}, "", nil
 }
 
@@ -376,23 +391,46 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
+	var failures []string
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	if err != nil {
-		// Note: we are explicitly not unlocking the pr here since a failing policy check will require
-		// approval
-		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+	    stepErr := err
+	    err = nil
+	    for {
+	        stepErr = errors.Unwrap(stepErr)
+	        if stepErr == nil {
+	            break
+	        }
+	        if strings.Contains(stepErr.Error(), "Some policies failed.") {
+	            failures = append(failures, stepErr.Error())
+	        } else {
+	            err = multierror.Append(err, stepErr)
+	        }
+	    }
+
+	    if err != nil {
+		    // Note: we are explicitly not unlocking the pr here since a failing policy check will require
+		    // approval
+		    return nil, "", err
+	    }
+	}
+
+	var policySetResults []models.PolicySetResult
+	err = json.Unmarshal([]byte(strings.Join(outputs, "\n")), &policySetResults)
+	if err != nil {
+	    return nil, "", err
 	}
 
 	return &models.PolicyCheckSuccess{
 		LockURL:           p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
-		PolicyCheckOutput: strings.Join(outputs, "\n"),
+		PolicySetResults:  policySetResults,
 		RePlanCmd:         ctx.RePlanCmd,
 		ApplyCmd:          ctx.ApplyCmd,
 
 		// set this to false right now because we don't have this information
 		// TODO: refactor the templates in a sane way so we don't need this
 		HasDiverged: false,
-	}, "", nil
+	}, strings.Join(failures, "\n"), nil
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*models.PlanSuccess, string, error) {
