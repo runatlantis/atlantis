@@ -2,12 +2,12 @@ package valid
 
 import (
 	"fmt"
-	"golang.org/x/exp/slices"
 	"regexp"
 	"strings"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
+	"golang.org/x/exp/slices"
 )
 
 const MergeableCommandReq = "mergeable"
