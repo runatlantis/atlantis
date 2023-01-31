@@ -19,6 +19,7 @@ func TestEnvStepRunner_Run(t *testing.T) {
 	cases := []struct {
 		Command     string
 		Value       string
+		Envs        map[string]string
 		ProjectName string
 		ExpValue    string
 		ExpErr      string
@@ -35,6 +36,13 @@ func TestEnvStepRunner_Run(t *testing.T) {
 			Command:  "echo 321",
 			Value:    "test",
 			ExpValue: "test",
+		},
+		{
+			Command: "echo $COMMENT_ARGS",
+			Envs: map[string]string{
+				"COMMENT_ARGS": "\\t\\e\\s\\t,\\v\\1,\\v\\2,\\v\\3",
+			},
+			ExpValue: "\\t\\e\\s\\t,\\v\\1,\\v\\2,\\v\\3",
 		},
 	}
 	RegisterMockTestingT(t)
@@ -77,7 +85,7 @@ func TestEnvStepRunner_Run(t *testing.T) {
 				TerraformVersion: tfVersion,
 				ProjectName:      c.ProjectName,
 			}
-			value, err := envRunner.Run(ctx, c.Command, c.Value, tmpDir, map[string]string(nil))
+			value, err := envRunner.Run(ctx, c.Command, c.Value, tmpDir, c.Envs)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return
