@@ -75,7 +75,7 @@ jobs:
       run: echo "RELEASE_VERSION=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
 
     - name: Build and push atlantis-base:${{ env.RELEASE_VERSION }}${{ env.IMAGE_SUFFIX }} image
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v4
       with:
         cache-from: type=gha
         cache-to: type=gha,mode=max
