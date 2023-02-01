@@ -13,7 +13,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/testsuite"
@@ -87,7 +86,7 @@ func testWorkflow(ctx workflow.Context, r req) (response, error) {
 
 	receiver := revision.NewReceiver(ctx, queue, a, func(ctx workflow.Context) (uuid.UUID, error) {
 		return r.ID, nil
-	}, worker, metrics.NewNullableScope())
+	}, worker)
 	selector := workflow.NewSelector(ctx)
 
 	selector.AddReceive(workflow.GetSignalChannel(ctx, "test-signal"), receiver.Receive)

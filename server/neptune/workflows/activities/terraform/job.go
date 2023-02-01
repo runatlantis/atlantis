@@ -29,6 +29,14 @@ type PlanJob struct {
 	execute.Job
 }
 
+func (m PlanJob) GetPlanMode() PlanMode {
+	if m.Mode != nil {
+		return *m.Mode
+	}
+
+	return PlanMode("default")
+}
+
 func (m PlanMode) ToFlag() Flag {
 	return Flag{
 		Value: string(m),

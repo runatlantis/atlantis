@@ -17,6 +17,8 @@ const (
 	ProjectKey        = Key("project")
 	ErrKey            = Key("err")
 	DeploymentIDKey   = Key("deployment-id")
+	PlanMode          = Key("plan-mode")
+	Trigger           = Key("workflow-trigger")
 )
 
 var Keys = []Key{RequestIDKey, RepositoryKey, PullNumKey, ProjectKey, SHAKey, InstallationIDKey, DeploymentIDKey, ErrKey}

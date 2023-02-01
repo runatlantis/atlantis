@@ -62,7 +62,6 @@ func testStateWorkflow(ctx workflow.Context, r workerRequest) (workerResponse, e
 	worker := queue.Worker{
 		Queue:    q,
 		Deployer: &testBlockingDeployer{},
-		Scope:    metrics.NewNullableScope(),
 	}
 
 	err := workflow.SetQueryHandler(ctx, "queue", func() (queueAndState, error) {

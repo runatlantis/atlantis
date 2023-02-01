@@ -6,6 +6,8 @@ import (
 
 	key "github.com/runatlantis/atlantis/server/neptune/context"
 
+	metricNames "github.com/runatlantis/atlantis/server/events/metrics"
+
 	"github.com/pkg/errors"
 	internalContext "github.com/runatlantis/atlantis/server/neptune/context"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
@@ -63,7 +65,6 @@ const (
 type Worker struct {
 	Queue    queue
 	Deployer deployer
-	Scope    metrics.Scope
 
 	// mutable
 	state             WorkerState
@@ -82,12 +83,11 @@ const (
 func NewWorker(
 	ctx workflow.Context,
 	q queue,
-	scope metrics.Scope,
 	a workerActivities,
 	tfWorkflow terraform.Workflow,
 	repoName, rootName string,
 ) (*Worker, error) {
-	tfWorkflowRunner := terraform.NewWorkflowRunner(a, tfWorkflow, scope)
+	tfWorkflowRunner := terraform.NewWorkflowRunner(a, tfWorkflow)
 	deployer := &Deployer{
 		Activities:              a,
 		TerraformWorkflowRunner: tfWorkflowRunner,
@@ -111,7 +111,6 @@ func NewWorker(
 		Queue:            q,
 		Deployer:         deployer,
 		latestDeployment: latestDeployment,
-		Scope:            scope,
 	}, nil
 }
 
@@ -166,8 +165,8 @@ func (w *Worker) Work(ctx workflow.Context) {
 			logger.Info(ctx, "Processing... ")
 		case receive:
 			logger.Info(ctx, "Received unlock signal... ")
-			w.Scope.SubScopeWithTags(map[string]string{metrics.SignalNameTag: UnlockSignalName}).
-				Counter(metrics.SignalReceiveMetric).
+			workflow.GetMetricsHandler(ctx).WithTags(map[string]string{metricNames.SignalNameTag: UnlockSignalName}).
+				Counter(metricNames.SignalReceive).
 				Inc(1)
 			w.Queue.SetLockForMergedItems(ctx, LockState{
 				Status: UnlockedStatus,
@@ -185,7 +184,12 @@ func (w *Worker) Work(ctx workflow.Context) {
 			continue
 		}
 
-		scope := addRevisionSubscope(w.Scope, msg)
+		ctx = setContextKeys(ctx, msg)
+
+		scope := metrics.NewScope(
+			ctx,
+			"revision",
+		)
 
 		//TODO: pass this scope further down the code
 		currentDeployment, err = w.deploy(ctx, msg, w.latestDeployment, scope)
@@ -250,6 +254,15 @@ func (w *Worker) awaitWork(ctx workflow.Context) workflow.Future {
 	return future
 }
 
+func setContextKeys(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo) workflow.Context {
+	ctx = workflow.WithValue(ctx, internalContext.SHAKey, requestedDeployment.Revision)
+	ctx = workflow.WithValue(ctx, internalContext.DeploymentIDKey, requestedDeployment.ID)
+	ctx = workflow.WithValue(ctx, internalContext.PlanMode, string(requestedDeployment.Root.Plan.GetPlanMode()))
+	ctx = workflow.WithValue(ctx, internalContext.Trigger, string(requestedDeployment.Root.Trigger))
+
+	return ctx
+}
+
 func (w *Worker) deploy(ctx workflow.Context, requestedDeployment terraform.DeploymentInfo, latestDeployment *deployment.Info, scope metrics.Scope) (*deployment.Info, error) {
 	w.setCurrentDeploymentState(CurrentDeployment{
 		Deployment: requestedDeployment,
@@ -260,33 +273,7 @@ func (w *Worker) deploy(ctx workflow.Context, requestedDeployment terraform.Depl
 		Status:     CompleteStatus,
 	})
 
-	ctx = workflow.WithValue(ctx, internalContext.SHAKey, requestedDeployment.Revision)
-	ctx = workflow.WithValue(ctx, internalContext.DeploymentIDKey, requestedDeployment.ID)
-
-	result, err := w.Deployer.Deploy(ctx, requestedDeployment, latestDeployment, scope)
-
-	return result, err
-}
-
-func addRevisionSubscope(s metrics.Scope, msg terraform.DeploymentInfo) metrics.Scope {
-	scope := s.SubScope("revision")
-	tags := make(map[string]string)
-
-	tags["workflow_trigger"] = string(msg.Root.Trigger)
-
-	if msg.Root.Plan.Mode != nil {
-		tags["plan_mode"] = string(*msg.Root.Plan.Mode)
-	} else {
-		tags["plan_mode"] = "default"
-	}
-
-	if msg.Root.Rerun {
-		tags["deploy_type"] = "retry"
-	} else {
-		tags["deploy_type"] = "new"
-	}
-
-	return scope.SubScopeWithTags(tags)
+	return w.Deployer.Deploy(ctx, requestedDeployment, latestDeployment, scope)
 }
 
 func (w *Worker) GetState() WorkerState {

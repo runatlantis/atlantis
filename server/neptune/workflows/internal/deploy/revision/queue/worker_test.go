@@ -132,7 +132,6 @@ func testWorkerWorkflow(ctx workflow.Context, r workerRequest) (workerResponse, 
 	worker := queue.Worker{
 		Queue:    q,
 		Deployer: deployer,
-		Scope:    metrics.NewNullableScope(),
 	}
 
 	err := workflow.SetQueryHandler(ctx, "queue", func() (queueAndState, error) {
@@ -392,7 +391,7 @@ func TestNewWorker(t *testing.T) {
 			ScheduleToCloseTimeout: 5 * time.Second,
 		})
 		q := queue.NewQueue(noopCallback, metrics.NewNullableScope())
-		_, err := queue.NewWorker(ctx, q, metrics.NewNullableScope(), &testDeployActivity{}, emptyWorkflow, "nish/repo", "root")
+		_, err := queue.NewWorker(ctx, q, &testDeployActivity{}, emptyWorkflow, "nish/repo", "root")
 		return res{
 			Lock: q.GetLockState(),
 		}, err

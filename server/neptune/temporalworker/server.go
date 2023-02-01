@@ -260,11 +260,6 @@ func (s Server) shutdown() {
 		s.Logger.Error(err.Error())
 	}
 
-	// flush stats before shutdown
-	if err := s.StatsCloser.Close(); err != nil {
-		s.Logger.Error(err.Error())
-	}
-
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := s.HTTPServerProxy.Shutdown(ctx); err != nil {
@@ -273,8 +268,14 @@ func (s Server) shutdown() {
 
 	s.CronScheduler.Shutdown(5 * time.Second)
 
-	s.Logger.Close()
 	s.TemporalClient.Close()
+
+	// flush stats before shutdown
+	if err := s.StatsCloser.Close(); err != nil {
+		s.Logger.Error(err.Error())
+	}
+
+	s.Logger.Close()
 }
 
 // TODO: consider building these before initializing the server so that the server is just responsible

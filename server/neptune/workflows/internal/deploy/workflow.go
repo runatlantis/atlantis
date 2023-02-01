@@ -1,7 +1,6 @@
 package deploy
 
 import (
-	"github.com/runatlantis/atlantis/server/events/metrics"
 	"time"
 
 	"github.com/pkg/errors"
@@ -19,9 +18,6 @@ import (
 
 const (
 	TaskQueue = "deploy"
-
-	// signals
-	NewRevisionSignalID = "new-revision"
 
 	RevisionReceiveTimeout    = 60 * time.Minute
 	ActiveDeployWorkflowStat  = "active"
@@ -87,11 +83,7 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 	// so we're modeling our own DI around this.
 	var a *workerActivities
 
-	metricsHandler := workflow.GetMetricsHandler(ctx).WithTags(map[string]string{
-		metrics.RepoTag: request.Repo.FullName,
-		metrics.RootTag: request.Root.Name,
-	})
-	scope := workflowMetrics.NewScope(metricsHandler, "workflow", "deploy")
+	scope := workflowMetrics.NewScope(ctx)
 
 	lockStateUpdater := queue.LockStateUpdater{
 		Activities: a,
@@ -100,22 +92,19 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 		lockStateUpdater.UpdateQueuedRevisions(ctx, d)
 	}, scope)
 
-	worker, err := queue.NewWorker(ctx, revisionQueue, scope, a, tfWorkflow, request.Repo.FullName, request.Root.Name)
+	worker, err := queue.NewWorker(ctx, revisionQueue, a, tfWorkflow, request.Repo.FullName, request.Root.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, a, sideeffect.GenerateUUID, worker,
-		scope.SubScopeWithTags(map[string]string{
-			workflowMetrics.SignalNameTag: NewRevisionSignalID,
-		}))
+	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, a, sideeffect.GenerateUUID, worker)
 
 	return &Runner{
 		Queue:                    revisionQueue,
 		Timeout:                  RevisionReceiveTimeout,
 		QueueWorker:              worker,
 		RevisionReceiver:         revisionReceiver,
-		NewRevisionSignalChannel: workflow.GetSignalChannel(ctx, NewRevisionSignalID),
+		NewRevisionSignalChannel: workflow.GetSignalChannel(ctx, revision.NewRevisionSignalID),
 		Scope:                    scope,
 	}, nil
 }

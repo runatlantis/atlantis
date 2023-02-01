@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/runatlantis/atlantis/server/events/metrics"
 	key "github.com/runatlantis/atlantis/server/neptune/context"
 
 	"github.com/pkg/errors"
@@ -12,7 +13,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github/markdown"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -29,18 +29,15 @@ type receiverActivities interface {
 
 type StateReceiver struct {
 	Activity receiverActivities
-	Scope    metrics.Scope
 }
 
 func (n *StateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel, deploymentInfo DeploymentInfo) {
 	var workflowState *state.Workflow
 	c.Receive(ctx, &workflowState)
 
-	scope := n.Scope.SubScopeWithTags(map[string]string{
+	workflow.GetMetricsHandler(ctx).WithTags(map[string]string{
 		metrics.SignalNameTag: state.WorkflowStateChangeSignal,
-	})
-
-	scope.Counter(metrics.SignalReceiveMetric).Inc(1)
+	}).Counter(metrics.SignalReceive).Inc(1)
 
 	// TODO: if we never created a check run, there was likely some issue, we should attempt to create it again.
 	if deploymentInfo.CheckRunID == 0 {

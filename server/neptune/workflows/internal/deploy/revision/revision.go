@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runatlantis/atlantis/server/events/metrics"
 	key "github.com/runatlantis/atlantis/server/neptune/context"
 
 	"github.com/google/uuid"
@@ -15,9 +16,13 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request/converter"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
+)
+
+const (
+	// signals
+	NewRevisionSignalID = "new-revision"
 )
 
 type idGenerator func(ctx workflow.Context) (uuid.UUID, error)
@@ -45,14 +50,13 @@ type Activities interface {
 	GithubCreateCheckRun(ctx context.Context, request activities.CreateCheckRunRequest) (activities.CreateCheckRunResponse, error)
 }
 
-func NewReceiver(ctx workflow.Context, queue Queue, activities Activities, generator idGenerator, worker DeploymentStore, scope metrics.Scope) *Receiver {
+func NewReceiver(ctx workflow.Context, queue Queue, activities Activities, generator idGenerator, worker DeploymentStore) *Receiver {
 	return &Receiver{
 		queue:       queue,
 		ctx:         ctx,
 		activities:  activities,
 		idGenerator: generator,
 		worker:      worker,
-		scope:       scope,
 	}
 }
 
@@ -62,7 +66,6 @@ type Receiver struct {
 	activities  Activities
 	idGenerator idGenerator
 	worker      DeploymentStore
-	scope       metrics.Scope
 }
 
 func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
@@ -74,7 +77,9 @@ func (n *Receiver) Receive(c workflow.ReceiveChannel, more bool) {
 	var request NewRevisionRequest
 	c.Receive(n.ctx, &request)
 
-	n.scope.Counter(metrics.SignalReceiveMetric).Inc(1)
+	workflow.GetMetricsHandler(n.ctx).WithTags(map[string]string{
+		metrics.SignalNameTag: NewRevisionSignalID,
+	}).Counter(metrics.SignalReceive).Inc(1)
 
 	root := converter.Root(request.Root)
 	repo := converter.Repo(request.Repo)

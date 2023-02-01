@@ -3,11 +3,6 @@ repos:
     apply_requirements: []
     checkout_strategy: merge
 
-metrics:
-  statsd:
-    host: "127.0.0.1"
-    port: "8125"
-
 temporal:
   host: temporalite
   port: 7233

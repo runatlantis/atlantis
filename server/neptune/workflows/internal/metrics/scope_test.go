@@ -51,16 +51,18 @@ func TestScope(t *testing.T) {
 	t.Run("subscope", func(t *testing.T) {
 		handler := testHandler{
 			expectedNamespace: "some.namespace.nish.hi",
+			t:                 t,
 		}
-		_ = metrics.NewScope(handler, "some", "namespace").
+		_ = metrics.NewScopeWithHandler(handler, "some", "namespace").
 			SubScope("nish").
 			Counter("hi")
 	})
 	t.Run("gauge", func(t *testing.T) {
 		handler := testHandler{
 			expectedNamespace: "nish.hi",
+			t:                 t,
 		}
-		_ = metrics.NewScope(handler, "nish").
+		_ = metrics.NewScopeWithHandler(handler, "nish").
 			Gauge("hi")
 	})
 
@@ -68,9 +70,22 @@ func TestScope(t *testing.T) {
 		handler := testHandler{
 			expectedNamespace: "nish.hi",
 			expectedTags:      map[string]string{"hello": "world"},
+			t:                 t,
 		}
-		_ = metrics.NewScope(handler, "nish").
+		_ = metrics.NewScopeWithHandler(handler, "nish").
 			SubScopeWithTags(map[string]string{"hello": "world"}).
+			Gauge("hi")
+	})
+
+	t.Run("tags_then_scope", func(t *testing.T) {
+		handler := testHandler{
+			expectedNamespace: "nish.hi.there.hi",
+			expectedTags:      map[string]string{"hello": "world"},
+			t:                 t,
+		}
+		_ = metrics.NewScopeWithHandler(handler, "nish").
+			SubScopeWithTags(map[string]string{"hello": "world"}).
+			SubScope("hi", "there").
 			Gauge("hi")
 	})
 }
