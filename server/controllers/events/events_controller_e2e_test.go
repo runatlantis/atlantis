@@ -4,17 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"sync"
-	"testing"
-
 	"github.com/google/go-github/v45/github"
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
@@ -26,12 +15,22 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/jobs"
 	lyftCommand "github.com/runatlantis/atlantis/server/lyft/command"
 	event_types "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github/request"
 	ffclient "github.com/thomaspoignant/go-feature-flag"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
+	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -841,9 +840,12 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 	teamFetcher := &mockTeamFetcher{
 		members: []string{},
 	}
+	reviewDismisser := &mockReviewDismisser{}
+	commitFetcher := &mockCommitFetcher{}
+	policyFilter := events.NewApprovedPolicyFilter(reviewFetcher, reviewDismisser, commitFetcher, teamFetcher, globalCfg.PolicySets.PolicySets)
 	conftestExecutor := &policy.ConfTestExecutor{
 		Exec:         runtime_models.LocalExec{},
-		PolicyFilter: events.NewApprovedPolicyFilter(reviewFetcher, teamFetcher),
+		PolicyFilter: policyFilter,
 	}
 	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
 		conftestVersion,
@@ -1422,15 +1424,44 @@ func (t *testStaleCommandChecker) CommandIsStale(ctx *command.Context) bool {
 	return false
 }
 
-type mockReviewFetcher struct {
-	approvers []string
-	error     error
-	isCalled  bool
+type mockCommitFetcher struct {
+	commit   *github.Commit
+	error    error
+	isCalled bool
 }
 
-func (f *mockReviewFetcher) ListApprovalReviewers(_ context.Context, _ int64, _ models.Repo, _ int) ([]string, error) {
-	f.isCalled = true
-	return f.approvers, f.error
+func (c *mockCommitFetcher) FetchLatestPRCommit(_ context.Context, _ int64, _ models.Repo, _ int) (*github.Commit, error) {
+	c.isCalled = true
+	return c.commit, c.error
+}
+
+type mockReviewDismisser struct {
+	error    error
+	isCalled bool
+}
+
+func (d *mockReviewDismisser) Dismiss(_ context.Context, _ int64, _ models.Repo, _ int, _ int64) error {
+	d.isCalled = true
+	return d.error
+}
+
+type mockReviewFetcher struct {
+	approvers             []string
+	listUsernamesIsCalled bool
+	listUsernamesError    error
+	reviews               []*github.PullRequestReview
+	listApprovalsIsCalled bool
+	listApprovalsError    error
+}
+
+func (f *mockReviewFetcher) ListLatestApprovalUsernames(_ context.Context, _ int64, _ models.Repo, _ int) ([]string, error) {
+	f.listUsernamesIsCalled = true
+	return f.approvers, f.listUsernamesError
+}
+
+func (f *mockReviewFetcher) ListApprovalReviews(_ context.Context, _ int64, _ models.Repo, _ int) ([]*github.PullRequestReview, error) {
+	f.listApprovalsIsCalled = true
+	return f.reviews, f.listApprovalsError
 }
 
 type mockTeamFetcher struct {

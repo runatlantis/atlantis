@@ -10,24 +10,26 @@ import (
 
 const ApprovalState = "APPROVED"
 
-type PRReviewerFetcher struct {
+type PRReviewFetcher struct {
 	ClientCreator githubapp.ClientCreator
 }
 
-func (r *PRReviewerFetcher) ListApprovalReviewers(ctx context.Context, installationToken int64, repo models.Repo, prNum int) ([]string, error) {
-	client, err := r.ClientCreator.NewInstallationClient(installationToken)
+func (r *PRReviewFetcher) ListApprovalReviews(ctx context.Context, installationToken int64, repo models.Repo, prNum int) ([]*gh.PullRequestReview, error) {
+	reviews, err := r.ListReviews(ctx, installationToken, repo, prNum)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating installation client")
+		return nil, errors.Wrap(err, "iterating through entries")
 	}
-
-	run := func(ctx context.Context, nextPage int) ([]*gh.PullRequestReview, *gh.Response, error) {
-		listOptions := gh.ListOptions{
-			PerPage: 100,
+	var approvals []*gh.PullRequestReview
+	for _, review := range reviews {
+		if review.GetState() == ApprovalState {
+			approvals = append(approvals, review)
 		}
-		listOptions.Page = nextPage
-		return client.PullRequests.ListReviews(ctx, repo.Owner, repo.Name, prNum, &listOptions)
 	}
-	reviews, err := Iterate(ctx, run)
+	return approvals, nil
+}
+
+func (r *PRReviewFetcher) ListLatestApprovalUsernames(ctx context.Context, installationToken int64, repo models.Repo, prNum int) ([]string, error) {
+	reviews, err := r.ListReviews(ctx, installationToken, repo, prNum)
 	if err != nil {
 		return nil, errors.Wrap(err, "iterating through entries")
 	}
@@ -54,4 +56,20 @@ func findLatestApprovals(reviews []*gh.PullRequestReview) []string {
 		reviewers[reviewer.GetLogin()] = true
 	}
 	return approvalReviewers
+}
+
+func (r *PRReviewFetcher) ListReviews(ctx context.Context, installationToken int64, repo models.Repo, prNum int) ([]*gh.PullRequestReview, error) {
+	client, err := r.ClientCreator.NewInstallationClient(installationToken)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating installation client")
+	}
+
+	run := func(ctx context.Context, nextPage int) ([]*gh.PullRequestReview, *gh.Response, error) {
+		listOptions := gh.ListOptions{
+			PerPage: 100,
+		}
+		listOptions.Page = nextPage
+		return client.PullRequests.ListReviews(ctx, repo.Owner, repo.Name, prNum, &listOptions)
+	}
+	return Iterate(ctx, run)
 }

@@ -38,17 +38,23 @@ type ConfTestExecutor struct {
 	PolicyFilter policyFilter
 }
 
-func NewConfTestExecutor(creator githubapp.ClientCreator, org string) *ConfTestExecutor {
-	reviewsFetcher := &github.PRReviewerFetcher{
+func NewConfTestExecutor(creator githubapp.ClientCreator, policySets valid.PolicySets) *ConfTestExecutor {
+	reviewFetcher := &github.PRReviewFetcher{
+		ClientCreator: creator,
+	}
+	reviewDismisser := &github.PRReviewDismisser{
+		ClientCreator: creator,
+	}
+	commitFetcher := &github.CommitFetcher{
 		ClientCreator: creator,
 	}
 	teamMemberFetcher := &github.TeamMemberFetcher{
 		ClientCreator: creator,
-		Org:           org,
+		Org:           policySets.Organization,
 	}
 	return &ConfTestExecutor{
 		Exec:         runtime_models.LocalExec{},
-		PolicyFilter: events.NewApprovedPolicyFilter(reviewsFetcher, teamMemberFetcher),
+		PolicyFilter: events.NewApprovedPolicyFilter(reviewFetcher, reviewDismisser, commitFetcher, teamMemberFetcher, policySets.PolicySets),
 	}
 }
 
