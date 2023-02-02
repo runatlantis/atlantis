@@ -2,7 +2,7 @@ version: 2
 jobs:
   e2e:
     docker:
-    - image: cimg/go:1.19 # If you update this, update it in the Makefile too
+    - image: cimg/go:1.20 # If you update this, update it in the Makefile too
       environment:
         # This version of TF will be downloaded before Atlantis is started.
         # We do this instead of setting --default-tf-version because setting

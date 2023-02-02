@@ -4,7 +4,7 @@ ARG ATLANTIS_BASE_TAG_TYPE=alpine
 
 # Stage 1: build artifact
 
-FROM golang:1.19.5-alpine AS builder
+FROM golang:1.20.0-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
