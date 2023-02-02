@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/metrics"
 	key "github.com/runatlantis/atlantis/server/neptune/context"
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/client"
@@ -43,10 +42,6 @@ const (
 
 	// 1 week timeout for review gate
 	ReviewGateTimeout = 24 * time.Hour * 7
-
-	ActiveTerraformWorkflowStat  = "workflow.terraform.active"
-	SuccessTerraformWorkflowStat = "workflow.terraform.success"
-	FailureTerraformWorkflowStat = "workflow.terraform.failure"
 )
 
 func Workflow(ctx workflow.Context, request Request) error {
@@ -77,11 +72,7 @@ func newRunner(ctx workflow.Context, request Request) *Runner {
 
 	parent := workflow.GetInfo(ctx).ParentWorkflowExecution
 
-	metricsHandler := workflow.GetMetricsHandler(ctx).WithTags(
-		map[string]string{
-			metrics.RepoTag: request.Repo.GetFullName(),
-			metrics.RootTag: request.Root.Name,
-		})
+	metricsHandler := workflow.GetMetricsHandler(ctx)
 
 	// We have critical things relying on this notification so this workflow provides guarantees around this. (ie. compliance auditing)  There should
 	// be no situation where we are deploying while this is failing.
@@ -204,8 +195,6 @@ func (r *Runner) Apply(ctx workflow.Context, root *terraform.LocalRoot, serverUR
 }
 
 func (r *Runner) Run(ctx workflow.Context) error {
-	r.MetricsHandler.Gauge(ActiveTerraformWorkflowStat).Update(1)
-	defer r.MetricsHandler.Gauge(ActiveTerraformWorkflowStat).Update(0)
 	var err error
 	// make sure we are updating state on completion.
 	defer func() {
@@ -267,7 +256,6 @@ func (r *Runner) run(ctx workflow.Context) error {
 	if err := r.Apply(ctx, root, response.ServerURL, planResponse); err != nil {
 		return r.toExternalError(err, "running apply job")
 	}
-	r.MetricsHandler.Counter(SuccessTerraformWorkflowStat).Inc(1)
 	return nil
 }
 
@@ -316,12 +304,9 @@ func (r *Runner) toExternalError(err error, msg string) error {
 			ErrType: planRejected.GetExternalType(),
 			Msg:     errors.Wrap(err, msg).Error(),
 		}
-		// marked as an error for the parent deploy workflow's perspective but are technically successful workflows
-		r.MetricsHandler.Counter(SuccessTerraformWorkflowStat).Inc(1)
 		return e.ToTemporalApplicationError()
 	}
 
-	r.MetricsHandler.Counter(FailureTerraformWorkflowStat).Inc(1)
 	var updateJobErr UpdateJobError
 	if errors.As(err, &updateJobErr) {
 		e := ApplicationError{

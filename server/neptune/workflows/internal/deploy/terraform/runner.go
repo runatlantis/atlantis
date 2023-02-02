@@ -4,13 +4,17 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	constants "github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	terraformActivities "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
+
+const DivergedMetric = "diverged"
 
 type PlanRejectionError struct {
 	msg string
@@ -46,7 +50,7 @@ type WorkflowRunner struct {
 	Workflow      Workflow
 }
 
-func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo, diffDirection activities.DiffDirection) error {
+func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo, diffDirection activities.DiffDirection, scope metrics.Scope) error {
 	id := deploymentInfo.ID
 	ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 		WorkflowID: id.String(),
@@ -63,7 +67,7 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 
 	request := terraform.Request{
 		Repo:         deploymentInfo.Repo,
-		Root:         r.buildRequestRoot(deploymentInfo.Root, diffDirection),
+		Root:         r.buildRequestRoot(deploymentInfo.Root, diffDirection, scope),
 		DeploymentID: id.String(),
 		Revision:     deploymentInfo.Revision,
 	}
@@ -72,7 +76,7 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 	return r.awaitWorkflow(ctx, future, deploymentInfo)
 }
 
-func (r *WorkflowRunner) buildRequestRoot(root terraformActivities.Root, diffDirection activities.DiffDirection) terraformActivities.Root {
+func (r *WorkflowRunner) buildRequestRoot(root terraformActivities.Root, diffDirection activities.DiffDirection, scope metrics.Scope) terraformActivities.Root {
 	var approvalType terraformActivities.PlanApprovalType
 	var reasons []string
 
@@ -81,6 +85,10 @@ func (r *WorkflowRunner) buildRequestRoot(root terraformActivities.Root, diffDir
 	}
 
 	if diffDirection == activities.DirectionDiverged {
+		scope.SubScopeWithTags(map[string]string{
+			constants.ManualOverrideReasonTag: DivergedMetric,
+		}).Counter(constants.ManualOverride).Inc(1)
+
 		reasons = append(reasons, ":warning: Requested Revision is not ahead of deployed revision, please confirm the changes described in the plan.")
 	}
 

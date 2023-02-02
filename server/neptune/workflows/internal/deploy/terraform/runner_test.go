@@ -9,6 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	internalTerraform "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
@@ -81,7 +82,7 @@ func parentWorkflow(ctx workflow.Context, r request) (response, error) {
 		runner.Workflow = testTerraformWorkflow
 	}
 
-	if err := runner.Run(ctx, r.Info, r.DiffDirection); err != nil {
+	if err := runner.Run(ctx, r.Info, r.DiffDirection, metrics.NewNullableScope()); err != nil {
 		if _, ok := err.(internalTerraform.PlanRejectionError); ok {
 			return response{
 				PlanRejection: true,

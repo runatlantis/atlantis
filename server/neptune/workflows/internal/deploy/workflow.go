@@ -111,7 +111,6 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 
 func (r *Runner) shutdown() {
 	r.Scope.Gauge(ActiveDeployWorkflowStat).Update(0)
-	r.Scope.Counter(SuccessDeployWorkflowStat).Inc(1)
 }
 
 func (r *Runner) Run(ctx workflow.Context) error {

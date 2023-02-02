@@ -47,6 +47,11 @@ func (q *Deploy) GetLockState() LockState {
 }
 
 func (q *Deploy) SetLockForMergedItems(ctx workflow.Context, state LockState) {
+	if state.Status == LockedStatus {
+		q.scope.Counter("locked").Inc(1)
+	} else {
+		q.scope.Counter("unlocked").Inc(1)
+	}
 	q.lock = state
 	q.lockStatusCallback(ctx, q)
 }

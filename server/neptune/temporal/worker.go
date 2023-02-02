@@ -56,7 +56,9 @@ func (a *activityInboundInterceptor) ExecuteActivity(
 
 	startTime := time.Now()
 	timer := handler.Timer(metrics.ActivityExecutionLatency)
-	defer timer.Record(time.Since(startTime))
+	defer func() {
+		timer.Record(time.Since(startTime))
+	}()
 
 	result, err := a.Next.ExecuteActivity(ctx, in)
 	if err != nil {
@@ -92,6 +94,25 @@ func (w *workflowInboundInterceptor) Init(outbound interceptor.WorkflowOutboundI
 	return w.Next.Init(i)
 }
 
+func (w *workflowInboundInterceptor) ExecuteWorkflow(ctx workflow.Context, in *interceptor.ExecuteWorkflowInput) (interface{}, error) {
+	handler := workflow.GetMetricsHandler(ctx)
+
+	startTime := time.Now()
+	timer := handler.Timer(metrics.WorkflowLatency)
+	defer func() {
+		timer.Record(time.Since(startTime))
+	}()
+
+	result, err := w.Next.ExecuteWorkflow(ctx, in)
+	if err != nil {
+		handler.Counter(metrics.WorkflowFailure).Inc(1)
+		return result, err
+	}
+
+	handler.Counter(metrics.WorkflowSuccess).Inc(1)
+	return result, err
+}
+
 func (w *workflowInboundInterceptor) HandleSignal(ctx workflow.Context, in *interceptor.HandleSignalInput) error {
 	handler := workflow.GetMetricsHandler(ctx).WithTags(map[string]string{
 		metrics.SignalNameTag: in.SignalName,
@@ -99,7 +120,9 @@ func (w *workflowInboundInterceptor) HandleSignal(ctx workflow.Context, in *inte
 
 	startTime := time.Now()
 	timer := handler.Timer(metrics.SignalHandleLatency)
-	defer timer.Record(time.Since(startTime))
+	defer func() {
+		timer.Record(time.Since(startTime))
+	}()
 
 	err := w.Next.HandleSignal(ctx, in)
 	if err != nil {

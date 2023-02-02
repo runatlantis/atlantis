@@ -28,4 +28,13 @@ const (
 
 	// Signal receive is when we receive it off the channel
 	SignalReceive = "signal_receive"
+
+	// Metrics are scoped to workflow namespaces anyways so let's
+	// keep these metrics simple.
+	WorkflowSuccess = "success"
+	WorkflowFailure = "failure"
+	WorkflowLatency = "latency"
+
+	ManualOverride          = "manual_override"
+	ManualOverrideReasonTag = "reason"
 )
