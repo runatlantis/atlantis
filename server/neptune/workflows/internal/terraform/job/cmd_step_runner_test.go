@@ -17,11 +17,11 @@ import (
 
 type testCmdExecuteActivity struct {
 	t           *testing.T
-	expectedReq map[string]string
+	expectedReq []activities.EnvVar
 }
 
 func (a *testCmdExecuteActivity) ExecuteCommand(ctx context.Context, request activities.ExecuteCommandRequest) (activities.ExecuteCommandResponse, error) {
-	assert.Equal(a.t, a.expectedReq, request.EnvVars)
+	assert.Equal(a.t, a.expectedReq, request.DynamicEnvVars)
 	return activities.ExecuteCommandResponse{}, nil
 }
 
@@ -33,7 +33,6 @@ func testCmdWorkflow(ctx workflow.Context, r request) (string, error) {
 	jobExecutionCtx := &runner.ExecutionContext{
 		Context:   ctx,
 		Path:      ProjectPath,
-		Envs:      map[string]string{},
 		TfVersion: r.LocalRoot.Root.TfVersion,
 	}
 
@@ -46,16 +45,30 @@ func testCmdWorkflow(ctx workflow.Context, r request) (string, error) {
 }
 
 func TestRunRunner_ShouldSetupEnvVars(t *testing.T) {
-
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 
-	expectedEnvVars := map[string]string{
-		"BASE_REPO_NAME":  RepoName,
-		"BASE_REPO_OWNER": RepoOwner,
-		"DIR":             ProjectPath,
-		"PROJECT_NAME":    ProjectName,
-		"REPO_REL_DIR":    "project",
+	expectedEnvVars := []activities.EnvVar{
+		{
+			Name:  "BASE_REPO_NAME",
+			Value: RepoName,
+		},
+		{
+			Name:  "BASE_REPO_OWNER",
+			Value: RepoOwner,
+		},
+		{
+			Name:  "DIR",
+			Value: ProjectPath,
+		},
+		{
+			Name:  "PROJECT_NAME",
+			Value: ProjectName,
+		},
+		{
+			Name:  "REPO_REL_DIR",
+			Value: "project",
+		},
 	}
 	testExecuteActivity := &testCmdExecuteActivity{
 		t:           t,

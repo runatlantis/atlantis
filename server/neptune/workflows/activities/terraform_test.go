@@ -106,14 +106,23 @@ func TestTerraformInit_RequestValidation(t *testing.T) {
 		RequestVersion  string
 		ExpectedVersion string
 		RequestArgs     []terraform.Argument
+		Envs            map[string]string
+		ExpectedEnvs    map[string]string
+		DynamicEnvs     []EnvVar
 		ExpectedArgs    []terraform.Argument
 	}{
 		{
+			//testing
 			RequestVersion:  "0.12.0",
 			ExpectedVersion: "0.12.0",
-			ExpectedArgs:    defaultArgs,
+
+			//defaults
+			ExpectedArgs: defaultArgs,
+			Envs:         map[string]string{},
+			ExpectedEnvs: map[string]string{},
 		},
 		{
+			//testing
 			ExpectedArgs: []terraform.Argument{
 				{
 					Key:   "input",
@@ -126,7 +135,29 @@ func TestTerraformInit_RequestValidation(t *testing.T) {
 					Value: "true",
 				},
 			},
+
+			// defaults
 			ExpectedVersion: defaultVersion,
+			Envs:            map[string]string{},
+			ExpectedEnvs:    map[string]string{},
+		},
+		{
+			// testing
+			Envs: map[string]string{"env1": "val1"},
+			DynamicEnvs: []EnvVar{
+				{
+					Name:  "env2",
+					Value: "val2",
+				},
+			},
+			ExpectedEnvs: map[string]string{
+				"env1": "val1",
+				"env2": "val2",
+			},
+
+			// defaults
+			ExpectedVersion: defaultVersion,
+			ExpectedArgs:    defaultArgs,
 		},
 	}
 
@@ -146,13 +177,14 @@ func TestTerraformInit_RequestValidation(t *testing.T) {
 				jobID:         jobID,
 				path:          path,
 				cmd:           terraform.NewSubCommand(terraform.Init).WithArgs(c.ExpectedArgs...),
-				customEnvVars: map[string]string{},
+				customEnvVars: c.ExpectedEnvs,
 				version:       expectedVersion,
 				resp:          "",
 			}
 
 			req := TerraformInitRequest{
-				Envs:                 map[string]string{},
+				Envs:                 c.Envs,
+				DynamicEnvs:          c.DynamicEnvs,
 				JobID:                jobID,
 				Path:                 path,
 				TfVersion:            c.RequestVersion,
@@ -262,13 +294,22 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 		ExpectedArgs    []terraform.Argument
 		ExpectedFlags   []terraform.Flag
 		PlanMode        *terraform.PlanMode
+		Envs            map[string]string
+		ExpectedEnvs    map[string]string
+		DynamicEnvs     []EnvVar
 	}{
 		{
+			//testing
 			RequestVersion:  "0.12.0",
 			ExpectedVersion: "0.12.0",
-			ExpectedArgs:    defaultArgs,
+
+			//default
+			ExpectedArgs: defaultArgs,
+			Envs:         map[string]string{},
+			ExpectedEnvs: map[string]string{},
 		},
 		{
+			//testing
 			ExpectedArgs: []terraform.Argument{
 				{
 					Key:   "input",
@@ -286,17 +327,44 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 					Value: "true",
 				},
 			},
+
+			// default
 			ExpectedVersion: defaultVersion,
+			Envs:            map[string]string{},
+			ExpectedEnvs:    map[string]string{},
 		},
 		{
-			ExpectedArgs:    defaultArgs,
-			ExpectedVersion: defaultVersion,
-			PlanMode:        terraform.NewDestroyPlanMode(),
+			// testing
+			PlanMode: terraform.NewDestroyPlanMode(),
 			ExpectedFlags: []terraform.Flag{
 				{
 					Value: "destroy",
 				},
 			},
+
+			// default
+			ExpectedArgs:    defaultArgs,
+			ExpectedVersion: defaultVersion,
+			Envs:            map[string]string{},
+			ExpectedEnvs:    map[string]string{},
+		},
+		{
+			// testing
+			Envs: map[string]string{"env1": "val1"},
+			DynamicEnvs: []EnvVar{
+				{
+					Name:  "env2",
+					Value: "val2",
+				},
+			},
+			ExpectedEnvs: map[string]string{
+				"env1": "val1",
+				"env2": "val2",
+			},
+
+			// default
+			ExpectedArgs:    defaultArgs,
+			ExpectedVersion: defaultVersion,
 		},
 	}
 
@@ -318,7 +386,7 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 						jobID:         jobID,
 						path:          path,
 						cmd:           terraform.NewSubCommand(terraform.Plan).WithArgs(c.ExpectedArgs...).WithFlags(c.ExpectedFlags...),
-						customEnvVars: map[string]string{},
+						customEnvVars: c.ExpectedEnvs,
 						version:       expectedVersion,
 						resp:          "",
 					},
@@ -327,7 +395,7 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 						jobID:         jobID,
 						path:          path,
 						cmd:           terraform.NewSubCommand(terraform.Show).WithFlags(terraform.Flag{Value: "json"}).WithInput("some/path/output.tfplan"),
-						customEnvVars: map[string]string{},
+						customEnvVars: c.ExpectedEnvs,
 						version:       expectedVersion,
 						resp:          "{}",
 					},
@@ -335,12 +403,13 @@ func TestTerraformPlan_RequestValidation(t *testing.T) {
 			}
 
 			req := TerraformPlanRequest{
-				Envs:      map[string]string{},
-				JobID:     jobID,
-				Path:      path,
-				TfVersion: c.RequestVersion,
-				Args:      c.RequestArgs,
-				Mode:      c.PlanMode,
+				Envs:        c.Envs,
+				DynamicEnvs: c.DynamicEnvs,
+				JobID:       jobID,
+				Path:        path,
+				TfVersion:   c.RequestVersion,
+				Args:        c.RequestArgs,
+				Mode:        c.PlanMode,
 			}
 
 			credsRefresher := &testCredsRefresher{}
@@ -459,13 +528,22 @@ func TestTerraformApply_RequestValidation(t *testing.T) {
 		ExpectedVersion string
 		RequestArgs     []terraform.Argument
 		ExpectedArgs    []terraform.Argument
+		Envs            map[string]string
+		ExpectedEnvs    map[string]string
+		DynamicEnvs     []EnvVar
 	}{
 		{
+			//testing
 			RequestVersion:  "0.12.0",
 			ExpectedVersion: "0.12.0",
-			ExpectedArgs:    defaultArgs,
+
+			//default
+			ExpectedArgs: defaultArgs,
+			Envs:         map[string]string{},
+			ExpectedEnvs: map[string]string{},
 		},
 		{
+			//testing
 			ExpectedArgs: []terraform.Argument{
 				{
 					Key:   "input",
@@ -477,7 +555,28 @@ func TestTerraformApply_RequestValidation(t *testing.T) {
 					Value: "false",
 				},
 			},
+			//default
 			ExpectedVersion: defaultVersion,
+			Envs:            map[string]string{},
+			ExpectedEnvs:    map[string]string{},
+		},
+		{
+			//testing
+			Envs: map[string]string{"env1": "val1"},
+			DynamicEnvs: []EnvVar{
+				{
+					Name:  "env2",
+					Value: "val2",
+				},
+			},
+			ExpectedEnvs: map[string]string{
+				"env1": "val1",
+				"env2": "val2",
+			},
+
+			//default
+			ExpectedVersion: defaultVersion,
+			ExpectedArgs:    defaultArgs,
 		},
 	}
 
@@ -497,18 +596,19 @@ func TestTerraformApply_RequestValidation(t *testing.T) {
 				jobID:         jobID,
 				path:          path,
 				cmd:           terraform.NewSubCommand(terraform.Apply).WithArgs(c.ExpectedArgs...).WithInput("some/path/output.tfplan"),
-				customEnvVars: map[string]string{},
+				customEnvVars: c.ExpectedEnvs,
 				version:       expectedVersion,
 				resp:          "",
 			}
 
 			req := TerraformApplyRequest{
-				Envs:      map[string]string{},
-				JobID:     jobID,
-				Path:      path,
-				TfVersion: c.RequestVersion,
-				Args:      c.RequestArgs,
-				PlanFile:  "some/path/output.tfplan",
+				Envs:        c.Envs,
+				DynamicEnvs: c.DynamicEnvs,
+				JobID:       jobID,
+				Path:        path,
+				TfVersion:   c.RequestVersion,
+				Args:        c.RequestArgs,
+				PlanFile:    "some/path/output.tfplan",
 			}
 
 			tfActivity := NewTerraformActivities(testClient, expectedVersion, &testStreamHandler{

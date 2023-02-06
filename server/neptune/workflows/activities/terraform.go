@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
@@ -98,10 +99,33 @@ func NewTerraformActivities(
 	}
 }
 
+func getEnvs(directEnvs map[string]string, dynamicEnvs []EnvVar) (map[string]string, error) {
+	envs := make(map[string]string)
+
+	for k, v := range directEnvs {
+		envs[k] = v
+	}
+
+	for _, e := range dynamicEnvs {
+		v, err := e.GetValue()
+
+		if err != nil {
+			return envs, errors.Wrap(err, fmt.Sprintf("loading dynamic env var with name %s", e.Name))
+		}
+
+		envs[e.Name] = v
+	}
+
+	return envs, nil
+}
+
 // Terraform Init
 type TerraformInitRequest struct {
-	Args                 []terraform.Argument
+	Args []terraform.Argument
+	// deprecated: Use DynamicEnvs instead
+	// remove once we are sure this isn't used
 	Envs                 map[string]string
+	DynamicEnvs          []EnvVar
 	JobID                string
 	TfVersion            string
 	Path                 string
@@ -115,6 +139,7 @@ type TerraformInitResponse struct {
 func (t *terraformActivities) TerraformInit(ctx context.Context, request TerraformInitRequest) (TerraformInitResponse, error) {
 	cancel := temporal.StartHeartbeat(ctx, temporal.HeartbeatTimeout)
 	defer cancel()
+
 	// Resolve the tf version to be used for this operation
 	tfVersion, err := t.resolveVersion(request.TfVersion)
 	if err != nil {
@@ -126,10 +151,16 @@ func (t *terraformActivities) TerraformInit(ctx context.Context, request Terrafo
 	}
 	args = append(args, request.Args...)
 
+	envs, err := getEnvs(request.Envs, request.DynamicEnvs)
+
+	if err != nil {
+		return TerraformInitResponse{}, err
+	}
+
 	r := &terraform.RunCommandRequest{
 		RootPath:          request.Path,
 		SubCommand:        terraform.NewSubCommand(terraform.Init).WithArgs(args...),
-		AdditionalEnvVars: request.Envs,
+		AdditionalEnvVars: envs,
 		Version:           tfVersion,
 	}
 
@@ -155,12 +186,15 @@ func (t *terraformActivities) TerraformInit(ctx context.Context, request Terrafo
 // Terraform Plan
 
 type TerraformPlanRequest struct {
-	Args      []terraform.Argument
-	Envs      map[string]string
-	JobID     string
-	TfVersion string
-	Path      string
-	Mode      *terraform.PlanMode
+	Args []terraform.Argument
+	// deprecated: Use DynamicEnvs instead
+	// remove once we are sure this isn't used
+	Envs        map[string]string
+	DynamicEnvs []EnvVar
+	JobID       string
+	TfVersion   string
+	Path        string
+	Mode        *terraform.PlanMode
 }
 
 type TerraformPlanResponse struct {
@@ -193,10 +227,16 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 		flags = append(flags, request.Mode.ToFlag())
 	}
 
+	envs, err := getEnvs(request.Envs, request.DynamicEnvs)
+
+	if err != nil {
+		return TerraformPlanResponse{}, err
+	}
+
 	planRequest := &terraform.RunCommandRequest{
 		RootPath:          request.Path,
 		SubCommand:        terraform.NewSubCommand(terraform.Plan).WithArgs(args...).WithFlags(flags...),
-		AdditionalEnvVars: request.Envs,
+		AdditionalEnvVars: envs,
 		Version:           tfVersion,
 	}
 	out, err := t.runCommandWithOutputStream(ctx, request.JobID, planRequest)
@@ -214,7 +254,7 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 				Value: "json",
 			}).
 			WithInput(planFile),
-		AdditionalEnvVars: request.Envs,
+		AdditionalEnvVars: envs,
 		Version:           tfVersion,
 	}
 
@@ -244,12 +284,15 @@ func (t *terraformActivities) TerraformPlan(ctx context.Context, request Terrafo
 // Terraform Apply
 
 type TerraformApplyRequest struct {
-	Args      []terraform.Argument
-	Envs      map[string]string
-	JobID     string
-	TfVersion string
-	Path      string
-	PlanFile  string
+	Args []terraform.Argument
+	// deprecated: Use DynamicEnvs instead
+	// remove once we are sure this isn't used
+	Envs        map[string]string
+	DynamicEnvs []EnvVar
+	JobID       string
+	TfVersion   string
+	Path        string
+	PlanFile    string
 }
 
 type TerraformApplyResponse struct {
@@ -268,10 +311,16 @@ func (t *terraformActivities) TerraformApply(ctx context.Context, request Terraf
 	args := []terraform.Argument{DisableInputArg}
 	args = append(args, request.Args...)
 
+	envs, err := getEnvs(request.Envs, request.DynamicEnvs)
+
+	if err != nil {
+		return TerraformApplyResponse{}, err
+	}
+
 	applyRequest := &terraform.RunCommandRequest{
 		RootPath:          request.Path,
 		SubCommand:        terraform.NewSubCommand(terraform.Apply).WithInput(planFile).WithArgs(args...),
-		AdditionalEnvVars: request.Envs,
+		AdditionalEnvVars: envs,
 		Version:           tfVersion,
 	}
 	out, err := t.runCommandWithOutputStream(ctx, request.JobID, applyRequest)

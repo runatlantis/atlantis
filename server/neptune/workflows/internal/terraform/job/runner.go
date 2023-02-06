@@ -22,7 +22,7 @@ const (
 // ExecutionContext wraps the workflow context with other info needed to execute a step
 type ExecutionContext struct {
 	Path      string
-	Envs      map[string]string
+	Envs      []EnvVar
 	TfVersion string
 	workflow.Context
 	JobID string
@@ -40,13 +40,18 @@ type stepRunner interface {
 	Run(executionContext *ExecutionContext, localRoot *terraform.LocalRoot, step execute.Step) (string, error)
 }
 
+// envStepRunner computes env variables
+type envStepRunner interface {
+	Run(executionContext *ExecutionContext, localRoot *terraform.LocalRoot, step execute.Step) (EnvVar, error)
+}
+
 type JobRunner struct { ///nolint:revive // avoiding refactor while adding linter action
 	Activity      terraformActivities
-	EnvStepRunner stepRunner
+	EnvStepRunner envStepRunner
 	CmdStepRunner stepRunner
 }
 
-func NewRunner(runStepRunner stepRunner, envStepRunner stepRunner, tfActivities terraformActivities) *JobRunner {
+func NewRunner(runStepRunner stepRunner, envStepRunner envStepRunner, tfActivities terraformActivities) *JobRunner {
 	return &JobRunner{
 		CmdStepRunner: runStepRunner,
 		EnvStepRunner: envStepRunner,
@@ -62,7 +67,6 @@ func (r *JobRunner) Plan(ctx workflow.Context, localRoot *terraform.LocalRoot, j
 	jobCtx := &ExecutionContext{
 		Context:   ctx,
 		Path:      localRoot.Path,
-		Envs:      map[string]string{},
 		TfVersion: localRoot.Root.TfVersion,
 		JobID:     jobID,
 	}
@@ -101,7 +105,6 @@ func (r *JobRunner) Apply(ctx workflow.Context, localRoot *terraform.LocalRoot, 
 	jobCtx := &ExecutionContext{
 		Context:   ctx,
 		Path:      localRoot.Path,
-		Envs:      map[string]string{},
 		TfVersion: localRoot.Root.TfVersion,
 		JobID:     jobID,
 	}
@@ -133,14 +136,20 @@ func (r *JobRunner) apply(ctx *ExecutionContext, planFile string, step execute.S
 	if err != nil {
 		return errors.Wrapf(err, "creating argument list")
 	}
+
+	var envs []activities.EnvVar
+	for _, e := range ctx.Envs {
+		envs = append(envs, e.ToActivityEnvVar())
+	}
 	var resp activities.TerraformApplyResponse
 	err = workflow.ExecuteActivity(ctx, r.Activity.TerraformApply, activities.TerraformApplyRequest{
-		Args:      args,
-		Envs:      ctx.Envs,
-		TfVersion: ctx.TfVersion,
-		Path:      ctx.Path,
-		JobID:     ctx.JobID,
-		PlanFile:  planFile,
+		Args:        args,
+		Envs:        map[string]string{},
+		DynamicEnvs: envs,
+		TfVersion:   ctx.TfVersion,
+		Path:        ctx.Path,
+		JobID:       ctx.JobID,
+		PlanFile:    planFile,
 	}).Get(ctx, &resp)
 	if err != nil {
 		return errors.Wrap(err, "running terraform apply activity")
@@ -155,13 +164,18 @@ func (r *JobRunner) plan(ctx *ExecutionContext, mode *terraform.PlanMode, extraA
 	if err != nil {
 		return resp, errors.Wrapf(err, "creating argument list")
 	}
+	var envs []activities.EnvVar
+	for _, e := range ctx.Envs {
+		envs = append(envs, e.ToActivityEnvVar())
+	}
 	err = workflow.ExecuteActivity(ctx, r.Activity.TerraformPlan, activities.TerraformPlanRequest{
-		Args:      args,
-		Envs:      ctx.Envs,
-		TfVersion: ctx.TfVersion,
-		JobID:     ctx.JobID,
-		Path:      ctx.Path,
-		Mode:      mode,
+		Args:        args,
+		Envs:        map[string]string{},
+		DynamicEnvs: envs,
+		TfVersion:   ctx.TfVersion,
+		JobID:       ctx.JobID,
+		Path:        ctx.Path,
+		Mode:        mode,
 	}).Get(ctx, &resp)
 	if err != nil {
 		return resp, errors.Wrap(err, "running terraform plan activity")
@@ -176,10 +190,15 @@ func (r *JobRunner) init(ctx *ExecutionContext, localRoot *terraform.LocalRoot, 
 	if err != nil {
 		return errors.Wrap(err, "creating argument list")
 	}
+	var envs []activities.EnvVar
+	for _, e := range ctx.Envs {
+		envs = append(envs, e.ToActivityEnvVar())
+	}
 	var resp activities.TerraformInitResponse
 	err = workflow.ExecuteActivity(ctx.Context, r.Activity.TerraformInit, activities.TerraformInitRequest{
 		Args:                 args,
-		Envs:                 ctx.Envs,
+		Envs:                 map[string]string{},
+		DynamicEnvs:          envs,
 		TfVersion:            ctx.TfVersion,
 		Path:                 ctx.Path,
 		JobID:                ctx.JobID,
@@ -198,7 +217,7 @@ func (r *JobRunner) runOptionalSteps(ctx *ExecutionContext, localRoot *terraform
 		return err
 	case "env":
 		o, err := r.EnvStepRunner.Run(ctx, localRoot, step)
-		ctx.Envs[step.EnvVarName] = o
+		ctx.Envs = append(ctx.Envs, o)
 		// output of env step doesn't need to be returned.
 		return err
 	}

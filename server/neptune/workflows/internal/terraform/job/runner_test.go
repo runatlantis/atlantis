@@ -72,16 +72,10 @@ func testJobPlanWorkflow(ctx workflow.Context, r terraform.Request) (activities.
 		Path: ProjectPath,
 	}
 
-	jobExecutionCtx := &job.ExecutionContext{
-		Context:   ctx,
-		Path:      ProjectPath,
-		Envs:      map[string]string{},
-		TfVersion: localRoot.Root.TfVersion,
-	}
-
 	var a *testTerraformActivity
 	jobRunner := job.NewRunner(&job.CmdStepRunner{}, &job.EnvStepRunner{}, a)
-	return jobRunner.Plan(jobExecutionCtx, &localRoot, JobID)
+
+	return jobRunner.Plan(ctx, &localRoot, JobID)
 }
 
 // test workflow that runs the plan job
@@ -96,16 +90,9 @@ func testJobApplyWorkflow(ctx workflow.Context, r terraform.Request) error {
 		Path: ProjectPath,
 	}
 
-	jobExecutionCtx := &job.ExecutionContext{
-		Context:   ctx,
-		Path:      ProjectPath,
-		Envs:      map[string]string{},
-		TfVersion: localRoot.Root.TfVersion,
-	}
-
 	var a *testTerraformActivity
 	jobRunner := job.NewRunner(&job.CmdStepRunner{}, &job.EnvStepRunner{}, a)
-	return jobRunner.Apply(jobExecutionCtx, &localRoot, JobID, "")
+	return jobRunner.Apply(ctx, &localRoot, JobID, "")
 }
 
 func TestJobRunner_Plan(t *testing.T) {
@@ -123,7 +110,13 @@ func TestJobRunner_Plan(t *testing.T) {
 					JobID: JobID,
 					Args:  []terraform_model.Argument{},
 					Envs:  map[string]string{},
-					Path:  ProjectPath,
+					DynamicEnvs: []activities.EnvVar{
+						{
+							Name:  "env1",
+							Value: "v1",
+						},
+					},
+					Path: ProjectPath,
 				},
 			},
 			close: struct {
@@ -139,7 +132,7 @@ func TestJobRunner_Plan(t *testing.T) {
 		env.RegisterWorkflow(testJobPlanWorkflow)
 
 		env.ExecuteWorkflow(testJobPlanWorkflow, terraform.Request{
-			Root: getTestRootFor("plan"),
+			Root: getTestRootForPlan(),
 			Repo: repo,
 		})
 
@@ -164,7 +157,13 @@ func TestJobRunner_Apply(t *testing.T) {
 					JobID: JobID,
 					Args:  []terraform_model.Argument{},
 					Envs:  map[string]string{},
-					Path:  ProjectPath,
+					DynamicEnvs: []activities.EnvVar{
+						{
+							Name:  "env1",
+							Value: "v1",
+						},
+					},
+					Path: ProjectPath,
 				},
 			},
 			close: struct {
@@ -180,13 +179,13 @@ func TestJobRunner_Apply(t *testing.T) {
 		env.RegisterWorkflow(testJobApplyWorkflow)
 
 		env.ExecuteWorkflow(testJobApplyWorkflow, terraform.Request{
-			Root: getTestRootFor("apply"),
+			Root: getTestRootForApply(),
 			Repo: repo,
 		})
 	})
 }
 
-func getTestRootFor(stepName string) terraform_model.Root {
+func getTestRootForPlan() terraform_model.Root {
 	return terraform_model.Root{
 		Name: ProjectName,
 		Path: "project",
@@ -194,8 +193,32 @@ func getTestRootFor(stepName string) terraform_model.Root {
 			Job: execute.Job{
 				Steps: []execute.Step{
 					{
-						StepName: stepName,
+						StepName:    "env",
+						EnvVarName:  "env1",
+						EnvVarValue: "v1",
 					},
+					{
+						StepName: "plan",
+					},
+				},
+			},
+		},
+	}
+}
+
+func getTestRootForApply() terraform_model.Root {
+	return terraform_model.Root{
+		Name: ProjectName,
+		Path: "project",
+		Apply: execute.Job{
+			Steps: []execute.Step{
+				{
+					StepName:    "env",
+					EnvVarName:  "env1",
+					EnvVarValue: "v1",
+				},
+				{
+					StepName: "apply",
 				},
 			},
 		},
