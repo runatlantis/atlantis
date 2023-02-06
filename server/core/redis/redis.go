@@ -329,6 +329,7 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 					res.RepoRelDir == proj.RepoRelDir &&
 					res.ProjectName == proj.ProjectName {
 
+					proj.PolicyStatus = res.PolicyCheckApprovals
 					proj.Status = res.PlanStatus()
 					updatedExisting = true
 					break
@@ -399,9 +400,10 @@ func (r *RedisDB) pullKey(pull models.PullRequest) (string, error) {
 
 func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
 	return models.ProjectStatus{
-		Workspace:   p.Workspace,
-		RepoRelDir:  p.RepoRelDir,
-		ProjectName: p.ProjectName,
-		Status:      p.PlanStatus(),
+		Workspace:    p.Workspace,
+		RepoRelDir:   p.RepoRelDir,
+		ProjectName:  p.ProjectName,
+		PolicyStatus: p.PolicyCheckApprovals,
+		Status:       p.PlanStatus(),
 	}
 }

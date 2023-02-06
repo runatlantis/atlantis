@@ -1,7 +1,5 @@
 {{ define "policyCheckSuccessUnwrapped" -}}
-```diff
-{{ .PolicyCheckOutput }}
-```
+{{ template "policyCheck" .PolicySetResults }}
 
 * :arrow_forward: To **apply** this plan, comment:
     * `{{ .ApplyCmd }}`

@@ -237,16 +237,18 @@ func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.P
 func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
 	var policyCheckApprovals []models.PolicySetApproval
-	for _, ps := range policySuccess.PolicySetResults {
-	    approvals := 0
-	    if !ps.Passed {
-	        for _, cps := range ctx.PolicySets.PolicySets {
-	            if ps.PolicySetName == cps.Name {
-	                approvals = 0 - cps.ReviewCount
-	            }
-	       }
-	    }
-	    policyCheckApprovals = append(policyCheckApprovals, models.PolicySetApproval{PolicySetName: ps.PolicySetName, Approvals: approvals})
+	if err == nil {
+		for _, ps := range policySuccess.PolicySetResults {
+    	    approvals := 0
+    	    if !ps.Passed {
+    	        for _, cps := range ctx.PolicySets.PolicySets {
+    	            if ps.PolicySetName == cps.Name {
+    	                approvals = 0 - cps.ReviewCount
+    	            }
+    	       }
+    	    }
+    	    policyCheckApprovals = append(policyCheckApprovals, models.PolicySetApproval{PolicySetName: ps.PolicySetName, Approvals: approvals})
+    	}
 	}
 	return command.ProjectResult{
 		Command:            command.PolicyCheck,
@@ -357,6 +359,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
+	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
 	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
@@ -393,26 +396,25 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 
 	var failures []string
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	var errs error
 	if err != nil {
-	    stepErr := err
-	    err = nil
-	    for {
-	        stepErr = errors.Unwrap(stepErr)
-	        if stepErr == nil {
-	            break
-	        }
-	        if strings.Contains(stepErr.Error(), "Some policies failed.") {
-	            failures = append(failures, stepErr.Error())
-	        } else {
-	            err = multierror.Append(err, stepErr)
-	        }
-	    }
+		for {
+			err = errors.Unwrap(err)
+			if err == nil {
+				break
+			}
+			if strings.Contains(err.Error(), "Some policies failed.") {
+				 failures = append(failures, err.Error())
+			} else {
+				errs = multierror.Append(errs, err)
+			}
+		}
 
-	    if err != nil {
-		    // Note: we are explicitly not unlocking the pr here since a failing policy check will require
-		    // approval
-		    return nil, "", err
-	    }
+		if errs != nil {
+			// Note: we are explicitly not unlocking the pr here since a failing policy check will require
+			// approval
+			return nil, "", errs
+		}
 	}
 
 	var policySetResults []models.PolicySetResult

@@ -444,6 +444,14 @@ type StateRmSuccess struct {
 	RePlanCmd string
 }
 
+func (p *PolicyCheckSuccess) CombinedOutput() string {
+    combinedOutput := ""
+    for _, psResult := range p.PolicySetResults {
+        combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResult.PolicySetOutput)
+    }
+    return combinedOutput
+}
+
 // Summary extracts one line summary of policy check.
 func (p *PolicyCheckSuccess) Summary() string {
 	note := ""

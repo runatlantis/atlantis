@@ -197,9 +197,9 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 	    if cmdErr != nil {
 	        // Since we're running conftest for each policyset, individual command errors should be concatenated.
 	        if isValidConftestOutput(cmdOutput) {
-	            combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s: conftest: %s", policySet.Name, "Some policies failed.")))
+	            combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s:\n  conftest:\n  %s", policySet.Name, "Some policies failed.")))
 	        } else {
-	            combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s: conftest: %s", policySet.Name, cmdOutput)))
+	            combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s:\n  conftest:\n  %s", policySet.Name, cmdOutput)))
 	        }
 	        passed = false
 	    }

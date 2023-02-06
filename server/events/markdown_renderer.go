@@ -196,8 +196,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			}
 			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), common})
 		} else if result.Failure != "" {
-		    if common.Command == "PolicyCheck" {
-		        resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), policyCheckFailureData{result.Failure, common, *result.PolicyCheckSuccess})
+		    if common.Command == "Policy Check" {
+		        resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckFailure"), policyCheckFailureData{result.Failure, common, *result.PolicyCheckSuccess})
+		    } else if common.Command == "Approve Policies" {
 		    } else {
 		        resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, common})
 		    }
@@ -210,12 +211,11 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			}
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
-//			result.PolicyCheckSuccess.PolicySetResults = strings.TrimSpace(string(result.PolicyCheckSuccess.PolicySetResults))
-//			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckSuccess.PolicySetResults) {
-//				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
-//			} else {
+			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckSuccess.CombinedOutput()) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
+			} else {
 			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessUnwrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
-//			}
+			}
 			numPolicyCheckSuccesses++
 		} else if result.ApplySuccess != "" {
 			output := strings.TrimSpace(result.ApplySuccess)
