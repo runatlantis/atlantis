@@ -91,12 +91,15 @@ func (c *ConfTestExecutor) Run(_ context.Context, prjCtx command.ProjectContext,
 			scope.Counter(metrics.ExecutionErrorMetric).Inc(1)
 			return "", errors.Wrap(err, "building args")
 		}
-
+		policyScope := scope.SubScope(policySet.Name)
 		cmdOutput, cmdErr := c.Exec.CombinedOutput(serializedArgs, envs, workdir)
 		// Continue running other policies if one fails since it might not be the only failing one
 		if cmdErr != nil {
 			policyErr = cmdErr
 			failedPolicies = append(failedPolicies, policySet)
+			policyScope.Counter(metrics.ExecutionFailureMetric)
+		} else {
+			policyScope.Counter(metrics.ExecutionSuccessMetric)
 		}
 		totalCmdOutput = append(totalCmdOutput, c.processOutput(cmdOutput, policySet, cmdErr))
 	}

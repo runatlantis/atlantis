@@ -3,12 +3,12 @@ package handlers
 import (
 	"context"
 	"fmt"
-
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/http"
 	"github.com/runatlantis/atlantis/server/logging"
+	contextInternal "github.com/runatlantis/atlantis/server/neptune/context"
 	event_types "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 )
 
@@ -94,10 +94,11 @@ type asyncHandler struct {
 func (h *asyncHandler) Handle(ctx context.Context, request *http.BufferedRequest, event event_types.Comment, command *command.Comment) error {
 	go func() {
 		// Passing background context to avoid context cancellation since the parent goroutine does not wait for this goroutine to finish execution.
-		err := h.commandHandler.Handle(context.Background(), request, event, command)
+		ctx = contextInternal.CopyFields(context.Background(), ctx)
+		err := h.commandHandler.Handle(ctx, request, event, command)
 
 		if err != nil {
-			h.logger.ErrorContext(context.Background(), err.Error())
+			h.logger.ErrorContext(ctx, err.Error())
 		}
 	}()
 	return nil

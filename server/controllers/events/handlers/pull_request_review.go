@@ -5,6 +5,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/http"
 	"github.com/runatlantis/atlantis/server/logging"
+	contextInternal "github.com/runatlantis/atlantis/server/neptune/context"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 )
 
@@ -38,12 +39,13 @@ func NewPullRequestReviewEvent(prReviewCommandRunner events.CommandRunner, logge
 	}
 }
 
-func (a AsyncPullRequestReviewEvent) Handle(_ context.Context, event event.PullRequestReview, req *http.BufferedRequest) error {
+func (a AsyncPullRequestReviewEvent) Handle(ctx context.Context, event event.PullRequestReview, req *http.BufferedRequest) error {
 	go func() {
 		// Passing background context to avoid context cancellation since the parent goroutine does not wait for this goroutine to finish execution.
-		err := a.handler.Handle(context.Background(), event, req)
+		ctx = contextInternal.CopyFields(context.Background(), ctx)
+		err := a.handler.Handle(ctx, event, req)
 		if err != nil {
-			a.logger.ErrorContext(context.Background(), err.Error())
+			a.logger.ErrorContext(ctx, err.Error())
 		}
 	}()
 	return nil

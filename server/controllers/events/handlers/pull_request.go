@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	contextInternal "github.com/runatlantis/atlantis/server/neptune/context"
 
 	"github.com/runatlantis/atlantis/server/controllers/events/errors"
 	"github.com/runatlantis/atlantis/server/events"
@@ -42,10 +43,11 @@ type asyncAutoplanner struct {
 func (p *asyncAutoplanner) Handle(ctx context.Context, request *http.BufferedRequest, event event_types.PullRequest) error {
 	go func() {
 		// Passing background context to avoid context cancellation since the parent goroutine does not wait for this goroutine to finish execution.
-		err := p.autoplanner.Handle(context.Background(), request, event)
+		ctx = contextInternal.CopyFields(context.Background(), ctx)
+		err := p.autoplanner.Handle(ctx, request, event)
 
 		if err != nil {
-			p.logger.ErrorContext(context.Background(), err.Error())
+			p.logger.ErrorContext(ctx, err.Error())
 		}
 	}()
 	return nil
