@@ -26,7 +26,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.22
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/moby/moby v20.10.23+incompatible
+	github.com/moby/patternmatcher v0.5.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/petergtz/pegomock v2.9.0+incompatible
 	github.com/pkg/errors v0.9.1
@@ -57,7 +57,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 )
 
@@ -128,5 +127,4 @@ require (
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gotest.tools/v3 v3.3.0 // indirect
 )
