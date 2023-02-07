@@ -89,6 +89,7 @@ allowed_regexp_prefixes:
 projects:
   - &template
     name: template
+    dir: template
     workflow: custom
     autoplan:
       enabled: true

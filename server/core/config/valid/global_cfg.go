@@ -2,12 +2,12 @@ package valid
 
 import (
 	"fmt"
-	"golang.org/x/exp/slices"
 	"regexp"
 	"strings"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 const MergeableCommandReq = "mergeable"
@@ -421,22 +421,22 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		}
 	}
 	for _, p := range rCfg.Projects {
-		if p.WorkflowName != nil && !slices.Contains(allowedOverrides, WorkflowKey) {
+		if p.WorkflowName != nil && !utils.SlicesContains(allowedOverrides, WorkflowKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", WorkflowKey, AllowedOverridesKey, WorkflowKey)
 		}
-		if p.ApplyRequirements != nil && !slices.Contains(allowedOverrides, ApplyRequirementsKey) {
+		if p.ApplyRequirements != nil && !utils.SlicesContains(allowedOverrides, ApplyRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ApplyRequirementsKey, AllowedOverridesKey, ApplyRequirementsKey)
 		}
-		if p.PlanRequirements != nil && !slices.Contains(allowedOverrides, PlanRequirementsKey) {
+		if p.PlanRequirements != nil && !utils.SlicesContains(allowedOverrides, PlanRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", PlanRequirementsKey, AllowedOverridesKey, PlanRequirementsKey)
 		}
-		if p.ImportRequirements != nil && !slices.Contains(allowedOverrides, ImportRequirementsKey) {
+		if p.ImportRequirements != nil && !utils.SlicesContains(allowedOverrides, ImportRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ImportRequirementsKey, AllowedOverridesKey, ImportRequirementsKey)
 		}
-		if p.DeleteSourceBranchOnMerge != nil && !slices.Contains(allowedOverrides, DeleteSourceBranchOnMergeKey) {
+		if p.DeleteSourceBranchOnMerge != nil && !utils.SlicesContains(allowedOverrides, DeleteSourceBranchOnMergeKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", DeleteSourceBranchOnMergeKey, AllowedOverridesKey, DeleteSourceBranchOnMergeKey)
 		}
-		if p.RepoLocking != nil && !slices.Contains(allowedOverrides, RepoLockingKey) {
+		if p.RepoLocking != nil && !utils.SlicesContains(allowedOverrides, RepoLockingKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", RepoLockingKey, AllowedOverridesKey, RepoLockingKey)
 		}
 	}
@@ -487,7 +487,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 				}
 			}
 
-			if !slices.Contains(allowedWorkflows, name) {
+			if !utils.SlicesContains(allowedWorkflows, name) {
 				return fmt.Errorf("workflow '%s' is not allowed for this repo", name)
 			}
 		}
