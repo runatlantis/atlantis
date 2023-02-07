@@ -23,7 +23,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 
-	"github.com/moby/moby/pkg/fileutils"
+	"github.com/moby/patternmatcher"
 	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -198,7 +198,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 			}
 			whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, wmRelPath)
 		}
-		pm, err := fileutils.NewPatternMatcher(whenModifiedRelToRepoRoot)
+		pm, err := patternmatcher.New(whenModifiedRelToRepoRoot)
 		if err != nil {
 			return nil, errors.Wrapf(err, "matching modified files with patterns: %v", project.Autoplan.WhenModified)
 		}
@@ -242,7 +242,7 @@ func (p *DefaultProjectFinder) filterToFileList(log logging.SimpleLogging, files
 	var filtered []string
 	patterns := strings.Split(fileList, ",")
 	// Ignore pattern matcher error here as it was checked for errors in server validation
-	patternMatcher, _ := fileutils.NewPatternMatcher(patterns)
+	patternMatcher, _ := patternmatcher.New(patterns)
 
 	for _, fileName := range files {
 		if p.shouldIgnore(fileName) {
