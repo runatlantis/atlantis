@@ -276,18 +276,18 @@ func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.
 	}
 }
 
-//func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
-//	approvedOut, failure, err := p.doApprovePolicies(ctx)
-//	return command.ProjectResult{
-//		Command:            command.PolicyCheck,
-//		Failure:            failure,
-//		Error:              err,
-//		PolicyCheckSuccess: approvedOut,
-//		RepoRelDir:         ctx.RepoRelDir,
-//		Workspace:          ctx.Workspace,
-//		ProjectName:        ctx.ProjectName,
-//	}
-//}
+func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
+	approvedOut, failure, err := p.doApprovePolicies(ctx)
+	return command.ProjectResult{
+		Command:            command.PolicyCheck,
+		Failure:            failure,
+		Error:              err,
+		PolicyCheckSuccess: approvedOut,
+		RepoRelDir:         ctx.RepoRelDir,
+		Workspace:          ctx.Workspace,
+		ProjectName:        ctx.ProjectName,
+	}
+}
 
 func (p *DefaultProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectResult {
 	versionOut, failure, err := p.doVersion(ctx)
@@ -331,15 +331,15 @@ func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) comman
 	}
 }
 
-//func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
-//
-//	// TODO: Make this a bit smarter
-//	// without checking some sort of state that the policy check has indeed passed this is likely to cause issues
-//
-//	return &models.PolicyCheckSuccess{
+func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
+
+	// TODO: Make this a bit smarter
+	// without checking some sort of state that the policy check has indeed passed this is likely to cause issues
+
+	return &models.PolicyCheckSuccess{
 //				PolicyCheckOutput: "Policies approved",
-//	}, "", nil
-//}
+	}, "", nil
+}
 
 func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
