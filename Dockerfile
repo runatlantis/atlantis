@@ -14,6 +14,13 @@ ARG ATLANTIS_DATE=unknown
 ENV ATLANTIS_DATE=${ATLANTIS_DATE}
 
 WORKDIR /app
+
+# This is needed to download transitive dependencies instead of compiling them
+# https://github.com/montanaflynn/golang-docker-cache
+# https://github.com/golang/go/issues/27719
+COPY go.mod go.sum ./
+RUN go mod graph | awk '{if ($1 !~ "@") print $2}' | xargs go get
+
 COPY . /app
 
 RUN --mount=type=cache,target=/go/pkg/mod \
