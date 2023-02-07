@@ -97,9 +97,9 @@ func (c *ConfTestExecutor) Run(_ context.Context, prjCtx command.ProjectContext,
 		if cmdErr != nil {
 			policyErr = cmdErr
 			failedPolicies = append(failedPolicies, policySet)
-			policyScope.Counter(metrics.ExecutionFailureMetric)
+			policyScope.Counter(metrics.ExecutionFailureMetric).Inc(1)
 		} else {
-			policyScope.Counter(metrics.ExecutionSuccessMetric)
+			policyScope.Counter(metrics.ExecutionSuccessMetric).Inc(1)
 		}
 		totalCmdOutput = append(totalCmdOutput, c.processOutput(cmdOutput, policySet, cmdErr))
 	}
