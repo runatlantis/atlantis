@@ -37,6 +37,8 @@ const (
 	dirFlagShort               = "d"
 	projectFlagLong            = "project"
 	projectFlagShort           = "p"
+	policySetFlagLong          = "policy-set"
+	policySetFlagShort         = ""
 	autoMergeDisabledFlagLong  = "auto-merge-disabled"
 	autoMergeDisabledFlagShort = ""
 	verboseFlagLong            = "verbose"
@@ -231,6 +233,10 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		name = command.ApprovePolicies
 		flagSet = pflag.NewFlagSet(command.ApprovePolicies.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Approve policies for this Terraform workspace.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Approve policies for this directory, relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Approve policies for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
+		flagSet.StringVarP(&project, policySetFlagLong, policySetFlagShort, "", "Approve policies for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.Unlock.String():
 		name = command.Unlock

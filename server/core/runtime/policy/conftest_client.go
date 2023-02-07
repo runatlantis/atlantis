@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 
+	"encoding/json"
+	"github.com/hashicorp/go-multierror"
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -14,12 +16,10 @@ import (
 	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"github.com/hashicorp/go-multierror"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"encoding/json"
 	"regexp"
 )
 
@@ -173,7 +173,6 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 	var policySetResults []models.PolicySetResult
 	var combinedErr error
 
-
 	for _, policySet := range ctx.PolicySets.PolicySets {
 		path, resolveErr := c.SourceResolver.Resolve(policySet)
 
@@ -184,31 +183,31 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		}
 
 		args := ConftestTestCommandArgs{
-		   	PolicyArgs: []Arg{NewPolicyArg(path)},
-		   	ExtraArgs:  extraArgs,
-		   	InputFile:  inputFile,
-		   	Command:    executablePath,
+			PolicyArgs: []Arg{NewPolicyArg(path)},
+			ExtraArgs:  extraArgs,
+			InputFile:  inputFile,
+			Command:    executablePath,
 		}
 
-	    serializedArgs, _ := args.build()
-	    cmdOutput, cmdErr := c.Exec.CombinedOutput(serializedArgs, envs, workdir)
+		serializedArgs, _ := args.build()
+		cmdOutput, cmdErr := c.Exec.CombinedOutput(serializedArgs, envs, workdir)
 
-	    passed := true
-	    if cmdErr != nil {
-	        // Since we're running conftest for each policyset, individual command errors should be concatenated.
-	        if isValidConftestOutput(cmdOutput) {
-	            combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s:\n  conftest:\n  %s", policySet.Name, "Some policies failed.")))
-	        } else {
-	            combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s:\n  conftest:\n  %s", policySet.Name, cmdOutput)))
-	        }
-	        passed = false
-	    }
+		passed := true
+		if cmdErr != nil {
+			// Since we're running conftest for each policyset, individual command errors should be concatenated.
+			if isValidConftestOutput(cmdOutput) {
+				combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s:\n  conftest:\n  %s", policySet.Name, "Some policies failed.")))
+			} else {
+				combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s:\n  conftest:\n  %s", policySet.Name, cmdOutput)))
+			}
+			passed = false
+		}
 
-	    policySetResults = append(policySetResults, models.PolicySetResult{
-	        PolicySetName:   policySet.Name,
-	        PolicySetOutput: cmdOutput,
-	        Passed:          passed,
-	    })
+		policySetResults = append(policySetResults, models.PolicySetResult{
+			PolicySetName:   policySet.Name,
+			PolicySetOutput: cmdOutput,
+			Passed:          passed,
+		})
 	}
 
 	if policySetResults == nil {
@@ -220,7 +219,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 
 	marshaledStatus, err := json.Marshal(policySetResults)
 	if err != nil {
-	    return "", errors.New(fmt.Sprintf("Cannot marshal data into []PolicySetResult. Error: %w Data: %w", err, policySetResults))
+		return "", errors.New(fmt.Sprintf("Cannot marshal data into []PolicySetResult. Error: %w Data: %w", err, policySetResults))
 	}
 	output := string(marshaledStatus)
 

@@ -40,13 +40,13 @@ func (p *PolicySets) HasPolicies() bool {
 
 // Check if any level of policy owners includes teams
 func (p *PolicySets) HasTeamOwners() bool {
-    hasTeamOwners := len(p.Owners.Teams) > 0
-    for _, policySet := range p.PolicySets {
-        if len(policySet.Owners.Teams) > 0 {
-            hasTeamOwners = true
-        }
-    }
-    return hasTeamOwners
+	hasTeamOwners := len(p.Owners.Teams) > 0
+	for _, policySet := range p.PolicySets {
+		if len(policySet.Owners.Teams) > 0 {
+			hasTeamOwners = true
+		}
+	}
+	return hasTeamOwners
 }
 
 func (o *PolicyOwners) IsOwner(username string, userTeams []string) bool {

@@ -3,11 +3,10 @@ package events
 import (
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/hashicorp/go-multierror"
-	"encoding/json"
 )
 
 func NewApprovePoliciesCommandRunner(
@@ -77,8 +76,6 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 	}
 
 	result := a.buildApprovePolicyCommandResults(ctx, projectCmds)
-	r, _ := json.Marshal(result)
-	ctx.Log.Err(string(r))
 
 	a.pullUpdater.updatePull(
 		ctx,
@@ -99,7 +96,7 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *com
 	// Check if vcs user is in the top-level owner list of the PolicySets. All projects
 	// share the same Owners list at this time so no reason to iterate over each
 	// project.
-    var prjResults []command.ProjectResult
+	var prjResults []command.ProjectResult
 	if len(prjCmds) > 0 {
 		teams := []string{}
 
@@ -114,55 +111,51 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *com
 		}
 		isAdmin := prjCmds[0].PolicySets.Owners.IsOwner(ctx.User.Username, teams)
 
-    	for _, prjCmd := range prjCmds {
-    	    var prjErrs error
-    	    var prjPolicyStatus []models.PolicySetApproval
-    	    // Grab policy set status for project
-    	    for _, prjPullStatus := range ctx.PullStatus.Projects {
-    	        if prjCmd.Workspace == prjPullStatus.Workspace &&
-    	            prjCmd.RepoRelDir == prjPullStatus.RepoRelDir &&
-    	            prjCmd.ProjectName == prjPullStatus.ProjectName {
-    	            prjPolicyStatus = prjPullStatus.PolicyStatus
-    	        }
-    	    }
+		for _, prjCmd := range prjCmds {
+			var prjErrs error
+			var prjPolicyStatus []models.PolicySetApproval
+			// Grab policy set status for project
+			for _, prjPullStatus := range ctx.PullStatus.Projects {
+				if prjCmd.Workspace == prjPullStatus.Workspace &&
+					prjCmd.RepoRelDir == prjPullStatus.RepoRelDir &&
+					prjCmd.ProjectName == prjPullStatus.ProjectName {
+					prjPolicyStatus = prjPullStatus.PolicyStatus
+				}
+			}
 
-    	    for _, policySet := range prjCmd.PolicySets.PolicySets {
-    	        isOwner := policySet.Owners.IsOwner(ctx.User.Username, teams) || isAdmin
-    	        for i, policyStatus := range prjPolicyStatus {
-    	            if policySet.Name == policyStatus.PolicySetName {
-    	                if policyStatus.Approvals == 0 {
-    	                    continue
-    	                }
-    	                if isOwner {
-    	                    prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
-    	                } else {
-    	                    prjErrs = multierror.Append(fmt.Errorf("Policy set: %s user %s is not a policy owner. Please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
-    	                }
-    	                if prjPolicyStatus[i].Approvals != 0 {
-    	                    prjErrs = multierror.Append(prjErrs, fmt.Errorf("Policy set: %s requires %d approvals, have %d.", policySet.Name, policySet.ReviewCount, (0-prjPolicyStatus[i].Approvals)))
-    	                }
-    	            }
-    	        }
-    	    }
+			for _, policySet := range prjCmd.PolicySets.PolicySets {
+				isOwner := policySet.Owners.IsOwner(ctx.User.Username, teams) || isAdmin
+				for i, policyStatus := range prjPolicyStatus {
+					if policySet.Name == policyStatus.PolicySetName {
+						if policyStatus.Approvals == 0 {
+							continue
+						}
+						if isOwner {
+							prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
+						} else {
+							prjErrs = multierror.Append(fmt.Errorf("Policy set: %s user %s is not a policy owner. Please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
+						}
+						if prjPolicyStatus[i].Approvals != 0 {
+							prjErrs = multierror.Append(prjErrs, fmt.Errorf("Policy set: %s requires %d approvals, have %d.", policySet.Name, policySet.ReviewCount, (0-prjPolicyStatus[i].Approvals)))
+						}
+					}
+				}
+			}
 
-    		//prjResult := a.prjCmdRunner.ApprovePolicies(prjCmd)
-    		prjResult := command.ProjectResult{
-                         		Command:              command.PolicyCheck,
-                         		Failure:              "",
-                         		Error:                prjErrs,
-                         		PolicyCheckSuccess:   nil,
-                         		PolicyCheckApprovals: prjPolicyStatus,
-                         		RepoRelDir:           prjCmd.RepoRelDir,
-                         		Workspace:            prjCmd.Workspace,
-                         		ProjectName:          prjCmd.ProjectName,
-                         	}
-    	    prjResults = append(prjResults, prjResult)
-    	    // TESTING. REMOVE ME.
-            j, _ := json.Marshal(prjResult)
-            ctx.Log.Err(string(j))
-    	}
+			prjResult := command.ProjectResult{
+				Command:              command.PolicyCheck,
+				Failure:              "",
+				Error:                prjErrs,
+				PolicyCheckSuccess:   nil,
+				PolicyCheckApprovals: prjPolicyStatus,
+				RepoRelDir:           prjCmd.RepoRelDir,
+				Workspace:            prjCmd.Workspace,
+				ProjectName:          prjCmd.ProjectName,
+			}
+			prjResults = append(prjResults, prjResult)
+		}
 	}
-    result.ProjectResults = prjResults
+	result.ProjectResults = prjResults
 	return
 }
 

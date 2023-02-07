@@ -19,6 +19,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"encoding/json"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
@@ -26,8 +28,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/hashicorp/go-multierror"
-	"encoding/json"
 )
 
 const OperationComplete = true
@@ -239,26 +239,26 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 	var policyCheckApprovals []models.PolicySetApproval
 	if err == nil {
 		for _, ps := range policySuccess.PolicySetResults {
-    	    approvals := 0
-    	    if !ps.Passed {
-    	        for _, cps := range ctx.PolicySets.PolicySets {
-    	            if ps.PolicySetName == cps.Name {
-    	                approvals = 0 - cps.ReviewCount
-    	            }
-    	       }
-    	    }
-    	    policyCheckApprovals = append(policyCheckApprovals, models.PolicySetApproval{PolicySetName: ps.PolicySetName, Approvals: approvals})
-    	}
+			approvals := 0
+			if !ps.Passed {
+				for _, cps := range ctx.PolicySets.PolicySets {
+					if ps.PolicySetName == cps.Name {
+						approvals = 0 - cps.ReviewCount
+					}
+				}
+			}
+			policyCheckApprovals = append(policyCheckApprovals, models.PolicySetApproval{PolicySetName: ps.PolicySetName, Approvals: approvals})
+		}
 	}
 	return command.ProjectResult{
-		Command:            command.PolicyCheck,
-		PolicyCheckSuccess: policySuccess,
+		Command:              command.PolicyCheck,
+		PolicyCheckSuccess:   policySuccess,
 		PolicyCheckApprovals: policyCheckApprovals,
-		Error:              err,
-		Failure:            failure,
-		RepoRelDir:         ctx.RepoRelDir,
-		Workspace:          ctx.Workspace,
-		ProjectName:        ctx.ProjectName,
+		Error:                err,
+		Failure:              failure,
+		RepoRelDir:           ctx.RepoRelDir,
+		Workspace:            ctx.Workspace,
+		ProjectName:          ctx.ProjectName,
 	}
 }
 
@@ -276,18 +276,18 @@ func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.
 	}
 }
 
-func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
-	approvedOut, failure, err := p.doApprovePolicies(ctx)
-	return command.ProjectResult{
-		Command:            command.PolicyCheck,
-		Failure:            failure,
-		Error:              err,
-		PolicyCheckSuccess: approvedOut,
-		RepoRelDir:         ctx.RepoRelDir,
-		Workspace:          ctx.Workspace,
-		ProjectName:        ctx.ProjectName,
-	}
-}
+//func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
+//	approvedOut, failure, err := p.doApprovePolicies(ctx)
+//	return command.ProjectResult{
+//		Command:            command.PolicyCheck,
+//		Failure:            failure,
+//		Error:              err,
+//		PolicyCheckSuccess: approvedOut,
+//		RepoRelDir:         ctx.RepoRelDir,
+//		Workspace:          ctx.Workspace,
+//		ProjectName:        ctx.ProjectName,
+//	}
+//}
 
 func (p *DefaultProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectResult {
 	versionOut, failure, err := p.doVersion(ctx)
@@ -331,15 +331,15 @@ func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) comman
 	}
 }
 
-func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
-
-	// TODO: Make this a bit smarter
-	// without checking some sort of state that the policy check has indeed passed this is likely to cause issues
-
-	return &models.PolicyCheckSuccess{
-//		PolicyCheckOutput: "Policies approved",
-	}, "", nil
-}
+//func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
+//
+//	// TODO: Make this a bit smarter
+//	// without checking some sort of state that the policy check has indeed passed this is likely to cause issues
+//
+//	return &models.PolicyCheckSuccess{
+//				PolicyCheckOutput: "Policies approved",
+//	}, "", nil
+//}
 
 func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
@@ -404,7 +404,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 				break
 			}
 			if strings.Contains(err.Error(), "Some policies failed.") {
-				 failures = append(failures, err.Error())
+				failures = append(failures, err.Error())
 			} else {
 				errs = multierror.Append(errs, err)
 			}
@@ -420,14 +420,14 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	var policySetResults []models.PolicySetResult
 	err = json.Unmarshal([]byte(strings.Join(outputs, "\n")), &policySetResults)
 	if err != nil {
-	    return nil, "", err
+		return nil, "", err
 	}
 
 	return &models.PolicyCheckSuccess{
-		LockURL:           p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
-		PolicySetResults:  policySetResults,
-		RePlanCmd:         ctx.RePlanCmd,
-		ApplyCmd:          ctx.ApplyCmd,
+		LockURL:          p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		PolicySetResults: policySetResults,
+		RePlanCmd:        ctx.RePlanCmd,
+		ApplyCmd:         ctx.ApplyCmd,
 
 		// set this to false right now because we don't have this information
 		// TODO: refactor the templates in a sane way so we don't need this

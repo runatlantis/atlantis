@@ -445,11 +445,11 @@ type StateRmSuccess struct {
 }
 
 func (p *PolicyCheckSuccess) CombinedOutput() string {
-    combinedOutput := ""
-    for _, psResult := range p.PolicySetResults {
-        combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResult.PolicySetOutput)
-    }
-    return combinedOutput
+	combinedOutput := ""
+	for _, psResult := range p.PolicySetResults {
+		combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResult.PolicySetOutput)
+	}
+	return combinedOutput
 }
 
 // Summary extracts one line summary of policy check.
