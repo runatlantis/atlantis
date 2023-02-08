@@ -10,7 +10,7 @@ import (
 	"net/http"
 )
 
-const DismissReason = "**New commits have triggered policy failures that must be approved by policy owners.**"
+const DismissReason = "**New plans have triggered policy failures that must be approved by policy owners.**"
 
 type PRReviewDismisser struct {
 	ClientCreator githubapp.ClientCreator

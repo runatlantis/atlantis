@@ -841,8 +841,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 		members: []string{},
 	}
 	reviewDismisser := &mockReviewDismisser{}
-	commitFetcher := &mockCommitFetcher{}
-	policyFilter := events.NewApprovedPolicyFilter(reviewFetcher, reviewDismisser, commitFetcher, teamFetcher, globalCfg.PolicySets.PolicySets)
+	policyFilter := events.NewApprovedPolicyFilter(reviewFetcher, reviewDismisser, teamFetcher, globalCfg.PolicySets.PolicySets)
 	conftestExecutor := &policy.ConfTestExecutor{
 		Exec:         runtime_models.LocalExec{},
 		PolicyFilter: policyFilter,
@@ -1422,17 +1421,6 @@ type testStaleCommandChecker struct{}
 
 func (t *testStaleCommandChecker) CommandIsStale(ctx *command.Context) bool {
 	return false
-}
-
-type mockCommitFetcher struct {
-	commit   *github.Commit
-	error    error
-	isCalled bool
-}
-
-func (c *mockCommitFetcher) FetchLatestPRCommit(_ context.Context, _ int64, _ models.Repo, _ int) (*github.Commit, error) {
-	c.isCalled = true
-	return c.commit, c.error
 }
 
 type mockReviewDismisser struct {

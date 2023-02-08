@@ -254,7 +254,7 @@ func (c *DefaultCommandRunner) RunPRReviewCommand(ctx context.Context, repo mode
 		Pull:              pull,
 		PullStatus:        status,
 		HeadRepo:          repo,
-		Trigger:           command.AutoTrigger,
+		Trigger:           command.PRReviewTrigger,
 		Scope:             scope,
 		TriggerTimestamp:  timestamp,
 		RequestCtx:        ctx,

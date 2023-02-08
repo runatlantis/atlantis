@@ -79,6 +79,7 @@ func NewProjectContext(
 		RequestCtx:           ctx.RequestCtx,
 		WorkflowModeType:     projCfg.WorkflowMode,
 		InstallationToken:    ctx.InstallationToken,
+		Trigger:              ctx.Trigger,
 	}
 }
 
@@ -160,6 +161,7 @@ type ProjectContext struct {
 
 	WorkflowModeType  valid.WorkflowModeType
 	InstallationToken int64
+	Trigger           CommandTrigger
 }
 
 // ProjectCloneDir creates relative path to clone the repo to. If we are running

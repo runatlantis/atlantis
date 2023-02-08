@@ -187,7 +187,7 @@ type mockPolicyFilter struct {
 	error    error
 }
 
-func (r *mockPolicyFilter) Filter(_ context.Context, _ int64, _ models.Repo, _ int, _ []valid.PolicySet) ([]valid.PolicySet, error) {
+func (r *mockPolicyFilter) Filter(_ context.Context, _ int64, _ models.Repo, _ int, _ command.CommandTrigger, _ []valid.PolicySet) ([]valid.PolicySet, error) {
 	r.isCalled = true
 	return r.policies, r.error
 }
