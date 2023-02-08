@@ -49,6 +49,7 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		"PATH":                       fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
 		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
 		"SHOWFILE":                   filepath.Join(path, ctx.GetShowResultFileName()),
+		"POLICYCHECKFILE":            filepath.Join(path, ctx.GetPolicyCheckResultFileName()),
 		"PROJECT_NAME":               ctx.ProjectName,
 		"PULL_AUTHOR":                ctx.Pull.Author,
 		"PULL_NUM":                   fmt.Sprintf("%d", ctx.Pull.Num),

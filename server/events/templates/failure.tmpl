@@ -1,3 +1,9 @@
 {{ define "failure" -}}
-**{{ .Command }} Failed**: {{ .Failure }}
+**{{ .Command }} Failed**:
+```diff
+{{ .Failure }}
+```
+{{- if ne .RenderedErrorContext ""}}
+{{ .RenderedErrorContext }}
+{{- end }}
 {{ end -}}

@@ -1,4 +1,6 @@
-{{ define "policyCheckSuccessUnwrapped" -}}
+{{ define "policyCheckResultsWrapped" -}}
+<details><summary>Show Output</summary>
+
 {{ template "policyCheck" .PolicySetResults }}
 
 * :arrow_forward: To **apply** this plan, comment:
@@ -6,5 +8,6 @@
 * :put_litter_in_its_place: To **delete** this plan click [here]({{ .LockURL }})
 * :repeat: To re-run policies **plan** this project again by commenting:
     * `{{ .RePlanCmd }}`
-{{ template "diverged" . }}
+</details>
+{{ .PolicyCheckSummary }}{{ template "diverged" . }}
 {{ end -}}

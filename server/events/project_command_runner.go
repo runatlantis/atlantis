@@ -236,29 +236,14 @@ func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.P
 // PolicyCheck evaluates policies defined with Rego for the project described by ctx.
 func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
-	var policyCheckApprovals []models.PolicySetApproval
-	if err == nil {
-		for _, ps := range policySuccess.PolicySetResults {
-			approvals := 0
-			if !ps.Passed {
-				for _, cps := range ctx.PolicySets.PolicySets {
-					if ps.PolicySetName == cps.Name {
-						approvals = 0 - cps.ReviewCount
-					}
-				}
-			}
-			policyCheckApprovals = append(policyCheckApprovals, models.PolicySetApproval{PolicySetName: ps.PolicySetName, Approvals: approvals})
-		}
-	}
 	return command.ProjectResult{
-		Command:              command.PolicyCheck,
-		PolicyCheckSuccess:   policySuccess,
-		PolicyCheckApprovals: policyCheckApprovals,
-		Error:                err,
-		Failure:              failure,
-		RepoRelDir:           ctx.RepoRelDir,
-		Workspace:            ctx.Workspace,
-		ProjectName:          ctx.ProjectName,
+		Command:       command.PolicyCheck,
+		PolicyCheckResults: policySuccess,
+		Error:         err,
+		Failure:       failure,
+		RepoRelDir:    ctx.RepoRelDir,
+		Workspace:     ctx.Workspace,
+		ProjectName:   ctx.ProjectName,
 	}
 }
 
@@ -279,13 +264,13 @@ func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.
 func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
 	approvedOut, failure, err := p.doApprovePolicies(ctx)
 	return command.ProjectResult{
-		Command:            command.PolicyCheck,
-		Failure:            failure,
-		Error:              err,
-		PolicyCheckSuccess: approvedOut,
-		RepoRelDir:         ctx.RepoRelDir,
-		Workspace:          ctx.Workspace,
-		ProjectName:        ctx.ProjectName,
+		Command:       command.PolicyCheck,
+		Failure:       failure,
+		Error:         err,
+		PolicyCheckResults: approvedOut,
+		RepoRelDir:    ctx.RepoRelDir,
+		Workspace:     ctx.Workspace,
+		ProjectName:   ctx.ProjectName,
 	}
 }
 
@@ -331,17 +316,17 @@ func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) comman
 	}
 }
 
-func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckResults, string, error) {
 
 	// TODO: Make this a bit smarter
 	// without checking some sort of state that the policy check has indeed passed this is likely to cause issues
 
-	return &models.PolicyCheckSuccess{
-//				PolicyCheckOutput: "Policies approved",
+	return &models.PolicyCheckResults{
+		//				PolicyCheckOutput: "Policies approved",
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckResults, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	// This should already be acquired from the prior plan operation.
 	// if for some reason an unlock happens between the plan and policy check step
@@ -423,7 +408,17 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		return nil, "", err
 	}
 
-	return &models.PolicyCheckSuccess{
+	// Update review count on policy set data
+	for i, policySet := range policySetResults {
+	    for _, ctxPolicySet := range ctx.PolicySets.PolicySets {
+		    if policySet.PolicySetName == ctxPolicySet.Name {
+			    policySetResults[i].ReqApprovals = ctxPolicySet.ReviewCount
+		    }
+	    }
+	}
+
+
+	return &models.PolicyCheckResults{
 		LockURL:          p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		PolicySetResults: policySetResults,
 		RePlanCmd:        ctx.RePlanCmd,

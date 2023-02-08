@@ -329,7 +329,7 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 					res.RepoRelDir == proj.RepoRelDir &&
 					res.ProjectName == proj.ProjectName {
 
-					proj.PolicyStatus = res.PolicyCheckApprovals
+					proj.PolicyStatus = res.PolicyApprovalStatus()
 					proj.Status = res.PlanStatus()
 					updatedExisting = true
 					break
@@ -403,7 +403,7 @@ func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.Project
 		Workspace:    p.Workspace,
 		RepoRelDir:   p.RepoRelDir,
 		ProjectName:  p.ProjectName,
-		PolicyStatus: p.PolicyCheckApprovals,
+		PolicyStatus: p.PolicyApprovalStatus(),
 		Status:       p.PlanStatus(),
 	}
 }

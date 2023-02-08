@@ -6,20 +6,19 @@ import (
 
 // ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {
-	Command              Name
-	SubCommand           string
-	RepoRelDir           string
-	Workspace            string
-	Error                error
-	Failure              string
-	PlanSuccess          *models.PlanSuccess
-	PolicyCheckSuccess   *models.PolicyCheckSuccess
-	PolicyCheckApprovals []models.PolicySetApproval
-	ApplySuccess         string
-	VersionSuccess       string
-	ImportSuccess        *models.ImportSuccess
-	StateRmSuccess       *models.StateRmSuccess
-	ProjectName          string
+	Command        Name
+	SubCommand     string
+	RepoRelDir     string
+	Workspace      string
+	Error          error
+	Failure        string
+	PlanSuccess    *models.PlanSuccess
+	PolicyCheckResults  *models.PolicyCheckResults
+	ApplySuccess   string
+	VersionSuccess string
+	ImportSuccess  *models.ImportSuccess
+	StateRmSuccess *models.StateRmSuccess
+	ProjectName    string
 }
 
 // CommitStatus returns the vcs commit status of this project result.
@@ -31,6 +30,22 @@ func (p ProjectResult) CommitStatus() models.CommitStatus {
 		return models.FailedCommitStatus
 	}
 	return models.SuccessCommitStatus
+}
+
+// PolicyApprovalStatus returns the approval status of policy sets.
+func (p ProjectResult) PolicyApprovalStatus() []models.PolicySetStatus {
+	var policyStatuses []models.PolicySetStatus
+	if p.PolicyCheckResults != nil {
+		for _, policySet := range p.PolicyCheckResults.PolicySetResults {
+			policyStatus := models.PolicySetStatus{
+				PolicySetName: policySet.PolicySetName,
+				Passed:        policySet.Passed,
+				Approvals:     policySet.CurApprovals,
+			}
+			policyStatuses = append(policyStatuses, policyStatus)
+		}
+	}
+	return policyStatuses
 }
 
 // PlanStatus returns the plan status.
@@ -65,5 +80,5 @@ func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 
 // IsSuccessful returns true if this project result had no errors.
 func (p ProjectResult) IsSuccessful() bool {
-	return p.PlanSuccess != nil || (p.PolicyCheckSuccess != nil && p.Error == nil) || p.ApplySuccess != ""
+	return p.PlanSuccess != nil || (p.PolicyCheckResults != nil && p.Error == nil) || p.ApplySuccess != ""
 }

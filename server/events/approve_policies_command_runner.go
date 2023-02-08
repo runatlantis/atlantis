@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -113,7 +114,10 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *com
 
 		for _, prjCmd := range prjCmds {
 			var prjErrs error
-			var prjPolicyStatus []models.PolicySetApproval
+			var prjFailures []string
+			var prjPolicyStatus []models.PolicySetStatus
+			var prjPolicyCheckResults models.PolicyCheckResults
+
 			// Grab policy set status for project
 			for _, prjPullStatus := range ctx.PullStatus.Projects {
 				if prjCmd.Workspace == prjPullStatus.Workspace &&
@@ -123,31 +127,48 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *com
 				}
 			}
 
+			// Run over each policy set for the project and perform appropriate approval.
+			var prjPolicySetResults []models.PolicySetResult
 			for _, policySet := range prjCmd.PolicySets.PolicySets {
 				isOwner := policySet.Owners.IsOwner(ctx.User.Username, teams) || isAdmin
 				for i, policyStatus := range prjPolicyStatus {
 					if policySet.Name == policyStatus.PolicySetName {
-						if policyStatus.Approvals == 0 {
+					    // Policy set either passed or has sufficient approvals. Move on.
+						if policyStatus.Passed || policyStatus.Approvals == policySet.ReviewCount {
 							continue
 						}
+						// Increment approval if user is owner.
 						if isOwner {
 							prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
+						// User is not authorized to approve policy set.
 						} else {
 							prjErrs = multierror.Append(fmt.Errorf("Policy set: %s user %s is not a policy owner. Please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
 						}
 						if prjPolicyStatus[i].Approvals != 0 {
-							prjErrs = multierror.Append(prjErrs, fmt.Errorf("Policy set: %s requires %d approvals, have %d.", policySet.Name, policySet.ReviewCount, (0-prjPolicyStatus[i].Approvals)))
+							prjFailures = append(prjFailures, fmt.Sprintf("Policy set: %s requires %d approvals, have %d.", policySet.Name, policySet.ReviewCount, (policySet.ReviewCount-prjPolicyStatus[i].Approvals)))
 						}
 					}
+				    prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
+			    	    PolicySetName: policySet.Name,
+			    	    Passed:        policyStatus.Passed,
+			    	    CurApprovals:  policyStatus.Approvals,
+			    	    ReqApprovals:  policySet.ReviewCount,
+			    	})
 				}
 			}
-
+			prjPolicyCheckResults = models.PolicyCheckResults{
+               	PolicySetResults: prjPolicySetResults,
+               	//LockURL: prjCmd.LockURL,
+               	RePlanCmd: prjCmd.RePlanCmd,
+               	ApplyCmd: prjCmd.ApplyCmd,
+               	ApprovePoliciesCmd: prjCmd.ApprovePoliciesCmd,
+               	//HasDiverged: prjCmd.HasDiverged,
+			}
 			prjResult := command.ProjectResult{
 				Command:              command.PolicyCheck,
-				Failure:              "",
+				Failure:              strings.Join(prjFailures, "\n"),
 				Error:                prjErrs,
-				PolicyCheckSuccess:   nil,
-				PolicyCheckApprovals: prjPolicyStatus,
+				PolicyCheckResults:   &prjPolicyCheckResults,
 				RepoRelDir:           prjCmd.RepoRelDir,
 				Workspace:            prjCmd.Workspace,
 				ProjectName:          prjCmd.ProjectName,

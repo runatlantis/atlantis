@@ -357,7 +357,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 						res.ProjectName == proj.ProjectName {
 
 						proj.Status = res.PlanStatus()
-						proj.PolicyStatus = res.PolicyCheckApprovals
+						proj.PolicyStatus = res.PolicyApprovalStatus()
 						updatedExisting = true
 						break
 					}
@@ -487,7 +487,7 @@ func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectS
 		Workspace:    p.Workspace,
 		RepoRelDir:   p.RepoRelDir,
 		ProjectName:  p.ProjectName,
-		PolicyStatus: p.PolicyCheckApprovals,
+		PolicyStatus: p.PolicyApprovalStatus(),
 		Status:       p.PlanStatus(),
 	}
 }

@@ -3,5 +3,7 @@
 ```
 {{.Error}}
 ```
-
+{{- if ne .RenderedErrorContext ""}}
+{{ .RenderedErrorContext }}
+{{- end }}
 {{- end }}

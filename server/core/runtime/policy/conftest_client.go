@@ -156,6 +156,8 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 		downloader.downloadConfTestVersion,
 	)
 
+
+
 	return &ConfTestExecutorWorkflow{
 		VersionCache:           versionCache,
 		DefaultConftestVersion: version,
@@ -196,16 +198,16 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		if cmdErr != nil {
 			// Since we're running conftest for each policyset, individual command errors should be concatenated.
 			if isValidConftestOutput(cmdOutput) {
-				combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s:\n  conftest:\n  %s", policySet.Name, "Some policies failed.")))
+				combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s: conftest: %s", policySet.Name, "Some policies failed.")))
 			} else {
-				combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s:\n  conftest:\n  %s", policySet.Name, cmdOutput)))
+				combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s: conftest: %s", policySet.Name, cmdOutput)))
 			}
 			passed = false
 		}
 
 		policySetResults = append(policySetResults, models.PolicySetResult{
 			PolicySetName:   policySet.Name,
-			PolicySetOutput: cmdOutput,
+			ConftestOutput: cmdOutput,
 			Passed:          passed,
 		})
 	}
@@ -221,6 +223,11 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("Cannot marshal data into []PolicySetResult. Error: %w Data: %w", err, policySetResults))
 	}
+
+	policyCheckResultFile := fmt.Sprintf("%s/%s", workdir, ctx.GetPolicyCheckResultFileName())
+	err = os.WriteFile(policyCheckResultFile, marshaledStatus, 0644)
+	combinedErr = multierror.Append(combinedErr, err)
+
 	output := string(marshaledStatus)
 
 	return c.sanitizeOutput(inputFile, output), combinedErr

@@ -23,6 +23,9 @@ type ProjectContext struct {
 	// ApplyCmd is the command that users should run to apply this plan. If
 	// this is an apply then this will be empty.
 	ApplyCmd string
+	// ApprovePoliciesCmd is the command that users should run to approve policies for this plan. If
+	// this is an apply then this will be empty.
+	ApprovePoliciesCmd string
 	// PlanRequirements is the list of requirements that must be satisfied
 	// before we will run the plan stage.
 	PlanRequirements []string
@@ -92,6 +95,8 @@ type ProjectContext struct {
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
 	PolicySets valid.PolicySets
+	// FilteredPolicySets describes which policy sets to target on the approve_policies step.
+	FilteredPolicySet string
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
 	// RepoLocking will get a lock when plan
@@ -130,6 +135,15 @@ func (p ProjectContext) GetShowResultFileName() string {
 	}
 	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
 	return fmt.Sprintf("%s-%s.json", projName, p.Workspace)
+}
+
+// GetPolicyCheckResultFileName returns the filename (not the path) to store the result from conftest_client.
+func (p ProjectContext) GetPolicyCheckResultFileName() string {
+	if p.ProjectName == "" {
+		return fmt.Sprintf("%spolicyout.json", p.Workspace)
+	}
+	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
+	return fmt.Sprintf("%s-%s-policyout.json", projName, p.Workspace)
 }
 
 // Gets a unique identifier for the current pull request as a single string

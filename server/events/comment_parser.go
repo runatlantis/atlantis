@@ -69,6 +69,8 @@ type CommentBuilder interface {
 	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 	// BuildApplyComment builds an apply comment for the specified args.
 	BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string
+	// BuildApprovePoliciesComment builds an approve_policies comment for the specified args.
+	BuildApprovePoliciesComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 }
 
 // CommentParser implements CommentParsing
@@ -384,6 +386,22 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
 	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled)
 	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Apply.String(), flags)
+}
+
+// BuildApprovePoliciesComment builds an approve_policies comment for the specified args.
+func (e *CommentParser) BuildApprovePoliciesComment(repoRelDir string, workspace string, project string, commentArgs []string) string {
+	flags := e.buildFlags(repoRelDir, workspace, project, false)
+	commentFlags := ""
+	if len(commentArgs) > 0 {
+		var flagsWithoutQuotes []string
+		for _, f := range commentArgs {
+			f = strings.TrimPrefix(f, "\"")
+			f = strings.TrimSuffix(f, "\"")
+			flagsWithoutQuotes = append(flagsWithoutQuotes, f)
+		}
+		commentFlags = fmt.Sprintf(" -- %s", strings.Join(flagsWithoutQuotes, " "))
+	}
+	return fmt.Sprintf("%s %s%s%s", e.ExecutableName, command.ApprovePolicies.String(), flags, commentFlags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {

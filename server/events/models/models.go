@@ -368,8 +368,17 @@ type PlanSuccess struct {
 
 type PolicySetResult struct {
 	PolicySetName   string
-	PolicySetOutput string
+	ConftestOutput  string
 	Passed          bool
+    ReqApprovals    int
+    CurApprovals    int
+}
+
+// PolicySetApproval tracks the number of approvals a given policy set has.
+type PolicySetStatus struct {
+    PolicySetName string
+    Passed        bool
+    Approvals     int
 }
 
 // Summary regexes
@@ -412,8 +421,8 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 	return strings.TrimSpace(formattedTerraformOutput)
 }
 
-// PolicyCheckSuccess is the result of a successful policy check run.
-type PolicyCheckSuccess struct {
+// PolicyCheckResults is the result of a successful policy check run.
+type PolicyCheckResults struct {
 	// PolicyCheckOutput is the output from policy check binary(conftest|opa)
 	PolicySetResults []PolicySetResult
 	// LockURL is the full URL to the lock held by this policy check.
@@ -422,6 +431,8 @@ type PolicyCheckSuccess struct {
 	RePlanCmd string
 	// ApplyCmd is the command that users should run to apply this plan.
 	ApplyCmd string
+	// ApprovePoliciesCmd is the command that users should run to approve policies for this plan.
+	ApprovePoliciesCmd string
 	// HasDiverged is true if we're using the checkout merge strategy and the
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
@@ -444,16 +455,18 @@ type StateRmSuccess struct {
 	RePlanCmd string
 }
 
-func (p *PolicyCheckSuccess) CombinedOutput() string {
+func (p *PolicyCheckResults) CombinedOutput() string {
 	combinedOutput := ""
 	for _, psResult := range p.PolicySetResults {
-		combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResult.PolicySetOutput)
+	    for _, psResultLine := range strings.Split(psResult.ConftestOutput, "\\n") {
+		    combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
+	    }
 	}
 	return combinedOutput
 }
 
 // Summary extracts one line summary of policy check.
-func (p *PolicyCheckSuccess) Summary() string {
+func (p *PolicyCheckResults) Summary() string {
 	note := ""
 	//
 	//r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
@@ -486,19 +499,13 @@ func (p PullStatus) StatusCount(status ProjectPlanStatus) int {
 	return c
 }
 
-// PolicySetApprovalStatus tracks the number of approvals a given PolicySet has received.
-type PolicySetApproval struct {
-	PolicySetName string
-	Approvals     int
-}
-
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
 	Workspace   string
 	RepoRelDir  string
 	ProjectName string
 	// PolicySetApprovals tracks the approval status of every PolicySet for a Project.
-	PolicyStatus []PolicySetApproval
+	PolicyStatus []PolicySetStatus
 	// Status is the status of where this project is at in the planning cycle.
 	Status ProjectPlanStatus
 }
