@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -293,7 +294,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	if !ctx.ForceApply {
+	if !ctx.ForceApply && ctx.WorkflowModeType != valid.PlatformWorkflowMode {
 		failure, err = p.AggregateApplyRequirements.ValidateProject(repoDir, ctx)
 		if failure != "" || err != nil {
 			return "", failure, err

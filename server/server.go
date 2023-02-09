@@ -19,8 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/palantir/go-githubapp/githubapp"
-	middleware "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"io"
 	"log"
 	"net/http"
@@ -32,6 +30,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/palantir/go-githubapp/githubapp"
+	"github.com/runatlantis/atlantis/server/neptune/template"
+	middleware "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 
 	"github.com/runatlantis/atlantis/server/events/terraform/filter"
 	"github.com/runatlantis/atlantis/server/neptune/storage"
@@ -738,7 +740,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 	)
 
-	applyCommandRunner := events.NewApplyCommandRunner(
+	legacyApplyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,
 		userConfig.DisableApplyAll,
 		applyLockingClient,
@@ -750,6 +752,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		pullReqStatusFetcher,
 	)
+
+	applyCommandRunner := &lyftCommands.PlatformModeRunner{
+		Runner:         legacyApplyCommandRunner,
+		Allocator:      featureAllocator,
+		Logger:         ctxLogger,
+		Builder:        projectCommandBuilder,
+		TemplateLoader: template.NewLoader[lyftCommands.LegacyApplyCommentInput](globalCfg),
+		VCSClient:      vcsClient,
+	}
 
 	policyCheckOutputGenerator := policies.CommandOutputGenerator{
 		PrjCommandRunner:  prjCmdRunner,

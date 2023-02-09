@@ -462,6 +462,36 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	Equals(t, "Pull request must be approved by at least one person other than the author before running apply.", firstRes.Failure)
 }
 
+func TestDefaultProjectCommandRunner_ForceOverridesApplyReqs_IfPlatformMode(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockSender := mocks.NewMockWebhooksSender()
+	runner := &events.DefaultProjectCommandRunner{
+		WorkingDir:       mockWorkingDir,
+		StepsRunner:      smocks.NewMockStepsRunner(),
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		AggregateApplyRequirements: &events.AggregateApplyRequirements{
+			WorkingDir: mockWorkingDir,
+		},
+		Webhooks: mockSender,
+	}
+	prjCtx := command.ProjectContext{
+		PullReqStatus: models.PullReqStatus{
+			ApprovalStatus: models.ApprovalStatus{
+				IsApproved: false,
+			},
+		},
+		ApplyRequirements: []string{"approved"},
+		WorkflowModeType:  valid.PlatformWorkflowMode,
+	}
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	When(mockWorkingDir.GetWorkingDir(prjCtx.BaseRepo, prjCtx.Pull, prjCtx.Workspace)).ThenReturn(tmp, nil)
+
+	firstRes := runner.Apply(prjCtx)
+	Equals(t, "", firstRes.Failure)
+}
+
 func TestDefaultProjectCommandRunner_ForceOverridesApplyReqs(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockWorkingDir := mocks.NewMockWorkingDir()
