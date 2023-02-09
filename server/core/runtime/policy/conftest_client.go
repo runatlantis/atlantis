@@ -156,8 +156,6 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 		downloader.downloadConfTestVersion,
 	)
 
-
-
 	return &ConfTestExecutorWorkflow{
 		VersionCache:           versionCache,
 		DefaultConftestVersion: version,
@@ -206,9 +204,9 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		}
 
 		policySetResults = append(policySetResults, models.PolicySetResult{
-			PolicySetName:   policySet.Name,
+			PolicySetName:  policySet.Name,
 			ConftestOutput: cmdOutput,
-			Passed:          passed,
+			Passed:         passed,
 		})
 	}
 

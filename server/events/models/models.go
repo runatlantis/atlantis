@@ -367,18 +367,18 @@ type PlanSuccess struct {
 }
 
 type PolicySetResult struct {
-	PolicySetName   string
-	ConftestOutput  string
-	Passed          bool
-    ReqApprovals    int
-    CurApprovals    int
+	PolicySetName  string
+	ConftestOutput string
+	Passed         bool
+	ReqApprovals   int
+	CurApprovals   int
 }
 
 // PolicySetApproval tracks the number of approvals a given policy set has.
 type PolicySetStatus struct {
-    PolicySetName string
-    Passed        bool
-    Approvals     int
+	PolicySetName string
+	Passed        bool
+	Approvals     int
 }
 
 // Summary regexes
@@ -458,9 +458,9 @@ type StateRmSuccess struct {
 func (p *PolicyCheckResults) CombinedOutput() string {
 	combinedOutput := ""
 	for _, psResult := range p.PolicySetResults {
-	    for _, psResultLine := range strings.Split(psResult.ConftestOutput, "\\n") {
-		    combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
-	    }
+		for _, psResultLine := range strings.Split(psResult.ConftestOutput, "\\n") {
+			combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
+		}
 	}
 	return combinedOutput
 }

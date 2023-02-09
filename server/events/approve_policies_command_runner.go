@@ -133,14 +133,14 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *com
 				isOwner := policySet.Owners.IsOwner(ctx.User.Username, teams) || isAdmin
 				for i, policyStatus := range prjPolicyStatus {
 					if policySet.Name == policyStatus.PolicySetName {
-					    // Policy set either passed or has sufficient approvals. Move on.
+						// Policy set either passed or has sufficient approvals. Move on.
 						if policyStatus.Passed || policyStatus.Approvals == policySet.ReviewCount {
 							continue
 						}
 						// Increment approval if user is owner.
 						if isOwner {
 							prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
-						// User is not authorized to approve policy set.
+							// User is not authorized to approve policy set.
 						} else {
 							prjErrs = multierror.Append(fmt.Errorf("Policy set: %s user %s is not a policy owner. Please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
 						}
@@ -148,30 +148,30 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *com
 							prjFailures = append(prjFailures, fmt.Sprintf("Policy set: %s requires %d approvals, have %d.", policySet.Name, policySet.ReviewCount, (policySet.ReviewCount-prjPolicyStatus[i].Approvals)))
 						}
 					}
-				    prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
-			    	    PolicySetName: policySet.Name,
-			    	    Passed:        policyStatus.Passed,
-			    	    CurApprovals:  policyStatus.Approvals,
-			    	    ReqApprovals:  policySet.ReviewCount,
-			    	})
+					prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
+						PolicySetName: policySet.Name,
+						Passed:        policyStatus.Passed,
+						CurApprovals:  policyStatus.Approvals,
+						ReqApprovals:  policySet.ReviewCount,
+					})
 				}
 			}
 			prjPolicyCheckResults = models.PolicyCheckResults{
-               	PolicySetResults: prjPolicySetResults,
-               	//LockURL: prjCmd.LockURL,
-               	RePlanCmd: prjCmd.RePlanCmd,
-               	ApplyCmd: prjCmd.ApplyCmd,
-               	ApprovePoliciesCmd: prjCmd.ApprovePoliciesCmd,
-               	//HasDiverged: prjCmd.HasDiverged,
+				PolicySetResults: prjPolicySetResults,
+				//LockURL: prjCmd.LockURL,
+				RePlanCmd:          prjCmd.RePlanCmd,
+				ApplyCmd:           prjCmd.ApplyCmd,
+				ApprovePoliciesCmd: prjCmd.ApprovePoliciesCmd,
+				//HasDiverged: prjCmd.HasDiverged,
 			}
 			prjResult := command.ProjectResult{
-				Command:              command.PolicyCheck,
-				Failure:              strings.Join(prjFailures, "\n"),
-				Error:                prjErrs,
-				PolicyCheckResults:   &prjPolicyCheckResults,
-				RepoRelDir:           prjCmd.RepoRelDir,
-				Workspace:            prjCmd.Workspace,
-				ProjectName:          prjCmd.ProjectName,
+				Command:            command.PolicyCheck,
+				Failure:            strings.Join(prjFailures, "\n"),
+				Error:              prjErrs,
+				PolicyCheckResults: &prjPolicyCheckResults,
+				RepoRelDir:         prjCmd.RepoRelDir,
+				Workspace:          prjCmd.Workspace,
+				ProjectName:        prjCmd.ProjectName,
 			}
 			prjResults = append(prjResults, prjResult)
 		}

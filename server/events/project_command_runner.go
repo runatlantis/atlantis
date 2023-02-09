@@ -237,13 +237,13 @@ func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.P
 func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
 	return command.ProjectResult{
-		Command:       command.PolicyCheck,
+		Command:            command.PolicyCheck,
 		PolicyCheckResults: policySuccess,
-		Error:         err,
-		Failure:       failure,
-		RepoRelDir:    ctx.RepoRelDir,
-		Workspace:     ctx.Workspace,
-		ProjectName:   ctx.ProjectName,
+		Error:              err,
+		Failure:            failure,
+		RepoRelDir:         ctx.RepoRelDir,
+		Workspace:          ctx.Workspace,
+		ProjectName:        ctx.ProjectName,
 	}
 }
 
@@ -264,13 +264,13 @@ func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.
 func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
 	approvedOut, failure, err := p.doApprovePolicies(ctx)
 	return command.ProjectResult{
-		Command:       command.PolicyCheck,
-		Failure:       failure,
-		Error:         err,
+		Command:            command.PolicyCheck,
+		Failure:            failure,
+		Error:              err,
 		PolicyCheckResults: approvedOut,
-		RepoRelDir:    ctx.RepoRelDir,
-		Workspace:     ctx.Workspace,
-		ProjectName:   ctx.ProjectName,
+		RepoRelDir:         ctx.RepoRelDir,
+		Workspace:          ctx.Workspace,
+		ProjectName:        ctx.ProjectName,
 	}
 }
 
@@ -410,13 +410,12 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 
 	// Update review count on policy set data
 	for i, policySet := range policySetResults {
-	    for _, ctxPolicySet := range ctx.PolicySets.PolicySets {
-		    if policySet.PolicySetName == ctxPolicySet.Name {
-			    policySetResults[i].ReqApprovals = ctxPolicySet.ReviewCount
-		    }
-	    }
+		for _, ctxPolicySet := range ctx.PolicySets.PolicySets {
+			if policySet.PolicySetName == ctxPolicySet.Name {
+				policySetResults[i].ReqApprovals = ctxPolicySet.ReviewCount
+			}
+		}
 	}
-
 
 	return &models.PolicyCheckResults{
 		LockURL:          p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
