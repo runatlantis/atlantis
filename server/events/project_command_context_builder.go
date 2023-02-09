@@ -250,7 +250,7 @@ func newProjectCommandContext(ctx *command.Context,
 	return command.ProjectContext{
 		CommandName:                cmd,
 		ApplyCmd:                   applyCmd,
-		ApprovePoliciesCmd:          approvePoliciesCmd,
+		ApprovePoliciesCmd:         approvePoliciesCmd,
 		BaseRepo:                   ctx.Pull.BaseRepo,
 		EscapedCommentArgs:         escapedCommentArgs,
 		AutomergeEnabled:           automergeEnabled,

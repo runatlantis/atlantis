@@ -95,8 +95,8 @@ type ProjectContext struct {
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
 	PolicySets valid.PolicySets
-	// FilteredPolicySets describes which policy sets to target on the approve_policies step.
-	FilteredPolicySet string
+	// PolicySetArg describes which policy sets to target on the approve_policies step.
+	PolicySetArg string
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
 	// RepoLocking will get a lock when plan
