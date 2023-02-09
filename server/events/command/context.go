@@ -36,5 +36,8 @@ type Context struct {
 
 	PullStatus *models.PullStatus
 
+	// PolicySet is the policy set to target (if specified) for the approve_policies command.
+	PolicySet string
+
 	Trigger Trigger
 }

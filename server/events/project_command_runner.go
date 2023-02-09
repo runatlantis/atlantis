@@ -26,6 +26,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -199,6 +200,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
+	VcsClient                 vcs.Client
 	Locker                    ProjectLocker
 	LockURLGenerator          LockURLGenerator
 	InitStepRunner            StepRunner
@@ -318,12 +320,66 @@ func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) comman
 
 func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckResults, string, error) {
 
-	// TODO: Make this a bit smarter
-	// without checking some sort of state that the policy check has indeed passed this is likely to cause issues
+	teams := []string{}
 
+	policySetCfg := ctx.PolicySets
+
+	// Only query the users team membership if any teams have been configured as owners on any policy set(s).
+	if policySetCfg.HasTeamOwners() {
+		// A convenient way to access vcsClient. Not sure if best way.
+		userTeams, err := p.VcsClient.GetTeamNamesForUser(ctx.Pull.BaseRepo, ctx.User)
+		if err != nil {
+			ctx.Log.Err("unable to get team membership for user: %s", err)
+			return nil, "", err
+		}
+		teams = append(teams, userTeams...)
+	}
+	isAdmin := policySetCfg.Owners.IsOwner(ctx.User.Username, teams)
+
+	var err error
+	var failures []string
+
+	// Run over each policy set for the project and perform appropriate approval.
+	var prjPolicySetResults []models.PolicySetResult
+	for _, policySet := range policySetCfg.PolicySets {
+		isOwner := policySet.Owners.IsOwner(ctx.User.Username, teams) || isAdmin
+		prjPolicyStatus := ctx.ProjectPolicyStatus
+		for i, policyStatus := range prjPolicyStatus {
+			ignorePolicy := false
+			if policySet.Name == policyStatus.PolicySetName {
+				// Policy set either passed or has sufficient approvals. Move on.
+				if policyStatus.Passed || policyStatus.Approvals == policySet.ReviewCount {
+					continue
+				}
+				// Set ignore flag if targeted policy does not match.
+				if ctx.PolicySetTargetedApprove != "" && ctx.PolicySetTargetedApprove != policySet.Name {
+					ignorePolicy = true
+				}
+				// Increment approval if user is owner.
+				if isOwner && !ignorePolicy {
+					prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
+					// User is not authorized to approve policy set.
+				} else if !ignorePolicy {
+					err = multierror.Append(fmt.Errorf("Policy set: %s user %s is not a policy owner. Please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
+				}
+				// Still bubble up this failure, even if policy set is not targeted.
+				if prjPolicyStatus[i].Approvals != policySet.ReviewCount {
+					failures = append(failures, fmt.Sprintf("Policy set: %s requires %d approvals, have %d.", policySet.Name, policySet.ReviewCount, prjPolicyStatus[i].Approvals))
+				}
+				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
+					PolicySetName: policySet.Name,
+					Passed:        policyStatus.Passed,
+					CurApprovals:  policyStatus.Approvals,
+					ReqApprovals:  policySet.ReviewCount,
+				})
+			}
+		}
+	}
 	return &models.PolicyCheckResults{
-		//				PolicyCheckOutput: "Policies approved",
-	}, "", nil
+		PolicySetResults:   prjPolicySetResults,
+		ApplyCmd:           ctx.ApplyCmd,
+		ApprovePoliciesCmd: ctx.ApprovePoliciesCmd,
+	}, strings.Join(failures, "\n"), err
 }
 
 func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckResults, string, error) {
@@ -418,10 +474,11 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	}
 
 	return &models.PolicyCheckResults{
-		LockURL:          p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
-		PolicySetResults: policySetResults,
-		RePlanCmd:        ctx.RePlanCmd,
-		ApplyCmd:         ctx.ApplyCmd,
+		LockURL:            p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		PolicySetResults:   policySetResults,
+		RePlanCmd:          ctx.RePlanCmd,
+		ApplyCmd:           ctx.ApplyCmd,
+		ApprovePoliciesCmd: ctx.ApprovePoliciesCmd,
 
 		// set this to false right now because we don't have this information
 		// TODO: refactor the templates in a sane way so we don't need this

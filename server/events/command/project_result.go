@@ -33,7 +33,7 @@ func (p ProjectResult) CommitStatus() models.CommitStatus {
 }
 
 // PolicyApprovalStatus returns the approval status of policy sets.
-func (p ProjectResult) PolicyApprovalStatus() []models.PolicySetStatus {
+func (p ProjectResult) PolicyStatus() []models.PolicySetStatus {
 	var policyStatuses []models.PolicySetStatus
 	if p.PolicyCheckResults != nil {
 		for _, policySet := range p.PolicyCheckResults.PolicySetResults {

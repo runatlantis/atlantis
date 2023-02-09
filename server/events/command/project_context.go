@@ -65,6 +65,8 @@ type ProjectContext struct {
 	PullReqStatus models.PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
+	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
+	ProjectPolicyStatus []models.PolicySetStatus
 	// Pull is the pull request we're responding to.
 	Pull models.PullRequest
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
@@ -96,7 +98,7 @@ type ProjectContext struct {
 	// policy check stage
 	PolicySets valid.PolicySets
 	// PolicySetArg describes which policy sets to target on the approve_policies step.
-	PolicySetArg string
+	PolicySetTargetedApprove string
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
 	// RepoLocking will get a lock when plan

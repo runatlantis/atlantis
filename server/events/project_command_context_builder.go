@@ -230,6 +230,7 @@ func newProjectCommandContext(ctx *command.Context,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
+	var projectPolicyStatus []models.PolicySetStatus
 
 	if ctx.PullStatus != nil {
 		for _, project := range ctx.PullStatus.Projects {
@@ -237,11 +238,13 @@ func newProjectCommandContext(ctx *command.Context,
 			// if name is not used, let's match the directory
 			if projCfg.Name == "" && project.RepoRelDir == projCfg.RepoRelDir {
 				projectPlanStatus = project.Status
+				projectPolicyStatus = project.PolicyStatus
 				break
 			}
 
 			if projCfg.Name != "" && project.ProjectName == projCfg.Name {
 				projectPlanStatus = project.Status
+				projectPolicyStatus = project.PolicyStatus
 				break
 			}
 		}
@@ -265,6 +268,7 @@ func newProjectCommandContext(ctx *command.Context,
 		Log:                        ctx.Log,
 		Scope:                      scope,
 		ProjectPlanStatus:          projectPlanStatus,
+		ProjectPolicyStatus:        projectPolicyStatus,
 		Pull:                       ctx.Pull,
 		ProjectName:                projCfg.Name,
 		PlanRequirements:           projCfg.PlanRequirements,
@@ -278,6 +282,7 @@ func newProjectCommandContext(ctx *command.Context,
 		Verbose:                    verbose,
 		Workspace:                  projCfg.Workspace,
 		PolicySets:                 policySets,
+		PolicySetTargetedApprove:   ctx.PolicySet,
 		PullReqStatus:              pullStatus,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
