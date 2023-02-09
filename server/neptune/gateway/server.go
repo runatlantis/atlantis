@@ -37,6 +37,7 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/sync"
 	internalSync "github.com/runatlantis/atlantis/server/neptune/sync"
 	"github.com/runatlantis/atlantis/server/neptune/sync/crons"
+	"github.com/runatlantis/atlantis/server/neptune/template"
 	"github.com/runatlantis/atlantis/server/neptune/temporal"
 	middleware "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/vcs/markdown"
@@ -304,6 +305,8 @@ func NewServer(config Config) (*Server, error) {
 		ClientCreator: clientCreator,
 	}
 
+	templateLoader := template.NewLoader[any](globalCfg)
+
 	gatewayEventsController := lyft_gateway.NewVCSEventsController(
 		statsScope,
 		[]byte(config.GithubWebhookSecret),
@@ -323,6 +326,7 @@ func NewServer(config Config) (*Server, error) {
 		asyncScheduler,
 		temporalClient,
 		rootConfigBuilder,
+		templateLoader,
 		checkRunFetcher,
 	)
 
