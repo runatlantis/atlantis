@@ -112,6 +112,14 @@ Values are chosen in this order:
   Only enable in trusted settings.
   :::
 
+### `--api-secret`
+  ```bash
+  atlantis server --api-secret="secret"
+  # or (recommended)
+  ATLANTIS_API_SECRET="secret"
+  ```
+  Required secret used to validate requests made to the [`/api/*` endpoints](api-endpoints.html).
+
 ### `--atlantis-url`
   ```bash
   atlantis server --atlantis-url="https://my-domain.com:9090/basepath"
@@ -166,6 +174,8 @@ By default, changes to modules will not trigger autoplanning. See the flags belo
 
 ```bash
 atlantis server --autoplan-modules
+# or
+ATLANTIS_AUTOPLAN_MODULES=true
 ```
 
 Defaults to `false`. When set to `true`, Atlantis will trace the local modules of included projects.
@@ -177,6 +187,8 @@ After tracing, Atlantis will plan any project that includes a changed module. Th
 
 ```bash
 atlantis server --autoplan-modules-from-projects='**/init.tf'
+# or
+ATLANTIS_AUTOPLAN_MODULES_FROM_PROJECTS='**/init.tf'
 ```
 
 Enables auto-planing of projects when a module dependency in the same repository has changed. 
@@ -873,6 +885,9 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_SILENCE_NO_PROJECTS=true
   ```
   `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a project defined in the `atlantis.yaml` file.
+  This flag ensures an Atlantis server only responds to its explicitly declared projects.
+  This has no effect if projects are undefined in the repo level `atlantis.yaml`.
+  This also silences targeted commands (eg. `atlantis plan -d mydir` or `atlantis apply -p myproj`) so if the project is not in the repo config `atlantis.yaml`, these commands will not run or report back in a comment.
 
   This is useful when running multiple Atlantis servers against a single repository so you can
   delegate work to each Atlantis server. Also useful when used with pre_workflow_hooks to dynamically generate an `atlantis.yaml` file.

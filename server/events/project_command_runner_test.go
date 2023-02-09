@@ -546,15 +546,17 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	}
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
+	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
 
 	runner := events.DefaultProjectCommandRunner{
-		Locker:           mockLocker,
-		LockURLGenerator: mockURLGenerator{},
-		RunStepRunner:    &run,
-		EnvStepRunner:    &env,
-		WorkingDir:       mockWorkingDir,
-		Webhooks:         nil,
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		RunStepRunner:             &run,
+		EnvStepRunner:             &env,
+		WorkingDir:                mockWorkingDir,
+		Webhooks:                  nil,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockCommandRequirementHandler,
 	}
 
 	repoDir := t.TempDir()

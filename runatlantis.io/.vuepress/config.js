@@ -33,6 +33,17 @@ export default defineUserConfig({
             // looking at the browser dev tools since the key is used in the API requests.
             apiKey: '3b733dff1539ca3a210775860301fa86',
             indexName: 'runatlantis',
+            appId: 'BH4D9OD16A',
+            locales: {
+                '/': {
+                    placeholder: 'Search Documentation',
+                    translations: {
+                        button: {
+                            buttonText: 'Search Documentation',
+                        },
+                    },
+                },
+            },
         }),
     ],
     head: [
@@ -139,6 +150,7 @@ export default defineUserConfig({
                             text: 'Overview',
                             link: 'using-atlantis',
                         },
+                        'api-endpoints',
                     ]
                 },
                 {

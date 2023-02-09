@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v49/github"
+	"github.com/google/go-github/v50/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -330,7 +330,7 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 				return models.ApprovalStatus{
 					IsApproved: true,
 					ApprovedBy: *review.User.Login,
-					Date:       *review.SubmittedAt,
+					Date:       review.SubmittedAt.Time,
 				}, nil
 			}
 		}

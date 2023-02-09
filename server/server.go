@@ -153,6 +153,7 @@ type WebhookConfig struct {
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
+	logging.SuppressDefaultLogging()
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
 
 	if err != nil {
@@ -415,8 +416,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	markdownRenderer := events.NewMarkdownRenderer(
 		gitlabClient.SupportsCommonMark(),
 		userConfig.DisableApplyAll,
-		userConfig.DisableMarkdownFolding,
 		disableApply,
+		userConfig.DisableMarkdownFolding,
 		userConfig.DisableRepoLocking,
 		userConfig.EnableDiffMarkdownFormat,
 		userConfig.MarkdownTemplateOverridesDir,
@@ -567,6 +568,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
 		statsScope,
 		logger,
 		terraformClient,
@@ -661,6 +663,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.QuietPolicyChecks,
 	)
 
+	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName)
 	planCommandRunner := events.NewPlanCommandRunner(
 		userConfig.SilenceVCSStatusNoPlans,
 		userConfig.SilenceVCSStatusNoProjects,
@@ -679,9 +682,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		backend,
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
+		pullReqStatusFetcher,
 	)
 
-	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName)
 	applyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,
 		userConfig.DisableApplyAll,
@@ -729,6 +732,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullReqStatusFetcher,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
+		userConfig.SilenceNoProjects,
 	)
 
 	stateCommandRunner := events.NewStateCommandRunner(

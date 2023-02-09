@@ -24,13 +24,21 @@ import (
 	"github.com/spf13/viper"
 )
 
-const atlantisVersion = "0.22.3"
+// All of this is filled in by goreleaser upon release
+// https://goreleaser.com/cookbooks/using-main.version/
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 func main() {
+
 	v := viper.New()
 
 	logger, err := logging.NewStructuredLogger()
 
+	logger.Debug("atlantis %s, commit %s, built at %s\n", version, commit, date)
 	if err != nil {
 		panic(fmt.Sprintf("unable to initialize logger. %s", err.Error()))
 	}
@@ -40,10 +48,10 @@ func main() {
 	server := &cmd.ServerCmd{
 		ServerCreator:   &cmd.DefaultServerCreator{},
 		Viper:           v,
-		AtlantisVersion: atlantisVersion,
+		AtlantisVersion: version,
 		Logger:          logger,
 	}
-	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
+	version := &cmd.VersionCmd{AtlantisVersion: version}
 	testdrive := &cmd.TestdriveCmd{}
 	cmd.RootCmd.AddCommand(server.Init())
 	cmd.RootCmd.AddCommand(version.Init())
