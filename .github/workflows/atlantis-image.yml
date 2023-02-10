@@ -57,10 +57,18 @@ jobs:
         labels: |
           org.opencontainers.image.licenses=Apache-2.0
         tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
+          type=ref,event=pr,suffix=${{ format('-{0}', matrix.image_type) }}
+          type=semver,pattern={{version}},suffix=${{ format('-{0}', matrix.image_type) }}
+          type=semver,pattern={{major}}.{{minor}},suffix=${{ format('-{0}', matrix.image_type) }}
+          type=sha,suffix=${{ format('-{0}', matrix.image_type) }}
+          type=raw,event=push,value=dev,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }}
+          type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ format('-{0}', matrix.image_type) }}
+          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') && matrix.image_type == 'alpine' }}
+          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') }},suffix=${{ format('-{0}', matrix.image_type) }}
+          type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') && matrix.image_type == 'alpine' }}
+          type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') }},suffix=${{ format('-{0}', matrix.image_type) }}
+        flavor: |
+          latest=false
 
     - name: Login to Packages Container registry
       uses: docker/login-action@v2
@@ -68,26 +76,6 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-
-    # Publish dev image to container registry
-    - name: Build and push atlantis:dev${{ env.IMAGE_SUFFIX }} image
-      if: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) }}
-      uses: docker/build-push-action@v4
-      with:
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        context: .
-        build-args: |
-          ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
-          ATLANTIS_VERSION=dev
-          ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
-          ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: |
-          ghcr.io/${{ github.repository_owner }}/atlantis:dev${{ env.IMAGE_SUFFIX }}
-          ghcr.io/${{ github.repository_owner }}/atlantis:dev-${{ matrix.image_type }}
-        labels: ${{ steps.meta.outputs.labels }}
 
     # Publish release to container registry
     - name: Populate release version
@@ -118,9 +106,5 @@ jobs:
         # release tag also has the image type appended i.e. latest-alpine
         # if it's v0.10.0 and alpine, it will do v0.10.0, v0.10.0-alpine, latest, latest-alpine
         # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
-        tags: |
-          ${{ env.IMAGE_BASE }}:${{ env.RELEASE_VERSION }}${{ env.IMAGE_SUFFIX }}
-          ${{ env.IMAGE_BASE }}:${{ env.RELEASE_VERSION }}-${{ matrix.image_type }}
-          ${{ env.IMAGE_BASE }}:${{ env.RELEASE_TAG }}${{ env.IMAGE_SUFFIX }}
-          ${{ env.IMAGE_BASE }}:${{ env.RELEASE_TAG }}-${{ matrix.image_type }}
+        tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
