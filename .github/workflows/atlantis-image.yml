@@ -126,3 +126,22 @@ jobs:
           ${{ env.IMAGE_BASE }}:${{ env.RELEASE_TAG }}${{ env.IMAGE_SUFFIX }}
           ${{ env.IMAGE_BASE }}:${{ env.RELEASE_TAG }}-${{ matrix.image_type }}
         labels: ${{ steps.meta.outputs.labels }}
+        
+    - name: GCP Login
+      id: auth
+      uses: "google-github-actions/auth@v1"
+      with:
+        credentials_json: ${{ secrets.GOOGLE_ARTIFACTORY_SA }}
+
+    - name: Set up gcloud
+      uses: "google-github-actions/setup-gcloud@v0"
+      with:
+        project_id: ${{ env.PROJECT_ID }}
+
+    - name: Authenticate to Artifact Registry
+      run: gcloud auth configure-docker europe-west1-docker.pkg.dev
+
+    - name: Push the Docker image to container registry
+      run: |
+        docker tag ghcr.io/checkout-anywhere/atlantis:${{ env.RELEASE_VERSION }} europe-west1-docker.pkg.dev/ct-common-resources/checkout-anywhere-artifactory/infrastructure/atlantis:${{ env.RELEASE_VERSION }}
+        docker push europe-west1-docker.pkg.dev/ct-common-resources/checkout-anywhere-artifactory/infrastructure/atlantis:${{ env.RELEASE_VERSION }}
