@@ -15,7 +15,7 @@ echo "${GITHUB_WORKSPACE}/e2e" >> $GITHUB_PATH
 cd e2e/
 
 # Download terraform
-curl -LOk https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+curl -sLOk https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 chmod +x terraform
 
