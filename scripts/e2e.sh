@@ -4,9 +4,8 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # download all the tooling needed for e2e tests
-CIRCLE_WORKING_DIRECTORY="${CIRCLE_WORKING_DIRECTORY/#\~/$HOME}" # https://discuss.circleci.com/t/circle-working-directory-doesnt-expand/17007/5
-${CIRCLE_WORKING_DIRECTORY}/scripts/e2e-deps.sh
-cd "${CIRCLE_WORKING_DIRECTORY}/e2e"
+${GITHUB_WORKSPACE}/scripts/e2e-deps.sh
+cd "${GITHUB_WORKSPACE}/e2e"
 
 # start atlantis server in the background and wait for it to start
 ./atlantis server \
