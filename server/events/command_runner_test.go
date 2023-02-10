@@ -812,7 +812,7 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
 		matchers.EqCommandName(command.PolicyCheck),
 		EqInt(0),
-		EqInt(0),
+		EqInt(2),
 	)
 }
 

@@ -756,6 +756,7 @@ func TestNewCommand_AllFieldsSet(t *testing.T) {
 		Flags:       []string{"a", "b"},
 		Name:        command.Plan,
 		ProjectName: "project",
+		PolicySet:   "policyset",
 	}, *cmd)
 }
 
@@ -794,7 +795,7 @@ func TestCommentCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_String(t *testing.T) {
-	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" flags="flag1,flag2"`
+	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" policyset="" flags="flag1,flag2"`
 	Equals(t, exp, (events.CommentCommand{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},

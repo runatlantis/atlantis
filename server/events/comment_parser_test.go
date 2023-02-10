@@ -1027,7 +1027,10 @@ var ApplyUsage = `Usage of apply:
 `
 
 var ApprovePolicyUsage = `Usage of approve_policies:
-      --verbose   Append Atlantis log to comment.
+      --policy-set string   Approve policies for this project. Refers to the name of
+                            the project configured in a repo config file. Cannot be
+                            used at same time as workspace or dir flags.
+      --verbose             Append Atlantis log to comment.
 `
 
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
