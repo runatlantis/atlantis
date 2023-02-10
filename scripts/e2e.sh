@@ -7,19 +7,21 @@ IFS=$'\n\t'
 ${GITHUB_WORKSPACE}/scripts/e2e-deps.sh
 cd "${GITHUB_WORKSPACE}/e2e"
 
+mkdir tmp/
+
 # start atlantis server in the background and wait for it to start
 ./atlantis server \
-  --gh-user="$GITHUB_USERNAME" \
-  --gh-token="$GITHUB_PASSWORD" \
-  --data-dir="/tmp" \
+  --gh-user="atlantisbot" \
+  --gh-token="$GITHUB_TOKEN" \
+  --data-dir="tmp/" \
   --log-level="debug" \
   --repo-allowlist="github.com/runatlantis/atlantis-tests" \
   --repo-config-json='{"repos":[{"id":"/.*/", "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true}]}' \
-  &> /tmp/atlantis-server.log &
+  &> tmp/atlantis-server.log &
 sleep 2
 
 # start ngrok in the background and wait for it to start
-./ngrok http 4141 > /tmp/ngrok.log &
+./ngrok http 4141 > tmp/ngrok.log &
 sleep 2
 
 # find out what URL ngrok has given us
@@ -38,6 +40,6 @@ then
 else
   echo "e2e tests failed"
   echo "atlantis logs:"
-  cat /tmp/atlantis-server.log
+  cat tmp/atlantis-server.log
   exit 1
 fi
