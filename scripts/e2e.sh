@@ -12,7 +12,6 @@ mkdir tmp/
 # start atlantis server in the background and wait for it to start
 ./atlantis server \
   --gh-user="atlantisbot" \
-  --gh-token="$GITHUB_TOKEN" \
   --data-dir="tmp/" \
   --log-level="debug" \
   --repo-allowlist="github.com/runatlantis/atlantis-tests" \
