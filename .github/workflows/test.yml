@@ -76,7 +76,10 @@ jobs:
     if: ${{ github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == 'runatlantis/atlantis' }}
     runs-on: ubuntu-22.04
     env:
+      ATLANTIS_GH_USER: atlantisbot
+      GITHUB_USERNAME: atlantisbot
       ATLANTIS_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ATLANTIS_GH_WEBHOOK_SECRET: secret
       # This version of TF will be downloaded before Atlantis is started.
       # We do this instead of setting --default-tf-version because setting
       # that flag starts the download asynchronously so we'd have a race
