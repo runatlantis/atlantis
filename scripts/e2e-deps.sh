@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+GITHUB_WORKSPACE#!/usr/bin/env bash
 
 # Exit immediately if a command returns a non-zero code
 set -e
@@ -9,7 +9,7 @@ if [ ! -f atlantis ]; then
     exit 1
 fi
 cp atlantis ${GITHUB_WORKSPACE}/e2e/
-echo "::add-path::$RUNNER_WORKSPACE/$(basename $GITHUB_REPOSITORY)/e2e"
+echo "::add-path::${GITHUB_WORKSPACE}/e2e"
 
 # cd into e2e folder
 cd e2e/
