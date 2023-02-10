@@ -8,7 +8,8 @@ if [ ! -f atlantis ]; then
     echo "atlantis binary not found. exiting...."
     exit 1
 fi
-cp atlantis ${CIRCLE_WORKING_DIRECTORY}/e2e/
+cp atlantis ${GITHUB_WORKSPACE}/e2e/
+echo "::add-path::$RUNNER_WORKSPACE/$(basename $GITHUB_REPOSITORY)/e2e"
 
 # cd into e2e folder
 cd e2e/
@@ -23,5 +24,5 @@ unzip ngrok-stable-linux-amd64.zip
 chmod +x ngrok 
 wget https://stedolan.github.io/jq/download/linux64/jq
 chmod +x jq
-# Copy github config file - replace with circleci user later
+# Copy github config file
 cp .gitconfig ~/.gitconfig
