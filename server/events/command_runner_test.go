@@ -855,7 +855,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 		return ReturnValues{
 			command.ProjectResult{
 				Command:            command.PolicyCheck,
-				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+				PolicyCheckResults: &models.PolicyCheckResults{},
 			},
 		}
 	})

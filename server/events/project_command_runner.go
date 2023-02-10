@@ -352,7 +352,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					continue
 				}
 				// Set ignore flag if targeted policy does not match.
-				if ctx.PolicySetTargetedApprove != "" && ctx.PolicySetTargetedApprove != policySet.Name {
+				if ctx.PolicySetTarget != "" && ctx.PolicySetTarget != policySet.Name {
 					ignorePolicy = true
 				}
 				// Increment approval if user is owner.
@@ -399,7 +399,6 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	}
 	ctx.Log.Debug("acquired lock for project")
 
-	// Acquire internal lock for the directory we're going to operate in.
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
 	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.

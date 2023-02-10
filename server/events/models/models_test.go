@@ -419,7 +419,8 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 	}
 }
 
-func TestPolicyCheckSuccess_Summary(t *testing.T) {
+func TestPolicyCheckResults_Summary(t *testing.T) {
+	policyName := "some policy"
 	cases := []string{
 		"20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
 		"3 tests, 0 passed, 1 warning, 1 failure, 0 exceptions, 1 skipped",
@@ -427,10 +428,15 @@ func TestPolicyCheckSuccess_Summary(t *testing.T) {
 	}
 	for i, summary := range cases {
 		t.Run(fmt.Sprintf("summary %d", i), func(t *testing.T) {
-			pcs := models.PolicyCheckSuccess{
-				PolicyCheckOutput: `WARN - <redacted plan file> - main - example main package\n` + summary,
+			pcs := models.PolicyCheckResults{
+				PolicySetResults: []models.PolicySetResult{
+					models.PolicySetResult{
+						PolicySetName:  policyName,
+						ConftestOutput: `WARN - <redacted plan file> - main - example main package\n` + summary,
+					},
+				},
 			}
-			Equals(t, summary, pcs.Summary())
+			Equals(t, fmt.Sprintf("policy set: %s: %s", policyName, summary), pcs.Summary())
 		})
 	}
 }

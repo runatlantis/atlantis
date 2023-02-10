@@ -1467,11 +1467,13 @@ policies:
 				},
 				PolicySets: valid.PolicySets{
 					Version: conftestVersion,
+				    ReviewCount: 1,
 					PolicySets: []valid.PolicySet{
 						{
 							Name:   "good-policy",
 							Path:   "rel/path/to/policy",
 							Source: valid.LocalPolicySet,
+				            ReviewCount: 1,
 						},
 					},
 				},
@@ -1802,11 +1804,13 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				},
 				PolicySets: valid.PolicySets{
 					Version: conftestVersion,
+				    ReviewCount: 1,
 					PolicySets: []valid.PolicySet{
 						{
 							Name:   "good-policy",
 							Path:   "rel/path/to/policy",
 							Source: valid.LocalPolicySet,
+				            ReviewCount: 1,
 						},
 					},
 				},

@@ -74,15 +74,15 @@ type commonData struct {
 
 // errData is data about an error response.
 type errData struct {
-	Error                string
-	RenderedErrorContext string
+	Error           string
+	RenderedContext string
 	commonData
 }
 
 // failureData is data about a failure response.
 type failureData struct {
-	Failure              string
-	RenderedErrorContext string
+	Failure         string
+	RenderedContext string
 	commonData
 }
 
@@ -195,12 +195,14 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			numPlanSuccesses++
 		} else if result.PolicyCheckResults != nil && common.Command == policyCheckCommandTitle {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckResults.CombinedOutput()) {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsWrapped"), policyCheckResultsData{PolicyCheckResults: *result.PolicyCheckResults})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsWrapped"), policyCheckResultsData{PolicyCheckResults: *result.PolicyCheckResults, PolicyCheckSummary: result.PolicyCheckResults.Summary()})
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsUnwrapped"), policyCheckResultsData{PolicyCheckResults: *result.PolicyCheckResults})
 			}
 			if result.Error == nil && result.Failure == "" {
 				numPolicyCheckSuccesses++
+			} else if result.Failure != "" {
+			    result.Failure = result.PolicyCheckResults.Summary()
 			}
 		} else if result.PolicyCheckResults != nil && common.Command == approvePoliciesCommandTitle {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckResults.CombinedOutput()) {
@@ -210,6 +212,8 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			}
 			if result.Error == nil && result.Failure == "" {
 				numPolicyApprovalSuccesses++
+			} else if result.Failure != "" {
+			    result.Failure = result.PolicyCheckResults.Summary()
 			}
 		} else if result.ApplySuccess != "" {
 			output := strings.TrimSpace(result.ApplySuccess)

@@ -265,13 +265,17 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					PolicyCheckSuccess: &models.PolicyCheckSuccess{
-						// strings.Repeat require to get wrapped result
-						PolicyCheckOutput: strings.Repeat("line\n", 13) + `Checking plan against the following policies:
-  test_policy
-FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							models.PolicySetResult{
+								PolicySetName: "policy1",
+								// strings.Repeat require to get wrapped result
+								ConftestOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
-2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions`,
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
+								Passed: false,
+							},
+						},
 						LockURL:   "lock-url",
 						RePlanCmd: "atlantis plan -d path -w workspace",
 						ApplyCmd:  "atlantis apply -d path -w workspace",
@@ -472,22 +476,33 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PolicyCheckSuccess: &models.PolicyCheckSuccess{
-						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-						LockURL:           "lock-url",
-						ApplyCmd:          "atlantis apply -d path -w workspace",
-						RePlanCmd:         "atlantis plan -d path -w workspace",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							models.PolicySetResult{
+								PolicySetName:  "policy1",
+								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:         true,
+							},
+						},
+						LockURL:   "lock-url",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+						RePlanCmd: "atlantis plan -d path -w workspace",
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PolicyCheckSuccess: &models.PolicyCheckSuccess{
-						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-						LockURL:           "lock-url2",
-						ApplyCmd:          "atlantis apply -d path2 -w workspace",
-						RePlanCmd:         "atlantis plan -d path2 -w workspace",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							models.PolicySetResult{
+								PolicySetName:  "policy1",
+								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:         true,
+							},
+						},						LockURL:          "lock-url2",
+						ApplyCmd:         "atlantis apply -d path2 -w workspace",
+						RePlanCmd:        "atlantis plan -d path2 -w workspace",
 					},
 				},
 			},
@@ -670,11 +685,16 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PolicyCheckSuccess: &models.PolicyCheckSuccess{
-						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-						LockURL:           "lock-url",
-						ApplyCmd:          "atlantis apply -d path -w workspace",
-						RePlanCmd:         "atlantis plan -d path -w workspace",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							models.PolicySetResult{
+								PolicySetName:  "policy1",
+								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:         true,
+							},
+						},						LockURL:          "lock-url",
+						ApplyCmd:         "atlantis apply -d path -w workspace",
+						RePlanCmd:        "atlantis plan -d path -w workspace",
 					},
 				},
 				{
@@ -1154,7 +1174,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 	filePath := fmt.Sprintf("%s/templates.tmpl", tmpDir)
 	_, err := os.Create(filePath)
 	Ok(t, err)
-	err = os.WriteFile(filePath, []byte("{{ define \"policyCheckSuccessUnwrapped\" -}}somecustometext{{- end}}\n"), 0600)
+	err = os.WriteFile(filePath, []byte("{{ define \"PolicyCheckResultsUnwrapped\" -}}somecustometext{{- end}}\n"), 0600)
 	Ok(t, err)
 	r := events.NewMarkdownRenderer(
 		false,      // gitlabSupportsCommonMark
@@ -1172,11 +1192,16 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 			{
 				Workspace:  "workspace",
 				RepoRelDir: "path",
-				PolicyCheckSuccess: &models.PolicyCheckSuccess{
-					PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-					LockURL:           "lock-url",
-					ApplyCmd:          "atlantis apply -d path -w workspace",
-					RePlanCmd:         "atlantis plan -d path -w workspace",
+				PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							models.PolicySetResult{
+								PolicySetName:  "policy1",
+								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:         true,
+							},
+						},					LockURL:          "lock-url",
+					ApplyCmd:         "atlantis apply -d path -w workspace",
+					RePlanCmd:        "atlantis plan -d path -w workspace",
 				},
 			},
 		},

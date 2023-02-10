@@ -97,8 +97,8 @@ type ProjectContext struct {
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
 	PolicySets valid.PolicySets
-	// PolicySetArg describes which policy sets to target on the approve_policies step.
-	PolicySetTargetedApprove string
+	// PolicySetTarget describes which policy sets to target on the approve_policies step.
+	PolicySetTarget string
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
 	// RepoLocking will get a lock when plan
@@ -142,7 +142,7 @@ func (p ProjectContext) GetShowResultFileName() string {
 // GetPolicyCheckResultFileName returns the filename (not the path) to store the result from conftest_client.
 func (p ProjectContext) GetPolicyCheckResultFileName() string {
 	if p.ProjectName == "" {
-		return fmt.Sprintf("%spolicyout.json", p.Workspace)
+		return fmt.Sprintf("%s-policyout.json", p.Workspace)
 	}
 	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
 	return fmt.Sprintf("%s-%s-policyout.json", projName, p.Workspace)

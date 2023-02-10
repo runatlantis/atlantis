@@ -669,11 +669,13 @@ policies:
 				},
 				PolicySets: valid.PolicySets{
 					Version: nil,
+					ReviewCount: 1,
 					PolicySets: []valid.PolicySet{
 						{
 							Name:   "good-policy",
 							Path:   "rel/path/to/source",
 							Source: "local",
+					        ReviewCount: 1,
 						},
 					},
 				},
@@ -715,11 +717,13 @@ policies:
 				},
 				PolicySets: valid.PolicySets{
 					Version: version,
+					ReviewCount: 1,
 					PolicySets: []valid.PolicySet{
 						{
 							Name:   "good-policy",
 							Path:   "rel/path/to/source",
 							Source: "local",
+					        ReviewCount: 1,
 						},
 					},
 				},

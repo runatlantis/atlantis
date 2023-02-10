@@ -211,7 +211,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 	}
 
 	if policySetResults == nil {
-		ctx.Log.Warn("No policies have been configured.")
+		ctx.Log.Warn("no policies have been configured.")
 		return "", nil
 		// TODO: enable when we can pass policies in otherwise e2e tests with policy checks fail
 		// return "", errors.Wrap(err, "building args")
@@ -219,10 +219,11 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 
 	marshaledStatus, err := json.Marshal(policySetResults)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Cannot marshal data into []PolicySetResult. Error: %w Data: %w", err, policySetResults))
+		return "", errors.New("cannot marshal data into []PolicySetResult. data.")
 	}
 
-	policyCheckResultFile := fmt.Sprintf("%s/%s", workdir, ctx.GetPolicyCheckResultFileName())
+	// Write policy check results to a file which can be used by custom workflow run steps for metrics, notifications, etc.
+	policyCheckResultFile := filepath.Join(workdir, ctx.GetPolicyCheckResultFileName())
 	err = os.WriteFile(policyCheckResultFile, marshaledStatus, 0644)
 	combinedErr = multierror.Append(combinedErr, err)
 

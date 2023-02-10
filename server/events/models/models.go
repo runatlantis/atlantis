@@ -423,7 +423,7 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 
 // PolicyCheckResults is the result of a successful policy check run.
 type PolicyCheckResults struct {
-	// PolicyCheckOutput is the output from policy check binary(conftest|opa)
+	// PolicySetResults is the output from policy check binary(conftest|opa)
 	PolicySetResults []PolicySetResult
 	// LockURL is the full URL to the lock held by this policy check.
 	LockURL string
@@ -458,6 +458,7 @@ type StateRmSuccess struct {
 func (p *PolicyCheckResults) CombinedOutput() string {
 	combinedOutput := ""
 	for _, psResult := range p.PolicySetResults {
+	    // accounting for json output from conftest.
 		for _, psResultLine := range strings.Split(psResult.ConftestOutput, "\\n") {
 			combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
 		}
@@ -468,12 +469,13 @@ func (p *PolicyCheckResults) CombinedOutput() string {
 // Summary extracts one line summary of policy check.
 func (p *PolicyCheckResults) Summary() string {
 	note := ""
-	//
-	//r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
-	//if match := r.FindString(p.PolicyCheckOutput); match != "" {
-	//	return note + match
-	//}
-	return note
+	for _, policySetResult := range p.PolicySetResults {
+	    r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
+    	if match := r.FindString(policySetResult.ConftestOutput); match != "" {
+	    	note = fmt.Sprintf("%s\npolicy set: %s: %s", note, policySetResult.PolicySetName, match)
+	    }
+	}
+	return strings.Trim(note, "\n")
 }
 
 type VersionSuccess struct {
