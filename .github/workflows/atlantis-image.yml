@@ -26,8 +26,8 @@ jobs:
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-      # Push if not (pull request or push) or this is a fork
-      PUSH: ${{ !contains(fromJson('["push", "pull_request"]'), github.event_name) || github.event.pull_request.head.repo.full_name != github.repository }}
+      # Push if not a pull request or this is a fork
+      PUSH: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
 
     steps:
     - uses: actions/checkout@v3
@@ -40,33 +40,28 @@ jobs:
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
-      # related issues for pinning buildkit
-      # https://github.com/docker/build-push-action/issues/761
-      # https://github.com/containerd/containerd/issues/7972
-      # https://github.com/containerd/containerd/pull/6995
-      with:
-        driver-opts: |
-          image=moby/buildkit:v0.10.6
 
     - name: Docker meta
       id: meta
       uses: docker/metadata-action@v4
+      env:
+        SUFFIX: ${{ format('-{0}', matrix.image_type) }}
       with:
         images: |
           ${{ env.DOCKER_REPO }}
         labels: |
           org.opencontainers.image.licenses=Apache-2.0
         tags: |
-          type=ref,event=pr,suffix=${{ format('-{0}', matrix.image_type) }}
-          type=semver,pattern={{version}},suffix=${{ format('-{0}', matrix.image_type) }}
-          type=semver,pattern={{major}}.{{minor}},suffix=${{ format('-{0}', matrix.image_type) }}
-          type=sha,suffix=${{ format('-{0}', matrix.image_type) }}
-          type=raw,event=push,value=dev,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }}
-          type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ format('-{0}', matrix.image_type) }}
-          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') && matrix.image_type == 'alpine' }}
-          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') }},suffix=${{ format('-{0}', matrix.image_type) }}
-          type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') && matrix.image_type == 'alpine' }}
-          type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') }},suffix=${{ format('-{0}', matrix.image_type) }}
+          type=semver,pattern={{version}},suffix=${{ env.SUFFIX }}
+          type=semver,pattern={{major}}.{{minor}},suffix=${{ env.SUFFIX }}
+          type=raw,event=push,value=dev,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }},suffix=
+          type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}
+          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') && matrix.image_type == 'alpine' }},suffix=
+          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') }},suffix=${{ env.SUFFIX }}
+          type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') && matrix.image_type == 'alpine' }},suffix=
+          type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') }},suffix=${{ env.SUFFIX }}
+          type=ref,event=pr,suffix=${{ env.SUFFIX }}
+          type=sha,suffix=${{ env.SUFFIX }}
         flavor: |
           latest=false
 
@@ -80,17 +75,7 @@ jobs:
     # Publish release to container registry
     - name: Populate release version
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-      run: |
-        echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
-        echo "head.repo: ${{ github.event.pull_request.head.repo.full_name }}"
-        echo "github.repository: ${{ github.repository }}"
-        echo "PUSH: ${{ env.PUSH }}"
-        echo "event_name: ${{ github.event_name }}"
-        echo "IsPushOrPullRequest: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) }}"
-        echo "IsNotPushOrPullRequest: ${{ !contains(fromJson('["push", "pull_request"]'), github.event_name) }}"
-        echo "head.repo == github.repo: ${{ github.event.pull_request.head.repo.full_name == github.repository }}"
-        echo "head.repo != github.repo: ${{ github.event.pull_request.head.repo.full_name != github.repository }}"
-        
+      run: echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
 
     - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
