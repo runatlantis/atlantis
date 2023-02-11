@@ -80,7 +80,7 @@ jobs:
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
       run: echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
 
-    - name: "Build ${{ env.PUSH == true && 'and push' }} atlantis:${{ env.RELEASE_VERSION }} image for ${{ env.RELEASE_TYPE }} release"
+    - name: "Build ${{ env.PUSH == true && 'and push' || '' }} atlantis:${{ env.RELEASE_VERSION }} image for ${{ env.RELEASE_TYPE }} release"
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
       uses: docker/build-push-action@v4
       with:
