@@ -92,7 +92,7 @@ jobs:
         echo "head.repo != github.repo: ${{ github.event.pull_request.head.repo.full_name != github.repository }}"
         
 
-    - name: "Build ${{ env.PUSH && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
+    - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
       uses: docker/build-push-action@v4
       with:
