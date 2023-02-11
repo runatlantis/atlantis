@@ -6,7 +6,7 @@
   commitMessageSuffix: " in {{packageFile}}",
   dependencyDashboardAutoclose: true,
   automerge: true,
-  platformAutomerge: false,
+  platformAutomerge: true,
   labels: ["dependencies"],
   postUpdateOptions: [
     "gomodTidy",
