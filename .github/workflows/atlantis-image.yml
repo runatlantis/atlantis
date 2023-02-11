@@ -82,8 +82,15 @@ jobs:
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
       run: |
         echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
-        echo "${{ github.event.pull_request.head.repo.full_name }}"
-        echo "${{ github.repository }}"
+        echo "head.repo: ${{ github.event.pull_request.head.repo.full_name }}"
+        echo "github.repository: ${{ github.repository }}"
+        echo "PUSH: ${{ env.PUSH }}"
+        echo "event_name: ${{ github.event_name }}"
+        echo "IsPushOrPullRequest: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) }}"
+        echo "IsNotPushOrPullRequest: ${{ !contains(fromJson('["push", "pull_request"]'), github.event_name) }}"
+        echo "head.repo == github.repo: ${{ github.event.pull_request.head.repo.full_name == github.repository }}"
+        echo "head.repo != github.repo: ${{ github.event.pull_request.head.repo.full_name != github.repository }}"
+        
 
     - name: "Build ${{ env.PUSH && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
