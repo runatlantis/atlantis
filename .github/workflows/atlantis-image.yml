@@ -27,7 +27,7 @@ jobs:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ${{ github.event.pull_request.head.repo.full_name }}
       # Push if not a pull request or this is a fork
-      PUSH: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != 'runatlantis/atlantis' }}
+      PUSH: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
 
     steps:
     - uses: actions/checkout@v3
@@ -80,7 +80,9 @@ jobs:
     # Publish release to container registry
     - name: Populate release version
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-      run: echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
+      run: |
+        echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
+        echo "${{ github.event.pull_request.head.repo.full_name }}"
 
     - name: "Build ${{ env.PUSH && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
