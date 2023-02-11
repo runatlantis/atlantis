@@ -77,7 +77,7 @@ jobs:
     # Publish release to container registry
     - name: Populate release version
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-      run: echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || "dev" }}" >> $GITHUB_ENV
+      run: echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
 
     - name: "Build and push atlantis:${{ env.RELEASE_VERSION }} image for ${{ env.RELEASE_TYPE }} release"
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
