@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       RELEASE_TYPE: ${{ contains(github.ref, 'pre') && 'pre' || 'stable' }}
+      PUSH: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'push-image-from-pr') }}
 
     steps:
     - uses: actions/checkout@v3
@@ -79,7 +80,7 @@ jobs:
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
       run: echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
 
-    - name: "Build and push atlantis:${{ env.RELEASE_VERSION }} image for ${{ env.RELEASE_TYPE }} release"
+    - name: "Build ${{ env.PUSH == true && 'and push' }} atlantis:${{ env.RELEASE_VERSION }} image for ${{ env.RELEASE_TYPE }} release"
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
       uses: docker/build-push-action@v4
       with:
@@ -92,7 +93,7 @@ jobs:
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
-        push: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'push-image-from-pr') }}
+        push: ${{ env.PUSH }}
         # release version is the name of the tag i.e. v0.10.0
         # release version also has the image type appended i.e. v0.10.0-alpine
         # release tag is either pre-release or latest i.e. latest
