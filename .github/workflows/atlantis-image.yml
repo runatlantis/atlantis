@@ -5,7 +5,7 @@ on:
     branches:
       - 'main'
     tags:
-      - v*.*.*       # stable release like, v0.19.2
+      - v*.*.* # stable release like, v0.19.2
       - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
   pull_request:
     paths:
@@ -92,7 +92,7 @@ jobs:
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
-        push: ${{ github.event_name != 'pull_request' }}
+        push: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'push-image-from-pr') }}
         # release version is the name of the tag i.e. v0.10.0
         # release version also has the image type appended i.e. v0.10.0-alpine
         # release tag is either pre-release or latest i.e. latest
