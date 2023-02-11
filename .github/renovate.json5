@@ -5,7 +5,7 @@
   ],
   commitMessageSuffix: " in {{packageFile}}",
   dependencyDashboardAutoclose: true,
-  automerge: false,
+  automerge: true,
   platformAutomerge: false,
   labels: ["dependencies"],
   postUpdateOptions: [
