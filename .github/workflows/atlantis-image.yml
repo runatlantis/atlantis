@@ -27,7 +27,7 @@ jobs:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ${{ github.event.pull_request.head.repo.full_name }}
       # Push if not (pull request or push) or this is a fork
-      PUSH: ${{ !contains(fromJson('["push", "pull_request"]') || github.event.pull_request.head.repo.full_name != github.repository }}
+      PUSH: ${{ !contains(fromJson('["push", "pull_request"]'), github.event_name) || github.event.pull_request.head.repo.full_name != github.repository }}
 
     steps:
     - uses: actions/checkout@v3
