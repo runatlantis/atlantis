@@ -95,12 +95,15 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	// and because the caller in that case actually constructs the clone url
 	// from the repo name and so there's no point checking if they match.
 	// Azure DevOps also does not require .git at the end of clone urls.
-	if vcsHostType != BitbucketServer && vcsHostType != AzureDevops {
-		expClonePath := fmt.Sprintf("/%s.git", repoFullName)
-		if expClonePath != cloneURLParsed.Path {
-			return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
-		}
-	}
+
+	//// Removing this check, since Gitlab or even local github-instances such as "Gitbucket" can be installed on a dedicated path
+	//// Having this check would make those fail.
+	//if vcsHostType != BitbucketServer && vcsHostType != AzureDevops {
+	//	expClonePath := fmt.Sprintf("/%s.git", repoFullName)
+	//	if expClonePath != cloneURLParsed.Path {
+	//		return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
+	//	}
+	//}
 
 	// We url encode because we're using them in a URL and weird characters can
 	// mess up git.
