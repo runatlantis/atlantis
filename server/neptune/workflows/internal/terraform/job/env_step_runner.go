@@ -4,8 +4,6 @@ import (
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/version"
-	"go.temporal.io/sdk/workflow"
 )
 
 type EnvStepRunner struct {
@@ -21,18 +19,7 @@ func (e *EnvStepRunner) Run(ctx *ExecutionContext, localRoot *terraform.LocalRoo
 }
 
 func (e *EnvStepRunner) getEnv(ctx *ExecutionContext, localRoot *terraform.LocalRoot, step execute.Step) (EnvVar, error) {
-	version := workflow.GetVersion(ctx, version.LazyLoadEnvVars, workflow.DefaultVersion, 1)
-
-	if version == workflow.DefaultVersion {
-		return e.getLegacyEnvVar(ctx, localRoot, step)
-	}
-
 	return NewEnvVarFromCmd(step.EnvVarName, step.RunCommand, ctx.Path, GetDefaultEnvVars(ctx, localRoot)), nil
-}
-
-func (e *EnvStepRunner) getLegacyEnvVar(ctx *ExecutionContext, localRoot *terraform.LocalRoot, step execute.Step) (EnvVar, error) {
-	res, err := e.CmdStepRunner.Run(ctx, localRoot, step)
-	return NewEnvVarFromString(step.EnvVarName, res), err
 }
 
 // StringEnvVar is an environment variable who's value is explicltly defined
