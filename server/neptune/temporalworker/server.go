@@ -303,6 +303,7 @@ func (s Server) buildTerraformWorker() worker.Worker {
 		Interceptors: []interceptor.WorkerInterceptor{
 			temporal.NewWorkerInterceptor(),
 		},
+		MaxConcurrentActivityExecutionSize: 30,
 	})
 	terraformWorker.RegisterActivity(s.TerraformActivities)
 	terraformWorker.RegisterActivity(s.GithubActivities)
