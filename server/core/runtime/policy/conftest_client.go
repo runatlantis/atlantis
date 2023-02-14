@@ -207,6 +207,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 			PolicySetName:  policySet.Name,
 			ConftestOutput: cmdOutput,
 			Passed:         passed,
+			ReqApprovals:   policySet.ReviewCount,
 		})
 	}
 

@@ -319,6 +319,22 @@ func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) comman
 }
 
 func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckResults, string, error) {
+	// Acquire Atlantis lock for this repo/dir/workspace.
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir), ctx.RepoLocking)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "acquiring lock")
+	}
+	if !lockAttempt.LockAcquired {
+		return nil, lockAttempt.LockFailureReason, nil
+	}
+	ctx.Log.Debug("acquired lock for project")
+
+	// Acquire internal lock for the directory we're going to operate in.
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlockFn()
 
 	teams := []string{}
 
@@ -336,50 +352,57 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	}
 	isAdmin := policySetCfg.Owners.IsOwner(ctx.User.Username, teams)
 
-	var err error
-	var failures []string
+	var failure string
 
 	// Run over each policy set for the project and perform appropriate approval.
 	var prjPolicySetResults []models.PolicySetResult
+	var prjErr error
+	allPassed := true
 	for _, policySet := range policySetCfg.PolicySets {
 		isOwner := policySet.Owners.IsOwner(ctx.User.Username, teams) || isAdmin
 		prjPolicyStatus := ctx.ProjectPolicyStatus
 		for i, policyStatus := range prjPolicyStatus {
+			increment := true
 			ignorePolicy := false
 			if policySet.Name == policyStatus.PolicySetName {
 				// Policy set either passed or has sufficient approvals. Move on.
 				if policyStatus.Passed || policyStatus.Approvals == policySet.ReviewCount {
-					continue
+					increment = false
 				}
 				// Set ignore flag if targeted policy does not match.
 				if ctx.PolicySetTarget != "" && ctx.PolicySetTarget != policySet.Name {
 					ignorePolicy = true
 				}
 				// Increment approval if user is owner.
-				if isOwner && !ignorePolicy {
+				if isOwner && !ignorePolicy && increment {
 					prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
 					// User is not authorized to approve policy set.
-				} else if !ignorePolicy {
-					err = multierror.Append(fmt.Errorf("Policy set: %s user %s is not a policy owner. Please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
+				} else if !ignorePolicy && increment {
+					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner. Please contact policy owners to approve failing policies.", policySet.Name, ctx.User.Username))
 				}
 				// Still bubble up this failure, even if policy set is not targeted.
 				if prjPolicyStatus[i].Approvals != policySet.ReviewCount {
-					failures = append(failures, fmt.Sprintf("Policy set: %s requires %d approvals, have %d.", policySet.Name, policySet.ReviewCount, prjPolicyStatus[i].Approvals))
+					allPassed = false
 				}
 				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
 					PolicySetName: policySet.Name,
 					Passed:        policyStatus.Passed,
-					CurApprovals:  policyStatus.Approvals,
+					CurApprovals:  prjPolicyStatus[i].Approvals,
 					ReqApprovals:  policySet.ReviewCount,
 				})
 			}
 		}
 	}
+	if allPassed == false {
+		failure = `One or more policy sets require additional approval.`
+	}
 	return &models.PolicyCheckResults{
+		LockURL:            p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		PolicySetResults:   prjPolicySetResults,
 		ApplyCmd:           ctx.ApplyCmd,
+		RePlanCmd:          ctx.RePlanCmd,
 		ApprovePoliciesCmd: ctx.ApprovePoliciesCmd,
-	}, strings.Join(failures, "\n"), err
+	}, failure, prjErr
 }
 
 func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckResults, string, error) {
@@ -434,7 +457,8 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	var failures []string
+	var failure string
+	allPassed := true
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	var errs error
 	if err != nil {
@@ -444,7 +468,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 				break
 			}
 			if strings.Contains(err.Error(), "Some policies failed.") {
-				failures = append(failures, err.Error())
+				allPassed = false
 			} else {
 				errs = multierror.Append(errs, err)
 			}
@@ -457,19 +481,14 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		}
 	}
 
+	if allPassed == false {
+		failure = "Some policy sets did not pass."
+	}
+
 	var policySetResults []models.PolicySetResult
 	err = json.Unmarshal([]byte(strings.Join(outputs, "\n")), &policySetResults)
 	if err != nil {
 		return nil, "", err
-	}
-
-	// Update review count on policy set data
-	for i, policySet := range policySetResults {
-		for _, ctxPolicySet := range ctx.PolicySets.PolicySets {
-			if policySet.PolicySetName == ctxPolicySet.Name {
-				policySetResults[i].ReqApprovals = ctxPolicySet.ReviewCount
-			}
-		}
 	}
 
 	return &models.PolicyCheckResults{
@@ -478,11 +497,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		RePlanCmd:          ctx.RePlanCmd,
 		ApplyCmd:           ctx.ApplyCmd,
 		ApprovePoliciesCmd: ctx.ApprovePoliciesCmd,
-
-		// set this to false right now because we don't have this information
-		// TODO: refactor the templates in a sane way so we don't need this
-		HasDiverged: false,
-	}, strings.Join(failures, "\n"), nil
+	}, failure, nil
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*models.PlanSuccess, string, error) {

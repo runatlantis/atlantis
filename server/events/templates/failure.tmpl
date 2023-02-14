@@ -1,8 +1,5 @@
 {{ define "failure" -}}
-**{{ .Command }} Failed**:
-```diff
-{{ .Failure }}
-```
+**{{ .Command }} Failed**: {{ .Failure }}
 {{- if ne .RenderedContext ""}}
 {{ .RenderedContext }}
 {{- end }}

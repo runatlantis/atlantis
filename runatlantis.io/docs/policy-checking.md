@@ -158,3 +158,21 @@ workflows:
 ### Quiet policy checks
 
 By default, Atlantis will add a comment to all pull requests with the policy check result - both successes and failures. Version 0.21.0 added the [`--quiet-policy-checks`](server-configuration.html#quiet-policy-checks) option, which will instead only add comments when policy checks fail, significantly reducing the number of comments when most policy check results succeed.
+
+
+### Data for custom run steps
+
+When the policy check workflow runs, a file is created in the working directory which contains information about the status of each policy set tested. This data may be useful in custom run steps to generate metrics or notifications. The file contains JSON data in the following format:
+
+```json
+[
+  {
+    "PolicySetName":  "policy1",
+    "ConftestOutput": "",
+    "Passed":         false,
+    "ReqApprovals":   1,
+    "CurApprovals":   0
+  }
+]
+
+```

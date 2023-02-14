@@ -458,7 +458,7 @@ type StateRmSuccess struct {
 func (p *PolicyCheckResults) CombinedOutput() string {
 	combinedOutput := ""
 	for _, psResult := range p.PolicySetResults {
-	    // accounting for json output from conftest.
+		// accounting for json output from conftest.
 		for _, psResultLine := range strings.Split(psResult.ConftestOutput, "\\n") {
 			combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
 		}
@@ -466,16 +466,42 @@ func (p *PolicyCheckResults) CombinedOutput() string {
 	return combinedOutput
 }
 
-// Summary extracts one line summary of policy check.
+// Summary extracts one line summary of each policy check.
 func (p *PolicyCheckResults) Summary() string {
 	note := ""
 	for _, policySetResult := range p.PolicySetResults {
-	    r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
-    	if match := r.FindString(policySetResult.ConftestOutput); match != "" {
-	    	note = fmt.Sprintf("%s\npolicy set: %s: %s", note, policySetResult.PolicySetName, match)
-	    }
+		r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
+		if match := r.FindString(policySetResult.ConftestOutput); match != "" {
+			note = fmt.Sprintf("%s\npolicy set: %s: %s", note, policySetResult.PolicySetName, match)
+		}
 	}
 	return strings.Trim(note, "\n")
+}
+
+// PolicyCleared is used to determine if policies have all succeeded or been approved.
+func (p *PolicyCheckResults) PolicyCleared() bool {
+	passing := true
+	for _, policySetResult := range p.PolicySetResults {
+		if policySetResult.Passed == false && (policySetResult.CurApprovals != policySetResult.ReqApprovals) {
+			passing = false
+		}
+	}
+	return passing
+}
+
+// PolicySummary returns a summary of the current approval state of policy sets.
+func (p *PolicyCheckResults) PolicySummary() string {
+	var summary []string
+	for _, policySetResult := range p.PolicySetResults {
+		if policySetResult.Passed == true {
+			summary = append(summary, fmt.Sprintf("policy set: %s: passed.", policySetResult.PolicySetName))
+		} else if policySetResult.CurApprovals == policySetResult.ReqApprovals {
+			summary = append(summary, fmt.Sprintf("policy set: %s: approved.", policySetResult.PolicySetName))
+		} else {
+			summary = append(summary, fmt.Sprintf("policy set: %s: requires: %d approval(s), have: %d.", policySetResult.PolicySetName, policySetResult.ReqApprovals, policySetResult.CurApprovals))
+		}
+	}
+	return strings.Join(summary, "\n")
 }
 
 type VersionSuccess struct {

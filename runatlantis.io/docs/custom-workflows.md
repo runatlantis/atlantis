@@ -456,6 +456,8 @@ Or a custom command
   * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
   either be generated (by show) or already exist (if running policy checks). Can be used to
   override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
+  * `POLICYCHECKFILE` - Absolute path to the location of policy check output if Atlantis runs policy checks.
+  See <LINK> for information of data structure.
   * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
   * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
   * `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.

@@ -1,7 +1,7 @@
 {{ define "policyCheck" -}}
 {{ $policy_sets := . }}
 {{ range $ps, $policy_sets }}
-* Policy Set: `{{ $ps.PolicySetName }}`
+#### Policy Set: `{{ $ps.PolicySetName }}`
 ```diff
 {{ $ps.ConftestOutput }}
 ```
