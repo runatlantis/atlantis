@@ -42,3 +42,7 @@ func (m PlanMode) ToFlag() Flag {
 		Value: string(m),
 	}
 }
+
+func (m PlanMode) String() string {
+	return string(m)
+}

@@ -191,7 +191,7 @@ func (w *Worker) Work(ctx workflow.Context) {
 			"revision",
 		)
 
-		//TODO: pass this scope further down the code
+		w.emitRevisionRequestStats(scope, msg)
 		currentDeployment, err = w.deploy(ctx, msg, w.latestDeployment, scope)
 
 		// since there was no error we can safely count this as our latest deploy
@@ -225,6 +225,17 @@ func (w *Worker) Work(ctx workflow.Context) {
 		scope.SubScopeWithTags(map[string]string{"error_type": readableErr}).Counter("failure")
 
 		selector.AddFuture(w.awaitWork(ctx), callback)
+	}
+}
+
+func (w *Worker) emitRevisionRequestStats(scope metrics.Scope, request terraform.DeploymentInfo) {
+	if request.Root.Rerun {
+		scope.Counter("rerun_requested").Inc(1)
+	}
+
+	planMode := request.Root.Plan.GetPlanMode().String()
+	if planMode != "" {
+		scope.Counter(fmt.Sprintf("%s_plan_mode_requested", planMode)).Inc(1)
 	}
 }
 
