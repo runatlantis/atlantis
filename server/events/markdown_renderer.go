@@ -70,7 +70,7 @@ type CommonData struct {
 	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
 	ExecutableName           string
-	pullID                   int
+	PullNum                  int
 }
 
 // ErrData is data about an error response.
@@ -149,7 +149,7 @@ func NewMarkdownRenderer(
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subCmd, log string, verbose bool, vcsHost models.VCSHostType) string {
+func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subCmd, log string, verbose bool, vcsHost models.VCSHostType, pullNum int) string {
 	commandStr := cases.Title(language.English).String(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := CommonData{
 		Command:                  commandStr,
@@ -162,6 +162,7 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subC
 		DisableRepoLocking:       m.disableRepoLocking,
 		EnableDiffMarkdownFormat: m.enableDiffMarkdownFormat,
 		ExecutableName:           m.executableName,
+		PullNum:                  pullNum,
 	}
 
 	templates := m.markdownTemplates
@@ -191,18 +192,11 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			ProjectName: result.ProjectName,
 		}
 		if result.PlanSuccess != nil {
-			planSuccessData := PlanSuccessData{
-				PlanSuccess:              *result.PlanSuccess,
-				PlanSummary:              result.PlanSuccess.Summary(),
-				PlanWasDeleted:           common.PlansDeleted,
-				DisableApply:             common.DisableApply,
-				DisableRepoLocking:       common.DisableRepoLocking,
-				EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat}
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), planSuccessData)
+				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), PlanSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			} else {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), planSuccessData)
+				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), PlanSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			}
 			numPlanSuccesses++
 		} else if result.PolicyCheckResults != nil && common.Command == policyCheckCommandTitle {

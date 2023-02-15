@@ -49,11 +49,8 @@ func TestRenderErr(t *testing.T) {
 		{
 			"policy check error",
 			command.PolicyCheck,
-			err,
-			"**Policy Check Error**\n```\nerr\n```" +
-				"\n* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:\n" +
-				"    * `atlantis approve_policies`\n" +
-				"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.",
+			fmt.Errorf("some conftest error"),
+			"**Policy Check Error**\n```\nsome conftest error\n```",
 		},
 	}
 
@@ -64,7 +61,7 @@ func TestRenderErr(t *testing.T) {
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
-				s := r.Render(res, c.Command, "", "log", verbose, models.Github)
+				s := r.Render(res, c.Command, "", "log", verbose, models.Github, 0)
 				if !verbose {
 					Equals(t, strings.TrimSpace(c.Expected), strings.TrimSpace(s))
 				} else {
@@ -109,7 +106,7 @@ func TestRenderFailure(t *testing.T) {
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
-				s := r.Render(res, c.Command, "", "log", verbose, models.Github)
+				s := r.Render(res, c.Command, "", "log", verbose, models.Github, 0)
 				if !verbose {
 					Equals(t, strings.TrimSpace(c.Expected), strings.TrimSpace(s))
 				} else {
@@ -126,7 +123,7 @@ func TestRenderErrAndFailure(t *testing.T) {
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-	s := r.Render(res, command.Plan, "", "", false, models.Github)
+	s := r.Render(res, command.Plan, "", "", false, models.Github, 0)
 	Equals(t, "**Plan Error**\n```\nerror\n```", s)
 }
 
@@ -260,6 +257,74 @@ $$$
 `,
 		},
 		{
+			"single successful policy check with multiple policy sets and project name",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								// strings.Repeat require to get wrapped result
+								ConftestOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
+								Passed:       false,
+								ReqApprovals: 1,
+							},
+							{
+								PolicySetName: "policy2",
+								// strings.Repeat require to get wrapped result
+								ConftestOutput: "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+								Passed:         true,
+								ReqApprovals:   1,
+							},
+						},
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+
+#### Policy Set: $policy2$
+$$$diff
+2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+policy set: policy2: passed.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+    * $$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan -d path -w workspace$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
+`,
+		},
+		{
 			"single successful policy check with project name",
 			command.PolicyCheck,
 			"",
@@ -267,13 +332,14 @@ $$$
 				{
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
-							models.PolicySetResult{
+							{
 								PolicySetName: "policy1",
 								// strings.Repeat require to get wrapped result
 								ConftestOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-								Passed: false,
+								Passed:       false,
+								ReqApprovals: 1,
 							},
 						},
 						LockURL:   "lock-url",
@@ -290,21 +356,42 @@ $$$
 
 <details><summary>Show Output</summary>
 
+
+#### Policy Set: $policy1$
 $$$diff
-` + strings.Repeat("line\n", 13) + `Checking plan against the following policies:
-  test_policy
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
 FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
-2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
 $$$
 
-* :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+    * $$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
     * $atlantis plan -d path -w workspace$
 </details>
-2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions
+
+$$$
+policy set: policy1: 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
@@ -513,9 +600,11 @@ $$$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
 
 ### 1. dir: $path$ workspace: $workspace$
+#### Policy Set: $policy1$
 $$$diff
 4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
 $$$
+
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
@@ -525,9 +614,11 @@ $$$
 
 ---
 ### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
+#### Policy Set: $policy1$
 $$$diff
 4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
 $$$
+
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path2 -w workspace$
@@ -701,6 +792,18 @@ $$$
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
 					Failure:    "failure",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							models.PolicySetResult{
+								PolicySetName:  "policy1",
+								ConftestOutput: "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+								Passed:         false,
+								ReqApprovals:   1,
+							},
+						}, LockURL: "lock-url",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
 				},
 				{
 					Workspace:   "workspace",
@@ -717,9 +820,11 @@ $$$
 1. project: $projectname$ dir: $path3$ workspace: $workspace$
 
 ### 1. dir: $path$ workspace: $workspace$
+#### Policy Set: $policy1$
 $$$diff
 4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
 $$$
+
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
@@ -730,6 +835,21 @@ $$$
 ---
 ### 2. dir: $path2$ workspace: $workspace$
 **Policy Check Failed**: failure
+#### Policy Set: $policy1$
+$$$diff
+4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+    * $$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan -d path -w workspace$
 
 ---
 ### 3. project: $projectname$ dir: $path3$ workspace: $workspace$
@@ -737,15 +857,14 @@ $$$
 $$$
 error
 $$$
-* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:
-    * $atlantis approve_policies$
-* :repeat: Or, address the policy failure by modifying the codebase and re-planning.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
+* :heavy_check_mark: To **approve** all unapplied plans from this pull request, comment:
+    * $atlantis approve_policies$
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
     * $atlantis unlock$
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan$
 `,
 		},
 		{
@@ -852,7 +971,7 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, c.SubCommand, "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, c.SubCommand, "log", verbose, c.VCSHost, 0)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
 						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
@@ -1007,7 +1126,7 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost, 0)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
 						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
@@ -1155,7 +1274,7 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost, 0)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
 						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
@@ -1170,6 +1289,7 @@ $$$
 
 // Run policy check with a custom template to validate custom template rendering.
 func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
+	var exp string
 	tmpDir := t.TempDir()
 	filePath := fmt.Sprintf("%s/templates.tmpl", tmpDir)
 	_, err := os.Create(filePath)
@@ -1205,9 +1325,23 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 				},
 			},
 		},
-	}, command.PolicyCheck, "", "log", false, models.Github)
-	exp := "Ran Policy Check for dir: `path` workspace: `workspace`\n\nsomecustometext"
-	Equals(t, exp, rendered)
+	}, command.PolicyCheck, "", "log", false, models.Github, 0)
+	exp = `Ran Policy Check for dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
+$$$
+
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan -d path -w workspace$`
+
+	expWithBackticks := strings.Replace(exp, "$", "`", -1)
+	Equals(t, expWithBackticks, rendered)
 }
 
 // Test that if folding is disabled that it's not used.
@@ -1231,7 +1365,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 				Error:      errors.New(strings.Repeat("line\n", 13)),
 			},
 		},
-	}, command.Plan, "", "log", false, models.Github)
+	}, command.Plan, "", "log", false, models.Github, 0)
 	Equals(t, false, strings.Contains(rendered, "\n<details>"))
 }
 
@@ -1322,7 +1456,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 							Error:      errors.New(c.Output),
 						},
 					},
-				}, command.Plan, "", "log", false, c.VCSHost)
+				}, command.Plan, "", "log", false, c.VCSHost, 0)
 				var exp string
 				if c.ShouldWrap {
 					exp = `Ran Plan for dir: $.$ workspace: $default$
@@ -1450,7 +1584,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 					}
 					rendered := mr.Render(command.Result{
 						ProjectResults: []command.ProjectResult{pr},
-					}, cmd, "", "log", false, c.VCSHost)
+					}, cmd, "", "log", false, c.VCSHost, 0)
 
 					// Check result.
 					var exp string
@@ -1549,7 +1683,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 				ApplySuccess: tfOut,
 			},
 		},
-	}, command.Apply, "", "log", false, models.Github)
+	}, command.Apply, "", "log", false, models.Github, 0)
 	exp := `Ran Apply for 2 projects:
 
 1. dir: $.$ workspace: $staging$
@@ -1614,7 +1748,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 				},
 			},
 		},
-	}, command.Plan, "", "log", false, models.Github)
+	}, command.Plan, "", "log", false, models.Github, 0)
 	exp := `Ran Plan for 2 projects:
 
 1. dir: $.$ workspace: $staging$
@@ -1765,7 +1899,7 @@ This plan was not saved because one or more projects failed and automerge requir
 				"",         // MarkdownTemplateOverridesDir
 				"atlantis", // executableName
 			)
-			rendered := mr.Render(c.cr, command.Plan, "", "log", false, models.Github)
+			rendered := mr.Render(c.cr, command.Plan, "", "log", false, models.Github, 0)
 			expWithBackticks := strings.Replace(c.exp, "$", "`", -1)
 			Equals(t, expWithBackticks, rendered)
 		})
@@ -2230,7 +2364,7 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost, 0)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
 						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
@@ -2667,7 +2801,7 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost, 0)
 					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
 						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
@@ -2705,7 +2839,7 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 				b.Run(fmt.Sprintf("verbose %t", verbose), func(b *testing.B) {
 					b.ReportAllocs()
 					for i := 0; i < b.N; i++ {
-						render = r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+						render = r.Render(res, c.Command, "", "log", verbose, c.VCSHost, 0)
 					}
 					Render = render
 				})
