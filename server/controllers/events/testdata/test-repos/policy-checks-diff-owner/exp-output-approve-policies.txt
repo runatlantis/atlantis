@@ -6,7 +6,7 @@ Ran Approve Policies for 1 projects:
 **Approve Policies Error**
 ```
 1 error occurred:
-	* policy set: test_policy user runatlantis is not a policy owner. Please contact policy owners to approve failing policies.
+	* policy set: test_policy user runatlantis is not a policy owner - please contact policy owners to approve failing policies
 
 
 ```

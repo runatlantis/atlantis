@@ -393,7 +393,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 			}
 		}
 	}
-	if allPassed == false {
+	if !allPassed {
 		failure = `One or more policy sets require additional approval.`
 	}
 	return &models.PolicyCheckResults{
@@ -481,7 +481,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		}
 	}
 
-	if allPassed == false {
+	if !allPassed {
 		failure = "Some policy sets did not pass."
 	}
 
