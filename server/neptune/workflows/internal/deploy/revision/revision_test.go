@@ -311,7 +311,7 @@ func TestEnqueue_MergeTrigger_QueueAlreadyLocked(t *testing.T) {
 		ExternalID: id.String(),
 		Summary:    "This deploy is locked from a manual deployment for revision 123334444555.  Unlock to proceed.",
 		Actions:    []github.CheckRunAction{github.CreateUnlockAction()},
-		State:      github.CheckRunQueued,
+		State:      github.CheckRunActionRequired,
 	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
 	env.ExecuteWorkflow(testWorkflow, req{

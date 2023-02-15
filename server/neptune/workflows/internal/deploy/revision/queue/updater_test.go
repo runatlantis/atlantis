@@ -82,7 +82,7 @@ func TestLockStateUpdater_locked(t *testing.T) {
 
 	updateCheckRunRequest := activities.UpdateCheckRunRequest{
 		Title:   terraform.BuildCheckRunTitle(info.Root.Name),
-		State:   github.CheckRunQueued,
+		State:   github.CheckRunActionRequired,
 		Repo:    info.Repo,
 		ID:      info.CheckRunID,
 		Summary: "This deploy is locked from a manual deployment for revision 1234.  Unlock to proceed.",

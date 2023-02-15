@@ -148,7 +148,7 @@ func TestStateReceive(t *testing.T) {
 					},
 				},
 			},
-			ExpectedCheckRunState: github.CheckRunPending,
+			ExpectedCheckRunState: github.CheckRunActionRequired,
 			ExpectedActions: []github.CheckRunAction{
 				{
 					Label:       "Confirm",

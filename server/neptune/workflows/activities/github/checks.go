@@ -47,12 +47,13 @@ func CreatePlanReviewAction(t PlanReviewActionType) CheckRunAction {
 type PlanReviewActionType string
 
 const (
-	CheckRunSuccess CheckRunState = "success"
-	CheckRunFailure CheckRunState = "failure"
-	CheckRunTimeout CheckRunState = "timed_out"
-	CheckRunPending CheckRunState = "in_progress"
-	CheckRunQueued  CheckRunState = "queued"
-	CheckRunUnknown CheckRunState = ""
+	CheckRunSuccess        CheckRunState = "success"
+	CheckRunFailure        CheckRunState = "failure"
+	CheckRunTimeout        CheckRunState = "timed_out"
+	CheckRunPending        CheckRunState = "in_progress"
+	CheckRunQueued         CheckRunState = "queued"
+	CheckRunActionRequired CheckRunState = "action_required"
+	CheckRunUnknown        CheckRunState = ""
 
 	Approve PlanReviewActionType = "Approve"
 	Reject  PlanReviewActionType = "Reject"

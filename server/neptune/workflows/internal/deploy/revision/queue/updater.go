@@ -22,15 +22,17 @@ func (u *LockStateUpdater) UpdateQueuedRevisions(ctx workflow.Context, queue *De
 
 	var actions []github.CheckRunAction
 	var summary string
+	state := github.CheckRunQueued
 	if lock.Status == LockedStatus {
 		actions = append(actions, github.CreateUnlockAction())
+		state = github.CheckRunActionRequired
 		summary = fmt.Sprintf("This deploy is locked from a manual deployment for revision %s.  Unlock to proceed.", lock.Revision)
 	}
 
 	for _, i := range infos {
 		err := workflow.ExecuteActivity(ctx, u.Activities.GithubUpdateCheckRun, activities.UpdateCheckRunRequest{
 			Title:   terraform.BuildCheckRunTitle(i.Root.Name),
-			State:   github.CheckRunQueued,
+			State:   state,
 			Repo:    i.Repo,
 			ID:      i.CheckRunID,
 			Summary: summary,

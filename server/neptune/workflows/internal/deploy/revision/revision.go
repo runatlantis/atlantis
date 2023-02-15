@@ -128,9 +128,11 @@ func (n *Receiver) createCheckRun(ctx workflow.Context, id, revision string, roo
 	lock := n.queue.GetLockState()
 	var actions []github.CheckRunAction
 	var summary string
+	state := github.CheckRunQueued
 
 	if lock.Status == queue.LockedStatus && (root.Trigger == activity.MergeTrigger) {
 		actions = append(actions, github.CreateUnlockAction())
+		state = github.CheckRunActionRequired
 		summary = fmt.Sprintf("This deploy is locked from a manual deployment for revision %s.  Unlock to proceed.", lock.Revision)
 	}
 
@@ -142,7 +144,7 @@ func (n *Receiver) createCheckRun(ctx workflow.Context, id, revision string, roo
 		ExternalID: id,
 		Summary:    summary,
 		Actions:    actions,
-		State:      github.CheckRunQueued,
+		State:      state,
 	}).Get(ctx, &resp)
 
 	// don't block on error here, we'll just try again later when we have our result.
