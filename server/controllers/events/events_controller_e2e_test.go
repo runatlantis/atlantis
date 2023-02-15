@@ -1201,6 +1201,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	Ok(t, err)
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
+		VcsClient:        e2eVCSClient,
 		Locker:           projectLocker,
 		LockURLGenerator: &mockLockURLGenerator{},
 		InitStepRunner: &runtime.InitStepRunner{

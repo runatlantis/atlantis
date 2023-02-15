@@ -196,9 +196,9 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		if cmdErr != nil {
 			// Since we're running conftest for each policyset, individual command errors should be concatenated.
 			if isValidConftestOutput(cmdOutput) {
-				combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s: conftest: %s", policySet.Name, "Some policies failed.")))
+				combinedErr = multierror.Append(combinedErr, fmt.Errorf("policy_set: %s: conftest: some policies failed", policySet.Name))
 			} else {
-				combinedErr = multierror.Append(combinedErr, errors.New(fmt.Sprintf("policy_set: %s: conftest: %s", policySet.Name, cmdOutput)))
+				combinedErr = multierror.Append(combinedErr, fmt.Errorf("policy_set: %s: conftest: %s", policySet.Name, cmdOutput))
 			}
 			passed = false
 		}
@@ -220,7 +220,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 
 	marshaledStatus, err := json.Marshal(policySetResults)
 	if err != nil {
-		return "", errors.New("cannot marshal data into []PolicySetResult. data.")
+		return "", errors.New("cannot marshal data into []PolicySetResult. data")
 	}
 
 	// Write policy check results to a file which can be used by custom workflow run steps for metrics, notifications, etc.

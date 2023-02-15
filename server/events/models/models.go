@@ -482,7 +482,7 @@ func (p *PolicyCheckResults) Summary() string {
 func (p *PolicyCheckResults) PolicyCleared() bool {
 	passing := true
 	for _, policySetResult := range p.PolicySetResults {
-		if policySetResult.Passed == false && (policySetResult.CurApprovals != policySetResult.ReqApprovals) {
+		if !policySetResult.Passed && (policySetResult.CurApprovals != policySetResult.ReqApprovals) {
 			passing = false
 		}
 	}
@@ -493,7 +493,7 @@ func (p *PolicyCheckResults) PolicyCleared() bool {
 func (p *PolicyCheckResults) PolicySummary() string {
 	var summary []string
 	for _, policySetResult := range p.PolicySetResults {
-		if policySetResult.Passed == true {
+		if policySetResult.Passed {
 			summary = append(summary, fmt.Sprintf("policy set: %s: passed.", policySetResult.PolicySetName))
 		} else if policySetResult.CurApprovals == policySetResult.ReqApprovals {
 			summary = append(summary, fmt.Sprintf("policy set: %s: approved.", policySetResult.PolicySetName))

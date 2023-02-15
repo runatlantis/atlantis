@@ -378,7 +378,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
 					// User is not authorized to approve policy set.
 				} else if !ignorePolicy && increment {
-					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner. Please contact policy owners to approve failing policies.", policySet.Name, ctx.User.Username))
+					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
 				}
 				// Still bubble up this failure, even if policy set is not targeted.
 				if prjPolicyStatus[i].Approvals != policySet.ReviewCount {

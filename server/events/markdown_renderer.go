@@ -100,7 +100,6 @@ type PlanSuccessData struct {
 	DisableApply             bool
 	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
-	CommonData
 }
 
 type PolicyCheckResultsData struct {

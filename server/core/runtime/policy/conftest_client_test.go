@@ -286,7 +286,6 @@ func TestRun(t *testing.T) {
 		expectedOutputPolicy2 := "Success"
 		expectedResult := `[{"PolicySetName":"policy1","ConftestOutput":"FAIL - <redacted plan file> - failure","Passed":false,"ReqApprovals":0,"CurApprovals":0},{"PolicySetName":"policy2","ConftestOutput":"Success","Passed":true,"ReqApprovals":0,"CurApprovals":0}]`
 
-
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 
@@ -298,7 +297,7 @@ func TestRun(t *testing.T) {
 
 		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
 
-		Assert(t, result == string(expectedResult), "result is expected")
+		Assert(t, result == expectedResult, "result is expected")
 		Assert(t, err != nil, "error is expected")
 
 	})
@@ -308,7 +307,6 @@ func TestRun(t *testing.T) {
 
 		expectedOutput := fmt.Sprintf("FAIL - %s - failure", filepath.Join(workdir, "testproj-default.json"))
 		expectedResult := `[{"PolicySetName":"policy1","ConftestOutput":"FAIL - <redacted plan file> - failure","Passed":false,"ReqApprovals":0,"CurApprovals":0},{"PolicySetName":"policy2","ConftestOutput":"FAIL - <redacted plan file> - failure","Passed":false,"ReqApprovals":0,"CurApprovals":0}]`
-
 
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
@@ -321,7 +319,7 @@ func TestRun(t *testing.T) {
 
 		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
 
-		Assert(t, result == string(expectedResult), "result is expected")
+		Assert(t, result == expectedResult, "result is expected")
 		Assert(t, err != nil, "error is expected")
 
 	})

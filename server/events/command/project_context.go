@@ -170,3 +170,21 @@ func getProjectIdentifier(relRepoDir string, projectName string) string {
 	replacer := strings.NewReplacer("/", "-", ".", "_")
 	return replacer.Replace(relRepoDir)
 }
+
+// PolicyCleared returns whether all policies are passing or not.
+func (p ProjectContext) PolicyCleared() bool {
+	passing := true
+	for _, psStatus := range p.ProjectPolicyStatus {
+		if psStatus.Passed {
+			continue
+		}
+		for _, psCfg := range p.PolicySets.PolicySets {
+			if psStatus.PolicySetName == psCfg.Name {
+				if psStatus.Approvals != psCfg.ReviewCount {
+					passing = false
+				}
+			}
+		}
+	}
+	return passing
+}
