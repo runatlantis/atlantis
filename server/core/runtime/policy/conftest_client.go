@@ -225,7 +225,8 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 
 	// Write policy check results to a file which can be used by custom workflow run steps for metrics, notifications, etc.
 	policyCheckResultFile := filepath.Join(workdir, ctx.GetPolicyCheckResultFileName())
-	err = os.WriteFile(policyCheckResultFile, marshaledStatus, 0644)
+	err = os.WriteFile(policyCheckResultFile, marshaledStatus, 0600)
+
 	combinedErr = multierror.Append(combinedErr, err)
 
 	output := string(marshaledStatus)
