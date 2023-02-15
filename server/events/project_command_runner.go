@@ -467,7 +467,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			if err == nil {
 				break
 			}
-			if strings.Contains(err.Error(), "Some policies failed.") {
+			if strings.Contains(err.Error(), "some policies failed") {
 				allPassed = false
 			} else {
 				errs = multierror.Append(errs, err)
