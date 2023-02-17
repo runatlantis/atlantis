@@ -274,6 +274,7 @@ func NewServer(config Config) (*Server, error) {
 		GithubCredentials: githubCredentials,
 		GithubHostname:    config.GithubHostname,
 		Logger:            ctxLogger,
+		Scope:             statsScope.SubScope("repo.fetch"),
 	}
 	hooksRunner := &preworkflow.HooksRunner{
 		GlobalCfg:    globalCfg,

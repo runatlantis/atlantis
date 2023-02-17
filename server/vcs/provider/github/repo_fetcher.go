@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/events/metrics"
+	"github.com/uber-go/tally/v4"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,10 +32,11 @@ type RepoFetcher struct {
 	Logger            logging.Logger
 	GithubCredentials tokenGetter
 	GlobalCfg         valid.GlobalCfg
+	Scope             tally.Scope
 }
 
 type RepoFetcherOptions struct {
-	ShallowClone bool
+	CloneDepth int
 }
 
 func (g *RepoFetcher) Fetch(ctx context.Context, repo models.Repo, branch string, sha string, options RepoFetcherOptions) (string, func(ctx context.Context, filePath string), error) {
@@ -57,7 +60,13 @@ func (g *RepoFetcher) Fetch(ctx context.Context, repo models.Repo, branch string
 	authURL := fmt.Sprintf("://x-access-token:%s", ghToken)
 	repo.CloneURL = strings.Replace(repo.CloneURL, "://:", authURL, 1)
 	repo.SanitizedCloneURL = strings.Replace(repo.SanitizedCloneURL, "://:", "://x-access-token:", 1)
-	return g.clone(ctx, repo, branch, sha, options)
+	path, cleanup, err := g.clone(ctx, repo, branch, sha, options)
+	if err != nil {
+		g.Scope.Counter(metrics.ExecutionErrorMetric).Inc(1)
+		return path, cleanup, err
+	}
+	g.Scope.Counter(metrics.ExecutionSuccessMetric).Inc(1)
+	return path, cleanup, err
 }
 
 func (g *RepoFetcher) clone(ctx context.Context, repo models.Repo, branch string, sha string, options RepoFetcherOptions) (string, func(ctx context.Context, filePath string), error) {
@@ -69,8 +78,9 @@ func (g *RepoFetcher) clone(ctx context.Context, repo models.Repo, branch string
 
 	// Fetch default branch into clone directory
 	cloneCmd := []string{"git", "clone", "--branch", branch, "--single-branch", repo.CloneURL, destinationPath}
-	if options.ShallowClone {
-		cloneCmd = append(cloneCmd, "--depth=1")
+
+	if options.CloneDepth > 0 {
+		cloneCmd = append(cloneCmd, fmt.Sprintf("--depth=%d", options.CloneDepth))
 	}
 	_, err := g.run(cloneCmd, destinationPath)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/uber-go/tally/v4"
 	"net/http"
 	"os"
 	"os/exec"
@@ -49,9 +50,10 @@ func TestFetchSimple(t *testing.T) {
 		GithubHostname:    testServer,
 		Logger:            logger,
 		GithubCredentials: &testTokenGetter{},
+		Scope:             tally.NewTestScope("test", map[string]string{}),
 	}
 	repo := newBaseRepo(repoDir)
-	options := github.RepoFetcherOptions{ShallowClone: false}
+	options := github.RepoFetcherOptions{}
 	destinationPath, _, err := fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha2, options)
 	assert.NoError(t, err)
 
@@ -86,9 +88,10 @@ func TestFetchSimple_Shallow(t *testing.T) {
 		GithubHostname:    testServer,
 		Logger:            logger,
 		GithubCredentials: &testTokenGetter{},
+		Scope:             tally.NewTestScope("test", map[string]string{}),
 	}
 	repo := newBaseRepo(repoDir)
-	options := github.RepoFetcherOptions{ShallowClone: true}
+	options := github.RepoFetcherOptions{CloneDepth: 1}
 	destinationPath, _, err := fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha2, options)
 	assert.NoError(t, err)
 
@@ -126,9 +129,10 @@ func TestFetchCheckout(t *testing.T) {
 		GithubHostname:    testServer,
 		Logger:            logger,
 		GithubCredentials: &testTokenGetter{},
+		Scope:             tally.NewTestScope("test", map[string]string{}),
 	}
 	repo := newBaseRepo(repoDir)
-	options := github.RepoFetcherOptions{ShallowClone: false}
+	options := github.RepoFetcherOptions{}
 	destinationPath, _, err := fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha1, options)
 	assert.NoError(t, err)
 
@@ -159,9 +163,10 @@ func TestFetchNonDefaultBranch(t *testing.T) {
 		GithubHostname:    testServer,
 		Logger:            logger,
 		GithubCredentials: &testTokenGetter{},
+		Scope:             tally.NewTestScope("test", map[string]string{}),
 	}
 	repo := newBaseRepo(repoDir)
-	options := github.RepoFetcherOptions{ShallowClone: false}
+	options := github.RepoFetcherOptions{}
 	destinationPath, _, err := fetcher.Fetch(context.Background(), repo, "test-branch", sha, options)
 	assert.NoError(t, err)
 
@@ -188,10 +193,11 @@ func TestFetchSimpleFailure(t *testing.T) {
 		GithubHostname:    testServer,
 		Logger:            logger,
 		GithubCredentials: &testTokenGetter{},
+		Scope:             tally.NewTestScope("test", map[string]string{}),
 	}
 	repo := newBaseRepo(repoDir)
 	repo.DefaultBranch = "invalid-branch"
-	options := github.RepoFetcherOptions{ShallowClone: false}
+	options := github.RepoFetcherOptions{}
 	_, _, err = fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha, options)
 	assert.Error(t, err)
 }
@@ -219,9 +225,10 @@ func TestFetchCheckoutFailure(t *testing.T) {
 		GithubHostname:    testServer,
 		Logger:            logger,
 		GithubCredentials: &testTokenGetter{},
+		Scope:             tally.NewTestScope("test", map[string]string{}),
 	}
 	repo := newBaseRepo(repoDir)
-	options := github.RepoFetcherOptions{ShallowClone: false}
+	options := github.RepoFetcherOptions{}
 	_, _, err = fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, "invalidsha", options)
 	assert.Error(t, err)
 }
@@ -247,9 +254,10 @@ func TestFetchNonDefaultBranchFailure(t *testing.T) {
 		GithubHostname:    testServer,
 		Logger:            logger,
 		GithubCredentials: &testTokenGetter{},
+		Scope:             tally.NewTestScope("test", map[string]string{}),
 	}
 	repo := newBaseRepo(repoDir)
-	options := github.RepoFetcherOptions{ShallowClone: false}
+	options := github.RepoFetcherOptions{}
 	_, _, err = fetcher.Fetch(context.Background(), repo, "invalid-branch", sha, options)
 	assert.Error(t, err)
 }
@@ -273,9 +281,10 @@ func TestFetch_ErrorGettingGHToken(t *testing.T) {
 		GithubCredentials: &testTokenGetter{
 			err: errors.New("error"),
 		},
+		Scope: tally.NewTestScope("test", map[string]string{}),
 	}
 	repo := newBaseRepo(repoDir)
-	options := github.RepoFetcherOptions{ShallowClone: false}
+	options := github.RepoFetcherOptions{}
 	_, _, err = fetcher.Fetch(context.Background(), repo, repo.DefaultBranch, sha, options)
 	assert.ErrorContains(t, err, "error")
 }

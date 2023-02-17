@@ -56,7 +56,7 @@ func TestRootConfigBuilder_Success(t *testing.T) {
 	expProjectConfigs := []*valid.MergedProjectCfg{
 		&projCfg,
 	}
-	repoOptions := github.RepoFetcherOptions{ShallowClone: true}
+	repoOptions := github.RepoFetcherOptions{}
 	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
 	builderOptions := event.BuilderOptions{
 		RepoFetcherOptions: repoOptions,
@@ -73,7 +73,7 @@ func TestRootConfigBuilder_DetermineRootsError(t *testing.T) {
 		error: expectedErr,
 	}
 	rcb.RootFinder = mockRootFinder
-	repoOptions := github.RepoFetcherOptions{ShallowClone: true}
+	repoOptions := github.RepoFetcherOptions{}
 	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
 	builderOptions := event.BuilderOptions{
 		RepoFetcherOptions: repoOptions,
@@ -91,7 +91,7 @@ func TestRootConfigBuilder_ParserValidatorParseError(t *testing.T) {
 		error: expectedErr,
 	}
 	rcb.ParserValidator = mockParserValidator
-	repoOptions := github.RepoFetcherOptions{ShallowClone: true}
+	repoOptions := github.RepoFetcherOptions{}
 	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
 	builderOptions := event.BuilderOptions{
 		RepoFetcherOptions: repoOptions,
@@ -108,7 +108,7 @@ func TestRootConfigBuilder_GetModifiedFilesError(t *testing.T) {
 	rcb.FileFetcher = &mockFileFetcher{
 		error: expectedErr,
 	}
-	repoOptions := github.RepoFetcherOptions{ShallowClone: true}
+	repoOptions := github.RepoFetcherOptions{}
 	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
 	builderOptions := event.BuilderOptions{
 		RepoFetcherOptions: repoOptions,
@@ -124,7 +124,7 @@ func TestRootConfigBuilder_CloneError(t *testing.T) {
 	rcb.RepoFetcher = &mockRepoFetcher{
 		cloneError: expectedErr,
 	}
-	repoOptions := github.RepoFetcherOptions{ShallowClone: true}
+	repoOptions := github.RepoFetcherOptions{}
 	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
 	builderOptions := event.BuilderOptions{
 		RepoFetcherOptions: repoOptions,
@@ -142,7 +142,7 @@ func TestRootConfigBuilder_HooksRunnerError(t *testing.T) {
 		error: expectedErr,
 	}
 	rcb.HooksRunner = mockHooksRunner
-	repoOptions := github.RepoFetcherOptions{ShallowClone: true}
+	repoOptions := github.RepoFetcherOptions{}
 	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
 	builderOptions := event.BuilderOptions{
 		RepoFetcherOptions: repoOptions,
