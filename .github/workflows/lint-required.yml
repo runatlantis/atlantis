@@ -1,0 +1,44 @@
+# For required checks when path filtering doesn;'t trigger the other job
+# https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks
+
+name: linter
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    branches:
+      - "main"
+    paths:
+      - 'runatlantis.io/**'
+      - '.github/**'
+      - '**/*.md'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  golangci-lint:
+    if: github.event.pull_request.draft == false
+    name: runner / golangci-lint
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No build required"'
+
+  revive:
+    if: github.event.pull_request.draft == false
+    name: runner / revive
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No build required"'
+
+  errcheck:
+    if: github.event.pull_request.draft == false
+    name: runner / errcheck
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No build required"'
