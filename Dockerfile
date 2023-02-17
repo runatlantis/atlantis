@@ -4,7 +4,7 @@ ARG ATLANTIS_BASE_TAG_TYPE=alpine
 
 # Stage 1: build artifact
 
-FROM golang:1.20.0-alpine AS builder
+FROM golang:1.20.1-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -36,7 +36,7 @@ ARG TARGETPLATFORM
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.3.8
+ENV DEFAULT_TERRAFORM_VERSION=1.3.9
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
