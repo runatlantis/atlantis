@@ -140,7 +140,7 @@ const (
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
 	DefaultCheckoutStrategy             = "branch"
-	DefaultCheckoutDepth                = 200
+	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
 	DefaultExecutableName               = "atlantis"
@@ -766,9 +766,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.AutoplanFileList == "" {
 		c.AutoplanFileList = DefaultAutoplanFileList
 	}
-	if c.CheckoutDepth == 0 {
+	if c.CheckoutDepth <= 0 {
 		c.CheckoutDepth = DefaultCheckoutDepth
-  	}
+		}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
 	}
@@ -837,9 +837,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
 	}
 
-	if userConfig.CheckoutDepth <= 0 {
-		return errors.New("invalid checkout depth: should be positive")
-	}
 
 	checkoutStrategy := userConfig.CheckoutStrategy
 	if checkoutStrategy != "branch" && checkoutStrategy != "merge" {

@@ -47,9 +47,9 @@ Atlantis only performs this merge during the `terraform plan` phase. If another
 commit is pushed to `main` **after** Atlantis runs `plan`, nothing will happen.
 :::
 
-To optimize cloning time, Atlantis does not fetch full repository in this mode. Instead, a shallow clone of two branches is performed. The depth of clone is specified by `--checkout-depth` flag. The cloning is performed in a following manner:
+To optimize cloning time, Atlantis can perform a shallow clone by specifying the `--checkout-depth` flag. The cloning is performed in a following manner:
 
-- Shallow clone of the default branch is performed with depth of `--checkout-depth` value.
+- Shallow clone of the default branch is performed with depth of `--checkout-depth` value of zero (full clone).
 - `branch` is retrieved, including the same amount of commits.
 - Merge base of the default branch and `branch` is checked for existence in the shallow clone.
 - If the merge base is not present, it means that either of the branches are ahead of the merge base by more than `--checkout-depth` commits. In this case full repo history is fetched.
