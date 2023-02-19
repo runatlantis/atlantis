@@ -768,7 +768,7 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.CheckoutDepth <= 0 {
 		c.CheckoutDepth = DefaultCheckoutDepth
-		}
+	}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
 	}
