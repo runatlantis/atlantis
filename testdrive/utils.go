@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -34,7 +35,7 @@ import (
 )
 
 const hashicorpReleasesURL = "https://releases.hashicorp.com"
-const terraformVersion = "1.3.7" // renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
+const terraformVersion = "1.3.9" // renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 const ngrokDownloadURL = "https://bin.equinox.io/c/4VmDzA7iaHb"
 const ngrokAPIURL = "localhost:41414" // We hope this isn't used.
 const atlantisPort = 4141
@@ -61,6 +62,17 @@ func downloadFile(url string, path string) error {
 	return err
 }
 
+// This function is used to sanitize the file path to avoid a "zip slip" attack
+// source: https://github.com/securego/gosec/issues/324#issuecomment-935927967
+func sanitizeArchivePath(d, t string) (v string, err error) {
+	v = filepath.Join(d, t)
+	if strings.HasPrefix(v, filepath.Clean(d)) {
+		return v, nil
+	}
+
+	return "", fmt.Errorf("%s: %s", "content filepath is tainted", t)
+}
+
 func unzip(archive, target string) error {
 	reader, err := zip.OpenReader(archive)
 	if err != nil {
@@ -68,7 +80,11 @@ func unzip(archive, target string) error {
 	}
 
 	for _, file := range reader.File {
-		path := filepath.Join(target, file.Name) // nolint: gosec
+		path, err := sanitizeArchivePath(target, file.Name)
+		if err != nil {
+			return err
+		}
+
 		if file.FileInfo().IsDir() {
 			if err := os.MkdirAll(path, file.Mode()); err != nil {
 				return err

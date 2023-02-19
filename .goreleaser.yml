@@ -25,10 +25,6 @@ changelog:
   skip: true
 
 release:
-  github:
-    owner: runatlantis
-    name: atlantis
-
   # If set to true, will not auto-publish the release.
   # Default is false.
   draft: false
@@ -46,6 +42,13 @@ release:
   # If set to true, will mark the release as not ready for production.
   # Default is false.
   prerelease: auto
+
+# TODO: This requires a gpg_private_key
+#       https://github.com/marketplace/actions/goreleaser-action#signing
+# signs:
+#   # https://goreleaser.com/customization/sign/
+#   -
+#     artifacts: all
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"

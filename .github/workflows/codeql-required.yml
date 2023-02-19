@@ -1,0 +1,38 @@
+# For required checks when path filtering doesn;'t trigger the other job
+# https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks
+
+name: "CodeQL"
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - '.github/**'
+  pull_request:
+    # The branches below must be a subset of the branches above
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    branches: [ "main" ]
+    paths:
+      - '.github/**'
+
+jobs:
+  analyze:
+    name: Analyze
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'go', 'javascript' ]
+    
+    steps:
+      - run: 'echo "No build required"'

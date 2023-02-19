@@ -227,8 +227,8 @@ func TestProjectOutputWrapper(t *testing.T) {
 				runner.Apply(ctx)
 			}
 
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus)
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus)
+			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus, nil)
+			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
 
 			switch c.CommandName {
 			case command.Plan:
@@ -546,15 +546,17 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	}
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
+	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
 
 	runner := events.DefaultProjectCommandRunner{
-		Locker:           mockLocker,
-		LockURLGenerator: mockURLGenerator{},
-		RunStepRunner:    &run,
-		EnvStepRunner:    &env,
-		WorkingDir:       mockWorkingDir,
-		Webhooks:         nil,
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		RunStepRunner:             &run,
+		EnvStepRunner:             &env,
+		WorkingDir:                mockWorkingDir,
+		Webhooks:                  nil,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockCommandRequirementHandler,
 	}
 
 	repoDir := t.TempDir()
@@ -684,6 +686,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			RegisterMockTestingT(t)
 			mockInit := mocks.NewMockStepRunner()
 			mockImport := mocks.NewMockStepRunner()
+			mockStateRm := mocks.NewMockStepRunner()
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
@@ -696,6 +699,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 				LockURLGenerator:          mockURLGenerator{},
 				InitStepRunner:            mockInit,
 				ImportStepRunner:          mockImport,
+				StateRmStepRunner:         mockStateRm,
 				WorkingDir:                mockWorkingDir,
 				Webhooks:                  mockSender,
 				WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),

@@ -19,23 +19,23 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 	}{
 		{
 			name:          "full commands can be parsed by comma",
-			allowCommands: "apply,plan,unlock,policy_check,approve_policies,version,import",
+			allowCommands: "apply,plan,unlock,policy_check,approve_policies,version,import,state",
 			want: []command.Name{
-				command.Apply, command.Plan, command.Unlock, command.PolicyCheck, command.ApprovePolicies, command.Version, command.Import,
+				command.Apply, command.Plan, command.Unlock, command.PolicyCheck, command.ApprovePolicies, command.Version, command.Import, command.State,
 			},
 		},
 		{
 			name:          "all",
 			allowCommands: "all",
 			want: []command.Name{
-				command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import,
+				command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import, command.State,
 			},
 		},
 		{
 			name:          "all with others returns same with all result",
 			allowCommands: "all,plan",
 			want: []command.Name{
-				command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import,
+				command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import, command.State,
 			},
 		},
 		{

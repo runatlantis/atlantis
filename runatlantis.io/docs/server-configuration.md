@@ -57,7 +57,7 @@ Values are chosen in this order:
 
   Notes:
   * Accepts a comma separated list, ex. `command1,command2`.
-  * `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import` and `all` are available.
+  * `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state` and `all` are available.
   * `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
 
 ### `--allow-draft-prs`
@@ -111,6 +111,14 @@ Values are chosen in this order:
   This setting enables pull requests to run arbitrary code on the Atlantis server.
   Only enable in trusted settings.
   :::
+
+### `--api-secret`
+  ```bash
+  atlantis server --api-secret="secret"
+  # or (recommended)
+  ATLANTIS_API_SECRET="secret"
+  ```
+  Required secret used to validate requests made to the [`/api/*` endpoints](api-endpoints.html).
 
 ### `--atlantis-url`
   ```bash
@@ -166,6 +174,8 @@ By default, changes to modules will not trigger autoplanning. See the flags belo
 
 ```bash
 atlantis server --autoplan-modules
+# or
+ATLANTIS_AUTOPLAN_MODULES=true
 ```
 
 Defaults to `false`. When set to `true`, Atlantis will trace the local modules of included projects.
@@ -177,6 +187,8 @@ After tracing, Atlantis will plan any project that includes a changed module. Th
 
 ```bash
 atlantis server --autoplan-modules-from-projects='**/init.tf'
+# or
+ATLANTIS_AUTOPLAN_MODULES_FROM_PROJECTS='**/init.tf'
 ```
 
 Enables auto-planing of projects when a module dependency in the same repository has changed. 
@@ -394,6 +406,8 @@ and set `--autoplan-modules` to `false`.
   Enable Atlantis to use regular expressions to run plan/apply commands against defined project names when `-p` flag is passed with it.
   
   This can be used to run all defined projects (with the `name` key) in `atlantis.yaml` using `atlantis plan -p .*`.
+  
+  The flag will only allow the regexes listed in the [`allowed_regexp_prefixes`](https://www.runatlantis.io/docs/repo-level-atlantis-yaml.html#reference) key defined in the repo `atlantis.yaml` file. If the key is undefined, its value defaults to `[]` which will allow any regex.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
@@ -871,6 +885,9 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_SILENCE_NO_PROJECTS=true
   ```
   `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a project defined in the `atlantis.yaml` file.
+  This flag ensures an Atlantis server only responds to its explicitly declared projects.
+  This has no effect if projects are undefined in the repo level `atlantis.yaml`.
+  This also silences targeted commands (eg. `atlantis plan -d mydir` or `atlantis apply -p myproj`) so if the project is not in the repo config `atlantis.yaml`, these commands will not run or report back in a comment.
 
   This is useful when running multiple Atlantis servers against a single repository so you can
   delegate work to each Atlantis server. Also useful when used with pre_workflow_hooks to dynamically generate an `atlantis.yaml` file.
