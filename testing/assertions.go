@@ -14,6 +14,7 @@
 package testing
 
 import (
+	"os/exec"
 	"strings"
 	"testing"
 
