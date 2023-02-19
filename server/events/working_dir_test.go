@@ -312,7 +312,7 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 		gotBaseCommitType := runCmd(t, cloneDir, "git", "cat-file", "-t", baseCommit)
 		Assert(t, gotBaseCommitType == "commit\n", "should have merge-base in shallow repo")
-		gotOldCommitType := runCmdErrCode(t, cloneDir, 128, "git", "cat-file", "-t", oldCommit)
+		gotOldCommitType := testing.runCmdErrCode(t, cloneDir, 128, "git", "cat-file", "-t", oldCommit)
 		Assert(t, strings.Contains(gotOldCommitType, "could not get object info"), "should not have old commit in shallow repo")
 	})
 
