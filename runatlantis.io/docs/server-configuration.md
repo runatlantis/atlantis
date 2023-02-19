@@ -312,7 +312,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_CHECKOUT_DEPTH=200
   ```
   How many commits from branches to fetch. Used only if `--checkout-strategy=merge` since the `branch` checkout strategy always defaults to a shallow clone using a depth of 1.
-  Defaults to `200`. See [Checkout Strategy](checkout-strategy.html) for more details.
+  Defaults to `0`. See [Checkout Strategy](checkout-strategy.html) for more details.
 
 ### `--checkout-strategy`
   ```bash
