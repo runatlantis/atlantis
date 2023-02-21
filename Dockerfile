@@ -1,4 +1,4 @@
-ARG ATLANTIS_BASE=ghcr.io/runatlantis/atlantis-base
+ARG ATLANTIS_BASE=ghcr.io/checkout-anywhere/atlantis-base
 ARG ATLANTIS_BASE_TAG_DATE=latest
 ARG ATLANTIS_BASE_TAG_TYPE=alpine
 
