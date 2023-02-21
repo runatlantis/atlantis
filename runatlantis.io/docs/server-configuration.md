@@ -174,6 +174,8 @@ By default, changes to modules will not trigger autoplanning. See the flags belo
 
 ```bash
 atlantis server --autoplan-modules
+# or
+ATLANTIS_AUTOPLAN_MODULES=true
 ```
 
 Defaults to `false`. When set to `true`, Atlantis will trace the local modules of included projects.
@@ -185,6 +187,8 @@ After tracing, Atlantis will plan any project that includes a changed module. Th
 
 ```bash
 atlantis server --autoplan-modules-from-projects='**/init.tf'
+# or
+ATLANTIS_AUTOPLAN_MODULES_FROM_PROJECTS='**/init.tf'
 ```
 
 Enables auto-planing of projects when a module dependency in the same repository has changed. 

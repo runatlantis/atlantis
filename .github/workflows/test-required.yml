@@ -1,0 +1,41 @@
+# For required checks when path filtering doesn;'t trigger the other job
+# https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks
+
+name: tester
+
+on:
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - '**/*.go'
+      - '.github/workflows/test.yml'
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    branches:
+      - "main"
+    paths-ignore:
+      - '**/*.go'
+      - '.github/workflows/test.yml'
+ 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    if: github.event.pull_request.draft == false
+    name: runner / gotest
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No build required"'
+
+  website_link_check:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No build required"'
