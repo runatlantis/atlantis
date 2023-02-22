@@ -149,7 +149,12 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 
 	// Helpfully warn the user if they're using "terraform" instead of "atlantis"
 	if args[0] == "terraform" && e.ExecutableName != "terraform" {
-		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName)}
+		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, "terraform")}
+	}
+
+	// Helpfully warn the user that the command might be misspelled
+	if utils.IsSimilarWord(args[0], e.ExecutableName) {
+		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, args[0])}
 	}
 
 	// Atlantis can be invoked using the name of the VCS host user we're
@@ -541,8 +546,8 @@ Use "{{ .ExecutableName }} [command] --help" for more information about a comman
 	"\n```"
 
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
-// someone runs a command with terraform instead of atlantis.
-var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `terraform`?"
+// someone runs a misspelled command or terraform instead of atlantis.
+var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `%s`?"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
 // `atlantis unlock` with flags.
