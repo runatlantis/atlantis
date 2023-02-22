@@ -837,7 +837,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
 	}
 
-
 	checkoutStrategy := userConfig.CheckoutStrategy
 	if checkoutStrategy != "branch" && checkoutStrategy != "merge" {
 		return errors.New("invalid checkout strategy: not one of branch or merge")
