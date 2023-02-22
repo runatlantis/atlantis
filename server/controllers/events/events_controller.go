@@ -43,6 +43,9 @@ const bitbucketCloudRequestIDHeader = "X-Request-UUID"
 const bitbucketServerRequestIDHeader = "X-Request-ID"
 const bitbucketServerSignatureHeader = "X-Hub-Signature"
 
+// The URL used for Azure DevOps test webhooks
+const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079"
+
 // VCSEventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
 type VCSEventsController struct {
@@ -639,6 +642,11 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 		return
 	}
 
+	if isAzureDevOpsTestRepoURL(resource.PullRequest.GetRepository()) {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring Azure DevOps Test Event with Repo URL: %v %s", resource.PullRequest.Repository.URL, azuredevopsReqID)
+		return
+	}
+
 	createdBy := resource.PullRequest.GetCreatedBy()
 	user := models.User{Username: createdBy.GetUniqueName()}
 	baseRepo, err := e.Parser.ParseAzureDevopsRepo(resource.PullRequest.GetRepository())
@@ -679,6 +687,16 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseW
 			e.respond(w, logging.Debug, http.StatusOK, "%s: %s", msg, azuredevopsReqID)
 			return
 		}
+	}
+
+	resource, ok := event.Resource.(*azuredevops.GitPullRequest)
+	if !ok || event.PayloadType != azuredevops.PullRequestEvent {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Event.Resource is nil or received bad event type %v; %s", event.Resource, azuredevopsReqID)
+		return
+	}
+	if isAzureDevOpsTestRepoURL(resource.GetRepository()) {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring Azure DevOps Test Event with Repo URL: %v %s", resource.Repository.URL, azuredevopsReqID)
+		return
 	}
 
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseAzureDevopsPullEvent(*event)
@@ -729,4 +747,11 @@ func (e *VCSEventsController) commentNotAllowlisted(baseRepo models.Repo, pullNu
 	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
 		e.Logger.Err("unable to comment on pull request: %s", err)
 	}
+}
+
+func isAzureDevOpsTestRepoURL(repository *azuredevops.GitRepository) bool {
+	if repository == nil {
+		return false
+	}
+	return repository.GetURL() == azuredevopsTestURL
 }
