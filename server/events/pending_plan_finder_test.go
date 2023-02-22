@@ -233,6 +233,22 @@ func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
 	Equals(t, 0, len(actPlans))
 }
 
+func runCmdErrCode(t *testing.T, dir string, errCode int, name string, args ...string) string {
+	t.Helper()
+	cpCmd := exec.Command(name, args...)
+	cpCmd.Dir = dir
+	cpOut, err := cpCmd.CombinedOutput()
+	cmd := strings.Join(append([]string{name}, args...), " ")
+	if err != nil {
+		if eerr, ok := err.(*exec.ExitError); ok {
+			Assert(t, errCode == eerr.ExitCode(), "unexpected exit code: want %v, got %v, running %q: %s", errCode, eerr.ExitCode(), cmd, cpCmd)
+			return string(cpOut)
+		}
+	}
+	Assert(t, false, "invalid exit code, running %q: %s", cmd, cpOut)
+	return string(cpOut)
+}
+
 // Test that it deletes pending plans.
 func TestPendingPlanFinder_DeletePlans(t *testing.T) {
 	files := map[string]interface{}{
