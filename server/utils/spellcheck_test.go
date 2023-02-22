@@ -8,7 +8,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func Test_Spellcheck(t *testing.T) {
+func Test_IsSimilarWord(t *testing.T) {
 	t.Log("check if given executable name is misspelled or just an unrelated word")
 
 	spellings := []struct {
