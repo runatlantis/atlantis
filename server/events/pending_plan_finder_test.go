@@ -233,7 +233,6 @@ func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
 	Equals(t, 0, len(actPlans))
 }
 
-
 func runCmdErrCode(t *testing.T, dir string, errCode int, name string, args ...string) string {
 	t.Helper()
 	cpCmd := exec.Command(name, args...)
