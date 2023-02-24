@@ -3,7 +3,6 @@ module github.com/runatlantis/atlantis
 go 1.20
 
 require (
-	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.1.0
