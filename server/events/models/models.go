@@ -390,6 +390,11 @@ func (p *PlanSuccess) DiffSummary() string {
 	return reNoChanges.FindString(p.TerraformOutput)
 }
 
+// NoChanges returns true if the plan has no changes.
+func (p *PlanSuccess) NoChanges() bool {
+	return reNoChanges.MatchString(p.TerraformOutput)
+}
+
 // Diff Markdown regexes
 var (
 	diffKeywordRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s=\s|\s->\s|<<|\{|\(known after apply\)| {2,}[^ ]+:.*)(.*)`)
