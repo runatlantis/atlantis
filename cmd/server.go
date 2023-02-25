@@ -71,6 +71,7 @@ const (
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	ExecutableName                   = "executable-name"
+	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
 	GHTokenFlag                      = "gh-token"
@@ -529,6 +530,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	WebsocketCheckOrigin: {
 		description:  "Enable websocket origin check",
+		defaultValue: false,
+	},
+	HideUnchangedPlanComments: {
+		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
 	},
 }

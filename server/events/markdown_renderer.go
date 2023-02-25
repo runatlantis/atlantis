@@ -48,28 +48,30 @@ type MarkdownRenderer struct {
 	// gitlabSupportsCommonMark is true if the version of GitLab we're
 	// using supports the CommonMark markdown format.
 	// If we're not configured with a GitLab client, this will be false.
-	gitlabSupportsCommonMark bool
-	disableApplyAll          bool
-	disableApply             bool
-	disableMarkdownFolding   bool
-	disableRepoLocking       bool
-	enableDiffMarkdownFormat bool
-	markdownTemplates        *template.Template
-	executableName           string
+	gitlabSupportsCommonMark  bool
+	disableApplyAll           bool
+	disableApply              bool
+	disableMarkdownFolding    bool
+	disableRepoLocking        bool
+	enableDiffMarkdownFormat  bool
+	markdownTemplates         *template.Template
+	executableName            string
+	hideUnchangedPlanComments bool
 }
 
 // commonData is data that all responses have.
 type commonData struct {
-	Command                  string
-	SubCommand               string
-	Verbose                  bool
-	Log                      string
-	PlansDeleted             bool
-	DisableApplyAll          bool
-	DisableApply             bool
-	DisableRepoLocking       bool
-	EnableDiffMarkdownFormat bool
-	ExecutableName           string
+	Command                   string
+	SubCommand                string
+	Verbose                   bool
+	Log                       string
+	PlansDeleted              bool
+	DisableApplyAll           bool
+	DisableApply              bool
+	DisableRepoLocking        bool
+	EnableDiffMarkdownFormat  bool
+	ExecutableName            string
+	HideUnchangedPlanComments bool
 }
 
 // errData is data about an error response.
@@ -109,6 +111,7 @@ type projectResultTmplData struct {
 	RepoRelDir  string
 	ProjectName string
 	Rendered    string
+	NoChanges   bool
 }
 
 // Initialize templates
@@ -121,6 +124,7 @@ func NewMarkdownRenderer(
 	enableDiffMarkdownFormat bool,
 	markdownTemplateOverridesDir string,
 	executableName string,
+	hideUnchangedPlanComments bool,
 ) *MarkdownRenderer {
 	var templates *template.Template
 	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
@@ -129,14 +133,15 @@ func NewMarkdownRenderer(
 		templates = overrides
 	}
 	return &MarkdownRenderer{
-		gitlabSupportsCommonMark: gitlabSupportsCommonMark,
-		disableApplyAll:          disableApplyAll,
-		disableMarkdownFolding:   disableMarkdownFolding,
-		disableApply:             disableApply,
-		disableRepoLocking:       disableRepoLocking,
-		enableDiffMarkdownFormat: enableDiffMarkdownFormat,
-		markdownTemplates:        templates,
-		executableName:           executableName,
+		gitlabSupportsCommonMark:  gitlabSupportsCommonMark,
+		disableApplyAll:           disableApplyAll,
+		disableMarkdownFolding:    disableMarkdownFolding,
+		disableApply:              disableApply,
+		disableRepoLocking:        disableRepoLocking,
+		enableDiffMarkdownFormat:  enableDiffMarkdownFormat,
+		markdownTemplates:         templates,
+		executableName:            executableName,
+		hideUnchangedPlanComments: hideUnchangedPlanComments,
 	}
 }
 
@@ -145,16 +150,17 @@ func NewMarkdownRenderer(
 func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subCmd, log string, verbose bool, vcsHost models.VCSHostType) string {
 	commandStr := cases.Title(language.English).String(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{
-		Command:                  commandStr,
-		SubCommand:               subCmd,
-		Verbose:                  verbose,
-		Log:                      log,
-		PlansDeleted:             res.PlansDeleted,
-		DisableApplyAll:          m.disableApplyAll || m.disableApply,
-		DisableApply:             m.disableApply,
-		DisableRepoLocking:       m.disableRepoLocking,
-		EnableDiffMarkdownFormat: m.enableDiffMarkdownFormat,
-		ExecutableName:           m.executableName,
+		Command:                   commandStr,
+		SubCommand:                subCmd,
+		Verbose:                   verbose,
+		Log:                       log,
+		PlansDeleted:              res.PlansDeleted,
+		DisableApplyAll:           m.disableApplyAll || m.disableApply,
+		DisableApply:              m.disableApply,
+		DisableRepoLocking:        m.disableRepoLocking,
+		EnableDiffMarkdownFormat:  m.enableDiffMarkdownFormat,
+		ExecutableName:            m.executableName,
+		HideUnchangedPlanComments: m.hideUnchangedPlanComments,
 	}
 
 	templates := m.markdownTemplates
@@ -197,6 +203,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			}
+			resultData.NoChanges = result.PlanSuccess.NoChanges()
 			numPlanSuccesses++
 		} else if result.PolicyCheckSuccess != nil {
 			result.PolicyCheckSuccess.PolicyCheckOutput = strings.TrimSpace(result.PolicyCheckSuccess.PolicyCheckOutput)
