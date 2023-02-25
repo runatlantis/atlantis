@@ -170,6 +170,10 @@ Values are chosen in this order:
 By default, changes to modules will not trigger autoplanning. See the flags below. 
 :::
 
+::: warning NOTE
+If any projects are defined in a repo atlantis.yaml file, the logic for this flag will not execute. See issue [#3122](https://github.com/runatlantis/atlantis/issues/3122).
+:::
+
 ### `--autoplan-modules`
 
 ```bash
@@ -182,6 +186,10 @@ Defaults to `false`. When set to `true`, Atlantis will trace the local modules o
 Included project are projects with files included by `--autoplan-file-list`. 
 After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
 `--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
+
+::: warning NOTE
+If any projects are defined in a repo atlantis.yaml file, the logic for this flag will not execute. See issue [#3122](https://github.com/runatlantis/atlantis/issues/3122).
+:::
 
 ### `--autoplan-modules-from-projects`
 
