@@ -63,7 +63,8 @@ jobs:
           type=ref,event=pr,suffix=${{ env.SUFFIX }}
           type=sha,suffix=${{ env.SUFFIX }}
         flavor: |
-          latest=false
+          latest=${{ contains(fromJson('["push", "pull_request"]'), github.event_name) && startsWith(github.ref, 'refs/tags/') }}
+          suffix=${{ format('-{0}', matrix.image_type) }}
 
     - name: Login to Packages Container registry
       uses: docker/login-action@v2
