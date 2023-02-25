@@ -1,6 +1,5 @@
 name: atlantis-image
 
-
 on:
   push:
     branches:
@@ -26,7 +25,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
-      DOCKER_REPO: ${{ github.repository }}
+      DOCKER_REPO: atlantis
       # Push if not a pull request or this is a fork
       PUSH: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
 
