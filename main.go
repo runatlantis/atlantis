@@ -43,15 +43,22 @@ func main() {
 		panic(fmt.Sprintf("unable to initialize logger. %s", err.Error()))
 	}
 
+	var sha = commit
+	if len(commit) >= 7 {
+		sha = commit[:7]
+	}
+
+	atlantisVersion := fmt.Sprintf("%s (commit: %s) (build date: %s)", version, sha, date)
+
 	// We're creating commands manually here rather than using init() functions
 	// (as recommended by cobra) because it makes testing easier.
 	server := &cmd.ServerCmd{
 		ServerCreator:   &cmd.DefaultServerCreator{},
 		Viper:           v,
-		AtlantisVersion: version,
+		AtlantisVersion: atlantisVersion,
 		Logger:          logger,
 	}
-	version := &cmd.VersionCmd{AtlantisVersion: version}
+	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
 	testdrive := &cmd.TestdriveCmd{}
 	cmd.RootCmd.AddCommand(server.Init())
 	cmd.RootCmd.AddCommand(version.Init())
