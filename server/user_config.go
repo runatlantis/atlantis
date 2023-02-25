@@ -41,6 +41,7 @@ type UserConfig struct {
 	EnableRegExpCmd                 bool   `mapstructure:"enable-regexp-cmd"`
 	EnableDiffMarkdownFormat        bool   `mapstructure:"enable-diff-markdown-format"`
 	ExecutableName                  string `mapstructure:"executable-name"`
+	HideUnchangedPlanComments       bool   `mapstructure:"hide-unchanged-plan-comments"`
 	GithubAllowMergeableBypassApply bool   `mapstructure:"gh-allow-mergeable-bypass-apply"`
 	GithubHostname                  string `mapstructure:"gh-hostname"`
 	GithubToken                     string `mapstructure:"gh-token"`

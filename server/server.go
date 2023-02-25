@@ -422,6 +422,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.EnableDiffMarkdownFormat,
 		userConfig.MarkdownTemplateOverridesDir,
 		userConfig.ExecutableName,
+		userConfig.HideUnchangedPlanComments,
 	)
 
 	var lockingClient locking.Locker

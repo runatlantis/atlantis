@@ -408,6 +408,16 @@ and set `--autoplan-modules` to `false`.
 
   This is useful when running multiple Atlantis servers against a single repository.
 
+### `--hide-unchanged-plan-comments`
+  ```bash
+  atlantis server --hide-unchanged-plan-comments
+  # or
+  ATLANTIS_HIDE_UNCHANGED_PLAN_COMMENTS=true
+  ```
+Remove no-changes plan comments from the pull request. 
+
+This is useful when you have many projects and want to keep the pull request clean from useless comments.
+
 ### `--gh-hostname`
   ```bash
   atlantis server --gh-hostname="my.github.enterprise.com"
