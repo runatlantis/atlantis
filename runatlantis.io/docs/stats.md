@@ -10,16 +10,16 @@ Currently Statsd and Prometheus is supported. See configuration below for detail
 
 Metrics are configured through the [Server Side Config](server-side-repo-config.html#metrics).
 
-## Available Metrics/Stats
+## Available Metrics
 
-There are plenty of metrics which are exposed by atlantis service. Let's say you have exposed metrics from a endpoint `/metrics` from your [Server Side Config](server-side-repo-config.html#metrics)
-```
+Assuming metrics are exposed from the endpoint `/metrics` from the [metrics](server-side-repo-config.html#metrics) server side config e.g.
+```yaml
 metrics:
   prometheus:
     endpoint: "/metrics"
 ```
-then on making curl request to your atlantis server on path `/metrics` will list down all the metrics exposed from atlantis service.
-```
+To see all the metrics exposed from atlantis service, make a GET request to the `/metrics` endpoint.
+```bash
 curl localhost:4141/metrics
 # HELP atlantis_cmd_autoplan_builder_execution_error atlantis_cmd_autoplan_builder_execution_error counter
 # TYPE atlantis_cmd_autoplan_builder_execution_error counter
