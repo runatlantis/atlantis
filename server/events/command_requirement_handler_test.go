@@ -162,8 +162,8 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				PolicySets: valid.PolicySets{
 					PolicySets: []valid.PolicySet{
 						{
-							Name:        "policy1",
-							ReviewCount: 1,
+							Name:         "policy1",
+							ApproveCount: 1,
 						},
 					},
 				},

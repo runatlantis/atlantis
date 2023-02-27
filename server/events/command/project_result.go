@@ -32,7 +32,7 @@ func (p ProjectResult) CommitStatus() models.CommitStatus {
 	return models.SuccessCommitStatus
 }
 
-// PolicyApprovalStatus returns the approval status of policy sets of this project result.
+// PolicyStatus returns the approval status of policy sets of this project result.
 func (p ProjectResult) PolicyStatus() []models.PolicySetStatus {
 	var policyStatuses []models.PolicySetStatus
 	if p.PolicyCheckResults != nil {

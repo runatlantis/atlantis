@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"encoding/json"
+	"regexp"
+
 	"github.com/hashicorp/go-multierror"
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -20,7 +22,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"regexp"
 )
 
 const (
@@ -192,7 +193,6 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		serializedArgs, _ := args.build()
 		cmdOutput, cmdErr := c.Exec.CombinedOutput(serializedArgs, envs, workdir)
 
-		passed := true
 		if cmdErr != nil {
 			// Since we're running conftest for each policyset, individual command errors should be concatenated.
 			if isValidConftestOutput(cmdOutput) {
@@ -200,6 +200,10 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 			} else {
 				combinedErr = multierror.Append(combinedErr, fmt.Errorf("policy_set: %s: conftest: %s", policySet.Name, cmdOutput))
 			}
+		}
+
+		passed := true
+		if hasFailures(cmdOutput) {
 			passed = false
 		}
 
@@ -207,7 +211,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 			PolicySetName:  policySet.Name,
 			ConftestOutput: cmdOutput,
 			Passed:         passed,
-			ReqApprovals:   policySet.ReviewCount,
+			ReqApprovals:   policySet.ApproveCount,
 		})
 	}
 
@@ -295,6 +299,15 @@ func getDefaultVersion() (*version.Version, error) {
 func isValidConftestOutput(output string) bool {
 
 	r := regexp.MustCompile(`^(WARN|FAIL|\[)`)
+	if match := r.FindString(output); match != "" {
+		return true
+	}
+	return false
+}
+
+// hasFailures checks whether any conftest policies have failed
+func hasFailures(output string) bool {
+	r := regexp.MustCompile(`([1-9]([0-9]?)* failure|failures": \[)`)
 	if match := r.FindString(output); match != "" {
 		return true
 	}

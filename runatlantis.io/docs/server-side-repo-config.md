@@ -523,7 +523,7 @@ If you set a workflow with the key `default`, it will override this.
 |------------------------|-----------------|---------|-----------|----------------------------------------------------------|
 | conftest_version       | string          | none    | no        | conftest version to run all policy sets                  |
 | owners                 | Owners(#Owners) | none    | yes       | owners that can approve failing policies                 |
-| review_count           | int             | 1       | no        | number of approvals required to bypass failing policies. |
+| approve_count          | int             | 1       | no        | number of approvals required to bypass failing policies. |
 | policy_sets            | []PolicySet     | none    | yes       | set of policies to run on a plan output                  |
 
 ### Owners

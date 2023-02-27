@@ -1466,14 +1466,14 @@ policies:
 					"custom1": customWorkflow1,
 				},
 				PolicySets: valid.PolicySets{
-					Version: conftestVersion,
-				    ReviewCount: 1,
+					Version:      conftestVersion,
+					ApproveCount: 1,
 					PolicySets: []valid.PolicySet{
 						{
-							Name:   "good-policy",
-							Path:   "rel/path/to/policy",
-							Source: valid.LocalPolicySet,
-				            ReviewCount: 1,
+							Name:         "good-policy",
+							Path:         "rel/path/to/policy",
+							Source:       valid.LocalPolicySet,
+							ApproveCount: 1,
 						},
 					},
 				},
@@ -1803,14 +1803,14 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					"custom": customWorkflow,
 				},
 				PolicySets: valid.PolicySets{
-					Version: conftestVersion,
-				    ReviewCount: 1,
+					Version:      conftestVersion,
+					ApproveCount: 1,
 					PolicySets: []valid.PolicySet{
 						{
-							Name:   "good-policy",
-							Path:   "rel/path/to/policy",
-							Source: valid.LocalPolicySet,
-				            ReviewCount: 1,
+							Name:         "good-policy",
+							Path:         "rel/path/to/policy",
+							Source:       valid.LocalPolicySet,
+							ApproveCount: 1,
 						},
 					},
 				},

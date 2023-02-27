@@ -771,8 +771,8 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				},
 				PolicySets: []valid.PolicySet{
 					{
-						Name:        "policy1",
-						ReviewCount: 1,
+						Name:         "policy1",
+						ApproveCount: 1,
 						Owners: valid.PolicyOwners{
 							Teams: []string{"someotherteam"},
 						},
@@ -796,12 +796,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				},
 				PolicySets: []valid.PolicySet{
 					{
-						Name:        "policy1",
-						ReviewCount: 1,
+						Name:         "policy1",
+						ApproveCount: 1,
 					},
 					{
-						Name:        "policy2",
-						ReviewCount: 2,
+						Name:         "policy2",
+						ApproveCount: 2,
 					},
 				},
 			},
@@ -828,12 +828,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						Owners: valid.PolicyOwners{
 							Users: []string{testdata.User.Username},
 						},
-						Name:        "policy1",
-						ReviewCount: 1,
+						Name:         "policy1",
+						ApproveCount: 1,
 					},
 					{
-						Name:        "policy2",
-						ReviewCount: 2,
+						Name:         "policy2",
+						ApproveCount: 2,
 					},
 				},
 			},
@@ -860,12 +860,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				},
 				PolicySets: []valid.PolicySet{
 					{
-						Name:        "policy1",
-						ReviewCount: 1,
+						Name:         "policy1",
+						ApproveCount: 1,
 					},
 					{
-						Name:        "policy2",
-						ReviewCount: 1,
+						Name:         "policy2",
+						ApproveCount: 1,
 					},
 				},
 			},
@@ -893,12 +893,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						Owners: valid.PolicyOwners{
 							Teams: []string{"someuserteam"},
 						},
-						Name:        "policy1",
-						ReviewCount: 1,
+						Name:         "policy1",
+						ApproveCount: 1,
 					},
 					{
-						Name:        "policy2",
-						ReviewCount: 1,
+						Name:         "policy2",
+						ApproveCount: 1,
 					},
 				},
 			},
@@ -925,8 +925,8 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						Owners: valid.PolicyOwners{
 							Teams: []string{"someuserteam"},
 						},
-						Name:        "policy1",
-						ReviewCount: 2,
+						Name:         "policy1",
+						ApproveCount: 2,
 					},
 				},
 			},

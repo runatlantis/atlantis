@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"encoding/json"
+
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -366,7 +367,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 			ignorePolicy := false
 			if policySet.Name == policyStatus.PolicySetName {
 				// Policy set either passed or has sufficient approvals. Move on.
-				if policyStatus.Passed || policyStatus.Approvals == policySet.ReviewCount {
+				if policyStatus.Passed || policyStatus.Approvals == policySet.ApproveCount {
 					increment = false
 				}
 				// Set ignore flag if targeted policy does not match.
@@ -381,14 +382,14 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
 				}
 				// Still bubble up this failure, even if policy set is not targeted.
-				if prjPolicyStatus[i].Approvals != policySet.ReviewCount {
+				if prjPolicyStatus[i].Approvals != policySet.ApproveCount {
 					allPassed = false
 				}
 				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
 					PolicySetName: policySet.Name,
 					Passed:        policyStatus.Passed,
 					CurApprovals:  prjPolicyStatus[i].Approvals,
-					ReqApprovals:  policySet.ReviewCount,
+					ReqApprovals:  policySet.ApproveCount,
 				})
 			}
 		}
@@ -496,6 +497,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Using this function instead of catching failed policy runs with errors, for cases when '--no-fail' is passed to conftest.
 	// One reason to pass such an arg to conftest would be to prevent workflow termination so custom run scripts
 	// can be run after the conftest step.
+	ctx.Log.Err(strings.Join(outputs, "\n"))
 	if !result.PolicyCleared() {
 		failure = "Some policy sets did not pass."
 	}

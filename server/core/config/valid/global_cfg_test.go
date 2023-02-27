@@ -668,14 +668,14 @@ policies:
 					StateRm:     valid.DefaultStateRmStage,
 				},
 				PolicySets: valid.PolicySets{
-					Version: nil,
-					ReviewCount: 1,
+					Version:      nil,
+					ApproveCount: 1,
 					PolicySets: []valid.PolicySet{
 						{
-							Name:   "good-policy",
-							Path:   "rel/path/to/source",
-							Source: "local",
-					        ReviewCount: 1,
+							Name:         "good-policy",
+							Path:         "rel/path/to/source",
+							Source:       "local",
+							ApproveCount: 1,
 						},
 					},
 				},
@@ -716,14 +716,14 @@ policies:
 					StateRm:     valid.DefaultStateRmStage,
 				},
 				PolicySets: valid.PolicySets{
-					Version: version,
-					ReviewCount: 1,
+					Version:      version,
+					ApproveCount: 1,
 					PolicySets: []valid.PolicySet{
 						{
-							Name:   "good-policy",
-							Path:   "rel/path/to/source",
-							Source: "local",
-					        ReviewCount: 1,
+							Name:         "good-policy",
+							Path:         "rel/path/to/source",
+							Source:       "local",
+							ApproveCount: 1,
 						},
 					},
 				},

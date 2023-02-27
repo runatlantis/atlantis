@@ -50,7 +50,7 @@ policies:
     - name: deny_local_exec
       path: <CODE_DIRECTORY>/policies/deny_local_exec/
       source: local
-      review_count: 2
+      approve_count: 2
       owners:
         users:
           - pseudomorph
@@ -60,7 +60,7 @@ policies:
 - `path` - Path to a policies directory. *Note: replace `<CODE_DIRECTORY>` with absolute dir path to conftest policy/policies.*
 - `source` - Tells atlantis where to fetch the policies from. Currently you can only host policies locally by using `local`.
 - `owners` - Defines the users/teams which are able to approve a specific policy set.
-- `review_count` - Defines the number of approvals needed to bypass policy checks. Defaults to the top-level policies configuration, if not specified.
+- `approve_count` - Defines the number of approvals needed to bypass policy checks. Defaults to the top-level policies configuration, if not specified.
 
 By default conftest is configured to only run the `main` package. If you wish to run specific/multiple policies consider passing `--namespace` or `--all-namespaces` to conftest with [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) via a custom workflow as shown in the below example.
 
