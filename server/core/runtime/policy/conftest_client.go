@@ -229,6 +229,12 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 
 	combinedErr = multierror.Append(combinedErr, err)
 
+	// Multierror will wrap combined errors in a way that the upstream functions won't be able to read it as nil.
+	// Let's pass nil back if there are no wrapped errors.
+	if errors.Unwrap(combinedErr) == nil {
+		combinedErr = nil
+	}
+
 	output := string(marshaledStatus)
 
 	return c.sanitizeOutput(inputFile, output), combinedErr

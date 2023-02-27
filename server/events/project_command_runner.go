@@ -458,7 +458,6 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	}
 
 	var failure string
-	allPassed := true
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	var errs error
 	if err != nil {
@@ -467,9 +466,8 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			if err == nil {
 				break
 			}
-			if strings.Contains(err.Error(), "some policies failed") {
-				allPassed = false
-			} else {
+			// Exclude errors for failed policies
+			if !strings.Contains(err.Error(), "some policies failed") {
 				errs = multierror.Append(errs, err)
 			}
 		}
@@ -481,23 +479,28 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		}
 	}
 
-	if !allPassed {
-		failure = "Some policy sets did not pass."
-	}
-
 	var policySetResults []models.PolicySetResult
 	err = json.Unmarshal([]byte(strings.Join(outputs, "\n")), &policySetResults)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return &models.PolicyCheckResults{
+	result := &models.PolicyCheckResults{
 		LockURL:            p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		PolicySetResults:   policySetResults,
 		RePlanCmd:          ctx.RePlanCmd,
 		ApplyCmd:           ctx.ApplyCmd,
 		ApprovePoliciesCmd: ctx.ApprovePoliciesCmd,
-	}, failure, nil
+	}
+
+	// Using this function instead of catching failed policy runs with errors, for cases when '--no-fail' is passed to conftest.
+	// One reason to pass such an arg to conftest would be to prevent workflow termination so custom run scripts
+	// can be run after the conftest step.
+	if !result.PolicyCleared() {
+		failure = "Some policy sets did not pass."
+	}
+
+	return result, failure, nil
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*models.PlanSuccess, string, error) {
