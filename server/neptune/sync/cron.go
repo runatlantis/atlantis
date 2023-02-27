@@ -30,6 +30,7 @@ func NewCronScheduler(logger logging.Logger) *CronScheduler {
 		delegate:  &SynchronousScheduler{Logger: logger},
 		ctx:       ctx,
 		cancelCtx: cancel,
+		logger:    logger,
 	}
 }
 
