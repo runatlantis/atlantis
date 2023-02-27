@@ -72,7 +72,7 @@ type commonData struct {
 	EnableDiffMarkdownFormat  bool
 	ExecutableName            string
 	HideUnchangedPlanComments bool
- 	PullNum                  int
+	PullNum                   int
 }
 
 // errData is data about an error response.
@@ -89,7 +89,6 @@ type failureData struct {
 	commonData
 }
 
-// resultData is data about a successful response.
 type resultData struct {
 	Results []projectResultTmplData
 	commonData
@@ -167,7 +166,7 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subC
 		EnableDiffMarkdownFormat:  m.enableDiffMarkdownFormat,
 		ExecutableName:            m.executableName,
 		HideUnchangedPlanComments: m.hideUnchangedPlanComments,
-		PullNum:                  pullNum,
+		PullNum:                   pullNum,
 	}
 
 	templates := m.markdownTemplates
@@ -191,7 +190,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 	templates := m.markdownTemplates
 
 	for _, result := range results {
-		ResultData := projectResultTmplData{
+		resultData := projectResultTmplData{
 			Workspace:   result.Workspace,
 			RepoRelDir:  result.RepoRelDir,
 			ProjectName: result.ProjectName,
@@ -199,9 +198,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		if result.PlanSuccess != nil {
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			} else {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
 			}
 			resultData.NoChanges = result.PlanSuccess.NoChanges()
 			numPlanSuccesses++
@@ -214,9 +213,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				commonData:            common,
 			}
 			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckResults.CombinedOutput()) {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsWrapped"), policyCheckResults)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsWrapped"), policyCheckResults)
 			} else {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsUnwrapped"), policyCheckResults)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsUnwrapped"), policyCheckResults)
 			}
 			if result.Error == nil && result.Failure == "" {
 				numPolicyCheckSuccesses++
@@ -230,9 +229,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				commonData:            common,
 			}
 			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckResults.CombinedOutput()) {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsWrapped"), policyCheckResults)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsWrapped"), policyCheckResults)
 			} else {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsUnwrapped"), policyCheckResults)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsUnwrapped"), policyCheckResults)
 			}
 			if result.Error == nil && result.Failure == "" {
 				numPolicyApprovalSuccesses++
@@ -240,35 +239,35 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		} else if result.ApplySuccess != "" {
 			output := strings.TrimSpace(result.ApplySuccess)
 			if m.shouldUseWrappedTmpl(vcsHost, result.ApplySuccess) {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyWrappedSuccess"), struct{ Output string }{output})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyWrappedSuccess"), struct{ Output string }{output})
 			} else {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyUnwrappedSuccess"), struct{ Output string }{output})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyUnwrappedSuccess"), struct{ Output string }{output})
 			}
 		} else if result.VersionSuccess != "" {
 			output := strings.TrimSpace(result.VersionSuccess)
 			if m.shouldUseWrappedTmpl(vcsHost, output) {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{output})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{output})
 			} else {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionUnwrappedSuccess"), struct{ Output string }{output})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionUnwrappedSuccess"), struct{ Output string }{output})
 			}
 			numVersionSuccesses++
 		} else if result.ImportSuccess != nil {
 			result.ImportSuccess.Output = strings.TrimSpace(result.ImportSuccess.Output)
 			if m.shouldUseWrappedTmpl(vcsHost, result.ImportSuccess.Output) {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessWrapped"), result.ImportSuccess)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessWrapped"), result.ImportSuccess)
 			} else {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
 			}
 		} else if result.StateRmSuccess != nil {
 			result.StateRmSuccess.Output = strings.TrimSpace(result.StateRmSuccess.Output)
 			if m.shouldUseWrappedTmpl(vcsHost, result.StateRmSuccess.Output) {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessWrapped"), result.StateRmSuccess)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessWrapped"), result.StateRmSuccess)
 			} else {
-				ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
 			}
 		} else {
 			if !(result.Error != nil || result.Failure != "") {
-				ResultData.Rendered = "Found no template. This is a bug!"
+				resultData.Rendered = "Found no template. This is a bug!"
 			}
 		}
 		if result.Error != nil {
@@ -276,11 +275,11 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			if m.shouldUseWrappedTmpl(vcsHost, result.Error.Error()) {
 				tmpl = templates.Lookup("wrappedErr")
 			}
-			ResultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), ResultData.Rendered, common})
+			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), resultData.Rendered, common})
 		} else if result.Failure != "" {
-			ResultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, ResultData.Rendered, common})
+			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, resultData.Rendered, common})
 		}
-		resultsTmplData = append(resultsTmplData, ResultData)
+		resultsTmplData = append(resultsTmplData, resultData)
 	}
 
 	var tmpl *template.Template
