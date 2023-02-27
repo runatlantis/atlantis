@@ -29,7 +29,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Masterminds/semver"
 	"github.com/hashicorp/go-getter/v2"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
@@ -337,11 +336,11 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 		tfVersions = []string{matched[1]}
 	}
 
-	constraint, _ := semver.NewConstraint(requiredVersionSetting)
-	versions := make([]*semver.Version, len(tfVersions))
+	constraint, _ := version.NewConstraint(requiredVersionSetting)
+	versions := make([]*version.Version, len(tfVersions))
 
 	for i, tfvals := range tfVersions {
-		newVersion, err := semver.NewVersion(tfvals)
+		newVersion, err := version.NewVersion(tfvals)
 		if err == nil {
 			versions[i] = newVersion
 		}
@@ -352,7 +351,7 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 		return nil
 	}
 
-	sort.Sort(sort.Reverse(semver.Collection(versions)))
+	sort.Sort(sort.Reverse(version.Collection(versions)))
 
 	for _, element := range versions {
 		if constraint.Check(element) { // Validate a version against a constraint

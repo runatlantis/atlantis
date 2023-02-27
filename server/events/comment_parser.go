@@ -26,8 +26,8 @@ import (
 	"github.com/google/shlex"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/utils"
 	"github.com/spf13/pflag"
-	"golang.org/x/exp/slices"
 )
 
 const (
@@ -153,7 +153,12 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 
 	// Helpfully warn the user if they're using "terraform" instead of "atlantis"
 	if args[0] == "terraform" && e.ExecutableName != "terraform" {
-		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName)}
+		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, "terraform")}
+	}
+
+	// Helpfully warn the user that the command might be misspelled
+	if utils.IsSimilarWord(args[0], e.ExecutableName) {
+		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, args[0])}
 	}
 
 	// Atlantis can be invoked using the name of the VCS host user we're
@@ -333,7 +338,7 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 			return "", nil, e.errMarkdown("subcommand required", name.String(), flagSet)
 		}
 		subCommand, commandArgs = commandArgs[0], commandArgs[1:]
-		isAvailableSubCommand := slices.Contains(availableSubCommands, subCommand)
+		isAvailableSubCommand := utils.SlicesContains(availableSubCommands, subCommand)
 		if !isAvailableSubCommand {
 			errMsg := fmt.Sprintf("invalid subcommand %s (not %s)", subCommand, strings.Join(availableSubCommands, ", "))
 			return "", nil, e.errMarkdown(errMsg, name.String(), flagSet)
@@ -556,8 +561,8 @@ Use "{{ .ExecutableName }} [command] --help" for more information about a comman
 	"\n```"
 
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
-// someone runs a command with terraform instead of atlantis.
-var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `terraform`?"
+// someone runs a misspelled command or terraform instead of atlantis.
+var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `%s`?"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
 // `atlantis unlock` with flags.

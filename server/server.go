@@ -153,6 +153,7 @@ type WebhookConfig struct {
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
+	logging.SuppressDefaultLogging()
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
 
 	if err != nil {
@@ -421,6 +422,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.EnableDiffMarkdownFormat,
 		userConfig.MarkdownTemplateOverridesDir,
 		userConfig.ExecutableName,
+		userConfig.HideUnchangedPlanComments,
 	)
 
 	var lockingClient locking.Locker
@@ -456,6 +458,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var workingDir events.WorkingDir = &events.FileWorkspace{
 		DataDir:          userConfig.DataDir,
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
+		CheckoutDepth:    userConfig.CheckoutDepth,
 		GithubAppEnabled: githubAppEnabled,
 	}
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir

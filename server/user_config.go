@@ -28,6 +28,7 @@ type UserConfig struct {
 	BitbucketToken                  string `mapstructure:"bitbucket-token"`
 	BitbucketUser                   string `mapstructure:"bitbucket-user"`
 	BitbucketWebhookSecret          string `mapstructure:"bitbucket-webhook-secret"`
+	CheckoutDepth                   int    `mapstructure:"checkout-depth"`
 	CheckoutStrategy                string `mapstructure:"checkout-strategy"`
 	DataDir                         string `mapstructure:"data-dir"`
 	DisableApplyAll                 bool   `mapstructure:"disable-apply-all"`
@@ -40,6 +41,7 @@ type UserConfig struct {
 	EnableRegExpCmd                 bool   `mapstructure:"enable-regexp-cmd"`
 	EnableDiffMarkdownFormat        bool   `mapstructure:"enable-diff-markdown-format"`
 	ExecutableName                  string `mapstructure:"executable-name"`
+	HideUnchangedPlanComments       bool   `mapstructure:"hide-unchanged-plan-comments"`
 	GithubAllowMergeableBypassApply bool   `mapstructure:"gh-allow-mergeable-bypass-apply"`
 	GithubHostname                  string `mapstructure:"gh-hostname"`
 	GithubToken                     string `mapstructure:"gh-token"`

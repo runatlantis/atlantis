@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v49/github"
+	"github.com/google/go-github/v50/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
