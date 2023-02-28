@@ -41,6 +41,7 @@ type Repo struct {
 	AllowCustomWorkflows        *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
 	TemplateOverrides           map[string]string `yaml:"template_overrides,omitempty" json:"template_overrides,omitempty"`
 	CheckoutStrategy            string            `yaml:"checkout_strategy,omitempty" json:"checkout_strategy,omitempty"`
+	RebaseEnabled               *bool             `yaml:"rebase_enabled,omitempty" json:"rebase_enabled,omitempty"`
 }
 
 func (g GlobalCfg) GetWorkflowNames() []string {
@@ -317,6 +318,7 @@ OUTER:
 		AllowCustomWorkflows:        r.AllowCustomWorkflows,
 		TemplateOverrides:           r.TemplateOverrides,
 		CheckoutStrategy:            checkoutStrategy,
+		RebaseEnabled:               r.RebaseEnabled,
 	}
 }
 

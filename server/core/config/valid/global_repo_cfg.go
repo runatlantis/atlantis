@@ -23,6 +23,7 @@ type Repo struct {
 	AllowCustomWorkflows        *bool
 	TemplateOverrides           map[string]string
 	CheckoutStrategy            string
+	RebaseEnabled               *bool
 }
 
 // IDMatches returns true if the repo ID otherID matches this config.

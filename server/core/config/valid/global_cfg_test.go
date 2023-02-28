@@ -92,6 +92,7 @@ func TestNewGlobalCfg(t *testing.T) {
 		},
 	}
 
+	rebaseEnabled := true
 	baseCfg := valid.GlobalCfg{
 		Repos: []valid.Repo{
 			{
@@ -105,6 +106,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				AllowedOverrides:     []string{},
 				AllowCustomWorkflows: Bool(false),
 				CheckoutStrategy:     "branch",
+				RebaseEnabled:        &rebaseEnabled,
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -589,6 +591,7 @@ policies:
 				Workspace:       "default",
 				Name:            "",
 				AutoplanEnabled: false,
+				RebaseEnabled:   true,
 			},
 		},
 		"policies set correct version if specified": {
@@ -640,6 +643,7 @@ policies:
 				Workspace:       "default",
 				Name:            "",
 				AutoplanEnabled: false,
+				RebaseEnabled:   true,
 			},
 		},
 	}
@@ -720,6 +724,7 @@ workflows:
 				Name:            "",
 				AutoplanEnabled: false,
 				PolicySets:      emptyPolicySets,
+				RebaseEnabled:   true,
 			},
 		},
 		"repos can use server-side defined pr and deployment workflow if allowed": {
@@ -780,6 +785,7 @@ deployment_workflows:
 				Name:            "",
 				AutoplanEnabled: false,
 				PolicySets:      emptyPolicySets,
+				RebaseEnabled:   true,
 			},
 		},
 		"repo-side apply reqs win out if allowed": {
@@ -819,6 +825,7 @@ repos:
 				Name:            "",
 				AutoplanEnabled: false,
 				PolicySets:      emptyPolicySets,
+				RebaseEnabled:   true,
 			},
 		},
 		"last server-side match wins": {
@@ -861,6 +868,7 @@ repos:
 				Name:            "myname",
 				AutoplanEnabled: false,
 				PolicySets:      emptyPolicySets,
+				RebaseEnabled:   true,
 			},
 		},
 		"autoplan is set properly": {
@@ -900,6 +908,7 @@ repos:
 				AutoplanEnabled: true,
 				WhenModified:    []string{".tf"},
 				PolicySets:      emptyPolicySets,
+				RebaseEnabled:   true,
 			},
 		},
 		"merge platform mode default config": {
@@ -938,6 +947,51 @@ repos:
 				AutoplanEnabled: true,
 				WhenModified:    []string{".tf"},
 				PolicySets:      emptyPolicySets,
+				RebaseEnabled:   true,
+			},
+		},
+		"disable rebase when configured": {
+			gCfg: `
+repos:
+- id: /.*/
+  apply_requirements: [approved]
+- id: /github.com/.*/
+  apply_requirements: [mergeable]
+- id: github.com/owner/repo
+  rebase_enabled: false
+  apply_requirements: [approved, mergeable]
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:       "mydir",
+				Workspace: "myworkspace",
+				Name:      String("myname"),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{"approved", "mergeable"},
+				Workflow: valid.Workflow{
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultPlanStage,
+				},
+				PullRequestWorkflow: valid.Workflow{
+					Name:        "default",
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultLocklessPlanStage,
+				},
+				DeploymentWorkflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
+				},
+				RepoRelDir:      "mydir",
+				Workspace:       "myworkspace",
+				Name:            "myname",
+				AutoplanEnabled: false,
+				PolicySets:      emptyPolicySets,
+				RebaseEnabled:   false,
 			},
 		},
 	}

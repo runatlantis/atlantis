@@ -12,6 +12,8 @@ type Repo struct {
 	Name string
 	// URL is the ssh clone URL (ie. git@github.com:owner/repo.git)
 	URL string
+	// Flag to determine if open PRs for a root need to be rebased
+	RebaseEnabled bool
 
 	Credentials AppCredentials
 }
