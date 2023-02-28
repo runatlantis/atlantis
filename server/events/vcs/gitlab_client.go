@@ -295,7 +295,7 @@ func (g *GitlabClient) WaitForSuccessPipeline(ctx context.Context, pull models.P
 
 // MergePull merges the merge request.
 func (g *GitlabClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	commitMsg := common.AutomergeCommitMsg
+	commitMsg := common.AutomergeCommitMsg(pull.Num)
 
 	mr, err := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
 	if err != nil {
