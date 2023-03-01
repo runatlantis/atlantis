@@ -40,14 +40,18 @@ atlantis_cmd_autoplan_builder_execution_time_count 10
 .....
 .....
 ```
-Some of the important metrics which you would like to monitor are
+::: tip NOTE
+The output shown above is trimmed, since with every new version release this metric set will need to be updated accordingly as there may be a case if some metrics are added/modified/deprecated, so the output shown above just gives a brief idea of how these metrics look like and rest can be explored.
+:::
 
-| Metric Name                                  | Metric Type                                                          | Purpose                                                                                                                                  |
-|----------------------------------------------|----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| atlantis_cmd_autoplan_execution_error        | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | since starting of atlantis server, the number of times when [autoplan](autoplanning.html#autoplanning) on the MR’s has thrown error.     |
-| atlantis_cmd_comment_plan_execution_error    | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | since starting of atlantis server, the number of times when on commenting `atlantis plan` on the MR’s has thrown error.                  |
-| atlantis_cmd_autoplan_execution_success      | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | since starting of atlantis server, the number of times when [autoplan](autoplanning.html#autoplanning) on the MR’s has run successfully. |
-| atlantis_cmd_comment_apply_execution_error   | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | since starting of atlantis server, the number of times when on commenting `atlantis apply` on the MR’s has thrown error.                 |
-| atlantis_cmd_comment_apply_execution_success | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | since starting of atlantis server, the number of times when on commenting `atlantis apply` on the MR’s has run successfully.             |
+Important metrics to monitor are
 
-Since there are a plenty of metrics exposed by atlantis, so you can go through them all and çan monitor the one's which are well suited for you.
+| Metric Name                                    | Metric Type                                                          | Purpose                                                                                                            |
+|------------------------------------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| `atlantis_cmd_autoplan_execution_error`        | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when [autoplan](autoplanning.html#autoplanning) has thrown error. |
+| `atlantis_cmd_comment_plan_execution_error`    | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis plan` has thrown error.      |
+| `atlantis_cmd_autoplan_execution_success`      | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when [autoplan](autoplanning.html#autoplanning) has run successfully. |
+| `atlantis_cmd_comment_apply_execution_error`   | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis apply` has thrown error.     |
+| `atlantis_cmd_comment_apply_execution_success` | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis apply` has run successfully. |
+
+Since there are a plenty of metrics exposed by atlantis, so one can go through them all and çan monitor the one's which are well suited for them.
