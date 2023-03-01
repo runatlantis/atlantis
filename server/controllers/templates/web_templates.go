@@ -415,7 +415,7 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <script src="https://unpkg.com/xterm-addon-fit@0.4.0/lib/xterm-addon-fit.js"></script>
 
     <script>
-      var term = new Terminal({scrollback: 15000});
+      var term = new Terminal({scrollback: 50000});
       var socket = new WebSocket(
         (document.location.protocol === "http:" ? "ws://" : "wss://") +
         document.location.host +
