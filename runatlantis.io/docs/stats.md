@@ -13,12 +13,15 @@ Metrics are configured through the [Server Side Config](server-side-repo-config.
 ## Available Metrics
 
 Assuming metrics are exposed from the endpoint `/metrics` from the [metrics](server-side-repo-config.html#metrics) server side config e.g.
+
 ```yaml
 metrics:
   prometheus:
     endpoint: "/metrics"
 ```
+
 To see all the metrics exposed from atlantis service, make a GET request to the `/metrics` endpoint.
+
 ```bash
 curl localhost:4141/metrics
 # HELP atlantis_cmd_autoplan_builder_execution_error atlantis_cmd_autoplan_builder_execution_error counter
@@ -40,6 +43,7 @@ atlantis_cmd_autoplan_builder_execution_time_count 10
 .....
 .....
 ```
+
 ::: tip NOTE
 The output shown above is trimmed, since with every new version release this metric set will need to be updated accordingly as there may be a case if some metrics are added/modified/deprecated, so the output shown above just gives a brief idea of how these metrics look like and rest can be explored.
 :::
