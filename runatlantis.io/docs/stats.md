@@ -58,4 +58,6 @@ Important metrics to monitor are
 | `atlantis_cmd_comment_apply_execution_error`   | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis apply` has thrown error.     |
 | `atlantis_cmd_comment_apply_execution_success` | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis apply` has run successfully. |
 
-Since there are a plenty of metrics exposed by atlantis, so one can go through them all and çan monitor the one's which are well suited for them.
+::: tip NOTE
+There are plenty of additional metrics exposed by atlantis that are not described above
+:::
