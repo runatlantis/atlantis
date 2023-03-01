@@ -107,6 +107,8 @@ func (d *VCSStatusUpdater) UpdateProject(ctx context.Context, projectCtx Project
 func (d *VCSStatusUpdater) statusDescription(status models.VCSStatus) string {
 	var description string
 	switch status {
+	case models.QueuedVCSStatus:
+		description = "queued."
 	case models.PendingVCSStatus:
 		description = "in progress..."
 	case models.FailedVCSStatus:

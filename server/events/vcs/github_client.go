@@ -554,6 +554,8 @@ func (g *GithubClient) updateCheckRun(ctx context.Context, request types.UpdateS
 
 func (g *GithubClient) resolveState(state models.VCSStatus) string {
 	switch state {
+	case models.QueuedVCSStatus:
+		return "Queued"
 	case models.PendingVCSStatus:
 		return "In Progress"
 	case models.SuccessVCSStatus:
@@ -645,6 +647,9 @@ func (g *GithubClient) resolveChecksStatus(state models.VCSStatus) (string, stri
 	case models.FailedVCSStatus:
 		status = Completed
 		conclusion = Failure
+
+	case models.QueuedVCSStatus:
+		status = Queued
 	}
 
 	return status.String(), conclusion.String()

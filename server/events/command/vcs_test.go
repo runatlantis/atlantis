@@ -35,6 +35,11 @@ func TestUpdateCombined(t *testing.T) {
 		expDescrip string
 	}{
 		{
+			status:     models.QueuedVCSStatus,
+			command:    command.Plan,
+			expDescrip: "Plan queued.",
+		},
+		{
 			status:     models.PendingVCSStatus,
 			command:    command.Plan,
 			expDescrip: "Plan in progress...",
@@ -99,6 +104,13 @@ func TestUpdateCombinedCount(t *testing.T) {
 		numTotal   int
 		expDescrip string
 	}{
+		{
+			status:     models.QueuedVCSStatus,
+			command:    command.Plan,
+			numSuccess: 0,
+			numTotal:   2,
+			expDescrip: "0/2 projects planned successfully.",
+		},
 		{
 			status:     models.PendingVCSStatus,
 			command:    command.Plan,

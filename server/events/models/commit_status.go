@@ -23,6 +23,7 @@ const (
 	PendingVCSStatus VCSStatus = iota
 	SuccessVCSStatus
 	FailedVCSStatus
+	QueuedVCSStatus
 )
 
 func (s VCSStatus) String() string {
@@ -33,6 +34,8 @@ func (s VCSStatus) String() string {
 		return "success"
 	case FailedVCSStatus:
 		return "failed"
+	case QueuedVCSStatus:
+		return "queued"
 	}
 	return "failed"
 }

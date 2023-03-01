@@ -10,6 +10,7 @@ import (
 func TestStatus_String(t *testing.T) {
 	cases := map[models.VCSStatus]string{
 		models.PendingVCSStatus: "pending",
+		models.QueuedVCSStatus:  "queued",
 		models.SuccessVCSStatus: "success",
 		models.FailedVCSStatus:  "failed",
 	}

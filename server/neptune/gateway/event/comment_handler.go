@@ -3,6 +3,7 @@ package event
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -20,6 +21,10 @@ import (
 const warningMessage = "⚠️ WARNING ⚠️\n\n You are force applying changes from your PR instead of merging into your default branch 🚀. This can have unpredictable consequences 🙏🏽 and should only be used in an emergency 🆘.\n\n To confirm behavior, review and confirm the plan within the generated atlantis/deploy GH check below.\n\n 𝐓𝐡𝐢𝐬 𝐚𝐜𝐭𝐢𝐨𝐧 𝐰𝐢𝐥𝐥 𝐛𝐞 𝐚𝐮𝐝𝐢𝐭𝐞𝐝.\n"
 
 type LegacyApplyCommentInput struct{}
+
+type statusUpdater interface {
+	UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.VCSStatus, cmdName fmt.Stringer, statusID string, output string) (string, error)
+}
 
 // Comment is our internal representation of a vcs based comment event.
 type Comment struct {
@@ -40,24 +45,27 @@ func NewCommentEventWorkerProxy(
 	allocator feature.Allocator,
 	scheduler scheduler,
 	rootDeployer rootDeployer,
-	vcsClient vcs.Client) *CommentEventWorkerProxy {
+	vcsClient vcs.Client,
+	vcsStatusUpdater statusUpdater) *CommentEventWorkerProxy {
 	return &CommentEventWorkerProxy{
-		logger:       logger,
-		snsWriter:    snsWriter,
-		allocator:    allocator,
-		scheduler:    scheduler,
-		vcsClient:    vcsClient,
-		rootDeployer: rootDeployer,
+		logger:           logger,
+		snsWriter:        snsWriter,
+		allocator:        allocator,
+		scheduler:        scheduler,
+		vcsClient:        vcsClient,
+		rootDeployer:     rootDeployer,
+		vcsStatusUpdater: vcsStatusUpdater,
 	}
 }
 
 type CommentEventWorkerProxy struct {
-	logger       logging.Logger
-	snsWriter    Writer
-	allocator    feature.Allocator
-	scheduler    scheduler
-	vcsClient    vcs.Client
-	rootDeployer rootDeployer
+	logger           logging.Logger
+	snsWriter        Writer
+	allocator        feature.Allocator
+	scheduler        scheduler
+	vcsClient        vcs.Client
+	rootDeployer     rootDeployer
+	vcsStatusUpdater statusUpdater
 }
 
 func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, event Comment, cmd *command.Comment) error {
@@ -67,7 +75,7 @@ func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.Buff
 
 	if err != nil {
 		p.logger.ErrorContext(ctx, "unable to allocate platform mode")
-		return p.forwardToSns(ctx, request)
+		return p.handleLegacyComment(ctx, request, event, cmd)
 	}
 
 	if shouldAllocate && cmd.ForceApply {
@@ -80,12 +88,20 @@ func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.Buff
 		})
 
 	}
+	return p.handleLegacyComment(ctx, request, event, cmd)
+}
+
+func (p *CommentEventWorkerProxy) handleLegacyComment(ctx context.Context, request *http.BufferedRequest, event Comment, cmd *command.Comment) error {
+	if cmd.Name == command.Plan || cmd.Name == command.Apply {
+		if _, err := p.vcsStatusUpdater.UpdateCombined(ctx, event.BaseRepo, event.Pull, models.QueuedVCSStatus, cmd.Name, "", "Request received. Adding to the queue..."); err != nil {
+			p.logger.WarnContext(ctx, fmt.Sprintf("unable to update commit status: %s", err))
+		}
+	}
 	return p.forwardToSns(ctx, request)
 }
 
 func (p *CommentEventWorkerProxy) forwardToSns(ctx context.Context, request *http.BufferedRequest) error {
 	buffer := bytes.NewBuffer([]byte{})
-
 	if err := request.GetRequestWithContext(ctx).Write(buffer); err != nil {
 		return errors.Wrap(err, "writing request to buffer")
 	}
@@ -93,7 +109,6 @@ func (p *CommentEventWorkerProxy) forwardToSns(ctx context.Context, request *htt
 	if err := p.snsWriter.WriteWithContext(ctx, buffer.Bytes()); err != nil {
 		return errors.Wrap(err, "writing buffer to sns")
 	}
-
 	p.logger.InfoContext(ctx, "proxied request to sns")
 
 	return nil
