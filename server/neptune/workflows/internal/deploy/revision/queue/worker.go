@@ -86,11 +86,13 @@ func NewWorker(
 	a workerActivities,
 	tfWorkflow terraform.Workflow,
 	repoName, rootName string,
+	githubCheckRunCache CheckRunClient,
 ) (*Worker, error) {
-	tfWorkflowRunner := terraform.NewWorkflowRunner(a, tfWorkflow)
+	tfWorkflowRunner := terraform.NewWorkflowRunner(a, tfWorkflow, githubCheckRunCache)
 	deployer := &Deployer{
 		Activities:              a,
 		TerraformWorkflowRunner: tfWorkflowRunner,
+		GithubCheckRunCache:     githubCheckRunCache,
 	}
 
 	latestDeployment, err := deployer.FetchLatestDeployment(ctx, repoName, rootName)

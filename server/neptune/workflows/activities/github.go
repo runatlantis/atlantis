@@ -66,19 +66,23 @@ type CreateCheckRunRequest struct {
 }
 
 type UpdateCheckRunRequest struct {
-	Title   string
-	State   internal.CheckRunState
-	Actions []internal.CheckRunAction
-	Repo    internal.Repo
-	ID      int64
-	Summary string
+	Title      string
+	State      internal.CheckRunState
+	Actions    []internal.CheckRunAction
+	Repo       internal.Repo
+	ID         int64
+	Summary    string
+	ExternalID string
 }
 
 type CreateCheckRunResponse struct {
-	ID int64
+	ID     int64
+	Status string
 }
+
 type UpdateCheckRunResponse struct {
-	ID int64
+	ID     int64
+	Status string
 }
 
 func (a *githubActivities) GithubUpdateCheckRun(ctx context.Context, request UpdateCheckRunRequest) (UpdateCheckRunResponse, error) {
@@ -91,9 +95,10 @@ func (a *githubActivities) GithubUpdateCheckRun(ctx context.Context, request Upd
 	state, conclusion := getCheckStateAndConclusion(request.State)
 
 	opts := github.UpdateCheckRunOptions{
-		Name:   request.Title,
-		Status: github.String(state),
-		Output: &output,
+		Name:       request.Title,
+		Status:     github.String(state),
+		Output:     &output,
+		ExternalID: &request.ExternalID,
 	}
 
 	// update with any actions
@@ -121,7 +126,8 @@ func (a *githubActivities) GithubUpdateCheckRun(ctx context.Context, request Upd
 	}
 
 	return UpdateCheckRunResponse{
-		ID: run.GetID(),
+		ID:     run.GetID(),
+		Status: run.GetStatus(),
 	}, nil
 }
 
@@ -167,7 +173,8 @@ func (a *githubActivities) GithubCreateCheckRun(ctx context.Context, request Cre
 	}
 
 	return CreateCheckRunResponse{
-		ID: run.GetID(),
+		ID:     run.GetID(),
+		Status: run.GetStatus(),
 	}, nil
 }
 

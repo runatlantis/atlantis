@@ -26,9 +26,9 @@ func Error(ctx workflow.Context, msg string, additionalKVs ...interface{}) {
 	logger.Error(msg, append(kvs, additionalKVs)...)
 }
 
-func Debug(ctx workflow.Context, msg string) {
+func Debug(ctx workflow.Context, msg string, additionalKVs ...interface{}) {
 	logger := workflow.GetLogger(ctx)
 	kvs := context.ExtractFieldsAsList(ctx)
 
-	logger.Debug(msg, kvs...)
+	logger.Debug(msg, append(kvs, additionalKVs)...)
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/notifier"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
@@ -85,19 +86,21 @@ func newRunner(ctx workflow.Context, request Request, tfWorkflow terraform.Workf
 
 	scope := workflowMetrics.NewScope(ctx)
 
+	checkRunCache := notifier.NewGithubCheckRunCache(a)
+
 	lockStateUpdater := queue.LockStateUpdater{
-		Activities: a,
+		GithubCheckRunCache: checkRunCache,
 	}
 	revisionQueue := queue.NewQueue(func(ctx workflow.Context, d *queue.Deploy) {
 		lockStateUpdater.UpdateQueuedRevisions(ctx, d)
 	}, scope)
 
-	worker, err := queue.NewWorker(ctx, revisionQueue, a, tfWorkflow, request.Repo.FullName, request.Root.Name)
+	worker, err := queue.NewWorker(ctx, revisionQueue, a, tfWorkflow, request.Repo.FullName, request.Root.Name, checkRunCache)
 	if err != nil {
 		return nil, err
 	}
 
-	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, a, sideeffect.GenerateUUID, worker)
+	revisionReceiver := revision.NewReceiver(ctx, revisionQueue, checkRunCache, sideeffect.GenerateUUID, worker)
 
 	return &Runner{
 		Queue:                    revisionQueue,

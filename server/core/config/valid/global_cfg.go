@@ -116,7 +116,10 @@ func (s *S3) GetContainerName() string {
 
 type Metrics struct {
 	Statsd *Statsd
+	Log    *Log
 }
+
+type Log struct{}
 
 type Statsd struct {
 	Port         string

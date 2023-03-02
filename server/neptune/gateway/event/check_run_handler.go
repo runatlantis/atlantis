@@ -134,10 +134,11 @@ func (h *CheckRunHandler) signalPlanReviewWorkflowChannel(ctx context.Context, e
 }
 
 func (h *CheckRunHandler) signalUnlockWorkflowChannel(ctx context.Context, event CheckRun, rootName string) error {
+	workflowID := buildDeployWorkflowID(event.Repo.FullName, rootName)
 	err := h.DeploySignaler.SignalWorkflow(
 		ctx,
 		// deploy workflow id is repo||root (the name of the check run is the root)
-		buildDeployWorkflowID(event.Repo.FullName, rootName),
+		workflowID,
 		// keeping this empty is fine since temporal will find the currently running workflow
 		"",
 		workflows.DeployUnlockSignalName,
@@ -145,9 +146,9 @@ func (h *CheckRunHandler) signalUnlockWorkflowChannel(ctx context.Context, event
 			User: event.User.Username,
 		})
 	if err != nil {
-		return errors.Wrapf(err, "signaling workflow with id: %s", event.ExternalID)
+		return errors.Wrapf(err, "signaling workflow with id: %s", workflowID)
 	}
-	h.Logger.InfoContext(ctx, fmt.Sprintf("Signaled workflow with id %s to unlock", event.ExternalID))
+	h.Logger.InfoContext(ctx, fmt.Sprintf("Signaled workflow with id %s to unlock", workflowID))
 	return nil
 }
 

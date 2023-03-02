@@ -1,23 +1,32 @@
 package revision_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/notifier"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/request"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/revision/queue"
 	terraformWorkflow "github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/terraform"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 )
+
+type testCheckRunClient struct {
+	expectedRequest notifier.GithubCheckRunRequest
+	expectedT       *testing.T
+}
+
+func (t *testCheckRunClient) CreateOrUpdate(ctx workflow.Context, deploymentID string, request notifier.GithubCheckRunRequest) (int64, error) {
+	assert.Equal(t.expectedT, t.expectedRequest, request)
+
+	return 1, nil
+}
 
 type testQueue struct {
 	Queue []terraformWorkflow.DeploymentInfo
@@ -53,18 +62,14 @@ type req struct {
 	Lock            queue.LockState
 	Current         queue.CurrentDeployment
 	InitialElements []terraformWorkflow.DeploymentInfo
+	ExpectedRequest notifier.GithubCheckRunRequest
+	ExpectedT       *testing.T
 }
 
 type response struct {
 	Queue   []terraformWorkflow.DeploymentInfo
 	Lock    queue.LockState
 	Timeout bool
-}
-
-type testActivities struct{}
-
-func (a *testActivities) GithubCreateCheckRun(ctx context.Context, request activities.CreateCheckRunRequest) (activities.CreateCheckRunResponse, error) {
-	return activities.CreateCheckRunResponse{}, nil
 }
 
 func testWorkflow(ctx workflow.Context, r req) (response, error) {
@@ -82,9 +87,10 @@ func testWorkflow(ctx workflow.Context, r req) (response, error) {
 		Current: r.Current,
 	}
 
-	var a *testActivities
-
-	receiver := revision.NewReceiver(ctx, queue, a, func(ctx workflow.Context) (uuid.UUID, error) {
+	receiver := revision.NewReceiver(ctx, queue, &testCheckRunClient{
+		expectedRequest: r.ExpectedRequest,
+		expectedT:       r.ExpectedT,
+	}, func(ctx workflow.Context) (uuid.UUID, error) {
 		return r.ID, nil
 	}, worker)
 	selector := workflow.NewSelector(ctx)
@@ -123,22 +129,17 @@ func TestEnqueue(t *testing.T) {
 		})
 	}, 0)
 
-	a := &testActivities{}
-
-	env.RegisterActivity(a)
-
 	id := uuid.Must(uuid.NewUUID())
-
-	env.OnActivity(a.GithubCreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
-		Title:      "atlantis/deploy: root",
-		Sha:        rev,
-		Repo:       github.Repo{Name: "nish"},
-		ExternalID: id.String(),
-		State:      github.CheckRunQueued,
-	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
 	env.ExecuteWorkflow(testWorkflow, req{
 		ID: id,
+		ExpectedRequest: notifier.GithubCheckRunRequest{
+			Title: "atlantis/deploy: root",
+			Sha:   rev,
+			Repo:  github.Repo{Name: "nish"},
+			State: github.CheckRunQueued,
+		},
+		ExpectedT: t,
 	})
 	env.AssertExpectations(t)
 	assert.True(t, env.IsWorkflowCompleted())
@@ -179,22 +180,17 @@ func TestEnqueue_ManualTrigger(t *testing.T) {
 		})
 	}, 0)
 
-	a := &testActivities{}
-
-	env.RegisterActivity(a)
-
 	id := uuid.Must(uuid.NewUUID())
-
-	env.OnActivity(a.GithubCreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
-		Title:      "atlantis/deploy: root",
-		Sha:        rev,
-		Repo:       github.Repo{Name: "nish"},
-		ExternalID: id.String(),
-		State:      github.CheckRunQueued,
-	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
 	env.ExecuteWorkflow(testWorkflow, req{
 		ID: id,
+		ExpectedRequest: notifier.GithubCheckRunRequest{
+			Title: "atlantis/deploy: root",
+			Sha:   rev,
+			Repo:  github.Repo{Name: "nish"},
+			State: github.CheckRunQueued,
+		},
+		ExpectedT: t,
 	})
 	env.AssertExpectations(t)
 	assert.True(t, env.IsWorkflowCompleted())
@@ -236,19 +232,7 @@ func TestEnqueue_ManualTrigger_QueueAlreadyLocked(t *testing.T) {
 		})
 	}, 0)
 
-	a := &testActivities{}
-
-	env.RegisterActivity(a)
-
 	id := uuid.Must(uuid.NewUUID())
-
-	env.OnActivity(a.GithubCreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
-		Title:      "atlantis/deploy: root",
-		Sha:        rev,
-		Repo:       github.Repo{Name: "nish"},
-		ExternalID: id.String(),
-		State:      github.CheckRunQueued,
-	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
 	env.ExecuteWorkflow(testWorkflow, req{
 		ID: id,
@@ -257,6 +241,13 @@ func TestEnqueue_ManualTrigger_QueueAlreadyLocked(t *testing.T) {
 			Status:   queue.LockedStatus,
 			Revision: "123334444555",
 		},
+		ExpectedRequest: notifier.GithubCheckRunRequest{
+			Title: "atlantis/deploy: root",
+			Sha:   rev,
+			Repo:  github.Repo{Name: "nish"},
+			State: github.CheckRunQueued,
+		},
+		ExpectedT: t,
 	})
 	env.AssertExpectations(t)
 	assert.True(t, env.IsWorkflowCompleted())
@@ -298,21 +289,7 @@ func TestEnqueue_MergeTrigger_QueueAlreadyLocked(t *testing.T) {
 		})
 	}, 0)
 
-	a := &testActivities{}
-
-	env.RegisterActivity(a)
-
 	id := uuid.Must(uuid.NewUUID())
-
-	env.OnActivity(a.GithubCreateCheckRun, mock.Anything, activities.CreateCheckRunRequest{
-		Title:      "atlantis/deploy: root",
-		Sha:        rev,
-		Repo:       github.Repo{Name: "nish"},
-		ExternalID: id.String(),
-		Summary:    "This deploy is locked from a manual deployment for revision 123334444555.  Unlock to proceed.",
-		Actions:    []github.CheckRunAction{github.CreateUnlockAction()},
-		State:      github.CheckRunActionRequired,
-	}).Return(activities.CreateCheckRunResponse{ID: 1}, nil)
 
 	env.ExecuteWorkflow(testWorkflow, req{
 		ID: id,
@@ -321,6 +298,15 @@ func TestEnqueue_MergeTrigger_QueueAlreadyLocked(t *testing.T) {
 			Status:   queue.LockedStatus,
 			Revision: "123334444555",
 		},
+		ExpectedRequest: notifier.GithubCheckRunRequest{
+			Title:   "atlantis/deploy: root",
+			Sha:     rev,
+			Repo:    github.Repo{Name: "nish"},
+			Summary: "This deploy is locked from a manual deployment for revision 123334444555.  Unlock to proceed.",
+			Actions: []github.CheckRunAction{github.CreateUnlockAction()},
+			State:   github.CheckRunActionRequired,
+		},
+		ExpectedT: t,
 	})
 	env.AssertExpectations(t)
 	assert.True(t, env.IsWorkflowCompleted())
@@ -362,8 +348,6 @@ func TestEnqueue_ManualTrigger_RequestAlreadyInQueue(t *testing.T) {
 		})
 	}, 0)
 
-	a := &testActivities{}
-	env.RegisterActivity(a)
 	id := uuid.Must(uuid.NewUUID())
 
 	deploymentInfo := terraformWorkflow.DeploymentInfo{
@@ -404,8 +388,6 @@ func TestEnqueue_ManualTrigger_RequestAlreadyInProgress(t *testing.T) {
 		})
 	}, 0)
 
-	a := &testActivities{}
-	env.RegisterActivity(a)
 	id := uuid.Must(uuid.NewUUID())
 
 	deploymentInfo := terraformWorkflow.DeploymentInfo{

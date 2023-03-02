@@ -49,9 +49,13 @@ func NewScopeWithReporter(cfg valid.Metrics, logger logging.Logger, statsNamespa
 }
 
 func NewReporter(cfg valid.Metrics, logger logging.Logger) (tally.StatsReporter, error) {
-	if cfg.Statsd == nil {
+	if cfg.Log != nil {
 		// return logging reporter and proceed
 		return newLoggingReporter(logger), nil
+	}
+
+	if cfg.Statsd == nil {
+		return newNoopReporter(), nil
 	}
 
 	statsdCfg := cfg.Statsd

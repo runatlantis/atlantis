@@ -7,6 +7,7 @@ import (
 	constants "github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	terraformActivities "github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/notifier"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
@@ -30,17 +31,22 @@ func (e PlanRejectionError) Error() string {
 	return e.msg
 }
 
+type CheckRunClient interface {
+	CreateOrUpdate(ctx workflow.Context, deploymentID string, request notifier.GithubCheckRunRequest) (int64, error)
+}
+
 type Workflow func(ctx workflow.Context, request terraform.Request) error
 
 type stateReceiver interface {
 	Receive(ctx workflow.Context, c workflow.ReceiveChannel, deploymentInfo DeploymentInfo)
 }
 
-func NewWorkflowRunner(a receiverActivities, w Workflow) *WorkflowRunner {
+func NewWorkflowRunner(a receiverActivities, w Workflow, githubCheckRunCache CheckRunClient) *WorkflowRunner {
 	return &WorkflowRunner{
 		Workflow: w,
 		StateReceiver: &StateReceiver{
-			Activity: a,
+			Activity:             a,
+			CheckRunSessionCache: githubCheckRunCache,
 		},
 	}
 }
@@ -80,7 +86,7 @@ func (r *WorkflowRunner) buildRequestRoot(root terraformActivities.Root, diffDir
 	var approvalType terraformActivities.PlanApprovalType
 	var reasons []string
 
-	if diffDirection == activities.DirectionDiverged || (root.Trigger == terraformActivities.ManualTrigger && !root.Rerun) {
+	if diffDirection == activities.DirectionDiverged || root.Trigger == terraformActivities.ManualTrigger {
 		approvalType = terraformActivities.ManualApproval
 	}
 
@@ -92,7 +98,7 @@ func (r *WorkflowRunner) buildRequestRoot(root terraformActivities.Root, diffDir
 		reasons = append(reasons, ":warning: Requested Revision is not ahead of deployed revision, please confirm the changes described in the plan.")
 	}
 
-	if root.Trigger == terraformActivities.ManualTrigger && !root.Rerun {
+	if root.Trigger == terraformActivities.ManualTrigger {
 		reasons = append(reasons, ":warning: Manually Triggered Deploys must be confirmed before proceeding.")
 	}
 

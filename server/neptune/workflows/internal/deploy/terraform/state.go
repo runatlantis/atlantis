@@ -4,15 +4,17 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	key "github.com/runatlantis/atlantis/server/neptune/context"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github/markdown"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/terraform"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/config/logger"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/notifier"
+	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/deploy/version"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/internal/terraform/state"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -28,7 +30,8 @@ type receiverActivities interface {
 }
 
 type StateReceiver struct {
-	Activity receiverActivities
+	Activity             receiverActivities
+	CheckRunSessionCache CheckRunClient
 }
 
 func (n *StateReceiver) Receive(ctx workflow.Context, c workflow.ReceiveChannel, deploymentInfo DeploymentInfo) {
@@ -61,11 +64,11 @@ func (n *StateReceiver) updateCheckRun(ctx workflow.Context, workflowState *stat
 	summary := markdown.RenderWorkflowStateTmpl(workflowState)
 	checkRunState := determineCheckRunState(workflowState)
 
-	request := activities.UpdateCheckRunRequest{
+	request := notifier.GithubCheckRunRequest{
 		Title:   BuildCheckRunTitle(deploymentInfo.Root.Name),
+		Sha:     deploymentInfo.Revision,
 		State:   checkRunState,
 		Repo:    deploymentInfo.Repo,
-		ID:      deploymentInfo.CheckRunID,
 		Summary: summary,
 	}
 
@@ -83,8 +86,21 @@ func (n *StateReceiver) updateCheckRun(ctx workflow.Context, workflowState *stat
 		})
 	}
 
-	// TODO: should we block here? maybe we can just make this async
-	return workflow.ExecuteActivity(ctx, n.Activity.GithubUpdateCheckRun, request).Get(ctx, nil)
+	version := workflow.GetVersion(ctx, version.CacheCheckRunSessions, workflow.DefaultVersion, 1)
+
+	if version == workflow.DefaultVersion {
+		return workflow.ExecuteActivity(ctx, n.Activity.GithubUpdateCheckRun, activities.UpdateCheckRunRequest{
+			Title:   request.Title,
+			State:   request.State,
+			Repo:    request.Repo,
+			ID:      deploymentInfo.CheckRunID,
+			Summary: request.Summary,
+			Actions: request.Actions,
+		}).Get(ctx, nil)
+	}
+
+	_, err := n.CheckRunSessionCache.CreateOrUpdate(ctx, deploymentInfo.ID.String(), request)
+	return err
 }
 
 func (n *StateReceiver) emitApplyEvents(ctx workflow.Context, jobState *state.Job, deploymentInfo DeploymentInfo) error {

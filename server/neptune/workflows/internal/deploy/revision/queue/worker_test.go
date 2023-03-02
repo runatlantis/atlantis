@@ -391,7 +391,7 @@ func TestNewWorker(t *testing.T) {
 			ScheduleToCloseTimeout: 5 * time.Second,
 		})
 		q := queue.NewQueue(noopCallback, metrics.NewNullableScope())
-		_, err := queue.NewWorker(ctx, q, &testDeployActivity{}, emptyWorkflow, "nish/repo", "root")
+		_, err := queue.NewWorker(ctx, q, &testDeployActivity{}, emptyWorkflow, "nish/repo", "root", &testCheckRunClient{})
 		return res{
 			Lock: q.GetLockState(),
 		}, err
