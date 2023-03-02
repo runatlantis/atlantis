@@ -84,34 +84,6 @@ Values are chosen in this order:
   which can run arbitrary code if given a malicious Terraform configuration.
   :::
 
-### `--allow-repo-config`
-  <Badge text="Deprecated" type="warn"/>
-  ```bash
-  atlantis server --allow-repo-config
-  # or
-  ATLANTIS_ALLOW_REPO_CONFIG=true
-  ```
-  This flag is deprecated. It allows all repos to use all restricted
-  `atlantis.yaml` keys. See [Repo Level Atlantis.yaml](repo-level-atlantis-yaml.html) for more details.
-
-  Instead of using this flag, create a server-side `--repo-config` file:
-  ```yaml
-  # repos.yaml
-  repos:
-  - id: /.*/
-    allowed_overrides: [apply_requirements, workflow]
-    allow_custom_workflows: true
-  ```
-  Or use
-  ```bash
-  --repo-config-json='{"repos":[{"id":"/.*/", "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true}]}'
-  ````
-
-  ::: warning SECURITY WARNING
-  This setting enables pull requests to run arbitrary code on the Atlantis server.
-  Only enable in trusted settings.
-  :::
-
 ### `--api-secret`
   ```bash
   atlantis server --api-secret="secret"
@@ -170,6 +142,10 @@ Values are chosen in this order:
 By default, changes to modules will not trigger autoplanning. See the flags below. 
 :::
 
+::: warning NOTE
+If any projects are defined in a repo atlantis.yaml file, the logic for this flag will not execute. See issue [#3122](https://github.com/runatlantis/atlantis/issues/3122).
+:::
+
 ### `--autoplan-modules`
 
 ```bash
@@ -182,6 +158,10 @@ Defaults to `false`. When set to `true`, Atlantis will trace the local modules o
 Included project are projects with files included by `--autoplan-file-list`. 
 After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
 `--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
+
+::: warning NOTE
+If any projects are defined in a repo atlantis.yaml file, the logic for this flag will not execute. See issue [#3122](https://github.com/runatlantis/atlantis/issues/3122).
+:::
 
 ### `--autoplan-modules-from-projects`
 
@@ -305,6 +285,15 @@ and set `--autoplan-modules` to `false`.
   This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
   :::
 
+### `--checkout-depth`
+  ```bash
+  atlantis server --checkout-depth=0
+  # or
+  ATLANTIS_CHECKOUT_DEPTH=0
+  ```
+  The number of commits to fetch from the branch. Used if `--checkout-strategy=merge` since the `--checkout-strategy=branch` (default) checkout strategy always defaults to a shallow clone using a depth of 1.
+  Defaults to `0`. See [Checkout Strategy](checkout-strategy.html) for more details.
+
 ### `--checkout-strategy`
   ```bash
   atlantis server --checkout-strategy="<branch|merge>"
@@ -344,17 +333,6 @@ and set `--autoplan-modules` to `false`.
   ```
   Terraform version to default to. Will download to `<data-dir>/bin/terraform<version>`
   if not in `PATH`. See [Terraform Versions](terraform-versions.html) for more details.
-
-### `--disable-apply`
-  <Badge text="Deprecated" type="warn"/>
-  ```bash
-  atlantis server --disable-apply
-  # or
-  ATLANTIS_DISABLE_APPLY=true
-  ```
-  Deprecated for `--allow-commands`.
-
-  Disable all `atlantis apply` commands, regardless of which flags are passed with it.
 
 ### `--disable-apply-all`
   ```bash
@@ -437,6 +415,16 @@ and set `--autoplan-modules` to `false`.
   Comment command trigger executable name. Defaults to `atlantis`.
 
   This is useful when running multiple Atlantis servers against a single repository.
+
+### `--hide-unchanged-plan-comments`
+  ```bash
+  atlantis server --hide-unchanged-plan-comments
+  # or
+  ATLANTIS_HIDE_UNCHANGED_PLAN_COMMENTS=true
+  ```
+Remove no-changes plan comments from the pull request. 
+
+This is useful when you have many projects and want to keep the pull request clean from useless comments.
 
 ### `--gh-hostname`
   ```bash
@@ -780,10 +768,6 @@ and set `--autoplan-modules` to `false`.
   ```
   :::
 
-### `--repo-whitelist`
-  <Badge text="Deprecated" type="warn"/>
-  Deprecated for `--repo-allowlist`.
-
 ### `--repo-allowlist`
   ```bash
   # NOTE: Use single quotes to avoid shell expansion of *.
@@ -814,44 +798,6 @@ and set `--autoplan-modules` to `false`.
   * Allowlist all repositories
     * `--repo-allowlist='*'`
 
-### `--require-approval`
-  <Badge text="Deprecated" type="warn"/>
-  ```bash
-  atlantis server --require-approval
-  # or
-  ATLANTIS_REQUIRE_APPROVAL=true
-  ```
-  This flag is deprecated. It requires all pull requests to be approved
-  before `atlantis apply` is allowed. See [Command Requirements](command-requirements.html) for more details.
-
-  Instead of using this flag, create a server-side `--repo-config` file:
-  ```yaml
-  # repos.yaml
-  repos:
-  - id: /.*/
-    apply_requirements: [approved]
-  ```
-  Or use `--repo-config-json='{"repos":[{"id":"/.*/", "apply_requirements":["approved"]}]}'` instead.
-
-### `--require-mergeable`
-  <Badge text="Deprecated" type="warn"/>
-  ```bash
-  atlantis server --require-mergeable
-  # or
-  ATLANTIS_REQUIRE_MERGEABLE=true
-  ```
-  This flag is deprecated. It causes all pull requests to be mergeable
-  before `atlantis apply` is allowed. See [Command Requirements](command-requirements.html) for more details.
-
-  Instead of using this flag, create a server-side `--repo-config` file:
-  ```yaml
-  # repos.yaml
-  repos:
-  - id: /.*/
-    apply_requirements: [mergeable]
-  ```
-  Or use `--repo-config-json='{"repos":[{"id":"/.*/", "apply_requirements":["mergeable"]}]}'` instead.
-
 ### `--silence-fork-pr-errors`
   ```bash
   atlantis server --silence-fork-pr-errors
@@ -860,10 +806,6 @@ and set `--autoplan-modules` to `false`.
   ```
   Normally, if Atlantis receives a pull request webhook from a fork and --allow-fork-prs is not set,
   it will comment back with an error. This flag disables that commenting.
-
-### `--silence-whitelist-errors`
-  <Badge text="Deprecated" type="warn"/>
-  Deprecated for `--silence-allowlist-errors`.
 
 ### `--silence-allowlist-errors`
   ```bash

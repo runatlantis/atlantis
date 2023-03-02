@@ -3,7 +3,6 @@ module github.com/runatlantis/atlantis
 go 1.20
 
 require (
-	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.1.0
@@ -12,15 +11,15 @@ require (
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-playground/validator/v10 v10.11.2
 	github.com/go-test/deep v1.1.0
-	github.com/golang-jwt/jwt/v4 v4.4.3
-	github.com/google/go-github/v50 v50.0.0
+	github.com/golang-jwt/jwt/v4 v4.5.0
+	github.com/google/go-github/v50 v50.1.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-getter/v2 v2.2.0
 	github.com/hashicorp/go-version v1.6.0
-	github.com/hashicorp/terraform-config-inspect v0.0.0-20230201191712-8cad743c8c26
+	github.com/hashicorp/terraform-config-inspect v0.0.0-20230223165911-2d94e3d51111
 	github.com/kr/pretty v0.3.1
 	github.com/mcdafydd/go-azuredevops v0.12.1
 	github.com/microcosm-cc/bluemonday v1.0.22
@@ -37,7 +36,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/urfave/negroni/v3 v3.0.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
 	github.com/xanzy/go-gitlab v0.80.2
@@ -49,7 +48,7 @@ require (
 )
 
 require (
-	github.com/agext/levenshtein v1.2.3 // indirect
+	github.com/agext/levenshtein v1.2.3
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect

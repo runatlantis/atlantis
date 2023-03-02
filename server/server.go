@@ -422,6 +422,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.EnableDiffMarkdownFormat,
 		userConfig.MarkdownTemplateOverridesDir,
 		userConfig.ExecutableName,
+		userConfig.HideUnchangedPlanComments,
 	)
 
 	var lockingClient locking.Locker
@@ -457,6 +458,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var workingDir events.WorkingDir = &events.FileWorkspace{
 		DataDir:          userConfig.DataDir,
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
+		CheckoutDepth:    userConfig.CheckoutDepth,
 		GithubAppEnabled: githubAppEnabled,
 	}
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir

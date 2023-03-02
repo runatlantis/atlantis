@@ -56,8 +56,9 @@ const (
 	BitbucketTokenFlag               = "bitbucket-token"
 	BitbucketUserFlag                = "bitbucket-user"
 	BitbucketWebhookSecretFlag       = "bitbucket-webhook-secret"
-	ConfigFlag                       = "config"
+	CheckoutDepthFlag                = "checkout-depth"
 	CheckoutStrategyFlag             = "checkout-strategy"
+	ConfigFlag                       = "config"
 	DataDirFlag                      = "data-dir"
 	DefaultTFVersionFlag             = "default-tf-version"
 	DisableApplyAllFlag              = "disable-apply-all"
@@ -70,6 +71,7 @@ const (
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	ExecutableName                   = "executable-name"
+	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
 	GHTokenFlag                      = "gh-token"
@@ -139,6 +141,7 @@ const (
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
 	DefaultCheckoutStrategy             = "branch"
+	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
 	DefaultExecutableName               = "atlantis"
@@ -529,8 +532,18 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable websocket origin check",
 		defaultValue: false,
 	},
+	HideUnchangedPlanComments: {
+		description:  "Remove no-changes plan comments from the pull request.",
+		defaultValue: false,
+	},
 }
 var intFlags = map[string]intFlag{
+	CheckoutDepthFlag: {
+		description: fmt.Sprintf("Used only if --%s=merge.", CheckoutStrategyFlag) +
+			" How many commits to include in each of base and feature branches when cloning repository." +
+			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
+		defaultValue: DefaultCheckoutDepth,
+	},
 	ParallelPoolSize: {
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
 		defaultValue: DefaultParallelPoolSize,
@@ -757,6 +770,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.AutoplanFileList == "" {
 		c.AutoplanFileList = DefaultAutoplanFileList
+	}
+	if c.CheckoutDepth <= 0 {
+		c.CheckoutDepth = DefaultCheckoutDepth
 	}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
