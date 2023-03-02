@@ -104,7 +104,8 @@ jobs:
           ATLANTIS_VERSION=${{ env.RELEASE_VERSION }}
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        #platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        platforms: linux/amd64
         push: ${{ env.PUSH }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
