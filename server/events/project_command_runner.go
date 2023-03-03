@@ -363,26 +363,25 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 		isOwner := policySet.Owners.IsOwner(ctx.User.Username, teams) || isAdmin
 		prjPolicyStatus := ctx.ProjectPolicyStatus
 		for i, policyStatus := range prjPolicyStatus {
-			increment := true
 			ignorePolicy := false
 			if policySet.Name == policyStatus.PolicySetName {
 				// Policy set either passed or has sufficient approvals. Move on.
-				if policyStatus.Passed || policyStatus.Approvals == policySet.ApproveCount {
-					increment = false
+				if policyStatus.Passed || (policyStatus.Approvals == policySet.ApproveCount) {
+					ignorePolicy = true
 				}
 				// Set ignore flag if targeted policy does not match.
-				if ctx.PolicySetTarget != "" && ctx.PolicySetTarget != policySet.Name {
+				if ctx.PolicySetTarget != "" && (ctx.PolicySetTarget != policySet.Name) {
 					ignorePolicy = true
 				}
 				// Increment approval if user is owner.
-				if isOwner && !ignorePolicy && increment {
+				if isOwner && !ignorePolicy {
 					prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
 					// User is not authorized to approve policy set.
-				} else if !ignorePolicy && increment {
+				} else if !ignorePolicy {
 					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
 				}
 				// Still bubble up this failure, even if policy set is not targeted.
-				if prjPolicyStatus[i].Approvals != policySet.ApproveCount {
+				if !ignorePolicy && (prjPolicyStatus[i].Approvals != policySet.ApproveCount) {
 					allPassed = false
 				}
 				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{

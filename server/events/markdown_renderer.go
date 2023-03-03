@@ -72,7 +72,6 @@ type commonData struct {
 	EnableDiffMarkdownFormat  bool
 	ExecutableName            string
 	HideUnchangedPlanComments bool
-	PullNum                   int
 }
 
 // errData is data about an error response.
@@ -152,7 +151,7 @@ func NewMarkdownRenderer(
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subCmd, log string, verbose bool, vcsHost models.VCSHostType, pullNum int) string {
+func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subCmd, log string, verbose bool, vcsHost models.VCSHostType) string {
 	commandStr := cases.Title(language.English).String(strings.Replace(cmdName.String(), "_", " ", -1))
 	common := commonData{
 		Command:                   commandStr,
@@ -166,7 +165,6 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subC
 		EnableDiffMarkdownFormat:  m.enableDiffMarkdownFormat,
 		ExecutableName:            m.executableName,
 		HideUnchangedPlanComments: m.hideUnchangedPlanComments,
-		PullNum:                   pullNum,
 	}
 
 	templates := m.markdownTemplates

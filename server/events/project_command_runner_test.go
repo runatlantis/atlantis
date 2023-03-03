@@ -946,6 +946,38 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			expFailure: ``,
 			hasErr:     false,
 		},
+		{
+			description: "Policies should not fail if they pass.",
+			userTeams:   []string{"someuserteam"},
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy1",
+						ApproveCount: 2,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Passed:        true,
+					Approvals:     0,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  2,
+					CurApprovals:  0,
+					Passed:        true,
+				},
+			},
+			expFailure: ``,
+			hasErr:     false,
+		},
 	}
 
 	for _, c := range cases {
