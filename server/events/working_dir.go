@@ -283,9 +283,17 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 		fetchRef = fmt.Sprintf("pull/%d/head:", p.Num)
 		fetchRemote = "origin"
 	}
-	if err := runGit("fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, fetchRef); err != nil {
-		return err
-	}
+
+        // if no checkout depth, omit depth arg
+        if w.CheckoutDepth == 0 {
+                if err := runGit("fetch", fetchRemote, fetchRef); err != nil {
+                         return err
+                }
+        } else {
+                if err := runGit("fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, fetchRef); err != nil {
+                         return err
+                }
+        }
 
 	if w.GpgNoSigningEnabled {
 		if err := runGit("config", "--local", "commit.gpgsign", "false"); err != nil {
