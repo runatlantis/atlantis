@@ -141,7 +141,7 @@ const (
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
 	DefaultCheckoutStrategy             = "branch"
-	DefaultCheckoutDepth                = 0
+	DefaultCheckoutDepth                = 50
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
 	DefaultExecutableName               = "atlantis"
