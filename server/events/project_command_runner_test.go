@@ -757,6 +757,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 		policySetCfg    valid.PolicySets
 		policySetStatus []models.PolicySetStatus
 		userTeams       []string // Teams the user is a member of
+		targetedPolicy  string   // Policy to target when running approvals
 
 		expOut     []models.PolicySetResult
 		expFailure string
@@ -978,6 +979,55 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			expFailure: ``,
 			hasErr:     false,
 		},
+		{
+			description:    "Non-targeted failing policies should still trigger failure when a targeted policy is cleared.",
+			userTeams:      []string{"someuserteam"},
+			targetedPolicy: "policy1",
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy2",
+						ApproveCount: 1,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Approvals:     0,
+					Passed:        false,
+				},
+				{
+					PolicySetName: "policy2",
+					Approvals:     0,
+					Passed:        false,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+			},
+			expFailure: `One or more policy sets require additional approval.`,
+			hasErr:     false,
+		},
 	}
 
 	for _, c := range cases {
@@ -1045,6 +1095,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				PolicySets:          c.policySetCfg,
 				ProjectPolicyStatus: projPolicyStatus,
 				Pull:                modelPull,
+				PolicySetTarget:     c.targetedPolicy,
 			}
 
 			res := runner.ApprovePolicies(ctx)
