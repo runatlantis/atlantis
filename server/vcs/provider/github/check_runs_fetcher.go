@@ -39,7 +39,7 @@ func (r *CheckRunsFetcher) ListFailedPolicyCheckRuns(ctx context.Context, instal
 		if checkRunResults != nil {
 			return checkRunResults.CheckRuns, resp, err
 		}
-		return nil, nil, errors.New("unable to retrieve check runs from GH check run results")
+		return nil, resp, errors.Wrap(err, "unable to retrieve check runs from GH check run results")
 	}
 
 	checkRuns, err := Iterate(ctx, run)
