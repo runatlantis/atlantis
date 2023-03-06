@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
@@ -46,7 +47,8 @@ func NewCommentEventWorkerProxy(
 	scheduler scheduler,
 	rootDeployer rootDeployer,
 	vcsClient vcs.Client,
-	vcsStatusUpdater statusUpdater) *CommentEventWorkerProxy {
+	vcsStatusUpdater statusUpdater,
+	globalCfg valid.GlobalCfg) *CommentEventWorkerProxy {
 	return &CommentEventWorkerProxy{
 		logger:           logger,
 		snsWriter:        snsWriter,
@@ -55,6 +57,7 @@ func NewCommentEventWorkerProxy(
 		vcsClient:        vcsClient,
 		rootDeployer:     rootDeployer,
 		vcsStatusUpdater: vcsStatusUpdater,
+		globalCfg:        globalCfg,
 	}
 }
 
@@ -66,6 +69,7 @@ type CommentEventWorkerProxy struct {
 	vcsClient        vcs.Client
 	rootDeployer     rootDeployer
 	vcsStatusUpdater statusUpdater
+	globalCfg        valid.GlobalCfg
 }
 
 func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.BufferedRequest, event Comment, cmd *command.Comment) error {
@@ -75,7 +79,7 @@ func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.Buff
 
 	if err != nil {
 		p.logger.ErrorContext(ctx, "unable to allocate platform mode")
-		return p.handleLegacyComment(ctx, request, event, cmd)
+		return p.handleLegacyComment(ctx, request, event, cmd, shouldAllocate)
 	}
 
 	if shouldAllocate && cmd.ForceApply {
@@ -88,16 +92,38 @@ func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.Buff
 		})
 
 	}
-	return p.handleLegacyComment(ctx, request, event, cmd)
+	return p.handleLegacyComment(ctx, request, event, cmd, shouldAllocate)
 }
 
-func (p *CommentEventWorkerProxy) handleLegacyComment(ctx context.Context, request *http.BufferedRequest, event Comment, cmd *command.Comment) error {
-	if event.Pull.State != models.ClosedPullState && (cmd.Name == command.Plan || cmd.Name == command.Apply) {
+func (p *CommentEventWorkerProxy) handleLegacyComment(ctx context.Context, request *http.BufferedRequest, event Comment, cmd *command.Comment, platformMode bool) error {
+	if p.shouldMarkEventQueued(event, cmd, platformMode) {
 		if _, err := p.vcsStatusUpdater.UpdateCombined(ctx, event.BaseRepo, event.Pull, models.QueuedVCSStatus, cmd.Name, "", "Request received. Adding to the queue..."); err != nil {
 			p.logger.WarnContext(ctx, fmt.Sprintf("unable to update commit status: %s", err))
 		}
 	}
 	return p.forwardToSns(ctx, request)
+}
+
+func (p *CommentEventWorkerProxy) shouldMarkEventQueued(event Comment, cmd *command.Comment, platformMode bool) bool {
+	// pending status should only be for plan and apply step
+	if cmd.Name != command.Plan && cmd.Name != command.Apply {
+		return false
+	}
+	// if command is apply, platform mode should not be enabled
+	if cmd.Name == command.Apply && platformMode {
+		return false
+	}
+	// pull event should not be from a fork
+	if event.Pull.HeadRepo.Owner != event.Pull.BaseRepo.Owner {
+		return false
+	}
+	// pull event should not be from closed PR
+	if event.Pull.State != models.ClosedPullState {
+		return false
+	}
+	// pull event should not use an invalid base branch
+	repo := p.globalCfg.MatchingRepo(event.Pull.BaseRepo.ID())
+	return repo.BranchMatches(event.Pull.BaseBranch)
 }
 
 func (p *CommentEventWorkerProxy) forwardToSns(ctx context.Context, request *http.BufferedRequest) error {

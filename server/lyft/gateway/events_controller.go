@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"net/http"
 
@@ -46,7 +47,8 @@ func NewVCSEventsController(
 	temporalClient client.Client,
 	rootConfigBuilder *gateway_handlers.RootConfigBuilder,
 	checkRunFetcher *github.CheckRunsFetcher,
-	vcsStatusUpdater *command.VCSStatusUpdater) *VCSEventsController {
+	vcsStatusUpdater *command.VCSStatusUpdater,
+	globalCfg valid.GlobalCfg) *VCSEventsController {
 	pullEventWorkerProxy := gateway_handlers.NewPullEventWorkerProxy(
 		snsWriter, logger,
 	)
@@ -74,7 +76,7 @@ func NewVCSEventsController(
 		commentParser,
 		repoAllowlistChecker,
 		vcsClient,
-		gateway_handlers.NewCommentEventWorkerProxy(logger, snsWriter, featureAllocator, asyncScheduler, rootDeployer, vcsClient, vcsStatusUpdater),
+		gateway_handlers.NewCommentEventWorkerProxy(logger, snsWriter, featureAllocator, asyncScheduler, rootDeployer, vcsClient, vcsStatusUpdater, globalCfg),
 		logger,
 	)
 

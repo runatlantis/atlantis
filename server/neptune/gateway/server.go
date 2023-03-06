@@ -327,6 +327,7 @@ func NewServer(config Config) (*Server, error) {
 		rootConfigBuilder,
 		checkRunFetcher,
 		vcsStatusUpdater,
+		globalCfg,
 	)
 
 	router := mux.NewRouter()
