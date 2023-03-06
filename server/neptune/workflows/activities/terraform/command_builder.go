@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -18,7 +19,7 @@ type commandBuilder struct {
 	terraformPluginCacheDir string
 }
 
-func (c *commandBuilder) Build(ctx context.Context, v *version.Version, path string, subCommand *SubCommand) (*exec.Cmd, error) {
+func (c *commandBuilder) Build(_ context.Context, v *version.Version, path string, subCommand *SubCommand) (*exec.Cmd, error) {
 	if v == nil {
 		v = c.defaultVersion
 	}
@@ -41,7 +42,11 @@ func (c *commandBuilder) Build(ctx context.Context, v *version.Version, path str
 	// AWS_ACCESS_KEY.
 	envVars = append(envVars, os.Environ()...)
 	tfCmd := fmt.Sprintf("%s %s", binPath, strings.Join(subCommand.Build(), " "))
-	cmd := exec.CommandContext(ctx, "sh", "-c", tfCmd)
+
+	cmd := exec.Command("sh", "-c", tfCmd)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
 	cmd.Dir = path
 	cmd.Env = envVars
 	return cmd, nil

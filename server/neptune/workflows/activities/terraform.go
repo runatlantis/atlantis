@@ -67,7 +67,7 @@ type TerraformClient interface {
 }
 
 type streamer interface {
-	Stream(jobID string, msg string)
+	RegisterJob(id string) chan string
 }
 
 type gitCredentialsRefresher interface {
@@ -359,13 +359,16 @@ func (t *terraformActivities) runCommandWithOutputStream(ctx context.Context, jo
 	s.Buffer(buf, bufioScannerBufferSize)
 
 	var output strings.Builder
+	ch := t.StreamHandler.RegisterJob(jobID)
 	for s.Scan() {
 		_, err := output.WriteString(s.Text())
 		if err != nil {
 			logger.Warn(ctx, "unable to write tf output to buffer")
 		}
-		t.StreamHandler.Stream(jobID, s.Text())
+		ch <- s.Text()
 	}
+
+	close(ch)
 
 	wg.Wait()
 

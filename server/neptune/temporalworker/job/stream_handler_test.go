@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"testing"
-	"time"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/terraform/filter"
@@ -28,7 +27,6 @@ func TestStreamHandler_Handle(t *testing.T) {
 	outputMsg := "a"
 
 	t.Run("broadcasts and stores filtered logs", func(t *testing.T) {
-		outputCh := make(chan *job.OutputLine)
 		logs := []string{outputMsg, fmt.Sprintf("[%s] New Line", regexString)}
 		testJobStore := &strictTestStore{
 			t: t,
@@ -63,63 +61,19 @@ func TestStreamHandler_Handle(t *testing.T) {
 			},
 		}
 
-		streamHandler := job.NewTestStreamHandler(
+		streamHandler := job.NewStreamHandler(
 			testJobStore,
 			testReceiverRegistry,
 			valid.TerraformLogFilters(logFilter),
-			outputCh,
 			logging.NewNoopCtxLogger(t),
 		)
 
-		go streamHandler.Handle()
+		ch := streamHandler.RegisterJob(jobID)
 
 		for _, line := range logs {
-			outputCh <- &job.OutputLine{
-				JobID: jobID,
-				Line:  line,
-			}
+			ch <- line
 		}
-		close(outputCh)
-	})
-}
-
-func TestStreamHandler_Stream(t *testing.T) {
-	jobID := "1234"
-	outputMsg := "a"
-
-	t.Run("streams to main terraform channel", func(t *testing.T) {
-		logs := []string{outputMsg, outputMsg}
-
-		// Buffered channel to simplify testing since it's not blocking
-		mainTfCh := make(chan *job.OutputLine, len(logs))
-		streamHandler := job.NewTestStreamHandler(
-			&testStore{},
-			&testReceiverRegistry{},
-			valid.TerraformLogFilters{},
-			mainTfCh,
-			logging.NewNoopCtxLogger(t),
-		)
-		go func() {
-			for _, line := range logs {
-				streamHandler.Stream(jobID, line)
-			}
-		}()
-
-		gotLogs := []string{}
-
-		// Read main terraform output channel
-	outside:
-		for {
-			select {
-			case line := <-mainTfCh:
-				gotLogs = append(gotLogs, line.Line)
-
-			// give buffer time for logs to be streamed to main terraform channe;
-			case <-time.After(2 * time.Second):
-				break outside
-			}
-		}
-		assert.Equal(t, logs, gotLogs)
+		close(ch)
 	})
 }
 
@@ -157,11 +111,10 @@ func TestStreamHandler_Close(t *testing.T) {
 				},
 			},
 		}
-		streamHandler := job.NewTestStreamHandler(
+		streamHandler := job.NewStreamHandler(
 			testStore,
 			testReceiverRegistry,
 			valid.TerraformLogFilters{},
-			nil,
 			logging.NewNoopCtxLogger(t),
 		)
 		err := streamHandler.CloseJob(context.Background(), jobID)
@@ -199,11 +152,10 @@ func TestStreamHandler_Cleanup(t *testing.T) {
 				},
 			},
 		}
-		streamHandler := job.NewTestStreamHandler(
+		streamHandler := job.NewStreamHandler(
 			testStore,
 			testReceiverRegistry,
 			valid.TerraformLogFilters{},
-			nil,
 			logging.NewNoopCtxLogger(t),
 		)
 		err := streamHandler.CleanUp(context.Background())

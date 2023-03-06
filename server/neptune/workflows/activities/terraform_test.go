@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -30,14 +31,24 @@ type testStreamHandler struct {
 	expectedJobID string
 	t             *testing.T
 	called        bool
+	wg            sync.WaitGroup
 }
 
-func (t *testStreamHandler) Stream(jobID string, msg string) {
-	assert.Equal(t.t, t.expectedJobID, jobID)
-	t.received = append(t.received, msg)
+func (t *testStreamHandler) RegisterJob(id string) chan string {
+	ch := make(chan string)
+	t.wg.Add(1)
+	go func() {
+		defer t.wg.Done()
+		for s := range ch {
+			t.received = append(t.received, s)
+		}
+		t.called = true
+	}()
+	return ch
+}
 
-	t.called = true
-
+func (t *testStreamHandler) Wait() {
+	t.wg.Wait()
 }
 
 type multiCallTfClient struct {
@@ -270,6 +281,8 @@ func TestTerraformInit_StreamsOutput(t *testing.T) {
 	_, err = env.ExecuteActivity(tfActivity.TerraformInit, req)
 	assert.NoError(t, err)
 
+	// wait before we check called value otherwise we might race
+	streamHandler.Wait()
 	assert.True(t, streamHandler.called)
 }
 
@@ -511,6 +524,8 @@ func TestTerraformPlan_ReturnsResponse(t *testing.T) {
 		},
 	}, resp)
 
+	// wait before we check called value otherwise we might race
+	streamHandler.Wait()
 	assert.True(t, streamHandler.called)
 }
 
@@ -672,5 +687,7 @@ func TestTerraformApply_StreamsOutput(t *testing.T) {
 	_, err = env.ExecuteActivity(tfActivity.TerraformApply, req)
 	assert.NoError(t, err)
 
+	// wait before we check called value otherwise we might race
+	streamHandler.Wait()
 	assert.True(t, streamHandler.called)
 }
