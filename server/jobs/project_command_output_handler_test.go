@@ -166,6 +166,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 			ProjectName: ctx.ProjectName,
 			Workspace:   ctx.Workspace,
 		}
+		wg.Wait() // Must finish reading messages before cleaning up
 		projectOutputHandler.CleanUp(pullContext)
 
 		// Check all the resources are cleaned up.
