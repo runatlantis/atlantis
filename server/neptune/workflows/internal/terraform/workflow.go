@@ -259,9 +259,9 @@ func (r *Runner) run(ctx workflow.Context) error {
 		return r.toExternalError(err, "getting worker info")
 	}
 
-	workflow.WithTaskQueue(ctx, response.TaskQueue)
-	workflow.WithHeartbeatTimeout(ctx, HeartBeatTimeout)
-	workflow.WithScheduleToStartTimeout(ctx, ScheduleToStartTimeout)
+	ctx = workflow.WithTaskQueue(ctx, response.TaskQueue)
+	ctx = workflow.WithHeartbeatTimeout(ctx, HeartBeatTimeout)
+	ctx = workflow.WithScheduleToStartTimeout(ctx, ScheduleToStartTimeout)
 
 	root, cleanup, err := r.RootFetcher.Fetch(ctx)
 	if err != nil {

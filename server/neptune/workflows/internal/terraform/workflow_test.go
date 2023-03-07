@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities"
@@ -244,7 +245,15 @@ func TestSuccess(t *testing.T) {
 	assert.NoError(t, err)
 
 	// set activity expectations
-	env.OnActivity(ga.GithubFetchRoot, mock.Anything, activities.FetchRootRequest{
+	env.OnActivity(ga.GithubFetchRoot, mock.MatchedBy(func(ctx context.Context) bool {
+		info := activity.GetInfo(ctx)
+
+		assert.Equal(t, "taskqueue", info.TaskQueue)
+		assert.Equal(t, 1*time.Minute, info.HeartbeatTimeout)
+
+		return true
+
+	}), activities.FetchRootRequest{
 		Repo:         testGithubRepo,
 		Root:         testLocalRoot.Root,
 		DeploymentID: testDeploymentID,
