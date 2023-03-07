@@ -266,7 +266,7 @@ func TestStateReceive(t *testing.T) {
 				},
 				Result: state.WorkflowResult{
 					Status: state.CompleteWorkflowStatus,
-					Reason: state.TimedOutError,
+					Reason: state.TimeoutError,
 				},
 			},
 			ExpectedCheckRunState: github.CheckRunTimeout,

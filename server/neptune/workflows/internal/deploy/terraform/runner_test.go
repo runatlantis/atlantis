@@ -36,7 +36,7 @@ type testSignalPayload struct {
 }
 
 func testTerraformWorklfowWithPlanRejectionError(ctx workflow.Context, request terraformWorkflow.Request) error {
-	return temporal.NewApplicationError("some message", terraformWorkflow.PlanRejectedErrorType, terraformWorkflow.ApplicationError{ErrType: terraformWorkflow.PlanRejectedErrorType, Msg: "something"})
+	return temporal.NewNonRetryableApplicationError("some message", terraformWorkflow.PlanRejectedErrorType, terraformWorkflow.ApplicationError{ErrType: terraformWorkflow.PlanRejectedErrorType, Msg: "something"})
 }
 
 // signals parent twice with a sleep in between to mimic what our real terraform workflow would be like

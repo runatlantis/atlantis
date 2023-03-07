@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	TimeoutErrorType         = "TimeoutError"
 	TerraformClientErrorType = "TerraformClientError"
 )
 
@@ -98,9 +97,6 @@ func (r *JobRunner) Plan(ctx workflow.Context, localRoot *terraform.LocalRoot, j
 }
 
 func (r *JobRunner) Apply(ctx workflow.Context, localRoot *terraform.LocalRoot, jobID string, planFile string) error {
-	ctx = workflow.WithRetryPolicy(ctx, temporal.RetryPolicy{
-		NonRetryableErrorTypes: []string{TerraformClientErrorType, TimeoutErrorType},
-	})
 	// Execution ctx for a job that handles setting up the env vars from the previous steps
 	jobCtx := &ExecutionContext{
 		Context:   ctx,
@@ -130,7 +126,7 @@ func (r *JobRunner) Apply(ctx workflow.Context, localRoot *terraform.LocalRoot, 
 	return nil
 }
 
-func (r *JobRunner) apply(ctx *ExecutionContext, planFile string, step execute.Step) error {
+func (r *JobRunner) apply(executionCtx *ExecutionContext, planFile string, step execute.Step) error {
 	args, err := terraform.NewArgumentList(step.ExtraArgs)
 
 	if err != nil {
@@ -138,19 +134,26 @@ func (r *JobRunner) apply(ctx *ExecutionContext, planFile string, step execute.S
 	}
 
 	var envs []activities.EnvVar
-	for _, e := range ctx.Envs {
+	for _, e := range executionCtx.Envs {
 		envs = append(envs, e.ToActivityEnvVar())
 	}
 	var resp activities.TerraformApplyResponse
+
+	// Applies should only be attempted once given there could be possible state mutations in the event
+	// of heartbeat timeouts for example.
+	ctx := workflow.WithRetryPolicy(executionCtx, temporal.RetryPolicy{
+		MaximumAttempts: 1,
+	})
 	err = workflow.ExecuteActivity(ctx, r.Activity.TerraformApply, activities.TerraformApplyRequest{
 		Args:        args,
 		Envs:        map[string]string{},
 		DynamicEnvs: envs,
-		TfVersion:   ctx.TfVersion,
-		Path:        ctx.Path,
-		JobID:       ctx.JobID,
+		TfVersion:   executionCtx.TfVersion,
+		Path:        executionCtx.Path,
+		JobID:       executionCtx.JobID,
 		PlanFile:    planFile,
 	}).Get(ctx, &resp)
+
 	if err != nil {
 		return errors.Wrap(err, "running terraform apply activity")
 	}

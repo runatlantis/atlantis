@@ -60,6 +60,9 @@ func (r *WorkflowRunner) Run(ctx workflow.Context, deploymentInfo DeploymentInfo
 	id := deploymentInfo.ID
 	ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 		WorkflowID: id.String(),
+		RetryPolicy: &temporal.RetryPolicy{
+			MaximumAttempts: 3,
+		},
 
 		// allows all signals to be received even in a cancellation state
 		WaitForCancellation: true,
@@ -142,12 +145,18 @@ func (r *WorkflowRunner) awaitWorkflow(ctx workflow.Context, future workflow.Chi
 	// application error and act accordingly
 	var appErr *temporal.ApplicationError
 	if errors.As(err, &appErr) {
-		var underlyingErr terraform.ApplicationError
-		detailsErr := appErr.Details(&underlyingErr)
+		unwrapped := errors.Unwrap(appErr)
 
-		if detailsErr == nil && underlyingErr.ErrType == terraform.PlanRejectedErrorType {
-			return PlanRejectionError{msg: underlyingErr.Msg}
+		var msg string
+		if unwrapped != nil {
+			msg = unwrapped.Error()
+		} else {
+			msg = "plan has been rejected"
 		}
+		if appErr.Type() == terraform.PlanRejectedErrorType {
+			return PlanRejectionError{msg: msg}
+		}
+
 	}
 
 	return errors.Wrap(err, "executing terraform workflow")

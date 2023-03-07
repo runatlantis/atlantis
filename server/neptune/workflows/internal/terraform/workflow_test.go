@@ -187,14 +187,7 @@ func testTerraformWorkflow(ctx workflow.Context, req request) (*response, error)
 
 		var appErr *temporal.ApplicationError
 		if errors.As(err, &appErr) {
-			var internalAppErr terraform.ApplicationError
-			e := appErr.Details(&internalAppErr)
-
-			if e != nil {
-				return nil, err
-			}
-
-			switch internalAppErr.ErrType {
+			switch appErr.Type() {
 			case terraform.PlanRejectedErrorType:
 				planRejected = true
 			case terraform.UpdateJobErrorType:

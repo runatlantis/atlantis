@@ -32,7 +32,10 @@ const (
 	UnknownCompletionReason WorkflowCompletionReason = iota
 	SuccessfulCompletionReason
 	InternalServiceError
-	TimedOutError
+	TimeoutError
+	SchedulingTimeoutError
+	HeartbeatTimeoutError
+	ActivityDurationTimeoutError
 )
 
 type JobOutput struct {

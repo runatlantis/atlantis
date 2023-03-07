@@ -37,10 +37,28 @@ type jobRunner interface {
 }
 
 const (
-	StartToCloseTimeout = 24 * time.Hour
-	HeartBeatTimeout    = 1 * time.Minute
+	// the length of our longest allowed activity. for now we've set this to 60 minutes
+	// as that is the default terraform timeout, we can change as necessary.
+	StartToCloseTimeout = 60 * time.Minute
 
-	// 1 week timeout for review gate
+	// the length of time we're willing to wait without a heartbeat from our activities.
+	// if we timeout here its indicative that our worker process has died.  This in
+	// combination with ScheduleToStart allows us to react to worker failures and schedule
+	// the entire workflow on another worker process.
+	// Note this value is tied to the heartbeat frequency specified in our activities.
+	HeartBeatTimeout = 1 * time.Minute
+
+	// the length of time we will wait to schedule activities
+	// on a given task queue, if this times out our tq might be starved.
+	// We pick 5 minutes since it's rare for a tf operation to last
+	// this long and when it does, more often than not we see it last
+	// for more than 10 minutes
+	// we can tune this value as necessary.
+	ScheduleToStartTimeout = 5 * time.Minute
+
+	// 1 week timeout for review gate, this is an application level timeout which ensures
+	// we are not running the workflow forever when waiting for confirmation/rejection
+	// of a plan.
 	ReviewGateTimeout = 24 * time.Hour * 7
 )
 
@@ -208,8 +226,14 @@ func (r *Runner) Run(ctx workflow.Context) error {
 		var timeoutErr *temporal.TimeoutError
 		if errors.As(err, &timeoutErr) {
 			switch timeoutErr.TimeoutType() {
-			case enums.TIMEOUT_TYPE_HEARTBEAT, enums.TIMEOUT_TYPE_START_TO_CLOSE:
-				reason = state.TimedOutError
+			case enums.TIMEOUT_TYPE_HEARTBEAT:
+				reason = state.HeartbeatTimeoutError
+			case enums.TIMEOUT_TYPE_START_TO_CLOSE:
+				reason = state.ActivityDurationTimeoutError
+			case enums.TIMEOUT_TYPE_SCHEDULE_TO_START:
+				reason = state.SchedulingTimeoutError
+			default:
+				reason = state.TimeoutError
 			}
 		}
 
@@ -228,7 +252,6 @@ func (r *Runner) Run(ctx workflow.Context) error {
 func (r *Runner) run(ctx workflow.Context) error {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: StartToCloseTimeout,
-		HeartbeatTimeout:    HeartBeatTimeout,
 	})
 	var response *activities.GetWorkerInfoResponse
 	err := workflow.ExecuteActivity(ctx, r.TerraformActivities.GetWorkerInfo).Get(ctx, &response)
@@ -236,9 +259,9 @@ func (r *Runner) run(ctx workflow.Context) error {
 		return r.toExternalError(err, "getting worker info")
 	}
 
-	opts := workflow.GetActivityOptions(ctx)
-	opts.TaskQueue = response.TaskQueue
-	ctx = workflow.WithActivityOptions(ctx, opts)
+	workflow.WithTaskQueue(ctx, response.TaskQueue)
+	workflow.WithHeartbeatTimeout(ctx, HeartBeatTimeout)
+	workflow.WithScheduleToStartTimeout(ctx, ScheduleToStartTimeout)
 
 	root, cleanup, err := r.RootFetcher.Fetch(ctx)
 	if err != nil {
@@ -268,6 +291,11 @@ func (r *Runner) executeCleanup(ctx workflow.Context, handlers ...func(workflow.
 		defer cancel()
 	}
 
+	// cap these retries since this we don't want to block in the event we fail to do so.
+	ctx = workflow.WithRetryPolicy(ctx, temporal.RetryPolicy{
+		MaximumAttempts: 3,
+	})
+
 	for _, h := range handlers {
 		cleanupErr := h(ctx)
 
@@ -287,7 +315,7 @@ func (e ApplicationError) Error() string {
 }
 
 func (e ApplicationError) ToTemporalApplicationError() error {
-	return temporal.NewApplicationError(
+	return temporal.NewNonRetryableApplicationError(
 		e.Msg,
 		e.ErrType,
 		e,
@@ -318,5 +346,22 @@ func (r *Runner) toExternalError(err error, msg string) error {
 		return e.ToTemporalApplicationError()
 	}
 
-	return errors.Wrap(err, msg)
+	var timeoutErr *temporal.TimeoutError
+	if errors.As(err, &timeoutErr) {
+		switch timeoutErr.TimeoutType() {
+		case enums.TIMEOUT_TYPE_SCHEDULE_TO_START:
+			// this likely means our worker died, so return a retryable
+			// error which would allow the workflow to get scheduled
+			// on a new worker.
+			return temporal.NewApplicationErrorWithCause(
+				timeoutErr.Message(),
+				SchedulingError,
+				timeoutErr,
+			)
+		}
+	}
+
+	// let's default to non-retryable for now since we don't know if the error would happen
+	// pre-apply or post-apply which determines basically whether we can retry this workflow as is.
+	return temporal.NewNonRetryableApplicationError(msg, UnknownErrorType, err)
 }

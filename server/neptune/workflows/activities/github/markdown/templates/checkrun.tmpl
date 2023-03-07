@@ -26,6 +26,22 @@ If a specific terraform operation has failed, check the logs (linked above) to d
 {{end}}
 {{if .TimedOut }}
 ## Timeout :clock1:
-:point_right: One or more operations has timed out. It's possible that a terraform operation is still making progress, this can be confirmed by checking the logs above. However,
-this deployment will need to be retried for this check to go green.
+:point_right: We've hit an unknown timeout.  Please retry the deployment. If this persists this is most likely a bug, please contact the owners of atlantis so they can diagnose it.
+{{end}}
+
+{{if .ActivityDurationTimeout }}
+## Timeout :clock1:
+:point_right: An operation has taken longer than 60 minutes and has timed out.  Please look at the logs and determine if this is intentional or not.
+To increase this timeout value beyond 60 minutes, please contact the owners of atlantis.
+{{end}}
+
+{{if .SchedulingTimeout }}
+## Timeout :clock1:
+:point_right: An operation has failed to be scheduled. Terraform operations need to be scheduled on the same worker so this is indicative of a worker process dying.  Hang tight while 
+we reschedule the workflow on another worker.  This check run will be updated with the new results.
+{{end}}
+
+{{if .HeartbeatTimeout }}
+## Timeout :clock1:
+:point_right: A long running operation has been lost. Please retry the deployment by hitting the "re-run" button.
 {{end}}
