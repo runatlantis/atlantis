@@ -118,7 +118,7 @@ func (p *CommentEventWorkerProxy) shouldMarkEventQueued(event Comment, cmd *comm
 		return false
 	}
 	// pull event should not be from closed PR
-	if event.Pull.State != models.ClosedPullState {
+	if event.Pull.State == models.ClosedPullState {
 		return false
 	}
 	// pull event should not use an invalid base branch
