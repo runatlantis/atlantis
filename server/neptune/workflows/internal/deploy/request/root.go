@@ -30,7 +30,7 @@ type Root struct {
 	Apply        Job
 	Plan         Job
 	RepoRelPath  string
-	WhenModified []string
+	TrackedFiles []string
 	TfVersion    string
 	PlanMode     PlanMode
 	PlanApproval PlanApproval

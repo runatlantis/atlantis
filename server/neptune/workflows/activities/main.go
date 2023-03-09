@@ -214,3 +214,12 @@ func mkSubDir(parentDir string, subDir string) (string, error) {
 
 	return fullDir, nil
 }
+
+type RevsionSetter struct {
+	*prRevisionSetterActivities
+}
+
+func NewRevisionSetter() (*RevsionSetter, error) {
+	// TODO: Pass necessary config to instantiate pr revision setter client
+	return &RevsionSetter{}, nil
+}

@@ -1,6 +1,9 @@
 package terraform
 
 import (
+	"path/filepath"
+	"strings"
+
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/execute"
 	"github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 )
@@ -10,12 +13,37 @@ type Root struct {
 	Name string
 
 	// Path is the relative path from the repo
-	Path      string
-	TfVersion string
-	Apply     execute.Job
-	Plan      PlanJob
-	Trigger   Trigger
-	Rerun     bool
+	Path         string
+	TfVersion    string
+	Apply        execute.Job
+	Plan         PlanJob
+	Trigger      Trigger
+	Rerun        bool
+	TrackedFiles []string
+}
+
+func (r Root) GetTrackedFilesRelativeToRepo() []string {
+	var trackedFilesRelToRepoRoot []string
+	for _, wm := range r.TrackedFiles {
+		wm = strings.TrimSpace(wm)
+		// An exclusion uses a '!' at the beginning. If it's there, we need
+		// to remove it, then add in the project path, then add it back.
+		exclusion := false
+		if wm != "" && wm[0] == '!' {
+			wm = wm[1:]
+			exclusion = true
+		}
+
+		// Prepend project dir to when modified patterns because the patterns
+		// are relative to the project dirs but our list of modified files is
+		// relative to the repo root.
+		wmRelPath := filepath.Join(r.Path, wm)
+		if exclusion {
+			wmRelPath = "!" + wmRelPath
+		}
+		trackedFilesRelToRepoRoot = append(trackedFilesRelToRepoRoot, wmRelPath)
+	}
+	return trackedFilesRelToRepoRoot
 }
 
 func (r Root) WithPlanApprovalOverride(a PlanApproval) Root {

@@ -3,11 +3,12 @@ package activities
 import (
 	"context"
 	"fmt"
-	key "github.com/runatlantis/atlantis/server/neptune/context"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+
+	key "github.com/runatlantis/atlantis/server/neptune/context"
 
 	"github.com/google/go-github/v45/github"
 	"github.com/hashicorp/go-getter"
@@ -287,4 +288,35 @@ func (a *githubActivities) GithubCompareCommit(ctx context.Context, request Comp
 	return CompareCommitResponse{
 		CommitComparison: DiffDirection(comparison.GetStatus()),
 	}, nil
+}
+
+type ListOpenPRsRequest struct {
+	Repo internal.Repo
+}
+
+type ListOpenPRsResponse struct {
+	PullRequests []internal.PullRequest
+}
+
+func (a *githubActivities) GithubListOpenPRs(ctx context.Context, request ListOpenPRsRequest) (ListOpenPRsResponse, error) {
+	// TODO: Use client.ListPullRequests(ctx, owner, repo, base, state) method to list open PR for a repo
+	// internal.Repo object has all the necessary fields to make this call
+	return ListOpenPRsResponse{}, nil
+}
+
+type ListModifiedFilesRequest struct {
+	Repo        internal.Repo
+	PullRequest internal.PullRequest
+}
+
+// strings are utf-8 encoded of size 1 to 4 bytes, assuming each file path is of length 100, max size of a filepath = 4 * 100 = 400 bytes
+// upper limit of 2Mb can accomodate (2*1024*1024)/400 = 524k filepaths which is >> max number of results per page supported by the GH API 100.
+type ListModifiedFilesResponse struct {
+	FilePaths []string
+}
+
+func (a *githubActivities) GithubListModifiedFiles(ctx context.Context, request ListModifiedFilesRequest) (ListModifiedFilesResponse, error) {
+	// TODO: Use client.ListModifiedFiles(ctx, owner, repo, pullNumber) to list files modified in a PR
+	// internal.Repo object and internal.PullRequest has all the necessary fields to make this call
+	return ListModifiedFilesResponse{}, nil
 }

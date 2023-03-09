@@ -57,7 +57,7 @@ func (d *DeployWorkflowSignaler) SignalWithStartWorkflow(ctx context.Context, ro
 					Steps: d.generateSteps(rootCfg.DeploymentWorkflow.Apply.Steps),
 				},
 				RepoRelPath:  rootCfg.RepoRelDir,
-				WhenModified: rootCfg.WhenModified,
+				TrackedFiles: rootCfg.WhenModified,
 				TfVersion:    tfVersion,
 				PlanMode:     d.generatePlanMode(rootCfg),
 				Trigger:      rootDeployOptions.Trigger,
