@@ -274,9 +274,11 @@ func convertTestSteps(steps []valid.Step) []workflows.Step {
 }
 
 type mockRootDeployer struct {
-	error error
+	isCalled bool
+	error    error
 }
 
 func (m *mockRootDeployer) Deploy(_ context.Context, _ event.RootDeployOptions) error {
+	m.isCalled = true
 	return m.error
 }

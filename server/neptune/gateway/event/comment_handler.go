@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github"
@@ -25,6 +24,10 @@ type LegacyApplyCommentInput struct{}
 
 type statusUpdater interface {
 	UpdateCombined(ctx context.Context, repo models.Repo, pull models.PullRequest, status models.VCSStatus, cmdName fmt.Stringer, statusID string, output string) (string, error)
+}
+
+type commentCreator interface {
+	CreateComment(repo models.Repo, pullNum int, comment string, command string) error
 }
 
 // Comment is our internal representation of a vcs based comment event.
@@ -46,7 +49,7 @@ func NewCommentEventWorkerProxy(
 	allocator feature.Allocator,
 	scheduler scheduler,
 	rootDeployer rootDeployer,
-	vcsClient vcs.Client,
+	commentCreator commentCreator,
 	vcsStatusUpdater statusUpdater,
 	globalCfg valid.GlobalCfg) *CommentEventWorkerProxy {
 	return &CommentEventWorkerProxy{
@@ -54,7 +57,7 @@ func NewCommentEventWorkerProxy(
 		snsWriter:        snsWriter,
 		allocator:        allocator,
 		scheduler:        scheduler,
-		vcsClient:        vcsClient,
+		commentCreator:   commentCreator,
 		rootDeployer:     rootDeployer,
 		vcsStatusUpdater: vcsStatusUpdater,
 		globalCfg:        globalCfg,
@@ -66,7 +69,7 @@ type CommentEventWorkerProxy struct {
 	snsWriter        Writer
 	allocator        feature.Allocator
 	scheduler        scheduler
-	vcsClient        vcs.Client
+	commentCreator   commentCreator
 	rootDeployer     rootDeployer
 	vcsStatusUpdater statusUpdater
 	globalCfg        valid.GlobalCfg
@@ -84,7 +87,7 @@ func (p *CommentEventWorkerProxy) Handle(ctx context.Context, request *http.Buff
 
 	if shouldAllocate && cmd.ForceApply {
 		p.logger.InfoContext(ctx, "running force apply command")
-		if err := p.vcsClient.CreateComment(event.BaseRepo, event.PullNum, warningMessage, ""); err != nil {
+		if err := p.commentCreator.CreateComment(event.BaseRepo, event.PullNum, warningMessage, ""); err != nil {
 			p.logger.ErrorContext(ctx, err.Error())
 		}
 		return p.scheduler.Schedule(ctx, func(ctx context.Context) error {
