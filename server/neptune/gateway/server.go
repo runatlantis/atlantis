@@ -278,8 +278,10 @@ func NewServer(config Config) (*Server, error) {
 		Scope:             statsScope.SubScope("repo.fetch"),
 	}
 	hooksRunner := &preworkflow.HooksRunner{
-		GlobalCfg:    globalCfg,
-		HookExecutor: &preworkflow.HookExecutor{},
+		GlobalCfg: globalCfg,
+		HookExecutor: &preworkflow.HookExecutor{
+			Logger: ctxLogger,
+		},
 	}
 	clientCreator, err := githubapp.NewDefaultCachingClientCreator(
 		config.AppCfg,

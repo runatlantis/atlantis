@@ -20,7 +20,7 @@ type repoFetcher interface {
 
 // hooksRunner runs preworkflow hooks for a given repository/commit
 type hooksRunner interface {
-	Run(repo models.Repo, repoDir string) error
+	Run(ctx context.Context, repo models.Repo, repoDir string) error
 }
 
 // fileFetcher handles being able to identify and fetch the changed files per individual commit
@@ -79,7 +79,7 @@ func (b *RootConfigBuilder) build(ctx context.Context, repo models.Repo, branch 
 	defer cleanup(ctx, repoDir)
 
 	// Run pre-workflow hooks
-	err = b.HooksRunner.Run(repo, repoDir)
+	err = b.HooksRunner.Run(ctx, repo, repoDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "running pre-workflow hooks")
 	}

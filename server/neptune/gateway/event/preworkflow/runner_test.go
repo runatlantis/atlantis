@@ -1,6 +1,7 @@
 package preworkflow_test
 
 import (
+	"context"
 	"errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -32,7 +33,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 			HookExecutor: &mockPreWorkflowHookExecutor{},
 			GlobalCfg:    globalCfg,
 		}
-		err := wh.Run(fixtures.GithubRepo, repoDir)
+		err := wh.Run(context.Background(), fixtures.GithubRepo, repoDir)
 		assert.NoError(t, err)
 	})
 	t.Run("success hooks not in cfg", func(t *testing.T) {
@@ -56,7 +57,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 			HookExecutor: &mockPreWorkflowHookExecutor{},
 			GlobalCfg:    globalCfg,
 		}
-		err := wh.Run(fixtures.GithubRepo, repoDir)
+		err := wh.Run(context.Background(), fixtures.GithubRepo, repoDir)
 		assert.NoError(t, err)
 	})
 	t.Run("error running pre hook", func(t *testing.T) {
@@ -76,7 +77,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 			},
 			GlobalCfg: globalCfg,
 		}
-		err := wh.Run(fixtures.GithubRepo, repoDir)
+		err := wh.Run(context.Background(), fixtures.GithubRepo, repoDir)
 		assert.Error(t, err, "error not nil")
 	})
 }
@@ -85,6 +86,6 @@ type mockPreWorkflowHookExecutor struct {
 	error error
 }
 
-func (m *mockPreWorkflowHookExecutor) Execute(_ *valid.PreWorkflowHook, _ models.Repo, _ string) error {
+func (m *mockPreWorkflowHookExecutor) Execute(_ context.Context, _ *valid.PreWorkflowHook, _ models.Repo, _ string) error {
 	return m.error
 }

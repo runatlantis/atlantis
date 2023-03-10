@@ -168,7 +168,7 @@ type mockHooksRunner struct {
 	error error
 }
 
-func (h *mockHooksRunner) Run(_ models.Repo, _ string) error {
+func (h *mockHooksRunner) Run(_ context.Context, _ models.Repo, _ string) error {
 	return h.error
 }
 
