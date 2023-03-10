@@ -77,7 +77,7 @@ func (p *PushHandler) Handle(ctx context.Context, event Push) error {
 func (p *PushHandler) handle(ctx context.Context, event Push) error {
 	builderOptions := BuilderOptions{
 		RepoFetcherOptions: github.RepoFetcherOptions{
-			CloneDepth: 3,
+			CloneDepth: 5,
 		},
 		FileFetcherOptions: github.FileFetcherOptions{
 			Sha: event.Sha,
