@@ -8,11 +8,11 @@ jobs:
     steps:
       - uses: actions/stale@v7
         with:
-          stale-pr-message: 'This issue is stale because it has been open for 6 months with no activity. Remove stale label or comment or this will be closed in 1 month.'
-          stale-issue-message: This issue is stale because it has been open for 6 months with no activity. Remove stale label or comment or this will be closed in 1 month.'
+          stale-pr-message: 'This issue is stale because it has been open for 1 month with no activity. Remove stale label or comment or this will be closed in 1 month.'
+          stale-issue-message: This issue is stale because it has been open for 1 month with no activity. Remove stale label or comment or this will be closed in 1 month.'
           remove-stale-when-updated: true
-          # 6 months
-          days-before-stale: 183
+          # 1 month
+          days-before-stale: 31
           # 1 month
           days-before-close: 31
           only-labels: 'waiting-on-response'
