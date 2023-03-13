@@ -224,7 +224,7 @@ func (w *Worker) Work(ctx workflow.Context) {
 			logger.Error(ctx, "failed to deploy revision, moving to next one", key.ErrKey, err)
 		}
 
-		scope.SubScopeWithTags(map[string]string{"error_type": readableErr}).Counter("failure")
+		scope.SubScopeWithTags(map[string]string{"error_type": readableErr}).Counter("failure").Inc(1)
 
 		selector.AddFuture(w.awaitWork(ctx), callback)
 	}
