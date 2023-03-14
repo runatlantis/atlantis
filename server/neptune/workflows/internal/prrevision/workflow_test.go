@@ -1,4 +1,4 @@
-package rebase
+package prrevision
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-func TestDeployer_ShouldRebasePullRequest(t *testing.T) {
+func Test_ShouldSetMinimumRevisionForPR(t *testing.T) {
 	cases := []struct {
 		description   string
 		root          terraform.Root
@@ -90,52 +90,50 @@ func TestDeployer_ShouldRebasePullRequest(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		res, err := shouldRebasePullRequest(c.root, c.modifiedFiles)
+		res, err := isRootModified(c.root, c.modifiedFiles)
 		assert.NoError(t, err)
 		assert.Equal(t, c.shouldReabse, res)
 	}
 }
 
-type testRebaserActvities struct{}
+type testRevisionSetterActivities struct{}
 
-func (t *testRebaserActvities) GithubListOpenPRs(ctx context.Context, request activities.ListOpenPRsRequest) (activities.ListOpenPRsResponse, error) {
-	return activities.ListOpenPRsResponse{}, nil
-}
-
-func (t *testRebaserActvities) GithubListModifiedFiles(ctx context.Context, request activities.ListModifiedFilesRequest) (activities.ListModifiedFilesResponse, error) {
-	return activities.ListModifiedFilesResponse{}, nil
-}
-
-func (t *testRebaserActvities) SetPRRevision(ctx context.Context, request activities.SetPRRevisionRequest) (activities.SetPRRevisionResponse, error) {
+func (t *testRevisionSetterActivities) SetPRRevision(ctx context.Context, request activities.SetPRRevisionRequest) (activities.SetPRRevisionResponse, error) {
 	return activities.SetPRRevisionResponse{}, nil
 }
 
-type RebaseRequest struct {
-	Repo github.Repo
-	Root terraform.Root
+type testGithubActivities struct{}
+
+func (t *testGithubActivities) ListPRs(ctx context.Context, request activities.ListPRsRequest) (activities.ListPRsResponse, error) {
+	return activities.ListPRsResponse{}, nil
 }
 
-func testShouldRebaseWorkflow(ctx workflow.Context, r RebaseRequest) error {
+func (t *testGithubActivities) ListModifiedFiles(ctx context.Context, request activities.ListModifiedFilesRequest) (activities.ListModifiedFilesResponse, error) {
+	return activities.ListModifiedFilesResponse{}, nil
+}
+
+func testSetMiminumValidRevisionForRootWorkflow(ctx workflow.Context, r Request) error {
 	options := workflow.ActivityOptions{
 		ScheduleToCloseTimeout: 5 * time.Second,
 	}
 	ctx = workflow.WithActivityOptions(ctx, options)
 
-	var g *testRebaserActvities
-	pullRebaser := PullRebaser{
-		RebaseActivites: g,
+	runner := Runner{
+		GithubActivities:         &testGithubActivities{},
+		RevisionSetterActivities: &testRevisionSetterActivities{},
+		Scope:                    metrics.NewNullableScope(),
 	}
-	return pullRebaser.RebaseOpenPRsForRoot(ctx, r.Repo, r.Root, metrics.NewNullableScope())
+	return runner.Run(ctx, r)
 }
 
-func TestPullRebasePRs_NoOpenPR(t *testing.T) {
+func TestMinRevisionSetter_NoOpenPR(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 
-	ga := &testRebaserActvities{}
+	ga := &testGithubActivities{}
 	env.RegisterActivity(ga)
 
-	req := RebaseRequest{
+	req := Request{
 		Repo: github.Repo{
 			Owner: "owner",
 			Name:  "test",
@@ -145,27 +143,30 @@ func TestPullRebasePRs_NoOpenPR(t *testing.T) {
 		},
 	}
 
-	env.OnActivity(ga.GithubListOpenPRs, mock.Anything, activities.ListOpenPRsRequest{
-		Repo: req.Repo,
-	}).Return(activities.ListOpenPRsResponse{
+	env.OnActivity(ga.ListPRs, mock.Anything, activities.ListPRsRequest{
+		Repo:  req.Repo,
+		State: github.Open,
+	}).Return(activities.ListPRsResponse{
 		PullRequests: []github.PullRequest{},
 	}, nil)
 
-	env.ExecuteWorkflow(testShouldRebaseWorkflow, req)
+	env.ExecuteWorkflow(testSetMiminumValidRevisionForRootWorkflow, req)
 	env.AssertExpectations(t)
 
 	err := env.GetWorkflowResult(nil)
 	assert.Nil(t, err)
 }
 
-func TestPullRebasePRs_OpenPR_NeedsRebase(t *testing.T) {
+func TestMinRevisionSetter_OpenPR_SetMinRevision(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 
-	ga := &testRebaserActvities{}
+	ga := &testGithubActivities{}
+	ra := &testRevisionSetterActivities{}
+	env.RegisterActivity(ra)
 	env.RegisterActivity(ga)
 
-	req := RebaseRequest{
+	req := Request{
 		Repo: github.Repo{
 			Owner: "owner",
 			Name:  "test",
@@ -188,46 +189,48 @@ func TestPullRebasePRs_OpenPR_NeedsRebase(t *testing.T) {
 	filesModifiedPr1 := []string{"test/dir2/rebase.tf"}
 	filesModifiedPr2 := []string{"test/dir1/no-rebase.tf"}
 
-	env.OnActivity(ga.GithubListOpenPRs, mock.Anything, activities.ListOpenPRsRequest{
+	env.OnActivity(ga.ListPRs, mock.Anything, activities.ListPRsRequest{
 		Repo: req.Repo,
-	}).Return(activities.ListOpenPRsResponse{
+	}).Return(activities.ListPRsResponse{
 		PullRequests: pullRequests,
 	}, nil)
 
-	env.OnActivity(ga.GithubListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
+	env.OnActivity(ga.ListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
 		Repo:        req.Repo,
 		PullRequest: pullRequests[0],
 	}).Return(activities.ListModifiedFilesResponse{
 		FilePaths: filesModifiedPr1,
 	}, nil)
 
-	env.OnActivity(ga.GithubListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
+	env.OnActivity(ga.ListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
 		Repo:        req.Repo,
 		PullRequest: pullRequests[1],
 	}).Return(activities.ListModifiedFilesResponse{
 		FilePaths: filesModifiedPr2,
 	}, nil)
 
-	env.OnActivity(ga.SetPRRevision, mock.Anything, activities.SetPRRevisionRequest{
+	env.OnActivity(ra.SetPRRevision, mock.Anything, activities.SetPRRevisionRequest{
 		Repository:  req.Repo,
 		PullRequest: pullRequests[0],
 	}).Return(activities.SetPRRevisionResponse{}, nil)
 
-	env.ExecuteWorkflow(testShouldRebaseWorkflow, req)
+	env.ExecuteWorkflow(testSetMiminumValidRevisionForRootWorkflow, req)
 	env.AssertExpectations(t)
 
 	err := env.GetWorkflowResult(nil)
 	assert.Nil(t, err)
 }
 
-func TestPullRebasePRs_OpenPR_ListModifiedFilesErr(t *testing.T) {
+func TestMinRevisionSetter_ListModifiedFilesErr(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 
-	ga := &testRebaserActvities{}
+	ga := &testGithubActivities{}
+	ra := &testRevisionSetterActivities{}
+	env.RegisterActivity(ra)
 	env.RegisterActivity(ga)
 
-	req := RebaseRequest{
+	req := Request{
 		Repo: github.Repo{
 			Owner: "owner",
 			Name:  "test",
@@ -244,37 +247,40 @@ func TestPullRebasePRs_OpenPR_ListModifiedFilesErr(t *testing.T) {
 		},
 	}
 
-	env.OnActivity(ga.GithubListOpenPRs, mock.Anything, activities.ListOpenPRsRequest{
-		Repo: req.Repo,
-	}).Return(activities.ListOpenPRsResponse{
+	env.OnActivity(ga.ListPRs, mock.Anything, activities.ListPRsRequest{
+		Repo:  req.Repo,
+		State: github.Open,
+	}).Return(activities.ListPRsResponse{
 		PullRequests: pullRequests,
 	}, nil)
 
-	env.OnActivity(ga.GithubListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
+	env.OnActivity(ga.ListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
 		Repo:        req.Repo,
 		PullRequest: pullRequests[0],
 	}).Return(activities.ListModifiedFilesResponse{}, errors.New("error"))
 
-	env.OnActivity(ga.SetPRRevision, mock.Anything, activities.SetPRRevisionRequest{
+	env.OnActivity(ra.SetPRRevision, mock.Anything, activities.SetPRRevisionRequest{
 		Repository:  req.Repo,
 		PullRequest: pullRequests[0],
 	}).Return(activities.SetPRRevisionResponse{}, nil)
 
-	env.ExecuteWorkflow(testShouldRebaseWorkflow, req)
+	env.ExecuteWorkflow(testSetMiminumValidRevisionForRootWorkflow, req)
 	env.AssertExpectations(t)
 
 	err := env.GetWorkflowResult(nil)
 	assert.Nil(t, err)
 }
 
-func TestPullRebasePRs_OpenPR_PatternMatchErr(t *testing.T) {
+func TestMinRevisionSetter_OpenPR_PatternMatchErr(t *testing.T) {
 	ts := testsuite.WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 
-	ga := &testRebaserActvities{}
+	ga := &testGithubActivities{}
+	ra := &testRevisionSetterActivities{}
+	env.RegisterActivity(ra)
 	env.RegisterActivity(ga)
 
-	req := RebaseRequest{
+	req := Request{
 		Repo: github.Repo{
 			Owner: "owner",
 			Name:  "test",
@@ -290,23 +296,23 @@ func TestPullRebasePRs_OpenPR_PatternMatchErr(t *testing.T) {
 		},
 	}
 
-	env.OnActivity(ga.GithubListOpenPRs, mock.Anything, activities.ListOpenPRsRequest{
+	env.OnActivity(ga.ListPRs, mock.Anything, activities.ListPRsRequest{
 		Repo: req.Repo,
-	}).Return(activities.ListOpenPRsResponse{
+	}).Return(activities.ListPRsResponse{
 		PullRequests: pullRequests,
 	}, nil)
 
 	filesModifiedPr1 := []string{"test/dir2/rebase.tf"}
-	env.OnActivity(ga.GithubListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
+	env.OnActivity(ga.ListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
 		Repo:        req.Repo,
 		PullRequest: pullRequests[0],
 	}).Return(activities.ListModifiedFilesResponse{
 		FilePaths: filesModifiedPr1,
 	}, nil)
 
-	env.ExecuteWorkflow(testShouldRebaseWorkflow, req)
+	env.ExecuteWorkflow(testSetMiminumValidRevisionForRootWorkflow, req)
 	env.AssertExpectations(t)
 
 	err := env.GetWorkflowResult(nil)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }
