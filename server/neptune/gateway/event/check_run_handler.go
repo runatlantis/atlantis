@@ -68,6 +68,7 @@ func (h *CheckRunHandler) Handle(ctx context.Context, event CheckRun) error {
 	}
 	matches := checkRunRegex.FindStringSubmatch(event.Name)
 	if len(matches) != 2 {
+		h.Logger.ErrorContext(ctx, fmt.Sprintf("unable to determine root name: %s", event.Name))
 		return fmt.Errorf("unable to determine root name")
 	}
 	rootName := matches[checkRunRegex.SubexpIndex("name")]
