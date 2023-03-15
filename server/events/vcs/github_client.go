@@ -579,12 +579,14 @@ func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
 	}
-	protection, resp, err := g.client.Repositories.GetBranchProtection(context.Background(), *repo.Owner.Name, *repo.Name, pull.BaseBranch)
+	protection, _, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner.GetLogin(), *repo.Name, pull.BaseBranch)
 	if err != nil {
-		return errors.Wrap(err, "getting branch protection rules")
+		if !errors.Is(err, github.ErrBranchNotProtected) {
+			return errors.Wrap(err, "getting branch protection rules")
+		}
 	}
 	requireLinearHistory := false
-	if resp.Response.StatusCode == 200 {
+	if protection != nil {
 		requireLinearHistory = protection.GetRequireLinearHistory().Enabled
 	}
 	const (
