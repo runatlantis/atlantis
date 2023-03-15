@@ -663,9 +663,7 @@
     execa "^6.1.0"
 
 "@vuepress/plugin-google-analytics@^2.0.0-beta.60":
-  version "2.0.0-beta.60"
-  resolved "https://registry.yarnpkg.com/@vuepress/plugin-google-analytics/-/plugin-google-analytics-2.0.0-beta.60.tgz#63607c276de87634b72fc12af6ba4ea986befd32"
-  integrity sha512-Uq8UiYh2O3pGG7CR+Me6DldumcIA8xnr6hPqjFdqpi4heQifepxxSY1VQcjGrhu1F/8m16O5MryKMaNtg12BqA==
+  version "2.0.0-beta.50-pre.1"
   dependencies:
     "@vuepress/client" "2.0.0-beta.60"
     "@vuepress/core" "2.0.0-beta.60"
@@ -1713,9 +1711,7 @@ vuepress-vite@2.0.0-beta.60:
     "@vuepress/theme-default" "2.0.0-beta.60"
 
 vuepress@^2.0.0-beta.60:
-  version "2.0.0-beta.60"
-  resolved "https://registry.yarnpkg.com/vuepress/-/vuepress-2.0.0-beta.60.tgz#19205a971ecd6c14d6412564e16e613fcebd58e7"
-  integrity sha512-evkv5PtX5pdlEyY5EcEV+rN/HTmi8iG7ZcvAnMFfYKWdvKiUjE+/DPwZfmE8emx33FEE2htbAKgtruABTocEjA==
+  version "2.0.0-beta.50-pre.1"
   dependencies:
     vuepress-vite "2.0.0-beta.60"
 
