@@ -579,13 +579,21 @@ func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
 	}
+	protection, resp, err := g.client.Repositories.GetBranchProtection(context.Background(), *repo.Owner.Name, *repo.Name, pull.BaseBranch)
+	if err != nil {
+		return errors.Wrap(err, "getting branch protection rules")
+	}
+	requireLinearHistory := false
+	if resp.Response.StatusCode == 200 {
+		requireLinearHistory = protection.GetRequireLinearHistory().Enabled
+	}
 	const (
 		defaultMergeMethod = "merge"
 		rebaseMergeMethod  = "rebase"
 		squashMergeMethod  = "squash"
 	)
 	method := defaultMergeMethod
-	if !repo.GetAllowMergeCommit() {
+	if !repo.GetAllowMergeCommit() || requireLinearHistory {
 		if repo.GetAllowRebaseMerge() {
 			method = rebaseMergeMethod
 		} else if repo.GetAllowSquashMerge() {
