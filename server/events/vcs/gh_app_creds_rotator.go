@@ -9,7 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// GitCredsTokenRotator continuously rotates the github app token ever 9 minutes and writes the ~/.git-credentials file
+// GitCredsTokenRotator continuously tries to rotate the github app access token every 30 seconds and writes the ~/.git-credentials file
 type GitCredsTokenRotator interface {
 	Start() error
 	Stop()
@@ -28,6 +28,7 @@ func NewGithubAppTokenRotator(
 	githubCredentials GithubCredentials,
 	githubHostname string) GitCredsTokenRotator {
 	return &githubAppTokenRotator{
+		stop:              make(chan struct{}),
 		log:               logger,
 		githubCredentials: githubCredentials,
 		githubHostname:    githubHostname,
@@ -38,17 +39,14 @@ func NewGithubAppTokenRotator(
 var _ GitCredsTokenRotator = (*githubAppTokenRotator)(nil)
 
 func (r *githubAppTokenRotator) Start() error {
-	quit := make(chan struct{})
-
-	// github tokens are valid for ~10 mins
-	ticker := time.NewTicker(9 * time.Minute)
+	ticker := time.NewTicker(30 * time.Second)
 
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
 				r.rotate()
-			case <-quit:
+			case <-r.stop:
 				ticker.Stop()
 				return
 			}
@@ -63,12 +61,12 @@ func (r *githubAppTokenRotator) Stop() {
 }
 
 func (r *githubAppTokenRotator) rotate() error {
-	r.log.Info("Refreshing git tokens for Github App")
+	r.log.Debug("Refreshing git tokens for Github App")
 	token, err := r.githubCredentials.GetToken()
 	if err != nil {
 		return errors.Wrap(err, "getting github token")
 	}
-
+	r.log.Debug("token %s", token)
 	home, err := homedir.Dir()
 	if err != nil {
 		return errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
