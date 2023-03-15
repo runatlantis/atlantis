@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -23,21 +22,9 @@ type GithubAppWorkingDir struct {
 // Clone writes a fresh token for Github App authentication
 func (g *GithubAppWorkingDir) Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error) {
 
-	log.Info("Refreshing git tokens for Github App")
-
 	token, err := g.Credentials.GetToken()
 	if err != nil {
 		return "", false, errors.Wrap(err, "getting github token")
-	}
-
-	home, err := homedir.Dir()
-	if err != nil {
-		return "", false, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
-	}
-
-	// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#http-based-git-access-by-an-installation
-	if err := WriteGitCreds("x-access-token", token, g.GithubHostname, home, log, true); err != nil {
-		return "", false, err
 	}
 
 	baseRepo := &p.BaseRepo

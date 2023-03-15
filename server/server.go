@@ -169,6 +169,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
 	var azuredevopsClient *vcs.AzureDevopsClient
+	var githubAppTokenRotator vcs.GitCredsTokenRotator
 
 	policyChecksEnabled := false
 	if userConfig.EnablePolicyChecksFlag {
@@ -304,12 +305,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
 		}
 		if userConfig.GithubUser != "" {
-			if err := events.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger, false); err != nil {
+			if err := vcs.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.GitlabUser != "" {
-			if err := events.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger, false); err != nil {
+			if err := vcs.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -320,12 +321,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			if bitbucketBaseURL == "https://api.bitbucket.org" {
 				bitbucketBaseURL = "bitbucket.org"
 			}
-			if err := events.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger, false); err != nil {
+			if err := vcs.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.AzureDevopsUser != "" {
-			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger, false); err != nil {
+			if err := vcs.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -470,6 +471,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			WorkingDir:     workingDir,
 			Credentials:    githubCredentials,
 			GithubHostname: userConfig.GithubHostname,
+		}
+
+		githubAppTokenRotator = vcs.NewGithubAppTokenRotator(logger, githubCredentials, userConfig.GithubHostname)
+		err := githubAppTokenRotator.Start()
+		if err != nil {
+			return nil, errors.Wrap(err, "Could not write credentials")
 		}
 	}
 
