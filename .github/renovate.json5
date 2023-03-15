@@ -1,7 +1,7 @@
 {
   extends: [
     "config:base",
-    "schedule:earlyMondays",
+    "schedule:daily",
   ],
   commitMessageSuffix: " in {{packageFile}}",
   dependencyDashboardAutoclose: true,
