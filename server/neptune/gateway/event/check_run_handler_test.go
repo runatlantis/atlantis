@@ -2,8 +2,6 @@ package event_test
 
 import (
 	"context"
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/neptune/sync"
 	"testing"
@@ -18,8 +16,8 @@ func TestCheckRunHandler(t *testing.T) {
 		signaler := &testSignaler{}
 		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:            logging.NewNoopCtxLogger(t),
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Logger:       logging.NewNoopCtxLogger(t),
+			RootDeployer: &testRootDeployer{},
 
 			// both are synchronous to keep our tests predictable
 			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
@@ -38,8 +36,8 @@ func TestCheckRunHandler(t *testing.T) {
 		signaler := &mockDeploySignaler{}
 		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:            logging.NewNoopCtxLogger(t),
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Logger:       logging.NewNoopCtxLogger(t),
+			RootDeployer: &testRootDeployer{},
 			// both are synchronous to keep our tests predictable
 			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
 			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
@@ -54,51 +52,56 @@ func TestCheckRunHandler(t *testing.T) {
 		assert.False(t, signaler.called)
 	})
 
-	t.Run("invalid rerequested branch", func(t *testing.T) {
-		version, err := version.NewVersion("1.0.3")
-		assert.NoError(t, err)
+	t.Run("success", func(t *testing.T) {
 		signaler := &mockDeploySignaler{}
 		logger := logging.NewNoopCtxLogger(t)
-		rootCfg := valid.MergedProjectCfg{
-			Name: testRoot,
-			DeploymentWorkflow: valid.Workflow{
-				Plan:  valid.DefaultPlanStage,
-				Apply: valid.DefaultApplyStage,
-			},
-			TerraformVersion: version,
-			WorkflowMode:     valid.DefaultWorkflowMode,
+
+		repo := models.Repo{DefaultBranch: "main"}
+		branch := "something"
+		user := models.User{
+			Username: "nish",
 		}
-		rootCfgs := []*valid.MergedProjectCfg{
-			&rootCfg,
-		}
-		rootConfigBuilder := &mockRootConfigBuilder{
-			rootConfigs: rootCfgs,
-		}
+		sha := "12345"
 		subject := event.CheckRunHandler{
-			Logger:            logging.NewNoopCtxLogger(t),
-			RootConfigBuilder: rootConfigBuilder,
+			Logger: logging.NewNoopCtxLogger(t),
+			RootDeployer: &testRootDeployer{
+				expectedT: t,
+				expectedOptions: event.RootDeployOptions{
+					RootNames: []string{
+						testRoot,
+					},
+					Repo:     repo,
+					Branch:   branch,
+					Sender:   user,
+					Revision: sha,
+				},
+			},
 			// both are synchronous to keep our tests predictable
 			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
 			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
 			DeploySignaler: signaler,
 		}
 		e := event.CheckRun{
-			Action: event.WrappedCheckRunAction("test"),
-			Name:   "atlantis/deploy: testroot",
-			Repo:   models.Repo{DefaultBranch: "main"},
-			Branch: "something",
+			Action:            event.WrappedCheckRunAction("test"),
+			Name:              "atlantis/deploy: testroot",
+			Repo:              repo,
+			HeadSha:           sha,
+			Branch:            branch,
+			User:              user,
+			InstallationToken: 2,
 		}
-		err = subject.Handle(context.Background(), e)
+		err := subject.Handle(context.Background(), e)
 		assert.NoError(t, err)
-		assert.False(t, signaler.called)
 	})
 
 	t.Run("invalid rerequested branch", func(t *testing.T) {
 		signaler := &mockDeploySignaler{}
 		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:            logging.NewNoopCtxLogger(t),
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Logger: logging.NewNoopCtxLogger(t),
+			RootDeployer: &testRootDeployer{
+				expectedT: t,
+			},
 			// both are synchronous to keep our tests predictable
 			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
 			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
@@ -119,8 +122,8 @@ func TestCheckRunHandler(t *testing.T) {
 		signaler := &mockDeploySignaler{}
 		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:            logging.NewNoopCtxLogger(t),
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Logger:       logging.NewNoopCtxLogger(t),
+			RootDeployer: &testRootDeployer{},
 			// both are synchronous to keep our tests predictable
 			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
 			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
@@ -139,8 +142,8 @@ func TestCheckRunHandler(t *testing.T) {
 		signaler := &mockDeploySignaler{}
 		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:            logging.NewNoopCtxLogger(t),
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Logger:       logging.NewNoopCtxLogger(t),
+			RootDeployer: &testRootDeployer{},
 			// both are synchronous to keep our tests predictable
 			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
 			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
@@ -163,8 +166,8 @@ func TestCheckRunHandler(t *testing.T) {
 		workflowID := "wfid"
 		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:            logging.NewNoopCtxLogger(t),
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Logger:       logging.NewNoopCtxLogger(t),
+			RootDeployer: &testRootDeployer{},
 			// both are synchronous to keep our tests predictable
 			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
 			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
@@ -189,8 +192,8 @@ func TestCheckRunHandler(t *testing.T) {
 		signaler := &mockDeploySignaler{}
 		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:            logging.NewNoopCtxLogger(t),
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Logger:       logging.NewNoopCtxLogger(t),
+			RootDeployer: &testRootDeployer{},
 			// both are synchronous to keep our tests predictable
 			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
 			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
@@ -235,8 +238,8 @@ func TestCheckRunHandler(t *testing.T) {
 		workflowID := "wfid"
 		logger := logging.NewNoopCtxLogger(t)
 		subject := event.CheckRunHandler{
-			Logger:            logging.NewNoopCtxLogger(t),
-			RootConfigBuilder: &mockRootConfigBuilder{},
+			Logger:       logging.NewNoopCtxLogger(t),
+			RootDeployer: &testRootDeployer{},
 			// both are synchronous to keep our tests predictable
 			SyncScheduler:  &sync.SynchronousScheduler{Logger: logger},
 			AsyncScheduler: &sync.SynchronousScheduler{Logger: logger},
@@ -255,4 +258,15 @@ func TestCheckRunHandler(t *testing.T) {
 		assert.True(t, signaler.called)
 	})
 
+}
+
+type testRootDeployer struct {
+	expectedT       *testing.T
+	expectedOptions event.RootDeployOptions
+	error           error
+}
+
+func (m *testRootDeployer) Deploy(_ context.Context, options event.RootDeployOptions) error {
+	assert.Equal(m.expectedT, m.expectedOptions, options)
+	return m.error
 }

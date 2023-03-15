@@ -14,72 +14,141 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var pushEvent event.Push
 var rcb event.RootConfigBuilder
 var globalCfg valid.GlobalCfg
 var expectedErr = errors.New("some error") //nolint:revive // error name is fine for testing purposes
 
 func setupTesting(t *testing.T) {
 	globalCfg = valid.NewGlobalCfg("somedir")
-	repo := models.Repo{
-		FullName:      "nish/repo",
-		DefaultBranch: "",
-	}
-	pushEvent = event.Push{
-		Repo: repo,
-		Sha:  "1234",
-	}
 	// creates a default PCB to used in each test; individual tests mutate a specific field to test certain functionalities
 	rcb = event.RootConfigBuilder{
 		RepoFetcher:     &mockRepoFetcher{},
 		HooksRunner:     &mockHooksRunner{},
 		ParserValidator: &mockParserValidator{},
-		RootFinder:      &mockRootFinder{},
-		FileFetcher:     &mockFileFetcher{},
-		GlobalCfg:       globalCfg,
-		Logger:          logging.NewNoopCtxLogger(t),
-		Scope:           tally.NewTestScope("test", map[string]string{}),
+		Strategy: &event.ModifiedRootsStrategy{
+			RootFinder:  &mockRootFinder{},
+			FileFetcher: &mockFileFetcher{},
+		},
+		GlobalCfg: globalCfg,
+		Logger:    logging.NewNoopCtxLogger(t),
+		Scope:     tally.NewTestScope("test", map[string]string{}),
 	}
 }
 
 func TestRootConfigBuilder_Success(t *testing.T) {
+	repo := models.Repo{
+		FullName: "nish/repo",
+	}
+
+	commit := &event.RepoCommit{
+		Repo: repo,
+		Sha:  "1234",
+	}
 	setupTesting(t)
 	projects := []valid.Project{
 		{
-			Name: &pushEvent.Repo.FullName,
+			Name: &commit.Repo.FullName,
 		},
 	}
-	rcb.RootFinder = &mockRootFinder{
+	rcb.Strategy.RootFinder = &mockRootFinder{
 		ConfigProjects: projects,
 	}
-	projCfg := globalCfg.MergeProjectCfg(pushEvent.Repo.ID(), projects[0], valid.RepoCfg{})
+	projCfg := globalCfg.MergeProjectCfg(commit.Repo.ID(), projects[0], valid.RepoCfg{})
 	expProjectConfigs := []*valid.MergedProjectCfg{
 		&projCfg,
 	}
-	repoOptions := github.RepoFetcherOptions{}
-	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
-	builderOptions := event.BuilderOptions{
-		RepoFetcherOptions: repoOptions,
-		FileFetcherOptions: fileOptions,
-	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken, builderOptions)
+
+	projectConfigs, err := rcb.Build(context.Background(), commit, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, expProjectConfigs, projectConfigs)
 }
 
+func TestRootConfigBuilder_Success_explicitRoots(t *testing.T) {
+	repo := models.Repo{
+		FullName: "nish/repo",
+	}
+
+	commit := &event.RepoCommit{
+		Repo: repo,
+		Sha:  "1234",
+	}
+	setupTesting(t)
+	root := testRoot
+	projects := []valid.Project{
+		{
+			Name: &root,
+		},
+	}
+	rcb.ParserValidator = &mockParserValidator{
+		repoCfg: valid.RepoCfg{
+			Projects: projects,
+		},
+	}
+	rootFinder := &mockRootFinder{
+		ConfigProjects: projects,
+	}
+
+	filefetcher := &mockFileFetcher{}
+	rcb.Strategy.RootFinder = rootFinder
+	rcb.Strategy.FileFetcher = filefetcher
+
+	projCfg := globalCfg.MergeProjectCfg(commit.Repo.ID(), projects[0], valid.RepoCfg{})
+	expProjectConfigs := []*valid.MergedProjectCfg{
+		&projCfg,
+	}
+
+	projectConfigs, err := rcb.Build(context.Background(), commit, 2, event.BuilderOptions{
+		RootNames: []string{root},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, expProjectConfigs, projectConfigs)
+	assert.False(t, rootFinder.called)
+	assert.False(t, filefetcher.called)
+}
+
+func TestRootConfigBuilder_Success_explicitRoots_invalid(t *testing.T) {
+	repo := models.Repo{
+		FullName: "nish/repo",
+	}
+
+	commit := &event.RepoCommit{
+		Repo: repo,
+		Sha:  "1234",
+	}
+	setupTesting(t)
+	root := testRoot
+	projects := []valid.Project{
+		{
+			Name: &root,
+		},
+	}
+	rcb.ParserValidator = &mockParserValidator{
+		repoCfg: valid.RepoCfg{
+			Projects: projects,
+		},
+	}
+
+	_, err := rcb.Build(context.Background(), commit, 2, event.BuilderOptions{
+		RootNames: []string{"another root"},
+	})
+	assert.Error(t, err)
+}
+
 func TestRootConfigBuilder_DetermineRootsError(t *testing.T) {
 	setupTesting(t)
+	repo := models.Repo{
+		FullName: "nish/repo",
+	}
+
+	commit := &event.RepoCommit{
+		Repo: repo,
+		Sha:  "1234",
+	}
 	mockRootFinder := &mockRootFinder{
 		error: expectedErr,
 	}
-	rcb.RootFinder = mockRootFinder
-	repoOptions := github.RepoFetcherOptions{}
-	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
-	builderOptions := event.BuilderOptions{
-		RepoFetcherOptions: repoOptions,
-		FileFetcherOptions: fileOptions,
-	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken, builderOptions)
+	rcb.Strategy.RootFinder = mockRootFinder
+	projectConfigs, err := rcb.Build(context.Background(), commit, 2)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -87,17 +156,19 @@ func TestRootConfigBuilder_DetermineRootsError(t *testing.T) {
 
 func TestRootConfigBuilder_ParserValidatorParseError(t *testing.T) {
 	setupTesting(t)
+	repo := models.Repo{
+		FullName: "nish/repo",
+	}
+
+	commit := &event.RepoCommit{
+		Repo: repo,
+		Sha:  "1234",
+	}
 	mockParserValidator := &mockParserValidator{
 		error: expectedErr,
 	}
 	rcb.ParserValidator = mockParserValidator
-	repoOptions := github.RepoFetcherOptions{}
-	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
-	builderOptions := event.BuilderOptions{
-		RepoFetcherOptions: repoOptions,
-		FileFetcherOptions: fileOptions,
-	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken, builderOptions)
+	projectConfigs, err := rcb.Build(context.Background(), commit, 2)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -105,32 +176,36 @@ func TestRootConfigBuilder_ParserValidatorParseError(t *testing.T) {
 
 func TestRootConfigBuilder_GetModifiedFilesError(t *testing.T) {
 	setupTesting(t)
-	rcb.FileFetcher = &mockFileFetcher{
+	repo := models.Repo{
+		FullName: "nish/repo",
+	}
+
+	commit := &event.RepoCommit{
+		Repo: repo,
+		Sha:  "1234",
+	}
+	rcb.Strategy.FileFetcher = &mockFileFetcher{
 		error: expectedErr,
 	}
-	repoOptions := github.RepoFetcherOptions{}
-	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
-	builderOptions := event.BuilderOptions{
-		RepoFetcherOptions: repoOptions,
-		FileFetcherOptions: fileOptions,
-	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken, builderOptions)
+	projectConfigs, err := rcb.Build(context.Background(), commit, 2)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 }
 
 func TestRootConfigBuilder_CloneError(t *testing.T) {
 	setupTesting(t)
+	repo := models.Repo{
+		FullName: "nish/repo",
+	}
+
+	commit := &event.RepoCommit{
+		Repo: repo,
+		Sha:  "1234",
+	}
 	rcb.RepoFetcher = &mockRepoFetcher{
 		cloneError: expectedErr,
 	}
-	repoOptions := github.RepoFetcherOptions{}
-	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
-	builderOptions := event.BuilderOptions{
-		RepoFetcherOptions: repoOptions,
-		FileFetcherOptions: fileOptions,
-	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken, builderOptions)
+	projectConfigs, err := rcb.Build(context.Background(), commit, 2)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -138,17 +213,19 @@ func TestRootConfigBuilder_CloneError(t *testing.T) {
 
 func TestRootConfigBuilder_HooksRunnerError(t *testing.T) {
 	setupTesting(t)
+	repo := models.Repo{
+		FullName: "nish/repo",
+	}
+
+	commit := &event.RepoCommit{
+		Repo: repo,
+		Sha:  "1234",
+	}
 	mockHooksRunner := &mockHooksRunner{
 		error: expectedErr,
 	}
 	rcb.HooksRunner = mockHooksRunner
-	repoOptions := github.RepoFetcherOptions{}
-	fileOptions := github.FileFetcherOptions{Sha: pushEvent.Sha}
-	builderOptions := event.BuilderOptions{
-		RepoFetcherOptions: repoOptions,
-		FileFetcherOptions: fileOptions,
-	}
-	projectConfigs, err := rcb.Build(context.Background(), pushEvent.Repo, pushEvent.Repo.DefaultBranch, pushEvent.Sha, pushEvent.InstallationToken, builderOptions)
+	projectConfigs, err := rcb.Build(context.Background(), commit, 2)
 	assert.Error(t, err)
 	assert.Empty(t, projectConfigs)
 
@@ -173,19 +250,23 @@ func (h *mockHooksRunner) Run(_ context.Context, _ models.Repo, _ string) error 
 }
 
 type mockFileFetcher struct {
-	error error
+	called bool
+	error  error
 }
 
 func (f *mockFileFetcher) GetModifiedFiles(_ context.Context, _ models.Repo, _ int64, _ github.FileFetcherOptions) ([]string, error) {
+	f.called = true
 	return nil, f.error
 }
 
 type mockRootFinder struct {
+	called         bool
 	ConfigProjects []valid.Project
 	error          error
 }
 
 func (m *mockRootFinder) FindRoots(_ context.Context, _ valid.RepoCfg, _ string, _ []string) ([]valid.Project, error) {
+	m.called = true
 	return m.ConfigProjects, m.error
 }
 

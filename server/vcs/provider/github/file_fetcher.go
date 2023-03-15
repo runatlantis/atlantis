@@ -12,6 +12,10 @@ type RemoteFileFetcher struct {
 	ClientCreator githubapp.ClientCreator
 }
 
+// FileFetcherOptions dictates the context of fetching modified files.
+// If a sha is provided, we get the modified files within the context of said sha
+// If a PR number is provided, we get the modified files for the whole PR
+// If both, we prioritize PR number
 type FileFetcherOptions struct {
 	Sha   string
 	PRNum int
@@ -24,10 +28,10 @@ func (r *RemoteFileFetcher) GetModifiedFiles(ctx context.Context, repo models.Re
 	}
 
 	var run func(ctx context.Context, nextPage int) ([]*gh.CommitFile, *gh.Response, error)
-	if fileFetcherOptions.Sha != "" {
-		run = GetCommit(client, repo, fileFetcherOptions)
-	} else if fileFetcherOptions.PRNum != 0 {
+	if fileFetcherOptions.PRNum != 0 {
 		run = ListFiles(client, repo, fileFetcherOptions)
+	} else if fileFetcherOptions.Sha != "" {
+		run = GetCommit(client, repo, fileFetcherOptions)
 	} else {
 		return nil, errors.New("invalid fileFetcherOptions")
 	}

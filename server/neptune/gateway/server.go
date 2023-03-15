@@ -296,11 +296,13 @@ func NewServer(config Config) (*Server, error) {
 		RepoFetcher:     repoFetcher,
 		HooksRunner:     hooksRunner,
 		ParserValidator: &event.ParserValidator{GlobalCfg: globalCfg},
-		RootFinder:      &event.RepoRootFinder{Logger: ctxLogger},
-		FileFetcher:     &github.RemoteFileFetcher{ClientCreator: clientCreator},
-		GlobalCfg:       globalCfg,
-		Logger:          ctxLogger,
-		Scope:           statsScope.SubScope("event.filters.root"),
+		Strategy: &event.ModifiedRootsStrategy{
+			RootFinder:  &event.RepoRootFinder{Logger: ctxLogger},
+			FileFetcher: &github.RemoteFileFetcher{ClientCreator: clientCreator},
+		},
+		GlobalCfg: globalCfg,
+		Logger:    ctxLogger,
+		Scope:     statsScope.SubScope("event.filters.root"),
 	}
 
 	checkRunFetcher := &github.CheckRunsFetcher{

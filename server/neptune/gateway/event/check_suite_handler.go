@@ -5,7 +5,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
-	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 )
 
 type CheckSuite struct {
@@ -39,19 +38,12 @@ func (h *CheckSuiteHandler) Handle(ctx context.Context, event CheckSuite) error 
 }
 
 func (h *CheckSuiteHandler) handle(ctx context.Context, event CheckSuite) error {
-	builderOptions := BuilderOptions{
-		RepoFetcherOptions: github.RepoFetcherOptions{},
-		FileFetcherOptions: github.FileFetcherOptions{
-			Sha: event.HeadSha,
-		},
-	}
 	rootDeployOptions := RootDeployOptions{
 		Repo:              event.Repo,
 		Branch:            event.Branch,
 		Revision:          event.HeadSha,
 		Sender:            event.Sender,
 		InstallationToken: event.InstallationToken,
-		BuilderOptions:    builderOptions,
 		Trigger:           workflows.ManualTrigger,
 		Rerun:             true,
 	}

@@ -2,14 +2,16 @@ package event_test
 
 import (
 	"context"
+	"testing"
+
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	"github.com/stretchr/testify/assert"
 	"go.temporal.io/sdk/client"
-	"testing"
 )
 
 func TestDeploy(t *testing.T) {
@@ -17,15 +19,45 @@ func TestDeploy(t *testing.T) {
 	version, err := version.NewVersion("1.0.3")
 	assert.NoError(t, err)
 	// use default values for testing
-	deployOptions := event.RootDeployOptions{}
+	deployOptions := event.RootDeployOptions{
+		Repo: models.Repo{
+			Name: "test",
+		},
+		Branch:          "some-branch",
+		Revision:        "some-revision",
+		OptionalPullNum: 1,
+		RootNames:       []string{"some-root"},
+		RepoFetcherOptions: &github.RepoFetcherOptions{
+			CloneDepth: 2000,
+		},
+		InstallationToken: 2,
+	}
+
+	commit := &event.RepoCommit{
+		Repo:          deployOptions.Repo,
+		Branch:        deployOptions.Branch,
+		Sha:           deployOptions.Revision,
+		OptionalPRNum: deployOptions.OptionalPullNum,
+	}
 
 	t.Run("root config builder error", func(t *testing.T) {
 		signaler := &mockDeploySignaler{}
 		ctx := context.Background()
 		deployer := event.RootDeployer{
-			DeploySignaler:    signaler,
-			Logger:            logger,
-			RootConfigBuilder: &mockRootConfigBuilder{error: assert.AnError},
+			DeploySignaler: signaler,
+			Logger:         logger,
+			RootConfigBuilder: &mockRootConfigBuilder{
+				expectedT:      t,
+				expectedCommit: commit,
+				expectedToken:  deployOptions.InstallationToken,
+				expectedOptions: []event.BuilderOptions{
+					{
+						RootNames:          deployOptions.RootNames,
+						RepoFetcherOptions: deployOptions.RepoFetcherOptions,
+					},
+				},
+				error: assert.AnError,
+			},
 		}
 
 		err := deployer.Deploy(ctx, deployOptions)
@@ -48,13 +80,21 @@ func TestDeploy(t *testing.T) {
 		rootCfgs := []*valid.MergedProjectCfg{
 			&rootCfg,
 		}
-		rootConfigBuilder := &mockRootConfigBuilder{
-			rootConfigs: rootCfgs,
-		}
 		deployer := event.RootDeployer{
-			DeploySignaler:    signaler,
-			Logger:            logger,
-			RootConfigBuilder: rootConfigBuilder,
+			DeploySignaler: signaler,
+			Logger:         logger,
+			RootConfigBuilder: &mockRootConfigBuilder{
+				expectedT:      t,
+				expectedCommit: commit,
+				expectedToken:  deployOptions.InstallationToken,
+				expectedOptions: []event.BuilderOptions{
+					{
+						RootNames:          deployOptions.RootNames,
+						RepoFetcherOptions: deployOptions.RepoFetcherOptions,
+					},
+				},
+				rootConfigs: rootCfgs,
+			},
 		}
 
 		err := deployer.Deploy(ctx, deployOptions)
@@ -77,13 +117,21 @@ func TestDeploy(t *testing.T) {
 		rootCfgs := []*valid.MergedProjectCfg{
 			&rootCfg,
 		}
-		rootConfigBuilder := &mockRootConfigBuilder{
-			rootConfigs: rootCfgs,
-		}
 		deployer := event.RootDeployer{
-			DeploySignaler:    signaler,
-			Logger:            logger,
-			RootConfigBuilder: rootConfigBuilder,
+			DeploySignaler: signaler,
+			Logger:         logger,
+			RootConfigBuilder: &mockRootConfigBuilder{
+				expectedT:      t,
+				expectedCommit: commit,
+				expectedToken:  deployOptions.InstallationToken,
+				expectedOptions: []event.BuilderOptions{
+					{
+						RootNames:          deployOptions.RootNames,
+						RepoFetcherOptions: deployOptions.RepoFetcherOptions,
+					},
+				},
+				rootConfigs: rootCfgs,
+			},
 		}
 
 		err := deployer.Deploy(ctx, deployOptions)
@@ -93,11 +141,18 @@ func TestDeploy(t *testing.T) {
 }
 
 type mockRootConfigBuilder struct {
-	rootConfigs []*valid.MergedProjectCfg
-	error       error
+	expectedCommit  *event.RepoCommit
+	expectedToken   int64
+	expectedOptions []event.BuilderOptions
+	expectedT       *testing.T
+	rootConfigs     []*valid.MergedProjectCfg
+	error           error
 }
 
-func (r *mockRootConfigBuilder) Build(_ context.Context, _ models.Repo, _ string, _ string, _ int64, _ event.BuilderOptions) ([]*valid.MergedProjectCfg, error) {
+func (r *mockRootConfigBuilder) Build(_ context.Context, commit *event.RepoCommit, installationToken int64, opts ...event.BuilderOptions) ([]*valid.MergedProjectCfg, error) {
+	assert.Equal(r.expectedT, r.expectedCommit, commit)
+	assert.Equal(r.expectedT, r.expectedToken, installationToken)
+	assert.Equal(r.expectedT, r.expectedOptions, opts)
 	return r.rootConfigs, r.error
 }
 

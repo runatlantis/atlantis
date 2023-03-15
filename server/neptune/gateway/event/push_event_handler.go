@@ -75,22 +75,16 @@ func (p *PushHandler) Handle(ctx context.Context, event Push) error {
 }
 
 func (p *PushHandler) handle(ctx context.Context, event Push) error {
-	builderOptions := BuilderOptions{
-		RepoFetcherOptions: github.RepoFetcherOptions{
-			CloneDepth: 5,
-		},
-		FileFetcherOptions: github.FileFetcherOptions{
-			Sha: event.Sha,
-		},
-	}
 	rootDeployOptions := RootDeployOptions{
 		Repo:              event.Repo,
 		Branch:            event.Ref.Name,
 		Revision:          event.Sha,
 		Sender:            event.Sender,
 		InstallationToken: event.InstallationToken,
-		BuilderOptions:    builderOptions,
-		Trigger:           workflows.MergeTrigger,
+		RepoFetcherOptions: &github.RepoFetcherOptions{
+			CloneDepth: 5,
+		},
+		Trigger: workflows.MergeTrigger,
 	}
 	return p.RootDeployer.Deploy(ctx, rootDeployOptions)
 }

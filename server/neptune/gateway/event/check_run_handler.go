@@ -3,8 +3,6 @@ package event
 import (
 	"context"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	"regexp"
 	"strings"
 
@@ -53,11 +51,11 @@ type CheckRun struct {
 }
 
 type CheckRunHandler struct {
-	Logger            logging.Logger
-	RootConfigBuilder rootConfigBuilder
-	SyncScheduler     scheduler
-	AsyncScheduler    scheduler
-	DeploySignaler    deploySignaler
+	Logger         logging.Logger
+	RootDeployer   rootDeployer
+	SyncScheduler  scheduler
+	AsyncScheduler scheduler
+	DeploySignaler deploySignaler
 }
 
 func (h *CheckRunHandler) Handle(ctx context.Context, event CheckRun) error {
@@ -154,42 +152,15 @@ func (h *CheckRunHandler) signalUnlockWorkflowChannel(ctx context.Context, event
 }
 
 func (h *CheckRunHandler) buildRoot(ctx context.Context, event CheckRun, rootName string) error {
-	builderOptions := BuilderOptions{
-		RepoFetcherOptions: github.RepoFetcherOptions{},
-		FileFetcherOptions: github.FileFetcherOptions{
-			Sha: event.HeadSha,
-		},
+	deployOptions := RootDeployOptions{
+		Repo:              event.Repo,
+		Branch:            event.Branch,
+		RootNames:         []string{rootName},
+		Revision:          event.HeadSha,
+		Sender:            event.User,
+		InstallationToken: event.InstallationToken,
+		Trigger:           workflows.ManualTrigger,
+		Rerun:             true,
 	}
-	rootCfgs, err := h.RootConfigBuilder.Build(ctx, event.Repo, event.Branch, event.HeadSha, event.InstallationToken, builderOptions)
-	if err != nil {
-		return errors.Wrap(err, "generating roots")
-	}
-	for _, rootCfg := range rootCfgs {
-		if rootCfg.Name != rootName {
-			continue
-		}
-		c := context.WithValue(ctx, contextInternal.ProjectKey, rootCfg.Name)
-		if rootCfg.WorkflowMode != valid.PlatformWorkflowMode {
-			h.Logger.DebugContext(c, "root is not configured for platform mode, skipping...")
-			continue
-		}
-		deployOptions := RootDeployOptions{
-			Repo:              event.Repo,
-			Branch:            event.Branch,
-			Revision:          event.HeadSha,
-			Sender:            event.User,
-			InstallationToken: event.InstallationToken,
-			BuilderOptions:    builderOptions,
-			Trigger:           workflows.ManualTrigger,
-			Rerun:             true,
-		}
-		run, err := h.DeploySignaler.SignalWithStartWorkflow(c, rootCfg, deployOptions)
-		if err != nil {
-			return errors.Wrap(err, "signalling workflow")
-		}
-		h.Logger.InfoContext(c, "Signaled workflow.", map[string]interface{}{
-			"workflow-id": run.GetID(), "run-id": run.GetRunID(),
-		})
-	}
-	return nil
+	return errors.Wrap(h.RootDeployer.Deploy(ctx, deployOptions), "deploying workflow")
 }

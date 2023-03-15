@@ -9,7 +9,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	"github.com/runatlantis/atlantis/server/neptune/workflows"
-	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -144,19 +143,13 @@ func (p *CommentEventWorkerProxy) forwardToSns(ctx context.Context, request *htt
 }
 
 func (p *CommentEventWorkerProxy) forceApply(ctx context.Context, event Comment) error {
-	// TODO: consider supporting shallow cloning for comment based events too
-	builderOptions := BuilderOptions{
-		FileFetcherOptions: github.FileFetcherOptions{
-			PRNum: event.PullNum,
-		},
-	}
 	rootDeployOptions := RootDeployOptions{
 		Repo:              event.HeadRepo,
 		Branch:            event.Pull.HeadBranch,
 		Revision:          event.Pull.HeadCommit,
+		OptionalPullNum:   event.Pull.Num,
 		Sender:            event.User,
 		InstallationToken: event.InstallationToken,
-		BuilderOptions:    builderOptions,
 		Trigger:           workflows.ManualTrigger,
 	}
 	return p.rootDeployer.Deploy(ctx, rootDeployOptions)
