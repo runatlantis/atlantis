@@ -62,7 +62,7 @@ type CheckRunHandler struct {
 
 func (h *CheckRunHandler) Handle(ctx context.Context, event CheckRun) error {
 	// first let's make sure this is an atlantis check run
-	if !strings.HasPrefix(event.Name, "atlantis") {
+	if !strings.HasPrefix(event.Name, "atlantis/deploy") {
 		h.Logger.DebugContext(ctx, "Ignoring non-atlantis checks event")
 		return nil
 	}

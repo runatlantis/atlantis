@@ -210,7 +210,7 @@ func TestCheckRunHandler(t *testing.T) {
 		assert.True(t, signaler.called)
 	})
 
-	t.Run("invalid root name", func(t *testing.T) {
+	t.Run("non-deploy atlantis check run", func(t *testing.T) {
 		user := models.User{Username: "nish"}
 		workflowID := "testrepo||testroot"
 		subject := event.CheckRunHandler{
@@ -223,10 +223,10 @@ func TestCheckRunHandler(t *testing.T) {
 			ExternalID: workflowID,
 			User:       user,
 			Repo:       models.Repo{FullName: "testrepo"},
-			Name:       "atlantis/invalid: testroot",
+			Name:       "atlantis/plan: testroot",
 		}
 		err := subject.Handle(context.Background(), e)
-		assert.ErrorContains(t, err, "unable to determine root name")
+		assert.NoError(t, err)
 	})
 
 	t.Run("signal error", func(t *testing.T) {
