@@ -9,7 +9,7 @@ import (
 
 // AutomergeCommitMsg returns the commit message to use when automerging.
 func AutomergeCommitMsg(pullNum int) string {
-	return fmt.Sprintf("[Atlantis] Automatically merging after successful apply: PR %d", pullNum)
+	return fmt.Sprintf("[Atlantis] Automatically merging after successful apply: PR #%d", pullNum)
 }
 
 // SplitComment splits comment into a slice of comments that are under maxSize.
