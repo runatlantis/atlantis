@@ -7,17 +7,17 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/scheduled"
 )
 
 // GitCredsTokenRotator continuously tries to rotate the github app access token every 30 seconds and writes the ~/.git-credentials file
 type GitCredsTokenRotator interface {
-	Start() error
-	Stop()
+	Run()
 	rotate() error
+	GenerateJob() (scheduled.JobDefinition, error)
 }
 
 type githubAppTokenRotator struct {
-	stop              chan struct{}
 	log               logging.SimpleLogging
 	githubCredentials GithubCredentials
 	githubHostname    string
@@ -28,7 +28,6 @@ func NewGithubAppTokenRotator(
 	githubCredentials GithubCredentials,
 	githubHostname string) GitCredsTokenRotator {
 	return &githubAppTokenRotator{
-		stop:              make(chan struct{}),
 		log:               logger,
 		githubCredentials: githubCredentials,
 		githubHostname:    githubHostname,
@@ -38,26 +37,16 @@ func NewGithubAppTokenRotator(
 // make sure interface is implemented correctly
 var _ GitCredsTokenRotator = (*githubAppTokenRotator)(nil)
 
-func (r *githubAppTokenRotator) Start() error {
-	ticker := time.NewTicker(30 * time.Second)
+func (r *githubAppTokenRotator) GenerateJob() (scheduled.JobDefinition, error) {
 
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				r.rotate()
-			case <-r.stop:
-				ticker.Stop()
-				return
-			}
-		}
-	}()
-
-	return r.rotate()
+	return scheduled.JobDefinition{
+		Job:    r,
+		Period: 30 * time.Second,
+	}, r.rotate()
 }
 
-func (r *githubAppTokenRotator) Stop() {
-	close(r.stop)
+func (r *githubAppTokenRotator) Run() {
+	r.rotate()
 }
 
 func (r *githubAppTokenRotator) rotate() error {

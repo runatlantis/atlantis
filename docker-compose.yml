@@ -7,9 +7,11 @@ services:
         - 4040:4040
         environment:
             # https://dashboard.ngrok.com/get-started/your-authtoken
-            NGROK_AUTH: REPLACE-WITH-YOUR-TOKEN
+            # NGROK_AUTH: REPLACE-WITH-YOUR-TOKEN // set this in atlantis.env
             NGROK_PROTOCOL: http
             NGROK_PORT: atlantis:4141
+        env_file:
+            - ./atlantis.env
         depends_on:
         - atlantis
     redis:

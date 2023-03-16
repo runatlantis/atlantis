@@ -462,6 +462,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CheckoutDepth:    userConfig.CheckoutDepth,
 		GithubAppEnabled: githubAppEnabled,
 	}
+
+	scheduledExecutorService := scheduled.NewExecutorService(
+		statsScope,
+		logger,
+	)
+
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir
 	if githubAppEnabled {
 		if !userConfig.WriteGitCreds {
@@ -474,10 +480,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		githubAppTokenRotator = vcs.NewGithubAppTokenRotator(logger, githubCredentials, userConfig.GithubHostname)
-		err := githubAppTokenRotator.Start()
+		tokenJd, err := githubAppTokenRotator.GenerateJob()
 		if err != nil {
 			return nil, errors.Wrap(err, "Could not write credentials")
 		}
+		scheduledExecutorService.AddJob(tokenJd)
 	}
 
 	projectLocker := &events.DefaultProjectLocker{
@@ -868,10 +875,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubHostname:      userConfig.GithubHostname,
 		GithubOrg:           userConfig.GithubOrg,
 	}
-	scheduledExecutorService := scheduled.NewExecutorService(
-		statsScope,
-		logger,
-	)
 
 	return &Server{
 		AtlantisVersion:                config.AtlantisVersion,
