@@ -789,7 +789,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 						w.Write([]byte(resp)) // nolint: errcheck
 					case "/api/v3/repos/runatlantis/atlantis/branches/master/protection":
 						w.WriteHeader(404)
-						w.Write([]byte("{\"message\":\"Branch not protected\"}"))
+						w.Write([]byte("{\"message\":\"Branch not protected\"}")) // nolint: errcheck
 						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -1000,10 +1000,10 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 						return
 					case "/api/v3/repos/runatlantis/atlantis/branches/master/protection":
 						if c.protectedBranch {
-							w.Write([]byte(protected))
+							w.Write([]byte(protected)) // nolint: errcheck
 						} else {
 							w.WriteHeader(404)
-							w.Write([]byte("{\"message\":\"Branch not protected\"}"))
+							w.Write([]byte("{\"message\":\"Branch not protected\"}")) // nolint: errcheck
 						}
 						return
 					case "/api/v3/repos/runatlantis/atlantis/pulls/1/merge":
