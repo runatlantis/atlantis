@@ -169,7 +169,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
 	var azuredevopsClient *vcs.AzureDevopsClient
-	var githubAppTokenRotator vcs.GitCredsTokenRotator
 
 	policyChecksEnabled := false
 	if userConfig.EnablePolicyChecksFlag {
@@ -299,11 +298,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
+	home, err := homedir.Dir()
+	if err != nil {
+		return nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
+	}
+
 	if userConfig.WriteGitCreds {
-		home, err := homedir.Dir()
-		if err != nil {
-			return nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
-		}
 		if userConfig.GithubUser != "" {
 			if err := vcs.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger, false); err != nil {
 				return nil, err
@@ -479,7 +479,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			GithubHostname: userConfig.GithubHostname,
 		}
 
-		githubAppTokenRotator = vcs.NewGithubAppTokenRotator(logger, githubCredentials, userConfig.GithubHostname)
+		githubAppTokenRotator := vcs.NewGithubAppTokenRotator(logger, githubCredentials, userConfig.GithubHostname, home)
 		tokenJd, err := githubAppTokenRotator.GenerateJob()
 		if err != nil {
 			return nil, errors.Wrap(err, "Could not write credentials")
