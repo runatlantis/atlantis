@@ -59,9 +59,9 @@ jobs:
           org.opencontainers.image.licenses=Apache-2.0
         tags: |
           # semver
-          type=semver,pattern={{version}},suffix=${{ env.SUFFIX }}
-          type=semver,pattern={{version}},enable=${{ matrix.image_type == 'alpine' }}
-          type=semver,pattern={{major}}.{{minor}},suffix=${{ env.SUFFIX }}
+          type=semver,pattern={{version}},prefix=v,suffix=${{ env.SUFFIX }}
+          type=semver,pattern={{version}},prefix=v,enable=${{ matrix.image_type == 'alpine' }}
+          type=semver,pattern={{major}}.{{minor}},prefix=v,suffix=${{ env.SUFFIX }}
           # dev
           type=raw,value=dev,suffix=${{ env.SUFFIX }}-{{ sha }}
           type=raw,event=push,value=dev,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }},suffix=

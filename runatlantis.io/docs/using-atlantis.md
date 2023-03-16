@@ -53,7 +53,7 @@ atlantis plan
 atlantis plan -d .
 
 # Runs plan in the `project1` directory of the repo with workspace `default`
-atlantis plan -d project1
+atlantis plan -p project1
 
 # Runs plan in the root directory of the repo with workspace `staging`
 atlantis plan -w staging
@@ -101,7 +101,7 @@ atlantis apply
 atlantis apply -d .
 
 # Runs apply in the `project1` directory of the repo with workspace `default`
-atlantis apply -d project1
+atlantis apply -p project1
 
 # Runs apply in the root directory of the repo with workspace `staging`
 atlantis apply -w staging
@@ -144,7 +144,7 @@ atlantis import ADDRESS ID
 atlantis import -d . ADDRESS ID
 
 # Runs import in the `project1` directory of the repo with workspace `default`
-atlantis import -d project1 ADDRESS ID
+atlantis import -p project1 ADDRESS ID
 
 # Runs import in the root directory of the repo with workspace `staging`
 atlantis import -w staging ADDRESS ID
@@ -189,7 +189,7 @@ atlantis state rm ADDRESS1 ADDRESS2
 atlantis state -d . rm ADDRESS
 
 # Runs state rm in the `project1` directory of the repo with workspace `default`
-atlantis state -d project1 rm ADDRESS
+atlantis state -p project1 rm ADDRESS
 
 # Runs state rm in the root directory of the repo with workspace `staging`
 atlantis state -w staging rm ADDRESS
