@@ -35,7 +35,5 @@ func (g *GithubAppWorkingDir) Clone(log logging.SimpleLogging, headRepo models.R
 	headRepo.CloneURL = strings.Replace(headRepo.CloneURL, "://:@", authURL, 1)
 	headRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://@", "://", 1)
 
-	log.Info("headRepo _ after: %s", headRepo)
-
 	return g.WorkingDir.Clone(log, headRepo, p, workspace)
 }
