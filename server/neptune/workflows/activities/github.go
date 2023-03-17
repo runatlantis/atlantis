@@ -38,6 +38,7 @@ type githubClient interface {
 	UpdateCheckRun(ctx internal.Context, owner, repo string, checkRunID int64, opts github.UpdateCheckRunOptions) (*github.CheckRun, *github.Response, error)
 	GetArchiveLink(ctx internal.Context, owner, repo string, archiveformat github.ArchiveFormat, opts *github.RepositoryContentGetOptions, followRedirects bool) (*url.URL, *github.Response, error)
 	CompareCommits(ctx internal.Context, owner, repo string, base, head string, opts *github.ListOptions) (*github.CommitsComparison, *github.Response, error)
+	ListModifiedFiles(ctx internal.Context, owner, repo string, pullNumber int) ([]*github.CommitFile, error)
 	ListPullRequests(ctx internal.Context, owner, repo, base, state string) ([]*github.PullRequest, error)
 }
 
@@ -331,14 +332,34 @@ type ListModifiedFilesRequest struct {
 	PullRequest internal.PullRequest
 }
 
-// strings are utf-8 encoded of size 1 to 4 bytes, assuming each file path is of length 100, max size of a filepath = 4 * 100 = 400 bytes
-// upper limit of 2Mb can accomodate (2*1024*1024)/400 = 524k filepaths which is >> max number of results per page supported by the GH API 100.
 type ListModifiedFilesResponse struct {
 	FilePaths []string
 }
 
 func (a *githubActivities) ListModifiedFiles(ctx context.Context, request ListModifiedFilesRequest) (ListModifiedFilesResponse, error) {
-	// TODO: Use client.ListModifiedFiles(ctx, owner, repo, pullNumber) to list files modified in a PR
-	// internal.Repo object and internal.PullRequest has all the necessary fields to make this call
-	return ListModifiedFilesResponse{}, nil
+	files, err := a.Client.ListModifiedFiles(
+		internal.ContextWithInstallationToken(ctx, request.Repo.Credentials.InstallationToken),
+		request.Repo.Owner,
+		request.Repo.Name,
+		request.PullRequest.Number,
+	)
+	if err != nil {
+		return ListModifiedFilesResponse{}, errors.Wrap(err, "listing modified files in pr")
+	}
+
+	filepaths := []string{}
+	for _, file := range files {
+		filepaths = append(filepaths, file.GetFilename())
+
+		// account for previous file name as well if the file has moved across roots
+		if file.GetStatus() == "renamed" {
+			filepaths = append(filepaths, file.GetPreviousFilename())
+		}
+	}
+
+	// strings are utf-8 encoded of size 1 to 4 bytes, assuming each file path is of length 100, max size of a filepath = 4 * 100 = 400 bytes
+	// upper limit of 2Mb can accomodate (2*1024*1024)/400 = 524k filepaths which is >> max number of results supported by the GH API 3000.
+	return ListModifiedFilesResponse{
+		FilePaths: filepaths,
+	}, nil
 }

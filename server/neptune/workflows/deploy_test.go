@@ -293,6 +293,10 @@ func (c *testGithubClient) CompareCommits(ctx internalGithub.Context, owner, rep
 	}, &github.Response{}, nil
 }
 
+func (c *testGithubClient) ListModifiedFiles(ctx internalGithub.Context, owner, repo string, pullNumber int) ([]*github.CommitFile, error) {
+	return []*github.CommitFile{}, nil
+}
+
 func (c *testGithubClient) ListPullRequests(ctx internalGithub.Context, owner, repo, base, state string) ([]*github.PullRequest, error) {
 	return []*github.PullRequest{}, nil
 }
