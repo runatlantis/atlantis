@@ -23,3 +23,5 @@ dist/
 tmp-CHANGELOG.md
 
 .envrc
+
+Dockerfile.local

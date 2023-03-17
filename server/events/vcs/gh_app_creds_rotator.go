@@ -52,6 +52,7 @@ func (r *githubAppTokenRotator) Run() {
 
 func (r *githubAppTokenRotator) rotate() error {
 	r.log.Debug("Refreshing git tokens for Github App")
+
 	token, err := r.githubCredentials.GetToken()
 	if err != nil {
 		return errors.Wrap(err, "Getting github token")
