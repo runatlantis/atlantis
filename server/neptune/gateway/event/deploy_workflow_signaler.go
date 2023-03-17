@@ -72,6 +72,7 @@ func (d *DeployWorkflowSignaler) SignalWithStartWorkflow(ctx context.Context, ro
 					InstallationToken: rootDeployOptions.InstallationToken,
 				},
 				RebaseEnabled: rootCfg.RebaseEnabled,
+				DefaultBranch: repo.DefaultBranch,
 			},
 			Tags: rootCfg.Tags,
 		},

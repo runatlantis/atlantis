@@ -14,6 +14,8 @@ type Repo struct {
 	URL string
 	// Flag to determine if open PRs for a root need to be rebased
 	RebaseEnabled bool
+	// Repo's default branch
+	DefaultBranch string
 
 	Credentials AppCredentials
 }

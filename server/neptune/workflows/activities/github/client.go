@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-github/v45/github"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
+	gh_helper "github.com/runatlantis/atlantis/server/vcs/provider/github"
 )
 
 type Client struct {
@@ -71,4 +72,25 @@ func (c *Client) CompareCommits(ctx Context, owner, repo string, base, head stri
 	}
 
 	return client.Repositories.CompareCommits(ctx, owner, repo, base, head, opts)
+}
+
+func (c *Client) ListPullRequests(ctx Context, owner, repo, base, state string) ([]*github.PullRequest, error) {
+	client, err := c.ClientCreator.NewInstallationClient(ctx.GetInstallationToken())
+	if err != nil {
+		return nil, errors.Wrap(err, "creating client from installation")
+	}
+
+	run := func(ctx context.Context, nextPage int) ([]*github.PullRequest, *github.Response, error) {
+		prListOptions := github.PullRequestListOptions{
+			State: state,
+			Base:  base,
+			ListOptions: github.ListOptions{
+				PerPage: 100,
+			},
+		}
+		prListOptions.ListOptions.Page = nextPage
+		return client.PullRequests.List(ctx, owner, repo, &prListOptions)
+	}
+
+	return gh_helper.Iterate(ctx, run)
 }
