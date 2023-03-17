@@ -82,8 +82,8 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 	headRepo := baseRepo
 
 	modifiedBaseRepo := baseRepo
-	modifiedBaseRepo.CloneURL = "https://x-access-token:token@github.com/runatlantis/atlantis.git"
-	modifiedBaseRepo.SanitizedCloneURL = "https://x-access-token:<redacted>@github.com/runatlantis/atlantis.git"
+	modifiedBaseRepo.CloneURL = "https://github.com/runatlantis/atlantis.git"
+	modifiedBaseRepo.SanitizedCloneURL = "https://:<redacted>@github.com/runatlantis/atlantis.git" // stays as is / unmodified
 
 	When(credentials.GetToken()).ThenReturn("token", nil)
 	When(workingDir.Clone(logger, modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")).ThenReturn(

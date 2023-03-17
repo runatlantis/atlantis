@@ -1,7 +1,6 @@
 package events
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -29,11 +28,13 @@ func (g *GithubAppWorkingDir) Clone(log logging.SimpleLogging, headRepo models.R
 	// This removes the credential part from the url and leaves us with the raw http url
 	// git will then pick up credentials from the credential store which is set in vcs.WriteGitCreds.
 	// Git credentials will then be rotated by vcs.GitCredsTokenRotator
-	authURL := fmt.Sprintf("://")
-	baseRepo.CloneURL = strings.Replace(baseRepo.CloneURL, "://:@", authURL, 1)
-	baseRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://:@", "://", 1)
-	headRepo.CloneURL = strings.Replace(headRepo.CloneURL, "://:@", authURL, 1)
-	headRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://@", "://", 1)
+	replacement := "://"
+	baseRepo.CloneURL = strings.Replace(baseRepo.CloneURL, "://:@", replacement, 1)
+	baseRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://:@", replacement, 1)
+	headRepo.CloneURL = strings.Replace(headRepo.CloneURL, "://:@", replacement, 1)
+	headRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://@", replacement, 1)
+
+	log.Info("%v", headRepo)
 
 	return g.WorkingDir.Clone(log, headRepo, p, workspace)
 }

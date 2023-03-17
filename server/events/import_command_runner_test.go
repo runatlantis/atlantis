@@ -14,6 +14,7 @@ import (
 )
 
 func TestImportCommandRunner_Run(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 
 	tests := []struct {
