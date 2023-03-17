@@ -173,7 +173,7 @@ func NewServer(config *config.Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing github activities")
 	}
 
-	revisionSetterActivities, err := activities.NewRevisionSetter()
+	revisionSetterActivities, err := activities.NewRevisionSetter(config.RevisionSetter)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing revision setter activities")
 	}

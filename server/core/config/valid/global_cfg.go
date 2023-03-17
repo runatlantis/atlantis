@@ -63,6 +63,7 @@ type GlobalCfg struct {
 	PersistenceConfig    PersistenceConfig
 	TerraformLogFilter   TerraformLogFilters
 	Temporal             Temporal
+	RevisionSetter       RevisionSetter
 }
 
 type PersistenceConfig struct {
@@ -137,6 +138,15 @@ type Temporal struct {
 
 type TerraformLogFilters struct {
 	Regexes []*regexp.Regexp
+}
+
+type BasicAuth struct {
+	Username string
+	Password string
+}
+type RevisionSetter struct {
+	BasicAuth BasicAuth
+	URL       string
 }
 
 // TODO: rename project to roots

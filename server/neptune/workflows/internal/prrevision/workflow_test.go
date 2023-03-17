@@ -98,8 +98,8 @@ func Test_ShouldSetMinimumRevisionForPR(t *testing.T) {
 
 type testRevisionSetterActivities struct{}
 
-func (t *testRevisionSetterActivities) SetPRRevision(ctx context.Context, request activities.SetPRRevisionRequest) (activities.SetPRRevisionResponse, error) {
-	return activities.SetPRRevisionResponse{}, nil
+func (t *testRevisionSetterActivities) SetPRRevision(ctx context.Context, request activities.SetPRRevisionRequest) error {
+	return nil
 }
 
 type testGithubActivities struct{}
@@ -213,7 +213,7 @@ func TestMinRevisionSetter_OpenPR_SetMinRevision(t *testing.T) {
 	env.OnActivity(ra.SetPRRevision, mock.Anything, activities.SetPRRevisionRequest{
 		Repository:  req.Repo,
 		PullRequest: pullRequests[0],
-	}).Return(activities.SetPRRevisionResponse{}, nil)
+	}).Return(nil)
 
 	env.ExecuteWorkflow(testSetMiminumValidRevisionForRootWorkflow, req)
 	env.AssertExpectations(t)
@@ -263,7 +263,7 @@ func TestMinRevisionSetter_ListModifiedFilesErr(t *testing.T) {
 	env.OnActivity(ra.SetPRRevision, mock.Anything, activities.SetPRRevisionRequest{
 		Repository:  req.Repo,
 		PullRequest: pullRequests[0],
-	}).Return(activities.SetPRRevisionResponse{}, nil)
+	}).Return(nil)
 
 	env.ExecuteWorkflow(testSetMiminumValidRevisionForRootWorkflow, req)
 	env.AssertExpectations(t)

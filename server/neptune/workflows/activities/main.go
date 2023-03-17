@@ -2,6 +2,7 @@ package activities
 
 import (
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -219,7 +220,20 @@ type RevsionSetter struct {
 	*prRevisionSetterActivities
 }
 
-func NewRevisionSetter() (*RevsionSetter, error) {
-	// TODO: Pass necessary config to instantiate pr revision setter client
-	return &RevsionSetter{}, nil
+func NewRevisionSetter(cfg valid.RevisionSetter) (*RevsionSetter, error) {
+	// Use a NoopClient if revision setter is not configured
+	var client revisionSetterClient
+	if cfg.URL == "" {
+		client = &NoopClient{}
+	} else {
+		client = &http.Client{}
+	}
+
+	return &RevsionSetter{
+		prRevisionSetterActivities: &prRevisionSetterActivities{
+			client:    client,
+			url:       cfg.URL,
+			basicAuth: cfg.BasicAuth,
+		},
+	}, nil
 }

@@ -35,6 +35,7 @@ type Config struct {
 	DeploymentConfig valid.StoreConfig
 	JobConfig        valid.StoreConfig
 	Metrics          valid.Metrics
+	RevisionSetter   valid.RevisionSetter
 	//TODO: combine this with above
 	StatsNamespace string
 
