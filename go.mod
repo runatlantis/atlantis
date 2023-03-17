@@ -17,7 +17,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/hashicorp/go-getter/v2 v2.2.0
+	github.com/hashicorp/go-getter/v2 v2.2.1
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20230313152339-7c9946b1df49
 	github.com/kr/pretty v0.3.1
