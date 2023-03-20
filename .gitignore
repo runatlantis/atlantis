@@ -17,11 +17,10 @@ atlantis
 atlantis.env
 *.act
 package-lock.json
+Dockerfile.local
 
 # gitreleaser
 dist/
 tmp-CHANGELOG.md
 
 .envrc
-
-Dockerfile.local
