@@ -8,7 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-const RedactedReplacement = "://:<redacted>@"
+const redactedReplacement = "://:<redacted>@"
 
 // GithubAppWorkingDir implements WorkingDir.
 // It acts as a proxy to an instance of WorkingDir that refreshes the app's token
@@ -32,9 +32,9 @@ func (g *GithubAppWorkingDir) Clone(log logging.SimpleLogging, headRepo models.R
 	// Git credentials will then be rotated by vcs.GitCredsTokenRotator
 	replacement := "://"
 	baseRepo.CloneURL = strings.Replace(baseRepo.CloneURL, "://:@", replacement, 1)
-	baseRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, RedactedReplacement, replacement, 1)
+	baseRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, redactedReplacement, replacement, 1)
 	headRepo.CloneURL = strings.Replace(headRepo.CloneURL, "://:@", replacement, 1)
-	headRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, RedactedReplacement, replacement, 1)
+	headRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, redactedReplacement, replacement, 1)
 
 	return g.WorkingDir.Clone(log, headRepo, p, workspace)
 }
