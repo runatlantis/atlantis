@@ -482,7 +482,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		githubAppTokenRotator := vcs.NewGithubAppTokenRotator(logger, githubCredentials, userConfig.GithubHostname, home)
 		tokenJd, err := githubAppTokenRotator.GenerateJob()
 		if err != nil {
-			return nil, errors.Wrap(err, "Could not write credentials")
+			return nil, errors.Wrap(err, "could not write credentials")
 		}
 		scheduledExecutorService.AddJob(tokenJd)
 	}
