@@ -895,7 +895,7 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   Namespace for emitting stats/metrics. See [stats](stats.html) section.
 
-### `--tf--download`
+### `--tf-download`
   ```bash
   atlantis server --tf-download=false
   # or
