@@ -44,8 +44,8 @@ RUN apk add git~=2.39 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/mai
     # git-lfs
     case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
-        "linux/arm64") GIT_LFS_ARCH=arm64 ;; \
-        "linux/arm/v7") GIT_LFS_ARCH=arm ;; \
+        #"linux/arm64") GIT_LFS_ARCH=arm64 ;; \
+        #"linux/arm/v7") GIT_LFS_ARCH=arm ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
     tar --strip-components=1 -xf git-lfs.tar.gz && \
@@ -55,8 +55,8 @@ RUN apk add git~=2.39 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/mai
     # gosu
     case ${TARGETPLATFORM} in \
         "linux/amd64") GOSU_ARCH=amd64 ;; \
-        "linux/arm64") GOSU_ARCH=arm64 ;; \
-        "linux/arm/v7") GOSU_ARCH=armhf ;; \
+        #"linux/arm64") GOSU_ARCH=arm64 ;; \
+        #"linux/arm/v7") GOSU_ARCH=armhf ;; \
     esac && \
     curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" && \
     curl -L -s --output gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" && \

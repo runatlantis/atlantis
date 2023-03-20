@@ -66,7 +66,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		var expectedMsg string
 		projectOutputHandler := createProjectCommandOutputHandler(t)
 
-		ch := make(chan string)
+		ch := make(chan string, 1)
 
 		// register channel and backfill from buffer
 		// Note: We call this synchronously because otherwise
@@ -101,7 +101,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// send first message to populated the buffer
 		projectOutputHandler.Send(ctx, Msg, false)
 
-		ch := make(chan string)
+		ch := make(chan string, 2)
 
 		receivedMsgs := []string{}
 
@@ -138,7 +138,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		var wg sync.WaitGroup
 		projectOutputHandler := createProjectCommandOutputHandler(t)
 
-		ch := make(chan string)
+		ch := make(chan string, 2)
 
 		// register channel and backfill from buffer
 		// Note: We call this synchronously because otherwise
@@ -166,6 +166,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 			ProjectName: ctx.ProjectName,
 			Workspace:   ctx.Workspace,
 		}
+		wg.Wait() // Must finish reading messages before cleaning up
 		projectOutputHandler.CleanUp(pullContext)
 
 		// Check all the resources are cleaned up.
@@ -180,7 +181,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 	t.Run("mark operation status complete and close conn buffers for the job", func(t *testing.T) {
 		projectOutputHandler := createProjectCommandOutputHandler(t)
 
-		ch := make(chan string)
+		ch := make(chan string, 2)
 
 		// register channel and backfill from buffer
 		// Note: We call this synchronously because otherwise
@@ -234,7 +235,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Wait for the handler to process the message
 		time.Sleep(10 * time.Millisecond)
 
-		ch2 := make(chan string)
+		ch2 := make(chan string, 2)
 		opComplete := make(chan bool)
 
 		// buffer channel will be closed immediately after logs are streamed
