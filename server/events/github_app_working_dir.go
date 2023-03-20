@@ -30,11 +30,9 @@ func (g *GithubAppWorkingDir) Clone(log logging.SimpleLogging, headRepo models.R
 	// Git credentials will then be rotated by vcs.GitCredsTokenRotator
 	replacement := "://"
 	baseRepo.CloneURL = strings.Replace(baseRepo.CloneURL, "://:@", replacement, 1)
-	baseRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://:@", replacement, 1)
+	baseRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://:<redacted>@", replacement, 1)
 	headRepo.CloneURL = strings.Replace(headRepo.CloneURL, "://:@", replacement, 1)
-	headRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://@", replacement, 1)
-
-	log.Info("%v", headRepo)
+	headRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://:<redacted>@", replacement, 1)
 
 	return g.WorkingDir.Clone(log, headRepo, p, workspace)
 }
