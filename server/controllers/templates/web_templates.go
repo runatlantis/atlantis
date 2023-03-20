@@ -151,7 +151,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   </div>
 </div>
 <footer>
-v{{ .AtlantisVersion }}
+{{ .AtlantisVersion }}
 </footer>
 <script>
 
