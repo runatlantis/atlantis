@@ -43,8 +43,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN AVAILABLE_TERRAFORM_VERSIONS="${DEFAULT_TERRAFORM_VERSION}" && \
     case "${TARGETPLATFORM}" in \
         "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
-        "linux/arm64") TERRAFORM_ARCH=arm64 ;; \
-        "linux/arm/v7") TERRAFORM_ARCH=arm ;; \
+        #"linux/arm64") TERRAFORM_ARCH=arm64 ;; \
+        #"linux/arm/v7") TERRAFORM_ARCH=arm ;; \
         *) echo "ERROR: 'TARGETPLATFORM' value expected: ${TARGETPLATFORM}"; exit 1 ;; \
     esac && \
     for VERSION in ${AVAILABLE_TERRAFORM_VERSIONS}; do \
@@ -65,9 +65,9 @@ ENV DEFAULT_CONFTEST_VERSION=0.39.2
 RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
     case "${TARGETPLATFORM}" in \
         "linux/amd64") CONFTEST_ARCH=x86_64 ;; \
-        "linux/arm64") CONFTEST_ARCH=arm64 ;; \
+        #"linux/arm64") CONFTEST_ARCH=arm64 ;; \
         # There is currently no compiled version of conftest for armv7
-        "linux/arm/v7") CONFTEST_ARCH=x86_64 ;; \
+        #"linux/arm/v7") CONFTEST_ARCH=x86_64 ;; \
     esac && \
     for VERSION in ${AVAILABLE_CONFTEST_VERSIONS}; do \
         curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
