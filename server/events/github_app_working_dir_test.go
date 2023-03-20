@@ -58,7 +58,6 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 }
 
 func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
-
 	pegomock.RegisterMockTestingT(t)
 
 	workingDir := eventMocks.NewMockWorkingDir()

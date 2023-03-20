@@ -102,6 +102,7 @@ func (s *ExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGrou
 
 }
 
+//go:generate pegomock generate -m --package mocks -o mocks/mock_executor_service_job.go Job
 type Job interface {
 	Run()
 }
