@@ -64,6 +64,16 @@ type GlobalCfg struct {
 	TerraformLogFilter   TerraformLogFilters
 	Temporal             Temporal
 	RevisionSetter       RevisionSetter
+	Admin                Admin
+}
+
+type GithubTeam struct {
+	Name string
+	Org  string
+}
+
+type Admin struct {
+	GithubTeam GithubTeam
 }
 
 type PersistenceConfig struct {

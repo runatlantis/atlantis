@@ -141,6 +141,7 @@ func (b *RootConfigBuilder) build(ctx context.Context, commit *RepoCommit, insta
 	// Parse repo configs into specific root configs (i.e. roots)
 	// TODO: rename project to roots
 	var mergedRootCfgs []*valid.MergedProjectCfg
+
 	repoCfg, err := b.ParserValidator.ParseRepoCfg(localRepo.Dir, localRepo.Repo.ID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "parsing %s", config.AtlantisYAMLFilename)

@@ -31,6 +31,9 @@ import (
 	"github.com/runatlantis/atlantis/server/lyft/feature"
 	lyft_gateway "github.com/runatlantis/atlantis/server/lyft/gateway"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/api"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/api/middleware"
+	"github.com/runatlantis/atlantis/server/neptune/gateway/api/request"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event/preworkflow"
 	httpInternal "github.com/runatlantis/atlantis/server/neptune/http"
@@ -38,7 +41,7 @@ import (
 	internalSync "github.com/runatlantis/atlantis/server/neptune/sync"
 	"github.com/runatlantis/atlantis/server/neptune/sync/crons"
 	"github.com/runatlantis/atlantis/server/neptune/temporal"
-	middleware "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
+	ghClient "github.com/runatlantis/atlantis/server/neptune/workflows/activities/github"
 	"github.com/runatlantis/atlantis/server/vcs/markdown"
 	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
@@ -286,7 +289,7 @@ func NewServer(config Config) (*Server, error) {
 	clientCreator, err := githubapp.NewDefaultCachingClientCreator(
 		config.AppCfg,
 		githubapp.WithClientMiddleware(
-			middleware.ClientMetrics(statsScope.SubScope("github")),
+			ghClient.ClientMetrics(statsScope.SubScope("github")),
 		))
 	if err != nil {
 		return nil, errors.Wrap(err, "creating github client creator")
@@ -303,6 +306,15 @@ func NewServer(config Config) (*Server, error) {
 		GlobalCfg: globalCfg,
 		Logger:    ctxLogger,
 		Scope:     statsScope.SubScope("event.filters.root"),
+	}
+
+	deploySignaler := &event.DeployWorkflowSignaler{
+		TemporalClient: temporalClient,
+	}
+	rootDeployer := &event.RootDeployer{
+		Logger:            ctxLogger,
+		RootConfigBuilder: rootConfigBuilder,
+		DeploySignaler:    deploySignaler,
 	}
 
 	checkRunFetcher := &github.CheckRunsFetcher{
@@ -328,17 +340,49 @@ func NewServer(config Config) (*Server, error) {
 		syncScheduler,
 		asyncScheduler,
 		temporalClient,
-		rootConfigBuilder,
+		rootDeployer,
+		deploySignaler,
 		checkRunFetcher,
 		vcsStatusUpdater,
 		globalCfg,
 	)
+
+	repoRetriever := &github.RepoRetriever{
+		ClientCreator: clientCreator,
+	}
+
+	branchRetriever := &github.BranchRetriever{
+		ClientCreator: clientCreator,
+	}
+
+	installationRetriever := &github.InstallationRetriever{
+		ClientCreator: clientCreator,
+	}
+
+	deployController := api.Controller[request.Deploy]{
+		RequestConverter: request.NewDeployConverter(
+			repoRetriever, branchRetriever, installationRetriever,
+		),
+		Handler: &api.DeployHandler{
+			Deployer:  rootDeployer,
+			Scheduler: asyncScheduler,
+			Logger:    ctxLogger,
+		},
+	}
 
 	router := mux.NewRouter()
 	router.HandleFunc("/healthz", Healthz).Methods("GET")
 	router.HandleFunc("/status", statusController.Get).Methods("GET")
 	router.HandleFunc("/events", gatewayEventsController.Post).Methods("POST")
 	router.HandleFunc("/debug/pprof/profile", pprof.Profile)
+
+	apiSubrouter := router.PathPrefix("/api/admin").Subrouter()
+	authMiddleware := &middleware.AdminAuthMiddleware{
+		Admin: globalCfg.Admin,
+	}
+
+	apiSubrouter.Use(authMiddleware.Middleware)
+	apiSubrouter.HandleFunc("/deploy", deployController.Handle).Methods("POST")
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
@@ -368,7 +412,6 @@ func NewServer(config Config) (*Server, error) {
 			},
 		},
 		StatsCloser:    closer,
-		Handler:        n,
 		Scheduler:      asyncScheduler,
 		Logger:         ctxLogger,
 		Port:           config.Port,

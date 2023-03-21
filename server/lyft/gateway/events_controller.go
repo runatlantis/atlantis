@@ -45,7 +45,8 @@ func NewVCSEventsController(
 	syncScheduler scheduler,
 	asyncScheduler scheduler,
 	temporalClient client.Client,
-	rootConfigBuilder *gateway_handlers.RootConfigBuilder,
+	rootDeployer *gateway_handlers.RootDeployer,
+	deploySignaler *gateway_handlers.DeployWorkflowSignaler,
 	checkRunFetcher *github.CheckRunsFetcher,
 	vcsStatusUpdater *command.VCSStatusUpdater,
 	globalCfg valid.GlobalCfg) *VCSEventsController {
@@ -64,14 +65,6 @@ func NewVCSEventsController(
 		pullEventWorkerProxy,
 	)
 
-	deploySignaler := &gateway_handlers.DeployWorkflowSignaler{
-		TemporalClient: temporalClient,
-	}
-	rootDeployer := &gateway_handlers.RootDeployer{
-		Logger:            logger,
-		RootConfigBuilder: rootConfigBuilder,
-		DeploySignaler:    deploySignaler,
-	}
 	commentHandler := handlers.NewCommentEventWithCommandHandler(
 		commentParser,
 		repoAllowlistChecker,
