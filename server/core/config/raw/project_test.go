@@ -283,6 +283,7 @@ func TestProject_ToValid(t *testing.T) {
 				},
 				ApplyRequirements: []string{"approved"},
 				Name:              String("myname"),
+				WorkflowModeType:  String("platform"),
 			},
 			exp: valid.Project{
 				Dir:              ".",
@@ -295,6 +296,7 @@ func TestProject_ToValid(t *testing.T) {
 				},
 				ApplyRequirements: []string{"approved"},
 				Name:              String("myname"),
+				WorkflowModeType:  String("platform"),
 			},
 		},
 		{

@@ -950,6 +950,47 @@ repos:
 				RebaseEnabled:   true,
 			},
 		},
+		"project level override of workflow mode": {
+			gCfg:   "",
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:       "mydir",
+				Workspace: "myworkspace",
+				Name:      String("myname"),
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{".tf"},
+					Enabled:      true,
+				},
+				WorkflowModeType: String("platform"),
+			},
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{},
+				Workflow: valid.Workflow{
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultPlanStage,
+				},
+				PullRequestWorkflow: valid.Workflow{
+					Name:        "default",
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultLocklessPlanStage,
+				},
+				DeploymentWorkflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
+				},
+				RepoRelDir:      "mydir",
+				Workspace:       "myworkspace",
+				Name:            "myname",
+				AutoplanEnabled: true,
+				WhenModified:    []string{".tf"},
+				PolicySets:      emptyPolicySets,
+				RebaseEnabled:   true,
+				WorkflowMode:    valid.PlatformWorkflowMode,
+			},
+		},
 		"disable rebase when configured": {
 			gCfg: `
 repos:

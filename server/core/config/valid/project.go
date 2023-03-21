@@ -26,6 +26,7 @@ type Project struct {
 	Autoplan                Autoplan
 	ApplyRequirements       []string
 	Tags                    map[string]string
+	WorkflowModeType        *string
 }
 
 // GetName returns the name of the project or an empty string if there is no

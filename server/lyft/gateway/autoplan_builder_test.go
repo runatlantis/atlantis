@@ -246,6 +246,48 @@ func TestIsValid_TerraformChanges_PlatformMode(t *testing.T) {
 	}
 }
 
+func TestIsValid_TerraformChanges_MixedPlatformAndLegacyRoots(t *testing.T) {
+	_ = setupAutoplan(t)
+	featureAllocator.Enabled = true
+	log := logging.NewNoopCtxLogger(t)
+	When(workingDir.Delete(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(nil)
+	When(workingDirLocker.TryLock(AnyString(), AnyInt(), AnyString())).ThenReturn(func() {}, nil)
+	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName:      command.Plan,
+				WorkflowModeType: valid.DefaultWorkflowMode,
+			},
+			{
+				CommandName:      command.Plan,
+				WorkflowModeType: valid.PlatformWorkflowMode,
+			},
+		}, nil)
+
+	containsTerraformChanges := autoplanValidator.InstrumentedIsValid(context.TODO(), log, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
+	Assert(t, containsTerraformChanges == true, "should have terraform changes")
+	vcsStatusUpdater.VerifyWasCalled(Once()).UpdateCombined(
+		matchers.AnyContextContext(),
+		matchers.EqModelsRepo(fixtures.GithubRepo),
+		matchers.EqModelsPullRequest(fixtures.Pull),
+		matchers.EqModelsVcsStatus(models.QueuedVCSStatus),
+		matchers.EqCommandName(command.Plan),
+		AnyString(),
+		AnyString())
+	vcsStatusUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		matchers.AnyContextContext(),
+		matchers.EqModelsRepo(fixtures.GithubRepo),
+		matchers.EqModelsPullRequest(fixtures.Pull),
+		matchers.EqModelsVcsStatus(models.SuccessVCSStatus),
+		matchers.EqCommandName(command.Apply),
+		AnyString(),
+		AnyString(),
+	)
+
+	workingDir.VerifyWasCalledOnce().Delete(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())
+	workingDirLocker.VerifyWasCalledOnce().TryLock(AnyString(), AnyInt(), AnyString())
+}
+
 func TestIsValid_PreworkflowHookError(t *testing.T) {
 	t.Log("verify returns false if preworkflow hook fails")
 	_ = setupAutoplan(t)
