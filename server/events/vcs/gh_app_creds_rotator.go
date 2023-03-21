@@ -47,7 +47,11 @@ func (r *githubAppTokenRotator) GenerateJob() (scheduled.JobDefinition, error) {
 }
 
 func (r *githubAppTokenRotator) Run() {
-	r.rotate()
+	err := r.rotate()
+	if err != nil {
+		// at least log the error message here, as we want to notify the that user that the key rotation wasn't successful
+		r.log.Err(err.Error())
+	}
 }
 
 func (r *githubAppTokenRotator) rotate() error {
