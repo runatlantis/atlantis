@@ -41,6 +41,10 @@ type GitlabClient struct {
 	Client *gitlab.Client
 	// Version is set to the server version.
 	Version *version.Version
+	// PollingInterval is the time between successive polls, where applicable.
+	PollingInterval time.Duration
+	// PollingInterval is the total duration for which to poll, where applicable.
+	PollingTimeout time.Duration
 }
 
 // commonMarkSupported is a version constraint that is true when this version of
@@ -53,7 +57,10 @@ var gitlabClientUnderTest = false
 
 // NewGitlabClient returns a valid GitLab client.
 func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging) (*GitlabClient, error) {
-	client := &GitlabClient{}
+	client := &GitlabClient{
+		PollingInterval: time.Second,
+		PollingTimeout:  time.Second * 30,
+	}
 
 	// Create the client differently depending on the base URL.
 	if hostname == "gitlab.com" {
@@ -123,10 +130,21 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 		if err != nil {
 			return nil, err
 		}
+		resp := new(gitlab.Response)
 		mr := new(gitlab.MergeRequest)
-		resp, err := g.Client.Do(req, mr)
-		if err != nil {
-			return nil, err
+		pollingStart := time.Now()
+		for {
+			resp, err = g.Client.Do(req, mr)
+			if err != nil {
+				return nil, err
+			}
+			if mr.ChangesCount != "" {
+				break
+			}
+			if time.Since(pollingStart) > g.PollingTimeout {
+				return nil, errors.Errorf("giving up polling %q after %s", apiURL, g.PollingTimeout.String())
+			}
+			time.Sleep(g.PollingInterval)
 		}
 
 		for _, f := range mr.Changes {
