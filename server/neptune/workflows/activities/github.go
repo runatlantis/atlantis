@@ -303,7 +303,7 @@ type ListPRsResponse struct {
 	PullRequests []internal.PullRequest
 }
 
-func (a *githubActivities) ListPRs(ctx context.Context, request ListPRsRequest) (ListPRsResponse, error) {
+func (a *githubActivities) GithubListPRs(ctx context.Context, request ListPRsRequest) (ListPRsResponse, error) {
 	prs, err := a.Client.ListPullRequests(
 		internal.ContextWithInstallationToken(ctx, request.Repo.Credentials.InstallationToken),
 		request.Repo.Owner,
@@ -336,7 +336,7 @@ type ListModifiedFilesResponse struct {
 	FilePaths []string
 }
 
-func (a *githubActivities) ListModifiedFiles(ctx context.Context, request ListModifiedFilesRequest) (ListModifiedFilesResponse, error) {
+func (a *githubActivities) GithubListModifiedFiles(ctx context.Context, request ListModifiedFilesRequest) (ListModifiedFilesResponse, error) {
 	files, err := a.Client.ListModifiedFiles(
 		internal.ContextWithInstallationToken(ctx, request.Repo.Credentials.InstallationToken),
 		request.Repo.Owner,

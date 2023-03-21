@@ -104,11 +104,11 @@ func (t *testRevisionSetterActivities) SetPRRevision(ctx context.Context, reques
 
 type testGithubActivities struct{}
 
-func (t *testGithubActivities) ListPRs(ctx context.Context, request activities.ListPRsRequest) (activities.ListPRsResponse, error) {
+func (t *testGithubActivities) GithubListPRs(ctx context.Context, request activities.ListPRsRequest) (activities.ListPRsResponse, error) {
 	return activities.ListPRsResponse{}, nil
 }
 
-func (t *testGithubActivities) ListModifiedFiles(ctx context.Context, request activities.ListModifiedFilesRequest) (activities.ListModifiedFilesResponse, error) {
+func (t *testGithubActivities) GithubListModifiedFiles(ctx context.Context, request activities.ListModifiedFilesRequest) (activities.ListModifiedFilesResponse, error) {
 	return activities.ListModifiedFilesResponse{}, nil
 }
 
@@ -143,7 +143,7 @@ func TestMinRevisionSetter_NoOpenPR(t *testing.T) {
 		},
 	}
 
-	env.OnActivity(ga.ListPRs, mock.Anything, activities.ListPRsRequest{
+	env.OnActivity(ga.GithubListPRs, mock.Anything, activities.ListPRsRequest{
 		Repo:  req.Repo,
 		State: github.OpenPullRequest,
 	}).Return(activities.ListPRsResponse{
@@ -189,21 +189,21 @@ func TestMinRevisionSetter_OpenPR_SetMinRevision(t *testing.T) {
 	filesModifiedPr1 := []string{"test/dir2/rebase.tf"}
 	filesModifiedPr2 := []string{"test/dir1/no-rebase.tf"}
 
-	env.OnActivity(ga.ListPRs, mock.Anything, activities.ListPRsRequest{
+	env.OnActivity(ga.GithubListPRs, mock.Anything, activities.ListPRsRequest{
 		Repo:  req.Repo,
 		State: github.OpenPullRequest,
 	}).Return(activities.ListPRsResponse{
 		PullRequests: pullRequests,
 	}, nil)
 
-	env.OnActivity(ga.ListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
+	env.OnActivity(ga.GithubListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
 		Repo:        req.Repo,
 		PullRequest: pullRequests[0],
 	}).Return(activities.ListModifiedFilesResponse{
 		FilePaths: filesModifiedPr1,
 	}, nil)
 
-	env.OnActivity(ga.ListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
+	env.OnActivity(ga.GithubListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
 		Repo:        req.Repo,
 		PullRequest: pullRequests[1],
 	}).Return(activities.ListModifiedFilesResponse{
@@ -248,14 +248,14 @@ func TestMinRevisionSetter_ListModifiedFilesErr(t *testing.T) {
 		},
 	}
 
-	env.OnActivity(ga.ListPRs, mock.Anything, activities.ListPRsRequest{
+	env.OnActivity(ga.GithubListPRs, mock.Anything, activities.ListPRsRequest{
 		Repo:  req.Repo,
 		State: github.OpenPullRequest,
 	}).Return(activities.ListPRsResponse{
 		PullRequests: pullRequests,
 	}, nil)
 
-	env.OnActivity(ga.ListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
+	env.OnActivity(ga.GithubListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
 		Repo:        req.Repo,
 		PullRequest: pullRequests[0],
 	}).Return(activities.ListModifiedFilesResponse{}, errors.New("error"))
@@ -297,7 +297,7 @@ func TestMinRevisionSetter_OpenPR_PatternMatchErr(t *testing.T) {
 		},
 	}
 
-	env.OnActivity(ga.ListPRs, mock.Anything, activities.ListPRsRequest{
+	env.OnActivity(ga.GithubListPRs, mock.Anything, activities.ListPRsRequest{
 		Repo:  req.Repo,
 		State: github.OpenPullRequest,
 	}).Return(activities.ListPRsResponse{
@@ -305,7 +305,7 @@ func TestMinRevisionSetter_OpenPR_PatternMatchErr(t *testing.T) {
 	}, nil)
 
 	filesModifiedPr1 := []string{"test/dir2/rebase.tf"}
-	env.OnActivity(ga.ListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
+	env.OnActivity(ga.GithubListModifiedFiles, mock.Anything, activities.ListModifiedFilesRequest{
 		Repo:        req.Repo,
 		PullRequest: pullRequests[0],
 	}).Return(activities.ListModifiedFilesResponse{

@@ -34,8 +34,8 @@ type setterActivities interface {
 }
 
 type githubActivities interface {
-	ListPRs(ctx context.Context, request activities.ListPRsRequest) (activities.ListPRsResponse, error)
-	ListModifiedFiles(ctx context.Context, request activities.ListModifiedFilesRequest) (activities.ListModifiedFilesResponse, error)
+	GithubListPRs(ctx context.Context, request activities.ListPRsRequest) (activities.ListPRsResponse, error)
+	GithubListModifiedFiles(ctx context.Context, request activities.ListModifiedFilesRequest) (activities.ListModifiedFilesResponse, error)
 }
 
 func Workflow(ctx workflow.Context, request Request) error {
@@ -80,7 +80,7 @@ func (r *Runner) Run(ctx workflow.Context, request Request) error {
 
 func (r *Runner) listOpenPRs(ctx workflow.Context, repo github.Repo) ([]github.PullRequest, error) {
 	var resp activities.ListPRsResponse
-	err := workflow.ExecuteActivity(ctx, r.GithubActivities.ListPRs, activities.ListPRsRequest{
+	err := workflow.ExecuteActivity(ctx, r.GithubActivities.GithubListPRs, activities.ListPRsRequest{
 		Repo:  repo,
 		State: github.OpenPullRequest,
 	}).Get(ctx, &resp)
@@ -95,7 +95,7 @@ func (r *Runner) setRevision(ctx workflow.Context, req Request, prs []github.Pul
 	// spawn activities to list modified files in each open PR async
 	futuresByPullNum := map[github.PullRequest]workflow.Future{}
 	for _, pr := range prs {
-		futuresByPullNum[pr] = workflow.ExecuteActivity(ctx, r.GithubActivities.ListModifiedFiles, activities.ListModifiedFilesRequest{
+		futuresByPullNum[pr] = workflow.ExecuteActivity(ctx, r.GithubActivities.GithubListModifiedFiles, activities.ListModifiedFilesRequest{
 			Repo:        req.Repo,
 			PullRequest: pr,
 		})
