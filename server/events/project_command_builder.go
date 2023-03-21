@@ -395,9 +395,9 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
-			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, repoDir)
+			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, repoDir+"/"+mp.Path)
 			if err != nil {
-				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", repoDir)
+				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", repoDir+"/"+mp.Path)
 			}
 			automerge := DefaultAutomergeEnabled
 			parallelApply := DefaultParallelApplyEnabled
