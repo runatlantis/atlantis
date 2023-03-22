@@ -3,15 +3,20 @@ package github
 import (
 	"context"
 
-	"github.com/google/go-github/v45/github"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
+type ExternalRepo interface {
+	GetFullName() string
+	GetCloneURL() string
+	GetDefaultBranch() string
+}
+
 // without this we have an import cycle
 type repoConverter interface {
-	Convert(*github.Repository) (models.Repo, error)
+	Convert(r ExternalRepo) (models.Repo, error)
 }
 
 type RepoRetriever struct {

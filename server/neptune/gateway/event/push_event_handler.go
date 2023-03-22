@@ -55,12 +55,12 @@ func (p *PushHandler) Handle(ctx context.Context, event Push) error {
 	}
 
 	if !shouldAllocate {
-		p.Logger.DebugContext(ctx, "handler not configured for allocation")
+		p.Logger.InfoContext(ctx, "handler not configured for allocation")
 		return nil
 	}
 
 	if event.Ref.Type != vcs.BranchRef || event.Ref.Name != event.Repo.DefaultBranch {
-		p.Logger.DebugContext(ctx, "dropping event for unexpected ref")
+		p.Logger.WarnContext(ctx, "dropping event for unexpected ref")
 		return nil
 	}
 

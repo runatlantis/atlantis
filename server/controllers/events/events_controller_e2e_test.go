@@ -1098,6 +1098,7 @@ func setupE2E(t *testing.T, repoFixtureDir string, userConfig *server.UserConfig
 				ghClient,
 			),
 		},
+		Logger: ctxLogger,
 	}
 
 	ctrl := events_controllers.VCSEventsController{

@@ -5,15 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
@@ -32,7 +29,6 @@ import (
 	lyft_gateway "github.com/runatlantis/atlantis/server/lyft/gateway"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/api"
-	"github.com/runatlantis/atlantis/server/neptune/gateway/api/middleware"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/api/request"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	"github.com/runatlantis/atlantis/server/neptune/gateway/event/preworkflow"
@@ -47,7 +43,6 @@ import (
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	"github.com/runatlantis/atlantis/server/wrappers"
 	"github.com/urfave/cli"
-	"github.com/urfave/negroni"
 	"go.temporal.io/sdk/client"
 	"golang.org/x/sync/errgroup"
 )
@@ -349,6 +344,7 @@ func NewServer(config Config) (*Server, error) {
 
 	repoRetriever := &github.RepoRetriever{
 		ClientCreator: clientCreator,
+		RepoConverter: repoConverter,
 	}
 
 	branchRetriever := &github.BranchRetriever{
@@ -359,7 +355,7 @@ func NewServer(config Config) (*Server, error) {
 		ClientCreator: clientCreator,
 	}
 
-	deployController := api.Controller[request.Deploy]{
+	deployController := &api.Controller[request.Deploy]{
 		RequestConverter: request.NewDeployConverter(
 			repoRetriever, branchRetriever, installationRetriever,
 		),
@@ -370,32 +366,18 @@ func NewServer(config Config) (*Server, error) {
 		},
 	}
 
-	router := mux.NewRouter()
-	router.HandleFunc("/healthz", Healthz).Methods("GET")
-	router.HandleFunc("/status", statusController.Get).Methods("GET")
-	router.HandleFunc("/events", gatewayEventsController.Post).Methods("POST")
-	router.HandleFunc("/debug/pprof/profile", pprof.Profile)
-
-	apiSubrouter := router.PathPrefix("/api/admin").Subrouter()
-	authMiddleware := &middleware.AdminAuthMiddleware{
-		Admin: globalCfg.Admin,
-	}
-
-	apiSubrouter.Use(authMiddleware.Middleware)
-	apiSubrouter.HandleFunc("/deploy", deployController.Handle).Methods("POST")
-
-	n := negroni.New(&negroni.Recovery{
-		Logger:     log.New(os.Stdout, "", log.LstdFlags),
-		PrintStack: false,
-		StackAll:   false,
-		StackSize:  1024 * 8,
-	})
-	n.UseHandler(router)
+	router := newRouter(
+		ctxLogger,
+		gatewayEventsController,
+		statusController,
+		deployController,
+		globalCfg,
+	)
 
 	s := httpInternal.ServerProxy{
 		Server: &http.Server{
 			Addr:              fmt.Sprintf(":%d", config.Port),
-			Handler:           n,
+			Handler:           router,
 			ReadHeaderTimeout: time.Second * 10,
 		},
 		SSLCertFile: config.SSLCertFile,

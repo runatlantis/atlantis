@@ -17,17 +17,17 @@ const (
 	UsernameContextKey RequestContextKey = "username"
 )
 
-// AdminAuthMiddleware is a somewhat hacky approach to provide authentication by requiring
+// AdminAuth is a somewhat hacky approach to provide authentication by requiring
 // a github token is passed in.  Using this token we fetch the authenticated user and validate
 // the login against a blessed list of admins.
 // There are a couple reasons for this method:
 // 1. we need the github username for auditing purposes
 // 2. APIs we currently support are clunky and are not GA.
-type AdminAuthMiddleware struct {
+type AdminAuth struct {
 	Admin valid.Admin
 }
 
-func (m *AdminAuthMiddleware) Middleware(next http.Handler) http.Handler {
+func (m *AdminAuth) Middleware(next http.Handler) http.Handler {
 	return &adminAuthHandler{
 		next:  next,
 		admin: m.Admin,

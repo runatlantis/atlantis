@@ -34,6 +34,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/logging"
+	key "github.com/runatlantis/atlantis/server/neptune/context"
 	event_types "github.com/runatlantis/atlantis/server/neptune/gateway/event"
 	github_converter "github.com/runatlantis/atlantis/server/vcs/provider/github/converter"
 	github_request "github.com/runatlantis/atlantis/server/vcs/provider/github/request"
@@ -178,6 +179,7 @@ func NewVCSEventsController(
 
 	router := &RequestRouter{
 		Resolvers: NewRequestResolvers(providerResolverInitializer, supportedVCSProviders),
+		Logger:    logger,
 	}
 
 	return &VCSEventsController{
@@ -219,15 +221,17 @@ type RequestResolver interface {
 // TODO: once VCSEventsController is fully broken down this implementation can just live in there.
 type RequestRouter struct {
 	Resolvers []RequestResolver
+	Logger    logging.Logger
 }
 
 func (p *RequestRouter) Route(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	// we do this to allow for multiple reads to the request body
 	request, err := httputils.NewBufferedRequest(r)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintln(w, err.Error())
+		p.logAndWriteBody(ctx, w, err.Error(), map[string]interface{}{key.ErrKey.String(): err})
 		return
 	}
 
@@ -240,42 +244,48 @@ func (p *RequestRouter) Route(w http.ResponseWriter, r *http.Request) {
 
 		if e, ok := err.(*requestErrors.RequestValidationError); ok {
 			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprintln(w, e.Error())
+			p.logAndWriteBody(ctx, w, e.Error(), map[string]interface{}{key.ErrKey.String(): e})
 			return
 		}
 
 		if e, ok := err.(*requestErrors.WebhookParsingError); ok {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(w, e.Error())
+			p.logAndWriteBody(ctx, w, e.Error(), map[string]interface{}{key.ErrKey.String(): e})
 			return
 		}
 
 		if e, ok := err.(*requestErrors.EventParsingError); ok {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(w, e.Error())
+			p.logAndWriteBody(ctx, w, e.Error(), map[string]interface{}{key.ErrKey.String(): e})
 			return
 		}
 
 		if e, ok := err.(*requestErrors.UnsupportedEventTypeError); ok {
 			// historically we've just ignored these so for now let's just do that.
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintln(w, e.Error())
+			p.logAndWriteBody(ctx, w, e.Error(), map[string]interface{}{key.ErrKey.String(): e})
 			return
 		}
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintln(w, err.Error())
+			p.logAndWriteBody(ctx, w, err.Error(), map[string]interface{}{key.ErrKey.String(): err})
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "Processing...")
+		p.logAndWriteBody(ctx, w, "Processing...")
 		return
 	}
 
 	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintln(w, "no resolver configured for request")
+	p.logAndWriteBody(ctx, w, "no resolver configured for request")
+}
+
+func (p *RequestRouter) logAndWriteBody(ctx context.Context, w http.ResponseWriter, msg string, fields ...map[string]interface{}) {
+	fmt.Fprintln(w, msg)
+	p.Logger.InfoContext(ctx, msg, fields...)
+
 }
 
 // VCSEventsController handles all webhook requests which signify 'events' in the

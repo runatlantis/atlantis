@@ -2,6 +2,7 @@ package converter
 
 import (
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/vcs/provider/github"
 )
 
 // RepoConverter converts a github repository to our internal model.
@@ -10,15 +11,9 @@ type RepoConverter struct {
 	GithubToken string
 }
 
-type externalRepo interface {
-	GetFullName() string
-	GetCloneURL() string
-	GetDefaultBranch() string
-}
-
 // ParseGithubRepo parses the response from the GitHub API endpoint that
 // returns a repo into the Atlantis model.
-func (c *RepoConverter) Convert(ghRepo externalRepo) (models.Repo, error) {
+func (c RepoConverter) Convert(ghRepo github.ExternalRepo) (models.Repo, error) {
 	repo, err := models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), c.GithubUser, c.GithubToken)
 
 	if err != nil {

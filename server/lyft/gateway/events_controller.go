@@ -126,6 +126,7 @@ func NewVCSEventsController(
 
 	router := &events_controllers.RequestRouter{
 		Resolvers: events_controllers.NewRequestResolvers(providerResolverInitializer, supportedVCSProviders),
+		Logger:    logger,
 	}
 
 	return &VCSEventsController{
