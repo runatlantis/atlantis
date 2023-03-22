@@ -29,8 +29,9 @@ func (p PolicySets) ToValid() valid.PolicySets {
 	}
 
 	// Default number of required reviews for all policy sets should be 1.
+	// Negative numbers are automatically set to 1.
 	policySets.ApproveCount = p.ApproveCount
-	if policySets.ApproveCount == 0 {
+	if policySets.ApproveCount <= 0 {
 		policySets.ApproveCount = 1
 	}
 
@@ -39,7 +40,8 @@ func (p PolicySets) ToValid() valid.PolicySets {
 	validPolicySets := make([]valid.PolicySet, 0)
 	for _, rawPolicySet := range p.PolicySets {
 		// Default to top-level review count if not specified.
-		if rawPolicySet.ApproveCount == 0 {
+		// Negative numbers are automatically set to the default.
+		if rawPolicySet.ApproveCount <= 0 {
 			rawPolicySet.ApproveCount = policySets.ApproveCount
 		}
 		validPolicySets = append(validPolicySets, rawPolicySet.ToValid())

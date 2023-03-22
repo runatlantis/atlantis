@@ -263,11 +263,12 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
 			}
-		} else {
-			if !(result.Error != nil || result.Failure != "") {
-				resultData.Rendered = "Found no template. This is a bug!"
-			}
+			// Error out if no template was found, only if there are no errors or failures.
+			// This is because some errors and failures rely on additional context rendered by templtes, but not all errors or failures.
+		} else if !(result.Error != nil || result.Failure != "") {
+			resultData.Rendered = "Found no template. This is a bug!"
 		}
+		// Render error or failure templates. Done outside of previous block so that other context can be rendered for use here.
 		if result.Error != nil {
 			tmpl := templates.Lookup("unwrappedErr")
 			if m.shouldUseWrappedTmpl(vcsHost, result.Error.Error()) {
