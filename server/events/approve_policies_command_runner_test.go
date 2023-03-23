@@ -15,6 +15,7 @@ import (
 )
 
 func TestApproveCommandRunner_IsOwner(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 
 	cases := []struct {
