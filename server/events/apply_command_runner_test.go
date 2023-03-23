@@ -19,6 +19,7 @@ import (
 )
 
 func TestApplyCommandRunner_IsLocked(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 
 	cases := []struct {
@@ -78,6 +79,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 }
 
 func TestApplyCommandRunner_IsSilenced(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 
 	cases := []struct {
