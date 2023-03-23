@@ -27,6 +27,7 @@ Execute [atlantis plan](using-atlantis.html#atlantis-plan) on the specified repo
 | Ref        | string                              | Yes      | Git reference, like a branch name        |
 | Type       | string                              | Yes      | Type of the VCS provider (Github/Gitlab) |
 | Paths      | [ [Path](api-endpoints.html#path) ] | Yes      | Paths to the projects to run the plan    |
+| PR         | int                                 | No       | Pull Request number                      |
 
 ##### Path
 
@@ -52,7 +53,8 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
     "Paths": [{
       "Directory": ".",
       "Workspace": "default"
-    }]
+    }],
+    "PR": 2
 }'
 ```
 
@@ -100,6 +102,7 @@ Execute [atlantis apply](using-atlantis.html#atlantis-apply) on the specified re
 | Ref        | string                                | Yes      | Git reference, like a branch name        |
 | Type       | string                                | Yes      | Type of the VCS provider (Github/Gitlab) |
 | Paths      | [ [Path](api-endpoints.html#path-1) ] | Yes      | Paths to the projects to run the apply   |
+| PR         | int                                   | No       | Pull Request number                      |
 
 ##### Path
 
@@ -125,7 +128,8 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
     "Paths": [{
       "Directory": ".",
       "Workspace": "default"
-    }]
+    }],
+    "PR": 2
 }'
 ```
 
