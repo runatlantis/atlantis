@@ -1,3 +1,8 @@
+# v0.23.3
+
+Bugfixes and new Features
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.23.3
 # v0.23.0
 
 Bugfixes and new Features
