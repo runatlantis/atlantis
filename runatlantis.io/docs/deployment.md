@@ -140,11 +140,11 @@ spec:
       partition: 0
   selector:
     matchLabels:
-      app: atlantis
+      app.kubernetes.io/name: atlantis
   template:
     metadata:
       labels:
-        app: atlantis
+        app.kubernetes.io/name: atlantis
     spec:
       securityContext:
         fsGroup: 1000 # Atlantis group (1000) read/write access to volumes.
@@ -270,7 +270,7 @@ spec:
     port: 80
     targetPort: 4141
   selector:
-    app: atlantis
+    app.kubernetes.io/name: atlantis
 ```
 </details>
 
@@ -285,16 +285,16 @@ kind: Deployment
 metadata:
   name: atlantis
   labels:
-    app: atlantis
+    app.kubernetes.io/name: atlantis
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: atlantis
+      app.kubernetes.io/name: atlantis
   template:
     metadata:
       labels:
-        app: atlantis
+        app.kubernetes.io/name: atlantis
     spec:
       containers:
       - name: atlantis
@@ -403,7 +403,7 @@ spec:
     port: 80
     targetPort: 4141
   selector:
-    app: atlantis
+    app.kubernetes.io/name: atlantis
 ```
 </details>
 
