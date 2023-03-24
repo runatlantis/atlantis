@@ -79,8 +79,7 @@ type FileWorkspace struct {
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
 // path to the root of the cloned repo. It also returns
-// a boolean indicating if we should warn users that the branch we're
-// merging into has been updated since we cloned it.
+// a boolean indicating whether we had to merge with upstream again.
 // If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
@@ -90,6 +89,7 @@ func (w *FileWorkspace) Clone(
 	p models.PullRequest,
 	workspace string) (string, bool, error) {
 	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
+	hasDiverged := false
 
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
@@ -119,6 +119,7 @@ func (w *FileWorkspace) Clone(
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
 			if w.CheckoutMerge && w.recheckDiverged(log, p, headRepo, cloneDir) {
 				log.Info("base branch has been updated, using merge strategy and will clone again")
+				hasDiverged = true
 			} else {
 				log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 				return cloneDir, false, nil
@@ -130,7 +131,7 @@ func (w *FileWorkspace) Clone(
 	}
 
 	// Otherwise we clone the repo.
-	return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
+	return cloneDir, hasDiverged, w.forceClone(log, cloneDir, headRepo, p)
 }
 
 // recheckDiverged returns true if the branch we're merging into has diverged
