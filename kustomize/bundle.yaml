@@ -34,12 +34,13 @@ spec:
         ports:
         - name: atlantis
           containerPort: 4141
+        # You may need to increase the memory depends on the state size terraform manages.
         resources:
           requests:
-            memory: 256Mi
+            memory: 512Mi
             cpu: 100m
           limits:
-            memory: 256Mi
+            memory: 1GBi
             cpu: 100m
         livenessProbe:
           # We only need to check every 60s since Atlantis is not a
