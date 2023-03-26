@@ -5,7 +5,7 @@ on:
     branches:
       - "main"
     paths:
-      - '**/*.go'
+      - '**.go'
       - '.github/workflows/test.yml'
   pull_request:
     types:
@@ -16,7 +16,7 @@ on:
     branches:
       - "main"
     paths:
-      - '**/*.go'
+      - '**.go'
       - '.github/workflows/test.yml'
  
 concurrency:
