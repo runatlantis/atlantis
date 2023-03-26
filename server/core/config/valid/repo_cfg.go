@@ -16,6 +16,7 @@ type RepoCfg struct {
 	// Version is the version of the atlantis YAML file.
 	Version                   int
 	Projects                  []Project
+	DriftDetection            DriftDetection
 	Workflows                 map[string]Workflow
 	PolicySets                PolicySets
 	Automerge                 bool
@@ -132,6 +133,7 @@ type Project struct {
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
 	ExecutionOrderGroup       int
+	DriftDetection            DriftDetection
 }
 
 // GetName returns the name of the project or an empty string if there is no
@@ -172,4 +174,9 @@ type Workflow struct {
 	PolicyCheck Stage
 	Import      Stage
 	StateRm     Stage
+}
+
+type DriftDetection struct {
+	Enabled bool
+	Cron    string
 }

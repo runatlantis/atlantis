@@ -21,19 +21,20 @@ const (
 )
 
 type Project struct {
-	Name                      *string   `yaml:"name,omitempty"`
-	Branch                    *string   `yaml:"branch,omitempty"`
-	Dir                       *string   `yaml:"dir,omitempty"`
-	Workspace                 *string   `yaml:"workspace,omitempty"`
-	Workflow                  *string   `yaml:"workflow,omitempty"`
-	TerraformVersion          *string   `yaml:"terraform_version,omitempty"`
-	Autoplan                  *Autoplan `yaml:"autoplan,omitempty"`
-	PlanRequirements          []string  `yaml:"plan_requirements,omitempty"`
-	ApplyRequirements         []string  `yaml:"apply_requirements,omitempty"`
-	ImportRequirements        []string  `yaml:"import_requirements,omitempty"`
-	DeleteSourceBranchOnMerge *bool     `yaml:"delete_source_branch_on_merge,omitempty"`
-	RepoLocking               *bool     `yaml:"repo_locking,omitempty"`
-	ExecutionOrderGroup       *int      `yaml:"execution_order_group,omitempty"`
+	Name                      *string         `yaml:"name,omitempty"`
+	Branch                    *string         `yaml:"branch,omitempty"`
+	Dir                       *string         `yaml:"dir,omitempty"`
+	DriftDetection            *DriftDetection `yaml:"drift_detection,omitempty"`
+	Workspace                 *string         `yaml:"workspace,omitempty"`
+	Workflow                  *string         `yaml:"workflow,omitempty"`
+	TerraformVersion          *string         `yaml:"terraform_version,omitempty"`
+	Autoplan                  *Autoplan       `yaml:"autoplan,omitempty"`
+	PlanRequirements          []string        `yaml:"plan_requirements,omitempty"`
+	ApplyRequirements         []string        `yaml:"apply_requirements,omitempty"`
+	ImportRequirements        []string        `yaml:"import_requirements,omitempty"`
+	DeleteSourceBranchOnMerge *bool           `yaml:"delete_source_branch_on_merge,omitempty"`
+	RepoLocking               *bool           `yaml:"repo_locking,omitempty"`
+	ExecutionOrderGroup       *int            `yaml:"execution_order_group,omitempty"`
 }
 
 func (p Project) Validate() error {
