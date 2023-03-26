@@ -57,6 +57,8 @@ policy_sets:
 			Ok(t, err)
 
 			var got2 raw.PolicySets
+			dec = yaml.NewDecoder(bytes.NewBuffer([]byte(c.input)))
+			dec.KnownFields(true)
 			err = dec.Decode(&got2)
 			Ok(t, err)
 			Equals(t, got2, got)
