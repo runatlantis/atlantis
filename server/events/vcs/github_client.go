@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v49/github"
+	"github.com/google/go-github/v50/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -330,7 +330,7 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 				return models.ApprovalStatus{
 					IsApproved: true,
 					ApprovedBy: *review.User.Login,
-					Date:       *review.SubmittedAt,
+					Date:       review.SubmittedAt.Time,
 				}, nil
 			}
 		}
@@ -579,13 +579,23 @@ func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
 	}
+	protection, _, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner.GetLogin(), *repo.Name, pull.BaseBranch)
+	if err != nil {
+		if !errors.Is(err, github.ErrBranchNotProtected) {
+			return errors.Wrap(err, "getting branch protection rules")
+		}
+	}
+	requireLinearHistory := false
+	if protection != nil {
+		requireLinearHistory = protection.GetRequireLinearHistory().Enabled
+	}
 	const (
 		defaultMergeMethod = "merge"
 		rebaseMergeMethod  = "rebase"
 		squashMergeMethod  = "squash"
 	)
 	method := defaultMergeMethod
-	if !repo.GetAllowMergeCommit() {
+	if !repo.GetAllowMergeCommit() || requireLinearHistory {
 		if repo.GetAllowRebaseMerge() {
 			method = rebaseMergeMethod
 		} else if repo.GetAllowSquashMerge() {

@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-test/deep"
+	"github.com/kr/pretty"
 )
 
 // Assert fails the test if the condition is false.
@@ -46,7 +46,7 @@ func Ok(tb testing.TB, err error) {
 func Equals(tb testing.TB, exp, act interface{}) {
 	tb.Helper()
 	if diff := deep.Equal(exp, act); diff != nil {
-		errLog(tb, "%s\n\nexp: %s******\ngot: %s", diff, spew.Sdump(exp), spew.Sdump(act))
+		errLog(tb, "%s\n\nexp: %s******\ngot: %s", diff, pretty.Sprint(exp), pretty.Sprint(act))
 		tb.FailNow()
 	}
 }

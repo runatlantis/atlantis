@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v49/github"
+	"github.com/google/go-github/v50/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 
@@ -1063,6 +1063,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	// Real dependencies.
+	logging.SuppressDefaultLogging()
 	logger := logging.NewNoopLogger(t)
 
 	eventParser := &events.EventParser{
@@ -1177,6 +1178,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		false,
+		false,
 		statsScope,
 		logger,
 		terraformClient,
@@ -1239,7 +1241,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	pullUpdater := &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            e2eVCSClient,
-		MarkdownRenderer:     events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis"),
+		MarkdownRenderer:     events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false),
 	}
 
 	autoMerger := &events.AutoMerger{
@@ -1327,6 +1329,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		e2ePullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
+		silenceNoProjects,
 	)
 
 	stateCommandRunner := events.NewStateCommandRunner(

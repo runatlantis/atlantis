@@ -1,7 +1,7 @@
 # This Dockerfile builds our base image with gosu, dumb-init and the atlantis
 # user. We split this from the main Dockerfile because this base doesn't change
 # and also because it kept breaking the build due to flakiness.
-FROM alpine:3.17.1
+FROM alpine:3.17.2
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # We use gosu to step down from root and run as the atlantis user so we need
@@ -28,7 +28,7 @@ ARG TARGETPLATFORM
 RUN apk add git~=2.39 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main/ && \
     apk add --no-cache \
         ca-certificates~=20220614 \
-        curl~=7.87 \
+        curl~=7.88 \
         unzip~=6.0 \
         bash~=5.2 \
         openssh~=9.1_p1 \

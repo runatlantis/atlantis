@@ -662,6 +662,7 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				false,
 				statsScope,
 				logger,
 				terraformClient,
@@ -870,6 +871,7 @@ projects:
 				true,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				false,
 				statsScope,
 				logger,
@@ -1111,6 +1113,7 @@ workflows:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				false,
 				statsScope,
 				logger,
 				terraformClient,
@@ -1164,6 +1167,126 @@ workflows:
 					Equals(t, c.expCtx.TerraformVersion.String(), ctx.TerraformVersion.String())
 				}
 			})
+		})
+	}
+}
+
+func TestBuildProjectCmdCtx_WithSilenceNoProjects(t *testing.T) {
+	globalCfg := `
+repos:
+- id: /.*/
+`
+	logger := logging.NewNoopLogger(t)
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+		},
+	}
+	cases := map[string]struct {
+		repoCfg string
+		expLen  int
+	}{
+		// One project matches the repo cfg, return it
+		"matching project": {
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+`,
+			expLen: 1,
+		},
+		// No project matches the repo cfg, ignore it
+		"no matching project": {
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project2
+  workspace: myworkspace
+`,
+			expLen: 0,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmp := DirStructure(t, map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"modules": map[string]interface{}{
+					"module": map[string]interface{}{
+						"main.tf": nil,
+					},
+				},
+			})
+
+			workingDir := NewMockWorkingDir()
+			When(workingDir.Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+
+			// Write and parse the global config file.
+			globalCfgPath := filepath.Join(tmp, "global.yaml")
+			Ok(t, os.WriteFile(globalCfgPath, []byte(globalCfg), 0600))
+			parser := &config.ParserValidator{}
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  false,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			Ok(t, err)
+
+			if c.repoCfg != "" {
+				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+			}
+			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+
+			terraformClient := mocks.NewMockClient()
+
+			builder := NewProjectCommandBuilder(
+				false,
+				parser,
+				&DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				NewDefaultWorkingDirLocker(),
+				globalCfg,
+				&DefaultPendingPlanFinder{},
+				&CommentParser{ExecutableName: "atlantis"},
+				false,
+				false,
+				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
+				true,
+				statsScope,
+				logger,
+				terraformClient,
+			)
+
+			for _, cmd := range []command.Name{command.Plan, command.Apply} {
+				t.Run(cmd.String(), func(t *testing.T) {
+					ctxs, err := builder.buildProjectCommandCtx(&command.Context{
+						Log:   logger,
+						Scope: statsScope,
+						Pull: models.PullRequest{
+							BaseRepo: baseRepo,
+						},
+						PullRequestStatus: models.PullReqStatus{
+							Mergeable: true,
+						},
+					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true)
+					Equals(t, c.expLen, len(ctxs))
+					Ok(t, err)
+				})
+			}
 		})
 	}
 }

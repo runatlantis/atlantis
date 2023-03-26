@@ -5,7 +5,7 @@ set -e
 
 # If the user is trying to run atlantis directly with some arguments, then
 # pass them to atlantis.
-if [ "$(echo "${1}" | cut -c1)" ]; then
+if [ "$(echo "${1}" | cut -c1)" = "-" ]; then
     set -- atlantis "$@"
 fi
 
