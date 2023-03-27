@@ -139,7 +139,12 @@ projects:
   autoplan:
     enabled: false
     when_modified: []
+  drift_detection:
+    enabled: false
   apply_requirements: [mergeable]
+drift_detection:
+  enabled: true
+  cron: "0 0 0 * 0"
 workflows:
   default:
     plan:
@@ -168,7 +173,14 @@ allowed_regexp_prefixes:
 							Enabled:      Bool(false),
 						},
 						ApplyRequirements: []string{"mergeable"},
+						DriftDetection: &raw.DriftDetection{
+							Enabled: Bool(false),
+						},
 					},
+				},
+				DriftDetection: &raw.DriftDetection{
+					Enabled: Bool(true),
+					Cron:    String("0 0 0 * 0"),
 				},
 				Workflows: map[string]raw.Workflow{
 					"default": {
@@ -362,6 +374,25 @@ func TestConfig_ToValid(t *testing.T) {
 						StateRm:     valid.DefaultStateRmStage,
 					},
 				},
+			},
+		},
+
+		{
+			description: "drift_detection set",
+			input: raw.RepoCfg{
+				Version: Int(2),
+				DriftDetection: &raw.DriftDetection{
+					Enabled: Bool(true),
+					Cron:    String("0 0 0 * 0"),
+				},
+			},
+			exp: valid.RepoCfg{
+				Version: 2,
+				DriftDetection: valid.DriftDetection{
+					Enabled: true,
+					Cron:    "0 0 0 * 0",
+				},
+				Workflows: map[string]valid.Workflow{},
 			},
 		},
 		{
