@@ -120,7 +120,7 @@ func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.Glo
 
 	var rawCfg raw.GlobalCfg
 	dec := yaml.NewDecoder(bytes.NewBuffer(configData))
-	if err := dec.Decode(&rawCfg); err != nil {
+	if err := dec.Decode(&rawCfg); err != nil && err != io.EOF {
 		return valid.GlobalCfg{}, err
 	}
 
