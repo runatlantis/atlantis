@@ -87,6 +87,22 @@ func (b *TestBuilder) BuildApplyCommands(ctx *command.Context, comment *command.
 	}, nil
 }
 
+type TestMultiBuilder struct {
+	called bool
+}
+
+func (b *TestMultiBuilder) BuildApplyCommands(ctx *command.Context, comment *command.Comment) ([]command.ProjectContext, error) {
+	b.called = true
+	return []command.ProjectContext{
+		{
+			WorkflowModeType: valid.PlatformWorkflowMode,
+		},
+		{
+			WorkflowModeType: valid.DefaultWorkflowMode,
+		},
+	}, nil
+}
+
 type TestCommenter struct {
 	expectedComment string
 	expectedPullNum int
@@ -136,6 +152,60 @@ func TestPlatformModeRunner_allocatesButNotPlatformMode(t *testing.T) {
 	builder := &TestBuilder{
 		Type: valid.DefaultWorkflowMode,
 	}
+	runner := &testCMDRunner{
+		t:           t,
+		expectedCmd: cmd,
+	}
+
+	subject := &lyftCommand.PlatformModeRunner{
+		Allocator: &testAllocator{
+			expectedFeatureName: feature.PlatformMode,
+			expectedT:           t,
+			expectedCtx:         feature.FeatureContext{RepoName: "owner/repo"},
+			expectedResult:      true,
+		},
+		Logger:  logging.NewNoopCtxLogger(t),
+		Builder: builder,
+		TemplateLoader: template.Loader[lyftCommand.LegacyApplyCommentInput]{
+			GlobalCfg: valid.GlobalCfg{},
+		},
+		VCSClient: commenter,
+		Runner:    runner,
+	}
+
+	subject.Run(ctx, cmd)
+
+	assert.True(t, runner.called)
+	assert.True(t, builder.called)
+	assert.False(t, commenter.called)
+}
+
+func TestPlatformModeRunner_allocatesButPartialPlatformMode(t *testing.T) {
+
+	ctx := &command.Context{
+		RequestCtx: context.Background(),
+		HeadRepo: models.Repo{
+			FullName: "owner/repo",
+		},
+		Pull: models.PullRequest{
+			Num: 1,
+			BaseRepo: models.Repo{
+				FullName: "owner/base",
+			},
+		},
+	}
+	cmd := &command.Comment{
+		Workspace: "hi",
+	}
+
+	commenter := &TestCommenter{
+		expectedT:       t,
+		expectedComment: "Platform mode does not support legacy apply commands. Please merge your PR to apply the changes. ",
+		expectedPullNum: 1,
+		expectedRepo:    ctx.Pull.BaseRepo,
+	}
+
+	builder := &TestMultiBuilder{}
 	runner := &testCMDRunner{
 		t:           t,
 		expectedCmd: cmd,
