@@ -16,6 +16,7 @@ type Recovery struct {
 func (m *Recovery) Middleware(next http.Handler) http.Handler {
 	return &recoveryHandler{
 		logger: m.Logger,
+		next:   next,
 	}
 }
 
