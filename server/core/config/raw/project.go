@@ -81,6 +81,7 @@ func (p Project) Validate() error {
 		validation.Field(&p.TerraformVersion, validation.By(VersionValidator)),
 		validation.Field(&p.Name, validation.By(validName)),
 		validation.Field(&p.Branch, validation.By(branchValid)),
+		validation.Field(&p.DriftDetection),
 	)
 }
 

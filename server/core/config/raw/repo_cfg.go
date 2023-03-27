@@ -26,6 +26,7 @@ const DefaultDeleteSourceBranchOnMerge = false
 type RepoCfg struct {
 	Version                   *int                `yaml:"version,omitempty"`
 	Projects                  []Project           `yaml:"projects,omitempty"`
+	DriftDetection            *DriftDetection     `yaml:"drift_detection,omitempty"`
 	Workflows                 map[string]Workflow `yaml:"workflows,omitempty"`
 	PolicySets                PolicySets          `yaml:"policies,omitempty"`
 	Automerge                 *bool               `yaml:"automerge,omitempty"`
@@ -49,6 +50,7 @@ func (r RepoCfg) Validate() error {
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.Version, validation.By(equals2)),
 		validation.Field(&r.Projects),
+		validation.Field(&r.DriftDetection),
 		validation.Field(&r.Workflows),
 	)
 }
@@ -64,6 +66,10 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		validProjects = append(validProjects, p.ToValid())
 	}
 
+	driftdetection := valid.DriftDetection{Enabled: false}
+	if r.DriftDetection != nil {
+		driftdetection = r.DriftDetection.ToValid()
+	}
 	automerge := DefaultAutomerge
 	if r.Automerge != nil {
 		automerge = *r.Automerge
@@ -89,5 +95,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		ParallelPolicyCheck:       parallelPlan,
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 		AllowedRegexpPrefixes:     r.AllowedRegexpPrefixes,
+		DriftDetection:            driftdetection,
 	}
 }
