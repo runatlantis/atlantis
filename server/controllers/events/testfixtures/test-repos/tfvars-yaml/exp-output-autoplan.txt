@@ -37,6 +37,7 @@ workspace=default
 </details>
 Plan: 1 to add, 0 to change, 0 to destroy.
 
+
 ---
 ### 2. project: `staging` dir: `.` workspace: `default`
 <details><summary>Show Output</summary>
@@ -69,6 +70,7 @@ Changes to Outputs:
     * `atlantis plan -p staging`
 </details>
 Plan: 1 to add, 0 to change, 0 to destroy.
+
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:

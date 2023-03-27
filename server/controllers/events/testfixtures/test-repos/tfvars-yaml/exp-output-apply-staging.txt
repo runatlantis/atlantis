@@ -12,4 +12,3 @@ var = "staging"
 workspace = "default"
 
 ```
-

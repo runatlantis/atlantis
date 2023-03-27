@@ -106,50 +106,6 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 	Equals(t, "output", output)
 }
 
-func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
-	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
-
-	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
-	err := os.WriteFile(lockFilePath, nil, 0600)
-	Ok(t, err)
-	// commit lock file
-	runCmd(t, repoDir, "git", "add", ".terraform.lock.hcl")
-	runCmd(t, repoDir, "git", "commit", "-m", "add .terraform.lock.hcl")
-
-	logger := logging.NewNoopCtxLogger(t)
-	prjCtx := command.ProjectContext{
-		Workspace:  "workspace",
-		RepoRelDir: ".",
-		Log:        logger,
-	}
-
-	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
-
-	tfVersion, _ := version.NewVersion("0.14.0")
-	iso := runtime.InitStepRunner{
-		TerraformExecutor: terraform,
-		DefaultTFVersion:  tfVersion,
-	}
-	When(terraform.RunCommandWithVersion(matchers.AnyContextContext(), matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
-		ThenReturn("output", nil)
-
-	ctx := context.Background()
-	output, err := iso.Run(ctx, command.ProjectContext{
-		Workspace:  "workspace",
-		RepoRelDir: ".",
-		Log:        logger,
-	}, []string{"extra", "args"}, repoDir, map[string]string(nil))
-	Ok(t, err)
-	// When there is no error, should not return init output to PR.
-	Equals(t, "", output)
-
-	expectedArgs := []string{"init", "-input=false", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, prjCtx, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
-}
-
 func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()

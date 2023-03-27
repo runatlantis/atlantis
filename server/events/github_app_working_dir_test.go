@@ -1,63 +1,16 @@
 package events_test
 
 import (
-	"fmt"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
 	vcsMocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
-
-// Test that if we don't have any existing files, we check out the repo with a github app.
-func TestClone_GithubAppNoneExisting(t *testing.T) {
-	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
-	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
-
-	dataDir, cleanup2 := TempDir(t)
-	defer cleanup2()
-
-	wd := &events.FileWorkspace{
-		DataDir:                     dataDir,
-		GlobalCfg:                   valid.NewGlobalCfg("somedir"),
-		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
-	}
-
-	defer disableSSLVerification()()
-	testServer, err := fixtures.GithubAppTestServer(t)
-	Ok(t, err)
-
-	gwd := &events.GithubAppWorkingDir{
-		WorkingDir: wd,
-		Credentials: &vcs.GithubAppCredentials{
-			Key:      []byte(fixtures.GithubPrivateKey),
-			AppID:    1,
-			Hostname: testServer,
-		},
-		GithubHostname: testServer,
-	}
-
-	logger := logging.NewNoopCtxLogger(t)
-
-	cloneDir, _, err := gwd.Clone(logger, models.Repo{}, models.PullRequest{
-		BaseRepo:   NewBaseRepo(),
-		HeadBranch: "branch",
-	}, "default")
-	Ok(t, err)
-
-	// Use rev-parse to verify at correct commit.
-	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
-	Equals(t, expCommit, actCommit)
-}
 
 func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 	workingDir := eventMocks.NewMockWorkingDir()

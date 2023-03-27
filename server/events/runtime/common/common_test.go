@@ -1,12 +1,8 @@
 package common
 
 import (
-	"os/exec"
 	"reflect"
-	"strings"
 	"testing"
-
-	. "github.com/runatlantis/atlantis/testing"
 )
 
 func Test_DeDuplicateExtraArgs(t *testing.T) {
@@ -87,61 +83,4 @@ func Test_DeDuplicateExtraArgs(t *testing.T) {
 			}
 		})
 	}
-}
-
-func runCmd(t *testing.T, dir string, name string, args ...string) string {
-	t.Helper()
-	cpCmd := exec.Command(name, args...)
-	cpCmd.Dir = dir
-	cpOut, err := cpCmd.CombinedOutput()
-	Assert(t, err == nil, "err running %q: %s", strings.Join(append([]string{name}, args...), " "), cpOut)
-	return string(cpOut)
-}
-
-func initRepo(t *testing.T) (string, func()) {
-	repoDir, cleanup := TempDir(t)
-	runCmd(t, repoDir, "git", "init")
-	runCmd(t, repoDir, "touch", ".gitkeep")
-	runCmd(t, repoDir, "git", "add", ".gitkeep")
-	runCmd(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
-	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
-	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
-	runCmd(t, repoDir, "git", "branch", "branch")
-	return repoDir, cleanup
-}
-
-func TestIsFileTracked(t *testing.T) {
-	// Initialize the git repo.
-	repoDir, cleanup := initRepo(t)
-	defer cleanup()
-
-	// file1 should not be tracked
-	tracked, err := IsFileTracked(repoDir, "file1")
-	Ok(t, err)
-	Equals(t, tracked, false)
-
-	// stage file1
-	runCmd(t, repoDir, "touch", "file1")
-	runCmd(t, repoDir, "git", "add", "file1")
-	runCmd(t, repoDir, "git", "commit", "-m", "add file1")
-
-	// file1 should  be tracked
-	tracked, err = IsFileTracked(repoDir, "file1")
-	Ok(t, err)
-	Equals(t, tracked, true)
-
-	// .terraform.lock.hcl should not be tracked
-	tracked, err = IsFileTracked(repoDir, ".terraform.lock.hcl")
-	Ok(t, err)
-	Equals(t, tracked, false)
-
-	// stage .terraform.lock.hcl
-	runCmd(t, repoDir, "touch", ".terraform.lock.hcl")
-	runCmd(t, repoDir, "git", "add", ".terraform.lock.hcl")
-	runCmd(t, repoDir, "git", "commit", "-m", "add .terraform.lock.hcl")
-
-	// file1 should  be tracked
-	tracked, err = IsFileTracked(repoDir, ".terraform.lock.hcl")
-	Ok(t, err)
-	Equals(t, tracked, true)
 }

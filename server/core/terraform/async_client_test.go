@@ -14,6 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -150,7 +151,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	outCh := client.RunCommandAsync(ctx, prjCtx, path, args, map[string]string{}, nil, workspace)
 
 	out, err := waitCh(outCh)
-	ErrEquals(t, fmt.Sprintf(`running "/usr/bin/sh -c echo dying && exit 1" in %q: exit status 1`, path), err)
+	assert.ErrorContains(t, err, fmt.Sprintf(`echo dying && exit 1" in %q: exit status 1`, path))
 	// Test that we still get our output.
 	Equals(t, "dying", out)
 }

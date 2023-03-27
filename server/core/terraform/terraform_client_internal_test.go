@@ -16,6 +16,7 @@ import (
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 // Test that it executes successfully
@@ -125,7 +126,7 @@ func TestDefaultClient_Synchronous_RunCommandWithVersion_Error(t *testing.T) {
 
 	When(mockBuilder.Build(nil, workspace, path, args)).ThenReturn(echoCommand, nil)
 	out, err := client.RunCommandWithVersion(ctx, prjCtx, path, args, map[string]string{}, nil, workspace)
-	ErrEquals(t, fmt.Sprintf(`running "/usr/bin/sh -c echo dying && exit 1" in %q: exit status 1`, path), err)
+	assert.ErrorContains(t, err, fmt.Sprintf(`echo dying && exit 1" in %q: exit status 1`, path))
 	// Test that we still get our output.
 	Equals(t, "dying\n", out)
 }

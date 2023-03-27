@@ -347,7 +347,9 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 		},
 	}
-	for _, c := range cases {
+	for _, ca := range cases {
+		c := ca
+
 		t.Run(c.Description, func(t *testing.T) {
 			t.Parallel()
 
