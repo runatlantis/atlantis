@@ -17,6 +17,7 @@ atlantis
 atlantis.env
 *.act
 package-lock.json
+Dockerfile.local
 
 # gitreleaser
 dist/

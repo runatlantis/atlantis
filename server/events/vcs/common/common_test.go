@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
-
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -60,4 +59,25 @@ func TestSplitComment_FourComments(t *testing.T) {
 		sepStart + comment[expMax:expMax*2] + sepEnd,
 		sepStart + comment[expMax*2:expMax*3] + sepEnd,
 		sepStart + comment[expMax*3:]}, split)
+}
+
+func TestAutomergeCommitMsg(t *testing.T) {
+	tests := []struct {
+		name    string
+		pullNum int
+		want    string
+	}{
+		{
+			name:    "Atlantis PR commit message should include PR number",
+			pullNum: 123,
+			want:    "[Atlantis] Automatically merging after successful apply: PR #123",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := common.AutomergeCommitMsg(tt.pullNum); got != tt.want {
+				t.Errorf("AutomergeCommitMsg() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
