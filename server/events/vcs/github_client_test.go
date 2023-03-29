@@ -841,7 +841,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 		allowSquash          bool
 		requireLinearHistory bool
 		protectedBranch      bool
-		protectionAvailabale bool
+		protectionAvailable  bool
 		expMethod            string
 	}{
 		"all true": {
@@ -850,7 +850,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: false,
 			protectedBranch:      false,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "merge",
 		},
 		"all false (edge case)": {
@@ -859,7 +859,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          false,
 			requireLinearHistory: false,
 			protectedBranch:      false,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "merge",
 		},
 		"merge: false rebase: true squash: true": {
@@ -868,7 +868,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: false,
 			protectedBranch:      false,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "rebase",
 		},
 		"merge: false rebase: false squash: true": {
@@ -877,7 +877,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: false,
 			protectedBranch:      false,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "squash",
 		},
 		"merge: false rebase: true squash: false": {
@@ -886,7 +886,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          false,
 			requireLinearHistory: false,
 			protectedBranch:      false,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "rebase",
 		},
 		"protected, all true, rlh: false": {
@@ -895,7 +895,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: false,
 			protectedBranch:      true,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "merge",
 		},
 		"protected, all false (edge case), rlh: false": {
@@ -904,7 +904,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          false,
 			requireLinearHistory: false,
 			protectedBranch:      true,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "merge",
 		},
 		"protected, merge: false rebase: true squash: true, rlh: false": {
@@ -913,7 +913,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: false,
 			protectedBranch:      true,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "rebase",
 		},
 		"protected, merge: false rebase: false squash: true, rlh: false": {
@@ -922,7 +922,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: false,
 			protectedBranch:      true,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "squash",
 		},
 		"protected, merge: false rebase: true squash: false, rlh: false": {
@@ -931,7 +931,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          false,
 			requireLinearHistory: false,
 			protectedBranch:      true,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "rebase",
 		},
 		"protected, all true, rlh: true": {
@@ -940,7 +940,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: true,
 			protectedBranch:      true,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "rebase",
 		},
 		"protected, all false (edge case), rlh: true": {
@@ -949,7 +949,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          false,
 			requireLinearHistory: true,
 			protectedBranch:      true,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "merge",
 		},
 		"protected, merge: false rebase: true squash: true, rlh: true": {
@@ -958,7 +958,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: true,
 			protectedBranch:      true,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "rebase",
 		},
 		"protected, merge: false rebase: false squash: true, rlh: true": {
@@ -967,7 +967,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: true,
 			protectedBranch:      true,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "squash",
 		},
 		"protected, merge: false rebase: true squash: false, rlh: true": {
@@ -976,7 +976,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          false,
 			requireLinearHistory: true,
 			protectedBranch:      true,
-			protectionAvailabale: true,
+			protectionAvailable:  true,
 			expMethod:            "rebase",
 		},
 		"protection not supported, all true": {
@@ -985,7 +985,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: false,
 			protectedBranch:      false,
-			protectionAvailabale: false,
+			protectionAvailable:  false,
 			expMethod:            "merge",
 		},
 		"protection not supported, merge: false, rebase: true, squash: true": {
@@ -994,7 +994,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: false,
 			protectedBranch:      false,
-			protectionAvailabale: false,
+			protectionAvailable:  false,
 			expMethod:            "rebase",
 		},
 		"protection not supported, merge: false, rebase: false, squash: true": {
@@ -1003,7 +1003,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          true,
 			requireLinearHistory: false,
 			protectedBranch:      false,
-			protectionAvailabale: false,
+			protectionAvailable:  false,
 			expMethod:            "squash",
 		},
 		"protection not supported, merge: false, rebase: true, squash: false": {
@@ -1012,7 +1012,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:          false,
 			requireLinearHistory: false,
 			protectedBranch:      false,
-			protectionAvailabale: false,
+			protectionAvailable:  false,
 			expMethod:            "rebase",
 		},
 	}
@@ -1051,12 +1051,12 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 						w.Write([]byte(resp)) // nolint: errcheck
 						return
 					case "/api/v3/repos/runatlantis/atlantis/branches/master/protection":
-						if c.protectedBranch && c.protectionAvailabale {
+						if c.protectedBranch && c.protectionAvailable {
 							w.Write([]byte(protected)) // nolint: errcheck
-						} else if !c.protectedBranch && c.protectionAvailabale {
+						} else if !c.protectedBranch && c.protectionAvailable {
 							w.WriteHeader(404)
 							w.Write([]byte("{\"message\":\"Branch not protected\"}")) // nolint: errcheck
-						} else if !c.protectionAvailabale {
+						} else if !c.protectionAvailable {
 							w.WriteHeader(403)
 							w.Write([]byte("{\"message\":\"Upgrade to GitHub Pro or make this repository public to enable this feature.\"}")) // nolint: errcheck
 						}
