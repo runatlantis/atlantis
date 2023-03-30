@@ -27,7 +27,6 @@ ARG TARGETPLATFORM
 # Install packages needed for running Atlantis.
 RUN apk add git~=2.40 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main/ && \
     apk add --no-cache \
-        git~=2.40 \
         ca-certificates~=20220614 \
         curl~=7.88 \
         unzip~=6.0 \
