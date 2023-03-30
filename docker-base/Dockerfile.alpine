@@ -25,8 +25,8 @@ ENV GIT_LFS_VERSION=3.3.0
 ARG TARGETPLATFORM
 
 # Install packages needed for running Atlantis.
-RUN apk add git~=2.39 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main/ && \
-    apk add --no-cache \
+RUN apk add --no-cache \
+        git~=2.40 \
         ca-certificates~=20220614 \
         curl~=7.88 \
         unzip~=6.0 \
