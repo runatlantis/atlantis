@@ -18,7 +18,7 @@ RUN addgroup atlantis && \
     chmod g=u /etc/passwd
 
 # Install gosu and git-lfs.
-ENV GOSU_VERSION=1.16-2
+ENV GOSU_VERSION=1.16-3
 ENV GIT_LFS_VERSION=3.3.0
 
 # Automatically populated with the architecture the image is being built for.
