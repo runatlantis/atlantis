@@ -140,6 +140,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		verbose,
 		ctx.Scope,
 		ctx.PullRequestStatus,
+		ctx.PullStatus,
 	)
 
 	projectCmds = append(projectCmds, projectCmdContext)
@@ -202,6 +203,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			verbose,
 			ctx.Scope,
 			ctx.PullRequestStatus,
+			ctx.PullStatus,
 		))
 	}
 
@@ -223,7 +225,8 @@ func newProjectCommandContext(ctx *command.Context,
 	parallelPlanEnabled bool,
 	verbose bool,
 	scope tally.Scope,
-	pullStatus models.PullReqStatus,
+	pullReqStatus models.PullReqStatus,
+	pullStatus *models.PullStatus,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
@@ -255,6 +258,7 @@ func newProjectCommandContext(ctx *command.Context,
 		ParallelApplyEnabled:       parallelApplyEnabled,
 		ParallelPlanEnabled:        parallelPlanEnabled,
 		ParallelPolicyCheckEnabled: parallelPlanEnabled,
+		Dependencies:               projCfg.Dependencies,
 		AutoplanEnabled:            projCfg.AutoplanEnabled,
 		Steps:                      steps,
 		HeadRepo:                   ctx.HeadRepo,
@@ -274,7 +278,8 @@ func newProjectCommandContext(ctx *command.Context,
 		Verbose:                    verbose,
 		Workspace:                  projCfg.Workspace,
 		PolicySets:                 policySets,
-		PullReqStatus:              pullStatus,
+		PullReqStatus:              pullReqStatus,
+		PullStatus:                 pullStatus,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 	}

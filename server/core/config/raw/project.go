@@ -31,6 +31,7 @@ type Project struct {
 	PlanRequirements          []string  `yaml:"plan_requirements,omitempty"`
 	ApplyRequirements         []string  `yaml:"apply_requirements,omitempty"`
 	ImportRequirements        []string  `yaml:"import_requirements,omitempty"`
+	Dependencies              []string  `yaml:"depends_on,omitempty"`
 	DeleteSourceBranchOnMerge *bool     `yaml:"delete_source_branch_on_merge,omitempty"`
 	RepoLocking               *bool     `yaml:"repo_locking,omitempty"`
 	ExecutionOrderGroup       *int      `yaml:"execution_order_group,omitempty"`
@@ -72,12 +73,17 @@ func (p Project) Validate() error {
 		return errors.Wrapf(err, "parsing: %s", branch)
 	}
 
+	Dependencies := func(value interface{}) error {
+		return nil
+	}
+
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Dir, validation.Required, validation.By(hasDotDot)),
 		validation.Field(&p.PlanRequirements, validation.By(validPlanReq)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&p.ImportRequirements, validation.By(validImportReq)),
 		validation.Field(&p.TerraformVersion, validation.By(VersionValidator)),
+		validation.Field(&p.Dependencies, validation.By(Dependencies)),
 		validation.Field(&p.Name, validation.By(validName)),
 		validation.Field(&p.Branch, validation.By(branchValid)),
 	)
@@ -120,6 +126,8 @@ func (p Project) ToValid() valid.Project {
 	v.ImportRequirements = p.ImportRequirements
 
 	v.Name = p.Name
+
+	v.Dependencies = p.Dependencies
 
 	if p.DeleteSourceBranchOnMerge != nil {
 		v.DeleteSourceBranchOnMerge = p.DeleteSourceBranchOnMerge

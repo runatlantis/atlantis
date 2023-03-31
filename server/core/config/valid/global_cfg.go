@@ -17,10 +17,7 @@ const PoliciesPassedCommandReq = "policies_passed"
 const PlanRequirementsKey = "plan_requirements"
 const ApplyRequirementsKey = "apply_requirements"
 const ImportRequirementsKey = "import_requirements"
-const PreWorkflowHooksKey = "pre_workflow_hooks"
 const WorkflowKey = "workflow"
-const PostWorkflowHooksKey = "post_workflow_hooks"
-const AllowedWorkflowsKey = "allowed_workflows"
 const AllowedOverridesKey = "allowed_overrides"
 const AllowCustomWorkflowsKey = "allow_custom_workflows"
 const DefaultWorkflowName = "default"
@@ -88,6 +85,7 @@ type MergedProjectCfg struct {
 	ImportRequirements        []string
 	Workflow                  Workflow
 	AllowedWorkflows          []string
+	Dependencies              []string
 	RepoRelDir                string
 	Workspace                 string
 	Name                      string
@@ -366,6 +364,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		Workflow:                  workflow,
 		RepoRelDir:                proj.Dir,
 		Workspace:                 proj.Workspace,
+		Dependencies:              proj.Dependencies,
 		Name:                      proj.GetName(),
 		AutoplanEnabled:           proj.Autoplan.Enabled,
 		TerraformVersion:          proj.TerraformVersion,
