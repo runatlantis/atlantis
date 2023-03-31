@@ -20,6 +20,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/jobs"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
 	bolt "go.etcd.io/bbolt"
 
@@ -187,6 +188,7 @@ func TestCleanUpPullComments(t *testing.T) {
 }
 
 func TestCleanUpLogStreaming(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 
 	t.Run("Should Clean Up Log Streaming Resources When PR is closed", func(t *testing.T) {

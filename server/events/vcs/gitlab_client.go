@@ -239,7 +239,14 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 	isPipelineSkipped := mr.HeadPipeline.Status == "skipped"
 	allowSkippedPipeline := project.AllowMergeOnSkippedPipeline && isPipelineSkipped
-	if (mr.DetailedMergeStatus == "mergeable" || mr.DetailedMergeStatus == "ci_still_running") &&
+
+	ok, err := g.SupportsDetailedMergeStatus()
+	if err != nil {
+		return false, err
+	}
+
+	if ((ok && (mr.DetailedMergeStatus == "mergeable" || mr.DetailedMergeStatus == "ci_still_running")) ||
+		(!ok && mr.MergeStatus == "can_be_merged")) &&
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
 		!mr.WorkInProgress &&
@@ -247,6 +254,19 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		return true, nil
 	}
 	return false, nil
+}
+
+func (g *GitlabClient) SupportsDetailedMergeStatus() (bool, error) {
+	v, err := g.GetVersion()
+	if err != nil {
+		return false, err
+	}
+
+	cons, err := version.NewConstraint(">= 15.6")
+	if err != nil {
+		return false, err
+	}
+	return cons.Check(v), nil
 }
 
 // UpdateStatus updates the build status of a commit.
@@ -313,7 +333,7 @@ func (g *GitlabClient) WaitForSuccessPipeline(ctx context.Context, pull models.P
 
 // MergePull merges the merge request.
 func (g *GitlabClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	commitMsg := common.AutomergeCommitMsg
+	commitMsg := common.AutomergeCommitMsg(pull.Num)
 
 	mr, err := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
 	if err != nil {
@@ -352,12 +372,7 @@ func (g *GitlabClient) DiscardReviews(repo models.Repo, pull models.PullRequest)
 
 // GetVersion returns the version of the Gitlab server this client is using.
 func (g *GitlabClient) GetVersion() (*version.Version, error) {
-	req, err := g.Client.NewRequest("GET", "/version", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	versionResp := new(gitlab.Version)
-	_, err = g.Client.Do(req, versionResp)
+	versionResp, _, err := g.Client.Version.GetVersion()
 	if err != nil {
 		return nil, err
 	}
