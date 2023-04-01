@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"golang.org/x/exp/slices"
+	"github.com/runatlantis/atlantis/server/utils"
 
 	"github.com/moby/patternmatcher"
 	"github.com/pkg/errors"
@@ -191,7 +191,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 	for _, project := range config.Projects {
 		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
 
-		if slices.Contains(dependentProjects, project.Dir) {
+		if utils.SlicesContains(dependentProjects, project.Dir) {
 			projects = append(projects, project)
 			continue
 		}
