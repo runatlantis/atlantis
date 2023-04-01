@@ -38,11 +38,14 @@ type UserConfig struct {
 	DisableRepoLocking          bool   `mapstructure:"disable-repo-locking"`
 	DisableUnlockLabel          string `mapstructure:"disable-unlock-label"`
 	DiscardApprovalOnPlanFlag   bool   `mapstructure:"discard-approval-on-plan"`
-	EmojiReaction               string `mapstructure:"emoji-reaction"`
-	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
-	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
-	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
-	ExecutableName              string `mapstructure:"executable-name"`
+	DriftDetection              bool   `mapstructure:"drift-detection"`
+	DriftDetectionCron          string `mapstructure:"drift-detection-cron"`
+
+	EmojiReaction            string `mapstructure:"emoji-reaction"`
+	EnablePolicyChecksFlag   bool   `mapstructure:"enable-policy-checks"`
+	EnableRegExpCmd          bool   `mapstructure:"enable-regexp-cmd"`
+	EnableDiffMarkdownFormat bool   `mapstructure:"enable-diff-markdown-format"`
+	ExecutableName           string `mapstructure:"executable-name"`
 	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
 	FailOnPreWorkflowHookError      bool   `mapstructure:"fail-on-pre-workflow-hook-error"`
 	HideUnchangedPlanComments       bool   `mapstructure:"hide-unchanged-plan-comments"`
