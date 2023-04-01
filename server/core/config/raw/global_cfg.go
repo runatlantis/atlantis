@@ -14,7 +14,7 @@ import (
 type GlobalCfg struct {
 	Repos          []Repo                    `yaml:"repos" json:"repos"`
 	Workflows      map[string]Workflow       `yaml:"workflows" json:"workflows"`
-	DriftDetection map[string]DriftDetection `yaml:"drift_detection" json:"workflows"`
+	DriftDetection map[string]DriftDetection `yaml:"drift_detection" json:"drift_detection"`
 	PolicySets     PolicySets                `yaml:"policies" json:"policies"`
 	Metrics        Metrics                   `yaml:"metrics" json:"metrics"`
 }
