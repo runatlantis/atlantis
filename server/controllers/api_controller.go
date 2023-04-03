@@ -40,6 +40,7 @@ type APIRequest struct {
 	Projects   []string
 	Paths      []struct {
 		Directory string
+		Flags     []string
 		Workspace string
 	}
 }
@@ -55,6 +56,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.
 	for _, path := range a.Paths {
 		cc = append(cc, &events.CommentCommand{
 			RepoRelDir: strings.TrimRight(path.Directory, "/"),
+			Flags:      path.Flags,
 			Workspace:  path.Workspace,
 		})
 	}
