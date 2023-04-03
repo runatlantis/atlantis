@@ -36,7 +36,7 @@ ARG TARGETPLATFORM
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.4.2
+ENV DEFAULT_TERRAFORM_VERSION=1.4.4
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -60,7 +60,7 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="1.0.11 1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_V
     ln -s "/usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform" /usr/local/bin/terraform
 
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV DEFAULT_CONFTEST_VERSION=0.39.2
+ENV DEFAULT_CONFTEST_VERSION=0.40.0
 
 RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
     case "${TARGETPLATFORM}" in \

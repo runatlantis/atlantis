@@ -30,7 +30,6 @@ func TestAPIController_Plan(t *testing.T) {
 		Repository: "Repo",
 		Ref:        "main",
 		Type:       "Gitlab",
-		PR:         40,
 		Projects:   []string{"default"},
 	})
 	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
@@ -74,11 +73,11 @@ func TestAPIController_Apply(t *testing.T) {
 				Type:       "Gitlab",
 				Paths: []struct {
 					Directory string
-					Flags     []string
+					ExtraArgs []string
 					Workspace string
 				}{
 					{
-						Flags: []string{"flag1", "flag2"},
+						ExtraArgs: []string{"flag1", "flag2"},
 					},
 				},
 				Projects: []string{"default"},

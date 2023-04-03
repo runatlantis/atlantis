@@ -16,7 +16,7 @@ type ExecutorService struct {
 	log logging.SimpleLogging
 
 	// jobs
-	runtimeStatsPublisher JobDefinition
+	jobs []JobDefinition
 }
 
 func NewExecutorService(
@@ -33,9 +33,13 @@ func NewExecutorService(
 	}
 
 	return &ExecutorService{
-		log:                   log,
-		runtimeStatsPublisher: runtimeStatsPublisherJob,
+		log:  log,
+		jobs: []JobDefinition{runtimeStatsPublisherJob},
 	}
+}
+
+func (s *ExecutorService) AddJob(jd JobDefinition) {
+	s.jobs = append(s.jobs, jd)
 }
 
 type JobDefinition struct {
@@ -50,7 +54,9 @@ func (s *ExecutorService) Run() {
 
 	var wg sync.WaitGroup
 
-	s.runScheduledJob(ctx, &wg, s.runtimeStatsPublisher)
+	for _, jd := range s.jobs {
+		s.runScheduledJob(ctx, &wg, jd)
+	}
 
 	interrupt := make(chan os.Signal, 1)
 
@@ -96,6 +102,7 @@ func (s *ExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGrou
 
 }
 
+//go:generate pegomock generate -m --package mocks -o mocks/mock_executor_service_job.go Job
 type Job interface {
 	Run()
 }

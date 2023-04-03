@@ -25,8 +25,10 @@ jobs:
       uses: goreleaser/goreleaser-action@v4
       if: (!contains(github.ref, 'pre'))
       with:
-        version: v0.183.0
-        args: release --rm-dist
+        version: v1.16.2
+        # You can pass flags to goreleaser via GORELEASER_ARGS
+        # --clean will save you deleting the dist dir
+        args: release --clean
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -46,8 +48,10 @@ jobs:
       uses: goreleaser/goreleaser-action@v4
       if: contains(github.ref, 'pre')
       with:
-        version: v0.183.0
-        args: release --rm-dist --release-notes=tmp-CHANGELOG.md
+        version: v1.16.2
+        # You can pass flags to goreleaser via GORELEASER_ARGS
+        # --clean will save you deleting the dist dir
+        args: release --clean --release-notes=tmp-CHANGELOG.md
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GORELEASER_CURRENT_TAG: ${{ steps.changelog.outputs.RELEASE_TAG }}
@@ -64,7 +68,7 @@ jobs:
           formula-name: atlantis
           commit-message: |
             {{formulaName}} {{version}}
-            
+
             Created by https://github.com/mislav/bump-homebrew-formula-action
         env:
           COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
