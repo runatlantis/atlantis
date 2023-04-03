@@ -207,6 +207,89 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 	}
 }
 
+func TestRequirements_ValidateProjectDependencies(t *testing.T) {
+	tests := []struct {
+		name        string
+		ctx         command.ProjectContext
+		setup       func(workingDir *mocks.MockWorkingDir)
+		wantFailure string
+		wantErr     assert.ErrorAssertionFunc
+	}{
+		{
+			name:    "pass no dependencies",
+			ctx:     command.ProjectContext{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "pass all dependencies applied",
+			ctx: command.ProjectContext{
+				Dependencies: []string{"project1"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.AppliedPlanStatus,
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fail all dependencies are not applied",
+			ctx: command.ProjectContext{
+				Dependencies: []string{"project1", "project2"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.PlannedPlanStatus,
+						},
+						{
+							ProjectName: "project2",
+							Status:      models.ErroredApplyStatus,
+						},
+					},
+				},
+			},
+			wantFailure: "Can't apply your project unless you apply its dependencies: [project1]",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "Fail one of dependencies is not applied",
+			ctx: command.ProjectContext{
+				Dependencies: []string{"project1", "project2"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.AppliedPlanStatus,
+						},
+						{
+							ProjectName: "project2",
+							Status:      models.ErroredApplyStatus,
+						},
+					},
+				},
+			},
+			wantFailure: "Can't apply your project unless you apply its dependencies: [project2]",
+			wantErr:     assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			workingDir := mocks.NewMockWorkingDir()
+			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
+			gotFailure, err := a.ValidateProjectDependencies(tt.ctx)
+			if !tt.wantErr(t, err, fmt.Sprintf("ValidateProjectDependencies(%v)", tt.ctx)) {
+				return
+			}
+			assert.Equalf(t, tt.wantFailure, gotFailure, "ValidateProjectDependencies(%v)", tt.ctx)
+		})
+	}
+}
+
 func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 	repoDir := "repoDir"
 	fullRequirements := []string{
