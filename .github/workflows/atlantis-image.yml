@@ -33,6 +33,12 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    # Lint the Dockerfile first before setting anything up
+    - name: Lint Dockerfile
+      uses: hadolint/hadolint-action@master
+      with:
+        dockerfile: "Dockerfile"
+
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v2
       with:
