@@ -19,6 +19,8 @@ WORKDIR /app
 # This is needed to download transitive dependencies instead of compiling them
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
+RUN apk add --no-cache \
+        bash~=5.2
 COPY go.mod go.sum ./
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN go mod graph | awk '{if ($1 !~ "@") print $2}' | xargs go get
