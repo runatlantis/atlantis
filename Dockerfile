@@ -20,6 +20,7 @@ WORKDIR /app
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
 COPY go.mod go.sum ./
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN go mod graph | awk '{if ($1 !~ "@") print $2}' | xargs go get
 
 COPY . /app
