@@ -52,7 +52,7 @@ RUN apt-get update \
 # install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-ENV DEFAULT_CONFTEST_VERSION=0.38.0
+ENV DEFAULT_CONFTEST_VERSION=0.40.0
 RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
     case ${TARGETPLATFORM} in \
         "linux/amd64") CONFTEST_ARCH=x86_64 ;; \
@@ -112,7 +112,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.3.7
+ENV DEFAULT_TERRAFORM_VERSION=1.4.4
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
@@ -160,10 +160,11 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Install packages needed for running Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
-RUN apk add --no-cache \
+RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main/ \
+        git~=2.40 && \
+    apk add --no-cache \
         ca-certificates~=20220614 \
         curl~=7.87 \
-        git~=2.39 \
         unzip~=6.0 \
         bash~=5.2 \
         openssh~=9.1_p1 \
