@@ -297,7 +297,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			}
 			ctx.Log.Info("successfully parsed remote %s file", repoCfgFile)
 			if len(repoCfg.Projects) > 0 {
-				matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "")
+				matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
 				if err != nil {
 					return nil, err
 				}
@@ -351,8 +351,14 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
 	}
 
+	moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
+	if err != nil {
+		ctx.Log.Warn("error(s) loading project module dependencies: %s", err)
+	}
+	ctx.Log.Debug("moduleInfo for %s (matching %q) = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
+
 	if len(repoCfg.Projects) > 0 {
-		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
+		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir, moduleInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -386,11 +392,6 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			ctx.Log.Info("found no %s file", repoCfgFile)
 		}
 		// build a module index for projects that are explicitly included
-		moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
-		if err != nil {
-			ctx.Log.Warn("error(s) loading project module dependencies: %s", err)
-		}
-		ctx.Log.Debug("moduleInfo for %s (matching %q) = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
