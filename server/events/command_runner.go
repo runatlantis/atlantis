@@ -212,7 +212,7 @@ func (c *DefaultCommandRunner) checkVarFilesInPlanCommandAllowlisted(cmd *Commen
 		return nil
 	}
 
-	return c.VarFileAllowlistChecker.Check(cmd.Flags)
+	return c.VarFileAllowlistChecker.Check(cmd.ExtraArgs)
 }
 
 // RunCommentCommand executes the command.

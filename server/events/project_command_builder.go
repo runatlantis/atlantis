@@ -230,7 +230,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 // See ProjectCommandBuilder.BuildPlanCommands.
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
-		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
+		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.ExtraArgs, cmd.Verbose)
 	}
 	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
 	return pcc, err
@@ -260,7 +260,7 @@ func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context
 func (p *DefaultProjectCommandBuilder) BuildImportCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		// import discard a plan file, so use buildAllCommandsByCfg instead buildAllProjectCommandsByPlan.
-		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
+		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.ExtraArgs, cmd.Verbose)
 	}
 	return p.buildProjectCommand(ctx, cmd)
 }
@@ -268,7 +268,7 @@ func (p *DefaultProjectCommandBuilder) BuildImportCommands(ctx *command.Context,
 func (p *DefaultProjectCommandBuilder) BuildStateRmCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		// state rm discard a plan file, so use buildAllCommandsByCfg instead buildAllProjectCommandsByPlan.
-		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
+		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.ExtraArgs, cmd.Verbose)
 	}
 	return p.buildProjectCommand(ctx, cmd)
 }
@@ -524,7 +524,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		command.Plan,
 		"",
 		cmd.ProjectName,
-		cmd.Flags,
+		cmd.ExtraArgs,
 		defaultRepoDir,
 		repoRelDir,
 		workspace,
@@ -619,7 +619,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 
 	var cmds []command.ProjectContext
 	for _, plan := range plans {
-		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), commentCmd.SubName, plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
+		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), commentCmd.SubName, plan.ProjectName, commentCmd.ExtraArgs, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
 		if err != nil {
 			return nil, errors.Wrapf(err, "building command for dir %q", plan.RepoRelDir)
 		}
@@ -667,7 +667,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		cmd.Name,
 		cmd.SubName,
 		cmd.ProjectName,
-		cmd.Flags,
+		cmd.ExtraArgs,
 		repoDir,
 		repoRelDir,
 		workspace,

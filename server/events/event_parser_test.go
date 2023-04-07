@@ -739,7 +739,7 @@ func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
 	cmd := events.NewCommentCommand("", nil, command.Plan, "", false, false, "", "")
 	Equals(t, events.CommentCommand{
 		RepoRelDir:  "",
-		Flags:       nil,
+		ExtraArgs:   nil,
 		Name:        command.Plan,
 		Verbose:     false,
 		Workspace:   "",
@@ -753,7 +753,7 @@ func TestNewCommand_AllFieldsSet(t *testing.T) {
 		Workspace:   "workspace",
 		RepoRelDir:  "dir",
 		Verbose:     true,
-		Flags:       []string{"a", "b"},
+		ExtraArgs:   []string{"a", "b"},
 		Name:        command.Plan,
 		ProjectName: "project",
 	}, *cmd)
@@ -794,10 +794,10 @@ func TestCommentCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_String(t *testing.T) {
-	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" flags="flag1,flag2"`
+	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" extraArgs="flag1,flag2"`
 	Equals(t, exp, (events.CommentCommand{
 		RepoRelDir:  "mydir",
-		Flags:       []string{"flag1", "flag2"},
+		ExtraArgs:   []string{"flag1", "flag2"},
 		Name:        command.Plan,
 		Verbose:     true,
 		Workspace:   "myworkspace",

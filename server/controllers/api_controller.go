@@ -56,7 +56,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.
 	for _, path := range a.Paths {
 		cc = append(cc, &events.CommentCommand{
 			RepoRelDir: strings.TrimRight(path.Directory, "/"),
-			Flags:      path.ExtraArgs,
+			ExtraArgs:  path.ExtraArgs,
 			Workspace:  path.Workspace,
 		})
 	}

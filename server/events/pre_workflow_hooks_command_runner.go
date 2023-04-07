@@ -71,7 +71,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 
 	var escapedArgs []string
 	if cmd != nil {
-		escapedArgs = escapeArgs(cmd.Flags)
+		escapedArgs = escapeArgs(cmd.ExtraArgs)
 	}
 
 	err = w.runHooks(
