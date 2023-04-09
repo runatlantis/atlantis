@@ -99,9 +99,9 @@ type CommentCommand struct {
 	// RepoRelDir is the path relative to the repo root to run the command in.
 	// Will never end in "/". If empty then the comment specified no directory.
 	RepoRelDir string
-	// ExtraArgs are the extra arguments appended to the comment,
+	// Flags are the extra arguments appended to the comment,
 	// ex. atlantis plan -- -target=resource
-	ExtraArgs []string
+	Flags []string
 	// Name is the name of the command the comment specified.
 	Name command.Name
 	// SubName is the name of the sub command the comment specified.
@@ -148,11 +148,11 @@ func (c CommentCommand) IsAutoplan() bool {
 
 // String returns a string representation of the command.
 func (c CommentCommand) String() string {
-	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q extraArgs=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, strings.Join(c.ExtraArgs, ","))
+	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, strings.Join(c.Flags, ","))
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, extraArgs []string, name command.Name, subName string, verbose, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -163,7 +163,7 @@ func NewCommentCommand(repoRelDir string, extraArgs []string, name command.Name,
 	}
 	return &CommentCommand{
 		RepoRelDir:        repoRelDir,
-		ExtraArgs:         extraArgs,
+		Flags:             flags,
 		Name:              name,
 		SubName:           subName,
 		Verbose:           verbose,

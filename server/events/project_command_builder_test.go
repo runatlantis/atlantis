@@ -211,7 +211,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 			Description: "no atlantis.yaml",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
-				ExtraArgs:  []string{"commentarg"},
+				Flags:      []string{"commentarg"},
 				Name:       command.Plan,
 				Workspace:  "myworkspace",
 			},
@@ -838,7 +838,7 @@ projects:
 				},
 				&events.CommentCommand{
 					RepoRelDir:  "",
-					ExtraArgs:   nil,
+					Flags:       nil,
 					Name:        command.Plan,
 					Verbose:     false,
 					Workspace:   "",
@@ -937,7 +937,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
-			ExtraArgs:   nil,
+			Flags:       nil,
 			Name:        command.Apply,
 			Verbose:     false,
 			Workspace:   "",
@@ -1029,7 +1029,7 @@ projects:
 	}
 	_, err = builder.BuildPlanCommands(ctx, &events.CommentCommand{
 		RepoRelDir:  ".",
-		ExtraArgs:   nil,
+		Flags:       nil,
 		Name:        command.Plan,
 		Verbose:     false,
 		Workspace:   "notconfigured",
@@ -1112,7 +1112,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				Scope: scope,
 			}, &events.CommentCommand{
 				RepoRelDir: ".",
-				ExtraArgs:  c.ExtraArgs,
+				Flags:      c.ExtraArgs,
 				Name:       command.Plan,
 				Verbose:    false,
 				Workspace:  "default",
@@ -1279,7 +1279,7 @@ projects:
 				},
 				&events.CommentCommand{
 					RepoRelDir: "",
-					ExtraArgs:  nil,
+					Flags:      nil,
 					Name:       command.Plan,
 					Verbose:    false,
 				})
@@ -1524,7 +1524,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
-			ExtraArgs:   nil,
+			Flags:       nil,
 			Name:        command.Version,
 			Verbose:     false,
 			Workspace:   "",

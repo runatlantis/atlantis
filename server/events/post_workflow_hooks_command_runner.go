@@ -73,7 +73,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 
 	var escapedArgs []string
 	if cmd != nil {
-		escapedArgs = escapeArgs(cmd.ExtraArgs)
+		escapedArgs = escapeArgs(cmd.Flags)
 	}
 
 	err = w.runHooks(

@@ -246,7 +246,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		}
 
 		cmd := &events.CommentCommand{
-			ExtraArgs: []string{"comment", "args"},
+			Flags: []string{"comment", "args"},
 		}
 
 		expectedCtx := pCtx
