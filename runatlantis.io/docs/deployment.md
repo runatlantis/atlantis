@@ -573,6 +573,8 @@ The standard [Kubernetes Helm Chart](#kubernetes-helm-chart) should work fine on
 
 Another option is [Azure Container Instances](https://docs.microsoft.com/en-us/azure/container-instances/). See this community member's [repo](https://github.com/jplane/atlantis-on-aci) or the new and more up-to-date [Terraform module](https://github.com/getindata/terraform-azurerm-atlantis) for install scripts and more information on running Atlantis on ACI.    
 
+**Note on ACI Deployment:** Due to a bug in earlier Docker releases, Docker v23.0.0 or later is required for straightforward deployment. Alternatively, the Atlantis Docker image can be pushed to a private registry such as ACR and then used.
+
 ### Roll Your Own
 If you want to roll your own Atlantis installation, you can get the `atlantis`
 binary from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
