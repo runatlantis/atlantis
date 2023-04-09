@@ -93,7 +93,8 @@ func TestAPIController_Apply(t *testing.T) {
 		w := httptest.NewRecorder()
 		ac.Apply(w, req)
 		ResponseContains(t, w, c.exp, "")
-		projectCommandBuilder.BuildApplyCommands(AnyPtrToCommandContext(), AnyPtrToEventsCommentCommand())
+		_, err := projectCommandBuilder.BuildApplyCommands(AnyPtrToCommandContext(), AnyPtrToEventsCommentCommand())
+		Ok(t, err)
 		projectCommandRunner.Plan(AnyCommandProjectContext())
 		projectCommandRunner.Apply(AnyCommandProjectContext())
 	}
