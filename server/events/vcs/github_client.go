@@ -34,6 +34,10 @@ import (
 // by GitHub.
 const maxCommentLength = 65536
 
+// Error message GitHub API returns if branch protection is not available
+// in current repository
+const githubBranchProtectionNotAvailable string = "Upgrade to GitHub Pro or make this repository public to enable this feature."
+
 var (
 	clientMutationID            = githubv4.NewString("atlantis")
 	pullRequestDismissalMessage = *githubv4.NewString("Dismissing reviews because of plan changes")
@@ -570,6 +574,11 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	return err
 }
 
+func isBranchProtectionNotAvailable(err error) bool {
+	errorResponse, ok := err.(*github.ErrorResponse)
+	return ok && errorResponse.Message == githubBranchProtectionNotAvailable
+}
+
 // MergePull merges the pull request.
 func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	// Users can set their repo to disallow certain types of merging.
@@ -581,7 +590,7 @@ func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 	}
 	protection, _, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner.GetLogin(), *repo.Name, pull.BaseBranch)
 	if err != nil {
-		if !errors.Is(err, github.ErrBranchNotProtected) {
+		if !errors.Is(err, github.ErrBranchNotProtected) && !isBranchProtectionNotAvailable(err) {
 			return errors.Wrap(err, "getting branch protection rules")
 		}
 	}

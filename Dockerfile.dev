@@ -1,7 +1,3 @@
 FROM ghcr.io/runatlantis/atlantis:latest
 COPY atlantis /usr/local/bin/atlantis
-# TODO: remove this once we get this in the base image
-# renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV DEFAULT_CONFTEST_VERSION=0.40.0
-
 WORKDIR /atlantis/src

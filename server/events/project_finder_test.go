@@ -538,7 +538,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			pf := events.DefaultProjectFinder{}
-			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(t), c.modified, c.config, tmpDir)
+			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(t), c.modified, c.config, tmpDir, nil)
 			Ok(t, err)
 			Equals(t, len(c.expProjPaths), len(projects))
 			for i, proj := range projects {
