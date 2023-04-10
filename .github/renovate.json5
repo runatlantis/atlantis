@@ -1,12 +1,12 @@
 {
   extends: [
     "config:base",
-    "schedule:earlyMondays",
+    "schedule:daily",
   ],
   commitMessageSuffix: " in {{packageFile}}",
   dependencyDashboardAutoclose: true,
-  automerge: false,
-  platformAutomerge: false,
+  automerge: true,
+  platformAutomerge: true,
   labels: ["dependencies"],
   postUpdateOptions: [
     "gomodTidy",

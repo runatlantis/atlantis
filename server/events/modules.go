@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
-	"github.com/moby/moby/pkg/fileutils"
+	"github.com/moby/patternmatcher"
 )
 
 type module struct {
@@ -127,10 +127,10 @@ func findModuleDependants(files fs.FS, autoplanModuleDependants string) (ModuleP
 		return moduleInfo{}, nil
 	}
 	// find all the projects matching autoplanModuleDependants
-	filter, _ := fileutils.NewPatternMatcher(strings.Split(autoplanModuleDependants, ","))
+	filter, _ := patternmatcher.New(strings.Split(autoplanModuleDependants, ","))
 	var projects []string
 	err := fs.WalkDir(files, ".", func(rel string, info fs.DirEntry, err error) error {
-		if match, _ := filter.Matches(rel); match {
+		if match, _ := filter.MatchesOrParentMatches(rel); match {
 			if projectDir := getProjectDirFromFs(files, rel); projectDir != "" {
 				projects = append(projects, projectDir)
 			}

@@ -22,8 +22,9 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/utils"
 
-	"github.com/moby/moby/pkg/fileutils"
+	"github.com/moby/patternmatcher"
 	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -44,7 +45,7 @@ type ProjectFinder interface {
 	// DetermineProjectsViaConfig returns the list of projects that were modified
 	// based on modifiedFiles and the repo's config.
 	// absRepoDir is the path to the cloned repo on disk.
-	DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
+	DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string, moduleInfo ModuleProjects) ([]valid.Project, error)
 
 	DetermineWorkspaceFromHCL(log logging.SimpleLogging, absRepoDir string) (string, error)
 }
@@ -174,10 +175,27 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 }
 
 // See ProjectFinder.DetermineProjectsViaConfig.
-func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error) {
+func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string, moduleInfo ModuleProjects) ([]valid.Project, error) {
+
+	// Check moduleInfo for downstream project dependencies
+	var dependentProjects []string
+	for _, file := range modifiedFiles {
+		if moduleInfo != nil {
+			downstreamProjects := moduleInfo.DependentProjects(path.Dir(file))
+			log.Debug("found downstream projects for %q: %v", file, downstreamProjects)
+			dependentProjects = append(dependentProjects, downstreamProjects...)
+		}
+	}
+
 	var projects []valid.Project
 	for _, project := range config.Projects {
 		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
+
+		if utils.SlicesContains(dependentProjects, project.Dir) {
+			projects = append(projects, project)
+			continue
+		}
+
 		var whenModifiedRelToRepoRoot []string
 		for _, wm := range project.Autoplan.WhenModified {
 			wm = strings.TrimSpace(wm)
@@ -198,7 +216,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 			}
 			whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, wmRelPath)
 		}
-		pm, err := fileutils.NewPatternMatcher(whenModifiedRelToRepoRoot)
+		pm, err := patternmatcher.New(whenModifiedRelToRepoRoot)
 		if err != nil {
 			return nil, errors.Wrapf(err, "matching modified files with patterns: %v", project.Autoplan.WhenModified)
 		}
@@ -242,7 +260,7 @@ func (p *DefaultProjectFinder) filterToFileList(log logging.SimpleLogging, files
 	var filtered []string
 	patterns := strings.Split(fileList, ",")
 	// Ignore pattern matcher error here as it was checked for errors in server validation
-	patternMatcher, _ := fileutils.NewPatternMatcher(patterns)
+	patternMatcher, _ := patternmatcher.New(patterns)
 
 	for _, fileName := range files {
 		if p.shouldIgnore(fileName) {

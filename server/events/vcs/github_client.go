@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v49/github"
+	"github.com/google/go-github/v50/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -33,6 +33,10 @@ import (
 // maxCommentLength is the maximum number of chars allowed in a single comment
 // by GitHub.
 const maxCommentLength = 65536
+
+// Error message GitHub API returns if branch protection is not available
+// in current repository
+const githubBranchProtectionNotAvailable string = "Upgrade to GitHub Pro or make this repository public to enable this feature."
 
 var (
 	clientMutationID            = githubv4.NewString("atlantis")
@@ -330,7 +334,7 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 				return models.ApprovalStatus{
 					IsApproved: true,
 					ApprovedBy: *review.User.Login,
-					Date:       *review.SubmittedAt,
+					Date:       review.SubmittedAt.Time,
 				}, nil
 			}
 		}
@@ -570,6 +574,11 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	return err
 }
 
+func isBranchProtectionNotAvailable(err error) bool {
+	errorResponse, ok := err.(*github.ErrorResponse)
+	return ok && errorResponse.Message == githubBranchProtectionNotAvailable
+}
+
 // MergePull merges the pull request.
 func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	// Users can set their repo to disallow certain types of merging.
@@ -579,13 +588,23 @@ func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
 	}
+	protection, _, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner.GetLogin(), *repo.Name, pull.BaseBranch)
+	if err != nil {
+		if !errors.Is(err, github.ErrBranchNotProtected) && !isBranchProtectionNotAvailable(err) {
+			return errors.Wrap(err, "getting branch protection rules")
+		}
+	}
+	requireLinearHistory := false
+	if protection != nil {
+		requireLinearHistory = protection.GetRequireLinearHistory().Enabled
+	}
 	const (
 		defaultMergeMethod = "merge"
 		rebaseMergeMethod  = "rebase"
 		squashMergeMethod  = "squash"
 	)
 	method := defaultMergeMethod
-	if !repo.GetAllowMergeCommit() {
+	if !repo.GetAllowMergeCommit() || requireLinearHistory {
 		if repo.GetAllowRebaseMerge() {
 			method = rebaseMergeMethod
 		} else if repo.GetAllowSquashMerge() {

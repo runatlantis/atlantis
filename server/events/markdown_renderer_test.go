@@ -57,7 +57,7 @@ func TestRenderErr(t *testing.T) {
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
 	for _, c := range cases {
 		res := command.Result{
 			Error: c.Error,
@@ -102,7 +102,7 @@ func TestRenderFailure(t *testing.T) {
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
 	for _, c := range cases {
 		res := command.Result{
 			Failure: c.Failure,
@@ -121,7 +121,7 @@ func TestRenderFailure(t *testing.T) {
 }
 
 func TestRenderErrAndFailure(t *testing.T) {
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
 	res := command.Result{
 		Error:   errors.New("error"),
 		Failure: "failure",
@@ -824,7 +824,7 @@ $$$
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis")
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -979,6 +979,7 @@ $$$
 		false,      // enableDiffMarkdownFormat
 		"",         // MarkdownTemplateOverridesDir
 		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
 	)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -1127,6 +1128,7 @@ $$$
 		false,      // enableDiffMarkdownFormat
 		"",         // MarkdownTemplateOverridesDir
 		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
 	)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -1165,6 +1167,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 		false,      // enableDiffMarkdownFormat
 		tmpDir,     // MarkdownTemplateOverridesDir
 		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
 	)
 
 	rendered := r.Render(command.Result{
@@ -1196,6 +1199,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 		false,      // enableDiffMarkdownFormat
 		"",         // MarkdownTemplateOverridesDir
 		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
 	)
 
 	rendered := mr.Render(command.Result{
@@ -1287,6 +1291,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 					false,                     // enableDiffMarkdownFormat
 					"",                        // MarkdownTemplateOverridesDir
 					"atlantis",                // executableName
+					false,                     // hideUnchangedPlanComments
 				)
 
 				rendered := mr.Render(command.Result{
@@ -1402,6 +1407,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 						false,                     // enableDiffMarkdownFormat
 						"",                        // MarkdownTemplateOverridesDir
 						"atlantis",                // executableName
+						false,                     // hideUnchangedPlanComments
 					)
 					var pr command.ProjectResult
 					switch cmd {
@@ -1509,6 +1515,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 		false,      // enableDiffMarkdownFormat
 		"",         // MarkdownTemplateOverridesDir
 		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
 	)
 	tfOut := strings.Repeat("line\n", 13)
 	rendered := mr.Render(command.Result{
@@ -1564,6 +1571,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 		false,      // enableDiffMarkdownFormat
 		"",         // MarkdownTemplateOverridesDir
 		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
 	)
 	tfOut := strings.Repeat("line\n", 13) + "Plan: 1 to add, 0 to change, 0 to destroy."
 	rendered := mr.Render(command.Result{
@@ -1739,6 +1747,7 @@ This plan was not saved because one or more projects failed and automerge requir
 				false,      // enableDiffMarkdownFormat
 				"",         // MarkdownTemplateOverridesDir
 				"atlantis", // executableName
+				false,      // hideUnchangedPlanComments
 			)
 			rendered := mr.Render(c.cr, command.Plan, "", "log", false, models.Github)
 			expWithBackticks := strings.Replace(c.exp, "$", "`", -1)
@@ -2197,6 +2206,7 @@ $$$
 		false,      // enableDiffMarkdownFormat
 		"",         // MarkdownTemplateOverridesDir
 		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
 	)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -2633,6 +2643,7 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 		true,       // enableDiffMarkdownFormat
 		"",         // MarkdownTemplateOverridesDir
 		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
 	)
 
 	for _, c := range cases {
@@ -2669,6 +2680,7 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 		true,       // enableDiffMarkdownFormat
 		"",         // MarkdownTemplateOverridesDir
 		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
 	)
 
 	for _, c := range cases {
@@ -2683,6 +2695,164 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 						render = r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
 					}
 					Render = render
+				})
+			}
+		})
+	}
+}
+
+func TestRenderProjectResultsHideUnchangedPlans(t *testing.T) {
+	cases := []struct {
+		Description    string
+		Command        command.Name
+		SubCommand     string
+		ProjectResults []command.ProjectResult
+		VCSHost        models.VCSHostType
+		Expected       string
+	}{
+		{
+			"multiple successful plans, hide unchanged plans",
+			command.Plan,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+						LockURL:         "lock-url2",
+						ApplyCmd:        "atlantis apply -d path2 -w workspace",
+						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path3",
+					ProjectName: "projectname2",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output3",
+						LockURL:         "lock-url3",
+						ApplyCmd:        "atlantis apply -d path3 -w workspace",
+						RePlanCmd:       "atlantis plan -d path3 -w workspace",
+					},
+				},
+			},
+			models.Github,
+			`Ran Plan for 3 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. project: $projectname$ dir: $path2$ workspace: $workspace$
+1. project: $projectname2$ dir: $path3$ workspace: $workspace$
+
+### 1. dir: $path$ workspace: $workspace$
+$$$diff
+terraform-output
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+
+---
+### 3. project: $projectname2$ dir: $path3$ workspace: $workspace$
+$$$diff
+terraform-output3
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path3 -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url3)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path3 -w workspace$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
+`,
+		},
+		{
+			"multiple successful plans, hide unchanged plans, all plans are unchanged",
+			command.Plan,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+						LockURL:         "lock-url",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+						LockURL:         "lock-url2",
+						ApplyCmd:        "atlantis apply -d path2 -w workspace",
+						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path3",
+					ProjectName: "projectname2",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+						LockURL:         "lock-url3",
+						ApplyCmd:        "atlantis apply -d path3 -w workspace",
+						RePlanCmd:       "atlantis plan -d path3 -w workspace",
+					},
+				},
+			},
+			models.Github,
+			`Ran Plan for 3 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. project: $projectname$ dir: $path2$ workspace: $workspace$
+1. project: $projectname2$ dir: $path3$ workspace: $workspace$
+
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
+`,
+		},
+	}
+
+	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", true)
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			res := command.Result{
+				ProjectResults: c.ProjectResults,
+			}
+			for _, verbose := range []bool{true, false} {
+				t.Run(c.Description, func(t *testing.T) {
+					s := r.Render(res, c.Command, c.SubCommand, "log", verbose, c.VCSHost)
+					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+					if !verbose {
+						Equals(t, strings.TrimSpace(expWithBackticks), strings.TrimSpace(s))
+					} else {
+						Equals(t, expWithBackticks+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", s)
+					}
 				})
 			}
 		})

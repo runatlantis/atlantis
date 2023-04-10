@@ -369,33 +369,30 @@ func TestDefaultProjectCommandBuilder_TerraformVersion(t *testing.T) {
 
 	baseVersionConfig := `
 terraform {
-  required_version = "%s0.12.8"
+  required_version = "%s"
 }
 `
-
-	exactSymbols := []string{"", "="}
 	// Depending on when the tests are run, the > and >= matching versions will have to be increased.
 	// It's probably not worth testing the terraform-switcher version here so we only test <, <=, and ~>.
 	// One way to test this in the future is to mock tfswitcher.GetTFList() to return the highest
 	// version of 1.3.5.
-	// nonExactSymbols := []string{">", ">=", "<", "<=", "~>"}
-	nonExactSymbols := []string{"<", "<=", "~>"}
-	nonExactVersions := map[string]map[string]string{
-		// ">": {
-		// 	"project1": "1.3.5",
-		// },
-		// ">=": {
-		// 	"project1": "1.3.5",
-		// },
-		"<": {
-			"project1": "0.12.7",
-		},
-		"<=": {
-			"project1": "0.12.8",
-		},
-		"~>": {
-			"project1": "0.12.31",
-		},
+	expectedVersions := map[string]string{
+		"= 0.12.8":  "0.12.8",
+		"< 0.12.8":  "0.12.7",
+		"<= 0.12.8": "0.12.8",
+		"~> 0.12.8": "0.12.31",
+
+		"= 1.0.0":  "1.0.0",
+		"< 1.0.0":  "0.15.5",
+		"<= 1.0.0": "1.0.0",
+		"~> 1.0.0": "1.0.11",
+
+		"= 1.0":  "1.0.0",
+		"< 1.0":  "0.15.5",
+		"<= 1.0": "1.0.0",
+		// cannot use ~> 1.3 or ~> 1.0 since that is a moving target since it will always
+		// resolve to the latest terraform 1.x
+		"~> 1.3.0": "1.3.9",
 	}
 
 	type testCase struct {
@@ -405,30 +402,17 @@ terraform {
 	}
 
 	testCases := make(map[string]testCase)
-
-	for _, exactSymbol := range exactSymbols {
-		testCases[fmt.Sprintf("exact version using \"%s\"", exactSymbol)] = testCase{
+	for version, expected := range expectedVersions {
+		testCases[fmt.Sprintf("version using \"%s\"", version)] = testCase{
 			DirStructure: map[string]interface{}{
 				"project1": map[string]interface{}{
-					"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbol),
+					"main.tf": fmt.Sprintf(baseVersionConfig, version),
 				},
 			},
 			Exp: map[string]string{
-				"project1": "0.12.8",
+				"project1": expected,
 			},
-			IsExact: true,
-		}
-	}
-
-	for _, nonExactSymbol := range nonExactSymbols {
-		testCases[fmt.Sprintf("non-exact version using \"%s\"", nonExactSymbol)] = testCase{
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": fmt.Sprintf(baseVersionConfig, nonExactSymbol),
-				},
-			},
-			Exp:     nonExactVersions[nonExactSymbol],
-			IsExact: false,
+			IsExact: version[0] == "="[0],
 		}
 	}
 
@@ -447,10 +431,10 @@ terraform {
 	testCases["projects with different terraform versions"] = testCase{
 		DirStructure: map[string]interface{}{
 			"project1": map[string]interface{}{
-				"main.tf": fmt.Sprintf(baseVersionConfig, exactSymbols[0]),
+				"main.tf": fmt.Sprintf(baseVersionConfig, "= 0.12.8"),
 			},
 			"project2": map[string]interface{}{
-				"main.tf": strings.Replace(fmt.Sprintf(baseVersionConfig, exactSymbols[0]), "0.12.8", "0.12.9", -1),
+				"main.tf": strings.Replace(fmt.Sprintf(baseVersionConfig, "= 0.12.8"), "0.12.8", "0.12.9", -1),
 			},
 		},
 		Exp: map[string]string{

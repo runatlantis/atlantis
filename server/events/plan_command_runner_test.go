@@ -16,6 +16,7 @@ import (
 )
 
 func TestPlanCommandRunner_IsSilenced(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 
 	cases := []struct {

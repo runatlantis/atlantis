@@ -3,12 +3,14 @@
 package common
 
 import (
+	"fmt"
 	"math"
 )
 
-// AutomergeCommitMsg is the commit message Atlantis will use when automatically
-// merging pull requests.
-const AutomergeCommitMsg = "[Atlantis] Automatically merging after successful apply"
+// AutomergeCommitMsg returns the commit message to use when automerging.
+func AutomergeCommitMsg(pullNum int) string {
+	return fmt.Sprintf("[Atlantis] Automatically merging after successful apply: PR #%d", pullNum)
+}
 
 // SplitComment splits comment into a slice of comments that are under maxSize.
 // It appends sepEnd to all comments that have a following comment.

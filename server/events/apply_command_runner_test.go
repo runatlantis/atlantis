@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v49/github"
+	"github.com/google/go-github/v50/github"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -19,6 +19,7 @@ import (
 )
 
 func TestApplyCommandRunner_IsLocked(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 
 	cases := []struct {
@@ -78,6 +79,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 }
 
 func TestApplyCommandRunner_IsSilenced(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 
 	cases := []struct {

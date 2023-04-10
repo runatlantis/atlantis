@@ -59,6 +59,10 @@ type FileWorkspace struct {
 	// If this is false, then we will check out the head branch from the pull
 	// request.
 	CheckoutMerge bool
+	// CheckoutDepth is how many commits of feature branch and main branch we'll
+	// retrieve by default. If their merge base is not retrieved with this depth,
+	// full fetch will be performed. Only matters if CheckoutMerge=true.
+	CheckoutDepth int
 	// TestingOverrideHeadCloneURL can be used during testing to override the
 	// URL of the head repo to be cloned. If it's empty then we clone normally.
 	TestingOverrideHeadCloneURL string
@@ -75,8 +79,7 @@ type FileWorkspace struct {
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
 // path to the root of the cloned repo. It also returns
-// a boolean indicating if we should warn users that the branch we're
-// merging into has been updated since we cloned it.
+// a boolean indicating whether we had to merge with upstream again.
 // If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
@@ -86,6 +89,7 @@ func (w *FileWorkspace) Clone(
 	p models.PullRequest,
 	workspace string) (string, bool, error) {
 	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
+	hasDiverged := false
 
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
@@ -113,26 +117,31 @@ func (w *FileWorkspace) Clone(
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
-			return cloneDir, w.warnDiverged(log, p, headRepo, cloneDir), nil
+			if w.CheckoutMerge && w.recheckDiverged(log, p, headRepo, cloneDir) {
+				log.Info("base branch has been updated, using merge strategy and will clone again")
+				hasDiverged = true
+			} else {
+				log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
+				return cloneDir, false, nil
+			}
+		} else {
+			log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
 		}
-
-		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
 		// We'll fall through to re-clone.
 	}
 
 	// Otherwise we clone the repo.
-	return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
+	return cloneDir, hasDiverged, w.forceClone(log, cloneDir, headRepo, p)
 }
 
-// warnDiverged returns true if we should warn the user that the branch we're
-// merging into has diverged from what we currently have checked out.
+// recheckDiverged returns true if the branch we're merging into has diverged
+// from what we currently have checked out.
 // This matters in the case of the merge checkout strategy because after
-// cloning the repo and doing the merge, it's possible main was updated.
-// Then users won't be getting the merge functionality they expected.
+// cloning the repo and doing the merge, it's possible main was updated
+// and we have to perform a new merge.
 // If there are any errors we return false since we prefer things to succeed
 // vs. stopping the plan/apply.
-func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
+func (w *FileWorkspace) recheckDiverged(log logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that main has diverged if we're using
 		// the checkout merge strategy. If we're just checking out the branch,
@@ -170,13 +179,7 @@ func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullReq
 		}
 	}
 
-	hasDiverged := w.HasDiverged(log, cloneDir)
-	if hasDiverged {
-		log.Info("remote main branch is ahead and thereby has new commits, it is recommended to pull new commits")
-	} else {
-		log.Debug("remote main branch has no new commits")
-	}
-	return hasDiverged
+	return w.HasDiverged(log, cloneDir)
 }
 
 func (w *FileWorkspace) HasDiverged(log logging.SimpleLogging, cloneDir string) bool {
@@ -232,53 +235,8 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 		baseCloneURL = w.TestingOverrideBaseCloneURL
 	}
 
-	var cmds [][]string
-	if w.CheckoutMerge {
-		// NOTE: We can't do a shallow clone when we're merging because we'll
-		// get merge conflicts if our clone doesn't have the commits that the
-		// branch we're merging branched off at.
-		// See https://groups.google.com/forum/#!topic/git-users/v3MkuuiDJ98.
-		fetchRef := fmt.Sprintf("+refs/heads/%s:", p.HeadBranch)
-		fetchRemote := "head"
-		if w.GithubAppEnabled {
-			fetchRef = fmt.Sprintf("pull/%d/head:", p.Num)
-			fetchRemote = "origin"
-		}
-		cmds = [][]string{
-			{
-				"git", "clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir,
-			},
-			{
-				"git", "remote", "add", "head", headCloneURL,
-			},
-			{
-				"git", "fetch", fetchRemote, fetchRef,
-			},
-		}
-		if w.GpgNoSigningEnabled {
-			cmds = append(cmds, []string{
-				"git", "config", "--local", "commit.gpgsign", "false",
-			})
-		}
-		// We use --no-ff because we always want there to be a merge commit.
-		// This way, our branch will look the same regardless if the merge
-		// could be fast forwarded. This is useful later when we run
-		// git rev-parse HEAD^2 to get the head commit because it will
-		// always succeed whereas without --no-ff, if the merge was fast
-		// forwarded then git rev-parse HEAD^2 would fail.
-		cmds = append(cmds, []string{
-			"git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD",
-		})
-	} else {
-		cmds = [][]string{
-			{
-				"git", "clone", "--branch", p.HeadBranch, "--depth=1", "--single-branch", headCloneURL, cloneDir,
-			},
-		}
-	}
-
-	for _, args := range cmds {
-		cmd := exec.Command(args[0], args[1:]...) // nolint: gosec
+	runGit := func(args ...string) error {
+		cmd := exec.Command("git", args...) // nolint: gosec
 		cmd.Dir = cloneDir
 		// The git merge command requires these env vars are set.
 		cmd.Env = append(os.Environ(), []string{
@@ -295,8 +253,69 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 			return fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
 		}
 		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
+		return nil
 	}
-	return nil
+
+	// if branch strategy, use depth=1
+	if !w.CheckoutMerge {
+		return runGit("clone", "--depth=1", "--branch", p.HeadBranch, "--single-branch", headCloneURL, cloneDir)
+	}
+	
+	// if merge strategy...
+
+	// if no checkout depth, omit depth arg
+	if w.CheckoutDepth == 0 {
+		if err := runGit("clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
+			 return err
+		}
+	} else {
+	 	if err := runGit("clone", "--depth", fmt.Sprint(w.CheckoutDepth), "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
+			 return err
+		}
+	}
+
+	if err := runGit("remote", "add", "head", headCloneURL); err != nil {
+		return err
+	}
+
+	fetchRef := fmt.Sprintf("+refs/heads/%s:", p.HeadBranch)
+	fetchRemote := "head"
+	if w.GithubAppEnabled {
+		fetchRef = fmt.Sprintf("pull/%d/head:", p.Num)
+		fetchRemote = "origin"
+	}
+
+        // if no checkout depth, omit depth arg
+        if w.CheckoutDepth == 0 {
+                if err := runGit("fetch", fetchRemote, fetchRef); err != nil {
+                         return err
+                }
+        } else {
+                if err := runGit("fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, fetchRef); err != nil {
+                         return err
+                }
+        }
+
+	if w.GpgNoSigningEnabled {
+		if err := runGit("config", "--local", "commit.gpgsign", "false"); err != nil {
+			return err
+		}
+	}
+	if err := runGit("merge-base", p.BaseBranch, "FETCH_HEAD"); err != nil {
+		// git merge-base returning error means that we did not receive enough commits in shallow clone.
+		// Fall back to retrieving full repo history.
+		if err := runGit("fetch", "--unshallow"); err != nil {
+			return err
+		}
+	}
+
+	// We use --no-ff because we always want there to be a merge commit.
+	// This way, our branch will look the same regardless if the merge
+	// could be fast forwarded. This is useful later when we run
+	// git rev-parse HEAD^2 to get the head commit because it will
+	// always succeed whereas without --no-ff, if the merge was fast
+	// forwarded then git rev-parse HEAD^2 would fail.
+	return runGit("merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
 }
 
 // GetWorkingDir returns the path to the workspace for this repo and pull.
