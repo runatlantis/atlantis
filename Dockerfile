@@ -5,7 +5,7 @@ ARG DEBIAN_TAG=11.6-slim
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.20.2-alpine AS builder
+FROM golang:1.20.3-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
