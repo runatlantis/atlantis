@@ -1,8 +1,25 @@
+**NOTE:** We do not plan to update this page anymore. Please see the releases page for the updated changelog.
+
+---
+
 # v0.23.3
 
 Bugfixes and new Features
 
 https://github.com/runatlantis/atlantis/releases/tag/v0.23.3
+
+# v0.23.2
+
+Bugfixes and new Features
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.23.2
+
+# v0.23.1
+
+Bugfixes and new Features
+
+https://github.com/runatlantis/atlantis/releases/tag/v0.23.1
+
 # v0.23.0
 
 Bugfixes and new Features
@@ -10,6 +27,7 @@ Bugfixes and new Features
 ## What's Changed
 
 https://github.com/runatlantis/atlantis/releases/tag/v0.23.0
+
 # v0.22.3
 
 Bugfixes and new Features
