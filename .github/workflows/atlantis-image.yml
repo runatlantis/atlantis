@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - 'Dockerfile'
+      - 'docker-entrypoint.sh'
       - '.github/workflows/atlantis-image.yml'
   workflow_dispatch:
 
@@ -31,6 +32,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    # Lint the Dockerfile first before setting anything up
+    - name: Lint Dockerfile
+      uses: hadolint/hadolint-action@master
+      with:
+        dockerfile: "Dockerfile"
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v2
@@ -56,6 +63,7 @@ jobs:
         images: |
           ${{ env.DOCKER_REPO }}
         labels: |
+          org.opencontainers.image.authors="Anubhav Mishra, Luke Kysow"
           org.opencontainers.image.licenses=Apache-2.0
         tags: |
           # semver
@@ -86,6 +94,22 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    # Publish dev image to container registry
+    - name: Build and push atlantis:dev${{ env.IMAGE_SUFFIX }} image
+      if: ${{ contains(fromJson('["push", "pull_request"]'), github.event_name) }}
+      uses: docker/build-push-action@v3
+      with:
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        context: .
+        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/atlantis:dev${{ env.IMAGE_SUFFIX }}
+          ghcr.io/${{ github.repository_owner }}/atlantis:dev-${{ matrix.image_type }}
+        target: ${{ matrix.image_type }}
+        labels: ${{ steps.meta.outputs.labels }}
+
     # Publish release to container registry
     - name: Populate release version
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
@@ -106,5 +130,6 @@ jobs:
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: ${{ env.PUSH }}
         tags: ${{ steps.meta.outputs.tags }}
+        target: ${{ matrix.image_type }}
         labels: ${{ steps.meta.outputs.labels }}
         outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}

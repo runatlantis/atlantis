@@ -325,7 +325,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest, pullOptions model
 		BypassPolicy:            new(bool),
 		BypassReason:            azuredevops.String(""),
 		DeleteSourceBranch:      &pullOptions.DeleteSourceBranchOnMerge,
-		MergeCommitMessage:      azuredevops.String(common.AutomergeCommitMsg),
+		MergeCommitMessage:      azuredevops.String(common.AutomergeCommitMsg(pull.Num)),
 		MergeStrategy:           &mcm,
 		SquashMerge:             new(bool),
 		TransitionWorkItems:     twi,
