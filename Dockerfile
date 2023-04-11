@@ -30,26 +30,26 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
-# FROM debian:${DEBIAN_TAG} as deps
+FROM debian:${DEBIAN_TAG} as deps
 
-# # Get the architecture the image is being built for
-# ARG TARGETPLATFORM
-# WORKDIR /tmp/build
+# Get the architecture the image is being built for
+ARG TARGETPLATFORM
+WORKDIR /tmp/build
 
-# # Install packages needed for building/verifying dependencies
-# # hadolint ignore=DL3008,SC2261
-# RUN apt-get update \
-#     && apt-get install -y --no-install-recommends \
-#         ca-certificates>=20210119 \
-#         curl>=7.74 \
-#         git>=1:2.30 \
-#         unzip>=6.0 \
-#         bash>=5.1 \
-#         openssh-server>=1:8.4p1 \
-#         libcap2>=1:2.44 \
-#         dumb-init>=1.2 \
-#         gnupg>=2.2 \
-#         openssl>=1.1.1n
+# Install packages needed for building/verifying dependencies
+# hadolint ignore=DL3008,SC2261
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates>=20210119 \
+        curl>=7.74 \
+        git>=1:2.30 \
+        unzip>=6.0 \
+        bash>=5.1 \
+        openssh-server>=1:8.4p1 \
+        libcap2>=1:2.44 \
+        dumb-init>=1.2 \
+        gnupg>=2.2 \
+        openssl>=1.1.1n
 
 # install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
