@@ -119,7 +119,8 @@ RUN case ${TARGETPLATFORM} in \
 ENV DEFAULT_TERRAFORM_VERSION=1.4.4
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
-RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
+#RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
+RUN AVAILABLE_TERRAFORM_VERSIONS="${DEFAULT_TERRAFORM_VERSION}" && \
     case "${TARGETPLATFORM}" in \
         "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
         #"linux/arm64") TERRAFORM_ARCH=arm64 ;; \
