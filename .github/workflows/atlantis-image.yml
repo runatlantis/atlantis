@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - 'Dockerfile'
+      - 'docker-entrypoint.sh'
       - '.github/workflows/atlantis-image.yml'
   workflow_dispatch:
 
@@ -32,6 +33,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    # Lint the Dockerfile first before setting anything up
+    - name: Lint Dockerfile
+      uses: hadolint/hadolint-action@master
+      with:
+        dockerfile: "Dockerfile"
 
     # - name: Set up QEMU
     #   uses: docker/setup-qemu-action@v2
@@ -57,6 +64,7 @@ jobs:
         images: |
           ${{ env.DOCKER_REPO }}
         labels: |
+          org.opencontainers.image.authors="@runatlantis Github Org"
           org.opencontainers.image.licenses=Apache-2.0
         tags: |
           # semver
@@ -108,5 +116,6 @@ jobs:
         platforms: linux/amd64
         push: ${{ env.PUSH }}
         tags: ${{ steps.meta.outputs.tags }}
+        target: ${{ matrix.image_type }}
         labels: ${{ steps.meta.outputs.labels }}
         outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}
