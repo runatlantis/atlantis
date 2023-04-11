@@ -43,61 +43,20 @@ func TestAPIController_Plan(t *testing.T) {
 
 func TestAPIController_Apply(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
-	cases := []struct {
-		apiRequest controllers.APIRequest
-		exp        int
-	}{
-		{
-			apiRequest: controllers.APIRequest{
-				Repository: "Repo",
-				Ref:        "main",
-				Type:       "Gitlab",
-				Projects:   []string{"default"},
-			},
-			exp: http.StatusOK,
-		},
-		{
-			apiRequest: controllers.APIRequest{
-				Repository: "Repo",
-				Ref:        "main",
-				Type:       "Gitlab",
-				PR:         42,
-				Projects:   []string{"default"},
-			},
-			exp: http.StatusOK,
-		},
-		{
-			apiRequest: controllers.APIRequest{
-				Repository: "Repo",
-				Ref:        "main",
-				Type:       "Gitlab",
-				Paths: []struct {
-					Directory string
-					ExtraArgs []string
-					Workspace string
-				}{
-					{
-						ExtraArgs: []string{"flag1", "flag2"},
-					},
-				},
-				Projects: []string{"default"},
-			},
-			exp: http.StatusOK,
-		},
-	}
-
-	for _, c := range cases {
-		body, _ := json.Marshal(c.apiRequest)
-		req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
-		req.Header.Set(atlantisTokenHeader, atlantisToken)
-		w := httptest.NewRecorder()
-		ac.Apply(w, req)
-		ResponseContains(t, w, c.exp, "")
-		_, err := projectCommandBuilder.BuildApplyCommands(AnyPtrToCommandContext(), AnyPtrToEventsCommentCommand())
-		Ok(t, err)
-		projectCommandRunner.Plan(AnyCommandProjectContext())
-		projectCommandRunner.Apply(AnyCommandProjectContext())
-	}
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+	projectCommandBuilder.VerifyWasCalledOnce().BuildApplyCommands(AnyPtrToCommandContext(), AnyPtrToEventsCommentCommand())
+	projectCommandRunner.VerifyWasCalledOnce().Plan(AnyCommandProjectContext())
+	projectCommandRunner.VerifyWasCalledOnce().Apply(AnyCommandProjectContext())
 }
 
 func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
