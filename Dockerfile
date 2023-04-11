@@ -180,6 +180,14 @@ CMD ["server"]
 # Stage 2 - Debian
 FROM debian:${DEBIAN_TAG} AS debian
 
+# atlantis user for gosu and OpenShift compatibility
+RUN addgroup atlantis && \
+    adduser --system --ingroup atlantis atlantis && \
+    adduser atlantis root && \
+    chown atlantis:root /home/atlantis/ && \
+    chmod g=u /home/atlantis/ && \
+    chmod g=u /etc/passwd
+
 # copy binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform
