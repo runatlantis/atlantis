@@ -6,7 +6,7 @@ jobs:
   stale:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/stale@v7
+      - uses: actions/stale@v8
         with:
           stale-pr-message: 'This issue is stale because it has been open for 1 month with no activity. Remove stale label or comment or this will be closed in 1 month.'
           stale-issue-message: This issue is stale because it has been open for 1 month with no activity. Remove stale label or comment or this will be closed in 1 month.'

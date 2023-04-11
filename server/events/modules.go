@@ -130,7 +130,7 @@ func findModuleDependants(files fs.FS, autoplanModuleDependants string) (ModuleP
 	filter, _ := patternmatcher.New(strings.Split(autoplanModuleDependants, ","))
 	var projects []string
 	err := fs.WalkDir(files, ".", func(rel string, info fs.DirEntry, err error) error {
-		if match, _ := filter.Matches(rel); match {
+		if match, _ := filter.MatchesOrParentMatches(rel); match {
 			if projectDir := getProjectDirFromFs(files, rel); projectDir != "" {
 				projects = append(projects, projectDir)
 			}

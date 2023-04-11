@@ -140,11 +140,11 @@ spec:
       partition: 0
   selector:
     matchLabels:
-      app: atlantis
+      app.kubernetes.io/name: atlantis
   template:
     metadata:
       labels:
-        app: atlantis
+        app.kubernetes.io/name: atlantis
     spec:
       securityContext:
         fsGroup: 1000 # Atlantis group (1000) read/write access to volumes.
@@ -270,7 +270,7 @@ spec:
     port: 80
     targetPort: 4141
   selector:
-    app: atlantis
+    app.kubernetes.io/name: atlantis
 ```
 </details>
 
@@ -285,16 +285,16 @@ kind: Deployment
 metadata:
   name: atlantis
   labels:
-    app: atlantis
+    app.kubernetes.io/name: atlantis
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: atlantis
+      app.kubernetes.io/name: atlantis
   template:
     metadata:
       labels:
-        app: atlantis
+        app.kubernetes.io/name: atlantis
     spec:
       containers:
       - name: atlantis
@@ -403,7 +403,7 @@ spec:
     port: 80
     targetPort: 4141
   selector:
-    app: atlantis
+    app.kubernetes.io/name: atlantis
 ```
 </details>
 
@@ -572,6 +572,8 @@ The standard [Kubernetes Helm Chart](#kubernetes-helm-chart) should work fine on
 
 
 Another option is [Azure Container Instances](https://docs.microsoft.com/en-us/azure/container-instances/). See this community member's [repo](https://github.com/jplane/atlantis-on-aci) or the new and more up-to-date [Terraform module](https://github.com/getindata/terraform-azurerm-atlantis) for install scripts and more information on running Atlantis on ACI.    
+
+**Note on ACI Deployment:** Due to a bug in earlier Docker releases, Docker v23.0.0 or later is required for straightforward deployment. Alternatively, the Atlantis Docker image can be pushed to a private registry such as ACR and then used.
 
 ### Roll Your Own
 If you want to roll your own Atlantis installation, you can get the `atlantis`
