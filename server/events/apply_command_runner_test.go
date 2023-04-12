@@ -215,3 +215,252 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		Description       string
+		ProjectContexts   []command.ProjectContext
+		ProjectResults    []command.ProjectResult
+		RunnerInvokeMatch []*EqMatcher
+		ExpComment        string
+	}{
+		{
+			Description: "When first apply fails, the second don't run",
+			ProjectContexts: []command.ProjectContext{
+				{
+					ExecutionOrderGroup:  0,
+					ProjectName:          "First",
+					ParallelApplyEnabled: true,
+				},
+				{
+					ExecutionOrderGroup:  1,
+					ProjectName:          "Second",
+					ParallelApplyEnabled: true,
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+				{
+					Command: command.Apply,
+					Error:   errors.New("Shabang!"),
+				},
+			},
+			RunnerInvokeMatch: []*EqMatcher{
+				Once(),
+				Once(),
+			},
+			ExpComment: "Ran Apply for 2 projects:\n\n" +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"2. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---",
+		},
+		{
+			Description: "When first apply succeeds, the second will run",
+			ProjectContexts: []command.ProjectContext{
+				{
+					ExecutionOrderGroup:  0,
+					ProjectName:          "First",
+					ParallelApplyEnabled: true,
+				},
+				{
+					ExecutionOrderGroup:  1,
+					ProjectName:          "Second",
+					ParallelApplyEnabled: true,
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					Command: command.Apply,
+					Error:   errors.New("Shabang!"),
+				},
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+			},
+			RunnerInvokeMatch: []*EqMatcher{
+				Once(),
+				Never(),
+			},
+			ExpComment: "Ran Apply for dir: `` workspace: ``\n\n**Apply Error**\n```\nShabang!\n```",
+		},
+		{
+			Description: "When both in a group of two succeeds, the following two will run",
+			ProjectContexts: []command.ProjectContext{
+				{
+					ExecutionOrderGroup:  0,
+					ProjectName:          "First",
+					ParallelApplyEnabled: true,
+				},
+				{
+					ExecutionOrderGroup: 0,
+					ProjectName:         "Second",
+				},
+				{
+					ExecutionOrderGroup: 1,
+					ProjectName:         "Third",
+				},
+				{
+					ExecutionOrderGroup: 1,
+					ProjectName:         "Fourth",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+				{
+					Command: command.Apply,
+					Error:   errors.New("Shabang!"),
+				},
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+			},
+			RunnerInvokeMatch: []*EqMatcher{
+				Once(),
+				Once(),
+				Never(),
+				Never(),
+			},
+			ExpComment: "Ran Apply for 2 projects:\n\n" +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"2. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---",
+		},
+		{
+			Description: "When one out of two fails, the following two will not run",
+			ProjectContexts: []command.ProjectContext{
+				{
+					ExecutionOrderGroup:  0,
+					ProjectName:          "First",
+					ParallelApplyEnabled: true,
+				},
+				{
+					ExecutionOrderGroup: 0,
+					ProjectName:         "Second",
+				},
+				{
+					ExecutionOrderGroup: 1,
+					ProjectName:         "Third",
+				},
+				{
+					ExecutionOrderGroup: 1,
+					ProjectName:         "Fourth",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+				{
+					Command: command.Apply,
+					Error:   errors.New("Shabang!"),
+				},
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+			},
+			RunnerInvokeMatch: []*EqMatcher{
+				Once(),
+				Once(),
+				Once(),
+				Once(),
+			},
+			ExpComment: "Ran Apply for 4 projects:\n\n" +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"3. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---\n### " +
+				"4. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
+		},
+		{
+			Description: "Don't block when parallel is not set",
+			ProjectContexts: []command.ProjectContext{
+				{
+					ExecutionOrderGroup: 0,
+					ProjectName:         "First",
+				},
+				{
+					ExecutionOrderGroup: 1,
+					ProjectName:         "Second",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					Command: command.Apply,
+					Error:   errors.New("Shabang!"),
+				},
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+			},
+			RunnerInvokeMatch: []*EqMatcher{
+				Once(),
+				Once(),
+			},
+			ExpComment: "Ran Apply for 2 projects:\n\n" +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---\n### " +
+				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			vcsClient := setup(t)
+
+			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
+			pull := &github.PullRequest{
+				State: github.String("open"),
+			}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+			cmd := &events.CommentCommand{Name: command.Apply}
+
+			ctx := &command.Context{
+				User:     testdata.User,
+				Log:      logging.NewNoopLogger(t),
+				Scope:    scopeNull,
+				Pull:     modelPull,
+				HeadRepo: testdata.GithubRepo,
+				Trigger:  command.CommentTrigger,
+			}
+
+			When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
+			for i := range c.ProjectContexts {
+				When(projectCommandRunner.Apply(c.ProjectContexts[i])).ThenReturn(c.ProjectResults[i])
+			}
+
+			applyCommandRunner.Run(ctx, cmd)
+
+			for i := range c.ProjectContexts {
+				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Apply(c.ProjectContexts[i])
+
+			}
+
+			vcsClient.VerifyWasCalledOnce().CreateComment(
+				testdata.GithubRepo, modelPull.Num, c.ExpComment, "apply",
+			)
+		})
+	}
+}

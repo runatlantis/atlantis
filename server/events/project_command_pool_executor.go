@@ -81,6 +81,9 @@ func runProjectCmdsParallelGroups(
 	for _, group := range groups {
 		res := runProjectCmdsParallel(group, runnerFunc, poolSize)
 		results = append(results, res.ProjectResults...)
+		if res.HasErrors() {
+			break
+		}
 	}
 
 	return command.Result{ProjectResults: results}
