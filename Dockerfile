@@ -166,7 +166,7 @@ RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/ma
         git~=2.40 && \
     apk add --no-cache \
         ca-certificates~=20220614 \
-        curl~=7.88 \
+        curl~=8.01 \
         unzip~=6.0 \
         bash~=5.2 \
         openssh~=9.1_p1 \
