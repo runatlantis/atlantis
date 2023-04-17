@@ -114,7 +114,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.4.4
+ENV DEFAULT_TERRAFORM_VERSION=1.4.5
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
@@ -166,7 +166,7 @@ RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/ma
         git~=2.40 && \
     apk add --no-cache \
         ca-certificates~=20220614 \
-        curl~=7.88 \
+        curl~=8.01 \
         unzip~=6.0 \
         bash~=5.2 \
         openssh~=9.1_p1 \
