@@ -20,7 +20,7 @@ services:
         ports:
         - '6379:6379'
         command: redis-server --save 20 1 --loglevel warning --requirepass test123
-        volumes: 
+        volumes:
         - redis:/data
     atlantis:
         depends_on:

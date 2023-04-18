@@ -787,10 +787,6 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 						defer r.Body.Close() // nolint: errcheck
 						w.WriteHeader(c.code)
 						w.Write([]byte(resp)) // nolint: errcheck
-					case "/api/v3/repos/runatlantis/atlantis/branches/master/protection":
-						w.WriteHeader(404)
-						w.Write([]byte("{\"message\":\"Branch not protected\"}")) // nolint: errcheck
-						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
@@ -817,8 +813,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 							Hostname: "github.com",
 						},
 					},
-					Num:        1,
-					BaseBranch: "master",
+					Num: 1,
 				}, models.PullRequestOptions{
 					DeleteSourceBranchOnMerge: false,
 				})
@@ -836,184 +831,40 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 // use that method
 func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 	cases := map[string]struct {
-		allowMerge           bool
-		allowRebase          bool
-		allowSquash          bool
-		requireLinearHistory bool
-		protectedBranch      bool
-		protectionAvailable  bool
-		expMethod            string
+		allowMerge  bool
+		allowRebase bool
+		allowSquash bool
+		expMethod   string
 	}{
 		"all true": {
-			allowMerge:           true,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  true,
-			expMethod:            "merge",
+			allowMerge:  true,
+			allowRebase: true,
+			allowSquash: true,
+			expMethod:   "merge",
 		},
 		"all false (edge case)": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          false,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  true,
-			expMethod:            "merge",
+			allowMerge:  false,
+			allowRebase: false,
+			allowSquash: false,
+			expMethod:   "merge",
 		},
 		"merge: false rebase: true squash: true": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
+			allowMerge:  false,
+			allowRebase: true,
+			allowSquash: true,
+			expMethod:   "rebase",
 		},
 		"merge: false rebase: false squash: true": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  true,
-			expMethod:            "squash",
+			allowMerge:  false,
+			allowRebase: false,
+			allowSquash: true,
+			expMethod:   "squash",
 		},
 		"merge: false rebase: true squash: false": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          false,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protected, all true, rlh: false": {
-			allowMerge:           true,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "merge",
-		},
-		"protected, all false (edge case), rlh: false": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          false,
-			requireLinearHistory: false,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "merge",
-		},
-		"protected, merge: false rebase: true squash: true, rlh: false": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protected, merge: false rebase: false squash: true, rlh: false": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "squash",
-		},
-		"protected, merge: false rebase: true squash: false, rlh: false": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          false,
-			requireLinearHistory: false,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protected, all true, rlh: true": {
-			allowMerge:           true,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: true,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protected, all false (edge case), rlh: true": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          false,
-			requireLinearHistory: true,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "merge",
-		},
-		"protected, merge: false rebase: true squash: true, rlh: true": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: true,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protected, merge: false rebase: false squash: true, rlh: true": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          true,
-			requireLinearHistory: true,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "squash",
-		},
-		"protected, merge: false rebase: true squash: false, rlh: true": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          false,
-			requireLinearHistory: true,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protection not supported, all true": {
-			allowMerge:           true,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  false,
-			expMethod:            "merge",
-		},
-		"protection not supported, merge: false, rebase: true, squash: true": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  false,
-			expMethod:            "rebase",
-		},
-		"protection not supported, merge: false, rebase: false, squash: true": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  false,
-			expMethod:            "squash",
-		},
-		"protection not supported, merge: false, rebase: true, squash: false": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          false,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  false,
-			expMethod:            "rebase",
+			allowMerge:  false,
+			allowRebase: true,
+			allowSquash: false,
+			expMethod:   "rebase",
 		},
 	}
 
@@ -1023,10 +874,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			// Modify response.
 			jsBytes, err := os.ReadFile("testdata/github-repo.json")
 			Ok(t, err)
-			rlhBytes, err := os.ReadFile("testdata/github-branch-protection-require-linear-history.json")
-			Ok(t, err)
 			resp := string(jsBytes)
-			protected := string(rlhBytes)
 			resp = strings.Replace(resp,
 				`"allow_squash_merge": true`,
 				fmt.Sprintf(`"allow_squash_merge": %t`, c.allowSquash),
@@ -1039,27 +887,12 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 				`"allow_rebase_merge": true`,
 				fmt.Sprintf(`"allow_rebase_merge": %t`, c.allowRebase),
 				-1)
-			protected = strings.Replace(protected,
-				`"enabled": true`,
-				fmt.Sprintf(`"enabled": %t`, c.requireLinearHistory),
-				-1)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					case "/api/v3/repos/runatlantis/atlantis":
 						w.Write([]byte(resp)) // nolint: errcheck
-						return
-					case "/api/v3/repos/runatlantis/atlantis/branches/master/protection":
-						if c.protectedBranch && c.protectionAvailable {
-							w.Write([]byte(protected)) // nolint: errcheck
-						} else if !c.protectedBranch && c.protectionAvailable {
-							w.WriteHeader(404)
-							w.Write([]byte("{\"message\":\"Branch not protected\"}")) // nolint: errcheck
-						} else if !c.protectionAvailable {
-							w.WriteHeader(403)
-							w.Write([]byte("{\"message\":\"Upgrade to GitHub Pro or make this repository public to enable this feature.\"}")) // nolint: errcheck
-						}
 						return
 					case "/api/v3/repos/runatlantis/atlantis/pulls/1/merge":
 						body, err := io.ReadAll(r.Body)
@@ -1103,8 +936,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 							Hostname: "github.com",
 						},
 					},
-					Num:        1,
-					BaseBranch: "master",
+					Num: 1,
 				}, models.PullRequestOptions{
 					DeleteSourceBranchOnMerge: false,
 				})

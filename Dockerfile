@@ -23,23 +23,24 @@ RUN apk add --no-cache \
         bash~=5.2
 COPY go.mod go.sum ./
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN go mod graph | awk '{if ($1 !~ "@") print $2}' | xargs go get
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod graph | awk '{if ($1 !~ "@") print $2}' | xargs go get
 
 COPY . /app
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
-FROM debian:${DEBIAN_TAG} as deps
+FROM debian:${DEBIAN_TAG} as debian-base
 
-# Get the architecture the image is being built for
-ARG TARGETPLATFORM
-WORKDIR /tmp/build
-
-# Install packages needed for building/verifying dependencies
+# Install packages needed for running Atlantis.
+# We place this last as it will bust less docker layer caches when packages update
+# hadolint ignore explanation
+# DL3008 (pin versions using "=") - Ignored to avoid failing the build
+# SC2261 (multiple redirections) - This is a bug https://github.com/hadolint/hadolint/issues/782
 # hadolint ignore=DL3008,SC2261
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
         ca-certificates>=20210119 \
         curl>=7.74 \
         git>=1:2.30 \
@@ -49,12 +50,20 @@ RUN apt-get update \
         libcap2>=1:2.44 \
         dumb-init>=1.2 \
         gnupg>=2.2 \
-        openssl>=1.1.1n
+        openssl>=1.1.1n && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+FROM debian-base as deps
+
+# Get the architecture the image is being built for
+ARG TARGETPLATFORM
+WORKDIR /tmp/build
 
 # install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
+ENV DEFAULT_CONFTEST_VERSION=0.41.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-ENV DEFAULT_CONFTEST_VERSION=0.40.0
 RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
     case ${TARGETPLATFORM} in \
         "linux/amd64") CONFTEST_ARCH=x86_64 ;; \
@@ -116,7 +125,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.4.4
+ENV DEFAULT_TERRAFORM_VERSION=1.4.5
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 #RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
@@ -169,7 +178,7 @@ RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/ma
         git~=2.40 && \
     apk add --no-cache \
         ca-certificates~=20220614 \
-        curl~=7.88 \
+        curl~=8.0 \
         unzip~=6.0 \
         bash~=5.2 \
         openssh~=9.1_p1 \
@@ -180,8 +189,15 @@ RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/ma
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
 
-# # Stage 2 - Debian
-# FROM debian:${DEBIAN_TAG} AS debian
+# Stage 2 - Debian
+FROM debian-base AS debian
+
+# Add atlantis user to Debian as well
+RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
+    adduser atlantis root && \
+    chown atlantis:root /home/atlantis/ && \
+    chmod g=u /home/atlantis/ && \
+    chmod g=u /etc/passwd
 
 # # copy binary
 # COPY --from=builder /app/atlantis /usr/local/bin/atlantis
@@ -194,24 +210,5 @@ CMD ["server"]
 # # copy docker entrypoint
 # COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# # Install packages needed for running Atlantis.
-# # We place this last as it will bust less docker layer caches when packages update
-# # hadolint ignore explanation
-# # DL3008 (pin versions using "=") - Ignored to avoid failing the build
-# # SC2261 (multiple redirections) - This is a bug https://github.com/hadolint/hadolint/issues/782
-# # hadolint ignore=DL3008,SC2261
-# RUN apt-get update && \
-#     apt-get install -y --no-install-recommends \
-#         ca-certificates>=20210119 \
-#         curl>=7.74 \
-#         git>=1:2.30 \
-#         unzip>=6.0 \
-#         bash>=5.1 \
-#         openssh-server>=1:8.4p1 \
-#         libcap2>=1:2.44 \
-#         dumb-init>=1.2 && \
-#     apt-get clean && \
-#     rm -rf /var/lib/apt/lists/*
-
-# ENTRYPOINT ["docker-entrypoint.sh"]
-# CMD ["server"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["server"]
