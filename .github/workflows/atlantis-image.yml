@@ -28,7 +28,7 @@ jobs:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ghcr.io/${{ github.repository }}
       # Push if not a pull request or this is a fork
-      PUSH: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
+      PUSH: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
 
     steps:
     - uses: actions/checkout@v3
