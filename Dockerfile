@@ -189,15 +189,15 @@ RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/ma
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
 
-# Stage 2 - Debian
-FROM debian-base AS debian
+# # Stage 2 - Debian
+# FROM debian-base AS debian
 
-# Add atlantis user to Debian as well
-RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
-    adduser atlantis root && \
-    chown atlantis:root /home/atlantis/ && \
-    chmod g=u /home/atlantis/ && \
-    chmod g=u /etc/passwd
+# # Add atlantis user to Debian as well
+# RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
+#     adduser atlantis root && \
+#     chown atlantis:root /home/atlantis/ && \
+#     chmod g=u /home/atlantis/ && \
+#     chmod g=u /etc/passwd
 
 # # copy binary
 # COPY --from=builder /app/atlantis /usr/local/bin/atlantis
@@ -210,5 +210,5 @@ RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
 # # copy docker entrypoint
 # COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["server"]
+# ENTRYPOINT ["docker-entrypoint.sh"]
+# CMD ["server"]
