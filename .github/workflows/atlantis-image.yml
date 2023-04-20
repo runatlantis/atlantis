@@ -12,6 +12,7 @@ on:
       - 'Dockerfile'
       - 'docker-entrypoint.sh'
       - '.github/workflows/atlantis-image.yml'
+      - '**.go'
   workflow_dispatch:
 
 concurrency:

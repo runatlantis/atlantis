@@ -7,7 +7,8 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - '.github/**'
+      - '!**.go'
+      - '!**.js'
   pull_request:
     # The branches below must be a subset of the branches above
     types:
@@ -17,7 +18,8 @@ on:
       - ready_for_review
     branches: [ "main" ]
     paths:
-      - '.github/**'
+      - '!**.go'
+      - '!**.js'
 
 jobs:
   analyze:
