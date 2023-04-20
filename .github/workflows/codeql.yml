@@ -25,7 +25,7 @@ on:
       - synchronize
       - ready_for_review
     branches: [ "main" ]
-    paths-ignore:
+    paths:
       - '**.go'
       - '**.js'
 
