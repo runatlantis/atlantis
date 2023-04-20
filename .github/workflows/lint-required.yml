@@ -12,10 +12,10 @@ on:
       - ready_for_review
     branches:
       - "main"
-    paths:
-      - 'runatlantis.io/**'
-      - '.github/**'
-      - '**.md'
+    paths-ignore:
+      - '**.go'
+      - 'go.*'
+      - '.github/workflows/linter.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
