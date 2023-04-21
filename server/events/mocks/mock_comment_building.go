@@ -39,6 +39,21 @@ func (mock *MockCommentBuilder) BuildApplyComment(_param0 string, _param1 string
 	return ret0
 }
 
+func (mock *MockCommentBuilder) BuildApprovePoliciesComment(_param0 string, _param1 string, _param2 string) string {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockCommentBuilder().")
+	}
+	params := []pegomock.Param{_param0, _param1, _param2}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("BuildApprovePoliciesComment", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem()})
+	var ret0 string
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(string)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockCommentBuilder) BuildPlanComment(_param0 string, _param1 string, _param2 string, _param3 []string) string {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommentBuilder().")

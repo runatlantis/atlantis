@@ -729,14 +729,14 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.RepoRelDir, func(t *testing.T) {
-			cmd := events.NewCommentCommand(c.RepoRelDir, nil, command.Plan, "", false, false, "workspace", "")
+			cmd := events.NewCommentCommand(c.RepoRelDir, nil, command.Plan, "", false, false, "workspace", "", "")
 			Equals(t, c.ExpDir, cmd.RepoRelDir)
 		})
 	}
 }
 
 func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
-	cmd := events.NewCommentCommand("", nil, command.Plan, "", false, false, "", "")
+	cmd := events.NewCommentCommand("", nil, command.Plan, "", false, false, "", "", "")
 	Equals(t, events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
@@ -748,7 +748,7 @@ func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
-	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, command.Plan, "", true, false, "workspace", "project")
+	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, command.Plan, "", true, false, "workspace", "project", "policyset")
 	Equals(t, events.CommentCommand{
 		Workspace:   "workspace",
 		RepoRelDir:  "dir",
@@ -756,6 +756,7 @@ func TestNewCommand_AllFieldsSet(t *testing.T) {
 		Flags:       []string{"a", "b"},
 		Name:        command.Plan,
 		ProjectName: "project",
+		PolicySet:   "policyset",
 	}, *cmd)
 }
 
@@ -794,7 +795,7 @@ func TestCommentCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_String(t *testing.T) {
-	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" flags="flag1,flag2"`
+	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" policyset="" flags="flag1,flag2"`
 	Equals(t, exp, (events.CommentCommand{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},

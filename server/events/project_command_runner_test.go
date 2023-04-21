@@ -29,6 +29,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/models/testdata"
+	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -745,4 +747,365 @@ type mockURLGenerator struct{}
 
 func (m mockURLGenerator) GenerateLockURL(lockID string) string {
 	return "https://" + lockID
+}
+
+// Test approve policies logic.
+func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
+	cases := []struct {
+		description string
+
+		policySetCfg    valid.PolicySets
+		policySetStatus []models.PolicySetStatus
+		userTeams       []string // Teams the user is a member of
+		targetedPolicy  string   // Policy to target when running approvals
+
+		expOut     []models.PolicySetResult
+		expFailure string
+		hasErr     bool
+	}{
+		{
+			description: "When user is not an owner at any level, approve policy fails.",
+			hasErr:      true,
+			policySetCfg: valid.PolicySets{
+				Owners: valid.PolicyOwners{
+					Users: []string{"someotheruser1"},
+				},
+				PolicySets: []valid.PolicySet{
+					{
+						Name:         "policy1",
+						ApproveCount: 1,
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someotherteam"},
+						},
+					},
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+				},
+			},
+			expFailure: "One or more policy sets require additional approval.",
+		},
+		{
+			description: "When user is a top-level owner, increment approval count on all policies.",
+			hasErr:      false,
+			policySetCfg: valid.PolicySets{
+				Owners: valid.PolicyOwners{
+					Users: []string{testdata.User.Username},
+				},
+				PolicySets: []valid.PolicySet{
+					{
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Name:         "policy2",
+						ApproveCount: 2,
+					},
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  2,
+					CurApprovals:  1,
+				},
+			},
+			expFailure: "One or more policy sets require additional approval.",
+		},
+		{
+			description: "When user is not a top-level owner, but an owner of a policy set, increment approval count only the policy set they are an owner of.",
+			hasErr:      true,
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Users: []string{testdata.User.Username},
+						},
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Name:         "policy2",
+						ApproveCount: 2,
+					},
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  2,
+					CurApprovals:  0,
+				},
+			},
+			expFailure: "One or more policy sets require additional approval.",
+		},
+		{
+			description: "When user is a top-level ownner through membership, increment approval on all policies.",
+			userTeams:   []string{"someuserteam"},
+			policySetCfg: valid.PolicySets{
+				Owners: valid.PolicyOwners{
+					Teams: []string{"someuserteam"},
+				},
+				PolicySets: []valid.PolicySet{
+					{
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Name:         "policy2",
+						ApproveCount: 1,
+					},
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+			},
+			expFailure: "",
+		},
+		{
+			description: "When user is not a top-level owner, but is an owner of one policy set through nembership, increment approval only the policy to which they are an owner.",
+			hasErr:      true,
+			userTeams:   []string{"someuserteam"},
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Name:         "policy2",
+						ApproveCount: 1,
+					},
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+			},
+			expFailure: "One or more policy sets require additional approval.",
+		},
+		{
+			description: "Do not increment or error on passing or fully-approved policy sets.",
+			userTeams:   []string{"someuserteam"},
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy1",
+						ApproveCount: 2,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Approvals:     2,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  2,
+					CurApprovals:  2,
+				},
+			},
+			expFailure: ``,
+			hasErr:     false,
+		},
+		{
+			description: "Policies should not fail if they pass.",
+			userTeams:   []string{"someuserteam"},
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy1",
+						ApproveCount: 2,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Passed:        true,
+					Approvals:     0,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  2,
+					CurApprovals:  0,
+					Passed:        true,
+				},
+			},
+			expFailure: ``,
+			hasErr:     false,
+		},
+		{
+			description:    "Non-targeted failing policies should still trigger failure when a targeted policy is cleared.",
+			userTeams:      []string{"someuserteam"},
+			targetedPolicy: "policy1",
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy2",
+						ApproveCount: 1,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Approvals:     0,
+					Passed:        false,
+				},
+				{
+					PolicySetName: "policy2",
+					Approvals:     0,
+					Passed:        false,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+			},
+			expFailure: `One or more policy sets require additional approval.`,
+			hasErr:     false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockVcsClient := vcsmocks.NewMockClient()
+			mockInit := mocks.NewMockStepRunner()
+			mockPlan := mocks.NewMockStepRunner()
+			mockApply := mocks.NewMockStepRunner()
+			mockRun := mocks.NewMockCustomStepRunner()
+			mockEnv := mocks.NewMockEnvStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+			mockSender := mocks.NewMockWebhooksSender()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:           mockLocker,
+				VcsClient:        mockVcsClient,
+				LockURLGenerator: mockURLGenerator{},
+				InitStepRunner:   mockInit,
+				PlanStepRunner:   mockPlan,
+				ApplyStepRunner:  mockApply,
+				RunStepRunner:    mockRun,
+				EnvStepRunner:    mockEnv,
+				WorkingDir:       mockWorkingDir,
+				Webhooks:         mockSender,
+				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+			}
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				matchers.AnyModelsRepo(),
+				matchers.AnyModelsPullRequest(),
+				AnyString(),
+			)).ThenReturn(repoDir, nil)
+			When(mockLocker.TryLock(
+				matchers.AnyLoggingSimpleLogging(),
+				matchers.AnyModelsPullRequest(),
+				matchers.AnyModelsUser(),
+				AnyString(),
+				matchers.AnyModelsProject(),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
+
+			var projPolicyStatus []models.PolicySetStatus
+			if c.policySetStatus == nil {
+				for _, p := range c.policySetCfg.PolicySets {
+					projPolicyStatus = append(projPolicyStatus, models.PolicySetStatus{
+						PolicySetName: p.Name,
+					})
+				}
+			} else {
+				projPolicyStatus = c.policySetStatus
+			}
+
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			When(runner.VcsClient.GetTeamNamesForUser(testdata.GithubRepo, testdata.User)).ThenReturn(c.userTeams, nil)
+			ctx := command.ProjectContext{
+				User:                testdata.User,
+				Log:                 logging.NewNoopLogger(t),
+				Workspace:           "default",
+				RepoRelDir:          ".",
+				PolicySets:          c.policySetCfg,
+				ProjectPolicyStatus: projPolicyStatus,
+				Pull:                modelPull,
+				PolicySetTarget:     c.targetedPolicy,
+			}
+
+			res := runner.ApprovePolicies(ctx)
+			Equals(t, c.expOut, res.PolicyCheckResults.PolicySetResults)
+			Equals(t, c.expFailure, res.Failure)
+			if c.hasErr == true {
+				Assert(t, res.Error != nil, "expecting error.")
+			} else {
+				Assert(t, res.Error == nil, "not expecting error.")
+			}
+		})
+	}
 }

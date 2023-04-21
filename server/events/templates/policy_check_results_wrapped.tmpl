@@ -1,0 +1,27 @@
+{{ define "policyCheckResultsWrapped" -}}
+<details><summary>Show Output</summary>
+{{- if eq .Command "Policy Check" }}
+{{ template "policyCheck" .PolicySetResults }}
+{{- end }}
+{{- if .PolicyCleared }}
+* :arrow_forward: To **apply** this plan, comment:
+    * `{{ .ApplyCmd }}`
+{{- else }}
+#### Policy Approval Status:
+```
+{{ .PolicyApprovalSummary }}
+```
+* :heavy_check_mark: To **approve** this project, comment:
+    * `{{ .ApprovePoliciesCmd }}`
+{{- end }}
+* :put_litter_in_its_place: To **delete** this plan click [here]({{ .LockURL }})
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * `{{ .RePlanCmd }}`
+</details>
+{{- if eq .Command "Policy Check" }}
+
+```
+{{ .PolicyCheckSummary }}
+```
+{{- end }}
+{{ end -}}

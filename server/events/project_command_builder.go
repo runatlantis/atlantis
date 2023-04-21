@@ -246,7 +246,11 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, 
 }
 
 func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
-	return p.buildAllProjectCommandsByPlan(ctx, cmd)
+	if !cmd.IsForSpecificProject() {
+		return p.buildAllProjectCommandsByPlan(ctx, cmd)
+	}
+	pac, err := p.buildProjectCommand(ctx, cmd)
+	return pac, err
 }
 
 func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {

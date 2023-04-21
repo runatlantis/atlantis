@@ -19,11 +19,15 @@ import (
 	"path/filepath"
 	"strings"
 
+	"encoding/json"
+
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -197,6 +201,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
+	VcsClient                 vcs.Client
 	Locker                    ProjectLocker
 	LockURLGenerator          LockURLGenerator
 	InitStepRunner            StepRunner
@@ -236,7 +241,7 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
 	return command.ProjectResult{
 		Command:            command.PolicyCheck,
-		PolicyCheckSuccess: policySuccess,
+		PolicyCheckResults: policySuccess,
 		Error:              err,
 		Failure:            failure,
 		RepoRelDir:         ctx.RepoRelDir,
@@ -265,7 +270,7 @@ func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext
 		Command:            command.PolicyCheck,
 		Failure:            failure,
 		Error:              err,
-		PolicyCheckSuccess: approvedOut,
+		PolicyCheckResults: approvedOut,
 		RepoRelDir:         ctx.RepoRelDir,
 		Workspace:          ctx.Workspace,
 		ProjectName:        ctx.ProjectName,
@@ -314,17 +319,93 @@ func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) comman
 	}
 }
 
-func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckResults, string, error) {
+	// Acquire Atlantis lock for this repo/dir/workspace.
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir), ctx.RepoLocking)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "acquiring lock")
+	}
+	if !lockAttempt.LockAcquired {
+		return nil, lockAttempt.LockFailureReason, nil
+	}
+	ctx.Log.Debug("acquired lock for project")
 
-	// TODO: Make this a bit smarter
-	// without checking some sort of state that the policy check has indeed passed this is likely to cause issues
+	// Acquire internal lock for the directory we're going to operate in.
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlockFn()
 
-	return &models.PolicyCheckSuccess{
-		PolicyCheckOutput: "Policies approved",
-	}, "", nil
+	teams := []string{}
+
+	policySetCfg := ctx.PolicySets
+
+	// Only query the users team membership if any teams have been configured as owners on any policy set(s).
+	if policySetCfg.HasTeamOwners() {
+		// A convenient way to access vcsClient. Not sure if best way.
+		userTeams, err := p.VcsClient.GetTeamNamesForUser(ctx.Pull.BaseRepo, ctx.User)
+		if err != nil {
+			ctx.Log.Err("unable to get team membership for user: %s", err)
+			return nil, "", err
+		}
+		teams = append(teams, userTeams...)
+	}
+	isAdmin := policySetCfg.Owners.IsOwner(ctx.User.Username, teams)
+
+	var failure string
+
+	// Run over each policy set for the project and perform appropriate approval.
+	var prjPolicySetResults []models.PolicySetResult
+	var prjErr error
+	allPassed := true
+	for _, policySet := range policySetCfg.PolicySets {
+		isOwner := policySet.Owners.IsOwner(ctx.User.Username, teams) || isAdmin
+		prjPolicyStatus := ctx.ProjectPolicyStatus
+		for i, policyStatus := range prjPolicyStatus {
+			ignorePolicy := false
+			if policySet.Name == policyStatus.PolicySetName {
+				// Policy set either passed or has sufficient approvals. Move on.
+				if policyStatus.Passed || (policyStatus.Approvals == policySet.ApproveCount) {
+					ignorePolicy = true
+				}
+				// Set ignore flag if targeted policy does not match.
+				if ctx.PolicySetTarget != "" && (ctx.PolicySetTarget != policySet.Name) {
+					ignorePolicy = true
+				}
+				// Increment approval if user is owner.
+				if isOwner && !ignorePolicy {
+					prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
+					// User is not authorized to approve policy set.
+				} else if !ignorePolicy {
+					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
+				}
+				// Still bubble up this failure, even if policy set is not targeted.
+				if !policyStatus.Passed && (prjPolicyStatus[i].Approvals != policySet.ApproveCount) {
+					allPassed = false
+				}
+				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
+					PolicySetName: policySet.Name,
+					Passed:        policyStatus.Passed,
+					CurApprovals:  prjPolicyStatus[i].Approvals,
+					ReqApprovals:  policySet.ApproveCount,
+				})
+			}
+		}
+	}
+	if !allPassed {
+		failure = `One or more policy sets require additional approval.`
+	}
+	return &models.PolicyCheckResults{
+		LockURL:            p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		PolicySetResults:   prjPolicySetResults,
+		ApplyCmd:           ctx.ApplyCmd,
+		RePlanCmd:          ctx.RePlanCmd,
+		ApprovePoliciesCmd: ctx.ApprovePoliciesCmd,
+	}, failure, prjErr
 }
 
-func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) (*models.PolicyCheckResults, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	// This should already be acquired from the prior plan operation.
 	// if for some reason an unlock happens between the plan and policy check step
@@ -376,23 +457,51 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
+	var failure string
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	var errs error
 	if err != nil {
-		// Note: we are explicitly not unlocking the pr here since a failing policy check will require
-		// approval
-		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		for {
+			err = errors.Unwrap(err)
+			if err == nil {
+				break
+			}
+			// Exclude errors for failed policies
+			if !strings.Contains(err.Error(), "some policies failed") {
+				errs = multierror.Append(errs, err)
+			}
+		}
+
+		if errs != nil {
+			// Note: we are explicitly not unlocking the pr here since a failing policy check will require
+			// approval
+			return nil, "", errs
+		}
 	}
 
-	return &models.PolicyCheckSuccess{
-		LockURL:           p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
-		PolicyCheckOutput: strings.Join(outputs, "\n"),
-		RePlanCmd:         ctx.RePlanCmd,
-		ApplyCmd:          ctx.ApplyCmd,
+	var policySetResults []models.PolicySetResult
+	err = json.Unmarshal([]byte(strings.Join(outputs, "\n")), &policySetResults)
+	if err != nil {
+		return nil, "", err
+	}
 
-		// set this to false right now because we don't have this information
-		// TODO: refactor the templates in a sane way so we don't need this
-		HasDiverged: false,
-	}, "", nil
+	result := &models.PolicyCheckResults{
+		LockURL:            p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		PolicySetResults:   policySetResults,
+		RePlanCmd:          ctx.RePlanCmd,
+		ApplyCmd:           ctx.ApplyCmd,
+		ApprovePoliciesCmd: ctx.ApprovePoliciesCmd,
+	}
+
+	// Using this function instead of catching failed policy runs with errors, for cases when '--no-fail' is passed to conftest.
+	// One reason to pass such an arg to conftest would be to prevent workflow termination so custom run scripts
+	// can be run after the conftest step.
+	ctx.Log.Err(strings.Join(outputs, "\n"))
+	if !result.PolicyCleared() {
+		failure = "Some policy sets did not pass."
+	}
+
+	return result, failure, nil
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*models.PlanSuccess, string, error) {

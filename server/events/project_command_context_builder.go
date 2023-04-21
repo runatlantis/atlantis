@@ -129,6 +129,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		ctx,
 		cmdName,
 		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+		cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 		prjCfg,
 		steps,
@@ -191,6 +192,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			ctx,
 			command.PolicyCheck,
 			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+			cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 			prjCfg,
 			steps,
@@ -213,6 +215,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 func newProjectCommandContext(ctx *command.Context,
 	cmd command.Name,
 	applyCmd string,
+	approvePoliciesCmd string,
 	planCmd string,
 	projCfg valid.MergedProjectCfg,
 	steps []valid.Step,
@@ -227,6 +230,7 @@ func newProjectCommandContext(ctx *command.Context,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
+	var projectPolicyStatus []models.PolicySetStatus
 
 	if ctx.PullStatus != nil {
 		for _, project := range ctx.PullStatus.Projects {
@@ -234,11 +238,13 @@ func newProjectCommandContext(ctx *command.Context,
 			// if name is not used, let's match the directory
 			if projCfg.Name == "" && project.RepoRelDir == projCfg.RepoRelDir {
 				projectPlanStatus = project.Status
+				projectPolicyStatus = project.PolicyStatus
 				break
 			}
 
 			if projCfg.Name != "" && project.ProjectName == projCfg.Name {
 				projectPlanStatus = project.Status
+				projectPolicyStatus = project.PolicyStatus
 				break
 			}
 		}
@@ -247,6 +253,7 @@ func newProjectCommandContext(ctx *command.Context,
 	return command.ProjectContext{
 		CommandName:                cmd,
 		ApplyCmd:                   applyCmd,
+		ApprovePoliciesCmd:         approvePoliciesCmd,
 		BaseRepo:                   ctx.Pull.BaseRepo,
 		EscapedCommentArgs:         escapedCommentArgs,
 		AutomergeEnabled:           automergeEnabled,
@@ -261,6 +268,7 @@ func newProjectCommandContext(ctx *command.Context,
 		Log:                        ctx.Log,
 		Scope:                      scope,
 		ProjectPlanStatus:          projectPlanStatus,
+		ProjectPolicyStatus:        projectPolicyStatus,
 		Pull:                       ctx.Pull,
 		ProjectName:                projCfg.Name,
 		PlanRequirements:           projCfg.PlanRequirements,
@@ -274,6 +282,7 @@ func newProjectCommandContext(ctx *command.Context,
 		Verbose:                    verbose,
 		Workspace:                  projCfg.Workspace,
 		PolicySets:                 policySets,
+		PolicySetTarget:            ctx.PolicySet,
 		PullReqStatus:              pullStatus,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,

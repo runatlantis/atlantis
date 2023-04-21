@@ -279,6 +279,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		HeadRepo:   headRepo,
 		Scope:      scope,
 		Trigger:    command.CommentTrigger,
+		PolicySet:  cmd.PolicySet,
 	}
 
 	if !c.validateCtxAndComment(ctx, cmd.Name) {

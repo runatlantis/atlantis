@@ -37,6 +37,8 @@ const (
 	dirFlagShort               = "d"
 	projectFlagLong            = "project"
 	projectFlagShort           = "p"
+	policySetFlagLong          = "policy-set"
+	policySetFlagShort         = ""
 	autoMergeDisabledFlagLong  = "auto-merge-disabled"
 	autoMergeDisabledFlagShort = ""
 	verboseFlagLong            = "verbose"
@@ -67,6 +69,8 @@ type CommentBuilder interface {
 	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 	// BuildApplyComment builds an apply comment for the specified args.
 	BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string
+	// BuildApprovePoliciesComment builds an approve_policies comment for the specified args.
+	BuildApprovePoliciesComment(repoRelDir string, workspace string, project string) string
 }
 
 // CommentParser implements CommentParsing
@@ -209,6 +213,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var workspace string
 	var dir string
 	var project string
+	var policySet string
 	var verbose, autoMergeDisabled bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
@@ -236,6 +241,10 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		name = command.ApprovePolicies
 		flagSet = pflag.NewFlagSet(command.ApprovePolicies.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Approve policies for this Terraform workspace.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Approve policies for this directory, relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Approve policies for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
+		flagSet.StringVarP(&policySet, policySetFlagLong, policySetFlagShort, "", "Approve policies for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.Unlock.String():
 		name = command.Unlock
@@ -296,7 +305,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project),
+		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project, policySet),
 	}
 }
 
@@ -383,6 +392,12 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
 	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled)
 	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Apply.String(), flags)
+}
+
+// BuildApprovePoliciesComment builds an apply comment for the specified args.
+func (e *CommentParser) BuildApprovePoliciesComment(repoRelDir string, workspace string, project string) string {
+	flags := e.buildFlags(repoRelDir, workspace, project, false)
+	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.ApprovePolicies.String(), flags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {

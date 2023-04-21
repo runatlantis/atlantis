@@ -649,9 +649,9 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 	}, maybeStatus.Projects)
 }
 
-// Test that if we update an existing pull status and our new status is for a
+// Test that if we update an existing pull status via Apply and our new status is for a
 // the same commit, that we merge the statuses.
-func TestPullStatus_UpdateMerge(t *testing.T) {
+func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 	b := newTestDB2(t)
 
 	pull := models.PullRequest{
@@ -756,6 +756,120 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 				RepoRelDir: "newresult",
 				Workspace:  "default",
 				Status:     models.AppliedPlanStatus,
+			},
+		}, updateStatus.Projects)
+	}
+}
+
+// Test that if we update one existing policy status via approve_policies and our new status is for a
+// the same commit, that we merge the statuses.
+func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
+	b := newTestDB2(t)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	_, err := b.UpdatePullWithResults(
+		pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.PolicyCheck,
+				RepoRelDir: "mergeme",
+				Workspace:  "default",
+				Failure:    "policy failure",
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{
+						{
+							PolicySetName: "policy1",
+							ReqApprovals:  1,
+						},
+					},
+				},
+			},
+			{
+				Command:     command.PolicyCheck,
+				RepoRelDir:  "projectname",
+				Workspace:   "default",
+				ProjectName: "projectname",
+				Failure:     "policy failure",
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{
+						{
+							PolicySetName: "policy1",
+							ReqApprovals:  1,
+						},
+					},
+				},
+			},
+		})
+	Ok(t, err)
+
+	updateStatus, err := b.UpdatePullWithResults(pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.ApprovePolicies,
+				RepoRelDir: "mergeme",
+				Workspace:  "default",
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{
+						{
+							PolicySetName: "policy1",
+							ReqApprovals:  1,
+							CurApprovals:  1,
+						},
+					},
+				},
+			},
+		})
+	Ok(t, err)
+
+	getStatus, err := b.GetPullStatus(pull)
+	Ok(t, err)
+
+	// Test both the pull state returned from the update call *and* the getCommandLock
+	// call.
+	for _, s := range []models.PullStatus{updateStatus, *getStatus} {
+		Equals(t, pull, s.Pull)
+		Equals(t, []models.ProjectStatus{
+			{
+				RepoRelDir: "mergeme",
+				Workspace:  "default",
+				Status:     models.PassedPolicyCheckStatus,
+				PolicyStatus: []models.PolicySetStatus{
+					{
+						PolicySetName: "policy1",
+						Approvals:     1,
+					},
+				},
+			},
+			{
+				RepoRelDir:  "projectname",
+				Workspace:   "default",
+				ProjectName: "projectname",
+				Status:      models.ErroredPolicyCheckStatus,
+				PolicyStatus: []models.PolicySetStatus{
+					{
+						PolicySetName: "policy1",
+						Approvals:     0,
+					},
+				},
 			},
 		}, updateStatus.Projects)
 	}

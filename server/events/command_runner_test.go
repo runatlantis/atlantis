@@ -812,7 +812,7 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
 		matchers.EqCommandName(command.PolicyCheck),
 		EqInt(0),
-		EqInt(0),
+		EqInt(2),
 	)
 }
 
@@ -855,7 +855,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 		return ReturnValues{
 			command.ProjectResult{
 				Command:            command.PolicyCheck,
-				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+				PolicyCheckResults: &models.PolicyCheckResults{},
 			},
 		}
 	})

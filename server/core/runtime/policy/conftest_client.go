@@ -7,6 +7,10 @@ import (
 	"runtime"
 	"strings"
 
+	"encoding/json"
+	"regexp"
+
+	"github.com/hashicorp/go-multierror"
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -14,6 +18,7 @@ import (
 	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -163,46 +168,80 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 }
 
 func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
-	policyArgs := []Arg{}
-	policySetNames := []string{}
 	ctx.Log.Debug("policy sets, %s ", ctx.PolicySets)
+
+	inputFile := filepath.Join(workdir, ctx.GetShowResultFileName())
+	var policySetResults []models.PolicySetResult
+	var combinedErr error
+
 	for _, policySet := range ctx.PolicySets.PolicySets {
-		path, err := c.SourceResolver.Resolve(policySet)
+		path, resolveErr := c.SourceResolver.Resolve(policySet)
 
 		// Let's not fail the whole step because of a single failure. Log and fail silently
-		if err != nil {
-			ctx.Log.Err("Error resolving policyset %s. err: %s", policySet.Name, err.Error())
+		if resolveErr != nil {
+			ctx.Log.Err("Error resolving policyset %s. err: %s", policySet.Name, resolveErr.Error())
 			continue
 		}
 
-		policyArg := NewPolicyArg(path)
-		policyArgs = append(policyArgs, policyArg)
+		args := ConftestTestCommandArgs{
+			PolicyArgs: []Arg{NewPolicyArg(path)},
+			ExtraArgs:  extraArgs,
+			InputFile:  inputFile,
+			Command:    executablePath,
+		}
 
-		policySetNames = append(policySetNames, policySet.Name)
+		serializedArgs, _ := args.build()
+		cmdOutput, cmdErr := c.Exec.CombinedOutput(serializedArgs, envs, workdir)
+
+		if cmdErr != nil {
+			// Since we're running conftest for each policyset, individual command errors should be concatenated.
+			if isValidConftestOutput(cmdOutput) {
+				combinedErr = multierror.Append(combinedErr, fmt.Errorf("policy_set: %s: conftest: some policies failed", policySet.Name))
+			} else {
+				combinedErr = multierror.Append(combinedErr, fmt.Errorf("policy_set: %s: conftest: %s", policySet.Name, cmdOutput))
+			}
+		}
+
+		passed := true
+		if hasFailures(cmdOutput) {
+			passed = false
+		}
+
+		policySetResults = append(policySetResults, models.PolicySetResult{
+			PolicySetName:  policySet.Name,
+			ConftestOutput: cmdOutput,
+			Passed:         passed,
+			ReqApprovals:   policySet.ApproveCount,
+		})
 	}
 
-	inputFile := filepath.Join(workdir, ctx.GetShowResultFileName())
-
-	args := ConftestTestCommandArgs{
-		PolicyArgs: policyArgs,
-		ExtraArgs:  extraArgs,
-		InputFile:  inputFile,
-		Command:    executablePath,
-	}
-
-	serializedArgs, err := args.build()
-
-	if err != nil {
-		ctx.Log.Warn("No policies have been configured")
+	if policySetResults == nil {
+		ctx.Log.Warn("no policies have been configured.")
 		return "", nil
 		// TODO: enable when we can pass policies in otherwise e2e tests with policy checks fail
 		// return "", errors.Wrap(err, "building args")
 	}
 
-	initialOutput := fmt.Sprintf("Checking plan against the following policies: \n  %s\n", strings.Join(policySetNames, "\n  "))
-	cmdOutput, err := c.Exec.CombinedOutput(serializedArgs, envs, workdir)
+	marshaledStatus, err := json.Marshal(policySetResults)
+	if err != nil {
+		return "", errors.New("cannot marshal data into []PolicySetResult. data")
+	}
 
-	return c.sanitizeOutput(inputFile, initialOutput+cmdOutput), err
+	// Write policy check results to a file which can be used by custom workflow run steps for metrics, notifications, etc.
+	policyCheckResultFile := filepath.Join(workdir, ctx.GetPolicyCheckResultFileName())
+	err = os.WriteFile(policyCheckResultFile, marshaledStatus, 0600)
+
+	combinedErr = multierror.Append(combinedErr, err)
+
+	// Multierror will wrap combined errors in a way that the upstream functions won't be able to read it as nil.
+	// Let's pass nil back if there are no wrapped errors.
+	if errors.Unwrap(combinedErr) == nil {
+		combinedErr = nil
+	}
+
+	output := string(marshaledStatus)
+
+	return c.sanitizeOutput(inputFile, output), combinedErr
 
 }
 
@@ -254,4 +293,23 @@ func getDefaultVersion() (*version.Version, error) {
 		return nil, errors.Wrapf(err, "wrapping version %s", defaultVersion)
 	}
 	return wrappedVersion, nil
+}
+
+// Checks if output from conftest is a valid output.
+func isValidConftestOutput(output string) bool {
+
+	r := regexp.MustCompile(`^(WARN|FAIL|\[)`)
+	if match := r.FindString(output); match != "" {
+		return true
+	}
+	return false
+}
+
+// hasFailures checks whether any conftest policies have failed
+func hasFailures(output string) bool {
+	r := regexp.MustCompile(`([1-9]([0-9]?)* failure|failures": \[)`)
+	if match := r.FindString(output); match != "" {
+		return true
+	}
+	return false
 }

@@ -1,8 +1,6 @@
 package events
 
 import (
-	"fmt"
-
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -74,7 +72,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 		return
 	}
 
-	result := a.buildApprovePolicyCommandResults(ctx, projectCmds)
+	result := runProjectCmds(projectCmds, a.prjCmdRunner.ApprovePolicies)
 
 	a.pullUpdater.updatePull(
 		ctx,
@@ -89,39 +87,6 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 	}
 
 	a.updateCommitStatus(ctx, pullStatus)
-}
-
-func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *command.Context, prjCmds []command.ProjectContext) (result command.Result) {
-	// Check if vcs user is in the owner list of the PolicySets. All projects
-	// share the same Owners list at this time so no reason to iterate over each
-	// project.
-	if len(prjCmds) > 0 {
-		teams := []string{}
-
-		// Only query the users team membership if any teams have been configured as owners.
-		if prjCmds[0].PolicySets.HasTeamOwners() {
-			userTeams, err := a.vcsClient.GetTeamNamesForUser(ctx.Pull.BaseRepo, ctx.User)
-			if err != nil {
-				ctx.Log.Err("unable to get team membership for user: %s", err)
-				return
-			}
-			teams = append(teams, userTeams...)
-		}
-
-		if !prjCmds[0].PolicySets.IsOwner(ctx.User.Username, teams) {
-			result.Error = fmt.Errorf("contact policy owners to approve failing policies")
-			return
-		}
-	}
-
-	var prjResults []command.ProjectResult
-
-	for _, prjCmd := range prjCmds {
-		prjResult := a.prjCmdRunner.ApprovePolicies(prjCmd)
-		prjResults = append(prjResults, prjResult)
-	}
-	result.ProjectResults = prjResults
-	return
 }
 
 func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {

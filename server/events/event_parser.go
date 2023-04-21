@@ -117,6 +117,8 @@ type CommentCommand struct {
 	// project specified in an atlantis.yaml file.
 	// If empty then the comment specified no project.
 	ProjectName string
+	// PolicySet is the name of a policy set to run an approval on.
+	PolicySet string
 }
 
 // IsForSpecificProject returns true if the command is for a specific dir, workspace
@@ -148,11 +150,11 @@ func (c CommentCommand) IsAutoplan() bool {
 
 // String returns a string representation of the command.
 func (c CommentCommand) String() string {
-	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, strings.Join(c.Flags, ","))
+	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q policyset=%q flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.PolicySet, strings.Join(c.Flags, ","))
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, workspace string, project string, policySet string) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -170,6 +172,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, sub
 		Workspace:         workspace,
 		AutoMergeDisabled: autoMergeDisabled,
 		ProjectName:       project,
+		PolicySet:         policySet,
 	}
 }
 

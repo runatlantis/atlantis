@@ -16,7 +16,7 @@ Enabling "policy checking" in addition to the [mergeable apply requirement](/doc
 
 ![Policy Check Apply Status Failure](./images/policy-check-apply-status-failure.png)
 
-Any failures need to either be addressed in a successive commit, or approved by a blessed owner. This approval is independent of the approval apply requirement which can coexist in the policy checking workflow. After an approval, the apply can proceed.
+Any failures need to either be addressed in a successive commit, or approved by top-level owner(s) of policies or the owner(s) of the policy set in question. Policy approvals are independent of the approval apply requirement which can coexist in the policy checking workflow. After policies are approved, the apply can proceed.
 
 ![Policy Check Approval](./images/policy-check-approval.png)
 
@@ -44,14 +44,23 @@ policies:
     users:
       - nishkrishnan
   policy_sets:
-    - name: null_resource_warning
-      path: <CODE_DIRECTORY>/policies/null_resource_warning/
+    - name: deny_null_resource
+      path: <CODE_DIRECTORY>/policies/deny_null_resource/
       source: local
+    - name: deny_local_exec
+      path: <CODE_DIRECTORY>/policies/deny_local_exec/
+      source: local
+      approve_count: 2
+      owners:
+        users:
+          - pseudomorph
 ```
 
 - `name` - A name of your policy set.
 - `path` - Path to a policies directory. *Note: replace `<CODE_DIRECTORY>` with absolute dir path to conftest policy/policies.*
 - `source` - Tells atlantis where to fetch the policies from. Currently you can only host policies locally by using `local`.
+- `owners` - Defines the users/teams which are able to approve a specific policy set.
+- `approve_count` - Defines the number of approvals needed to bypass policy checks. Defaults to the top-level policies configuration, if not specified.
 
 By default conftest is configured to only run the `main` package. If you wish to run specific/multiple policies consider passing `--namespace` or `--all-namespaces` to conftest with [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) via a custom workflow as shown in the below example.
 
@@ -158,3 +167,21 @@ workflows:
 ### Quiet policy checks
 
 By default, Atlantis will add a comment to all pull requests with the policy check result - both successes and failures. Version 0.21.0 added the [`--quiet-policy-checks`](server-configuration.html#quiet-policy-checks) option, which will instead only add comments when policy checks fail, significantly reducing the number of comments when most policy check results succeed.
+
+
+### Data for custom run steps
+
+When the policy check workflow runs, a file is created in the working directory which contains information about the status of each policy set tested. This data may be useful in custom run steps to generate metrics or notifications. The file contains JSON data in the following format:
+
+```json
+[
+  {
+    "PolicySetName":  "policy1",
+    "ConftestOutput": "",
+    "Passed":         false,
+    "ReqApprovals":   1,
+    "CurApprovals":   0
+  }
+]
+
+```
