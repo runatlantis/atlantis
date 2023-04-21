@@ -39,6 +39,7 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		"HEAD_REPO_OWNER":    ctx.HeadRepo.Owner,
 		"PULL_AUTHOR":        ctx.Pull.Author,
 		"PULL_NUM":           fmt.Sprintf("%d", ctx.Pull.Num),
+		"PULL_URL":           ctx.Pull.URL,
 		"USER_NAME":          ctx.User.Username,
 		"OUTPUT_STATUS_FILE": outputFilePath,
 	}
