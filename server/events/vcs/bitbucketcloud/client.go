@@ -100,7 +100,8 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, co
 	return err
 }
 
-func (b *Client) ReactToComment(repo models.Repo, commentID int64, reaction string) error {
+// UpdateComment updates the body of a comment on the merge request.
+func (b *Client) ReactToComment(repo models.Repo, commentID int64, reaction string) error { // nolint revive
 	// TODO: Bitbucket support for reactions
 	return nil
 }

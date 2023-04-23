@@ -145,7 +145,7 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, co
 	return nil
 }
 
-func (b *Client) ReactToComment(repo models.Repo, commentID int64, reaction string) error {
+func (b *Client) ReactToComment(repo models.Repo, commentID int64, reaction string) error { // nolint: revive
 	return nil
 }
 

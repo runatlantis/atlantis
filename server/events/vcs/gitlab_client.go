@@ -180,7 +180,7 @@ func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return nil
 }
 
-func (g *GitlabClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error {
+func (g *GitlabClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error { // nolint: revive
 	return nil
 }
 
