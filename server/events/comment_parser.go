@@ -43,7 +43,7 @@ const (
 	autoMergeDisabledFlagShort   = ""
 	verboseFlagLong              = "verbose"
 	verboseFlagShort             = ""
-	clearPolicyApprovalFlagLong  = "clear-approval"
+	clearPolicyApprovalFlagLong  = "clear-policy-approval"
 	clearPolicyApprovalFlagShort = ""
 )
 
