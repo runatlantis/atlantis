@@ -196,8 +196,8 @@ func TestParse_UnusedArguments(t *testing.T) {
 		},
 		{
 			command.ApprovePolicies,
-			"arg arg2 --",
-			"arg arg2",
+			"arg arg2 arg3 --",
+			"arg arg2 arg3",
 		},
 		{
 			command.Import,
@@ -1027,6 +1027,7 @@ var ApplyUsage = `Usage of apply:
 `
 
 var ApprovePolicyUsage = `Usage of approve_policies:
+      --clear-approval      Clear any existing policy approvals.
   -d, --dir string          Approve policies for this directory, relative to root of
                             repo, ex. 'child/dir'.
       --policy-set string   Approve policies for this project. Refers to the name of
