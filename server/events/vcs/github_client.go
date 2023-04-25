@@ -198,6 +198,13 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return nil
 }
 
+// ReactToComment adds a reaction to a comment.
+func (g *GithubClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error {
+	g.logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions", repo.Owner, repo.Name, commentID)
+	_, _, err := g.client.Reactions.CreateIssueCommentReaction(g.ctx, repo.Owner, repo.Name, commentID, reaction)
+	return err
+}
+
 func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	var allComments []*github.IssueComment
 	nextPage := 0
@@ -395,7 +402,7 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 		return false, errors.Wrap(err, "getting combined status")
 	}
 
-	//iterate over statuses - return false if we find one that isnt "apply" and doesnt have state = "success"
+	//iterate over statuses - return false if we find one that isn't "apply" and doesn't have state = "success"
 	for _, r := range status.Statuses {
 		if strings.HasPrefix(*r.Context, fmt.Sprintf("%s/%s", vcstatusname, command.Apply.String())) {
 			continue

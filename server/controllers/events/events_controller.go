@@ -49,13 +49,15 @@ const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/
 // VCSEventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
 type VCSEventsController struct {
-	CommandRunner events.CommandRunner
-	PullCleaner   events.PullCleaner
-	Logger        logging.SimpleLogging
-	Scope         tally.Scope
-	Parser        events.EventParsing
-	CommentParser events.CommentParsing
-	ApplyDisabled bool
+	CommandRunner  events.CommandRunner
+	PullCleaner    events.PullCleaner
+	Logger         logging.SimpleLogging
+	Scope          tally.Scope
+	Parser         events.EventParsing
+	CommentParser  events.CommentParsing
+	ApplyDisabled  bool
+	EmojiReaction  string
+	ExecutableName string
 	// GithubWebhookSecret is the secret added to this webhook via the GitHub
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
@@ -309,9 +311,18 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 		}
 	}
 
+	body := event.GetComment().GetBody()
+
+	if strings.HasPrefix(body, e.ExecutableName+" ") {
+		err = e.VCSClient.ReactToComment(baseRepo, *event.Comment.ID, e.EmojiReaction)
+		if err != nil {
+			logger.Warn("Failed to react to comment: %s", err)
+		}
+	}
+
 	// We pass in nil for maybeHeadRepo because the head repo data isn't
 	// available in the GithubIssueComment event.
-	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, pullNum, event.Comment.GetBody(), models.Github)
+	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, pullNum, body, models.Github)
 }
 
 // HandleBitbucketCloudCommentEvent handles comment events from Bitbucket.
