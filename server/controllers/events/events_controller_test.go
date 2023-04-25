@@ -381,6 +381,25 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 	cr.VerifyWasCalledOnce().RunCommentCommand(baseRepo, nil, nil, user, 1, &cmd)
 }
 
+func TestPost_GithubCommentReaction(t *testing.T) {
+	t.Log("when the event is a github comment with a valid command we call the command handler")
+	e, v, _, _, p, _, _, vcsClient, cp := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "issue_comment")
+	event := `{"action": "created", "comment": {"body": "atlantis help", "id": 1}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+	baseRepo := models.Repo{}
+	user := models.User{}
+	cmd := events.CommentCommand{}
+	When(p.ParseGithubIssueCommentEvent(matchers.AnyPtrToGithubIssueCommentEvent())).ThenReturn(baseRepo, user, 1, nil)
+	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, "Processing...")
+
+	vcsClient.VerifyWasCalledOnce().ReactToComment(baseRepo, 1, "eyes")
+}
+
 func TestPost_GithubPullRequestInvalid(t *testing.T) {
 	t.Log("when the event is a github pull request with invalid data we return a 400")
 	e, v, _, _, p, _, _, _, _ := setup(t)
@@ -922,6 +941,8 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	e := events_controllers.VCSEventsController{
+		ExecutableName:                  "atlantis",
+		EmojiReaction:                   "eyes",
 		TestingMode:                     true,
 		Logger:                          logger,
 		Scope:                           scope,

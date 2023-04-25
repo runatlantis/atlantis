@@ -222,6 +222,21 @@ func (mock *MockClient) PullIsMergeable(_param0 models.Repo, _param1 models.Pull
 	return ret0, ret1
 }
 
+func (mock *MockClient) ReactToComment(_param0 models.Repo, _param1 int64, _param2 string) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockClient().")
+	}
+	params := []pegomock.Param{_param0, _param1, _param2}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ReactToComment", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockClient) SupportsSingleFileDownload(_param0 models.Repo) bool {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
@@ -633,6 +648,41 @@ func (c *MockClient_PullIsMergeable_OngoingVerification) GetAllCapturedArguments
 		_param1 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
+		}
+		_param2 = make([]string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockClient) ReactToComment(_param0 models.Repo, _param1 int64, _param2 string) *MockClient_ReactToComment_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1, _param2}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ReactToComment", params, verifier.timeout)
+	return &MockClient_ReactToComment_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockClient_ReactToComment_OngoingVerification struct {
+	mock              *MockClient
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockClient_ReactToComment_OngoingVerification) GetCapturedArguments() (models.Repo, int64, string) {
+	_param0, _param1, _param2 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
+}
+
+func (c *MockClient_ReactToComment_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int64, _param2 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.Repo, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.Repo)
+		}
+		_param1 = make([]int64, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(int64)
 		}
 		_param2 = make([]string, len(c.methodInvocations))
 		for u, param := range params[2] {

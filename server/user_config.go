@@ -37,6 +37,7 @@ type UserConfig struct {
 	DisableMarkdownFolding          bool   `mapstructure:"disable-markdown-folding"`
 	DisableRepoLocking              bool   `mapstructure:"disable-repo-locking"`
 	DiscardApprovalOnPlanFlag       bool   `mapstructure:"discard-approval-on-plan"`
+	EmojiReaction                   string `mapstructure:"emoji-reaction"`
 	EnablePolicyChecksFlag          bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd                 bool   `mapstructure:"enable-regexp-cmd"`
 	EnableDiffMarkdownFormat        bool   `mapstructure:"enable-diff-markdown-format"`
