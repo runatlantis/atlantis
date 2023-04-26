@@ -13,6 +13,9 @@ on:
       - 'docker-entrypoint.sh'
       - '.github/workflows/atlantis-image.yml'
       - '**.go'
+      - 'go.*'
+      - 'yarn.lock'
+      - 'package.json'
   workflow_dispatch:
 
 concurrency:
