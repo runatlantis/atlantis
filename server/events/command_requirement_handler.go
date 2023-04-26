@@ -48,7 +48,7 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 		// this should come before mergeability check since mergeability is a superset of this check.
 		case valid.PoliciesPassedCommandReq:
 			// We should rely on this function instead of plan status, since plan status after a failed apply will not carry the policy error over.
-			if !ctx.PolicyCleared() {
+			if !ctx.ProjectPolicyStatus.PolicyCleared() {
 				return "All policies must pass for project before running apply.", nil
 			}
 		case raw.MergeableRequirement:

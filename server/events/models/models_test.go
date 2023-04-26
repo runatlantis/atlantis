@@ -571,7 +571,7 @@ policy set: policy3: passed.`,
 			pcs := models.PolicyCheckResults{
 				PolicySetResults: summary.policysetResults,
 			}
-			Equals(t, summary.policyClearedExp, pcs.PolicyCleared())
+			Equals(t, summary.policyClearedExp, pcs.PolicySetResults.PolicyCleared())
 			Equals(t, summary.policySummaryExp, pcs.PolicySummary())
 		})
 	}
@@ -611,4 +611,32 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 1, ps.StatusCount(models.DiscardedPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.ErroredPolicyCheckStatus))
 	Equals(t, 1, ps.StatusCount(models.PassedPolicyCheckStatus))
+}
+
+func TestPolicySetDataList_CompressDecompress(t *testing.T) {
+	cases := []struct {
+		description      string
+		policysetResults models.PolicySetDataList
+	}{
+		{
+			description: "test single format with single policy set",
+			policysetResults: models.PolicySetDataList{
+				{
+					PolicySetName:  "policy1",
+					ConftestOutput: "20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
+				},
+			},
+		},
+		{
+			description:      "nil type should not error",
+			policysetResults: nil,
+		},
+	}
+	for _, summary := range cases {
+		t.Run(summary.description, func(t *testing.T) {
+			compressed := summary.policysetResults.GetCompressed()
+			decompressed := compressed.GetDecompressed()
+			Equals(t, decompressed, summary.policysetResults)
+		})
+	}
 }

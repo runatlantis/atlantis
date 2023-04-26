@@ -19,12 +19,17 @@
 package models
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	paths "path"
 	"regexp"
 	"strings"
 	"time"
+
+	"compress/gzip"
+	"encoding/base64"
 
 	"github.com/runatlantis/atlantis/server/logging"
 
@@ -369,16 +374,80 @@ type PlanSuccess struct {
 type PolicySetResult struct {
 	PolicySetName  string
 	ConftestOutput string
+	PolicyHash     string
 	Passed         bool
 	ReqApprovals   int
 	CurApprovals   int
 }
 
-// PolicySetApproval tracks the number of approvals a given policy set has.
-type PolicySetStatus struct {
-	PolicySetName string
-	Passed        bool
-	Approvals     int
+// Encapsulate PolicySetResult in a custom type
+type PolicySetDataList []PolicySetResult
+
+// Compress compresses ConftestOutput on the parent for storage in the backend.
+func (p PolicySetDataList) GetCompressed() PolicySetDataList {
+	var policySetDataList PolicySetDataList
+	if p != nil {
+		for i, policySetResult := range p {
+			var conftestOutput string
+			if policySetResult.ConftestOutput != "" {
+				var b bytes.Buffer
+
+				gz := gzip.NewWriter(&b)
+				gz.Write([]byte(policySetResult.ConftestOutput))
+				gz.Flush()
+				gz.Close()
+
+				conftestOutput = base64.StdEncoding.EncodeToString(b.Bytes())
+			}
+
+			policySetDataList = append(policySetDataList, PolicySetResult{
+				PolicySetName:  p[i].PolicySetName,
+				ConftestOutput: conftestOutput,
+				PolicyHash:     p[i].PolicyHash,
+				Passed:         p[i].Passed,
+				ReqApprovals:   p[i].ReqApprovals,
+				CurApprovals:   p[i].CurApprovals,
+			})
+		}
+	}
+	return policySetDataList
+}
+
+// Decompress decompresses ConftestOutput on the parent after being pulled from the backend.
+func (p PolicySetDataList) GetDecompressed() PolicySetDataList {
+	var policySetDataList PolicySetDataList
+	if p != nil {
+		for i, policySetResult := range p {
+			var conftestOutput string
+			if policySetResult.ConftestOutput != "" {
+				dstr, _ := base64.StdEncoding.DecodeString(policySetResult.ConftestOutput)
+				gz, _ := gzip.NewReader(bytes.NewReader(dstr))
+				out, _ := ioutil.ReadAll(gz)
+				conftestOutput = string(out)
+			}
+
+			policySetDataList = append(policySetDataList, PolicySetResult{
+				PolicySetName:  p[i].PolicySetName,
+				ConftestOutput: conftestOutput,
+				PolicyHash:     p[i].PolicyHash,
+				Passed:         p[i].Passed,
+				ReqApprovals:   p[i].ReqApprovals,
+				CurApprovals:   p[i].CurApprovals,
+			})
+		}
+	}
+	return policySetDataList
+}
+
+// PolicyCleared is used to determine if policies have all succeeded or been approved.
+func (p PolicySetDataList) PolicyCleared() bool {
+	passing := true
+	for _, policySetResult := range p {
+		if !policySetResult.Passed && (policySetResult.CurApprovals != policySetResult.ReqApprovals) {
+			passing = false
+		}
+	}
+	return passing
 }
 
 // Summary regexes
@@ -428,8 +497,8 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 
 // PolicyCheckResults is the result of a successful policy check run.
 type PolicyCheckResults struct {
-	// PolicySetResults is the output from policy check binary(conftest|opa)
-	PolicySetResults []PolicySetResult
+	// PolicySetDataList is the output from policy check binary(conftest|opa)
+	PolicySetResults PolicySetDataList
 	// LockURL is the full URL to the lock held by this policy check.
 	LockURL string
 	// RePlanCmd is the command that users should run to re-plan this project.
@@ -442,22 +511,6 @@ type PolicyCheckResults struct {
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
 	HasDiverged bool
-}
-
-// ImportSuccess is the result of a successful import run.
-type ImportSuccess struct {
-	// Output is the output from terraform import
-	Output string
-	// RePlanCmd is the command that users should run to re-plan this project.
-	RePlanCmd string
-}
-
-// StateRmSuccess is the result of a successful state rm run.
-type StateRmSuccess struct {
-	// Output is the output from terraform state rm
-	Output string
-	// RePlanCmd is the command that users should run to re-plan this project.
-	RePlanCmd string
 }
 
 func (p *PolicyCheckResults) CombinedOutput() string {
@@ -483,17 +536,6 @@ func (p *PolicyCheckResults) Summary() string {
 	return strings.Trim(note, "\n")
 }
 
-// PolicyCleared is used to determine if policies have all succeeded or been approved.
-func (p *PolicyCheckResults) PolicyCleared() bool {
-	passing := true
-	for _, policySetResult := range p.PolicySetResults {
-		if !policySetResult.Passed && (policySetResult.CurApprovals != policySetResult.ReqApprovals) {
-			passing = false
-		}
-	}
-	return passing
-}
-
 // PolicySummary returns a summary of the current approval state of policy sets.
 func (p *PolicyCheckResults) PolicySummary() string {
 	var summary []string
@@ -507,6 +549,22 @@ func (p *PolicyCheckResults) PolicySummary() string {
 		}
 	}
 	return strings.Join(summary, "\n")
+}
+
+// ImportSuccess is the result of a successful import run.
+type ImportSuccess struct {
+	// Output is the output from terraform import
+	Output string
+	// RePlanCmd is the command that users should run to re-plan this project.
+	RePlanCmd string
+}
+
+// StateRmSuccess is the result of a successful state rm run.
+type StateRmSuccess struct {
+	// Output is the output from terraform state rm
+	Output string
+	// RePlanCmd is the command that users should run to re-plan this project.
+	RePlanCmd string
 }
 
 type VersionSuccess struct {
@@ -538,7 +596,7 @@ type ProjectStatus struct {
 	RepoRelDir  string
 	ProjectName string
 	// PolicySetApprovals tracks the approval status of every PolicySet for a Project.
-	PolicyStatus []PolicySetStatus
+	PolicyStatus PolicySetDataList
 	// Status is the status of where this project is at in the planning cycle.
 	Status ProjectPlanStatus
 }

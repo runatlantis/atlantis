@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 
+	"crypto/md5"
+
 	"encoding/json"
 	"regexp"
 
@@ -207,9 +209,15 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 			passed = false
 		}
 
+		sanitizedCmdOutput := c.sanitizeOutput(inputFile, cmdOutput)
+
+		policyHash := md5.Sum([]byte(sanitizedCmdOutput))
+		policyHashString := fmt.Sprintf("%x", policyHash[:])
+
 		policySetResults = append(policySetResults, models.PolicySetResult{
 			PolicySetName:  policySet.Name,
-			ConftestOutput: cmdOutput,
+			ConftestOutput: sanitizedCmdOutput,
+			PolicyHash:     policyHashString,
 			Passed:         passed,
 			ReqApprovals:   policySet.ApproveCount,
 		})
@@ -241,7 +249,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 
 	output := string(marshaledStatus)
 
-	return c.sanitizeOutput(inputFile, output), combinedErr
+	return output, combinedErr
 
 }
 

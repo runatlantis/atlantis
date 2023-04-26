@@ -795,10 +795,11 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				Workspace:  "default",
 				Failure:    "policy failure",
 				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
+					PolicySetResults: models.PolicySetDataList{
 						{
-							PolicySetName: "policy1",
-							ReqApprovals:  1,
+							PolicySetName:  "policy1",
+							ReqApprovals:   1,
+							ConftestOutput: "",
 						},
 					},
 				},
@@ -810,7 +811,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				ProjectName: "projectname",
 				Failure:     "policy failure",
 				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
+					PolicySetResults: models.PolicySetDataList{
 						{
 							PolicySetName: "policy1",
 							ReqApprovals:  1,
@@ -828,7 +829,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
 				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
+					PolicySetResults: models.PolicySetDataList{
 						{
 							PolicySetName: "policy1",
 							ReqApprovals:  1,
@@ -852,10 +853,11 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
 				Status:     models.PassedPolicyCheckStatus,
-				PolicyStatus: []models.PolicySetStatus{
+				PolicyStatus: models.PolicySetDataList{
 					{
 						PolicySetName: "policy1",
-						Approvals:     1,
+						CurApprovals:  1,
+						ReqApprovals:  1,
 					},
 				},
 			},
@@ -864,10 +866,11 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				Workspace:   "default",
 				ProjectName: "projectname",
 				Status:      models.ErroredPolicyCheckStatus,
-				PolicyStatus: []models.PolicySetStatus{
+				PolicyStatus: models.PolicySetDataList{
 					{
 						PolicySetName: "policy1",
-						Approvals:     0,
+						ReqApprovals:  1,
+						CurApprovals:  0,
 					},
 				},
 			},

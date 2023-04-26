@@ -15,10 +15,11 @@ const (
 // PolicySet objects. PolicySets struct is used by PolicyCheck workflow to build
 // context to enforce policies.
 type PolicySets struct {
-	Version      *version.Version
-	Owners       PolicyOwners
-	ApproveCount int
-	PolicySets   []PolicySet
+	Version         *version.Version
+	Owners          PolicyOwners
+	ApproveCount    int
+	StickyApprovals bool
+	PolicySets      []PolicySet
 }
 
 type PolicyOwners struct {
@@ -27,11 +28,12 @@ type PolicyOwners struct {
 }
 
 type PolicySet struct {
-	Source       string
-	Path         string
-	Name         string
-	ApproveCount int
-	Owners       PolicyOwners
+	Source          string
+	Path            string
+	Name            string
+	ApproveCount    int
+	StickyApprovals bool
+	Owners          PolicyOwners
 }
 
 func (p *PolicySets) HasPolicies() bool {

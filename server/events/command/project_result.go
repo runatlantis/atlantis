@@ -32,22 +32,6 @@ func (p ProjectResult) CommitStatus() models.CommitStatus {
 	return models.SuccessCommitStatus
 }
 
-// PolicyStatus returns the approval status of policy sets of this project result.
-func (p ProjectResult) PolicyStatus() []models.PolicySetStatus {
-	var policyStatuses []models.PolicySetStatus
-	if p.PolicyCheckResults != nil {
-		for _, policySet := range p.PolicyCheckResults.PolicySetResults {
-			policyStatus := models.PolicySetStatus{
-				PolicySetName: policySet.PolicySetName,
-				Passed:        policySet.Passed,
-				Approvals:     policySet.CurApprovals,
-			}
-			policyStatuses = append(policyStatuses, policyStatus)
-		}
-	}
-	return policyStatuses
-}
-
 // PlanStatus returns the plan status.
 func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 	switch p.Command {

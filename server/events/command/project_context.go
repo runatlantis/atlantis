@@ -66,7 +66,7 @@ type ProjectContext struct {
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
-	ProjectPolicyStatus []models.PolicySetStatus
+	ProjectPolicyStatus models.PolicySetDataList
 	// Pull is the pull request we're responding to.
 	Pull models.PullRequest
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
@@ -169,22 +169,4 @@ func getProjectIdentifier(relRepoDir string, projectName string) string {
 	// Replace . with _ to ensure projects with no project name and root dir set to "." have a valid URL
 	replacer := strings.NewReplacer("/", "-", ".", "_")
 	return replacer.Replace(relRepoDir)
-}
-
-// PolicyCleared returns whether all policies are passing or not.
-func (p ProjectContext) PolicyCleared() bool {
-	passing := true
-	for _, psStatus := range p.ProjectPolicyStatus {
-		if psStatus.Passed {
-			continue
-		}
-		for _, psCfg := range p.PolicySets.PolicySets {
-			if psStatus.PolicySetName == psCfg.Name {
-				if psStatus.Approvals != psCfg.ApproveCount {
-					passing = false
-				}
-			}
-		}
-	}
-	return passing
 }

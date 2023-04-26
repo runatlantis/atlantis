@@ -8,10 +8,11 @@ import (
 
 // PolicySets is the raw schema for repo-level atlantis.yaml config.
 type PolicySets struct {
-	Version      *string      `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
-	Owners       PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
-	PolicySets   []PolicySet  `yaml:"policy_sets" json:"policy_sets"`
-	ApproveCount int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
+	Version         *string      `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
+	Owners          PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
+	PolicySets      []PolicySet  `yaml:"policy_sets" json:"policy_sets"`
+	ApproveCount    int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
+	StickyApprovals bool         `yaml:"sticky_approvals,omitempty" json:"sticky_approvals,omitempty"`
 }
 
 func (p PolicySets) Validate() error {
@@ -44,6 +45,10 @@ func (p PolicySets) ToValid() valid.PolicySets {
 		if rawPolicySet.ApproveCount <= 0 {
 			rawPolicySet.ApproveCount = policySets.ApproveCount
 		}
+		if rawPolicySet.StickyApprovals == nil {
+			rawPolicySet.StickyApprovals = &policySets.StickyApprovals
+		}
+
 		validPolicySets = append(validPolicySets, rawPolicySet.ToValid())
 	}
 	policySets.PolicySets = validPolicySets
@@ -70,11 +75,12 @@ func (o PolicyOwners) ToValid() valid.PolicyOwners {
 }
 
 type PolicySet struct {
-	Path         string       `yaml:"path" json:"path"`
-	Source       string       `yaml:"source" json:"source"`
-	Name         string       `yaml:"name" json:"name"`
-	Owners       PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
-	ApproveCount int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
+	Path            string       `yaml:"path" json:"path"`
+	Source          string       `yaml:"source" json:"source"`
+	Name            string       `yaml:"name" json:"name"`
+	Owners          PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
+	ApproveCount    int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
+	StickyApprovals *bool        `yaml:"sticky_approvals,omitempty" json:"sticky_approvals,omitempty"`
 }
 
 func (p PolicySet) Validate() error {
@@ -82,6 +88,7 @@ func (p PolicySet) Validate() error {
 		validation.Field(&p.Name, validation.Required.Error("is required")),
 		validation.Field(&p.Owners),
 		validation.Field(&p.ApproveCount),
+		validation.Field(&p.StickyApprovals),
 		validation.Field(&p.Path, validation.Required.Error("is required")),
 		validation.Field(&p.Source, validation.In(valid.LocalPolicySet, valid.GithubPolicySet).Error("only 'local' and 'github' source types are supported")),
 	)
@@ -95,6 +102,7 @@ func (p PolicySet) ToValid() valid.PolicySet {
 	policySet.Source = p.Source
 	policySet.ApproveCount = p.ApproveCount
 	policySet.Owners = p.Owners.ToValid()
+	policySet.StickyApprovals = *p.StickyApprovals
 
 	return policySet
 }

@@ -300,16 +300,18 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 		return newStatus, errors.Wrap(err, "db transaction failed")
 	}
 
+	var newProjectResults []models.ProjectStatus
+	for _, res := range newResults {
+		newProjectResults = append(newProjectResults, r.projectResultToProject(res))
+	}
+
 	// If there is no pull OR if the pull we have is out of date, we
 	// just write a new pull.
 	if currStatus == nil || currStatus.Pull.HeadCommit != pull.HeadCommit {
-		var statuses []models.ProjectStatus
-		for _, res := range newResults {
-			statuses = append(statuses, r.projectResultToProject(res))
-		}
+
 		newStatus = models.PullStatus{
 			Pull:     pull,
-			Projects: statuses,
+			Projects: newProjectResults,
 		}
 	} else {
 		// If there's an existing pull at the right commit then we have to
@@ -318,7 +320,7 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 		// in this command and so we don't want to delete our data about
 		// other projects that aren't affected by this command.
 		newStatus = *currStatus
-		for _, res := range newResults {
+		for _, res := range newProjectResults {
 			// First, check if we should update any existing projects.
 			updatedExisting := false
 			for i := range newStatus.Projects {
@@ -329,19 +331,19 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 					res.RepoRelDir == proj.RepoRelDir &&
 					res.ProjectName == proj.ProjectName {
 
-					proj.Status = res.PlanStatus()
+					proj.Status = res.Status
 
 					// Updating only policy sets which are included in results; keeping the rest.
 					if len(proj.PolicyStatus) > 0 {
 						for i, oldPolicySet := range proj.PolicyStatus {
-							for _, newPolicySet := range res.PolicyStatus() {
+							for _, newPolicySet := range res.PolicyStatus {
 								if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
 									proj.PolicyStatus[i] = newPolicySet
 								}
 							}
 						}
 					} else {
-						proj.PolicyStatus = res.PolicyStatus()
+						proj.PolicyStatus = res.PolicyStatus
 					}
 
 					updatedExisting = true
@@ -352,7 +354,7 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 			if !updatedExisting {
 				// If we didn't update an existing project, then we need to
 				// add this because it's a new one.
-				newStatus.Projects = append(newStatus.Projects, r.projectResultToProject(res))
+				newStatus.Projects = append(newStatus.Projects, res)
 			}
 		}
 	}
@@ -372,6 +374,14 @@ func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
 		if err := json.Unmarshal([]byte(val), &p); err != nil {
 			return nil, errors.Wrapf(err, "deserializing pull at %q with contents %q", key, val)
 		}
+
+		// Decompress long text fields
+		for i, _ := range p.Projects {
+			if p.Projects[i].PolicyStatus != nil {
+				p.Projects[i].PolicyStatus = p.Projects[i].PolicyStatus.GetDecompressed()
+			}
+		}
+
 		return &p, nil
 	}
 }
@@ -412,11 +422,15 @@ func (r *RedisDB) pullKey(pull models.PullRequest) (string, error) {
 }
 
 func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
+	var policyStatus models.PolicySetDataList
+	if p.PolicyCheckResults != nil {
+		policyStatus = p.PolicyCheckResults.PolicySetResults.GetCompressed()
+	}
 	return models.ProjectStatus{
 		Workspace:    p.Workspace,
 		RepoRelDir:   p.RepoRelDir,
 		ProjectName:  p.ProjectName,
-		PolicyStatus: p.PolicyStatus(),
+		PolicyStatus: policyStatus,
 		Status:       p.PlanStatus(),
 	}
 }

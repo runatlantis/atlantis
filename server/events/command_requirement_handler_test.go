@@ -152,19 +152,12 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
 				ProjectPlanStatus: models.ErroredPolicyCheckStatus,
-				ProjectPolicyStatus: []models.PolicySetStatus{
+				ProjectPolicyStatus: models.PolicySetDataList{
 					{
 						PolicySetName: "policy1",
 						Passed:        false,
-						Approvals:     0,
-					},
-				},
-				PolicySets: valid.PolicySets{
-					PolicySets: []valid.PolicySet{
-						{
-							Name:         "policy1",
-							ApproveCount: 1,
-						},
+						CurApprovals:  0,
+						ReqApprovals:  1,
 					},
 				},
 			},

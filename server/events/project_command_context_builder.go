@@ -230,7 +230,7 @@ func newProjectCommandContext(ctx *command.Context,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
-	var projectPolicyStatus []models.PolicySetStatus
+	var projectPolicyStatus models.PolicySetDataList
 
 	if ctx.PullStatus != nil {
 		for _, project := range ctx.PullStatus.Projects {

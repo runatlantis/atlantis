@@ -755,11 +755,11 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 		description string
 
 		policySetCfg    valid.PolicySets
-		policySetStatus []models.PolicySetStatus
+		policySetStatus models.PolicySetDataList
 		userTeams       []string // Teams the user is a member of
 		targetedPolicy  string   // Policy to target when running approvals
 
-		expOut     []models.PolicySetResult
+		expOut     models.PolicySetDataList
 		expFailure string
 		hasErr     bool
 	}{
@@ -931,10 +931,10 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 					},
 				},
 			},
-			policySetStatus: []models.PolicySetStatus{
+			policySetStatus: models.PolicySetDataList{
 				{
 					PolicySetName: "policy1",
-					Approvals:     2,
+					CurApprovals:  2,
 				},
 			},
 			expOut: []models.PolicySetResult{
@@ -961,11 +961,11 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 					},
 				},
 			},
-			policySetStatus: []models.PolicySetStatus{
+			policySetStatus: models.PolicySetDataList{
 				{
 					PolicySetName: "policy1",
 					Passed:        true,
-					Approvals:     0,
+					CurApprovals:  0,
 				},
 			},
 			expOut: []models.PolicySetResult{
@@ -1001,19 +1001,19 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 					},
 				},
 			},
-			policySetStatus: []models.PolicySetStatus{
+			policySetStatus: models.PolicySetDataList{
 				{
 					PolicySetName: "policy1",
-					Approvals:     0,
+					CurApprovals:  0,
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     0,
+					CurApprovals:  0,
 					Passed:        false,
 				},
 			},
-			expOut: []models.PolicySetResult{
+			expOut: models.PolicySetDataList{
 				{
 					PolicySetName: "policy1",
 					ReqApprovals:  1,
@@ -1074,10 +1074,10 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				LockKey:      "lock-key",
 			}, nil)
 
-			var projPolicyStatus []models.PolicySetStatus
+			var projPolicyStatus models.PolicySetDataList
 			if c.policySetStatus == nil {
 				for _, p := range c.policySetCfg.PolicySets {
-					projPolicyStatus = append(projPolicyStatus, models.PolicySetStatus{
+					projPolicyStatus = append(projPolicyStatus, models.PolicySetResult{
 						PolicySetName: p.Name,
 					})
 				}

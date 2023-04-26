@@ -356,7 +356,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	var failure string
 
 	// Run over each policy set for the project and perform appropriate approval.
-	var prjPolicySetResults []models.PolicySetResult
+	var prjPolicySetResults models.PolicySetDataList
 	var prjErr error
 	allPassed := true
 	for _, policySet := range policySetCfg.PolicySets {
@@ -366,7 +366,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 			ignorePolicy := false
 			if policySet.Name == policyStatus.PolicySetName {
 				// Policy set either passed or has sufficient approvals. Move on.
-				if policyStatus.Passed || (policyStatus.Approvals == policySet.ApproveCount) {
+				if policyStatus.Passed || (policyStatus.CurApprovals == policySet.ApproveCount) {
 					ignorePolicy = true
 				}
 				// Set ignore flag if targeted policy does not match.
@@ -375,19 +375,19 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 				}
 				// Increment approval if user is owner.
 				if isOwner && !ignorePolicy {
-					prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
+					prjPolicyStatus[i].CurApprovals = policyStatus.CurApprovals + 1
 					// User is not authorized to approve policy set.
 				} else if !ignorePolicy {
 					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
 				}
 				// Still bubble up this failure, even if policy set is not targeted.
-				if !policyStatus.Passed && (prjPolicyStatus[i].Approvals != policySet.ApproveCount) {
+				if !policyStatus.Passed && (prjPolicyStatus[i].CurApprovals != policySet.ApproveCount) {
 					allPassed = false
 				}
 				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
 					PolicySetName: policySet.Name,
 					Passed:        policyStatus.Passed,
-					CurApprovals:  prjPolicyStatus[i].Approvals,
+					CurApprovals:  prjPolicyStatus[i].CurApprovals,
 					ReqApprovals:  policySet.ApproveCount,
 				})
 			}
@@ -497,7 +497,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// One reason to pass such an arg to conftest would be to prevent workflow termination so custom run scripts
 	// can be run after the conftest step.
 	ctx.Log.Err(strings.Join(outputs, "\n"))
-	if !result.PolicyCleared() {
+	if !result.PolicySetResults.PolicyCleared() {
 		failure = "Some policy sets did not pass."
 	}
 

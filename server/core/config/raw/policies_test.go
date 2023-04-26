@@ -199,8 +199,9 @@ func TestPolicySets_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.PolicySets{
-				Version:      version,
-				ApproveCount: 1,
+				Version:         version,
+				ApproveCount:    1,
+				StickyApprovals: false,
 				Owners: valid.PolicyOwners{
 					Users: []string{"test"},
 					Teams: []string{"testteam"},
@@ -215,8 +216,9 @@ func TestPolicySets_ToValid(t *testing.T) {
 								"jane-doe",
 							},
 						},
-						Path:   "rel/path/to/source",
-						Source: "local",
+						Path:            "rel/path/to/source",
+						Source:          "local",
+						StickyApprovals: false,
 					},
 				},
 			},
@@ -240,8 +242,9 @@ func TestPolicySets_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.PolicySets{
-				Version:      version,
-				ApproveCount: 1,
+				Version:         version,
+				ApproveCount:    1,
+				StickyApprovals: false,
 				PolicySets: []valid.PolicySet{
 					{
 						Name: "good-policy",
@@ -251,9 +254,91 @@ func TestPolicySets_ToValid(t *testing.T) {
 								"jane-doe",
 							},
 						},
-						Path:         "rel/path/to/source",
-						Source:       "local",
-						ApproveCount: 1,
+						Path:            "rel/path/to/source",
+						Source:          "local",
+						ApproveCount:    1,
+						StickyApprovals: false,
+					},
+				},
+			},
+		},
+		{
+			description: "sticky approvals inherit from top-level",
+			input: raw.PolicySets{
+				Version:         String("v1.0.0"),
+				StickyApprovals: true,
+				PolicySets: []raw.PolicySet{
+					{
+						Name: "good-policy",
+						Owners: raw.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
+						},
+						Path:   "rel/path/to/source",
+						Source: valid.LocalPolicySet,
+					},
+				},
+			},
+			exp: valid.PolicySets{
+				Version:         version,
+				ApproveCount:    1,
+				StickyApprovals: true,
+				PolicySets: []valid.PolicySet{
+					{
+						Name: "good-policy",
+						Owners: valid.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
+						},
+						Path:            "rel/path/to/source",
+						Source:          "local",
+						ApproveCount:    1,
+						StickyApprovals: true,
+					},
+				},
+			},
+		},
+		{
+			description: "sticky approvals override top-level, when set",
+			input: raw.PolicySets{
+				Version:         String("v1.0.0"),
+				StickyApprovals: true,
+				PolicySets: []raw.PolicySet{
+					{
+						Name:            "good-policy",
+						StickyApprovals: false,
+						Owners: raw.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
+						},
+						Path:   "rel/path/to/source",
+						Source: valid.LocalPolicySet,
+					},
+				},
+			},
+			exp: valid.PolicySets{
+				Version:         version,
+				ApproveCount:    1,
+				StickyApprovals: true,
+				PolicySets: []valid.PolicySet{
+					{
+						Name: "good-policy",
+						Owners: valid.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
+						},
+						Path:            "rel/path/to/source",
+						Source:          "local",
+						ApproveCount:    1,
+						StickyApprovals: false,
 					},
 				},
 			},

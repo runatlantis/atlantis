@@ -207,7 +207,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				PolicyCheckResults:    *result.PolicyCheckResults,
 				PolicyCheckSummary:    result.PolicyCheckResults.Summary(),
 				PolicyApprovalSummary: result.PolicyCheckResults.PolicySummary(),
-				PolicyCleared:         result.PolicyCheckResults.PolicyCleared(),
+				PolicyCleared:         result.PolicyCheckResults.PolicySetResults.PolicyCleared(),
 				commonData:            common,
 			}
 			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckResults.CombinedOutput()) {
@@ -223,7 +223,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				PolicyCheckResults:    *result.PolicyCheckResults,
 				PolicyCheckSummary:    result.PolicyCheckResults.Summary(),
 				PolicyApprovalSummary: result.PolicyCheckResults.PolicySummary(),
-				PolicyCleared:         result.PolicyCheckResults.PolicyCleared(),
+				PolicyCleared:         result.PolicyCheckResults.PolicySetResults.PolicyCleared(),
 				commonData:            common,
 			}
 			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckResults.CombinedOutput()) {
