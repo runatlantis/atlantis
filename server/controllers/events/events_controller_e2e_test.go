@@ -940,6 +940,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+
 		{
 			Description:                "failing policy checks with quiet flag enabled",
 			RepoDir:                    "policy-checks",
@@ -954,6 +955,26 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "replan after approving policies with policy approval cached",
+			RepoDir:       "policy-checks-policy-caching",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis approve_policies",
+				"atlantis plan",
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-approve-policies.txt"},
+				{"exp-output-replan.txt"},
+				{"exp-output-policy-check-2.txt"},
+				{"exp-output-apply-success.txt"},
 				{"exp-output-merge.txt"},
 			},
 		},

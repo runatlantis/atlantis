@@ -1,0 +1,10 @@
+policies:
+  sticky_approvals: true
+  owners:
+    users:
+      - runatlantis
+  policy_sets:
+    - name: test_policy
+      path: policies/policy.rego
+      source: local
+        
