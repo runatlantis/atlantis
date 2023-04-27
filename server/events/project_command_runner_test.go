@@ -14,6 +14,7 @@
 package events_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -1105,6 +1106,237 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				Assert(t, res.Error != nil, "expecting error.")
 			} else {
 				Assert(t, res.Error == nil, "not expecting error.")
+			}
+		})
+	}
+}
+
+// Test policy check logic.
+func TestDefaultProjectCommandRunner_PolicyCheck(t *testing.T) {
+	cases := []struct {
+		description string
+
+		policySetCfg     valid.PolicySets
+		policySetStatus  models.PolicySetDataList
+		conftesetResults models.PolicySetDataList
+
+		equalsPrevStatus bool
+	}{
+		{
+			description: "previous approvals cleared on matching policy checks without sticky approvals.",
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Name:            "policy1",
+						StickyApprovals: false,
+					},
+				},
+			},
+			policySetStatus: models.PolicySetDataList{
+				{
+					PolicySetName:  "policy1",
+					Passed:         false,
+					ConftestOutput: "some failures",
+					PolicyHash:     "1234abce",
+					CurApprovals:   1,
+					ReqApprovals:   1,
+				},
+			},
+			conftesetResults: models.PolicySetDataList{
+				{
+					PolicySetName:  "policy1",
+					Passed:         false,
+					ConftestOutput: "some failures",
+					PolicyHash:     "1234abce",
+					CurApprovals:   0,
+					ReqApprovals:   1,
+				},
+			},
+			equalsPrevStatus: false,
+		},
+		{
+			description: "previous approvals retained on matching policy checks with sticky approvals.",
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Name:            "policy1",
+						StickyApprovals: true,
+					},
+				},
+			},
+			policySetStatus: models.PolicySetDataList{
+				{
+					PolicySetName:  "policy1",
+					Passed:         false,
+					ConftestOutput: "some failures",
+					PolicyHash:     "1234abce",
+					CurApprovals:   1,
+					ReqApprovals:   1,
+				},
+			},
+			conftesetResults: models.PolicySetDataList{
+				{
+					PolicySetName:  "policy1",
+					Passed:         false,
+					ConftestOutput: "some failures",
+					PolicyHash:     "1234abce",
+					CurApprovals:   0,
+					ReqApprovals:   1,
+				},
+			},
+			equalsPrevStatus: true,
+		},
+		{
+			description: "previous approvals cleared on non-matching policy checks and no sticky approvals.",
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Name:            "policy1",
+						StickyApprovals: false,
+					},
+				},
+			},
+			policySetStatus: models.PolicySetDataList{
+				{
+					PolicySetName:  "policy1",
+					Passed:         false,
+					ConftestOutput: "some failures",
+					PolicyHash:     "1234abce",
+					CurApprovals:   1,
+					ReqApprovals:   1,
+				},
+			},
+			conftesetResults: models.PolicySetDataList{
+				{
+					PolicySetName:  "policy1",
+					Passed:         false,
+					ConftestOutput: "some other failures",
+					PolicyHash:     "9999zzzz",
+					CurApprovals:   0,
+					ReqApprovals:   1,
+				},
+			},
+			equalsPrevStatus: false,
+		},
+		{
+			description: "previous approvals cleared on non-matching policy checks with sticky approvals.",
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Name:            "policy1",
+						StickyApprovals: true,
+					},
+				},
+			},
+			policySetStatus: models.PolicySetDataList{
+				{
+					PolicySetName:  "policy1",
+					Passed:         false,
+					ConftestOutput: "some failures",
+					PolicyHash:     "1234abce",
+					CurApprovals:   1,
+					ReqApprovals:   1,
+				},
+			},
+			conftesetResults: models.PolicySetDataList{
+				{
+					PolicySetName:  "policy1",
+					Passed:         false,
+					ConftestOutput: "some other failures",
+					PolicyHash:     "9999zzzz",
+					CurApprovals:   0,
+					ReqApprovals:   1,
+				},
+			},
+			equalsPrevStatus: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockVcsClient := vcsmocks.NewMockClient()
+			mockInit := mocks.NewMockStepRunner()
+			mockPlan := mocks.NewMockStepRunner()
+			mockApply := mocks.NewMockStepRunner()
+			mockPolicyCheck := mocks.NewMockStepRunner()
+			mockRun := mocks.NewMockCustomStepRunner()
+			mockEnv := mocks.NewMockEnvStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+			mockSender := mocks.NewMockWebhooksSender()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                mockLocker,
+				VcsClient:             mockVcsClient,
+				LockURLGenerator:      mockURLGenerator{},
+				PolicyCheckStepRunner: mockPolicyCheck,
+				InitStepRunner:        mockInit,
+				PlanStepRunner:        mockPlan,
+				ApplyStepRunner:       mockApply,
+				RunStepRunner:         mockRun,
+				EnvStepRunner:         mockEnv,
+				WorkingDir:            mockWorkingDir,
+				Webhooks:              mockSender,
+				WorkingDirLocker:      events.NewDefaultWorkingDirLocker(),
+			}
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				matchers.AnyModelsRepo(),
+				matchers.AnyModelsPullRequest(),
+				AnyString(),
+			)).ThenReturn(repoDir, nil)
+			When(mockLocker.TryLock(
+				matchers.AnyLoggingSimpleLogging(),
+				matchers.AnyModelsPullRequest(),
+				matchers.AnyModelsUser(),
+				AnyString(),
+				matchers.AnyModelsProject(),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
+
+			//expEnvs := map[string]string{
+			//	"name": "value",
+			//}
+			var projPolicyStatus models.PolicySetDataList
+			if c.policySetStatus == nil {
+				for _, p := range c.policySetCfg.PolicySets {
+					projPolicyStatus = append(projPolicyStatus, models.PolicySetResult{
+						PolicySetName: p.Name,
+					})
+				}
+			} else {
+				projPolicyStatus = c.policySetStatus
+			}
+
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			ctx := command.ProjectContext{
+				Log:                 logging.NewNoopLogger(t),
+				Workspace:           "default",
+				RepoRelDir:          ".",
+				PolicySets:          c.policySetCfg,
+				ProjectPolicyStatus: projPolicyStatus,
+				Pull:                modelPull,
+				Steps: []valid.Step{
+					{
+						StepName: "policy_check",
+					},
+				},
+			}
+
+			out, _ := json.Marshal(c.conftesetResults)
+
+			When(mockPolicyCheck.Run(ctx, nil, repoDir, make(map[string]string))).ThenReturn(string(out), nil)
+			res := runner.PolicyCheck(ctx)
+			mockPolicyCheck.VerifyWasCalledOnce().Run(ctx, nil, repoDir, make(map[string]string))
+
+			if c.equalsPrevStatus {
+				Equals(t, c.policySetStatus, res.PolicyCheckResults.PolicySetResults)
+			} else {
+				Equals(t, c.conftesetResults, res.PolicyCheckResults.PolicySetResults)
 			}
 		})
 	}
