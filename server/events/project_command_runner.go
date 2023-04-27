@@ -385,10 +385,12 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					allPassed = false
 				}
 				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
-					PolicySetName: policySet.Name,
-					Passed:        policyStatus.Passed,
-					CurApprovals:  prjPolicyStatus[i].CurApprovals,
-					ReqApprovals:  policySet.ApproveCount,
+					PolicySetName:  policySet.Name,
+					Passed:         policyStatus.Passed,
+					CurApprovals:   prjPolicyStatus[i].CurApprovals,
+					ReqApprovals:   policySet.ApproveCount,
+					ConftestOutput: prjPolicyStatus[i].ConftestOutput,
+					PolicyHash:     prjPolicyStatus[i].PolicyHash,
 				})
 			}
 		}
@@ -479,10 +481,27 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		}
 	}
 
-	var policySetResults []models.PolicySetResult
+	var policySetResults models.PolicySetDataList
 	err = json.Unmarshal([]byte(strings.Join(outputs, "\n")), &policySetResults)
 	if err != nil {
 		return nil, "", err
+	}
+
+	// Retain previous approval counts if policy runs match and `StickApprovals` enabled.
+	for i, policySetResult := range policySetResults {
+		var policyHash string
+		var curApprovals int
+		for _, policyStatus := range ctx.ProjectPolicyStatus {
+			if policySetResult.PolicySetName == policyStatus.PolicySetName {
+				policyHash = policyStatus.PolicyHash
+				curApprovals = policyStatus.CurApprovals
+			}
+		}
+		for _, policySet := range ctx.PolicySets.PolicySets {
+			if policySetResult.PolicySetName == policySet.Name && policySet.StickyApprovals && policySetResult.PolicyHash == policyHash {
+				policySetResults[i].CurApprovals = curApprovals
+			}
+		}
 	}
 
 	result := &models.PolicyCheckResults{

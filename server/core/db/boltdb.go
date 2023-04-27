@@ -327,18 +327,16 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 			return err
 		}
 
-		var newProjectResults []models.ProjectStatus
-		for _, r := range newResults {
-			newProjectResults = append(newProjectResults, b.projectResultToProject(r))
-		}
-
 		// If there is no pull OR if the pull we have is out of date, we
 		// just write a new pull.
 		if currStatus == nil || currStatus.Pull.HeadCommit != pull.HeadCommit {
-
+			var statuses []models.ProjectStatus
+			for _, r := range newResults {
+				statuses = append(statuses, b.projectResultToProject(r))
+			}
 			newStatus = models.PullStatus{
 				Pull:     pull,
-				Projects: newProjectResults,
+				Projects: statuses,
 			}
 		} else {
 			// If there's an existing pull at the right commit then we have to
@@ -347,7 +345,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 			// in this command and so we don't want to delete our data about
 			// other projects that aren't affected by this command.
 			newStatus = *currStatus
-			for _, res := range newProjectResults {
+			for _, res := range newResults {
 				// First, check if we should update any existing projects.
 				updatedExisting := false
 				for i := range newStatus.Projects {
@@ -358,19 +356,19 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 						res.RepoRelDir == proj.RepoRelDir &&
 						res.ProjectName == proj.ProjectName {
 
-						proj.Status = res.Status
+						proj.Status = res.PlanStatus()
 
 						// Updating only policy sets which are included in results; keeping the rest.
 						if len(proj.PolicyStatus) > 0 {
-							for i, oldPolicySet := range proj.PolicyStatus {
-								for _, newPolicySetStatuses := range res.PolicyStatus {
-									if oldPolicySet.PolicySetName == newPolicySetStatuses.PolicySetName {
-										proj.PolicyStatus[i] = newPolicySetStatuses
+							for i, oldPolicySet := range proj.PolicyStatus.GetCompressed() {
+								for _, newPolicySet := range res.PolicyStatus() {
+									if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
+										proj.PolicyStatus[i] = newPolicySet
 									}
 								}
 							}
 						} else {
-							proj.PolicyStatus = res.PolicyStatus
+							proj.PolicyStatus = res.PolicyStatus()
 						}
 
 						updatedExisting = true
@@ -381,7 +379,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 				if !updatedExisting {
 					// If we didn't update an existing project, then we need to
 					// add this because it's a new one.
-					newStatus.Projects = append(newStatus.Projects, res)
+					newStatus.Projects = append(newStatus.Projects, b.projectResultToProject(res))
 				}
 			}
 		}
@@ -406,6 +404,15 @@ func (b *BoltDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, err
 		s, txErr = b.getPullFromBucket(bucket, key)
 		return txErr
 	})
+
+	// Decompress large text in PolicyStatus
+	if s != nil {
+		for i, projStatus := range s.Projects {
+			if projStatus.PolicyStatus != nil {
+				s.Projects[i].PolicyStatus = projStatus.PolicyStatus.GetDecompressed()
+			}
+		}
+	}
 	return s, errors.Wrap(err, "DB transaction failed")
 }
 
@@ -487,13 +494,6 @@ func (b *BoltDB) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.Pul
 		return nil, errors.Wrapf(err, "deserializing pull at %q with contents %q", key, serialized)
 	}
 
-	// Decompress long text fields
-	for i, _ := range p.Projects {
-		if p.Projects[i].PolicyStatus != nil {
-			p.Projects[i].PolicyStatus = p.Projects[i].PolicyStatus.GetDecompressed()
-		}
-	}
-
 	return &p, nil
 }
 
@@ -506,15 +506,11 @@ func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.
 }
 
 func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
-	var policyStatus models.PolicySetDataList
-	if p.PolicyCheckResults != nil {
-		policyStatus = p.PolicyCheckResults.PolicySetResults.GetCompressed()
-	}
 	return models.ProjectStatus{
 		Workspace:    p.Workspace,
 		RepoRelDir:   p.RepoRelDir,
 		ProjectName:  p.ProjectName,
-		PolicyStatus: policyStatus,
+		PolicyStatus: p.PolicyStatus(),
 		Status:       p.PlanStatus(),
 	}
 }

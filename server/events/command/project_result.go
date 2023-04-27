@@ -32,6 +32,14 @@ func (p ProjectResult) CommitStatus() models.CommitStatus {
 	return models.SuccessCommitStatus
 }
 
+func (p ProjectResult) PolicyStatus() models.PolicySetDataList {
+	var policyStatuses models.PolicySetDataList
+	if p.PolicyCheckResults != nil {
+		policyStatuses = p.PolicyCheckResults.PolicySetResults.GetCompressed()
+	}
+	return policyStatuses
+}
+
 // PlanStatus returns the plan status.
 func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 	switch p.Command {

@@ -1,7 +1,7 @@
 {{ define "policyCheckResultsUnwrapped" -}}
-{{- if eq .Command "Policy Check" }}
+
 {{ template "policyCheck" .PolicySetResults }}
-{{- end }}
+
 {{- if .PolicyCleared }}
 * :arrow_forward: To **apply** this plan, comment:
     * `{{ .ApplyCmd }}`

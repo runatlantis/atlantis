@@ -166,6 +166,8 @@ func TestPolicySets_Validate(t *testing.T) {
 }
 
 func TestPolicySets_ToValid(t *testing.T) {
+	trueValue := true
+	falseValue := false
 	version, _ := version.NewVersion("v1.0.0")
 	cases := []struct {
 		description string
@@ -303,14 +305,14 @@ func TestPolicySets_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "sticky approvals override top-level, when set",
+			description: "sticky approvals override top-level, when set. case 1.",
 			input: raw.PolicySets{
 				Version:         String("v1.0.0"),
 				StickyApprovals: true,
 				PolicySets: []raw.PolicySet{
 					{
 						Name:            "good-policy",
-						StickyApprovals: false,
+						StickyApprovals: &falseValue,
 						Owners: raw.PolicyOwners{
 							Users: []string{
 								"john-doe",
@@ -339,6 +341,47 @@ func TestPolicySets_ToValid(t *testing.T) {
 						Source:          "local",
 						ApproveCount:    1,
 						StickyApprovals: false,
+					},
+				},
+			},
+		},
+		{
+			description: "sticky approvals override top-level, when set. case 2.",
+			input: raw.PolicySets{
+				Version:         String("v1.0.0"),
+				StickyApprovals: false,
+				PolicySets: []raw.PolicySet{
+					{
+						Name:            "good-policy",
+						StickyApprovals: &trueValue,
+						Owners: raw.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
+						},
+						Path:   "rel/path/to/source",
+						Source: valid.LocalPolicySet,
+					},
+				},
+			},
+			exp: valid.PolicySets{
+				Version:         version,
+				ApproveCount:    1,
+				StickyApprovals: false,
+				PolicySets: []valid.PolicySet{
+					{
+						Name: "good-policy",
+						Owners: valid.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
+						},
+						Path:            "rel/path/to/source",
+						Source:          "local",
+						ApproveCount:    1,
+						StickyApprovals: true,
 					},
 				},
 			},

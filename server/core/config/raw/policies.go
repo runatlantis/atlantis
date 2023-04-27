@@ -32,6 +32,7 @@ func (p PolicySets) ToValid() valid.PolicySets {
 	// Default number of required reviews for all policy sets should be 1.
 	// Negative numbers are automatically set to 1.
 	policySets.ApproveCount = p.ApproveCount
+	policySets.StickyApprovals = p.StickyApprovals
 	if policySets.ApproveCount <= 0 {
 		policySets.ApproveCount = 1
 	}
@@ -80,7 +81,7 @@ type PolicySet struct {
 	Name            string       `yaml:"name" json:"name"`
 	Owners          PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
 	ApproveCount    int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
-	StickyApprovals *bool        `yaml:"sticky_approvals,omitempty" json:"sticky_approvals,omitempty"`
+	StickyApprovals *bool        `yaml:"sticky_approvals,omitempty" json:"sticky_approvals,omitempty"` // PTR reference is used to achieve a ternary conditional for value inheritence.
 }
 
 func (p PolicySet) Validate() error {
