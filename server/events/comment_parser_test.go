@@ -1027,17 +1027,19 @@ var ApplyUsage = `Usage of apply:
 `
 
 var ApprovePolicyUsage = `Usage of approve_policies:
-      --clear-approval      Clear any existing policy approvals.
-  -d, --dir string          Approve policies for this directory, relative to root of
-                            repo, ex. 'child/dir'.
-      --policy-set string   Approve policies for this project. Refers to the name of
-                            the project configured in a repo config file. Cannot be
-                            used at same time as workspace or dir flags.
-  -p, --project string      Approve policies for this project. Refers to the name of
-                            the project configured in a repo config file. Cannot be
-                            used at same time as workspace or dir flags.
-      --verbose             Append Atlantis log to comment.
-  -w, --workspace string    Approve policies for this Terraform workspace.
+      --clear-policy-approval   Clear any existing policy approvals.
+  -d, --dir string              Approve policies for this directory, relative to
+                                root of repo, ex. 'child/dir'.
+      --policy-set string       Approve policies for this project. Refers to the
+                                name of the project configured in a repo config
+                                file. Cannot be used at same time as workspace or
+                                dir flags.
+  -p, --project string          Approve policies for this project. Refers to the
+                                name of the project configured in a repo config
+                                file. Cannot be used at same time as workspace or
+                                dir flags.
+      --verbose                 Append Atlantis log to comment.
+  -w, --workspace string        Approve policies for this Terraform workspace.
 `
 
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
