@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"crypto/md5"
+	"crypto/md5" // nolint: gosec
 
 	"encoding/json"
 	"regexp"
@@ -211,7 +211,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 
 		sanitizedCmdOutput := c.sanitizeOutput(inputFile, cmdOutput)
 
-		policyHash := md5.Sum([]byte(sanitizedCmdOutput))
+		policyHash := md5.Sum([]byte(sanitizedCmdOutput)) // nolint: gosec
 		policyHashString := fmt.Sprintf("%x", policyHash[:])
 
 		policySetResults = append(policySetResults, models.PolicySetResult{

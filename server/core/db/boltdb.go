@@ -360,7 +360,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 
 						// Updating only policy sets which are included in results; keeping the rest.
 						if len(proj.PolicyStatus) > 0 {
-							for i, oldPolicySet := range proj.PolicyStatus.GetCompressed() {
+							for i, oldPolicySet := range proj.PolicyStatus {
 								for _, newPolicySet := range res.PolicyStatus() {
 									if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
 										proj.PolicyStatus[i] = newPolicySet

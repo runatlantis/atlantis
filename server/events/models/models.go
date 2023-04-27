@@ -21,7 +21,7 @@ package models
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/url"
 	paths "path"
 	"regexp"
@@ -386,29 +386,37 @@ type PolicySetDataList []PolicySetResult
 // Compress compresses ConftestOutput on the parent for storage in the backend.
 func (p PolicySetDataList) GetCompressed() PolicySetDataList {
 	var policySetDataList PolicySetDataList
-	if p != nil {
-		for i, policySetResult := range p {
-			var conftestOutput string
-			if policySetResult.ConftestOutput != "" {
-				var b bytes.Buffer
+	for i, policySetResult := range p {
+		var conftestOutput string
+		if policySetResult.ConftestOutput != "" {
+			var b bytes.Buffer
 
-				gz := gzip.NewWriter(&b)
-				gz.Write([]byte(policySetResult.ConftestOutput))
-				gz.Flush()
-				gz.Close()
-
-				conftestOutput = base64.StdEncoding.EncodeToString(b.Bytes())
+			// Errors are highly unlikely and DB update logic is a bit hairy, just panic if errors occur.
+			gz := gzip.NewWriter(&b)
+			_, err := gz.Write([]byte(policySetResult.ConftestOutput))
+			if err != nil {
+				panic(err)
+			}
+			err = gz.Flush()
+			if err != nil {
+				panic(err)
+			}
+			err = gz.Close()
+			if err != nil {
+				panic(err)
 			}
 
-			policySetDataList = append(policySetDataList, PolicySetResult{
-				PolicySetName:  p[i].PolicySetName,
-				ConftestOutput: conftestOutput,
-				PolicyHash:     p[i].PolicyHash,
-				Passed:         p[i].Passed,
-				ReqApprovals:   p[i].ReqApprovals,
-				CurApprovals:   p[i].CurApprovals,
-			})
+			conftestOutput = base64.StdEncoding.EncodeToString(b.Bytes())
 		}
+
+		policySetDataList = append(policySetDataList, PolicySetResult{
+			PolicySetName:  p[i].PolicySetName,
+			ConftestOutput: conftestOutput,
+			PolicyHash:     p[i].PolicyHash,
+			Passed:         p[i].Passed,
+			ReqApprovals:   p[i].ReqApprovals,
+			CurApprovals:   p[i].CurApprovals,
+		})
 	}
 	return policySetDataList
 }
@@ -416,25 +424,33 @@ func (p PolicySetDataList) GetCompressed() PolicySetDataList {
 // Decompress decompresses ConftestOutput on the parent after being pulled from the backend.
 func (p PolicySetDataList) GetDecompressed() PolicySetDataList {
 	var policySetDataList PolicySetDataList
-	if p != nil {
-		for i, policySetResult := range p {
-			var conftestOutput string
-			if policySetResult.ConftestOutput != "" {
-				dstr, _ := base64.StdEncoding.DecodeString(policySetResult.ConftestOutput)
-				gz, _ := gzip.NewReader(bytes.NewReader(dstr))
-				out, _ := ioutil.ReadAll(gz)
-				conftestOutput = string(out)
+	for i, policySetResult := range p {
+		var conftestOutput string
+		if policySetResult.ConftestOutput != "" {
+			// Errors are highly unlikely and DB update logic is a bit hairy, just panic if errors occur.
+			dstr, err := base64.StdEncoding.DecodeString(policySetResult.ConftestOutput)
+			if err != nil {
+				panic(err)
 			}
-
-			policySetDataList = append(policySetDataList, PolicySetResult{
-				PolicySetName:  p[i].PolicySetName,
-				ConftestOutput: conftestOutput,
-				PolicyHash:     p[i].PolicyHash,
-				Passed:         p[i].Passed,
-				ReqApprovals:   p[i].ReqApprovals,
-				CurApprovals:   p[i].CurApprovals,
-			})
+			gz, err := gzip.NewReader(bytes.NewReader(dstr))
+			if err != nil {
+				panic(err)
+			}
+			out, err := io.ReadAll(gz)
+			if err != nil {
+				panic(err)
+			}
+			conftestOutput = string(out)
 		}
+
+		policySetDataList = append(policySetDataList, PolicySetResult{
+			PolicySetName:  p[i].PolicySetName,
+			ConftestOutput: conftestOutput,
+			PolicyHash:     p[i].PolicyHash,
+			Passed:         p[i].Passed,
+			ReqApprovals:   p[i].ReqApprovals,
+			CurApprovals:   p[i].CurApprovals,
+		})
 	}
 	return policySetDataList
 }

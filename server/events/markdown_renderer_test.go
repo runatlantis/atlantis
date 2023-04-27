@@ -1318,7 +1318,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 				RepoRelDir: "path",
 				PolicyCheckResults: &models.PolicyCheckResults{
 					PolicySetResults: []models.PolicySetResult{
-						models.PolicySetResult{
+						{
 							PolicySetName:  "policy1",
 							ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 							Passed:         true,
