@@ -263,7 +263,7 @@ $$$
 			[]command.ProjectResult{
 				{
 					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
+						PolicySetResults: models.PolicySetDataList{
 							{
 								PolicySetName: "policy1",
 								// strings.Repeat require to get wrapped result
@@ -331,7 +331,7 @@ $$$
 			[]command.ProjectResult{
 				{
 					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
+						PolicySetResults: models.PolicySetDataList{
 							{
 								PolicySetName: "policy1",
 								// strings.Repeat require to get wrapped result
@@ -355,6 +355,7 @@ $$$
 			`Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
 
 <details><summary>Show Output</summary>
+
 
 
 #### Policy Set: $policy1$
@@ -564,8 +565,8 @@ $$$
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							models.PolicySetResult{
+						PolicySetResults: models.PolicySetDataList{
+							{
 								PolicySetName:  "policy1",
 								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 								Passed:         true,
@@ -581,8 +582,8 @@ $$$
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
 					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							models.PolicySetResult{
+						PolicySetResults: models.PolicySetDataList{
+							{
 								PolicySetName:  "policy1",
 								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 								Passed:         true,
@@ -777,8 +778,8 @@ $$$
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							models.PolicySetResult{
+						PolicySetResults: models.PolicySetDataList{
+							{
 								PolicySetName:  "policy1",
 								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 								Passed:         true,
@@ -793,8 +794,8 @@ $$$
 					RepoRelDir: "path2",
 					Failure:    "failure",
 					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							models.PolicySetResult{
+						PolicySetResults: models.PolicySetDataList{
+							{
 								PolicySetName:  "policy1",
 								ConftestOutput: "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
 								Passed:         false,
