@@ -21,7 +21,7 @@ Any failures need to either be addressed in a successive commit, or approved by 
 ![Policy Check Approval](./images/policy-check-approval.png)
 
 :::warning
-Any plans following the approval will discard any policy approval and prompt again for it.
+Any plans following the approval will discard any policy approval and prompt again for it, unless 'sticky approvals' are enabled.
 :::
 
 ## Getting Started
@@ -43,6 +43,7 @@ policies:
   owners:
     users:
       - nishkrishnan
+  sticky_approvals: false
   policy_sets:
     - name: deny_null_resource
       path: <CODE_DIRECTORY>/policies/deny_null_resource/
@@ -60,7 +61,8 @@ policies:
 - `path` - Path to a policies directory. *Note: replace `<CODE_DIRECTORY>` with absolute dir path to conftest policy/policies.*
 - `source` - Tells atlantis where to fetch the policies from. Currently you can only host policies locally by using `local`.
 - `owners` - Defines the users/teams which are able to approve a specific policy set.
-- `approve_count` - Defines the number of approvals needed to bypass policy checks. Defaults to the top-level policies configuration, if not specified.
+- `approve_count` - Defines the number of approvals needed to bypass policy checks. Defaults to the top-level policies configuration, if not specified. Top-level defaults to 1.
+- `sticky_approvals` = Determins whether to preserve approval counts between policy check runs, when output from conftest is identical. Defaults to the top-level policies configuration if not specified. Top-level defaults to false.
 
 By default conftest is configured to only run the `main` package. If you wish to run specific/multiple policies consider passing `--namespace` or `--all-namespaces` to conftest with [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) via a custom workflow as shown in the below example.
 
@@ -184,4 +186,34 @@ When the policy check workflow runs, a file is created in the working directory 
   }
 ]
 
+```
+
+### Sticky Approvals
+:::warning
+Please be aware of the risks involved in using this feature. It can introduce a vector for allowing unauthorized changes through if certain mitigating factors are not present.
+:::
+The policy configuration setting `sticky_approvals` will preserve approval counts between policy check runs, if and only if the output from conftest is identical.
+
+This can be useful for keeping development velocity high. Sometimes small changes need to be made after initial approval, and seeking additional review/approval can add unecessary friction. Especially if there are multiple separate policy sets with different owners.
+
+Examples of potential use cases:
+- PR is rebased
+- Changes to PR are made, which have no bearing on the triggered policies
+
+#### Risk
+
+Risk with using sticky approvals comes from how policy failures can be interpreted by Atlantis. As of now, the best that can be done is to compare the output from conftest. Lower cardinality messaging opens the door to big problems.
+
+Take for instance, a policy which is triggered on vpc peering connections. Consider the policy, when triggered, provides a general statement:
+```
+Fail - <redacted> - vpc peering connections are disallowed.
+```
+
+Let's say that the resource is triggered for destination VPC `dest-VPC` and source VPC `acceptable-source-VPC`. The PR is reviewed and approved. The author then changes source VPC to `bad-source-VPC`. In this case, a new plan would occur, but policy messaging would remain the same, thus preserving previous approval counts. No further policy reviews would be required, and the bad change would be free to go through.
+
+To prevent this sort of policy side-stepping, it is imperative to write policy messages so that they have high cardinality; they should be explicit and discreetly identifiable.
+
+A better output for such a policy would be along the lines of:
+```
+Fail - <redacted> - vpc peering connections are disallowed. Source VPC: `acceptable-source-VPC` Dest VPC: `dest-VPC`
 ```

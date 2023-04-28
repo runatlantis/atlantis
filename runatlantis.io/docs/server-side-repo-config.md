@@ -519,13 +519,13 @@ If you set a workflow with the key `default`, it will override this.
 
 ### Policies
 
-| Key                    | Type            | Default | Required  | Description                                                           |
-|------------------------|-----------------|---------|-----------|-----------------------------------------------------------------------|
-| conftest_version       | string          | none    | no        | conftest version to run all policy sets                               |
-| owners                 | Owners(#Owners) | none    | yes       | owners that can approve failing policies                              |
-| approve_count          | int             | 1       | no        | number of approvals required to bypass failing policies               |
-| sticky_approvals       | bool            | false   | no        | whether to preserve previous approval counts if policy outputs match  |
-| policy_sets            | []PolicySet     | none    | yes       | set of policies to run on a plan output                               |
+| Key                    | Type                        | Default | Required  | Description                                                           |
+|------------------------|-----------------------------|---------|-----------|-----------------------------------------------------------------------|
+| conftest_version       | string                      | none    | no        | conftest version to run all policy sets                               |
+| owners                 | [Owners](#owners)           | none    | yes       | owners that can approve failing policies                              |
+| approve_count          | int                         | 1       | no        | number of approvals required to bypass failing policies               |
+| sticky_approvals       | bool                        | false   | no        | whether to preserve previous approval counts if policy outputs match  |
+| policy_sets            | [][PolicySet](#policyset)   | none    | yes       | set of policies to run on a plan output                               |
 
 ### Owners
 | Key         | Type              | Default | Required   | Description                                             |
@@ -535,13 +535,13 @@ If you set a workflow with the key `default`, it will override this.
 
 ### PolicySet
 
-| Key              | Type   | Default              | Required | Description                                                                                 |
-|------------------|--------|----------------------|----------|---------------------------------------------------------------------------------------------|
-| name             | string | none                 | yes      | unique name for the policy set                                                              |
-| path             | string | none                 | yes      | path to the rego policies directory                                                         |
-| source           | string | none                 | yes      | only `local` is supported at this time                                                      |
-| approve_count    | int    | inherited(#Policies) | no       | number of approvals required to bypass failing policies. inherits from policies if not set  |
-| sticky_approvals | bool   | inherited(#Policies) | no       | whether to preserve previous approval counts if policy outputs match                        |
+| Key              | Type   | Default                          | Required | Description                                                           |
+|------------------|--------|----------------------------------|----------|-----------------------------------------------------------------------|
+| name             | string | none                             | yes      | unique name for the policy set                                        |
+| path             | string | none                             | yes      | path to the rego policies directory                                   |
+| source           | string | none                             | yes      | only `local` is supported at this time                                |
+| approve_count    | int    | inherited([Policies](#policies)) | no       | number of approvals required to bypass failing policies               |
+| sticky_approvals | bool   | inherited([Policies](#policies)) | no       | whether to preserve previous approval counts if policy outputs match  |
 
 
 ### Metrics
