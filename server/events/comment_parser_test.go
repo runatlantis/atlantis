@@ -261,7 +261,6 @@ func TestParse_InvalidCommand(t *testing.T) {
 		"a warning.")
 	comments := []string{
 		"atlantis paln",
-		"atlantis Plan",
 		"atlantis appely apply",
 	}
 	cp := events.NewCommentParser(

@@ -151,13 +151,16 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{Ignore: true}
 	}
 
+	// Lowercase it to avoid autocorrect issues with browsers.
+	executableName := strings.ToLower(args[0])
+
 	// Helpfully warn the user if they're using "terraform" instead of "atlantis"
-	if args[0] == "terraform" && e.ExecutableName != "terraform" {
+	if executableName == "terraform" && e.ExecutableName != "terraform" {
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, "terraform")}
 	}
 
 	// Helpfully warn the user that the command might be misspelled
-	if utils.IsSimilarWord(args[0], e.ExecutableName) {
+	if utils.IsSimilarWord(executableName, e.ExecutableName) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, args[0])}
 	}
 
@@ -175,7 +178,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		vcsUser = e.AzureDevopsUser
 	}
 	executableNames := []string{"run", e.ExecutableName, "@" + vcsUser}
-	if !e.stringInSlice(args[0], executableNames) {
+	if !e.stringInSlice(executableName, executableNames) {
 		return CommentParseResult{Ignore: true}
 	}
 
@@ -194,7 +197,9 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	if len(args) == 1 {
 		return CommentParseResult{CommentResponse: e.HelpComment()}
 	}
-	cmd := args[1]
+
+	// Lowercase it to avoid autocorrect issues with browsers.
+	cmd := strings.ToLower(args[1])
 
 	// Help output.
 	if e.stringInSlice(cmd, []string{"help", "-h", "--help"}) {
