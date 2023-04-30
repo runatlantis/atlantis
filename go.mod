@@ -12,7 +12,6 @@ require (
 	github.com/go-playground/validator/v10 v10.12.0
 	github.com/go-test/deep v1.1.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
-	github.com/google/go-github/v51 v51.0.0
 	github.com/google/go-github/v52 v52.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0
