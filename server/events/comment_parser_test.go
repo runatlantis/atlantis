@@ -718,6 +718,30 @@ func TestParse_Parsing(t *testing.T) {
 	}
 }
 
+// Validate that the command and the action arguments can be uppercase/lowercase.
+func TestParse_ValidCaseCommand(t *testing.T) {
+	comments := []string{
+		"atlantis plan",
+		"Atlantis plan",
+		"Atlantis Plan",
+		"ATLANTIS PLAN",
+	}
+	for _, comment := range comments {
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, models.Github)
+			Equals(t, "", r.CommentResponse)
+			Equals(t, &events.CommentCommand{
+				RepoRelDir:  "",
+				Flags:       nil,
+				Name:        command.Plan,
+				Verbose:     false,
+				Workspace:   "",
+				ProjectName: "",
+			}, r.Command)
+		})
+	}
+}
+
 func TestBuildPlanApplyVersionComment(t *testing.T) {
 	cases := []struct {
 		repoRelDir        string
