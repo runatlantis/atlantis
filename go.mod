@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/alicebob/miniredis/v2 v2.30.1
+	github.com/alicebob/miniredis/v2 v2.30.2
 	github.com/bradleyfalzon/ghinstallation/v2 v2.3.0
 	github.com/briandowns/spinner v1.23.0
 	github.com/elazarl/go-bindata-assetfs v1.0.1
