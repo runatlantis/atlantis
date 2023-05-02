@@ -367,7 +367,9 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 			if policySet.Name == policyStatus.PolicySetName {
 				// Policy set either passed or has sufficient approvals. Move on.
 				if policyStatus.Passed || (policyStatus.CurApprovals == policySet.ApproveCount) {
-					ignorePolicy = true
+					if !ctx.ClearPolicyApproval {
+						ignorePolicy = true
+					}
 				}
 				// Set ignore flag if targeted policy does not match.
 				if ctx.PolicySetTarget != "" && (ctx.PolicySetTarget != policySet.Name) {
@@ -375,7 +377,11 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 				}
 				// Increment approval if user is owner.
 				if isOwner && !ignorePolicy {
-					prjPolicyStatus[i].CurApprovals = policyStatus.CurApprovals + 1
+					if !ctx.ClearPolicyApproval {
+						prjPolicyStatus[i].CurApprovals = policyStatus.CurApprovals + 1
+					} else {
+						prjPolicyStatus[i].Approvals = 0
+					}
 					// User is not authorized to approve policy set.
 				} else if !ignorePolicy {
 					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))

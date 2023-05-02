@@ -20,9 +20,13 @@ Any failures need to either be addressed in a successive commit, or approved by 
 
 ![Policy Check Approval](./images/policy-check-approval.png)
 
+Policy approvals may be cleared either by re-planing, or by issuing the following command:
+```
+atlantis approve_policies --clear-policy-approvals
+```
+
 :::warning
 Any plans following the approval will discard any policy approval and prompt again for it, unless 'sticky approvals' are enabled.
-:::
 
 ## Getting Started
 

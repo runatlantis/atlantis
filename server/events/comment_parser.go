@@ -31,18 +31,20 @@ import (
 )
 
 const (
-	workspaceFlagLong          = "workspace"
-	workspaceFlagShort         = "w"
-	dirFlagLong                = "dir"
-	dirFlagShort               = "d"
-	projectFlagLong            = "project"
-	projectFlagShort           = "p"
-	policySetFlagLong          = "policy-set"
-	policySetFlagShort         = ""
-	autoMergeDisabledFlagLong  = "auto-merge-disabled"
-	autoMergeDisabledFlagShort = ""
-	verboseFlagLong            = "verbose"
-	verboseFlagShort           = ""
+	workspaceFlagLong            = "workspace"
+	workspaceFlagShort           = "w"
+	dirFlagLong                  = "dir"
+	dirFlagShort                 = "d"
+	projectFlagLong              = "project"
+	projectFlagShort             = "p"
+	policySetFlagLong            = "policy-set"
+	policySetFlagShort           = ""
+	autoMergeDisabledFlagLong    = "auto-merge-disabled"
+	autoMergeDisabledFlagShort   = ""
+	verboseFlagLong              = "verbose"
+	verboseFlagShort             = ""
+	clearPolicyApprovalFlagLong  = "clear-policy-approval"
+	clearPolicyApprovalFlagShort = ""
 )
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -214,6 +216,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var dir string
 	var project string
 	var policySet string
+	var clearPolicyApproval bool
 	var verbose, autoMergeDisabled bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
@@ -245,6 +248,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Approve policies for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Approve policies for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.StringVarP(&policySet, policySetFlagLong, policySetFlagShort, "", "Approve policies for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
+		flagSet.BoolVarP(&clearPolicyApproval, clearPolicyApprovalFlagLong, clearPolicyApprovalFlagShort, false, "Clear any existing policy approvals.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.Unlock.String():
 		name = command.Unlock
@@ -305,7 +309,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project, policySet),
+		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project, policySet, clearPolicyApproval),
 	}
 }
 
