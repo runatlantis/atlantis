@@ -148,7 +148,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		ctx.Log.Err("writing results: %s", err)
 	}
 
-	p.updateCommitStatus(ctx, pullStatus)
+	p.updatePlanCommitStatus(ctx, pullStatus)
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
 	if len(policyCheckCmds) > 0 &&
@@ -218,7 +218,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 					return
 				}
 				ctx.Log.Debug("resetting VCS status")
-				p.updateCommitStatus(ctx, *pullStatus)
+				p.updatePlanCommitStatus(ctx, *pullStatus)
 			} else {
 				// With a generic plan, we set successful commit statuses
 				// with 0/0 projects planned successfully because some users require
@@ -272,7 +272,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	p.updateCommitStatus(ctx, pullStatus)
+	p.updatePlanCommitStatus(ctx, pullStatus)
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
@@ -291,7 +291,7 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 }
 
-func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
+func (p *PlanCommandRunner) updatePlanCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus
