@@ -754,10 +754,11 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 	cases := []struct {
 		description string
 
-		policySetCfg    valid.PolicySets
-		policySetStatus []models.PolicySetStatus
-		userTeams       []string // Teams the user is a member of
-		targetedPolicy  string   // Policy to target when running approvals
+		policySetCfg        valid.PolicySets
+		policySetStatus     []models.PolicySetStatus
+		userTeams           []string // Teams the user is a member of
+		targetedPolicy      string   // Policy to target when running approvals
+		clearPolicyApproval bool
 
 		expOut     []models.PolicySetResult
 		expFailure string
@@ -1028,6 +1029,154 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			expFailure: `One or more policy sets require additional approval.`,
 			hasErr:     false,
 		},
+		{
+			description:         "Approval count should be zero if ClearPolicyApproval is set.",
+			userTeams:           []string{"someuserteam"},
+			clearPolicyApproval: true,
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy2",
+						ApproveCount: 2,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Approvals:     1,
+					Passed:        false,
+				},
+				{
+					PolicySetName: "policy2",
+					Approvals:     1,
+					Passed:        false,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  2,
+					CurApprovals:  0,
+				},
+			},
+			expFailure: `One or more policy sets require additional approval.`,
+			hasErr:     false,
+		},
+		{
+			description:         "Approval count should not clear if user is not owner and ClearPolicyApproval is set.",
+			userTeams:           []string{"someuserteam"},
+			clearPolicyApproval: true,
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someotheruserteam"},
+						},
+						Name:         "policy2",
+						ApproveCount: 2,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Approvals:     1,
+					Passed:        false,
+				},
+				{
+					PolicySetName: "policy2",
+					Approvals:     1,
+					Passed:        false,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  2,
+					CurApprovals:  1,
+				},
+			},
+			expFailure: `One or more policy sets require additional approval.`,
+			hasErr:     true,
+		},
+		{
+			description:         "Approval count should only clear targeted policies when ClearPolicyApproval is set.",
+			userTeams:           []string{"someuserteam"},
+			targetedPolicy:      "policy2",
+			clearPolicyApproval: true,
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Owners: valid.PolicyOwners{
+							Teams: []string{"someuserteam"},
+						},
+						Name:         "policy2",
+						ApproveCount: 2,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Approvals:     1,
+					Passed:        false,
+				},
+				{
+					PolicySetName: "policy2",
+					Approvals:     1,
+					Passed:        false,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  2,
+					CurApprovals:  0,
+				},
+			},
+			expFailure: `One or more policy sets require additional approval.`,
+			hasErr:     false,
+		},
 	}
 
 	for _, c := range cases {
@@ -1096,6 +1245,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				ProjectPolicyStatus: projPolicyStatus,
 				Pull:                modelPull,
 				PolicySetTarget:     c.targetedPolicy,
+				ClearPolicyApproval: c.clearPolicyApproval,
 			}
 
 			res := runner.ApprovePolicies(ctx)

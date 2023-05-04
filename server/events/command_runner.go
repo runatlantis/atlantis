@@ -272,14 +272,15 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	ctx := &command.Context{
-		User:       user,
-		Log:        log,
-		Pull:       pull,
-		PullStatus: status,
-		HeadRepo:   headRepo,
-		Scope:      scope,
-		Trigger:    command.CommentTrigger,
-		PolicySet:  cmd.PolicySet,
+		User:                user,
+		Log:                 log,
+		Pull:                pull,
+		PullStatus:          status,
+		HeadRepo:            headRepo,
+		Scope:               scope,
+		Trigger:             command.CommentTrigger,
+		PolicySet:           cmd.PolicySet,
+		ClearPolicyApproval: cmd.ClearPolicyApproval,
 	}
 
 	if !c.validateCtxAndComment(ctx, cmd.Name) {
