@@ -1,4 +1,4 @@
-FROM golang:1.20.3
+FROM golang:1.20.4
 
 RUN apt-get update && apt-get --no-install-recommends -y install unzip \
     && apt-get clean \

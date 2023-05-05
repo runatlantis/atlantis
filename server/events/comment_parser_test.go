@@ -261,7 +261,6 @@ func TestParse_InvalidCommand(t *testing.T) {
 		"a warning.")
 	comments := []string{
 		"atlantis paln",
-		"atlantis Plan",
 		"atlantis appely apply",
 	}
 	cp := events.NewCommentParser(
@@ -383,9 +382,7 @@ func TestParse_RelativeDirPath(t *testing.T) {
 	}
 }
 
-// If there's multiple lines but it's whitespace, allow the command. This
-// occurs when you copy and paste via GitHub.
-func TestParse_Multiline(t *testing.T) {
+func TestParse_ValidCommand(t *testing.T) {
 	comments := []string{
 		"atlantis plan\n",
 		"atlantis plan\n\n",
@@ -395,6 +392,10 @@ func TestParse_Multiline(t *testing.T) {
 		"\r\natlantis plan",
 		"\natlantis plan\n",
 		"\r\natlantis plan\r\n",
+		"atlantis plan",
+		"Atlantis plan",
+		"Atlantis Plan",
+		"ATLANTIS PLAN",
 	}
 	for _, comment := range comments {
 		t.Run(comment, func(t *testing.T) {
