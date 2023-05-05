@@ -60,6 +60,7 @@ type ApplyCommandRunner struct {
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
 	silenceVCSStatusNoProjects bool
+	skipApplyNoChanges         bool
 }
 
 func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
@@ -200,6 +201,9 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 	status := models.SuccessCommitStatus
 
 	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus)
+	if a.skipApplyNoChanges {
+		numSuccess += pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
+	}
 	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
 	if numErrored > 0 {

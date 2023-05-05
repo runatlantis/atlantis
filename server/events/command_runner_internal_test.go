@@ -10,14 +10,16 @@ import (
 
 func TestApplyUpdateCommitStatus(t *testing.T) {
 	cases := map[string]struct {
-		cmd           command.Name
-		pullStatus    models.PullStatus
-		expStatus     models.CommitStatus
-		expNumSuccess int
-		expNumTotal   int
+		cmd                command.Name
+		skipApplyNoChanges bool
+		pullStatus         models.PullStatus
+		expStatus          models.CommitStatus
+		expNumSuccess      int
+		expNumTotal        int
 	}{
 		"apply, one pending": {
-			cmd: command.Apply,
+			cmd:                command.Apply,
+			skipApplyNoChanges: false,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -33,7 +35,8 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			expNumTotal:   2,
 		},
 		"apply, all successful": {
-			cmd: command.Apply,
+			cmd:                command.Apply,
+			skipApplyNoChanges: false,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -49,7 +52,8 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			expNumTotal:   2,
 		},
 		"apply, one errored, one pending": {
-			cmd: command.Apply,
+			cmd:                command.Apply,
+			skipApplyNoChanges: false,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -67,6 +71,40 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			expNumSuccess: 1,
 			expNumTotal:   3,
 		},
+		"apply, one planned no changes": {
+			cmd:                command.Apply,
+			skipApplyNoChanges: false,
+			pullStatus: models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Status: models.AppliedPlanStatus,
+					},
+					{
+						Status: models.PlannedNoChangesPlanStatus,
+					},
+				},
+			},
+			expStatus:     models.PendingCommitStatus,
+			expNumSuccess: 1,
+			expNumTotal:   2,
+		},
+		"apply, one planned no changes, skip apply when no changes": {
+			cmd:                command.Apply,
+			skipApplyNoChanges: true,
+			pullStatus: models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Status: models.AppliedPlanStatus,
+					},
+					{
+						Status: models.PlannedNoChangesPlanStatus,
+					},
+				},
+			},
+			expStatus:     models.SuccessCommitStatus,
+			expNumSuccess: 2,
+			expNumTotal:   2,
+		},
 	}
 
 	for name, c := range cases {
@@ -74,6 +112,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			csu := &MockCSU{}
 			cr := &ApplyCommandRunner{
 				commitStatusUpdater: csu,
+				skipApplyNoChanges:  c.skipApplyNoChanges,
 			}
 			cr.updateCommitStatus(&command.Context{}, c.pullStatus)
 			Equals(t, models.Repo{}, csu.CalledRepo)
