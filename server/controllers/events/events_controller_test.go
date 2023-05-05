@@ -179,8 +179,7 @@ func TestPost_GitlabCommentInvalidCommand(t *testing.T) {
 
 func TestPost_GithubCommentInvalidCommand(t *testing.T) {
 	t.Log("when the event is a github comment with an invalid command we ignore it")
-	e, v, _, _, p, _, _, _, cp := setup(t)
-	vcsClient := vcsmocks.NewMockClient()
+	e, v, _, _, p, _, _, vcsClient, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "issue_comment")
 	event := `{"action": "created"}`
