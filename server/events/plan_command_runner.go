@@ -76,6 +76,7 @@ type PlanCommandRunner struct {
 	// a plan.
 	DiscardApprovalOnPlan bool
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
+	skipApplyNoChanges    bool
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -149,6 +150,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 
 	p.updatePlanCommitStatus(ctx, pullStatus)
+	if p.skipApplyNoChanges {
+		p.updateApplyCommitStatus(ctx, pullStatus)
+	}
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
 	if len(policyCheckCmds) > 0 &&
@@ -273,6 +277,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	p.updatePlanCommitStatus(ctx, pullStatus)
+	if p.skipApplyNoChanges {
+		p.updateApplyCommitStatus(ctx, pullStatus)
+	}
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
@@ -311,6 +318,37 @@ func (p *PlanCommandRunner) updatePlanCommitStatus(ctx *command.Context, pullSta
 		ctx.Pull,
 		status,
 		command.Plan,
+		numSuccess,
+		len(pullStatus.Projects),
+	); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
+}
+
+func (p *PlanCommandRunner) updateApplyCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
+	if !p.skipApplyNoChanges {
+		return
+	}
+	var numSuccess int
+	var numErrored int
+	status := models.SuccessCommitStatus
+
+	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
+	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
+
+	if numErrored > 0 {
+		status = models.FailedCommitStatus
+	} else if numSuccess < len(pullStatus.Projects) {
+		// If there are plans that haven't been applied yet, we'll use a pending
+		// status.
+		status = models.PendingCommitStatus
+	}
+
+	if err := p.commitStatusUpdater.UpdateCombinedCount(
+		ctx.Pull.BaseRepo,
+		ctx.Pull,
+		status,
+		command.Apply,
 		numSuccess,
 		len(pullStatus.Projects),
 	); err != nil {
