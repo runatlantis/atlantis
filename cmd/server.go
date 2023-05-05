@@ -117,6 +117,7 @@ const (
 	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
 	// SilenceWhitelistErrorsFlag is deprecated for SilenceAllowlistErrorsFlag.
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
+	SkipApplyNoChanges         = "skip-apply-no-changes"
 	SkipCloneNoChanges         = "skip-clone-no-changes"
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
@@ -512,6 +513,10 @@ var boolFlags = map[string]boolFlag{
 	WriteGitCredsFlag: {
 		description: "Write out a .git-credentials file with the provider user and token to allow cloning private modules over HTTPS or SSH." +
 			" This writes secrets to disk and should only be enabled in a secure environment.",
+		defaultValue: false,
+	},
+	SkipApplyNoChanges: {
+		description:  "Skips the apply command if the plan command resutls in 'No Changes'.",
 		defaultValue: false,
 	},
 	SkipCloneNoChanges: {

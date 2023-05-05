@@ -700,6 +700,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
+		userConfig.SkipApplyNoChanges,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -717,6 +718,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
+		userConfig.SkipApplyNoChanges,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(

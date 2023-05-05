@@ -101,6 +101,7 @@ type UserConfig struct {
 	SilenceAllowlistErrors     bool `mapstructure:"silence-allowlist-errors"`
 	// SilenceWhitelistErrors is deprecated in favour of SilenceAllowlistErrors
 	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
+	SkipApplyNoChanges     bool            `mapstructure:"skip-apply-no-changes"`
 	SkipCloneNoChanges     bool            `mapstructure:"skip-clone-no-changes"`
 	SlackToken             string          `mapstructure:"slack-token"`
 	SSLCertFile            string          `mapstructure:"ssl-cert-file"`

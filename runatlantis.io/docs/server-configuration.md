@@ -842,6 +842,14 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   `--silence-vcs-status-no-plans` will tell Atlantis to ignore setting VCS status if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 
+### `--skip-apply-no-changes`
+  ```bash
+  atlantis server --skip-apply-no-changes
+  # or
+  ATLANTIS_SKIP_APPLY_NO_CHANGES=true
+  ```
+  `--skip-apply-no-changes` will allow skipping the apply command if the plan command results in "No Changes". This option enables skipping of the apply command by setting the commit status in the VCS to "successful" without actually running the apply command. Defaults to `false`.
+
 ### `--skip-clone-no-changes`
   ```bash
   atlantis server --skip-clone-no-changes
