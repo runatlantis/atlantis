@@ -581,6 +581,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commentParser,
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
+		userConfig.ParallelPlan,
+		userConfig.ParallelApply,
 		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,

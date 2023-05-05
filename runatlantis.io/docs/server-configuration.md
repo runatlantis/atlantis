@@ -656,6 +656,22 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
 
+### `--parallel-plan`
+  ```bash
+  atlantis server --parallel-plan
+  # or
+  ATLANTIS_PARALLEL_PLAN=true
+  ```
+  Whether to run plan operations in parallel. Defaults to `false`. When enabled at this level, it overrides the `parallel_plan` setting in the repo config.
+
+### `--parallel-apply`
+  ```bash
+  atlantis server --parallel-apply
+  # or
+  ATLANTIS_PARALLEL_APPLY=true
+  ```
+  Whether to run apply operations in parallel. Defaults to `false`. When enabled at this level, it overrides the `parallel_apply` setting in the repo config.
+
 ### `--port`
   ```bash
   atlantis server --port=4141

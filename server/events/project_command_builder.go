@@ -30,10 +30,6 @@ const (
 	DefaultWorkspace = "default"
 	// DefaultAutomergeEnabled is the default for the automerge setting.
 	DefaultAutomergeEnabled = false
-	// DefaultParallelApplyEnabled is the default for the parallel apply setting.
-	DefaultParallelApplyEnabled = false
-	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
-	DefaultParallelPlanEnabled = false
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
 )
@@ -50,6 +46,8 @@ func NewInstrumentedProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
+	EnableParallelPlan bool,
+	EnableParallelApply bool,
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	RestrictFileList bool,
@@ -77,6 +75,8 @@ func NewInstrumentedProjectCommandBuilder(
 			commentBuilder,
 			skipCloneNoChanges,
 			EnableRegExpCmd,
+			EnableParallelPlan,
+			EnableParallelApply,
 			AutoDetectModuleFiles,
 			AutoplanFileList,
 			RestrictFileList,
@@ -102,6 +102,8 @@ func NewProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
+	EnableParallelPlan bool,
+	EnableParallelApply bool,
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	RestrictFileList bool,
@@ -120,6 +122,8 @@ func NewProjectCommandBuilder(
 		PendingPlanFinder:     pendingPlanFinder,
 		SkipCloneNoChanges:    skipCloneNoChanges,
 		EnableRegExpCmd:       EnableRegExpCmd,
+		EnableParallelPlan:    EnableParallelPlan,
+		EnableParallelApply:   EnableParallelApply,
 		AutoDetectModuleFiles: AutoDetectModuleFiles,
 		AutoplanFileList:      AutoplanFileList,
 		RestrictFileList:      RestrictFileList,
@@ -205,6 +209,8 @@ type DefaultProjectCommandBuilder struct {
 	AutoDetectModuleFiles        string
 	AutoplanFileList             string
 	EnableDiffMarkdownFormat     bool
+	EnableParallelPlan           bool
+	EnableParallelApply          bool
 	RestrictFileList             bool
 	SilenceNoProjects            bool
 	TerraformExecutor            terraform.Client
@@ -361,6 +367,15 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	}
 	ctx.Log.Debug("moduleInfo for %s (matching %q) = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
 
+	automerge := DefaultAutomergeEnabled
+	parallelApply := p.EnableParallelApply
+	parallelPlan := p.EnableParallelPlan
+	if hasRepoCfg {
+		automerge = automerge || repoCfg.Automerge
+		parallelApply = parallelApply || repoCfg.ParallelApply
+		parallelPlan = parallelPlan || repoCfg.ParallelPlan
+	}
+
 	if len(repoCfg.Projects) > 0 {
 		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir, moduleInfo)
 		if err != nil {
@@ -380,9 +395,9 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					mergedCfg,
 					commentFlags,
 					repoDir,
-					repoCfg.Automerge,
-					repoCfg.ParallelApply,
-					repoCfg.ParallelPlan,
+					automerge,
+					parallelApply,
+					parallelPlan,
 					verbose,
 					p.TerraformExecutor,
 				)...)
@@ -404,14 +419,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			if err != nil {
 				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", repoDir)
 			}
-			automerge := DefaultAutomergeEnabled
-			parallelApply := DefaultParallelApplyEnabled
-			parallelPlan := DefaultParallelPlanEnabled
-			if hasRepoCfg {
-				automerge = repoCfg.Automerge
-				parallelApply = repoCfg.ParallelApply
-				parallelPlan = repoCfg.ParallelPlan
-			}
+
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)
 
 			projCtxs = append(projCtxs,
@@ -698,8 +706,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
 	automerge := DefaultAutomergeEnabled
-	parallelApply := DefaultParallelApplyEnabled
-	parallelPlan := DefaultParallelPlanEnabled
+	parallelApply := p.EnableParallelApply
+	parallelPlan := p.EnableParallelPlan
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
 		parallelApply = repoCfgPtr.ParallelApply
