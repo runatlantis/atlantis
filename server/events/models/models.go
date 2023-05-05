@@ -554,6 +554,9 @@ const (
 	// PlannedPlanStatus means that a plan has been successfully generated but
 	// not yet applied.
 	PlannedPlanStatus
+	// PlannedNoChangesPlanStatus means that a plan has been successfully
+	// generated with "No changes" and not yet applied.
+	PlannedNoChangesPlanStatus
 	// ErroredApplyStatus means that a plan has been generated but there was an
 	// error while applying it.
 	ErroredApplyStatus
@@ -578,6 +581,8 @@ func (p ProjectPlanStatus) String() string {
 		return "plan_errored"
 	case PlannedPlanStatus:
 		return "planned"
+	case PlannedNoChangesPlanStatus:
+		return "planned_no_changes"
 	case ErroredApplyStatus:
 		return "apply_errored"
 	case AppliedPlanStatus:
