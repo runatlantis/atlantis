@@ -756,7 +756,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 		description string
 
 		policySetCfg        valid.PolicySets
-		policySetStatus     []models.PolicySetStatus
+		policySetStatus     models.PolicySetDataList
 		userTeams           []string // Teams the user is a member of
 		targetedPolicy      string   // Policy to target when running approvals
 		clearPolicyApproval bool
@@ -1052,15 +1052,15 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 					},
 				},
 			},
-			policySetStatus: []models.PolicySetStatus{
+			policySetStatus: models.PolicySetDataList{
 				{
 					PolicySetName: "policy1",
-					Approvals:     1,
+					CurApprovals:  1,
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     1,
+					CurApprovals:  1,
 					Passed:        false,
 				},
 			},
@@ -1101,15 +1101,15 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 					},
 				},
 			},
-			policySetStatus: []models.PolicySetStatus{
+			policySetStatus: models.PolicySetDataList{
 				{
 					PolicySetName: "policy1",
-					Approvals:     1,
+					CurApprovals:  1,
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     1,
+					CurApprovals:  1,
 					Passed:        false,
 				},
 			},
@@ -1151,15 +1151,15 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 					},
 				},
 			},
-			policySetStatus: []models.PolicySetStatus{
+			policySetStatus: models.PolicySetDataList{
 				{
 					PolicySetName: "policy1",
-					Approvals:     1,
+					CurApprovals:  1,
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     1,
+					CurApprovals:  1,
 					Passed:        false,
 				},
 			},

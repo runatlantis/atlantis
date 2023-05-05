@@ -380,7 +380,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					if !ctx.ClearPolicyApproval {
 						prjPolicyStatus[i].CurApprovals = policyStatus.CurApprovals + 1
 					} else {
-						prjPolicyStatus[i].Approvals = 0
+						prjPolicyStatus[i].CurApprovals = 0
 					}
 					// User is not authorized to approve policy set.
 				} else if !ignorePolicy {
