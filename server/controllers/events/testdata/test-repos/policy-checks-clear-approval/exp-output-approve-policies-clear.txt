@@ -4,6 +4,15 @@ Ran Approve Policies for 1 projects:
 
 ### 1. dir: `.` workspace: `default`
 **Approve Policies Failed**: One or more policy sets require additional approval.
+#### Policy Set: `test_policy`
+```diff
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions
+
+```
+
+
 #### Policy Approval Status:
 ```
 policy set: test_policy: requires: 1 approval(s), have: 0.
