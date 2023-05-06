@@ -174,7 +174,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main/ \
         git~=2.40 && \
     apk add --no-cache \
-        ca-certificates~=20220614 \
+        ca-certificates~=20230506 \
         curl~=8.0 \
         unzip~=6.0 \
         bash~=5.2 \
