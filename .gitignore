@@ -18,6 +18,7 @@ atlantis.env
 *.act
 package-lock.json
 Dockerfile.local
+.gitconfig
 
 # gitreleaser
 dist/
