@@ -102,6 +102,9 @@ Values are chosen in this order:
   and in links from pull request comments. Defaults to `http://$(hostname):$port`
   where `$port` is from the [`--port`](#port) flag. Supports a basepath if you're hosting Atlantis under a path.
 
+  Notes:
+  * If you're using a load balancer with a different port, remember to update the URL with the correct one, not the one defined in the `--port` flag.
+
 ### `--automerge`
   ```bash
   atlantis server --automerge
