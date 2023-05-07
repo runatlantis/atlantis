@@ -103,7 +103,8 @@ Values are chosen in this order:
   where `$port` is from the [`--port`](#port) flag. Supports a basepath if you're hosting Atlantis under a path.
 
   Notes:
-  * If you're using a load balancer with a different port, remember to update the URL with the correct one, not the one defined in the `--port` flag.
+  * If a load balancer with a non http/https port (not the one defined in the `--port` flag) is used, update the URL to include the port like in the example above.
+   * This URL is used as the `details` link next to each atlantis job to view the job's logs.
 
 ### `--automerge`
   ```bash
