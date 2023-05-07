@@ -62,7 +62,7 @@ WORKDIR /tmp/build
 
 # install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV DEFAULT_CONFTEST_VERSION=0.41.0
+ENV DEFAULT_CONFTEST_VERSION=0.42.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
     case ${TARGETPLATFORM} in \
@@ -174,7 +174,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main/ \
         git~=2.40 && \
     apk add --no-cache \
-        ca-certificates~=20220614 \
+        ca-certificates~=20230506 \
         curl~=8.0 \
         unzip~=6.0 \
         bash~=5.2 \
