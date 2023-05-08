@@ -206,11 +206,11 @@ type DefaultProjectCommandBuilder struct {
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	SkipCloneNoChanges           bool
 	EnableRegExpCmd              bool
+	EnableParallelPlan           bool
+	EnableParallelApply          bool
 	AutoDetectModuleFiles        string
 	AutoplanFileList             string
 	EnableDiffMarkdownFormat     bool
-	EnableParallelPlan           bool
-	EnableParallelApply          bool
 	RestrictFileList             bool
 	SilenceNoProjects            bool
 	TerraformExecutor            terraform.Client
@@ -709,9 +709,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	if repoCfgPtr != nil {
-		automerge = repoCfgPtr.Automerge
-		parallelApply = repoCfgPtr.ParallelApply
-		parallelPlan = repoCfgPtr.ParallelPlan
+		automerge = automerge || repoCfgPtr.Automerge
+		parallelApply = parallelApply || repoCfgPtr.ParallelApply
+		parallelPlan = parallelPlan || repoCfgPtr.ParallelPlan
 	}
 
 	if len(matchingProjects) > 0 {
