@@ -516,7 +516,7 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	SkipApplyNoChanges: {
-		description:  "Skips the apply command if the plan command resutls in 'No Changes'.",
+		description:  "Skips the apply command if the plan command results in 'No Changes'.",
 		defaultValue: false,
 	},
 	SkipCloneNoChanges: {
