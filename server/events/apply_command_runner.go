@@ -22,7 +22,7 @@ func NewApplyCommandRunner(
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
-	skipApplyNoChanges bool,
+	SetAtlantisApplyCheckSuccessfulIfNoChanges bool,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
 		vcsClient:                  vcsClient,
@@ -39,7 +39,7 @@ func NewApplyCommandRunner(
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
-		skipApplyNoChanges:         skipApplyNoChanges,
+		SetAtlantisApplyCheckSuccessfulIfNoChanges: SetAtlantisApplyCheckSuccessfulIfNoChanges,
 	}
 }
 
@@ -61,8 +61,8 @@ type ApplyCommandRunner struct {
 	SilenceNoProjects bool
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
-	silenceVCSStatusNoProjects bool
-	skipApplyNoChanges         bool
+	silenceVCSStatusNoProjects                 bool
+	SetAtlantisApplyCheckSuccessfulIfNoChanges bool
 }
 
 func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
@@ -203,7 +203,7 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 	status := models.SuccessCommitStatus
 
 	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus)
-	if a.skipApplyNoChanges {
+	if a.SetAtlantisApplyCheckSuccessfulIfNoChanges {
 		numSuccess += pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
 	}
 	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)

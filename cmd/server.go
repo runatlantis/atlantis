@@ -107,17 +107,17 @@ const (
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
-	RepoWhitelistFlag          = "repo-whitelist"
-	RepoAllowlistFlag          = "repo-allowlist"
-	RequireApprovalFlag        = "require-approval"
-	RequireMergeableFlag       = "require-mergeable"
-	SilenceNoProjectsFlag      = "silence-no-projects"
-	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
-	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
-	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
+	RepoWhitelistFlag                          = "repo-whitelist"
+	RepoAllowlistFlag                          = "repo-allowlist"
+	RequireApprovalFlag                        = "require-approval"
+	RequireMergeableFlag                       = "require-mergeable"
+	SetAtlantisApplyCheckSuccessfulIfNoChanges = "set-atlantis-apply-check-successful-if-no-changes"
+	SilenceNoProjectsFlag                      = "silence-no-projects"
+	SilenceForkPRErrorsFlag                    = "silence-fork-pr-errors"
+	SilenceVCSStatusNoPlans                    = "silence-vcs-status-no-plans"
+	SilenceAllowlistErrorsFlag                 = "silence-allowlist-errors"
 	// SilenceWhitelistErrorsFlag is deprecated for SilenceAllowlistErrorsFlag.
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
-	SkipApplyNoChanges         = "skip-apply-no-changes"
 	SkipCloneNoChanges         = "skip-clone-no-changes"
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
@@ -485,6 +485,10 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 		hidden:       true,
 	},
+	SetAtlantisApplyCheckSuccessfulIfNoChanges: {
+		description:  "Set the `atlantis/apply` pull request status check to \"passing\" if \"No Changes\" are detected.",
+		defaultValue: false,
+	},
 	SilenceNoProjectsFlag: {
 		description:  "Silences Atlants from responding to PRs when it finds no projects.",
 		defaultValue: false,
@@ -513,10 +517,6 @@ var boolFlags = map[string]boolFlag{
 	WriteGitCredsFlag: {
 		description: "Write out a .git-credentials file with the provider user and token to allow cloning private modules over HTTPS or SSH." +
 			" This writes secrets to disk and should only be enabled in a secure environment.",
-		defaultValue: false,
-	},
-	SkipApplyNoChanges: {
-		description:  "Skips the apply command if the plan command results in 'No Changes'.",
 		defaultValue: false,
 	},
 	SkipCloneNoChanges: {

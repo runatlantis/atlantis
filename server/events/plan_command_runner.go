@@ -26,7 +26,7 @@ func NewPlanCommandRunner(
 	lockingLocker locking.Locker,
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
-	skipApplyNoChanges bool,
+	SetAtlantisApplyCheckSuccessfulIfNoChanges bool,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -47,7 +47,7 @@ func NewPlanCommandRunner(
 		lockingLocker:              lockingLocker,
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
-		skipApplyNoChanges:         skipApplyNoChanges,
+		SetAtlantisApplyCheckSuccessfulIfNoChanges: SetAtlantisApplyCheckSuccessfulIfNoChanges,
 	}
 }
 
@@ -76,9 +76,9 @@ type PlanCommandRunner struct {
 	lockingLocker              locking.Locker
 	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
 	// a plan.
-	DiscardApprovalOnPlan bool
-	pullReqStatusFetcher  vcs.PullReqStatusFetcher
-	skipApplyNoChanges    bool
+	DiscardApprovalOnPlan                      bool
+	pullReqStatusFetcher                       vcs.PullReqStatusFetcher
+	SetAtlantisApplyCheckSuccessfulIfNoChanges bool
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -152,7 +152,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 
 	p.updatePlanCommitStatus(ctx, pullStatus)
-	if p.skipApplyNoChanges {
+	if p.SetAtlantisApplyCheckSuccessfulIfNoChanges {
 		p.updateApplyCommitStatus(ctx, pullStatus)
 	}
 
@@ -279,7 +279,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	p.updatePlanCommitStatus(ctx, pullStatus)
-	if p.skipApplyNoChanges {
+	if p.SetAtlantisApplyCheckSuccessfulIfNoChanges {
 		p.updateApplyCommitStatus(ctx, pullStatus)
 	}
 
@@ -328,7 +328,7 @@ func (p *PlanCommandRunner) updatePlanCommitStatus(ctx *command.Context, pullSta
 }
 
 func (p *PlanCommandRunner) updateApplyCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
-	if !p.skipApplyNoChanges {
+	if !p.SetAtlantisApplyCheckSuccessfulIfNoChanges {
 		return
 	}
 	var numSuccess int
