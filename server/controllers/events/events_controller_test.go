@@ -179,7 +179,7 @@ func TestPost_GitlabCommentInvalidCommand(t *testing.T) {
 
 func TestPost_GithubCommentInvalidCommand(t *testing.T) {
 	t.Log("when the event is a github comment with an invalid command we ignore it")
-	e, v, _, _, p, _, _, _, cp := setup(t)
+	e, v, _, _, p, _, _, vcsClient, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "issue_comment")
 	event := `{"action": "created"}`
@@ -189,6 +189,7 @@ func TestPost_GithubCommentInvalidCommand(t *testing.T) {
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Ignoring non-command comment: \"\"")
+	vcsClient.VerifyWasCalled(Never()).ReactToComment(models.Repo{}, 1, "eyes")
 }
 
 func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
@@ -386,7 +387,7 @@ func TestPost_GithubCommentReaction(t *testing.T) {
 	e, v, _, _, p, _, _, vcsClient, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "issue_comment")
-	event := `{"action": "created", "comment": {"body": "atlantis help", "id": 1}}`
+	event := `{"action": "created", "comment": {"body": "@atlantis-bot help", "id": 1}}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	baseRepo := models.Repo{}
 	user := models.User{}
