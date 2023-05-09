@@ -385,8 +385,8 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					repoCfg.Automerge,
 					repoCfg.ParallelApply,
 					repoCfg.ParallelPlan,
-					repoCfg.AbortOnExcecutionOrderFail,
 					verbose,
+					repoCfg.AbortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}

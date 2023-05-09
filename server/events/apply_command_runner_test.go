@@ -262,7 +262,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				"2. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---",
 		},
 		{
-			Description: "When first apply succeeds, the second will run",
+			Description: "When first apply fails, the second not will run",
 			ProjectContexts: []command.ProjectContext{
 				{
 					ExecutionOrderGroup:        0,
