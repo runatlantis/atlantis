@@ -151,9 +151,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		ctx.Log.Err("writing results: %s", err)
 	}
 
-	p.updatePlanCommitStatus(ctx, pullStatus)
+	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	if p.SetAtlantisApplyCheckSuccessfulIfNoChanges {
-		p.updateApplyCommitStatus(ctx, pullStatus)
+		p.updateCommitStatus(ctx, pullStatus, command.Apply)
 	}
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
@@ -224,7 +224,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 					return
 				}
 				ctx.Log.Debug("resetting VCS status")
-				p.updatePlanCommitStatus(ctx, *pullStatus)
+				p.updateCommitStatus(ctx, *pullStatus, command.Plan)
 			} else {
 				// With a generic plan, we set successful commit statuses
 				// with 0/0 projects planned successfully because some users require
@@ -278,9 +278,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	p.updatePlanCommitStatus(ctx, pullStatus)
+	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	if p.SetAtlantisApplyCheckSuccessfulIfNoChanges {
-		p.updateApplyCommitStatus(ctx, pullStatus)
+		p.updateCommitStatus(ctx, pullStatus, command.Apply)
 	}
 
 	// Runs policy checks step after all plans are successful.
@@ -300,57 +300,39 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 }
 
-func (p *PlanCommandRunner) updatePlanCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
+func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus, commandName command.Name) {
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus
 
-	numErrored = pullStatus.StatusCount(models.ErroredPlanStatus)
-	// We consider anything that isn't a plan error as a plan success.
-	// For example, if there is an apply error, that means that at least a
-	// plan was generated successfully.
-	numSuccess = len(pullStatus.Projects) - numErrored
+	if commandName == command.Plan {
+		numErrored = pullStatus.StatusCount(models.ErroredPlanStatus)
+		// We consider anything that isn't a plan error as a plan success.
+		// For example, if there is an apply error, that means that at least a
+		// plan was generated successfully.
+		numSuccess = len(pullStatus.Projects) - numErrored
 
-	if numErrored > 0 {
-		status = models.FailedCommitStatus
+		if numErrored > 0 {
+			status = models.FailedCommitStatus
+		}
+	} else if commandName == command.Apply {
+		numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
+		numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
+
+		if numErrored > 0 {
+			status = models.FailedCommitStatus
+		} else if numSuccess < len(pullStatus.Projects) {
+			// If there are plans that haven't been applied yet, we'll use a pending
+			// status.
+			status = models.PendingCommitStatus
+		}
 	}
 
 	if err := p.commitStatusUpdater.UpdateCombinedCount(
 		ctx.Pull.BaseRepo,
 		ctx.Pull,
 		status,
-		command.Plan,
-		numSuccess,
-		len(pullStatus.Projects),
-	); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
-}
-
-func (p *PlanCommandRunner) updateApplyCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
-	if !p.SetAtlantisApplyCheckSuccessfulIfNoChanges {
-		return
-	}
-	var numSuccess int
-	var numErrored int
-	status := models.SuccessCommitStatus
-
-	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
-	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
-
-	if numErrored > 0 {
-		status = models.FailedCommitStatus
-	} else if numSuccess < len(pullStatus.Projects) {
-		// If there are plans that haven't been applied yet, we'll use a pending
-		// status.
-		status = models.PendingCommitStatus
-	}
-
-	if err := p.commitStatusUpdater.UpdateCombinedCount(
-		ctx.Pull.BaseRepo,
-		ctx.Pull,
-		status,
-		command.Apply,
+		commandName,
 		numSuccess,
 		len(pullStatus.Projects),
 	); err != nil {

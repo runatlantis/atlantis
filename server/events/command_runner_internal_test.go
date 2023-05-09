@@ -176,7 +176,7 @@ func TestPlanUpdatePlanCommitStatus(t *testing.T) {
 			cr := &PlanCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			cr.updatePlanCommitStatus(&command.Context{}, c.pullStatus)
+			cr.updateCommitStatus(&command.Context{}, c.pullStatus, command.Plan)
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
@@ -274,7 +274,7 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 				commitStatusUpdater:                        csu,
 				SetAtlantisApplyCheckSuccessfulIfNoChanges: true,
 			}
-			cr.updateApplyCommitStatus(&command.Context{}, c.pullStatus)
+			cr.updateCommitStatus(&command.Context{}, c.pullStatus, command.Apply)
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
