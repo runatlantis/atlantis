@@ -150,3 +150,115 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 		})
 	}
 }
+
+func TestPlanCommandRunner_IsSetAtlantisApplyStatus(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		Description                                string
+		PrevPlanStored                             bool
+		SetAtlantisApplyCheckSuccessfulIfNoChanges bool
+		ExpVCSApplyStatusSet                       bool
+		ExpVCSApplyStatusTotal                     int
+		ExpVCSApplyStatusSucc                      int
+	}{
+		{
+			Description: "When planning without the flag, don't set the atlantis/apply VCS status",
+		},
+		{
+			Description: "When planning with the flag, set the atlantis/apply VCS status to 0/0",
+			SetAtlantisApplyCheckSuccessfulIfNoChanges: true,
+			ExpVCSApplyStatusSet:                       true,
+			ExpVCSApplyStatusTotal:                     0,
+			ExpVCSApplyStatusSucc:                      0,
+		},
+		{
+			Description:    "When planning with the previous plan that results in No Changes and without the flag, don't set the atlantis/apply VCS status",
+			PrevPlanStored: true,
+			SetAtlantisApplyCheckSuccessfulIfNoChanges: false,
+			ExpVCSApplyStatusSet:                       false,
+		},
+		{
+			Description:    "When planning with the previous plan that results in No Changes and setting the flag, set the atlantis/apply VCS status to 1/1",
+			PrevPlanStored: true,
+			SetAtlantisApplyCheckSuccessfulIfNoChanges: true,
+			ExpVCSApplyStatusSet:                       true,
+			ExpVCSApplyStatusTotal:                     1,
+			ExpVCSApplyStatusSucc:                      1,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			// create an empty DB
+			tmp := t.TempDir()
+			db, err := db.New(tmp)
+			Ok(t, err)
+
+			vcsClient := setup(t, func(tc *TestConfig) {
+				tc.SetAtlantisApplyCheckSuccessfulIfNoChanges = c.SetAtlantisApplyCheckSuccessfulIfNoChanges
+				tc.backend = db
+			})
+
+			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+			cmd := &events.CommentCommand{Name: command.Plan}
+			ctx := &command.Context{
+				User:     testdata.User,
+				Log:      logging.NewNoopLogger(t),
+				Scope:    scopeNull,
+				Pull:     modelPull,
+				HeadRepo: testdata.GithubRepo,
+				Trigger:  command.CommentTrigger,
+			}
+			if c.PrevPlanStored {
+				_, err = db.UpdatePullWithResults(modelPull, []command.ProjectResult{
+					{
+						Command:    command.Plan,
+						RepoRelDir: "prevdir",
+						Workspace:  "default",
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Your infrastructure matches the configuration.",
+						},
+					},
+				})
+				Ok(t, err)
+			}
+
+			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
+				return ReturnValues{[]command.ProjectContext{}, nil}
+			})
+
+			planCommandRunner.Run(ctx, cmd)
+
+			vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
+
+			ExpCommitStatus := models.SuccessCommitStatus
+			if c.ExpVCSApplyStatusSucc != c.ExpVCSApplyStatusTotal {
+				ExpCommitStatus = models.PendingCommitStatus
+			}
+
+			if c.ExpVCSApplyStatusSet {
+				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+					matchers.AnyModelsRepo(),
+					matchers.AnyModelsPullRequest(),
+					matchers.EqModelsCommitStatus(ExpCommitStatus),
+					matchers.EqCommandName(command.Apply),
+					EqInt(c.ExpVCSApplyStatusSucc),
+					EqInt(c.ExpVCSApplyStatusTotal),
+				)
+			} else {
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+					matchers.AnyModelsRepo(),
+					matchers.AnyModelsPullRequest(),
+					matchers.AnyModelsCommitStatus(),
+					matchers.EqCommandName(command.Apply),
+					AnyInt(),
+					AnyInt(),
+				)
+			}
+		})
+	}
+}
