@@ -28,11 +28,11 @@ func NewMockEventParsing(options ...pegomock.Option) *MockEventParsing {
 func (mock *MockEventParsing) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockEventParsing) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockEventParsing) GetBitbucketCloudPullEventType(_param0 string) models.PullRequestEventType {
+func (mock *MockEventParsing) GetBitbucketCloudPullEventType(_param0 string, _param1 string, _param2 string) models.PullRequestEventType {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockEventParsing().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{_param0, _param1, _param2}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetBitbucketCloudPullEventType", params, []reflect.Type{reflect.TypeOf((*models.PullRequestEventType)(nil)).Elem()})
 	var ret0 models.PullRequestEventType
 	if len(result) != 0 {

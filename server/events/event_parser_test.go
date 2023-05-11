@@ -1012,7 +1012,7 @@ func TestGetBitbucketCloudEventType(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.header, func(t *testing.T) {
-			act := parser.GetBitbucketCloudPullEventType(c.header, "", "")
+			act := parser.GetBitbucketCloudPullEventType(c.header, "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
 			Equals(t, c.exp, act)
 		})
 	}
