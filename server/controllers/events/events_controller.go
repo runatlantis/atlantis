@@ -373,7 +373,7 @@ func (e *VCSEventsController) handleBitbucketCloudPullRequestEvent(w http.Respon
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	e.Logger.Debug("SHA is %s", pull.HeadCommit)
+	e.Logger.Debug("SHA is %q", pull.HeadCommit)
 	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType, pull.HeadCommit, pull.URL)
 	e.Logger.Info("identified event as type %q", pullEventType.String())
 	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType)
