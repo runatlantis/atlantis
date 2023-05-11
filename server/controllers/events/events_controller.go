@@ -43,8 +43,6 @@ const bitbucketCloudRequestIDHeader = "X-Request-UUID"
 const bitbucketServerRequestIDHeader = "X-Request-ID"
 const bitbucketServerSignatureHeader = "X-Hub-Signature"
 
-var bitbucketSha = ""
-
 // The URL used for Azure DevOps test webhooks
 const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079"
 
@@ -375,9 +373,8 @@ func (e *VCSEventsController) handleBitbucketCloudPullRequestEvent(w http.Respon
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	e.Logger.Info("SHA is %s", pull.HeadCommit)
-	//bitbucketSha = pull.HeadCommit
-	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType)
+	e.Logger.Debug("SHA is %s", pull.HeadCommit)
+	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType, pull.HeadCommit, pull.URL)
 	e.Logger.Info("identified event as type %q", pullEventType.String())
 	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType)
 
