@@ -346,6 +346,7 @@ func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFu
 func (e *EventParser) GetBitbucketCloudPullEventType(eventTypeHeader string, sha string, pr string) models.PullRequestEventType {
 	switch eventTypeHeader {
 	case bitbucketcloud.PullCreatedHeader:
+		lastBitbucketSha.Add(pr, sha)
 		return models.OpenedPullEvent
 	case bitbucketcloud.PullUpdatedHeader:
 		lastSha, _ := lastBitbucketSha.Get(pr)

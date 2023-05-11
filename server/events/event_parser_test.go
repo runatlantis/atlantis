@@ -984,6 +984,25 @@ func TestParseBitbucketCloudPullEvent_States(t *testing.T) {
 	}
 }
 
+func TestBitBucketNonCodeChangesAreIgnored(t *testing.T) {
+	// lets say a user opens a PR
+	act := parser.GetBitbucketCloudPullEventType("pullrequest:created", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OpenedPullEvent, act)
+	// Another update with same SHA should be ignored
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OtherPullEvent, act)
+	// Only if SHA changes do we act
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha2", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.UpdatedPullEvent, act)
+
+	// If sha changes in seperate PR,
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "otherPRSha", "https://github.com/fakeorg/fakerepo/pull/2")
+	Equals(t, models.UpdatedPullEvent, act)
+	// We will still ignore same shas in first PR
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha2", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OtherPullEvent, act)
+}
+
 func TestGetBitbucketCloudEventType(t *testing.T) {
 	cases := []struct {
 		header string
