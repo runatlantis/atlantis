@@ -1031,7 +1031,9 @@ func TestGetBitbucketCloudEventType(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.header, func(t *testing.T) {
-			act := parser.GetBitbucketCloudPullEventType(c.header, "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+			// we pass in the header as the SHA so the SHA changes each time
+			// the code will ignore duplicate SHAS to avoid extra TF plans
+			act := parser.GetBitbucketCloudPullEventType(c.header, c.header, "https://github.com/fakeorg/fakerepo/pull/1")
 			Equals(t, c.exp, act)
 		})
 	}
