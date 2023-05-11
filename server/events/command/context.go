@@ -39,5 +39,8 @@ type Context struct {
 	// PolicySet is the policy set to target (if specified) for the approve_policies command.
 	PolicySet string
 
+	// ClearPolicyApproval is true if approval should be cleared on specified policies.
+	ClearPolicyApproval bool
+
 	Trigger Trigger
 }

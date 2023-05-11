@@ -196,8 +196,8 @@ func TestParse_UnusedArguments(t *testing.T) {
 		},
 		{
 			command.ApprovePolicies,
-			"arg arg2 --",
-			"arg arg2",
+			"arg arg2 arg3 --",
+			"arg arg2 arg3",
 		},
 		{
 			command.Import,
@@ -261,7 +261,6 @@ func TestParse_InvalidCommand(t *testing.T) {
 		"a warning.")
 	comments := []string{
 		"atlantis paln",
-		"atlantis Plan",
 		"atlantis appely apply",
 	}
 	cp := events.NewCommentParser(
@@ -383,9 +382,7 @@ func TestParse_RelativeDirPath(t *testing.T) {
 	}
 }
 
-// If there's multiple lines but it's whitespace, allow the command. This
-// occurs when you copy and paste via GitHub.
-func TestParse_Multiline(t *testing.T) {
+func TestParse_ValidCommand(t *testing.T) {
 	comments := []string{
 		"atlantis plan\n",
 		"atlantis plan\n\n",
@@ -395,6 +392,10 @@ func TestParse_Multiline(t *testing.T) {
 		"\r\natlantis plan",
 		"\natlantis plan\n",
 		"\r\natlantis plan\r\n",
+		"atlantis plan",
+		"Atlantis plan",
+		"Atlantis Plan",
+		"ATLANTIS PLAN",
 	}
 	for _, comment := range comments {
 		t.Run(comment, func(t *testing.T) {
@@ -1027,16 +1028,19 @@ var ApplyUsage = `Usage of apply:
 `
 
 var ApprovePolicyUsage = `Usage of approve_policies:
-  -d, --dir string          Approve policies for this directory, relative to root of
-                            repo, ex. 'child/dir'.
-      --policy-set string   Approve policies for this project. Refers to the name of
-                            the project configured in a repo config file. Cannot be
-                            used at same time as workspace or dir flags.
-  -p, --project string      Approve policies for this project. Refers to the name of
-                            the project configured in a repo config file. Cannot be
-                            used at same time as workspace or dir flags.
-      --verbose             Append Atlantis log to comment.
-  -w, --workspace string    Approve policies for this Terraform workspace.
+      --clear-policy-approval   Clear any existing policy approvals.
+  -d, --dir string              Approve policies for this directory, relative to
+                                root of repo, ex. 'child/dir'.
+      --policy-set string       Approve policies for this project. Refers to the
+                                name of the project configured in a repo config
+                                file. Cannot be used at same time as workspace or
+                                dir flags.
+  -p, --project string          Approve policies for this project. Refers to the
+                                name of the project configured in a repo config
+                                file. Cannot be used at same time as workspace or
+                                dir flags.
+      --verbose                 Append Atlantis log to comment.
+  -w, --workspace string        Approve policies for this Terraform workspace.
 `
 
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +

@@ -122,6 +122,8 @@ type CommentCommand struct {
 	ProjectName string
 	// PolicySet is the name of a policy set to run an approval on.
 	PolicySet string
+	// ClearPolicyApproval is true if approvals should be cleared out for specified policies.
+	ClearPolicyApproval bool
 }
 
 // IsForSpecificProject returns true if the command is for a specific dir, workspace
@@ -153,11 +155,11 @@ func (c CommentCommand) IsAutoplan() bool {
 
 // String returns a string representation of the command.
 func (c CommentCommand) String() string {
-	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q policyset=%q flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.PolicySet, strings.Join(c.Flags, ","))
+	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q policyset=%q, clear-policy-approval=%t, flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.PolicySet, c.ClearPolicyApproval, strings.Join(c.Flags, ","))
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, workspace string, project string, policySet string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, workspace string, project string, policySet string, clearPolicyApproval bool) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -167,15 +169,16 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, sub
 		}
 	}
 	return &CommentCommand{
-		RepoRelDir:        repoRelDir,
-		Flags:             flags,
-		Name:              name,
-		SubName:           subName,
-		Verbose:           verbose,
-		Workspace:         workspace,
-		AutoMergeDisabled: autoMergeDisabled,
-		ProjectName:       project,
-		PolicySet:         policySet,
+		RepoRelDir:          repoRelDir,
+		Flags:               flags,
+		Name:                name,
+		SubName:             subName,
+		Verbose:             verbose,
+		Workspace:           workspace,
+		AutoMergeDisabled:   autoMergeDisabled,
+		ProjectName:         project,
+		PolicySet:           policySet,
+		ClearPolicyApproval: clearPolicyApproval,
 	}
 }
 
