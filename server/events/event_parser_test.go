@@ -1003,6 +1003,23 @@ func TestBitBucketNonCodeChangesAreIgnored(t *testing.T) {
 	Equals(t, models.OtherPullEvent, act)
 }
 
+func TestBitbucketShaCacheExpires(t *testing.T) {
+	// lets say a user opens a PR
+	act := parser.GetBitbucketCloudPullEventType("pullrequest:created", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OpenedPullEvent, act)
+	// Another update with same SHA should be ignored
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OtherPullEvent, act)
+	// But after 300 times, the cache should expire
+	// this is so we don't have ever increasing memory usage
+	for i := 0; i < 302; i++ {
+		parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", fmt.Sprintf("https://github.com/fakeorg/fakerepo/pull/%d", i))
+	}
+	// and now SHA will seen as a change again
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.UpdatedPullEvent, act)
+}
+
 func TestGetBitbucketCloudEventType(t *testing.T) {
 	cases := []struct {
 		header string
