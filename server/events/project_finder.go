@@ -149,7 +149,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 
 	var dirs []string
 	for _, modifiedFile := range modifiedTerraformFiles {
-		projectDir := getProjectDir(modifiedFile, absRepoDir)
+		projectDir := getProjectDir(log, modifiedFile, absRepoDir)
 		if projectDir != "" {
 			dirs = append(dirs, projectDir)
 		} else if moduleInfo != nil {
@@ -289,76 +289,89 @@ func (p *DefaultProjectFinder) shouldIgnore(fileName string) bool {
 	return false
 }
 
-// getProjectDir attempts to determine based on the location of a modified
-// file, where the root of the Terraform project is. It also attempts to verify
-// if the root is valid by looking for a main.tf file. It returns a relative
-// path to the repo. If the project is at the root returns ".". If modified file
-// doesn't lead to a valid project path, returns an empty string.
-func getProjectDir(modifiedFilePath string, repoDir string) string {
-	return getProjectDirFromFs(os.DirFS(repoDir), modifiedFilePath)
+// getProjectDir determines which project should be planned based on the path to a changed file.
+// - If the directory containing the changed file contains ".tf" files and is not a module, return that
+// - If not, check the parent directory. Repeat until the root of the repo is reached
+// - If the root of the repo has ".tf" files, return that. If not:
+//   - If the directory containing the changed files is not a module, return that
+//   - If the directory containing the changed files _is_ a module, return "" (nothing is planned)
+//
+// File paths are all relative to the root of the repository
+func getProjectDir(log logging.SimpleLogging, modifiedFilePath string, repoDir string) string {
+	return getProjectDirFromFs(log, os.DirFS(repoDir), modifiedFilePath)
 }
 
-func getProjectDirFromFs(files fs.FS, modifiedFilePath string) string {
+func getProjectDirFromFs(log logging.SimpleLogging, files fs.FS, modifiedFilePath string) string {
 	dir := path.Dir(modifiedFilePath)
-	if path.Base(dir) == "env" {
-		// If the modified file was inside an env/ directory, we treat this
-		// specially and run plan one level up. This supports directory structures
-		// like:
-		// root/
-		//   main.tf
-		//   env/
-		//     dev.tfvars
-		//     staging.tfvars
-		return path.Dir(dir)
+
+	searchDir := dir
+	nonRootDir, err := isNonRoot(searchDir)
+	if err != nil {
+		log.Warn("Found error checking relative path of %q to repo directory: %s", searchDir, err)
+		return dir
 	}
 
-	// Surrounding dir with /'s so we can match on /modules/ even if dir is
-	// "modules" or "project1/modules"
-	if isModule(dir) {
-		// We treat changes inside modules/ folders specially. There are two cases:
-		// 1. modules folder inside project:
-		// root/
-		//   main.tf
-		//     modules/
-		//       ...
-		// In this case, if we detect a change in modules/, we will determine
-		// the project root to be at root/.
-		//
-		// 2. shared top-level modules folder
-		// root/
-		//  project1/
-		//    main.tf # uses modules via ../modules
-		//  project2/
-		//    main.tf # uses modules via ../modules
-		//  modules/
-		//    ...
-		// In this case, if we detect a change in modules/ we don't know which
-		// project was using this module so we can't suggest a project root, but we
-		// also detect that there's no main.tf in the parent folder of modules/
-		// so we won't suggest that as a project. So in this case we return nothing.
-		// The code below makes this happen.
-
-		// Need to add a trailing slash before splitting on modules/ because if
-		// the input was modules/file.tf then path.Dir will be "modules" and so our
-		// split on "modules/" will fail.
-		dirWithTrailingSlash := dir + "/"
-		modulesSplit := strings.SplitN(dirWithTrailingSlash, "modules/", 2)
-		modulesParent := modulesSplit[0]
-
-		// Now we check whether there is a main.tf in the parent.
-		if _, err := fs.Stat(files, filepath.Join(modulesParent, "main.tf")); errors.Is(err, fs.ErrNotExist) {
-			return ""
+	for nonRootDir {
+		dirHasTfFiles, err := hasTerraformFiles(files, searchDir)
+		if err != nil {
+			log.Warn("Found error checking for Terraform files in dir %q: %s", searchDir, err)
+			return dir
 		}
-		return path.Clean(modulesParent)
+		if dirHasTfFiles && !isModule(searchDir) {
+			return searchDir
+		}
+		searchDir = path.Dir(searchDir)
+		nonRootDir, err = isNonRoot(searchDir)
+		if err != nil {
+			log.Warn("Found error checking relative path of %q to repo directory: %s", searchDir, err)
+			return dir
+		}
 	}
 
-	// If it wasn't a modules directory, we assume we're in a project and return
-	// this directory.
+	rootHasTerraformFiles, err := hasTerraformFiles(files, ".")
+	if err != nil {
+		log.Warn("Found error checking for Terraform files in repo directory: %s", err)
+		return dir
+	}
+	if rootHasTerraformFiles {
+		return "."
+	}
+
+	if isModule(dir) {
+		return ""
+	}
 	return dir
+}
+
+// Check if a given directory in a filesystem contains any files with the ".tf" extension
+func hasTerraformFiles(files fs.FS, dir string) (bool, error) {
+	tfFiles, err := fs.Glob(files, dir+"/*.tf")
+	if err != nil {
+		return false, err
+	}
+	if len(tfFiles) > 0 {
+		return true, nil
+	}
+	return false, nil
 }
 
 func isModule(dir string) bool {
 	return strings.Contains("/"+dir+"/", "/modules/")
+}
+
+// Check if a given directory is a child of the current working directory
+// Directory paths are all relative to the root of the repository
+func isNonRoot(dir string) (bool, error) {
+	up := "../"
+
+	rel, err := filepath.Rel(".", dir)
+	if err != nil {
+		return false, err
+	}
+	if !strings.HasPrefix(rel, up) && rel != ".." && rel != "." {
+		return true, nil
+	}
+	return false, nil
 }
 
 // unique de-duplicates strs.

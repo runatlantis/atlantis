@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/moby/patternmatcher"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 type module struct {
@@ -123,15 +124,20 @@ func FindModuleProjects(absRepoDir string, autoplanModuleDependants string) (Mod
 }
 
 func findModuleDependants(files fs.FS, autoplanModuleDependants string) (ModuleProjects, error) {
+	log, err := logging.NewStructuredLogger()
+	if err != nil {
+		return nil, err
+	}
+
 	if autoplanModuleDependants == "" {
 		return moduleInfo{}, nil
 	}
 	// find all the projects matching autoplanModuleDependants
 	filter, _ := patternmatcher.New(strings.Split(autoplanModuleDependants, ","))
 	var projects []string
-	err := fs.WalkDir(files, ".", func(rel string, info fs.DirEntry, err error) error {
+	err = fs.WalkDir(files, ".", func(rel string, info fs.DirEntry, err error) error {
 		if match, _ := filter.MatchesOrParentMatches(rel); match {
-			if projectDir := getProjectDirFromFs(files, rel); projectDir != "" {
+			if projectDir := getProjectDirFromFs(log, files, rel); projectDir != "" {
 				projects = append(projects, projectDir)
 			}
 		}

@@ -92,10 +92,15 @@ func setupTmpRepos(t *testing.T) {
 	envDir = t.TempDir()
 	err = os.MkdirAll(filepath.Join(envDir, "env"), 0700)
 	Ok(t, err)
-	_, err = os.Create(filepath.Join(envDir, "env/staging.tfvars"))
-	Ok(t, err)
-	_, err = os.Create(filepath.Join(envDir, "env/production.tfvars"))
-	Ok(t, err)
+	for _, path := range []string{
+		"main.tf",
+		"env/staging.tfvars",
+		"env/production.tfvars",
+		"env/global-env-config.auto.tfvars.json",
+	} {
+		_, err = os.Create(filepath.Join(envDir, path))
+		Ok(t, err)
+	}
 }
 
 func TestDetermineWorkspaceFromHCL(t *testing.T) {
