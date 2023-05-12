@@ -178,8 +178,8 @@ RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/ma
         curl~=8.0 \
         unzip~=6.0 \
         bash~=5.2 \
-        openssh~=9.1_p1 \
-        libcap~=2.66 \
+        openssh~=9.3_p1 \
+        libcap~=2.68 \
         dumb-init~=1.2 \
         gcompat~=1.1
 
