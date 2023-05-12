@@ -375,6 +375,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
+	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
 	if hasRepoCfg {
 		if repoCfg.Automerge != nil {
 			automerge = *repoCfg.Automerge
@@ -385,7 +386,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		if repoCfg.ParallelPlan != nil {
 			parallelPlan = *repoCfg.ParallelPlan
 		}
-    	abortOnExcecutionOrderFail = repoCfg.AbortOnExcecutionOrderFail
+		abortOnExcecutionOrderFail = repoCfg.AbortOnExcecutionOrderFail
 	}
 
 	if len(repoCfg.Projects) > 0 {
@@ -722,13 +723,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
+	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
 	if repoCfgPtr != nil {
-<<<<<<< HEAD
-		automerge = automerge || repoCfgPtr.Automerge
-		parallelApply = parallelApply || repoCfgPtr.ParallelApply
-		parallelPlan = parallelPlan || repoCfgPtr.ParallelPlan
-		abortOnExcecutionOrderFail = *&repoCfgPtr.AbortOnExcecutionOrderFail
-=======
 		if repoCfgPtr.Automerge != nil {
 			automerge = *repoCfgPtr.Automerge
 		}
@@ -738,7 +734,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		if repoCfgPtr.ParallelPlan != nil {
 			parallelPlan = *repoCfgPtr.ParallelPlan
 		}
->>>>>>> 387c80e5 (Fix automerge priority and tests)
+		abortOnExcecutionOrderFail = *&repoCfgPtr.AbortOnExcecutionOrderFail
 	}
 
 	if len(matchingProjects) > 0 {
