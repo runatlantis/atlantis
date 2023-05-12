@@ -30,6 +30,8 @@ const (
 	Import
 	// State is a command to run terraform state rm
 	State
+	// Maintenance is not a command, but a placeholder for all commands, not added to String().
+	Maintenance
 	// Adding more? Don't forget to update String() below
 )
 

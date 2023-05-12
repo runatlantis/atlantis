@@ -21,6 +21,7 @@ import (
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -123,10 +124,30 @@ type DefaultCommandRunner struct {
 	PullStatusFetcher              PullStatusFetcher
 	TeamAllowlistChecker           *TeamAllowlistChecker
 	VarFileAllowlistChecker        *VarFileAllowlistChecker
+	Locker                         locking.MaintenanceLockChecker
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
+	locked, err := c.IsLocked()
+	// CheckMaintenanceLock falls back to EnableMaintenanceMode flag if fetching the lock
+	// raises an error
+	// We will log failure as warning
+	if err != nil {
+		c.Logger.Warn("checking global apply lock: %s", err)
+	}
+	if locked {
+		c.Logger.Info("ignoring apply command since apply disabled globally")
+		if err := c.VCSClient.CreateComment(
+			baseRepo,
+			pull.Num,
+			"**Error:** Server is in maintenance mode. Running `autoplan` failed. Try running `atlantis plan` later.",
+			"autoplan",
+		); err != nil {
+			c.Logger.Err("unable to comment on pull request: %s", err)
+		}
+		return
+	}
 	if opStarted := c.Drainer.StartOp(); !opStarted {
 		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment, command.Plan.String()); commentErr != nil {
 			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
@@ -221,6 +242,25 @@ func (c *DefaultCommandRunner) checkVarFilesInPlanCommandAllowlisted(cmd *Commen
 // the event is further validated before making an additional (potentially
 // wasteful) call to get the necessary data.
 func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
+	locked, err := c.IsLocked()
+	// CheckMaintenanceLock falls back to EnableMaintenanceMode flag if fetching the lock
+	// raises an error
+	// We will log failure as warning
+	if err != nil {
+		c.Logger.Warn("checking global apply lock: %s", err)
+	}
+	if locked {
+		c.Logger.Info("ignoring apply command since apply disabled globally")
+		if err := c.VCSClient.CreateComment(
+			baseRepo,
+			pullNum,
+			fmt.Sprintf("**Error:** Server is in maintenance mode. Running `%s` failed. Try again later.", cmd),
+			"autoplan",
+		); err != nil {
+			c.Logger.Err("unable to comment on pull request: %s", err)
+		}
+		return
+	}
 	if opStarted := c.Drainer.StartOp(); !opStarted {
 		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, ShutdownComment, ""); commentErr != nil {
 			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
@@ -436,6 +476,12 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 			logger.Err("unable to comment: %s", commentErr)
 		}
 	}
+}
+
+func (c *DefaultCommandRunner) IsLocked() (bool, error) {
+	lock, err := c.Locker.CheckMaintenanceLock()
+
+	return lock.Locked, err
 }
 
 var automergeComment = `Automatically merging because all plans have been successfully applied.`

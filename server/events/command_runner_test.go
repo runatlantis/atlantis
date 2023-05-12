@@ -65,6 +65,7 @@ var policyCheckCommandRunner *events.PolicyCheckCommandRunner
 var approvePoliciesCommandRunner *events.ApprovePoliciesCommandRunner
 var planCommandRunner *events.PlanCommandRunner
 var applyLockChecker *lockingmocks.MockApplyLockChecker
+var maintenanceLockChecker *lockingmocks.MockMaintenanceLockChecker
 var lockingLocker *lockingmocks.MockLocker
 var applyCommandRunner *events.ApplyCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
@@ -123,6 +124,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
 	applyLockChecker = lockingmocks.NewMockApplyLockChecker()
+	maintenanceLockChecker = lockingmocks.NewMockMaintenanceLockChecker()
 	lockingLocker = lockingmocks.NewMockLocker()
 
 	dbUpdater = &events.DBUpdater{
@@ -257,6 +259,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              testConfig.backend,
+		Locker:                         maintenanceLockChecker,
 	}
 
 	return vcsClient

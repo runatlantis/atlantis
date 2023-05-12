@@ -428,6 +428,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	var lockingClient locking.Locker
 	var applyLockingClient locking.ApplyLocker
+	var maintenanceLockingClient locking.MaintenanceLocker
 	var backend locking.Backend
 
 	switch dbtype := userConfig.LockingDBType; dbtype {
@@ -454,6 +455,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	applyLockingClient = locking.NewApplyClient(backend, disableApply)
+	maintenanceLockingClient = locking.NewMaintenanceClient(backend, userConfig.EnableMaintenanceMode)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
@@ -797,6 +799,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PullStatusFetcher:              backend,
 		TeamAllowlistChecker:           githubTeamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
+		Locker:                         maintenanceLockingClient,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {

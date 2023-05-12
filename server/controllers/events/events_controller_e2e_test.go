@@ -47,6 +47,7 @@ import (
 // Because if depends on the version, we need to upgrade test base image before e2e fix it.
 const conftestCommand = "conftest"
 
+var maintenanceLocker locking.MaintenanceLocker
 var applyLocker locking.ApplyLocker
 var userConfig server.UserConfig
 
@@ -1108,6 +1109,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	backend := boltdb
 	lockingClient := locking.NewClient(boltdb)
 	noOpLocker := locking.NewNoOpLocker()
+	maintenanceLocker = locking.NewMaintenanceClient(boltdb, userConfig.EnableMaintenanceMode)
 	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	projectLocker := &events.DefaultProjectLocker{
 		Locker:     lockingClient,
@@ -1383,6 +1385,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              backend,
+		Locker:                         maintenanceLocker,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")

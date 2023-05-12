@@ -70,6 +70,7 @@ const (
 	EmojiReaction                    = "emoji-reaction"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
+	EnableMaintenanceModeFlag        = "enable-maintenance-mode"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	ExecutableName                   = "executable-name"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
@@ -447,6 +448,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnableDiffMarkdownFormat: {
 		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
+		defaultValue: false,
+	},
+	EnableMaintenanceModeFlag: {
+		description:  "Start Atlantis in maintenance mode; all commands blocked.",
 		defaultValue: false,
 	},
 	GHAllowMergeableBypassApply: {
