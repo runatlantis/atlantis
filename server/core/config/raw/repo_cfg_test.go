@@ -265,8 +265,8 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 			exp: valid.RepoCfg{
 				Version:                    2,
-				Automerge:                  Bool(false),
-				ParallelApply:              Bool(false),
+				Automerge:                  nil,
+				ParallelApply:              nil,
 				AbortOnExcecutionOrderFail: false,
 				Workflows:                  map[string]valid.Workflow{},
 			},

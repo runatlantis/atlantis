@@ -159,9 +159,6 @@ Use the `--parallel-pool-size` to configure the max number of plans and applies 
 
 Parallel plans and applies work across both multiple directories and multiple workspaces.
 
-:::Note: When `--parallel-plan` or `--parallel-apply` is set at the server config level, it will be enabled for all repos. This behavior is similar to `automerge` and `--automerge`.
-:::
-
 ### Configuring Planning
 
 Given the directory structure:

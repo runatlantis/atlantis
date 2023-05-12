@@ -666,7 +666,7 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_PARALLEL_PLAN=true
   ```
-  Whether to run plan operations in parallel. Defaults to `false`. When enabled at this level, it overrides the `parallel_plan` setting in the repo config.
+  Whether to run plan operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precidence.
 
 ### `--parallel-apply`
   ```bash
@@ -674,7 +674,7 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_PARALLEL_APPLY=true
   ```
-  Whether to run apply operations in parallel. Defaults to `false`. When enabled at this level, it overrides the `parallel_apply` setting in the repo config.
+  Whether to run apply operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precidence.
 
 ### `--port`
   ```bash
