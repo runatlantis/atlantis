@@ -22,6 +22,7 @@ type LocksController struct {
 	Locker             locking.Locker
 	Logger             logging.SimpleLogging
 	ApplyLocker        locking.ApplyLocker
+	MaintenanceLocker  locking.MaintenanceLocker
 	VCSClient          vcs.Client
 	LockDetailTemplate templates.TemplateWriter
 	WorkingDir         events.WorkingDir
@@ -52,6 +53,30 @@ func (l *LocksController) UnlockApply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	l.respond(w, logging.Info, http.StatusOK, "Deleted apply lock")
+}
+
+// LockMaintenance handles creating a global lock on ALL commands.
+// If Lock already exists it will be a no-op
+func (l *LocksController) LockMaintenance(w http.ResponseWriter, r *http.Request) {
+	lock, err := l.MaintenanceLocker.LockMaintenance()
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "creating maintenance lock failed with: %s", err)
+		return
+	}
+
+	l.respond(w, logging.Info, http.StatusOK, "Maintenance Lock is acquired on %s", lock.Time.Format("2006-01-02 15:04:05"))
+}
+
+// UnlockMaintenance handles releasing a global lock on ALL commands.
+// If Lock doesn't exists it will be a no-op
+func (l *LocksController) UnlockMaintenance(w http.ResponseWriter, r *http.Request) {
+	err := l.MaintenanceLocker.UnlockMaintenance()
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "deleting maintenance lock failed with: %s", err)
+		return
+	}
+
+	l.respond(w, logging.Info, http.StatusOK, "Deleted maintenance lock")
 }
 
 // GetLock is the GET /locks/{id} route. It renders the lock detail view.

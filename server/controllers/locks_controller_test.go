@@ -113,6 +113,84 @@ func TestUnlockApply(t *testing.T) {
 	})
 }
 
+func TestCreateMaintenanceLock(t *testing.T) {
+	t.Run("Creates maintenance lock", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+		w := httptest.NewRecorder()
+
+		layout := "2006-01-02T15:04:05.000Z"
+		strLockTime := "2020-09-01T00:45:26.371Z"
+		expLockTime := "2020-09-01 00:45:26"
+		lockTime, _ := time.Parse(layout, strLockTime)
+
+		l := mocks.NewMockMaintenanceLocker()
+		When(l.LockMaintenance()).ThenReturn(locking.MaintenanceCommandLock{
+			Locked: true,
+			Time:   lockTime,
+		}, nil)
+
+		lc := controllers.LocksController{
+			Logger:            logging.NewNoopLogger(t),
+			MaintenanceLocker: l,
+		}
+		lc.LockMaintenance(w, req)
+
+		ResponseContains(t, w, http.StatusOK, fmt.Sprintf("Maintenance Lock is acquired on %s", expLockTime))
+	})
+
+	t.Run("Maintenance lock creation fails", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+		w := httptest.NewRecorder()
+
+		l := mocks.NewMockMaintenanceLocker()
+		When(l.LockMaintenance()).ThenReturn(locking.MaintenanceCommandLock{
+			Locked: false,
+		}, errors.New("failed to acquire lock"))
+
+		lc := controllers.LocksController{
+			Logger:            logging.NewNoopLogger(t),
+			MaintenanceLocker: l,
+		}
+		lc.LockMaintenance(w, req)
+
+		ResponseContains(t, w, http.StatusInternalServerError, "creating maintenance lock failed with: failed to acquire lock")
+	})
+}
+
+func TestUnlockMaintenance(t *testing.T) {
+	t.Run("Maintenance lock deleted successfully", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+		w := httptest.NewRecorder()
+
+		l := mocks.NewMockMaintenanceLocker()
+		When(l.UnlockMaintenance()).ThenReturn(nil)
+
+		lc := controllers.LocksController{
+			Logger:            logging.NewNoopLogger(t),
+			MaintenanceLocker: l,
+		}
+		lc.UnlockMaintenance(w, req)
+
+		ResponseContains(t, w, http.StatusOK, "Deleted apply lock")
+	})
+
+	t.Run("Maintenance lock deletion failed", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+		w := httptest.NewRecorder()
+
+		l := mocks.NewMockMaintenanceLocker()
+		When(l.UnlockMaintenance()).ThenReturn(errors.New("failed to delete lock"))
+
+		lc := controllers.LocksController{
+			Logger:            logging.NewNoopLogger(t),
+			MaintenanceLocker: l,
+		}
+		lc.UnlockMaintenance(w, req)
+
+		ResponseContains(t, w, http.StatusInternalServerError, "deleting apply lock failed with: failed to delete lock")
+	})
+}
+
 func TestGetLockRoute_NoLockID(t *testing.T) {
 	t.Log("If there is no lock ID in the request then we should get a 400")
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
