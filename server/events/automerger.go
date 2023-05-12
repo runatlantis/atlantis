@@ -48,7 +48,6 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 func (c *AutoMerger) automergeEnabled(projectCmds []command.ProjectContext) bool {
 	// If the global automerge is set, we always automerge.
 	return c.GlobalAutomerge ||
-		// Otherwise we check if this repo is configured for automerging.
 		(len(projectCmds) > 0 && projectCmds[0].AutomergeEnabled)
 }
 

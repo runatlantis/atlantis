@@ -28,8 +28,6 @@ const (
 	// DefaultWorkspace is the default Terraform workspace we run commands in.
 	// This is also Terraform's default workspace.
 	DefaultWorkspace = "default"
-	// DefaultAutomergeEnabled is the default for the automerge setting.
-	DefaultAutomergeEnabled = false
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
 	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
@@ -48,6 +46,7 @@ func NewInstrumentedProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
+	EnableAutoMerge bool,
 	EnableParallelPlan bool,
 	EnableParallelApply bool,
 	AutoDetectModuleFiles string,
@@ -77,6 +76,7 @@ func NewInstrumentedProjectCommandBuilder(
 			commentBuilder,
 			skipCloneNoChanges,
 			EnableRegExpCmd,
+			EnableAutoMerge,
 			EnableParallelPlan,
 			EnableParallelApply,
 			AutoDetectModuleFiles,
@@ -104,6 +104,7 @@ func NewProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
+	EnableAutoMerge bool,
 	EnableParallelPlan bool,
 	EnableParallelApply bool,
 	AutoDetectModuleFiles string,
@@ -124,6 +125,7 @@ func NewProjectCommandBuilder(
 		PendingPlanFinder:     pendingPlanFinder,
 		SkipCloneNoChanges:    skipCloneNoChanges,
 		EnableRegExpCmd:       EnableRegExpCmd,
+		EnableAutoMerge:       EnableAutoMerge,
 		EnableParallelPlan:    EnableParallelPlan,
 		EnableParallelApply:   EnableParallelApply,
 		AutoDetectModuleFiles: AutoDetectModuleFiles,
@@ -208,6 +210,7 @@ type DefaultProjectCommandBuilder struct {
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	SkipCloneNoChanges           bool
 	EnableRegExpCmd              bool
+	EnableAutoMerge              bool
 	EnableParallelPlan           bool
 	EnableParallelApply          bool
 	AutoDetectModuleFiles        string
@@ -369,14 +372,20 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	}
 	ctx.Log.Debug("moduleInfo for %s (matching %q) = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
 
-	automerge := DefaultAutomergeEnabled
+	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	if hasRepoCfg {
-		automerge = automerge || repoCfg.Automerge
-		parallelApply = parallelApply || repoCfg.ParallelApply
-		parallelPlan = parallelPlan || repoCfg.ParallelPlan
-    		abortOnExcecutionOrderFail = repoCfg.AbortOnExcecutionOrderFail
+		if repoCfg.Automerge != nil {
+			automerge = *repoCfg.Automerge
+		}
+		if repoCfg.ParallelApply != nil {
+			parallelApply = *repoCfg.ParallelApply
+		}
+		if repoCfg.ParallelPlan != nil {
+			parallelPlan = *repoCfg.ParallelPlan
+		}
+    	abortOnExcecutionOrderFail = repoCfg.AbortOnExcecutionOrderFail
 	}
 
 	if len(repoCfg.Projects) > 0 {
@@ -710,14 +719,26 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	}
 	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
-	automerge := DefaultAutomergeEnabled
+	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	if repoCfgPtr != nil {
+<<<<<<< HEAD
 		automerge = automerge || repoCfgPtr.Automerge
 		parallelApply = parallelApply || repoCfgPtr.ParallelApply
 		parallelPlan = parallelPlan || repoCfgPtr.ParallelPlan
 		abortOnExcecutionOrderFail = *&repoCfgPtr.AbortOnExcecutionOrderFail
+=======
+		if repoCfgPtr.Automerge != nil {
+			automerge = *repoCfgPtr.Automerge
+		}
+		if repoCfgPtr.ParallelApply != nil {
+			parallelApply = *repoCfgPtr.ParallelApply
+		}
+		if repoCfgPtr.ParallelPlan != nil {
+			parallelPlan = *repoCfgPtr.ParallelPlan
+		}
+>>>>>>> 387c80e5 (Fix automerge priority and tests)
 	}
 
 	if len(matchingProjects) > 0 {
