@@ -32,6 +32,8 @@ const (
 	DefaultAutomergeEnabled = false
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
+	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
+	DefaultAbortOnExcecutionOrderFail = false
 )
 
 func NewInstrumentedProjectCommandBuilder(
@@ -374,6 +376,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		automerge = automerge || repoCfg.Automerge
 		parallelApply = parallelApply || repoCfg.ParallelApply
 		parallelPlan = parallelPlan || repoCfg.ParallelPlan
+    abortOnExcecutionOrderFail = repoCfg.AbortOnExcecutionOrderFail
 	}
 
 	if len(repoCfg.Projects) > 0 {
@@ -399,6 +402,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
+					repoCfg.AbortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -434,6 +438,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
+					abortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -712,6 +717,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		automerge = automerge || repoCfgPtr.Automerge
 		parallelApply = parallelApply || repoCfgPtr.ParallelApply
 		parallelPlan = parallelPlan || repoCfgPtr.ParallelPlan
+		abortOnExcecutionOrderFail = *&repoCfgPtr.AbortOnExcecutionOrderFail
 	}
 
 	if len(matchingProjects) > 0 {
@@ -736,6 +742,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					parallelApply,
 					parallelPlan,
 					verbose,
+					abortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -759,6 +766,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				parallelApply,
 				parallelPlan,
 				verbose,
+				abortOnExcecutionOrderFail,
 				p.TerraformExecutor,
 			)...)
 	}
