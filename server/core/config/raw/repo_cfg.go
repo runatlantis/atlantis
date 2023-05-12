@@ -25,6 +25,9 @@ const DefaultDeleteSourceBranchOnMerge = false
 // DefaultEmojiReaction is the default emoji reaction for repos
 const DefaultEmojiReaction = ""
 
+// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
+const DefaultAbortOnExcecutionOrderFail = false
+
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
 type RepoCfg struct {
 	Version                   *int                `yaml:"version,omitempty"`
@@ -37,6 +40,7 @@ type RepoCfg struct {
 	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
 	EmojiReaction             *string             `yaml:"emoji_reaction,omitempty"`
 	AllowedRegexpPrefixes     []string            `yaml:"allowed_regexp_prefixes,omitempty"`
+	AbortOnExcecutionOrderFail *bool               `yaml:"abort_on_execution_order_fail,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
@@ -88,6 +92,11 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		emojiReaction = *r.EmojiReaction
 	}
 
+	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
+	if r.AbortOnExcecutionOrderFail != nil {
+		abortOnExcecutionOrderFail = *r.AbortOnExcecutionOrderFail
+	}
+
 	return valid.RepoCfg{
 		Version:                   *r.Version,
 		Projects:                  validProjects,
@@ -99,5 +108,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 		AllowedRegexpPrefixes:     r.AllowedRegexpPrefixes,
 		EmojiReaction:             emojiReaction,
+		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
 	}
 }
