@@ -47,10 +47,17 @@ type ApplyLockData struct {
 	TimeFormatted string
 }
 
+type MaintenanceLockData struct {
+	Locked        bool
+	Time          time.Time
+	TimeFormatted string
+}
+
 // IndexData holds the data for rendering the index page
 type IndexData struct {
 	Locks           []LockIndexData
 	ApplyLock       ApplyLockData
+	MaintenanceLock MaintenanceLockData
 	AtlantisVersion string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
 	// not using a path-based proxy, this will be an empty string. Never ends
@@ -103,6 +110,21 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     </div>
     {{ end }}
   </section>
+  <section>
+    {{ if .MaintenanceLock.Locked }}
+    <div class="twelve center columns">
+      <h6><strong>Maintenance lock disabled globally</strong></h6>
+      <h6><code>Lock Status</code>: <strong>Active</strong></h6>
+      <h6><code>Active Since</code>: <strong>{{ .MaintenanceLock.TimeFormatted }}</strong></h6>
+      <a class="button button-primary" id="maintenanceUnlockPrompt">Enable Maintenance Lock</a>
+    </div>
+    {{ else }}
+    <div class="twelve columns">
+      <h6><strong>All commands are enabled</strong></h6>
+      <a class="button button-primary" id="maintenanceLockPrompt">Disable maintenance lock</a>
+    </div>
+    {{ end }}
+  </section>
   <br>
   <br>
   <br>
@@ -145,6 +167,32 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
       <div class="modal-body">
         <p><strong>Are you sure you want to release global apply lock?</strong></p>
         <input class="button-primary" id="applyUnlockYes" type="submit" value="Yes">
+        <input type="button" class="cancel" value="Cancel">
+      </div>
+    </div>
+  </div>
+  <div id="maintenanceLockMessageModal" class="modal">
+    <!-- Modal content -->
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p><strong>Are you sure you want to create a global maintenance lock? It will disable all commands globally</strong></p>
+        <input class="button-primary" id="maintenanceLockYes" type="submit" value="Yes">
+        <input type="button" class="cancel" value="Cancel">
+      </div>
+    </div>
+  </div>
+  <div id="maintenanceUnlockMessageModal" class="modal">
+    <!-- Modal content -->
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p><strong>Are you sure you want to release global maintenance lock?</strong></p>
+        <input class="button-primary" id="maintenanceUnlockYes" type="submit" value="Yes">
         <input type="button" class="cancel" value="Cancel">
       </div>
     </div>
@@ -202,6 +250,82 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   var [modal, btn] = applyLockModalSetup("unlock");
   {{ else }}
   var [modal, btn] = applyLockModalSetup("lock");
+  {{ end }}
+
+  // Get the <span> element that closes the modal
+  // using document.getElementsByClassName since jquery $("close") doesn't seem to work for btn click events
+  var span = document.getElementsByClassName("close")[0];
+  var cancelBtn = document.getElementsByClassName("cancel")[0];
+
+  // When the user clicks the button, open the modal
+  btn.click(function() {
+    modal.css("display", "block");
+  });
+
+  // When the user clicks on <span> (x), close the modal
+  span.onclick = function() {
+    modal.css("display", "none");
+  }
+  cancelBtn.onclick = function() {
+    modal.css("display", "none");
+  }
+
+  // When the user clicks anywhere outside of the modal, close it
+  window.onclick = function(event) {
+      if (event.target == modal) {
+          modal.css("display", "none");
+      }
+  }
+</script>
+<script>
+
+  function applyLockModalSetup(lockOrUnlock) {
+      // Get the modal
+      switch( lockOrUnlock ) {
+      case "lock":
+          var modal = $("#maintenanceLockMessageModal");
+
+          var btn = $("#maintenanceLockPrompt");
+
+          $("#maintenanceLockYes").click(function() {
+            $.ajax({
+                url: '{{ .CleanedBasePath }}/maintenance/lock',
+                type: 'POST',
+                success: function(result) {
+                  window.location.replace("{{ .CleanedBasePath }}/?discard=true");
+                }
+            });
+          });
+
+          break;
+      case "unlock":
+          var modal = $("#maintenanceUnlockMessageModal");
+
+          var btn = $("#maintenanceUnlockPrompt");
+          var btnMaintenanceUnlock =
+
+          $("#maintenanceUnlockYes").click(function() {
+            $.ajax({
+                url: '{{ .CleanedBasePath }}/maintenance/unlock',
+                type: 'DELETE',
+                success: function(result) {
+                  window.location.replace("{{ .CleanedBasePath }}/?discard=true");
+                }
+            });
+          });
+
+          break;
+      default:
+          throw("unsupported command " + lockOrUnlock)
+      }
+
+      return [modal, btn];
+  }
+
+  {{ if .MaintenanceLock.Locked }}
+  var [modal, btn] = maintenanceLockModalSetup("unlock");
+  {{ else }}
+  var [modal, btn] = maintenanceLockModalSetup("lock");
   {{ end }}
 
   // Get the <span> element that closes the modal

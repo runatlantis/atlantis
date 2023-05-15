@@ -101,6 +101,7 @@ type Server struct {
 	StatsCloser                    io.Closer
 	Locker                         locking.Locker
 	ApplyLocker                    locking.ApplyLocker
+	MaintenanceLocker              locking.MaintenanceLocker
 	VCSEventsController            *events_controllers.VCSEventsController
 	GithubAppController            *controllers.GithubAppController
 	LocksController                *controllers.LocksController
@@ -810,6 +811,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisURL:        parsedURL,
 		Locker:             lockingClient,
 		ApplyLocker:        applyLockingClient,
+		MaintenanceLocker:  maintenanceLockingClient,
 		Logger:             logger,
 		VCSClient:          vcsClient,
 		LockDetailTemplate: templates.LockTemplate,
@@ -895,6 +897,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatsCloser:                    closer,
 		Locker:                         lockingClient,
 		ApplyLocker:                    applyLockingClient,
+		MaintenanceLocker:              maintenanceLockingClient,
 		VCSEventsController:            eventsController,
 		GithubAppController:            githubAppController,
 		LocksController:                locksController,
@@ -1051,10 +1054,24 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
+	maintenanceLock, err := s.MaintenanceLocker.CheckMaintenanceLock()
+	s.Logger.Info("Maintenance Lock: %v", maintenanceLock)
+	if err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, "Could not retrieve global maintenance lock: %s", err)
+		return
+	}
+
 	applyLockData := templates.ApplyLockData{
 		Time:          applyCmdLock.Time,
 		Locked:        applyCmdLock.Locked,
 		TimeFormatted: applyCmdLock.Time.Format("02-01-2006 15:04:05"),
+	}
+
+	maintenanceLockData := templates.MaintenanceLockData{
+		Time:          maintenanceLock.Time,
+		Locked:        maintenanceLock.Locked,
+		TimeFormatted: maintenanceLock.Time.Format("02-01-2006 15:04:05"),
 	}
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
@@ -1062,6 +1079,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	err = s.IndexTemplate.Execute(w, templates.IndexData{
 		Locks:           lockResults,
 		ApplyLock:       applyLockData,
+		MaintenanceLock: maintenanceLockData,
 		AtlantisVersion: s.AtlantisVersion,
 		CleanedBasePath: s.AtlantisURL.Path,
 	})
