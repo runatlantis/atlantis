@@ -279,7 +279,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 </script>
 <script>
 
-  function applyLockModalSetup(lockOrUnlock) {
+  function maintenanceLockModalSetup(lockOrUnlock) {
       // Get the modal
       switch( lockOrUnlock ) {
       case "lock":
