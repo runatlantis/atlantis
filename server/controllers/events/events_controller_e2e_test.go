@@ -95,6 +95,8 @@ func TestGitHubWorkflow(t *testing.T) {
 		DisableApply bool
 		// ApplyLock creates an apply lock that temporarily disables apply command
 		ApplyLock bool
+		// MaintenanceLock create a maintenance lock that temporarily disables ALL commands
+		MaintenanceLock bool
 		// AllowCommands flag what kind of atlantis commands are available.
 		AllowCommands []command.Name
 		// ExpAutomerge is true if we expect Atlantis to automerge.
@@ -412,6 +414,24 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 		},
 		{
+			Description:     "global maintenance lock disables all commands",
+			RepoDir:         "simple-yaml",
+			ModifiedFiles:   []string{"main.tf"},
+			DisableApply:    false,
+			MaintenanceLock: true,
+			ExpAutoplan:     true,
+			Comments: []string{
+				"atlantis plan",
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan-maintenance-lock.txt"},
+				{"exp-output-plan-maintenance-lock.txt"},
+				{"exp-output-apply-maintenance-lock.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
 			Description:   "disable apply flag always takes presedence",
 			RepoDir:       "simple-yaml",
 			ModifiedFiles: []string{"main.tf"},
@@ -593,6 +613,10 @@ func TestGitHubWorkflow(t *testing.T) {
 				_, _ = applyLocker.LockApply()
 			}
 
+			if c.MaintenanceLock {
+				_, _ = maintenanceLocker.LockMaintenance()
+			}
+
 			// Now send any other comments.
 			for _, comment := range c.Comments {
 				commentReq := GitHubCommentEvent(t, comment)
@@ -612,7 +636,10 @@ func TestGitHubWorkflow(t *testing.T) {
 			ctrl.Post(w, pullClosedReq)
 			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
-			expNumHooks := len(c.Comments) + 1 - c.ExpParseFailedCount
+			expNumHooks := 0
+			if !c.MaintenanceLock {
+				expNumHooks = len(c.Comments) + 1 - c.ExpParseFailedCount
+			}
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
 			mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
 			// Let's verify the post-workflow hook was called for each comment including the pull request opened event

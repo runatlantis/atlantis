@@ -134,10 +134,10 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	// raises an error
 	// We will log failure as warning
 	if err != nil {
-		c.Logger.Warn("checking global apply lock: %s", err)
+		c.Logger.Warn("checking global maintenance lock: %s", err)
 	}
 	if locked {
-		c.Logger.Info("ignoring apply command since apply disabled globally")
+		c.Logger.Info("ignoring autoplan since maintenance mode is enabled")
 		if err := c.VCSClient.CreateComment(
 			baseRepo,
 			pull.Num,
@@ -247,15 +247,15 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	// raises an error
 	// We will log failure as warning
 	if err != nil {
-		c.Logger.Warn("checking global apply lock: %s", err)
+		c.Logger.Warn("checking global maintenance lock: %s", err)
 	}
 	if locked {
-		c.Logger.Info("ignoring apply command since apply disabled globally")
+		c.Logger.Info(fmt.Sprintf("ignoring %s command since maintenance mode is enabled", cmd))
 		if err := c.VCSClient.CreateComment(
 			baseRepo,
 			pullNum,
-			fmt.Sprintf("**Error:** Server is in maintenance mode. Running `%s` failed. Try again later.", cmd),
-			"autoplan",
+			fmt.Sprintf("**Error:** Server is in maintenance mode. Running `%s` failed. Try again later.", cmd.Name.String()),
+			cmd.Name.String(),
 		); err != nil {
 			c.Logger.Err("unable to comment on pull request: %s", err)
 		}

@@ -76,7 +76,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	if locked {
-		ctx.Log.Info("ignoring apply command since apply disabled globally")
+		ctx.Log.Info("ignoring apply command since  globally")
 		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyDisabledComment, command.Apply.String()); err != nil {
 			ctx.Log.Err("unable to comment on pull request: %s", err)
 		}

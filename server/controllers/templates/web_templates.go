@@ -113,15 +113,15 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <section>
     {{ if .MaintenanceLock.Locked }}
     <div class="twelve center columns">
-      <h6><strong>Maintenance lock disabled globally</strong></h6>
+      <h6><strong>All commands are disabled</strong></h6>
       <h6><code>Lock Status</code>: <strong>Active</strong></h6>
       <h6><code>Active Since</code>: <strong>{{ .MaintenanceLock.TimeFormatted }}</strong></h6>
-      <a class="button button-primary" id="maintenanceUnlockPrompt">Enable Maintenance Lock</a>
+      <a class="button button-primary" id="maintenanceUnlockPrompt">Disable Maintenance Lock</a>
     </div>
     {{ else }}
     <div class="twelve columns">
       <h6><strong>All commands are enabled</strong></h6>
-      <a class="button button-primary" id="maintenanceLockPrompt">Disable maintenance lock</a>
+      <a class="button button-primary" id="maintenanceLockPrompt">Enable maintenance lock</a>
     </div>
     {{ end }}
   </section>
@@ -149,12 +149,12 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <!-- Modal content -->
     <div class="modal-content">
       <div class="modal-header">
-        <span class="close">&times;</span>
+        <span class="close" id="close-apply-lock">&times;</span>
       </div>
       <div class="modal-body">
         <p><strong>Are you sure you want to create a global apply lock? It will disable applies globally</strong></p>
         <input class="button-primary" id="applyLockYes" type="submit" value="Yes">
-        <input type="button" class="cancel" value="Cancel">
+        <input type="button" class="cancel" value="Cancel" id="cancel-apply-lock">
       </div>
     </div>
   </div>
@@ -162,12 +162,12 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <!-- Modal content -->
     <div class="modal-content">
       <div class="modal-header">
-        <span class="close">&times;</span>
+        <span class="close" id="close-apply-lock">&times;</span>
       </div>
       <div class="modal-body">
         <p><strong>Are you sure you want to release global apply lock?</strong></p>
         <input class="button-primary" id="applyUnlockYes" type="submit" value="Yes">
-        <input type="button" class="cancel" value="Cancel">
+        <input type="button" class="cancel" value="Cancel" id="cancel-apply-lock">
       </div>
     </div>
   </div>
@@ -175,12 +175,12 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <!-- Modal content -->
     <div class="modal-content">
       <div class="modal-header">
-        <span class="close">&times;</span>
+        <span class="close" id="close-maintenance-lock">&times;</span>
       </div>
       <div class="modal-body">
         <p><strong>Are you sure you want to create a global maintenance lock? It will disable all commands globally</strong></p>
         <input class="button-primary" id="maintenanceLockYes" type="submit" value="Yes">
-        <input type="button" class="cancel" value="Cancel">
+        <input type="button" class="cancel" value="Cancel" id="cancel-maintenance-lock">
       </div>
     </div>
   </div>
@@ -188,12 +188,12 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <!-- Modal content -->
     <div class="modal-content">
       <div class="modal-header">
-        <span class="close">&times;</span>
+        <span class="close" id="close-maintenance-lock">&times;</span>
       </div>
       <div class="modal-body">
         <p><strong>Are you sure you want to release global maintenance lock?</strong></p>
         <input class="button-primary" id="maintenanceUnlockYes" type="submit" value="Yes">
-        <input type="button" class="cancel" value="Cancel">
+        <input type="button" class="cancel" value="Cancel" id="cancel-maintenance-lock">
       </div>
     </div>
   </div>
@@ -247,33 +247,33 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   }
 
   {{ if .ApplyLock.Locked }}
-  var [modal, btn] = applyLockModalSetup("unlock");
+  var [applyModal, applyBtn] = applyLockModalSetup("unlock");
   {{ else }}
-  var [modal, btn] = applyLockModalSetup("lock");
+  var [applyModal, applyBtn] = applyLockModalSetup("lock");
   {{ end }}
 
   // Get the <span> element that closes the modal
   // using document.getElementsByClassName since jquery $("close") doesn't seem to work for btn click events
-  var span = document.getElementsByClassName("close")[0];
-  var cancelBtn = document.getElementsByClassName("cancel")[0];
+  var applySpan = document.getElementById("close-apply-lock");
+  var applyCancelBtn = document.getElementById("cancel-apply-lock");
 
   // When the user clicks the button, open the modal
-  btn.click(function() {
-    modal.css("display", "block");
+  applyBtn.click(function() {
+    applyModal.css("display", "block");
   });
 
   // When the user clicks on <span> (x), close the modal
   span.onclick = function() {
-    modal.css("display", "none");
+    applyModal.css("display", "none");
   }
   cancelBtn.onclick = function() {
-    modal.css("display", "none");
+    applyModal.css("display", "none");
   }
 
   // When the user clicks anywhere outside of the modal, close it
   window.onclick = function(event) {
-      if (event.target == modal) {
-          modal.css("display", "none");
+      if (event.target == maintModal) {
+          applyModal.css("display", "none");
       }
   }
 </script>
@@ -323,33 +323,33 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   }
 
   {{ if .MaintenanceLock.Locked }}
-  var [modal, btn] = maintenanceLockModalSetup("unlock");
+  var [maintModal, maintBtn] = maintenanceLockModalSetup("unlock");
   {{ else }}
-  var [modal, btn] = maintenanceLockModalSetup("lock");
+  var [maintModal, maintBtn] = maintenanceLockModalSetup("lock");
   {{ end }}
 
   // Get the <span> element that closes the modal
   // using document.getElementsByClassName since jquery $("close") doesn't seem to work for btn click events
-  var span = document.getElementsByClassName("close")[0];
-  var cancelBtn = document.getElementsByClassName("cancel")[0];
+  var maintSpan = document.getElementById("close-maintenance-lock");
+  var maintCancelBtn = document.getElementById("cancel-maintenance-lock");
 
   // When the user clicks the button, open the modal
-  btn.click(function() {
-    modal.css("display", "block");
+  maintBtn.click(function() {
+    maintModal.css("display", "block");
   });
 
   // When the user clicks on <span> (x), close the modal
-  span.onclick = function() {
-    modal.css("display", "none");
+  maintSpan.onclick = function() {
+    maintModal.css("display", "none");
   }
-  cancelBtn.onclick = function() {
-    modal.css("display", "none");
+  maintCancelBtn.onclick = function() {
+    maintModal.css("display", "none");
   }
 
   // When the user clicks anywhere outside of the modal, close it
   window.onclick = function(event) {
-      if (event.target == modal) {
-          modal.css("display", "none");
+      if (event.target == maintModal) {
+          maintModal.css("display", "none");
       }
   }
 </script>
