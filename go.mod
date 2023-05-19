@@ -23,7 +23,7 @@ require (
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20230413234026-f1617e8a5fcc
 	github.com/kr/pretty v0.3.1
 	github.com/mcdafydd/go-azuredevops v0.12.1
-	github.com/microcosm-cc/bluemonday v1.0.23
+	github.com/microcosm-cc/bluemonday v1.0.24
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/patternmatcher v0.5.0
@@ -124,7 +124,7 @@ require (
 	github.com/zclconf/go-cty v1.12.1 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
-	golang.org/x/net v0.9.0 // indirect
+	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
