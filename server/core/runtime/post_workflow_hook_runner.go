@@ -58,6 +58,9 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		return "", "", err
 	}
 
+	wh.OutputHandler.SendWorkflowHook(ctx, string(out), false)
+	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+
 	// Read the value from the "outputFilePath" file
 	// to be returned as a custom description.
 	var customStatusOut []byte
@@ -70,9 +73,6 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 			return "", "", err
 		}
 	}
-
-	wh.OutputHandler.SendWorkflowHook(ctx, string(out), false)
-	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
 
 	ctx.Log.Info("successfully ran %q in %q", command, path)
 	return string(out), strings.Trim(string(customStatusOut), "\n"), nil
