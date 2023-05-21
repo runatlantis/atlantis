@@ -52,7 +52,7 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 	cmd.Env = finalEnvVars
 	out, err := cmd.CombinedOutput()
 
-	wh.OutputHandler.SendWorkflowHook(ctx, string(out), false)
+	wh.OutputHandler.SendWorkflowHook(ctx, strings.ReplaceAll(string(out), "\n", "\r\n"), false)
 	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
 
 	if err != nil {
