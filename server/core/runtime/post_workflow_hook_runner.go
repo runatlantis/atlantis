@@ -23,7 +23,7 @@ type DefaultPostWorkflowHookRunner struct {
 func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error) {
 	outputFilePath := filepath.Join(path, "OUTPUT_STATUS_FILE")
 
-	cmd := exec.Command("sh", "-c", command) // #nosec
+	cmd := exec.Command("bash", "-c", command) // #nosec
 	cmd.Dir = path
 
 	baseEnvVars := os.Environ()
@@ -52,7 +52,8 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 	cmd.Env = finalEnvVars
 	out, err := cmd.CombinedOutput()
 
-	wh.OutputHandler.SendWorkflowHook(ctx, strings.ReplaceAll(string(out), "\n", "\r\n"), false)
+	outString := strings.ReplaceAll(string(out), "\n", "\r\n")
+	wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
 	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
 
 	if err != nil {
@@ -75,5 +76,5 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 	}
 
 	ctx.Log.Info("successfully ran %q in %q", command, path)
-	return string(out), strings.Trim(string(customStatusOut), "\n"), nil
+	return outString, strings.Trim(string(customStatusOut), "\n"), nil
 }

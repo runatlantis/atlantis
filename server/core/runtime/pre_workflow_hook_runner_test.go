@@ -31,7 +31,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo hi",
-			ExpOut:         "hi\n",
+			ExpOut:         "hi\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
@@ -43,7 +43,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        `printf 'your main.tf file does not provide default region.\ncheck'`,
-			ExpOut:         "your main.tf file does not provide default region.\ncheck",
+			ExpOut:         "your main.tf file does not provide default region.\r\ncheck",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
@@ -55,7 +55,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo hi >> file && cat file",
-			ExpOut:         "hi\n",
+			ExpOut:         "hi\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
@@ -67,13 +67,13 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME head_commit=$HEAD_COMMIT base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_url=$PULL_URL pull_author=$PULL_AUTHOR",
-			ExpOut:         "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=main pull_num=2 pull_url=https://github.com/runatlantis/atlantis/pull/2 pull_author=acme\n",
+			ExpOut:         "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=main pull_num=2 pull_url=https://github.com/runatlantis/atlantis/pull/2 pull_author=acme\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
 		{
 			Command:        "echo user_name=$USER_NAME",
-			ExpOut:         "user_name=acme-user\n",
+			ExpOut:         "user_name=acme-user\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
