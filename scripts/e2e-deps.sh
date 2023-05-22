@@ -18,7 +18,7 @@ unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 chmod +x terraform
 cp terraform /home/circleci/go/bin
 # Download ngrok to create a tunnel to expose atlantis server
-wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
+wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v2-stable-linux-amd64.tgz
 unzip ngrok-stable-linux-amd64.zip 
 chmod +x ngrok 
 wget https://stedolan.github.io/jq/download/linux64/jq
