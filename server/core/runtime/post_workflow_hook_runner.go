@@ -58,7 +58,7 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
 		ctx.Log.Debug("error: %s", err)
-		return "", "", err
+		return string(out), "", err
 	}
 
 	// Read the value from the "outputFilePath" file
@@ -70,7 +70,7 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		if customStatusErr != nil {
 			err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
 			ctx.Log.Debug("error: %s", err)
-			return "", "", err
+			return string(out), "", err
 		}
 	}
 
