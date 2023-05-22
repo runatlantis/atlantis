@@ -23,7 +23,7 @@ type DefaultPostWorkflowHookRunner struct {
 func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error) {
 	outputFilePath := filepath.Join(path, "OUTPUT_STATUS_FILE")
 
-	cmd := exec.Command("bash", "-c", command) // #nosec
+	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
 
 	baseEnvVars := os.Environ()
