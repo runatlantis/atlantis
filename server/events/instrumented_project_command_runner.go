@@ -22,7 +22,7 @@ type InstrumentedProjectCommandRunner struct {
 
 func NewInstrumentedProjectCommandRunner(scope tally.Scope, projectCommandRunner ProjectCommandRunner) *InstrumentedProjectCommandRunner {
 	projectTags := command.ProjectScopeTags{}
-	scope = scope.Tagged(projectTags.Loadtags())
+	scope = scope.SubScope("project").Tagged(projectTags.Loadtags())
 
 	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric, metrics.ExecutionFailureMetric} {
 		metrics.InitCounter(scope, m)
@@ -60,7 +60,7 @@ func (p *InstrumentedProjectCommandRunner) StateRm(ctx command.ProjectContext) c
 
 func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult, scope tally.Scope) command.ProjectResult {
 	// ensures we are differentiating between project level command and overall command
-	scope = ctx.SetProjectScopeTags(scope)
+	scope = ctx.SetProjectScopeTags(scope).SubScope(commandName)
 	logger := ctx.Log
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
