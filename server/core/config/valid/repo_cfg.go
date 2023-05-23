@@ -24,7 +24,9 @@ type RepoCfg struct {
 	ParallelPolicyCheck       bool
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
+	EmojiReaction             string
 	AllowedRegexpPrefixes     []string
+	AbortOnExcecutionOrderFail bool
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {

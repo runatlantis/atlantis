@@ -28,7 +28,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
-	"github.com/google/go-github/v51/github"
+	"github.com/google/go-github/v52/github"
 	. "github.com/petergtz/pegomock"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -812,7 +812,7 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
 		matchers.EqCommandName(command.PolicyCheck),
 		EqInt(0),
-		EqInt(0),
+		EqInt(2),
 	)
 }
 
@@ -855,7 +855,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 		return ReturnValues{
 			command.ProjectResult{
 				Command:            command.PolicyCheck,
-				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+				PolicyCheckResults: &models.PolicyCheckResults{},
 			},
 		}
 	})

@@ -12,6 +12,10 @@ on:
       - 'Dockerfile'
       - 'docker-entrypoint.sh'
       - '.github/workflows/atlantis-image.yml'
+      - '**.go'
+      - 'go.*'
+      - 'yarn.lock'
+      - 'package.json'
   workflow_dispatch:
 
 concurrency:
@@ -28,8 +32,8 @@ jobs:
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ghcr.io/${{ github.repository }}
-      # Push if not a pull request or this is a fork
-      PUSH: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
+      # Push if not a pull request and references the main branch
+      PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
 
     steps:
     - uses: actions/checkout@v3
@@ -72,9 +76,9 @@ jobs:
           type=semver,pattern={{version}},prefix=v,enable=${{ matrix.image_type == 'alpine' }}
           type=semver,pattern={{major}}.{{minor}},prefix=v,suffix=${{ env.SUFFIX }}
           # dev
-          type=raw,value=dev,suffix=${{ env.SUFFIX }}-{{ sha }}
-          type=raw,event=push,value=dev,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }},suffix=
           type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}
+          type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}-{{ sha }}
+          type=raw,event=push,value=dev,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }},suffix=
           # prerelease
           type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') && matrix.image_type == 'alpine' }},suffix=
           type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') }},suffix=${{ env.SUFFIX }}

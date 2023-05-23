@@ -152,6 +152,21 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
 				ProjectPlanStatus: models.ErroredPolicyCheckStatus,
+				ProjectPolicyStatus: []models.PolicySetStatus{
+					{
+						PolicySetName: "policy1",
+						Passed:        false,
+						Approvals:     0,
+					},
+				},
+				PolicySets: valid.PolicySets{
+					PolicySets: []valid.PolicySet{
+						{
+							Name:         "policy1",
+							ApproveCount: 1,
+						},
+					},
+				},
 			},
 			wantFailure: "All policies must pass for project before running apply.",
 			wantErr:     assert.NoError,

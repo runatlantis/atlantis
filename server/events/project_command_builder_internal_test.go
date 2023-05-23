@@ -64,6 +64,7 @@ workflows:
 			repoCfg: "",
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   false,
@@ -120,6 +121,7 @@ projects:
   `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -180,6 +182,7 @@ projects:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -248,6 +251,7 @@ projects:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -403,6 +407,7 @@ workflows:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -465,6 +470,7 @@ projects:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -530,6 +536,7 @@ workflows:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -581,6 +588,7 @@ projects:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   false,
@@ -793,6 +801,7 @@ projects:
   `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -p myproject_1",
+				ApprovePoliciesCmd: "atlantis approve_policies -p myproject_1",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -969,6 +978,7 @@ repos:
 			repoCfg: "",
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   false,
@@ -1030,6 +1040,7 @@ workflows:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -1054,6 +1065,7 @@ workflows:
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				PolicySetTarget:    "",
 			},
 			expPolicyCheckSteps: []string{"policy_check"},
 		},

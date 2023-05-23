@@ -456,6 +456,8 @@ Or a custom command
   * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
   either be generated (by show) or already exist (if running policy checks). Can be used to
   override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
+  * `POLICYCHECKFILE` - Absolute path to the location of policy check output if Atlantis runs policy checks.
+  See [policy checking](/docs/policy-checking.html#data-for-custom-run-steps) for information of data structure.
   * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
   * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
   * `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.
@@ -465,6 +467,7 @@ Or a custom command
   * `BASE_BRANCH_NAME` - Name of the base branch of the pull request (the branch that the pull request is getting merged into)
   * `PROJECT_NAME` - Name of the project configured in `atlantis.yaml`. If no project name is configured this will be an empty string.
   * `PULL_NUM` - Pull request number or ID, ex. `2`.
+  * `PULL_URL` - Pull request URL, ex. `https://github.com/runatlantis/atlantis/pull/2`.
   * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
   * `REPO_REL_DIR` - The relative path of the project in the repository. For example if your project is in `dir1/dir2/` then this will be set to `"dir1/dir2"`. If your project is at the root this will be `"."`.
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.

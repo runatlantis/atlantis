@@ -419,18 +419,160 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 	}
 }
 
-func TestPolicyCheckSuccess_Summary(t *testing.T) {
-	cases := []string{
-		"20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
-		"3 tests, 0 passed, 1 warning, 1 failure, 0 exceptions, 1 skipped",
-		"1 test, 0 passed, 1 warning, 1 failure, 1 exception",
+func TestPolicyCheckResults_Summary(t *testing.T) {
+	cases := []struct {
+		description      string
+		policysetResults []models.PolicySetResult
+		exp              string
+	}{
+		{
+			description: "test single format with single policy set",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName:  "policy1",
+					ConftestOutput: "20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
+				},
+			},
+			exp: "policy set: policy1: 20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
+		},
+		{
+			description: "test multiple formats with multiple policy sets",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName:  "policy1",
+					ConftestOutput: "20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
+				},
+				{
+					PolicySetName:  "policy2",
+					ConftestOutput: "3 tests, 0 passed, 1 warning, 1 failure, 0 exceptions, 1 skipped",
+				},
+				{
+					PolicySetName:  "policy3",
+					ConftestOutput: "1 test, 0 passed, 1 warning, 1 failure, 1 exception",
+				},
+			},
+			exp: `policy set: policy1: 20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions
+policy set: policy2: 3 tests, 0 passed, 1 warning, 1 failure, 0 exceptions, 1 skipped
+policy set: policy3: 1 test, 0 passed, 1 warning, 1 failure, 1 exception`,
+		},
 	}
-	for i, summary := range cases {
-		t.Run(fmt.Sprintf("summary %d", i), func(t *testing.T) {
-			pcs := models.PolicyCheckSuccess{
-				PolicyCheckOutput: `WARN - <redacted plan file> - main - example main package\n` + summary,
+	for _, summary := range cases {
+		t.Run(summary.description, func(t *testing.T) {
+			pcs := models.PolicyCheckResults{
+				PolicySetResults: summary.policysetResults,
 			}
-			Equals(t, summary, pcs.Summary())
+			Equals(t, summary.exp, pcs.Summary())
+		})
+	}
+}
+
+// Test PolicyCleared and PolicySummary
+func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
+	cases := []struct {
+		description      string
+		policysetResults []models.PolicySetResult
+		policyClearedExp bool
+		policySummaryExp string
+	}{
+		{
+			description: "single policy set, not passed",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					Passed:        false,
+					ReqApprovals:  1,
+				},
+			},
+			policyClearedExp: false,
+			policySummaryExp: "policy set: policy1: requires: 1 approval(s), have: 0.",
+		},
+		{
+			description: "single policy set, passed",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					Passed:        true,
+					ReqApprovals:  1,
+				},
+			},
+			policyClearedExp: true,
+			policySummaryExp: "policy set: policy1: passed.",
+		},
+		{
+			description: "single policy set, fully approved",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					Passed:        false,
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+			},
+			policyClearedExp: true,
+			policySummaryExp: "policy set: policy1: approved.",
+		},
+		{
+			description: "multiple policy sets, different states.",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					Passed:        false,
+					ReqApprovals:  2,
+					CurApprovals:  0,
+				},
+				{
+					PolicySetName: "policy2",
+					Passed:        false,
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy3",
+					Passed:        true,
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+			},
+			policyClearedExp: false,
+			policySummaryExp: `policy set: policy1: requires: 2 approval(s), have: 0.
+policy set: policy2: approved.
+policy set: policy3: passed.`,
+		},
+		{
+			description: "multiple policy sets, all cleared.",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					Passed:        false,
+					ReqApprovals:  2,
+					CurApprovals:  2,
+				},
+				{
+					PolicySetName: "policy2",
+					Passed:        false,
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy3",
+					Passed:        true,
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+			},
+			policyClearedExp: true,
+			policySummaryExp: `policy set: policy1: approved.
+policy set: policy2: approved.
+policy set: policy3: passed.`,
+		},
+	}
+	for _, summary := range cases {
+		t.Run(summary.description, func(t *testing.T) {
+			pcs := models.PolicyCheckResults{
+				PolicySetResults: summary.policysetResults,
+			}
+			Equals(t, summary.policyClearedExp, pcs.PolicyCleared())
+			Equals(t, summary.policySummaryExp, pcs.PolicySummary())
 		})
 	}
 }

@@ -366,6 +366,21 @@ type PlanSuccess struct {
 	HasDiverged bool
 }
 
+type PolicySetResult struct {
+	PolicySetName  string
+	ConftestOutput string
+	Passed         bool
+	ReqApprovals   int
+	CurApprovals   int
+}
+
+// PolicySetApproval tracks the number of approvals a given policy set has.
+type PolicySetStatus struct {
+	PolicySetName string
+	Passed        bool
+	Approvals     int
+}
+
 // Summary regexes
 var (
 	reChangesOutside = regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
@@ -411,16 +426,18 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 	return strings.TrimSpace(formattedTerraformOutput)
 }
 
-// PolicyCheckSuccess is the result of a successful policy check run.
-type PolicyCheckSuccess struct {
-	// PolicyCheckOutput is the output from policy check binary(conftest|opa)
-	PolicyCheckOutput string
+// PolicyCheckResults is the result of a successful policy check run.
+type PolicyCheckResults struct {
+	// PolicySetResults is the output from policy check binary(conftest|opa)
+	PolicySetResults []PolicySetResult
 	// LockURL is the full URL to the lock held by this policy check.
 	LockURL string
 	// RePlanCmd is the command that users should run to re-plan this project.
 	RePlanCmd string
 	// ApplyCmd is the command that users should run to apply this plan.
 	ApplyCmd string
+	// ApprovePoliciesCmd is the command that users should run to approve policies for this plan.
+	ApprovePoliciesCmd string
 	// HasDiverged is true if we're using the checkout merge strategy and the
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
@@ -443,15 +460,53 @@ type StateRmSuccess struct {
 	RePlanCmd string
 }
 
-// Summary extracts one line summary of policy check.
-func (p *PolicyCheckSuccess) Summary() string {
-	note := ""
-
-	r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
-	if match := r.FindString(p.PolicyCheckOutput); match != "" {
-		return note + match
+func (p *PolicyCheckResults) CombinedOutput() string {
+	combinedOutput := ""
+	for _, psResult := range p.PolicySetResults {
+		// accounting for json output from conftest.
+		for _, psResultLine := range strings.Split(psResult.ConftestOutput, "\\n") {
+			combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
+		}
 	}
-	return note
+	return combinedOutput
+}
+
+// Summary extracts one line summary of each policy check.
+func (p *PolicyCheckResults) Summary() string {
+	note := ""
+	for _, policySetResult := range p.PolicySetResults {
+		r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
+		if match := r.FindString(policySetResult.ConftestOutput); match != "" {
+			note = fmt.Sprintf("%s\npolicy set: %s: %s", note, policySetResult.PolicySetName, match)
+		}
+	}
+	return strings.Trim(note, "\n")
+}
+
+// PolicyCleared is used to determine if policies have all succeeded or been approved.
+func (p *PolicyCheckResults) PolicyCleared() bool {
+	passing := true
+	for _, policySetResult := range p.PolicySetResults {
+		if !policySetResult.Passed && (policySetResult.CurApprovals != policySetResult.ReqApprovals) {
+			passing = false
+		}
+	}
+	return passing
+}
+
+// PolicySummary returns a summary of the current approval state of policy sets.
+func (p *PolicyCheckResults) PolicySummary() string {
+	var summary []string
+	for _, policySetResult := range p.PolicySetResults {
+		if policySetResult.Passed {
+			summary = append(summary, fmt.Sprintf("policy set: %s: passed.", policySetResult.PolicySetName))
+		} else if policySetResult.CurApprovals == policySetResult.ReqApprovals {
+			summary = append(summary, fmt.Sprintf("policy set: %s: approved.", policySetResult.PolicySetName))
+		} else {
+			summary = append(summary, fmt.Sprintf("policy set: %s: requires: %d approval(s), have: %d.", policySetResult.PolicySetName, policySetResult.ReqApprovals, policySetResult.CurApprovals))
+		}
+	}
+	return strings.Join(summary, "\n")
 }
 
 type VersionSuccess struct {
@@ -482,6 +537,8 @@ type ProjectStatus struct {
 	Workspace   string
 	RepoRelDir  string
 	ProjectName string
+	// PolicySetApprovals tracks the approval status of every PolicySet for a Project.
+	PolicyStatus []PolicySetStatus
 	// Status is the status of where this project is at in the planning cycle.
 	Status ProjectPlanStatus
 }

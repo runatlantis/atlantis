@@ -49,11 +49,8 @@ func TestRenderErr(t *testing.T) {
 		{
 			"policy check error",
 			command.PolicyCheck,
-			err,
-			"**Policy Check Error**\n```\nerr\n```" +
-				"\n* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:\n" +
-				"    * `atlantis approve_policies`\n" +
-				"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.",
+			fmt.Errorf("some conftest error"),
+			"**Policy Check Error**\n```\nsome conftest error\n```",
 		},
 	}
 
@@ -260,18 +257,91 @@ $$$
 `,
 		},
 		{
+			"single successful policy check with multiple policy sets and project name",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								// strings.Repeat require to get wrapped result
+								ConftestOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
+								Passed:       false,
+								ReqApprovals: 1,
+							},
+							{
+								PolicySetName: "policy2",
+								// strings.Repeat require to get wrapped result
+								ConftestOutput: "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+								Passed:         true,
+								ReqApprovals:   1,
+							},
+						},
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+
+#### Policy Set: $policy2$
+$$$diff
+2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+policy set: policy2: passed.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+    * $$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan -d path -w workspace$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
+`,
+		},
+		{
 			"single successful policy check with project name",
 			command.PolicyCheck,
 			"",
 			[]command.ProjectResult{
 				{
-					PolicyCheckSuccess: &models.PolicyCheckSuccess{
-						// strings.Repeat require to get wrapped result
-						PolicyCheckOutput: strings.Repeat("line\n", 13) + `Checking plan against the following policies:
-  test_policy
-FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								// strings.Repeat require to get wrapped result
+								ConftestOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
-2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions`,
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
+								Passed:       false,
+								ReqApprovals: 1,
+							},
+						},
 						LockURL:   "lock-url",
 						RePlanCmd: "atlantis plan -d path -w workspace",
 						ApplyCmd:  "atlantis apply -d path -w workspace",
@@ -286,21 +356,42 @@ FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibit
 
 <details><summary>Show Output</summary>
 
+
+#### Policy Set: $policy1$
 $$$diff
-` + strings.Repeat("line\n", 13) + `Checking plan against the following policies:
-  test_policy
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
 FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
-2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
 $$$
 
-* :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+    * $$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
     * $atlantis plan -d path -w workspace$
 </details>
-2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions
+
+$$$
+policy set: policy1: 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
@@ -472,22 +563,33 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PolicyCheckSuccess: &models.PolicyCheckSuccess{
-						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-						LockURL:           "lock-url",
-						ApplyCmd:          "atlantis apply -d path -w workspace",
-						RePlanCmd:         "atlantis plan -d path -w workspace",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							models.PolicySetResult{
+								PolicySetName:  "policy1",
+								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:         true,
+							},
+						},
+						LockURL:   "lock-url",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+						RePlanCmd: "atlantis plan -d path -w workspace",
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PolicyCheckSuccess: &models.PolicyCheckSuccess{
-						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-						LockURL:           "lock-url2",
-						ApplyCmd:          "atlantis apply -d path2 -w workspace",
-						RePlanCmd:         "atlantis plan -d path2 -w workspace",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							models.PolicySetResult{
+								PolicySetName:  "policy1",
+								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:         true,
+							},
+						}, LockURL: "lock-url2",
+						ApplyCmd:  "atlantis apply -d path2 -w workspace",
+						RePlanCmd: "atlantis plan -d path2 -w workspace",
 					},
 				},
 			},
@@ -498,9 +600,11 @@ $$$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
 
 ### 1. dir: $path$ workspace: $workspace$
+#### Policy Set: $policy1$
 $$$diff
 4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
 $$$
+
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
@@ -510,9 +614,11 @@ $$$
 
 ---
 ### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
+#### Policy Set: $policy1$
 $$$diff
 4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
 $$$
+
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path2 -w workspace$
@@ -670,17 +776,34 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PolicyCheckSuccess: &models.PolicyCheckSuccess{
-						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-						LockURL:           "lock-url",
-						ApplyCmd:          "atlantis apply -d path -w workspace",
-						RePlanCmd:         "atlantis plan -d path -w workspace",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							models.PolicySetResult{
+								PolicySetName:  "policy1",
+								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:         true,
+							},
+						}, LockURL: "lock-url",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+						RePlanCmd: "atlantis plan -d path -w workspace",
 					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
 					Failure:    "failure",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							models.PolicySetResult{
+								PolicySetName:  "policy1",
+								ConftestOutput: "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+								Passed:         false,
+								ReqApprovals:   1,
+							},
+						}, LockURL: "lock-url",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
 				},
 				{
 					Workspace:   "workspace",
@@ -697,9 +820,11 @@ $$$
 1. project: $projectname$ dir: $path3$ workspace: $workspace$
 
 ### 1. dir: $path$ workspace: $workspace$
+#### Policy Set: $policy1$
 $$$diff
 4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
 $$$
+
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
@@ -710,6 +835,21 @@ $$$
 ---
 ### 2. dir: $path2$ workspace: $workspace$
 **Policy Check Failed**: failure
+#### Policy Set: $policy1$
+$$$diff
+4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+    * $$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan -d path -w workspace$
 
 ---
 ### 3. project: $projectname$ dir: $path3$ workspace: $workspace$
@@ -717,15 +857,14 @@ $$$
 $$$
 error
 $$$
-* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:
-    * $atlantis approve_policies$
-* :repeat: Or, address the policy failure by modifying the codebase and re-planning.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
+* :heavy_check_mark: To **approve** all unapplied plans from this pull request, comment:
+    * $atlantis approve_policies$
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
     * $atlantis unlock$
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan$
 `,
 		},
 		{
@@ -1152,11 +1291,12 @@ $$$
 
 // Run policy check with a custom template to validate custom template rendering.
 func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
+	var exp string
 	tmpDir := t.TempDir()
 	filePath := fmt.Sprintf("%s/templates.tmpl", tmpDir)
 	_, err := os.Create(filePath)
 	Ok(t, err)
-	err = os.WriteFile(filePath, []byte("{{ define \"policyCheckSuccessUnwrapped\" -}}somecustometext{{- end}}\n"), 0600)
+	err = os.WriteFile(filePath, []byte("{{ define \"PolicyCheckResultsUnwrapped\" -}}somecustometext{{- end}}\n"), 0600)
 	Ok(t, err)
 	r := events.NewMarkdownRenderer(
 		false,      // gitlabSupportsCommonMark
@@ -1175,17 +1315,36 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 			{
 				Workspace:  "workspace",
 				RepoRelDir: "path",
-				PolicyCheckSuccess: &models.PolicyCheckSuccess{
-					PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-					LockURL:           "lock-url",
-					ApplyCmd:          "atlantis apply -d path -w workspace",
-					RePlanCmd:         "atlantis plan -d path -w workspace",
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{
+						models.PolicySetResult{
+							PolicySetName:  "policy1",
+							ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+							Passed:         true,
+						},
+					}, LockURL: "lock-url",
+					ApplyCmd:  "atlantis apply -d path -w workspace",
+					RePlanCmd: "atlantis plan -d path -w workspace",
 				},
 			},
 		},
 	}, command.PolicyCheck, "", "log", false, models.Github)
-	exp := "Ran Policy Check for dir: `path` workspace: `workspace`\n\nsomecustometext"
-	Equals(t, exp, rendered)
+	exp = `Ran Policy Check for dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
+$$$
+
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan -d path -w workspace$`
+
+	expWithBackticks := strings.Replace(exp, "$", "`", -1)
+	Equals(t, expWithBackticks, rendered)
 }
 
 // Test that if folding is disabled that it's not used.

@@ -67,6 +67,7 @@ const (
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
+	EmojiReaction                    = "emoji-reaction"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
@@ -144,6 +145,7 @@ const (
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
+	DefaultEmojiReaction                = "eyes"
 	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
@@ -243,6 +245,10 @@ var stringFlags = map[string]stringFlag{
 	DataDirFlag: {
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	EmojiReaction: {
+		description:  "Emoji Reaction to use to react to comments",
+		defaultValue: DefaultEmojiReaction,
 	},
 	ExecutableName: {
 		description:  "Comment command executable name.",
@@ -650,7 +656,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 
 	c.SetUsageTemplate(usageTmpl(stringFlags, intFlags, boolFlags))
 	// If a user passes in an invalid flag, tell them what the flag was.
-	c.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+	c.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		s.printErr(err)
 		return err
 	})
@@ -791,6 +797,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.BitbucketBaseURL == "" {
 		c.BitbucketBaseURL = DefaultBitbucketBaseURL
+	}
+	if c.EmojiReaction == "" {
+		c.EmojiReaction = DefaultEmojiReaction
 	}
 	if c.ExecutableName == "" {
 		c.ExecutableName = DefaultExecutableName

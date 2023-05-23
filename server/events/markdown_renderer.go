@@ -76,17 +76,18 @@ type commonData struct {
 
 // errData is data about an error response.
 type errData struct {
-	Error string
+	Error           string
+	RenderedContext string
 	commonData
 }
 
 // failureData is data about a failure response.
 type failureData struct {
-	Failure string
+	Failure         string
+	RenderedContext string
 	commonData
 }
 
-// resultData is data about a successful response.
 type resultData struct {
 	Results []projectResultTmplData
 	commonData
@@ -101,9 +102,12 @@ type planSuccessData struct {
 	EnableDiffMarkdownFormat bool
 }
 
-type policyCheckSuccessData struct {
-	models.PolicyCheckSuccess
-	PolicyCheckSummary string
+type policyCheckResultsData struct {
+	models.PolicyCheckResults
+	PolicyCheckSummary    string
+	PolicyApprovalSummary string
+	PolicyCleared         bool
+	commonData
 }
 
 type projectResultTmplData struct {
@@ -166,10 +170,10 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subC
 	templates := m.markdownTemplates
 
 	if res.Error != nil {
-		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), common})
+		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), "", common})
 	}
 	if res.Failure != "" {
-		return m.renderTemplateTrimSpace(templates.Lookup("failureWithLog"), failureData{res.Failure, common})
+		return m.renderTemplateTrimSpace(templates.Lookup("failureWithLog"), failureData{res.Failure, "", common})
 	}
 	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
 }
@@ -178,6 +182,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 	numPolicyCheckSuccesses := 0
+	numPolicyApprovalSuccesses := 0
 	numVersionSuccesses := 0
 
 	templates := m.markdownTemplates
@@ -188,15 +193,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			RepoRelDir:  result.RepoRelDir,
 			ProjectName: result.ProjectName,
 		}
-		if result.Error != nil {
-			tmpl := templates.Lookup("unwrappedErr")
-			if m.shouldUseWrappedTmpl(vcsHost, result.Error.Error()) {
-				tmpl = templates.Lookup("wrappedErr")
-			}
-			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), common})
-		} else if result.Failure != "" {
-			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, common})
-		} else if result.PlanSuccess != nil {
+		if result.PlanSuccess != nil {
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
@@ -205,14 +202,38 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			}
 			resultData.NoChanges = result.PlanSuccess.NoChanges()
 			numPlanSuccesses++
-		} else if result.PolicyCheckSuccess != nil {
-			result.PolicyCheckSuccess.PolicyCheckOutput = strings.TrimSpace(result.PolicyCheckSuccess.PolicyCheckOutput)
-			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckSuccess.PolicyCheckOutput) {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessWrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess, PolicyCheckSummary: result.PolicyCheckSuccess.Summary()})
-			} else {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckSuccessUnwrapped"), policyCheckSuccessData{PolicyCheckSuccess: *result.PolicyCheckSuccess})
+		} else if result.PolicyCheckResults != nil && common.Command == policyCheckCommandTitle {
+			policyCheckResults := policyCheckResultsData{
+				PolicyCheckResults:    *result.PolicyCheckResults,
+				PolicyCheckSummary:    result.PolicyCheckResults.Summary(),
+				PolicyApprovalSummary: result.PolicyCheckResults.PolicySummary(),
+				PolicyCleared:         result.PolicyCheckResults.PolicyCleared(),
+				commonData:            common,
 			}
-			numPolicyCheckSuccesses++
+			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckResults.CombinedOutput()) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsWrapped"), policyCheckResults)
+			} else {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsUnwrapped"), policyCheckResults)
+			}
+			if result.Error == nil && result.Failure == "" {
+				numPolicyCheckSuccesses++
+			}
+		} else if result.PolicyCheckResults != nil && common.Command == approvePoliciesCommandTitle {
+			policyCheckResults := policyCheckResultsData{
+				PolicyCheckResults:    *result.PolicyCheckResults,
+				PolicyCheckSummary:    result.PolicyCheckResults.Summary(),
+				PolicyApprovalSummary: result.PolicyCheckResults.PolicySummary(),
+				PolicyCleared:         result.PolicyCheckResults.PolicyCleared(),
+				commonData:            common,
+			}
+			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckResults.CombinedOutput()) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsWrapped"), policyCheckResults)
+			} else {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsUnwrapped"), policyCheckResults)
+			}
+			if result.Error == nil && result.Failure == "" {
+				numPolicyApprovalSuccesses++
+			}
 		} else if result.ApplySuccess != "" {
 			output := strings.TrimSpace(result.ApplySuccess)
 			if m.shouldUseWrappedTmpl(vcsHost, result.ApplySuccess) {
@@ -242,8 +263,20 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
 			}
-		} else {
+			// Error out if no template was found, only if there are no errors or failures.
+			// This is because some errors and failures rely on additional context rendered by templtes, but not all errors or failures.
+		} else if !(result.Error != nil || result.Failure != "") {
 			resultData.Rendered = "Found no template. This is a bug!"
+		}
+		// Render error or failure templates. Done outside of previous block so that other context can be rendered for use here.
+		if result.Error != nil {
+			tmpl := templates.Lookup("unwrappedErr")
+			if m.shouldUseWrappedTmpl(vcsHost, result.Error.Error()) {
+				tmpl = templates.Lookup("wrappedErr")
+			}
+			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), resultData.Rendered, common})
+		} else if result.Failure != "" {
+			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, resultData.Rendered, common})
 		}
 		resultsTmplData = append(resultsTmplData, resultData)
 	}
@@ -257,7 +290,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 	case len(resultsTmplData) == 1 && common.Command == policyCheckCommandTitle && numPolicyCheckSuccesses > 0:
 		tmpl = templates.Lookup("singleProjectPlanSuccess")
 	case len(resultsTmplData) == 1 && common.Command == policyCheckCommandTitle && numPolicyCheckSuccesses == 0:
-		tmpl = templates.Lookup("singleProjectPlanUnsuccessful")
+		tmpl = templates.Lookup("singleProjectPolicyUnsuccessful")
 	case len(resultsTmplData) == 1 && common.Command == versionCommandTitle && numVersionSuccesses > 0:
 		tmpl = templates.Lookup("singleProjectVersionSuccess")
 	case len(resultsTmplData) == 1 && common.Command == versionCommandTitle && numVersionSuccesses == 0:
@@ -273,11 +306,20 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		default:
 			return fmt.Sprintf("no template matched–this is a bug: command=%s, subcommand=%s", common.Command, common.SubCommand)
 		}
-	case common.Command == planCommandTitle,
-		common.Command == policyCheckCommandTitle:
+	case common.Command == planCommandTitle:
 		tmpl = templates.Lookup("multiProjectPlan")
+	case common.Command == policyCheckCommandTitle:
+		if numPolicyCheckSuccesses == len(results) {
+			tmpl = templates.Lookup("multiProjectPlan")
+		} else {
+			tmpl = templates.Lookup("multiProjectPolicyUnsuccessful")
+		}
 	case common.Command == approvePoliciesCommandTitle:
-		tmpl = templates.Lookup("approveAllProjects")
+		if numPolicyApprovalSuccesses == len(results) {
+			tmpl = templates.Lookup("approveAllProjects")
+		} else {
+			tmpl = templates.Lookup("multiProjectPolicyUnsuccessful")
+		}
 	case common.Command == applyCommandTitle:
 		tmpl = templates.Lookup("multiProjectApply")
 	case common.Command == versionCommandTitle:

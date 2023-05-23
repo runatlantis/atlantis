@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v51/github"
+	"github.com/google/go-github/v52/github"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -105,8 +105,8 @@ func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.Pull
 	}
 
 	return files, err
-
 }
+
 func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
 	scope := c.StatsScope.SubScope("create_comment")
 	scope = SetGitScopeTags(scope, repo.FullName, pullNum)
@@ -127,6 +127,26 @@ func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, commen
 	executionSuccess.Inc(1)
 	return nil
 }
+
+func (c *InstrumentedClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error {
+	scope := c.StatsScope.SubScope("react_to_comment")
+
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
+
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
+
+	if err := c.Client.ReactToComment(repo, commentID, reaction); err != nil {
+		executionError.Inc(1)
+		c.Logger.Err("Unable to react to comment, error: %s", err.Error())
+		return err
+	}
+
+	executionSuccess.Inc(1)
+	return nil
+}
+
 func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	scope := c.StatsScope.SubScope("hide_prev_plan_comments")
 	scope = SetGitScopeTags(scope, repo.FullName, pullNum)
@@ -148,6 +168,7 @@ func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum i
 	return nil
 
 }
+
 func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	scope := c.StatsScope.SubScope("pull_is_approved")
 	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
@@ -169,8 +190,8 @@ func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRe
 	}
 
 	return approved, err
-
 }
+
 func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	scope := c.StatsScope.SubScope("pull_is_mergeable")
 	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
@@ -213,8 +234,8 @@ func (c *InstrumentedClient) UpdateStatus(repo models.Repo, pull models.PullRequ
 
 	executionSuccess.Inc(1)
 	return nil
-
 }
+
 func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	scope := c.StatsScope.SubScope("merge_pull")
 	scope = SetGitScopeTags(scope, pull.BaseRepo.FullName, pull.Num)
@@ -233,7 +254,6 @@ func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions mode
 
 	executionSuccess.Inc(1)
 	return nil
-
 }
 
 // taken from other parts of the code, would be great to have this in a shared spot

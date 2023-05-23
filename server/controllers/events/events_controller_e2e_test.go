@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v51/github"
+	"github.com/google/go-github/v52/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 
@@ -957,6 +957,25 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:   "failing policy with approval and policy approval clear",
+			RepoDir:       "policy-checks-clear-approval",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis approve_policies",
+				"atlantis approve_policies --clear-policy-approval",
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-approve-policies-success.txt"},
+				{"exp-output-approve-policies-clear.txt"},
+				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1202,6 +1221,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	Ok(t, err)
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
+		VcsClient:        e2eVCSClient,
 		Locker:           projectLocker,
 		LockURLGenerator: &mockLockURLGenerator{},
 		InitStepRunner: &runtime.InitStepRunner{
