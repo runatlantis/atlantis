@@ -99,11 +99,6 @@ type MockPreWorkflowHookRunner_Run_OngoingVerification struct {
 func (c *MockPreWorkflowHookRunner_Run_OngoingVerification) GetCapturedArguments() (models.WorkflowHookCommandContext, string, string) {
 	ctx, command, path := c.GetAllCapturedArguments()
 	return ctx[len(ctx)-1], command[len(command)-1], path[len(path)-1]
-}
-
-func (c *MockPreWorkflowHookRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.WorkflowHookCommandContext, _param1 []string, _param2 []string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
 		_param0 = make([]models.WorkflowHookCommandContext, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.WorkflowHookCommandContext)
@@ -115,6 +110,14 @@ func (c *MockPreWorkflowHookRunner_Run_OngoingVerification) GetAllCapturedArgume
 		_param2 = make([]string, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(string)
+		}
+		_param3 = make([]string, len(c.methodInvocations))
+		for u, param := range params[3] {
+			_param3[u] = param.(string)
+		}
+		_param4 = make([]string, len(c.methodInvocations))
+		for u, param := range params[4] {
+			_param4[u] = param.(string)
 		}
 	}
 	return

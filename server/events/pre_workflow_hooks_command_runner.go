@@ -106,6 +106,16 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 		}
 
 		ctx.HookID = uuid.NewString()
+		shell := hook.Shell
+		if shell == "" {
+			ctx.Log.Info("Setting shell to default")
+			shell = "sh"
+		}
+		shellArgs := hook.ShellArgs
+		if shellArgs == "" {
+			ctx.Log.Info("Setting shellArgs to default")
+			shellArgs = "-c"
+		}
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
 		if err != nil {
 			return err
@@ -116,7 +126,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			return err
 		}
 
-		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, repoDir)
+		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
 
 		if err != nil {
 			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.FailedCommitStatus, hookDescription, runtimeDesc, url); err != nil {
