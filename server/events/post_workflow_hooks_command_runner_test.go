@@ -57,9 +57,31 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		Log:      log,
 	}
 
+	defaultShell := "sh"
+	defaultShellArgs := "-c"
+
 	testHook := valid.WorkflowHook{
 		StepName:   "test",
 		RunCommand: "some command",
+	}
+
+	testHookWithShell := valid.WorkflowHook{
+		StepName:   "test1",
+		RunCommand: "echo test1",
+		Shell:      "bash",
+	}
+
+	testHookWithShellArgs := valid.WorkflowHook{
+		StepName:   "test2",
+		RunCommand: "echo test2",
+		ShellArgs:  "-ce",
+	}
+
+	testHookWithShellandShellArgs := valid.WorkflowHook{
+		StepName:   "test3",
+		RunCommand: "echo test3",
+		Shell:      "bash",
+		ShellArgs:  "-ce",
 	}
 
 	repoDir := "path/to/repo"
@@ -104,11 +126,16 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
-		When(whPostWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, runtimeDesc, nil)
-		err := postWh.RunPostHooks(ctx, cmd)
+
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))
+		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Any[String](),
+			Any[String](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
+
+		err := postWh.RunPostHooks(ctx, nil)
 
 		Ok(t, err)
-		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
+			Eq(testHook.RunCommand), Eq(defaultShell), Eq(defaultShellArgs), Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 	t.Run("success hooks not in cfg", func(t *testing.T) {
@@ -136,7 +163,8 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		Ok(t, err)
 
-		whPostWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
+		whPostWorkflowHookRunner.VerifyWasCalled(Never()).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(),
+			EqString(testHook.RunCommand), EqString(defaultShell), EqString(defaultShellArgs), EqString(repoDir))
 		postWhWorkingDirLocker.VerifyWasCalled(Never()).TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, "path")
 		postWhWorkingDir.VerifyWasCalled(Never()).Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)
 	})
@@ -162,7 +190,8 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		Assert(t, err != nil, "error not nil")
 		postWhWorkingDir.VerifyWasCalled(Never()).Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)
-		whPostWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
+		whPostWorkflowHookRunner.VerifyWasCalled(Never()).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(),
+			EqString(testHook.RunCommand), EqString(defaultShell), EqString(defaultShellArgs), EqString(repoDir))
 	})
 
 	t.Run("error cloning", func(t *testing.T) {
@@ -193,7 +222,8 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		Assert(t, err != nil, "error not nil")
 
-		whPostWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
+		whPostWorkflowHookRunner.VerifyWasCalled(Never()).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(),
+			EqString(testHook.RunCommand), EqString(defaultShell), EqString(defaultShellArgs), EqString(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 
@@ -220,7 +250,8 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
-		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))).ThenReturn(result, runtimeDesc, errors.New("some error"))
+		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
+			Any[String](), Any[String](), Eq(repoDir))).ThenReturn(result, runtimeDesc, errors.New("some error"))
 
 		err := postWh.RunPostHooks(ctx, cmd)
 
@@ -259,12 +290,117 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
-		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
+		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
+			Any[String](), Any[String](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
 		err := postWh.RunPostHooks(ctx, cmd)
 
 		Ok(t, err)
-		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
+			Eq(testHook.RunCommand), Eq(defaultShell), Eq(defaultShellArgs), Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
+
+	t.Run("shell passed to webhooks", func(t *testing.T) {
+		postWorkflowHooksSetup(t)
+
+		var unlockCalled = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: testdata.GithubRepo.ID(),
+					PostWorkflowHooks: []*valid.WorkflowHook{
+						&testHookWithShell,
+					},
+				},
+			},
+		}
+
+		postWh.GlobalCfg = globalCfg
+
+		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
+		When(postWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
+		When(whPostWorkflowHookRunner.Run(runtimematchers.AnyModelsWorkflowHookCommandContext(),
+			EqString(testHookWithShell.RunCommand), AnyString(), AnyString(), EqString(repoDir))).ThenReturn(result, runtimeDesc, nil)
+
+		err := postWh.RunPostHooks(ctx, nil)
+
+		Ok(t, err)
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(runtimematchers.AnyModelsWorkflowHookCommandContext(),
+			EqString(testHookWithShell.RunCommand), EqString(testHookWithShell.Shell), EqString(defaultShellArgs), EqString(repoDir))
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
+
+	t.Run("shellArgs passed to webhooks", func(t *testing.T) {
+		postWorkflowHooksSetup(t)
+
+		var unlockCalled = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: testdata.GithubRepo.ID(),
+					PostWorkflowHooks: []*valid.WorkflowHook{
+						&testHookWithShellArgs,
+					},
+				},
+			},
+		}
+
+		postWh.GlobalCfg = globalCfg
+
+		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
+		When(postWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
+		When(whPostWorkflowHookRunner.Run(runtimematchers.AnyModelsWorkflowHookCommandContext(),
+			EqString(testHook.RunCommand), AnyString(), AnyString(), EqString(repoDir))).ThenReturn(result, runtimeDesc, nil)
+
+		err := postWh.RunPostHooks(ctx, nil)
+
+		Ok(t, err)
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(runtimematchers.AnyModelsWorkflowHookCommandContext(),
+			EqString(testHookWithShellArgs.RunCommand), EqString(defaultShell), EqString(testHookWithShellArgs.ShellArgs), EqString(repoDir))
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
+
+	t.Run("Shell and ShellArgs passed to webhooks", func(t *testing.T) {
+		postWorkflowHooksSetup(t)
+
+		var unlockCalled = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: testdata.GithubRepo.ID(),
+					PostWorkflowHooks: []*valid.WorkflowHook{
+						&testHookWithShellandShellArgs,
+					},
+				},
+			},
+		}
+
+		postWh.GlobalCfg = globalCfg
+
+		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
+		When(postWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
+		When(whPostWorkflowHookRunner.Run(runtimematchers.AnyModelsWorkflowHookCommandContext(),
+			EqString(testHookWithShellandShellArgs.RunCommand), AnyString(), AnyString(), EqString(repoDir))).ThenReturn(result, runtimeDesc, nil)
+
+		err := postWh.RunPostHooks(ctx, nil)
+
+		Ok(t, err)
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(runtimematchers.AnyModelsWorkflowHookCommandContext(),
+			EqString(testHookWithShellandShellArgs.RunCommand), EqString(testHookWithShellandShellArgs.Shell), EqString(testHookWithShellandShellArgs.ShellArgs), EqString(repoDir))
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
+
 }
