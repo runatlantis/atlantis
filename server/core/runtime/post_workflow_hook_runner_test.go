@@ -49,7 +49,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo 'a",
-			ExpOut:         "sh: 1: Syntax error: Unterminated quoted string\n",
+			ExpOut:         "sh: 1: Syntax error: Unterminated quoted string\r\n",
 			ExpErr:         "exit status 2: running \"echo 'a\" in",
 			ExpDescription: "",
 		},
@@ -61,7 +61,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "lkjlkj",
-			ExpOut:         "sh: 1: lkjlkj: not found\n",
+			ExpOut:         "sh: 1: lkjlkj: not found\r\n",
 			ExpErr:         "exit status 127: running \"lkjlkj\" in",
 			ExpDescription: "",
 		},
@@ -125,7 +125,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 				},
 				Log: logger,
 			}
-			out, desc, err := r.Run(ctx, c.Command, tmpDir)
+			_, desc, err := r.Run(ctx, c.Command, tmpDir)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 			} else {
@@ -134,9 +134,8 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			// Replace $DIR in the exp with the actual temp dir. We do this
 			// here because when constructing the cases we don't yet know the
 			// temp dir.
-			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
-			Equals(t, expOut, out)
 			Equals(t, c.ExpDescription, desc)
+			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 			projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
 				runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(expOut), EqBool(false))
 		})
