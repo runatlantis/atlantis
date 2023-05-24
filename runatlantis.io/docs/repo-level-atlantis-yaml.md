@@ -264,11 +264,11 @@ version: 3
 abort_on_execution_order_fail: true
 projects:
 - dir: project1
-  execution_order_group: 2
-- dir: project2
   execution_order_group: 1
+- dir: project2
+  execution_order_group: 2
 ```
-With this config above, Atlantis runs planning/applying for project2 first, then for project1.
+With this config above, Atlantis runs planning/applying for project1 first, then for project2.
 Several projects can have same `execution_order_group`. Any order in one group isn't guaranteed.
 `parallel_plan` and `parallel_apply` respect these order groups, so parallel planning/applying works
 in each group one by one. 
