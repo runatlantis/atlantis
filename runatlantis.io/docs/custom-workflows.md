@@ -260,6 +260,10 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+      - env:
+          # Reduce Terraform suggestion output
+          name: TF_IN_AUTOMATION
+          value: 'true'
       - run: terragrunt plan -input=false -out=$PLANFILE
       - run: terragrunt show -json $PLANFILE > $SHOWFILE
     apply:
@@ -267,6 +271,10 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+      - env:
+          # Reduce Terraform suggestion output
+          name: TF_IN_AUTOMATION
+          value: 'true'
       - run: terragrunt apply -input=false $PLANFILE
 ```
 
@@ -285,12 +293,20 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+      - env:
+          # Reduce Terraform suggestion output
+          name: TF_IN_AUTOMATION
+          value: 'true'
       - run: terragrunt plan -out $PLANFILE
     apply:
       steps:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+      - env:
+          # Reduce Terraform suggestion output
+          name: TF_IN_AUTOMATION
+          value: 'true'
       - run: terragrunt apply $PLANFILE
 ```
 
