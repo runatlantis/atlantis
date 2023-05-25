@@ -36,6 +36,8 @@ repos:
           description: Generating configs
 ```
 
+## Customising the Shell
+
 By default, the command will be run using the 'sh' shell with an argument of '-c'. This
 can be customised using the `shell` and `shellArgs` keys.
 
