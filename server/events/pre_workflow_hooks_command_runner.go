@@ -108,12 +108,12 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 		ctx.HookID = uuid.NewString()
 		shell := hook.Shell
 		if shell == "" {
-			ctx.Log.Info("Setting shell to default")
+			ctx.Log.Debug("Setting shell to default")
 			shell = "sh"
 		}
 		shellArgs := hook.ShellArgs
 		if shellArgs == "" {
-			ctx.Log.Info("Setting shellArgs to default")
+			ctx.Log.Debug("Setting shellArgs to default")
 			shellArgs = "-c"
 		}
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
