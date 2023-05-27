@@ -371,6 +371,14 @@ and set `--autoplan-modules` to `false`.
   ```
   Stops atlantis from locking projects and or workspaces when running terraform.
 
+### `--emoji-reaction`
+  ```bash
+  atlantis server --emoji-reaction thumbsup
+  # or
+  ATLANTIS_EMOJI_REACTION=thumbsup
+  ```
+  The emoji reaction to use for marking processed comments. Currently supported on GitHub and GitLab. Defaults to `eyes`.
+
 ### `--enable-policy-checks`
   ```bash
   atlantis server --enable-policy-checks
