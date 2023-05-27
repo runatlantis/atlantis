@@ -377,7 +377,8 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_EMOJI_REACTION=thumbsup
   ```
-  The emoji reaction to use for marking processed comments. Currently supported on GitHub and GitLab. Defaults to `eyes`.
+  The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab.
+  Defaults to `eyes`.
 
 ### `--enable-policy-checks`
   ```bash
