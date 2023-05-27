@@ -26,6 +26,7 @@ type RepoCfg struct {
 	RepoLocking               *bool
 	EmojiReaction             string
 	AllowedRegexpPrefixes     []string
+	AbortOnExcecutionOrderFail bool
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {

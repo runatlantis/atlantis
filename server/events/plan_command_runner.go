@@ -130,7 +130,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
+		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
@@ -250,7 +250,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
+		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}

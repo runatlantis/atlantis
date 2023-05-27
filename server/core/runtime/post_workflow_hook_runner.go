@@ -52,10 +52,13 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 	cmd.Env = finalEnvVars
 	out, err := cmd.CombinedOutput()
 
+	wh.OutputHandler.SendWorkflowHook(ctx, string(out), false)
+	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
 		ctx.Log.Debug("error: %s", err)
-		return "", "", err
+		return string(out), "", err
 	}
 
 	// Read the value from the "outputFilePath" file
@@ -67,12 +70,9 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		if customStatusErr != nil {
 			err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
 			ctx.Log.Debug("error: %s", err)
-			return "", "", err
+			return string(out), "", err
 		}
 	}
-
-	wh.OutputHandler.SendWorkflowHook(ctx, string(out), false)
-	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
 
 	ctx.Log.Info("successfully ran %q in %q", command, path)
 	return string(out), strings.Trim(string(customStatusOut), "\n"), nil
