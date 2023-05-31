@@ -16,7 +16,7 @@ workflows](custom-workflows.html#custom-run-command) in several ways.
 Pre workflow hooks can only be specified in the Server-Side Repo Config under the
 `repos` key.
 ::: tip Note
-`pre-workflow-hooks` do not prevent Atlantis from executing it's
+`pre-workflow-hooks` do not prevent Atlantis from executing its
 workflows(`plan`, `apply`) even if a `run` command exits with an error.
 ::: 
 
@@ -24,8 +24,8 @@ workflows(`plan`, `apply`) even if a `run` command exits with an error.
 
 ### Dynamic Repo Config Generation
 
-If you want to generate your `atlantis.yaml` before Atlantis can parse it, you
-can add a `run` command to `pre_workflow_hooks`. Your Repo config will be generated
+To generate the repo `atlantis.yaml` before Atlantis can parse it,
+add a `run` command to `pre_workflow_hooks`. Your Repo config will be generated
 right before Atlantis parses it.
 
 ```yaml
@@ -36,10 +36,10 @@ repos:
           description: Generating configs
 ```
 
-## Customising the Shell
+## Customizing the Shell
 
 By default, the command will be run using the 'sh' shell with an argument of '-c'. This
-can be customised using the `shell` and `shellArgs` keys.
+can be customized using the `shell` and `shellArgs` keys.
 
 Example:
 

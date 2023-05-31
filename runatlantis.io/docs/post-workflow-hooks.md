@@ -43,10 +43,10 @@ repos:
       # ...
 ```
 
-## Customising the Shell
+## Customizing the Shell
 
 By default, the commands will be run using the 'sh' shell with an argument of '-c'. This
-can be customised using the `shell` and `shellArgs` keys.
+can be customized using the `shell` and `shellArgs` keys.
 
 Example:
 
@@ -54,8 +54,10 @@ Example:
 repos:
     - id: /.*/
       post_workflow_hooks:
-        - run: infracost output --path=/tmp/$BASE_REPO_OWNER-$BASE_REPO_NAME-$PULL_NUM-*-infracost.json --format=github-comment --out-file=/tmp/infracost-comment.md
-          description: Running Infracost
+        - run: |
+            echo 'atlantis.yaml config:'
+            cat atlantis.yaml
+          description: atlantis.yaml report
           shell: bash
           shellArgs: -cv
 ```
