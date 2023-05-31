@@ -22,7 +22,7 @@ wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v2-stable-linux-amd64.zip -O ngr
 unzip ngrok-stable-linux-amd64.zip
 chmod +x ngrok
 # Download jq
-wget https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64
+wget -O jq https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64
 chmod +x jq
 # Copy github config file - replace with circleci user later
 cp .gitconfig ~/.gitconfig
