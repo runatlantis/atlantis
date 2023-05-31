@@ -14,18 +14,18 @@ import (
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
 type RepoCfg struct {
 	// Version is the version of the atlantis YAML file.
-	Version                   int
-	Projects                  []Project
-	Workflows                 map[string]Workflow
-	PolicySets                PolicySets
-	Automerge                 bool
-	ParallelApply             bool
-	ParallelPlan              bool
-	ParallelPolicyCheck       bool
-	DeleteSourceBranchOnMerge *bool
-	RepoLocking               *bool
-	EmojiReaction             string
-	AllowedRegexpPrefixes     []string
+	Version                    int
+	Projects                   []Project
+	Workflows                  map[string]Workflow
+	PolicySets                 PolicySets
+	Automerge                  bool
+	ParallelApply              bool
+	ParallelPlan               bool
+	ParallelPolicyCheck        bool
+	DeleteSourceBranchOnMerge  *bool
+	RepoLocking                *bool
+	EmojiReaction              string
+	AllowedRegexpPrefixes      []string
 	AbortOnExcecutionOrderFail bool
 }
 
@@ -121,19 +121,20 @@ func (r RepoCfg) ValidateWorkspaceAllowed(repoRelDir string, workspace string) e
 }
 
 type Project struct {
-	Dir                       string
-	BranchRegex               *regexp.Regexp
-	Workspace                 string
-	Name                      *string
-	WorkflowName              *string
-	TerraformVersion          *version.Version
-	Autoplan                  Autoplan
-	PlanRequirements          []string
-	ApplyRequirements         []string
-	ImportRequirements        []string
-	DeleteSourceBranchOnMerge *bool
-	RepoLocking               *bool
-	ExecutionOrderGroup       int
+	Dir                              string
+	BranchRegex                      *regexp.Regexp
+	Workspace                        string
+	Name                             *string
+	WorkflowName                     *string
+	TerraformVersion                 *version.Version
+	GoogleWorkloadIdentityFederation *GoogleWorkloadIdentityFederation
+	Autoplan                         Autoplan
+	PlanRequirements                 []string
+	ApplyRequirements                []string
+	ImportRequirements               []string
+	DeleteSourceBranchOnMerge        *bool
+	RepoLocking                      *bool
+	ExecutionOrderGroup              int
 }
 
 // GetName returns the name of the project or an empty string if there is no
@@ -148,6 +149,11 @@ func (p Project) GetName() string {
 type Autoplan struct {
 	WhenModified []string
 	Enabled      bool
+}
+
+type GoogleWorkloadIdentityFederation struct {
+	ServiceAccountEmail      string
+	WorkloadIdentityProvider string
 }
 
 type Stage struct {

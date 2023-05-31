@@ -83,22 +83,23 @@ type Repo struct {
 }
 
 type MergedProjectCfg struct {
-	PlanRequirements          []string
-	ApplyRequirements         []string
-	ImportRequirements        []string
-	Workflow                  Workflow
-	AllowedWorkflows          []string
-	RepoRelDir                string
-	Workspace                 string
-	Name                      string
-	AutoplanEnabled           bool
-	AutoMergeDisabled         bool
-	TerraformVersion          *version.Version
-	RepoCfgVersion            int
-	PolicySets                PolicySets
-	DeleteSourceBranchOnMerge bool
-	ExecutionOrderGroup       int
-	RepoLocking               bool
+	PlanRequirements                 []string
+	ApplyRequirements                []string
+	ImportRequirements               []string
+	Workflow                         Workflow
+	AllowedWorkflows                 []string
+	RepoRelDir                       string
+	Workspace                        string
+	Name                             string
+	GoogleWorkloadIdentityFederation *GoogleWorkloadIdentityFederation
+	AutoplanEnabled                  bool
+	AutoMergeDisabled                bool
+	TerraformVersion                 *version.Version
+	RepoCfgVersion                   int
+	PolicySets                       PolicySets
+	DeleteSourceBranchOnMerge        bool
+	ExecutionOrderGroup              int
+	RepoLocking                      bool
 }
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.
@@ -360,20 +361,21 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		PlanRequirementsKey, strings.Join(planReqs, ","), ApplyRequirementsKey, strings.Join(applyReqs, ","), ImportRequirementsKey, strings.Join(importReqs, ","), WorkflowKey, workflow.Name)
 
 	return MergedProjectCfg{
-		PlanRequirements:          planReqs,
-		ApplyRequirements:         applyReqs,
-		ImportRequirements:        importReqs,
-		Workflow:                  workflow,
-		RepoRelDir:                proj.Dir,
-		Workspace:                 proj.Workspace,
-		Name:                      proj.GetName(),
-		AutoplanEnabled:           proj.Autoplan.Enabled,
-		TerraformVersion:          proj.TerraformVersion,
-		RepoCfgVersion:            rCfg.Version,
-		PolicySets:                g.PolicySets,
-		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
-		ExecutionOrderGroup:       proj.ExecutionOrderGroup,
-		RepoLocking:               repoLocking,
+		PlanRequirements:                 planReqs,
+		ApplyRequirements:                applyReqs,
+		ImportRequirements:               importReqs,
+		Workflow:                         workflow,
+		RepoRelDir:                       proj.Dir,
+		Workspace:                        proj.Workspace,
+		Name:                             proj.GetName(),
+		GoogleWorkloadIdentityFederation: proj.GoogleWorkloadIdentityFederation,
+		AutoplanEnabled:                  proj.Autoplan.Enabled,
+		TerraformVersion:                 proj.TerraformVersion,
+		RepoCfgVersion:                   rCfg.Version,
+		PolicySets:                       g.PolicySets,
+		DeleteSourceBranchOnMerge:        deleteSourceBranchOnMerge,
+		ExecutionOrderGroup:              proj.ExecutionOrderGroup,
+		RepoLocking:                      repoLocking,
 	}
 }
 
@@ -383,18 +385,19 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 	log.Debug("building config based on server-side config")
 	planReqs, applyReqs, importReqs, workflow, _, _, deleteSourceBranchOnMerge, repoLocking := g.getMatchingCfg(log, repoID)
 	return MergedProjectCfg{
-		PlanRequirements:          planReqs,
-		ApplyRequirements:         applyReqs,
-		ImportRequirements:        importReqs,
-		Workflow:                  workflow,
-		RepoRelDir:                repoRelDir,
-		Workspace:                 workspace,
-		Name:                      "",
-		AutoplanEnabled:           DefaultAutoPlanEnabled,
-		TerraformVersion:          nil,
-		PolicySets:                g.PolicySets,
-		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
-		RepoLocking:               repoLocking,
+		PlanRequirements:                 planReqs,
+		ApplyRequirements:                applyReqs,
+		ImportRequirements:               importReqs,
+		Workflow:                         workflow,
+		RepoRelDir:                       repoRelDir,
+		Workspace:                        workspace,
+		Name:                             "",
+		GoogleWorkloadIdentityFederation: nil,
+		AutoplanEnabled:                  DefaultAutoPlanEnabled,
+		TerraformVersion:                 nil,
+		PolicySets:                       g.PolicySets,
+		DeleteSourceBranchOnMerge:        deleteSourceBranchOnMerge,
+		RepoLocking:                      repoLocking,
 	}
 }
 
