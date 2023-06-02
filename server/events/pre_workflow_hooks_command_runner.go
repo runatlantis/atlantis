@@ -83,7 +83,6 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 			User:               user,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
-			HookID:             uuid.NewString(),
 		},
 		preWorkflowHooks, repoDir)
 
@@ -105,6 +104,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			hookDescription = fmt.Sprintf("Pre workflow hook #%d", i)
 		}
 
+		ctx.HookID = uuid.NewString()
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
 		if err != nil {
 			return err
