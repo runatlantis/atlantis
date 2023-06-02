@@ -116,6 +116,7 @@ type projectResultTmplData struct {
 	ProjectName string
 	Rendered    string
 	NoChanges   bool
+	Stats       models.PlanSuccessStats
 }
 
 // Initialize templates
@@ -194,6 +195,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			ProjectName: result.ProjectName,
 		}
 		if result.PlanSuccess != nil {
+			resultData.Stats = result.PlanSuccess.Stats()
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
