@@ -100,6 +100,7 @@ type planSuccessData struct {
 	DisableApply             bool
 	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
+	PlanStats                models.PlanSuccessStats
 }
 
 type policyCheckResultsData struct {
@@ -116,7 +117,6 @@ type projectResultTmplData struct {
 	ProjectName string
 	Rendered    string
 	NoChanges   bool
-	Stats       models.PlanSuccessStats
 }
 
 // Initialize templates
@@ -195,7 +195,6 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			ProjectName: result.ProjectName,
 		}
 		if result.PlanSuccess != nil {
-			resultData.Stats = result.PlanSuccess.Stats()
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			data := planSuccessData{
 				PlanSuccess:              *result.PlanSuccess,
@@ -203,6 +202,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				DisableApply:             common.DisableApply,
 				DisableRepoLocking:       common.DisableRepoLocking,
 				EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat,
+				PlanStats:                result.PlanSuccess.Stats(),
 			}
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
 				data.PlanSummary = result.PlanSuccess.Summary()
