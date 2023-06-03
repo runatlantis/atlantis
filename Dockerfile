@@ -62,7 +62,7 @@ WORKDIR /tmp/build
 
 # install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV DEFAULT_CONFTEST_VERSION=0.42.1
+ENV DEFAULT_CONFTEST_VERSION=0.43.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
     case ${TARGETPLATFORM} in \
