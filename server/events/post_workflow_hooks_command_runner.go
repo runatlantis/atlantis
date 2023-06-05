@@ -85,7 +85,6 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 			User:               user,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
-			HookID:             uuid.NewString(),
 		},
 		postWorkflowHooks, repoDir)
 
@@ -108,6 +107,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 			hookDescription = fmt.Sprintf("Post workflow hook #%d", i)
 		}
 
+		ctx.HookID = uuid.NewString()
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
 		if err != nil {
 			return err

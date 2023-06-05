@@ -778,6 +778,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
+		VCSClient:                      vcsClient,
 		GithubPullGetter:               githubClient,
 		GitlabMergeRequestGetter:       gitlabClient,
 		AzureDevopsPullGetter:          azuredevopsClient,
