@@ -80,7 +80,7 @@ type FileWorkspace struct {
 	// use the global setting without overriding
 	GpgNoSigningEnabled bool
 	// flag indicating if a re-clone will be safe (project lock held, about to run plan)
-	safeToReClone bool
+	SafeToReClone bool
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -96,7 +96,7 @@ func (w *FileWorkspace) Clone(
 	workspace string) (string, bool, error) {
 	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
 	hasDiverged := false
-	defer func() { w.safeToReClone = false }()
+	defer func() { w.SafeToReClone = false }()
 
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
@@ -124,7 +124,7 @@ func (w *FileWorkspace) Clone(
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			if w.safeToReClone && w.CheckoutMerge && w.recheckDiverged(log, p, headRepo, cloneDir) {
+			if w.SafeToReClone && w.CheckoutMerge && w.recheckDiverged(log, p, headRepo, cloneDir) {
 				log.Info("base branch has been updated, using merge strategy and will clone again")
 				hasDiverged = true
 			} else {
@@ -371,5 +371,5 @@ func (w *FileWorkspace) sanitizeGitCredentials(s string, base models.Repo, head 
 
 // Set the flag that indicates it is safe to re-clone if necessary
 func (w *FileWorkspace) SetSafeToReClone() {
-	w.safeToReClone = true
+	w.SafeToReClone = true
 }
