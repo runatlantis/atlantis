@@ -612,3 +612,73 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 1, ps.StatusCount(models.ErroredPolicyCheckStatus))
 	Equals(t, 1, ps.StatusCount(models.PassedPolicyCheckStatus))
 }
+
+func TestPlanSuccessStats(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		exp    models.PlanSuccessStats
+	}{
+		{
+			"has changes",
+			`An execution plan has been generated and is shown below.
+					Resource actions are indicated with the following symbols:
+					  - destroy
+					Terraform will perform the following actions:
+					  - null_resource.hi[1]
+					Plan: 1 to add, 3 to change, 2 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+				Add:     1,
+				Change:  3,
+				Destroy: 2,
+			},
+		},
+		{
+			"no changes",
+			`An execution plan has been generated and is shown below.
+					Resource actions are indicated with the following symbols:
+					No changes. Infrastructure is up-to-date.`,
+			models.PlanSuccessStats{},
+		},
+		{
+			"changes outside",
+			`Note: Objects have changed outside of Terraform
+					Terraform detected the following changes made outside of Terraform since the
+					last "terraform apply":
+					No changes. Your infrastructure matches the configuration.`,
+			models.PlanSuccessStats{
+				ChangesOutside: true,
+			},
+		},
+		{
+			"changes and changes outside",
+			`Note: Objects have changed outside of Terraform
+					Terraform detected the following changes made outside of Terraform since the
+					last "terraform apply":
+					An execution plan has been generated and is shown below.
+					Resource actions are indicated with the following symbols:
+					  - destroy
+					Terraform will perform the following actions:
+					  - null_resource.hi[1]
+					Plan: 3 to add, 0 to change, 1 to destroy.`,
+			models.PlanSuccessStats{
+				Changes:        true,
+				ChangesOutside: true,
+
+				Add:     3,
+				Change:  0,
+				Destroy: 1,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := models.NewPlanSuccessStats(tt.output)
+			if s != tt.exp {
+				t.Errorf("\nexp: %#v\ngot: %#v", tt.exp, s)
+			}
+		})
+	}
+}

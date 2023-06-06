@@ -60,7 +60,7 @@ projects:
   delete_source_branch_on_merge: true
   repo_locking: true
   autoplan:
-    when_modified: ["*.tf", "../modules/**/*.tf"]
+    when_modified: ["*.tf", "../modules/**/*.tf", ".terraform.lock.hcl"]
     enabled: true
   plan_requirements: [mergeable, approved, undiverged]
   apply_requirements: [mergeable, approved, undiverged]
@@ -98,6 +98,7 @@ projects:
       when_modified:
         - "./terraform/modules/**/*.tf"
         - "**/*.tf"
+        - ".terraform.lock.hcl"
 
   - <<: *template
     name: ue1-prod-titan
@@ -184,7 +185,7 @@ version: 3
 projects:
 - dir: project1
   autoplan:
-    when_modified: ["../modules/**/*.tf", "*.tf*"]
+    when_modified: ["../modules/**/*.tf", "*.tf*", ".terraform.lock.hcl"]
 ```
 
 Note:

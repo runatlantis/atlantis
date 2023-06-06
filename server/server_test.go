@@ -267,3 +267,12 @@ func TestParseAtlantisURL(t *testing.T) {
 		})
 	}
 }
+
+func TestCommandRunnerVCSClientInitialized(t *testing.T) {
+	s, _ := server.NewServer(server.UserConfig{
+		AtlantisURL: "http://example.com",
+	},
+		server.Config{},
+	)
+	Assert(t, s.CommandRunner.VCSClient != nil, "VCSClient must not be nil.")
+}
