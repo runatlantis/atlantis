@@ -260,17 +260,17 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	if !w.CheckoutMerge {
 		return runGit("clone", "--depth=1", "--branch", p.HeadBranch, "--single-branch", headCloneURL, cloneDir)
 	}
-	
+
 	// if merge strategy...
 
 	// if no checkout depth, omit depth arg
 	if w.CheckoutDepth == 0 {
 		if err := runGit("clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
-			 return err
+			return err
 		}
 	} else {
-	 	if err := runGit("clone", "--depth", fmt.Sprint(w.CheckoutDepth), "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
-			 return err
+		if err := runGit("clone", "--depth", fmt.Sprint(w.CheckoutDepth), "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
+			return err
 		}
 	}
 
@@ -285,16 +285,16 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 		fetchRemote = "origin"
 	}
 
-        // if no checkout depth, omit depth arg
-        if w.CheckoutDepth == 0 {
-                if err := runGit("fetch", fetchRemote, fetchRef); err != nil {
-                         return err
-                }
-        } else {
-                if err := runGit("fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, fetchRef); err != nil {
-                         return err
-                }
-        }
+	// if no checkout depth, omit depth arg
+	if w.CheckoutDepth == 0 {
+		if err := runGit("fetch", fetchRemote, fetchRef); err != nil {
+			return err
+		}
+	} else {
+		if err := runGit("fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, fetchRef); err != nil {
+			return err
+		}
+	}
 
 	if w.GpgNoSigningEnabled {
 		if err := runGit("config", "--local", "commit.gpgsign", "false"); err != nil {
