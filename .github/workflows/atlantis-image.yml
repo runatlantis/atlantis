@@ -51,6 +51,9 @@ jobs:
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
+      with:
+        driver-opts: |
+          image=moby/buildkit:v0.11.2
 
     # release version is the name of the tag i.e. v0.10.0
     # release version also has the image type appended i.e. v0.10.0-alpine
