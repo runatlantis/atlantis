@@ -52,7 +52,7 @@ type WorkingDir interface {
 	// Set a flag in the workingdir so Clone() can know that it is safe to re-clone the workingdir if
 	// the upstream branch has been modified. This is only safe after grabbing the project lock
 	// and before running any plans
-	SetSafeToReClone()
+	SetCheckForUpstreamChanges()
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -79,8 +79,8 @@ type FileWorkspace struct {
 	GithubAppEnabled bool
 	// use the global setting without overriding
 	GpgNoSigningEnabled bool
-	// flag indicating if a re-clone will be safe (project lock held, about to run plan)
-	SafeToReClone bool
+	// flag indicating if we have to merge with potential new changes upstream (directly after grabbing project lock)
+	CheckForUpstreamChanges bool
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -95,7 +95,7 @@ func (w *FileWorkspace) Clone(
 	p models.PullRequest,
 	workspace string) (string, bool, error) {
 	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
-	defer func() { w.SafeToReClone = false }()
+	defer func() { w.CheckForUpstreamChanges = false }()
 
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
@@ -123,7 +123,7 @@ func (w *FileWorkspace) Clone(
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			if w.SafeToReClone && w.CheckoutMerge && w.recheckDiverged(log, p, headRepo, cloneDir) {
+			if w.CheckForUpstreamChanges && w.CheckoutMerge && w.recheckDiverged(log, p, headRepo, cloneDir) {
 				log.Info("base branch has been updated, using merge strategy and will merge again")
 				return cloneDir, true, w.mergeAgain(log, cloneDir, headRepo, p)
 			} else {
@@ -403,7 +403,7 @@ func (w *FileWorkspace) sanitizeGitCredentials(s string, base models.Repo, head 
 	return strings.Replace(baseReplaced, head.CloneURL, head.SanitizedCloneURL, -1)
 }
 
-// Set the flag that indicates it is safe to re-clone if necessary
-func (w *FileWorkspace) SetSafeToReClone() {
-	w.SafeToReClone = true
+// Set the flag that indicates we need to check for upstream changes (if using merge checkout strategy)
+func (w *FileWorkspace) SetCheckForUpstreamChanges() {
+	w.CheckForUpstreamChanges = true
 }

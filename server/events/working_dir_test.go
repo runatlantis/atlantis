@@ -480,7 +480,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	Assert(t, hasDiverged == false, "Clone with CheckoutMerge=false should not merge")
 
 	wd.CheckoutMerge = true
-	wd.SetSafeToReClone()
+	wd.SetCheckForUpstreamChanges()
 	// Run the clone twice with the merge strategy, the first run should
 	// return true for hasDiverged, subsequent runs should
 	// return false since the first call is supposed to merge.
@@ -492,7 +492,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	Ok(t, err)
 	Assert(t, hasDiverged == true, "First clone with CheckoutMerge=true with diverged base should have merged")
 
-	wd.SetSafeToReClone()
+	wd.SetCheckForUpstreamChanges()
 	_, hasDiverged, err = wd.Clone(logging.NewNoopLogger(t), models.Repo{CloneURL: repoDir}, models.PullRequest{
 		BaseRepo:   models.Repo{CloneURL: repoDir},
 		HeadBranch: "second-pr",
