@@ -95,7 +95,6 @@ func (w *FileWorkspace) Clone(
 	p models.PullRequest,
 	workspace string) (string, bool, error) {
 	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
-	hasDiverged := false
 	defer func() { w.SafeToReClone = false }()
 
 	// If the directory already exists, check if it's at the right commit.
@@ -125,8 +124,8 @@ func (w *FileWorkspace) Clone(
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
 			if w.SafeToReClone && w.CheckoutMerge && w.recheckDiverged(log, p, headRepo, cloneDir) {
-				log.Info("base branch has been updated, using merge strategy and will clone again")
-				hasDiverged = true
+				log.Info("base branch has been updated, using merge strategy and will merge again")
+				return cloneDir, true, w.mergeAgain(log, cloneDir, headRepo, p)
 			} else {
 				log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 				return cloneDir, false, nil
@@ -138,7 +137,7 @@ func (w *FileWorkspace) Clone(
 	}
 
 	// Otherwise we clone the repo.
-	return cloneDir, hasDiverged, w.forceClone(log, cloneDir, headRepo, p)
+	return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
 }
 
 // recheckDiverged returns true if the branch we're merging into has diverged
@@ -242,26 +241,7 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 		baseCloneURL = w.TestingOverrideBaseCloneURL
 	}
 
-	runGit := func(args ...string) error {
-		cmd := exec.Command("git", args...) // nolint: gosec
-		cmd.Dir = cloneDir
-		// The git merge command requires these env vars are set.
-		cmd.Env = append(os.Environ(), []string{
-			"EMAIL=atlantis@runatlantis.io",
-			"GIT_AUTHOR_NAME=atlantis",
-			"GIT_COMMITTER_NAME=atlantis",
-		}...)
-
-		cmdStr := w.sanitizeGitCredentials(strings.Join(cmd.Args, " "), p.BaseRepo, headRepo)
-		output, err := cmd.CombinedOutput()
-		sanitizedOutput := w.sanitizeGitCredentials(string(output), p.BaseRepo, headRepo)
-		if err != nil {
-			sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
-			return fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
-		}
-		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
-		return nil
-	}
+	runGit := w.makeGitRunner(log, cloneDir, headRepo, p)
 
 	// if branch strategy, use depth=1
 	if !w.CheckoutMerge {
@@ -284,7 +264,66 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	if err := runGit("remote", "add", "head", headCloneURL); err != nil {
 		return err
 	}
+	if w.GpgNoSigningEnabled {
+		if err := runGit("config", "--local", "commit.gpgsign", "false"); err != nil {
+			return err
+		}
+	}
 
+	return w.mergeToBaseBranch(p, runGit)
+}
+
+// There is a new upstream update that we need, and we want to update to it
+// without deleting any existing plans
+func (w *FileWorkspace) mergeAgain(log logging.SimpleLogging,
+	cloneDir string,
+	headRepo models.Repo,
+	p models.PullRequest) error {
+
+	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
+	mutex := value.(*sync.Mutex)
+
+	defer mutex.Unlock()
+	if locked := mutex.TryLock(); !locked {
+		mutex.Lock()
+		return nil
+	}
+
+	runGit := w.makeGitRunner(log, cloneDir, headRepo, p)
+
+	// Reset branch as if it was cloned again
+	if err := runGit("reset", "--hard", fmt.Sprintf("refs/remotes/head/%s", p.BaseBranch)); err != nil {
+		return err
+	}
+
+	return w.mergeToBaseBranch(p, runGit)
+}
+
+func (w *FileWorkspace) makeGitRunner(log logging.SimpleLogging, cloneDir string, headRepo models.Repo, p models.PullRequest) func(args ...string) error {
+	return func(args ...string) error {
+		cmd := exec.Command("git", args...) // nolint: gosec
+		cmd.Dir = cloneDir
+		// The git merge command requires these env vars are set.
+		cmd.Env = append(os.Environ(), []string{
+			"EMAIL=atlantis@runatlantis.io",
+			"GIT_AUTHOR_NAME=atlantis",
+			"GIT_COMMITTER_NAME=atlantis",
+		}...)
+
+		cmdStr := w.sanitizeGitCredentials(strings.Join(cmd.Args, " "), p.BaseRepo, headRepo)
+		output, err := cmd.CombinedOutput()
+		sanitizedOutput := w.sanitizeGitCredentials(string(output), p.BaseRepo, headRepo)
+		if err != nil {
+			sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
+			return fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
+		}
+		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
+		return nil
+	}
+}
+
+// Merge the PR into the base branch.
+func (w *FileWorkspace) mergeToBaseBranch(p models.PullRequest, runGit func(args ...string) error) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", p.HeadBranch)
 	fetchRemote := "head"
 	if w.GithubAppEnabled {
@@ -303,11 +342,6 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 		}
 	}
 
-	if w.GpgNoSigningEnabled {
-		if err := runGit("config", "--local", "commit.gpgsign", "false"); err != nil {
-			return err
-		}
-	}
 	if err := runGit("merge-base", p.BaseBranch, "FETCH_HEAD"); err != nil {
 		// git merge-base returning error means that we did not receive enough commits in shallow clone.
 		// Fall back to retrieving full repo history.
