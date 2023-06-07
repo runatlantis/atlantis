@@ -5,7 +5,7 @@ import (
 	"github.com/petergtz/pegomock"
 	"reflect"
 
-	github "github.com/google/go-github/v52/github"
+	github "github.com/google/go-github/v53/github"
 )
 
 func AnyPtrToGithubIssueCommentEvent() *github.IssueCommentEvent {
