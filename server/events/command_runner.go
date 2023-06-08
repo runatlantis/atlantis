@@ -27,7 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
