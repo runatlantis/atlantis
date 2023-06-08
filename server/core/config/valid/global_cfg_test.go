@@ -80,6 +80,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				AllowCustomWorkflows:      Bool(false),
 				DeleteSourceBranchOnMerge: Bool(false),
 				RepoLocking:               Bool(true),
+				PolicyCheck:               Bool(false),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -88,94 +89,115 @@ func TestNewGlobalCfg(t *testing.T) {
 	}
 
 	cases := []struct {
-		allowRepoCfg  bool
-		approvedReq   bool
-		mergeableReq  bool
-		unDivergedReq bool
+		allowRepoCfg       bool
+		approvedReq        bool
+		mergeableReq       bool
+		unDivergedReq      bool
+		policyCheckEnabled bool
 	}{
 		{
-			allowRepoCfg:  false,
-			approvedReq:   false,
-			mergeableReq:  false,
-			unDivergedReq: false,
+			allowRepoCfg:       false,
+			approvedReq:        false,
+			mergeableReq:       false,
+			unDivergedReq:      false,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  true,
-			approvedReq:   false,
-			mergeableReq:  false,
-			unDivergedReq: false,
+			allowRepoCfg:       true,
+			approvedReq:        false,
+			mergeableReq:       false,
+			unDivergedReq:      false,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  false,
-			approvedReq:   true,
-			mergeableReq:  false,
-			unDivergedReq: false,
+			allowRepoCfg:       false,
+			approvedReq:        true,
+			mergeableReq:       false,
+			unDivergedReq:      false,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  false,
-			approvedReq:   false,
-			mergeableReq:  true,
-			unDivergedReq: false,
+			allowRepoCfg:       false,
+			approvedReq:        false,
+			mergeableReq:       true,
+			unDivergedReq:      false,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  false,
-			approvedReq:   true,
-			mergeableReq:  true,
-			unDivergedReq: false,
+			allowRepoCfg:       false,
+			approvedReq:        true,
+			mergeableReq:       true,
+			unDivergedReq:      false,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  true,
-			approvedReq:   true,
-			mergeableReq:  true,
-			unDivergedReq: false,
+			allowRepoCfg:       true,
+			approvedReq:        true,
+			mergeableReq:       true,
+			unDivergedReq:      false,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  false,
-			approvedReq:   false,
-			mergeableReq:  false,
-			unDivergedReq: true,
+			allowRepoCfg:       false,
+			approvedReq:        false,
+			mergeableReq:       false,
+			unDivergedReq:      true,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  true,
-			approvedReq:   false,
-			mergeableReq:  false,
-			unDivergedReq: true,
+			allowRepoCfg:       true,
+			approvedReq:        false,
+			mergeableReq:       false,
+			unDivergedReq:      true,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  false,
-			approvedReq:   true,
-			mergeableReq:  false,
-			unDivergedReq: true,
+			allowRepoCfg:       false,
+			approvedReq:        true,
+			mergeableReq:       false,
+			unDivergedReq:      true,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  false,
-			approvedReq:   false,
-			mergeableReq:  true,
-			unDivergedReq: true,
+			allowRepoCfg:       false,
+			approvedReq:        false,
+			mergeableReq:       true,
+			unDivergedReq:      true,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  false,
-			approvedReq:   true,
-			mergeableReq:  true,
-			unDivergedReq: true,
+			allowRepoCfg:       false,
+			approvedReq:        true,
+			mergeableReq:       true,
+			unDivergedReq:      true,
+			policyCheckEnabled: false,
 		},
 		{
-			allowRepoCfg:  true,
-			approvedReq:   true,
-			mergeableReq:  true,
-			unDivergedReq: true,
+			allowRepoCfg:       true,
+			approvedReq:        true,
+			mergeableReq:       true,
+			unDivergedReq:      true,
+			policyCheckEnabled: false,
+		},
+		{
+			allowRepoCfg:       true,
+			approvedReq:        true,
+			mergeableReq:       true,
+			unDivergedReq:      true,
+			policyCheckEnabled: true,
 		},
 	}
 
 	for _, c := range cases {
-		caseName := fmt.Sprintf("allow_repo: %t, approved: %t, mergeable: %t, undiverged: %t",
-			c.allowRepoCfg, c.approvedReq, c.mergeableReq, c.unDivergedReq)
+		caseName := fmt.Sprintf("allow_repo: %t, approved: %t, mergeable: %t, undiverged: %t, policy_check: %t",
+			c.allowRepoCfg, c.approvedReq, c.mergeableReq, c.unDivergedReq, c.policyCheckEnabled)
 		t.Run(caseName, func(t *testing.T) {
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  c.allowRepoCfg,
-				MergeableReq:  c.mergeableReq,
-				ApprovedReq:   c.approvedReq,
-				UnDivergedReq: c.unDivergedReq,
+				AllowRepoCfg:       c.allowRepoCfg,
+				MergeableReq:       c.mergeableReq,
+				ApprovedReq:        c.approvedReq,
+				UnDivergedReq:      c.unDivergedReq,
+				PolicyCheckEnabled: c.policyCheckEnabled,
 			}
 			act := valid.NewGlobalCfgFromArgs(globalCfgArgs)
 
@@ -186,7 +208,7 @@ func TestNewGlobalCfg(t *testing.T) {
 
 			if c.allowRepoCfg {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
-				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking"}
+				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "policy_check"}
 			}
 			if c.mergeableReq {
 				exp.Repos[0].PlanRequirements = append(exp.Repos[0].PlanRequirements, "mergeable")
@@ -202,6 +224,12 @@ func TestNewGlobalCfg(t *testing.T) {
 				exp.Repos[0].PlanRequirements = append(exp.Repos[0].PlanRequirements, "undiverged")
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "undiverged")
 				exp.Repos[0].ImportRequirements = append(exp.Repos[0].ImportRequirements, "undiverged")
+			}
+			if c.policyCheckEnabled {
+				exp.Repos[0].PlanRequirements = append(exp.Repos[0].PlanRequirements, "policies_passed")
+				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "policies_passed")
+				exp.Repos[0].ImportRequirements = append(exp.Repos[0].ImportRequirements, "policies_passed")
+				exp.Repos[0].PolicyCheck = Bool(true)
 			}
 
 			Equals(t, exp, act)
