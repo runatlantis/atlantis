@@ -393,6 +393,13 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
 	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
 
+	// Pretend that terraform has created a plan file, we'll check for it later
+	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
+	assert.NoFileExists(t, planFile)
+	_, err := os.Create(planFile)
+	Assert(t, err == nil, "creating plan file: %v", err)
+	assert.FileExists(t, planFile)
+
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
@@ -406,6 +413,7 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 	}, "default")
 	Ok(t, err)
 	Equals(t, false, mergedAgain)
+	assert.NoFileExists(t, planFile, "Plan file should have been wiped out by Clone")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
