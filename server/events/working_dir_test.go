@@ -3,6 +3,7 @@ package events_test
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -469,6 +470,13 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 		GpgNoSigningEnabled: true,
 	}
 
+	// Pretend terraform has created a plan file, we'll check for it later
+	planFile := filepath.Join(repoDir, "repos/0/default/default.tfplan")
+	assert.NoFileExists(t, planFile)
+	_, err := os.Create(planFile)
+	Assert(t, err == nil, "creating plan file: %v", err)
+	assert.FileExists(t, planFile)
+
 	// Run the clone without the checkout merge strategy. It should return
 	// false for hasDiverged
 	_, hasDiverged, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
@@ -478,6 +486,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	}, "default")
 	Ok(t, err)
 	Assert(t, hasDiverged == false, "Clone with CheckoutMerge=false should not merge")
+	assert.FileExists(t, planFile, "Existing plan file should not be deleted by Clone with merge disabled")
 
 	wd.CheckoutMerge = true
 	wd.SetCheckForUpstreamChanges()
@@ -490,6 +499,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 		BaseBranch: "main",
 	}, "default")
 	Ok(t, err)
+	assert.FileExists(t, planFile, "Existing plan file should not be deleted by merging again")
 	Assert(t, hasDiverged == true, "First clone with CheckoutMerge=true with diverged base should have merged")
 
 	wd.SetCheckForUpstreamChanges()
@@ -500,6 +510,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	}, "default")
 	Ok(t, err)
 	Assert(t, hasDiverged == false, "Second clone with CheckoutMerge=true and initially diverged base should not merge again")
+	assert.FileExists(t, planFile, "Existing plan file should not have been deleted")
 }
 
 func TestHasDiverged_MasterHasDiverged(t *testing.T) {
