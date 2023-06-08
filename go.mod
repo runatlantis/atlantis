@@ -7,7 +7,6 @@ require (
 	github.com/alicebob/miniredis/v2 v2.30.3
 	github.com/bradleyfalzon/ghinstallation/v2 v2.4.0
 	github.com/briandowns/spinner v1.23.0
-	github.com/elazarl/go-bindata-assetfs v1.0.1
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-playground/validator/v10 v10.14.0
 	github.com/go-test/deep v1.1.0
