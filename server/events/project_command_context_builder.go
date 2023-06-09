@@ -166,7 +166,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
 	terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
-	if prjCfg.PolicyCheck == true {
+	if prjCfg.PolicyCheck {
 		ctx.Log.Debug("PolicyChecks are enabled")
 	} else {
 		// PolicyCheck is disabled at repository level

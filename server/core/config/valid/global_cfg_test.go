@@ -1198,6 +1198,248 @@ func TestGlobalCfg_MatchingRepo(t *testing.T) {
 	}
 }
 
+func TestGlobalCfg_PolicyCheckOverride(t *testing.T) {
+	var emptyPolicySets valid.PolicySets
+
+	defaultWorkflow := valid.Workflow{
+		Name:        "default",
+		Apply:       valid.DefaultApplyStage,
+		PolicyCheck: valid.DefaultPolicyCheckStage,
+		Plan:        valid.DefaultPlanStage,
+		Import:      valid.DefaultImportStage,
+		StateRm:     valid.DefaultStateRmStage,
+	}
+	cases := map[string]struct {
+		gPolicyCheck  bool
+		gCfg          string
+		repoID        string
+		proj          valid.Project
+		repoWorkflows map[string]valid.Workflow
+		exp           valid.MergedProjectCfg
+	}{
+		"global policy check disabled": {
+			gPolicyCheck: false,
+			gCfg: `
+repos:
+- id: /.*/
+  plan_requirements: [approved]
+  apply_requirements: [approved]
+  import_requirements: [approved]
+- id: /github.com/.*/
+  plan_requirements: [mergeable]
+  apply_requirements: [mergeable]
+  import_requirements: [mergeable]
+- id: github.com/owner/repo
+  plan_requirements: [approved, mergeable]
+  apply_requirements: [approved, mergeable]
+  import_requirements: [approved, mergeable]
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:         "mydir",
+				Workspace:   "myworkspace",
+				Name:        String("myname"),
+				PolicyCheck: Bool(false),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{"approved", "mergeable"},
+				ApplyRequirements:  []string{"approved", "mergeable"},
+				ImportRequirements: []string{"approved", "mergeable"},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         "mydir",
+				Workspace:          "myworkspace",
+				Name:               "myname",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+				PolicyCheck:        false,
+			},
+		},
+		"global policy check enabled": {
+			gPolicyCheck: true,
+			gCfg: `
+repos:
+- id: /.*/
+  plan_requirements: [approved]
+  apply_requirements: [approved]
+  import_requirements: [approved]
+- id: /github.com/.*/
+  plan_requirements: [mergeable]
+  apply_requirements: [mergeable]
+  import_requirements: [mergeable]
+- id: github.com/owner/repo
+  plan_requirements: [approved, mergeable]
+  apply_requirements: [approved, mergeable]
+  import_requirements: [approved, mergeable]
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:         "mydir",
+				Workspace:   "myworkspace",
+				Name:        String("myname"),
+				PolicyCheck: Bool(true),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{"approved", "mergeable", "policies_passed"},
+				ApplyRequirements:  []string{"approved", "mergeable", "policies_passed"},
+				ImportRequirements: []string{"approved", "mergeable", "policies_passed"},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         "mydir",
+				Workspace:          "myworkspace",
+				Name:               "myname",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+				PolicyCheck:        true,
+			},
+		},
+		"global policy check enabled except current repo": {
+			gPolicyCheck: true,
+			gCfg: `
+repos:
+- id: /.*/
+  plan_requirements: [approved]
+  apply_requirements: [approved]
+  import_requirements: [approved]
+- id: /github.com/.*/
+  plan_requirements: [mergeable]
+  apply_requirements: [mergeable]
+  import_requirements: [mergeable]
+- id: github.com/owner/repo
+  plan_requirements: [approved, mergeable]
+  apply_requirements: [approved, mergeable]
+  import_requirements: [approved, mergeable]
+  policy_check: false
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:         "mydir",
+				Workspace:   "myworkspace",
+				Name:        String("myname"),
+				PolicyCheck: Bool(false),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{"approved", "mergeable"},
+				ApplyRequirements:  []string{"approved", "mergeable"},
+				ImportRequirements: []string{"approved", "mergeable"},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         "mydir",
+				Workspace:          "myworkspace",
+				Name:               "myname",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+				PolicyCheck:        false,
+			},
+		},
+		"global policy check disabled and disabled on current repo": {
+			gPolicyCheck: false,
+			gCfg: `
+repos:
+- id: /.*/
+  plan_requirements: [approved]
+  apply_requirements: [approved]
+  import_requirements: [approved]
+- id: /github.com/.*/
+  plan_requirements: [mergeable]
+  apply_requirements: [mergeable]
+  import_requirements: [mergeable]
+- id: github.com/owner/repo
+  plan_requirements: [approved, mergeable]
+  apply_requirements: [approved, mergeable]
+  import_requirements: [approved, mergeable]
+  policy_check: false
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:         "mydir",
+				Workspace:   "myworkspace",
+				Name:        String("myname"),
+				PolicyCheck: Bool(false),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{"approved", "mergeable"},
+				ApplyRequirements:  []string{"approved", "mergeable"},
+				ImportRequirements: []string{"approved", "mergeable"},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         "mydir",
+				Workspace:          "myworkspace",
+				Name:               "myname",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+				PolicyCheck:        false,
+			},
+		},
+		"global policy check disabled and enabled on current repo": {
+			gPolicyCheck: false,
+			gCfg: `
+repos:
+- id: /.*/
+  plan_requirements: [approved]
+  apply_requirements: [approved]
+  import_requirements: [approved]
+- id: /github.com/.*/
+  plan_requirements: [mergeable]
+  apply_requirements: [mergeable]
+  import_requirements: [mergeable]
+- id: github.com/owner/repo
+  plan_requirements: [approved, mergeable]
+  apply_requirements: [approved, mergeable]
+  import_requirements: [approved, mergeable]
+  policy_check: true
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:         "mydir",
+				Workspace:   "myworkspace",
+				Name:        String("myname"),
+				PolicyCheck: Bool(false),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{"approved", "mergeable"},
+				ApplyRequirements:  []string{"approved", "mergeable"},
+				ImportRequirements: []string{"approved", "mergeable"},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         "mydir",
+				Workspace:          "myworkspace",
+				Name:               "myname",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+				PolicyCheck:        true, // Project will have policy check as true but since it is globally disable it wont actually run
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmp := t.TempDir()
+			var global valid.GlobalCfg
+			path := filepath.Join(tmp, "config.yaml")
+			Ok(t, os.WriteFile(path, []byte(c.gCfg), 0600))
+			var err error
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:       false,
+				MergeableReq:       false,
+				ApprovedReq:        false,
+				UnDivergedReq:      false,
+				PolicyCheckEnabled: c.gPolicyCheck,
+			}
+
+			global, err = (&config.ParserValidator{}).ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			Ok(t, err)
+
+			global.PolicySets = emptyPolicySets
+			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopLogger(t), c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
+		})
+	}
+}
+
 // String is a helper routine that allocates a new string value
 // to store v and returns a pointer to it.
 func String(v string) *string { return &v }
