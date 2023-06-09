@@ -145,6 +145,41 @@ func (c *MockCommentBuilder_BuildApplyComment_OngoingVerification) GetAllCapture
 	return
 }
 
+func (verifier *VerifierMockCommentBuilder) BuildApprovePoliciesComment(_param0 string, _param1 string, _param2 string) *MockCommentBuilder_BuildApprovePoliciesComment_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1, _param2}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "BuildApprovePoliciesComment", params, verifier.timeout)
+	return &MockCommentBuilder_BuildApprovePoliciesComment_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockCommentBuilder_BuildApprovePoliciesComment_OngoingVerification struct {
+	mock              *MockCommentBuilder
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockCommentBuilder_BuildApprovePoliciesComment_OngoingVerification) GetCapturedArguments() (string, string, string) {
+	_param0, _param1, _param2 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
+}
+
+func (c *MockCommentBuilder_BuildApprovePoliciesComment_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
+		}
+		_param1 = make([]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(string)
+		}
+		_param2 = make([]string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
+		}
+	}
+	return
+}
+
 func (verifier *VerifierMockCommentBuilder) BuildPlanComment(_param0 string, _param1 string, _param2 string, _param3 []string) *MockCommentBuilder_BuildPlanComment_OngoingVerification {
 	params := []pegomock.Param{_param0, _param1, _param2, _param3}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "BuildPlanComment", params, verifier.timeout)

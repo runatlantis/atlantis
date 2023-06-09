@@ -33,8 +33,8 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/uber-go/tally"
-	"github.com/uber-go/tally/prometheus"
+	tally "github.com/uber-go/tally/v4"
+	prometheus "github.com/uber-go/tally/v4/prometheus"
 	"github.com/urfave/negroni/v3"
 
 	cfg "github.com/runatlantis/atlantis/server/core/config"
