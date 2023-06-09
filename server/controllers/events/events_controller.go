@@ -29,7 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
