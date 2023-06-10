@@ -200,19 +200,6 @@ tbody {
 .content {
   margin-bottom: 2px;
 }
-.list-title {
-  position: relative;
-  float: left;
-}
-.list-status {
-  position: relative;
-  float: right;
-}
-.list-timestamp {
-  position: relative;
-  float: right;
-  padding-right: 2px;
-}
 .unlock-discard-btn {
   border-color: red !important;
   background-color: red !important;
@@ -247,8 +234,50 @@ tbody {
 .list-unlock{
   float: right;
 }
-.lock-row{
-  cursor: default;
+
+/* Styles for the lock index */
+.lock-grid{
+  display: grid;
+  grid-template-columns: auto 2fr auto auto auto;
+  border: 1px solid #dbeaf4;
+  width: 100%;
+  font-size: 12px;
+  letter-spacing: .1rem;
+}
+
+.lock-header {
+  display: contents;
+  font-weight: bold;
+}
+
+.lock-header span {
+  border-bottom: 1px solid #dbeaf4;
+  padding: 5px;
+}
+
+.lock-row {
+  display: contents;
+  text-transform: uppercase;
+  /*font-weight: 600;*/
+}
+
+.lock-link {
+  text-decoration: none;
+  color: #555
+}
+
+.lock-row a {
+  border-bottom: 1px solid #dbeaf4;
+  padding: 5px;
+}
+
+.lock-row:hover a {
+  background-color: #dbeaf4;
+  cursor: pointer;
+}
+
+.lock-row:hover a:hover {
+  color: initial
 }
 
 /* The Modal (background) */

@@ -110,15 +110,34 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <p class="title-heading small"><strong>Locks</strong></p>
     {{ if .Locks }}
     {{ $basePath := .CleanedBasePath }}
+    <div class="lock-grid">
+    <div class="lock-header">
+      <span>Repository</span>
+      <span>Project</span>
+      <span>Workspace</span>
+      <span>Date/Time</span>
+      <span>Status</span>
+    </div>
     {{ range .Locks }}
-      <a href="{{ $basePath }}{{.LockPath}}">
-        <div class="twelve columns button content lock-row">
-        <div class="list-title">{{.RepoFullName}} <span class="heading-font-size">#{{.PullNum}}</span> <code>{{.Path}}</code> <code>{{.Workspace}}</code></div>
-        <div class="list-status"><code>Locked</code></div>
-        <div class="list-timestamp"><span class="heading-font-size">{{.TimeFormatted}}</span></div>
+        <div class="lock-row">
+        <a class="lock-link" href="{{ $basePath }}{{.LockPath}}">
+          <span>{{.RepoFullName}} #{{.PullNum}}</span>
+        </a>
+        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          <span><code>{{.Path}}</code></span>
+        </a>
+        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          <span><code>{{.Workspace}}</code></span>
+        </a>
+        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          <span>{{.TimeFormatted}}</span>
+        </a>
+        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          <span><code>Locked</code></span>
+        </a>
         </div>
-      </a>
     {{ end }}
+    </div>
     {{ else }}
     <p class="placeholder">No locks found.</p>
     {{ end }}
