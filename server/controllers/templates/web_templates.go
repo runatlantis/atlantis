@@ -426,6 +426,8 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <script src="{{ .CleanedBasePath }}/static/js/xterm-4.9.0.js"></script>
     <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.6.0.js"></script>
     <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-0.7.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-bar.js"></script>
 
     <script>
       function updateTerminalStatus(msg) {
@@ -450,9 +452,14 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
       })
       var attachAddon = new AttachAddon.AttachAddon(socket);
       var fitAddon = new FitAddon.FitAddon();
+      var searchAddon = new SearchAddon.SearchAddon();
+      var searchBarAddon = new SearchBarAddon.SearchBarAddon({searchAddon});
       term.loadAddon(attachAddon);
       term.loadAddon(fitAddon);
+      term.loadAddon(searchAddon);
+      term.loadAddon(searchBarAddon);
       term.open(document.getElementById("terminal"));
+      searchBarAddon.show();
       fitAddon.fit();
       window.addEventListener("resize", () => fitAddon.fit());
     </script>
