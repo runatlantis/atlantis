@@ -168,7 +168,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
                 url: '{{ .CleanedBasePath }}/apply/lock',
                 type: 'POST',
                 success: function(result) {
-                  window.location.replace("{{ .CleanedBasePath }}/?discard=true");
+                  window.location.replace("{{ .CleanedBasePath }}/");
                 }
             });
           });
@@ -185,7 +185,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
                 url: '{{ .CleanedBasePath }}/apply/unlock',
                 type: 'DELETE',
                 success: function(result) {
-                  window.location.replace("{{ .CleanedBasePath }}/?discard=true");
+                  window.location.replace("{{ .CleanedBasePath }}/");
                 }
             });
           });
