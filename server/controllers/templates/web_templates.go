@@ -121,10 +121,10 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     {{ range .Locks }}
         <div class="lock-row">
         <a class="lock-link" href="{{ $basePath }}{{.LockPath}}">
-          <span>{{.RepoFullName}} #{{.PullNum}}</span>
+          <span class="lock-reponame">{{.RepoFullName}} #{{.PullNum}}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
-          <span><code>{{.Path}}</code></span>
+          <span class="lock-path">{{.Path}}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
           <span><code>{{.Workspace}}</code></span>

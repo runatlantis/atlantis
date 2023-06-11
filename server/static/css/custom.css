@@ -238,7 +238,7 @@ tbody {
 /* Styles for the lock index */
 .lock-grid{
   display: grid;
-  grid-template-columns: auto 2fr auto auto auto;
+  grid-template-columns: auto auto auto auto auto;
   border: 1px solid #dbeaf4;
   width: 100%;
   font-size: 12px;
@@ -261,11 +261,6 @@ tbody {
   /*font-weight: 600;*/
 }
 
-.lock-link {
-  text-decoration: none;
-  color: #555
-}
-
 .lock-row a {
   border-bottom: 1px solid #dbeaf4;
   padding: 5px;
@@ -278,6 +273,25 @@ tbody {
 
 .lock-row:hover a:hover {
   color: initial
+}
+
+.lock-link {
+  text-decoration: none;
+  color: #555
+}
+
+.lock-reponame {
+  word-break: break-all;
+}
+
+.lock-path {
+  padding: .2rem .5rem;
+  margin: 0 .2rem;
+  font-size: 90%;
+  background: #F1F1F1;
+  border: 1px solid #E1E1E1;
+  border-radius: 4px;
+  word-break: break-all;
 }
 
 /* The Modal (background) */
