@@ -130,7 +130,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
           <span><code>{{.Workspace}}</code></span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
-          <span>{{.TimeFormatted}}</span>
+          <span class="lock-datetime">{{.TimeFormatted}}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
           <span><code>Locked</code></span>
