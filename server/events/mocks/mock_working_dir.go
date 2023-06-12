@@ -132,6 +132,14 @@ func (mock *MockWorkingDir) HasDiverged(_param0 logging.SimpleLogging, _param1 s
 	return ret0
 }
 
+func (mock *MockWorkingDir) SetSafeToReClone() {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+	}
+	params := []pegomock.Param{}
+	pegomock.GetGenericMockFrom(mock).Invoke("SetSafeToReClone", params, []reflect.Type{})
+}
+
 func (mock *MockWorkingDir) VerifyWasCalledOnce() *VerifierMockWorkingDir {
 	return &VerifierMockWorkingDir{
 		mock:                   mock,
@@ -369,4 +377,21 @@ func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetAllCapturedArguments
 		}
 	}
 	return
+}
+
+func (verifier *VerifierMockWorkingDir) SetSafeToReClone() *MockWorkingDir_SetSafeToReClone_OngoingVerification {
+	params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "SetSafeToReClone", params, verifier.timeout)
+	return &MockWorkingDir_SetSafeToReClone_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDir_SetSafeToReClone_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDir_SetSafeToReClone_OngoingVerification) GetCapturedArguments() {
+}
+
+func (c *MockWorkingDir_SetSafeToReClone_OngoingVerification) GetAllCapturedArguments() {
 }

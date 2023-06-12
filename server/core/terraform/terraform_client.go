@@ -28,6 +28,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-getter/v2"
 	"github.com/hashicorp/go-version"
@@ -413,13 +414,16 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
 	}
 	cmd.Env = envVars
+	start := time.Now()
 	out, err := cmd.CombinedOutput()
+	dur := time.Since(start)
+	log := ctx.Log.With("duration", dur)
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-		ctx.Log.Err(err.Error())
+		log.Err(err.Error())
 		return ansi.Strip(string(out)), err
 	}
-	ctx.Log.Info("Successfully ran %q in %q", tfCmd, path)
+	log.Info("successfully ran %q in %q", tfCmd, path)
 
 	return ansi.Strip(string(out)), nil
 }
