@@ -86,7 +86,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 # We use gosu to step down from root and run as the atlantis user
 # renovate: datasource=github-releases depName=tianon/gosu
 #ENV GOSU_VERSION=1.16
-ENV GOSU_VERSION=1.16-4
+ENV GOSU_VERSION=1.16-5
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GOSU_ARCH=amd64 ;; \
@@ -125,7 +125,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.4.6
+ENV DEFAULT_TERRAFORM_VERSION=1.5.0
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 #RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
