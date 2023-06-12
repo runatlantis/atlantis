@@ -106,6 +106,7 @@ type Server struct {
 	StatusController               *controllers.StatusController
 	JobsController                 *controllers.JobsController
 	APIController                  *controllers.APIController
+	OIDCController                 *controllers.OIDCController
 	IndexTemplate                  templates.TemplateWriter
 	LockDetailTemplate             templates.TemplateWriter
 	ProjectJobsTemplate            templates.TemplateWriter
@@ -850,6 +851,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:                 vcsClient,
 	}
 
+	oidcController := &controllers.OIDCController{
+		AtlantisURL: parsedURL,
+		Logger:      logger,
+	}
+
 	eventsController := &events_controllers.VCSEventsController{
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
@@ -901,6 +907,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		JobsController:                 jobsController,
 		StatusController:               statusController,
 		APIController:                  apiController,
+		OIDCController:                 oidcController,
 		IndexTemplate:                  templates.IndexTemplate,
 		LockDetailTemplate:             templates.LockTemplate,
 		ProjectJobsTemplate:            templates.ProjectJobsTemplate,
