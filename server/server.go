@@ -943,6 +943,7 @@ func (s *Server) Start() error {
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
 	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
 	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
+	s.Router.HandleFunc("/.well-known/openid-configuration", s.OIDCController.GetOpenIDConfiguration).Methods("GET")
 
 	r, ok := s.StatsReporter.(prometheus.Reporter)
 	if ok {
