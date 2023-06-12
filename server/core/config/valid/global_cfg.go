@@ -99,6 +99,7 @@ type MergedProjectCfg struct {
 	DeleteSourceBranchOnMerge bool
 	ExecutionOrderGroup       int
 	RepoLocking               bool
+	OIDC                      *OIDC
 }
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.

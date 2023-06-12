@@ -34,6 +34,7 @@ type Project struct {
 	DeleteSourceBranchOnMerge *bool     `yaml:"delete_source_branch_on_merge,omitempty"`
 	RepoLocking               *bool     `yaml:"repo_locking,omitempty"`
 	ExecutionOrderGroup       *int      `yaml:"execution_order_group,omitempty"`
+	OIDC                      *OIDC     `yaml:"oidc,omitempty"`
 }
 
 func (p Project) Validate() error {
