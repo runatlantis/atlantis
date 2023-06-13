@@ -4,16 +4,13 @@
 ```diff
 {{ .PreConftestOutput }}
 ```
-
-{{- end }}
+{{- end -}}
 {{ template "policyCheck" .PolicySetResults }}
 {{- if ne .PostConftestOutput "" }}
-
 ```diff
 {{ .PostConftestOutput }}
 ```
-
-{{- end }}
+{{ end -}}
 {{- end }}
 {{- if .PolicyCleared }}
 * :arrow_forward: To **apply** this plan, comment:
