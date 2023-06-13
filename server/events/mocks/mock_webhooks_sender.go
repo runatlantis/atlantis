@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v3"
 	webhooks "github.com/runatlantis/atlantis/server/events/webhooks"
 	logging "github.com/runatlantis/atlantis/server/logging"
 	"reflect"

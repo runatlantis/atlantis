@@ -5,7 +5,7 @@ package mocks
 
 import (
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v3"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"

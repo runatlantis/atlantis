@@ -29,7 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 
 	"github.com/google/go-github/v53/github"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v3"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
