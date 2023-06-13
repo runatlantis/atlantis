@@ -498,6 +498,9 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		}
 		preConftestOutput = append(preConftestOutput, output)
 	}
+	if policySetResults == nil {
+		return nil, "", errors.New("unable to unmarshal conftest output")
+	}
 	if len(outputs) > 0 {
 		postConftestOutput = outputs[(index + 1):]
 	}
