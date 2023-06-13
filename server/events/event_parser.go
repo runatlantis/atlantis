@@ -236,7 +236,7 @@ type EventParsing interface {
 	// headRepo is the repo the merge request branch is from.
 	// user is the pull request author.
 	ParseGitlabMergeRequestCommentEvent(event gitlab.MergeCommentEvent) (
-		baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
+		baseRepo models.Repo, headRepo models.Repo, commentID int, user models.User, err error)
 
 	// ParseGitlabMergeRequest parses the response from the GitLab API endpoint
 	// that returns a merge request.
@@ -672,10 +672,12 @@ func (e *EventParser) ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (pul
 // ParseGitlabMergeRequestCommentEvent parses GitLab merge request comment
 // events.
 // See EventParsing for return value docs.
-func (e *EventParser) ParseGitlabMergeRequestCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+func (e *EventParser) ParseGitlabMergeRequestCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, commentID int, user models.User, err error) {
 	// Parse the base repo first.
+
 	repoFullName := event.Project.PathWithNamespace
 	cloneURL := event.Project.GitHTTPURL
+	commentID = event.ObjectAttributes.ID
 	baseRepo, err = models.NewRepo(models.Gitlab, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
 	if err != nil {
 		return

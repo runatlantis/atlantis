@@ -180,8 +180,10 @@ func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return nil
 }
 
-func (g *GitlabClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error { // nolint: revive
-	return nil
+// ReactToComment adds a reaction to a comment.
+func (g *GitlabClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {
+	_, _, err := g.Client.AwardEmoji.CreateMergeRequestAwardEmojiOnNote(repo.FullName, pullNum, int(commentID), &gitlab.CreateAwardEmojiOptions{Name: reaction})
+	return err
 }
 
 func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
