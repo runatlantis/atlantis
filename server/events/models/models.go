@@ -434,6 +434,8 @@ func (p PlanSuccess) Stats() PlanSuccessStats {
 
 // PolicyCheckResults is the result of a successful policy check run.
 type PolicyCheckResults struct {
+	PreConftestOutput  string
+	PostConftestOutput string
 	// PolicySetResults is the output from policy check binary(conftest|opa)
 	PolicySetResults []PolicySetResult
 	// LockURL is the full URL to the lock held by this policy check.
