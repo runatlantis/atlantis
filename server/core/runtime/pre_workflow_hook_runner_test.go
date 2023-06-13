@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v3"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"

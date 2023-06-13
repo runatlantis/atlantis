@@ -20,7 +20,7 @@ import (
 
 	"strings"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v3"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks/matchers"

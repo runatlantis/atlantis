@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v3"
 	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	tfmatchers "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"

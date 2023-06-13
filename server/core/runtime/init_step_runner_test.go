@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v3"
 	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
