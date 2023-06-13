@@ -8,13 +8,11 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.4.0
 	github.com/briandowns/spinner v1.23.0
 	github.com/cactus/go-statsd-client/v5 v5.0.0
-	github.com/elazarl/go-bindata-assetfs v1.0.1
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-playground/validator/v10 v10.14.1
 	github.com/go-test/deep v1.1.0
 	github.com/golang-jwt/jwt/v5 v5.0.0
-	github.com/google/go-github/v52 v52.0.0
-	github.com/google/go-github/v53 v53.0.0
+	github.com/google/go-github/v53 v53.1.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
@@ -30,7 +28,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/patternmatcher v0.5.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
-	github.com/petergtz/pegomock v2.9.0+incompatible
+	github.com/petergtz/pegomock/v3 v3.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -43,7 +41,7 @@ require (
 	github.com/uber-go/tally/v4 v4.1.7
 	github.com/urfave/negroni/v3 v3.0.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
-	github.com/xanzy/go-gitlab v0.84.0
+	github.com/xanzy/go-gitlab v0.85.0
 	go.etcd.io/bbolt v1.3.7
 	go.uber.org/zap v1.24.0
 	golang.org/x/term v0.8.0
@@ -85,6 +83,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-github/v52 v52.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -105,8 +104,7 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/onsi/ginkgo v1.16.5 // indirect
-	github.com/onsi/gomega v1.24.1 // indirect
+	github.com/onsi/gomega v1.27.6 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.12.1 // indirect

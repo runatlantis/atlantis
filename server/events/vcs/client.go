@@ -26,7 +26,7 @@ type Client interface {
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
 	CreateComment(repo models.Repo, pullNum int, comment string, command string) error
 
-	ReactToComment(repo models.Repo, commentID int64, reaction string) error
+	ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error
 	HidePrevCommandComments(repo models.Repo, pullNum int, command string) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error)
 	PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error)
