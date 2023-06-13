@@ -2,7 +2,7 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v3"
 	"reflect"
 
 	go_gitlab "github.com/xanzy/go-gitlab"

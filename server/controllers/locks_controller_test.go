@@ -18,7 +18,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 
 	"github.com/gorilla/mux"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v3"
 	"github.com/runatlantis/atlantis/server/events"
 
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
