@@ -189,7 +189,7 @@ func TestPost_GithubCommentInvalidCommand(t *testing.T) {
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Ignoring non-command comment: \"\"")
-	vcsClient.VerifyWasCalled(Never()).ReactToComment(models.Repo{}, 1, "eyes")
+	vcsClient.VerifyWasCalled(Never()).ReactToComment(models.Repo{}, 1, 1, "eyes")
 }
 
 func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
@@ -398,7 +398,19 @@ func TestPost_GithubCommentReaction(t *testing.T) {
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
 
-	vcsClient.VerifyWasCalledOnce().ReactToComment(baseRepo, 1, "eyes")
+	vcsClient.VerifyWasCalledOnce().ReactToComment(baseRepo, 1, 1, "eyes")
+}
+
+func TestPost_GilabCommentReaction(t *testing.T) {
+	t.Log("when the event is a gitlab comment with a valid command we call the ReactToComment handler")
+	e, _, gl, _, _, _, _, vcsClient, _ := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(gitlabHeader, "value")
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, "Processing...")
+	vcsClient.VerifyWasCalledOnce().ReactToComment(models.Repo{}, 0, 0, "eyes")
 }
 
 func TestPost_GithubPullRequestInvalid(t *testing.T) {

@@ -35,7 +35,7 @@ func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, co
 func (a *NotConfiguredVCSClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	return nil
 }
-func (a *NotConfiguredVCSClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error { // nolint: revive
+func (a *NotConfiguredVCSClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { // nolint: revive
 	return nil
 }
 func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
