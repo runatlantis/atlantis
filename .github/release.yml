@@ -25,3 +25,6 @@ changelog:
     - title: Dependencies
       labels:
         - dependencies
+    - title: Build
+      labels:
+        - build
