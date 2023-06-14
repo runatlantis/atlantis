@@ -23,8 +23,8 @@ import (
 	"time"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/petergtz/pegomock"
-	. "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v3"
+	. "github.com/petergtz/pegomock/v3"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
 ARG ALPINE_TAG=3.18.0
-ARG DEBIAN_TAG=11.7-slim
+ARG DEBIAN_TAG=12.0-slim
 
 # Stage 1: build artifact and download deps
 
