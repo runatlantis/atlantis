@@ -37,20 +37,18 @@ FROM debian:${DEBIAN_TAG} as debian-base
 # We place this last as it will bust less docker layer caches when packages update
 # hadolint ignore explanation
 # DL3008 (pin versions using "=") - Ignored to avoid failing the build
-# SC2261 (multiple redirections) - This is a bug https://github.com/hadolint/hadolint/issues/782
-# hadolint ignore=DL3008,SC2261
+# hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates>=20210119 \
-        curl>=7.74 \
-        git>=1:2.30 \
-        unzip>=6.0 \
-        bash>=5.1 \
-        openssh-server>=1:8.4p1 \
-        libcap2>=1:2.44 \
-        dumb-init>=1.2 \
-        gnupg>=2.2 \
-        openssl>=1.1.1n && \
+        ca-certificates=20210119 \
+        curl=7.74.0-1.3+deb11u7 \
+        git=1:2.30.2-1+deb11u2 \
+        unzip=6.0-26+deb11u1 \
+        openssh-server=1:8.4p1-5+deb11u1 \
+        libcap2=1:2.44-1 \
+        dumb-init=1.2.5-1 \
+        gnupg=2.2.27-2+deb11u2 \
+        openssl=1.1.1n-0+deb11u4 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
