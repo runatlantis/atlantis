@@ -5,7 +5,7 @@ package mocks
 
 import (
 	go_version "github.com/hashicorp/go-version"
-	pegomock "github.com/petergtz/pegomock/v3"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 	"time"
 )

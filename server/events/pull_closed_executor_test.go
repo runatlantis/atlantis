@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	bolt "go.etcd.io/bbolt"
 
-	. "github.com/petergtz/pegomock/v3"
+	. "github.com/petergtz/pegomock/v4"
 	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"

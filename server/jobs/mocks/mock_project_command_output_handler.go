@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock/v3"
+	pegomock "github.com/petergtz/pegomock/v4"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	jobs "github.com/runatlantis/atlantis/server/jobs"

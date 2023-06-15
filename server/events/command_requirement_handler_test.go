@@ -10,7 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 
-	. "github.com/petergtz/pegomock/v3"
+	. "github.com/petergtz/pegomock/v4"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"

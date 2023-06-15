@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v3"
+	. "github.com/petergtz/pegomock/v4"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
 	"github.com/runatlantis/atlantis/server/events"

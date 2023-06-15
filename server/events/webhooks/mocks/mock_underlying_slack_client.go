@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock/v3"
+	pegomock "github.com/petergtz/pegomock/v4"
 	slack "github.com/slack-go/slack"
 	"reflect"
 	"time"

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v3"
+	. "github.com/petergtz/pegomock/v4"
 	cache_mocks "github.com/runatlantis/atlantis/server/core/runtime/cache/mocks"
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	models_mocks "github.com/runatlantis/atlantis/server/core/runtime/models/mocks"

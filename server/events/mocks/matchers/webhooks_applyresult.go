@@ -2,7 +2,7 @@
 package matchers
 
 import (
-	pegomock "github.com/petergtz/pegomock/v3"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 
 	webhooks "github.com/runatlantis/atlantis/server/events/webhooks"

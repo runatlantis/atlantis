@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v3"
-	pegomock "github.com/petergtz/pegomock/v3"
+	. "github.com/petergtz/pegomock/v4"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/events"
 	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"

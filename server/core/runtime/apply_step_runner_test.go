@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v3"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
