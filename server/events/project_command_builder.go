@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -36,6 +36,8 @@ const (
 	DefaultParallelPlanEnabled = false
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
+	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
+	DefaultAbortOnExcecutionOrderFail = false
 )
 
 func NewInstrumentedProjectCommandBuilder(
@@ -246,7 +248,11 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, 
 }
 
 func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
-	return p.buildAllProjectCommandsByPlan(ctx, cmd)
+	if !cmd.IsForSpecificProject() {
+		return p.buildAllProjectCommandsByPlan(ctx, cmd)
+	}
+	pac, err := p.buildProjectCommand(ctx, cmd)
+	return pac, err
 }
 
 func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
@@ -380,6 +386,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					repoCfg.ParallelApply,
 					repoCfg.ParallelPlan,
 					verbose,
+					repoCfg.AbortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -403,10 +410,12 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			automerge := DefaultAutomergeEnabled
 			parallelApply := DefaultParallelApplyEnabled
 			parallelPlan := DefaultParallelPlanEnabled
+			abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
 			if hasRepoCfg {
 				automerge = repoCfg.Automerge
 				parallelApply = repoCfg.ParallelApply
 				parallelPlan = repoCfg.ParallelPlan
+				abortOnExcecutionOrderFail = repoCfg.AbortOnExcecutionOrderFail
 			}
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)
 
@@ -422,6 +431,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
+					abortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -696,10 +706,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	automerge := DefaultAutomergeEnabled
 	parallelApply := DefaultParallelApplyEnabled
 	parallelPlan := DefaultParallelPlanEnabled
+	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
 		parallelApply = repoCfgPtr.ParallelApply
 		parallelPlan = repoCfgPtr.ParallelPlan
+		abortOnExcecutionOrderFail = *&repoCfgPtr.AbortOnExcecutionOrderFail
 	}
 
 	if len(matchingProjects) > 0 {
@@ -724,6 +736,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					parallelApply,
 					parallelPlan,
 					verbose,
+					abortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -747,6 +760,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				parallelApply,
 				parallelPlan,
 				verbose,
+				abortOnExcecutionOrderFail,
 				p.TerraformExecutor,
 			)...)
 	}

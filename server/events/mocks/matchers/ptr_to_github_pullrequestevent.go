@@ -2,10 +2,10 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v3"
 	"reflect"
 
-	github "github.com/google/go-github/v50/github"
+	github "github.com/google/go-github/v53/github"
 )
 
 func AnyPtrToGithubPullRequestEvent() *github.PullRequestEvent {

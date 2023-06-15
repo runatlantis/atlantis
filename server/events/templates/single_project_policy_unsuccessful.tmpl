@@ -1,0 +1,16 @@
+{{ define "singleProjectPolicyUnsuccessful" -}}
+{{ $result := index .Results 0 -}}
+Ran {{ .Command }} for {{ if $result.ProjectName }}project: `{{ $result.ProjectName }}` {{ end }}dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
+
+{{ $result.Rendered }}
+{{ if ne .DisableApplyAll true }}
+---
+* :heavy_check_mark: To **approve** all unapplied plans from this pull request, comment:
+    * `{{ .ExecutableName }} approve_policies`
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * `{{ .ExecutableName }} unlock`
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * `{{ .ExecutableName }} plan`
+{{ end -}}
+{{- template "log" . -}}
+{{ end -}}

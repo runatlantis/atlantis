@@ -102,6 +102,10 @@ Values are chosen in this order:
   and in links from pull request comments. Defaults to `http://$(hostname):$port`
   where `$port` is from the [`--port`](#port) flag. Supports a basepath if you're hosting Atlantis under a path.
 
+  Notes:
+  * If a load balancer with a non http/https port (not the one defined in the `--port` flag) is used, update the URL to include the port like in the example above.
+   * This URL is used as the `details` link next to each atlantis job to view the job's logs.
+
 ### `--automerge`
   ```bash
   atlantis server --automerge
@@ -367,6 +371,15 @@ and set `--autoplan-modules` to `false`.
   ```
   Stops atlantis from locking projects and or workspaces when running terraform.
 
+### `--emoji-reaction`
+  ```bash
+  atlantis server --emoji-reaction thumbsup
+  # or
+  ATLANTIS_EMOJI_REACTION=thumbsup
+  ```
+  The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab.
+  Defaults to `eyes`.
+
 ### `--enable-policy-checks`
   ```bash
   atlantis server --enable-policy-checks
@@ -607,7 +620,7 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
   ```
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub currently. This is not enabled by default.
+  GitHub and GitLab currently. This is not enabled by default.
 
 ### `--locking-db-type`
   ```bash

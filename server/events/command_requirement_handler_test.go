@@ -10,7 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v3"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -152,6 +152,21 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
 				ProjectPlanStatus: models.ErroredPolicyCheckStatus,
+				ProjectPolicyStatus: []models.PolicySetStatus{
+					{
+						PolicySetName: "policy1",
+						Passed:        false,
+						Approvals:     0,
+					},
+				},
+				PolicySets: valid.PolicySets{
+					PolicySets: []valid.PolicySet{
+						{
+							Name:         "policy1",
+							ApproveCount: 1,
+						},
+					},
+				},
 			},
 			wantFailure: "All policies must pass for project before running apply.",
 			wantErr:     assert.NoError,

@@ -18,6 +18,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"embed"
 	"flag"
 	"fmt"
 	"io"
@@ -33,8 +34,8 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/uber-go/tally"
-	"github.com/uber-go/tally/prometheus"
+	tally "github.com/uber-go/tally/v4"
+	prometheus "github.com/uber-go/tally/v4/prometheus"
 	"github.com/urfave/negroni/v3"
 
 	cfg "github.com/runatlantis/atlantis/server/core/config"
@@ -45,7 +46,6 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
 
-	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
@@ -64,7 +64,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/static"
 )
 
 const (
@@ -148,6 +147,9 @@ type WebhookConfig struct {
 	// slack webhooks. Should be without '#'.
 	Channel string `mapstructure:"channel"`
 }
+
+//go:embed static
+var staticAssets embed.FS
 
 // NewServer returns a new server. If there are issues starting the server or
 // its dependencies an error will be returned. This is like the main() function
@@ -610,6 +612,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
+		VcsClient:        vcsClient,
 		Locker:           projectLocker,
 		LockURLGenerator: router,
 		InitStepRunner: &runtime.InitStepRunner{
@@ -861,6 +864,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
 		RepoAllowlistChecker:            repoAllowlist,
 		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
+		EmojiReaction:                   userConfig.EmojiReaction,
+		ExecutableName:                  userConfig.ExecutableName,
 		SupportedVCSHosts:               supportedVCSHosts,
 		VCSClient:                       vcsClient,
 		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
@@ -918,7 +923,7 @@ func (s *Server) Start() error {
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
-	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
+	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")

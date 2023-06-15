@@ -4,7 +4,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 //go:generate pegomock generate -m --package mocks -o mocks/mock_command_requirement_handler.go CommandRequirementHandler
@@ -48,7 +47,8 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 			}
 		// this should come before mergeability check since mergeability is a superset of this check.
 		case valid.PoliciesPassedCommandReq:
-			if ctx.ProjectPlanStatus == models.ErroredPolicyCheckStatus {
+			// We should rely on this function instead of plan status, since plan status after a failed apply will not carry the policy error over.
+			if !ctx.PolicyCleared() {
 				return "All policies must pass for project before running apply.", nil
 			}
 		case raw.MergeableRequirement:

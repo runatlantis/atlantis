@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 )
 
 type ExecutorService struct {

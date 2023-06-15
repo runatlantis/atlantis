@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v50/github"
+	"github.com/google/go-github/v53/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -33,10 +33,6 @@ import (
 // maxCommentLength is the maximum number of chars allowed in a single comment
 // by GitHub.
 const maxCommentLength = 65536
-
-// Error message GitHub API returns if branch protection is not available
-// in current repository
-const githubBranchProtectionNotAvailable string = "Upgrade to GitHub Pro or make this repository public to enable this feature."
 
 var (
 	clientMutationID            = githubv4.NewString("atlantis")
@@ -200,6 +196,13 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 		}
 	}
 	return nil
+}
+
+// ReactToComment adds a reaction to a comment.
+func (g *GithubClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {
+	g.logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions", repo.Owner, repo.Name, commentID)
+	_, _, err := g.client.Reactions.CreateIssueCommentReaction(g.ctx, repo.Owner, repo.Name, commentID, reaction)
+	return err
 }
 
 func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
@@ -399,7 +402,7 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 		return false, errors.Wrap(err, "getting combined status")
 	}
 
-	//iterate over statuses - return false if we find one that isnt "apply" and doesnt have state = "success"
+	//iterate over statuses - return false if we find one that isn't "apply" and doesn't have state = "success"
 	for _, r := range status.Statuses {
 		if strings.HasPrefix(*r.Context, fmt.Sprintf("%s/%s", vcstatusname, command.Apply.String())) {
 			continue
@@ -574,11 +577,6 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	return err
 }
 
-func isBranchProtectionNotAvailable(err error) bool {
-	errorResponse, ok := err.(*github.ErrorResponse)
-	return ok && errorResponse.Message == githubBranchProtectionNotAvailable
-}
-
 // MergePull merges the pull request.
 func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	// Users can set their repo to disallow certain types of merging.
@@ -588,23 +586,13 @@ func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
 	}
-	protection, _, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner.GetLogin(), *repo.Name, pull.BaseBranch)
-	if err != nil {
-		if !errors.Is(err, github.ErrBranchNotProtected) && !isBranchProtectionNotAvailable(err) {
-			return errors.Wrap(err, "getting branch protection rules")
-		}
-	}
-	requireLinearHistory := false
-	if protection != nil {
-		requireLinearHistory = protection.GetRequireLinearHistory().Enabled
-	}
 	const (
 		defaultMergeMethod = "merge"
 		rebaseMergeMethod  = "rebase"
 		squashMergeMethod  = "squash"
 	)
 	method := defaultMergeMethod
-	if !repo.GetAllowMergeCommit() || requireLinearHistory {
+	if !repo.GetAllowMergeCommit() {
 		if repo.GetAllowRebaseMerge() {
 			method = rebaseMergeMethod
 		} else if repo.GetAllowSquashMerge() {

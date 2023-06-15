@@ -330,6 +330,20 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 					res.ProjectName == proj.ProjectName {
 
 					proj.Status = res.PlanStatus()
+
+					// Updating only policy sets which are included in results; keeping the rest.
+					if len(proj.PolicyStatus) > 0 {
+						for i, oldPolicySet := range proj.PolicyStatus {
+							for _, newPolicySet := range res.PolicyStatus() {
+								if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
+									proj.PolicyStatus[i] = newPolicySet
+								}
+							}
+						}
+					} else {
+						proj.PolicyStatus = res.PolicyStatus()
+					}
+
 					updatedExisting = true
 					break
 				}
@@ -399,9 +413,10 @@ func (r *RedisDB) pullKey(pull models.PullRequest) (string, error) {
 
 func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
 	return models.ProjectStatus{
-		Workspace:   p.Workspace,
-		RepoRelDir:  p.RepoRelDir,
-		ProjectName: p.ProjectName,
-		Status:      p.PlanStatus(),
+		Workspace:    p.Workspace,
+		RepoRelDir:   p.RepoRelDir,
+		ProjectName:  p.ProjectName,
+		PolicyStatus: p.PolicyStatus(),
+		Status:       p.PlanStatus(),
 	}
 }
