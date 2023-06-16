@@ -111,12 +111,12 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 		ctx.HookID = uuid.NewString()
 		shell := hook.Shell
 		if shell == "" {
-			ctx.Log.Debugf("Setting shell to default: %q", shell)
+			ctx.Log.Debug("Setting shell to default: %q", shell)
 			shell = "sh"
 		}
 		shellArgs := hook.ShellArgs
 		if shellArgs == "" {
-			ctx.Log.Debugf("Setting shellArgs to default: %q", shellArgs)
+			ctx.Log.Debug("Setting shellArgs to default: %q", shellArgs)
 			shellArgs = "-c"
 		}
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
