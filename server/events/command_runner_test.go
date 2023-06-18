@@ -16,7 +16,6 @@ package events_test
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -69,11 +68,6 @@ var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
-
-func AnyRepo() models.Repo {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.Repo{})))
-	return models.Repo{}
-}
 
 type TestConfig struct {
 	parallelPoolSize           int

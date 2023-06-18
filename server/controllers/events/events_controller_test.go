@@ -22,7 +22,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -47,11 +46,6 @@ const azuredevopsHeader = "Request-Id"
 
 var user = []byte("user")
 var secret = []byte("secret")
-
-func AnyRepo() models.Repo {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.Repo{})))
-	return models.Repo{}
-}
 
 func TestPost_NotGithubOrGitlab(t *testing.T) {
 	t.Log("when the request is not for gitlab or github a 400 is returned")

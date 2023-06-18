@@ -576,8 +576,8 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(githubGetter.GetPullRequest(AnyRepo(), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
-			When(vcsClient.GetModifiedFiles(AnyRepo(), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
+			When(githubGetter.GetPullRequest(Any[models.Repo](), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -628,7 +628,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				expNumReplies++
 			}
 
-			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
+			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)
@@ -741,8 +741,8 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(githubGetter.GetPullRequest(AnyRepo(), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
-			When(vcsClient.GetModifiedFiles(AnyRepo(), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
+			When(githubGetter.GetPullRequest(Any[models.Repo](), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -801,7 +801,7 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 			// and apply have 1 for each comment plus one for the locks deleted at the
 			// end.
 
-			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(2)).CreateComment(AnyRepo(), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
+			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(2)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, false)
@@ -992,12 +992,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(vcsClient.PullIsMergeable(AnyRepo(), Any[models.PullRequest](), Eq("atlantis-test"))).ThenReturn(true, nil)
-			When(vcsClient.PullIsApproved(AnyRepo(), Any[models.PullRequest]())).ThenReturn(models.ApprovalStatus{
+			When(vcsClient.PullIsMergeable(Any[models.Repo](), Any[models.PullRequest](), Eq("atlantis-test"))).ThenReturn(true, nil)
+			When(vcsClient.PullIsApproved(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(models.ApprovalStatus{
 				IsApproved: true,
 			}, nil)
-			When(githubGetter.GetPullRequest(AnyRepo(), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
-			When(vcsClient.GetModifiedFiles(AnyRepo(), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
+			When(githubGetter.GetPullRequest(Any[models.Repo](), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -1045,7 +1045,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				expNumReplies--
 			}
 
-			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
+			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)

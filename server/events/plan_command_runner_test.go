@@ -128,7 +128,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				timesComment = 0
 			}
 
-			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(AnyRepo(), Any[int](), Any[string](), Any[string]())
+			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 			if c.ExpVCSStatusSet {
 				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 					Any[models.Repo](),
@@ -503,7 +503,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			}
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
-				AnyRepo(), Eq(modelPull.Num), Any[string](), Eq("plan"),
+				Any[models.Repo](), Eq(modelPull.Num), Any[string](), Eq("plan"),
 			)
 		})
 	}
