@@ -251,7 +251,7 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	body, _ := io.ReadAll(w.Result().Body)
 	exp := "Repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), Any[int](), Any[string](), Any[string]())
 
 }
 
@@ -316,7 +316,7 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	body, _ := io.ReadAll(w.Result().Body)
 	exp := "Repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), Any[int](), Any[string](), Any[string]())
 }
 
 func TestPost_GitlabCommentResponse(t *testing.T) {

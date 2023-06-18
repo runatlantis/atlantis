@@ -272,7 +272,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
 	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
-	cp.VerifyWasCalled(Never()).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
+	cp.VerifyWasCalled(Never()).CreateComment(AnyRepo(), Any[int](), Any[string](), Any[string]())
 }
 
 func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
@@ -356,7 +356,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	tmp := t.TempDir()
 	backend, err := db.New(tmp)
 	Ok(t, err)
-	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())).ThenReturn(errors.New("err"))
+	When(cp.CreateComment(AnyRepo(), Any[int](), Any[string](), Any[string]())).ThenReturn(errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),

@@ -129,15 +129,15 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				timesComment = 0
 			}
 
-			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
+			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(AnyRepo(), Any[int](), Any[string](), Any[string]())
 			if c.ExpVCSStatusSet {
 				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
 					matchers.AnyModelsRepo(),
 					matchers.AnyModelsPullRequest(),
 					matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
 					matchers.EqCommandName(command.Plan),
-					EqInt(c.ExpVCSStatusSucc),
-					EqInt(c.ExpVCSStatusTotal),
+					Eq(c.ExpVCSStatusSucc),
+					Eq(c.ExpVCSStatusTotal),
 				)
 			} else {
 				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
@@ -145,8 +145,8 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 					matchers.AnyModelsPullRequest(),
 					matchers.AnyModelsCommitStatus(),
 					matchers.EqCommandName(command.Plan),
-					AnyInt(),
-					AnyInt(),
+					Any[int](),
+					Any[int](),
 				)
 			}
 		})
@@ -504,7 +504,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			}
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
-				AnyRepo(), EqInt(modelPull.Num), AnyString(), EqString("plan"),
+				AnyRepo(), Eq(modelPull.Num), Any[string](), Eq("plan"),
 			)
 		})
 	}

@@ -35,7 +35,7 @@ func TestStateRmStepRunner_Run_Success(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	s := NewStateRmStepRunner(terraform, tfVersion)
 
-	When(terraform.RunCommandWithVersion(runtimematchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), tfmatchers.AnyMapOfStringToString(), tfmatchers.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(runtimematchers.AnyCommandProjectContext(), Any[string](), Any[[]string](), tfmatchers.AnyMapOfStringToString(), tfmatchers.AnyPtrToGoVersionVersion(), Any[string]())).
 		ThenReturn("output", nil)
 	output, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
 	Ok(t, err)
@@ -65,7 +65,7 @@ func TestStateRmStepRunner_Run_Workspace(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	s := NewStateRmStepRunner(terraform, tfVersion)
 
-	When(terraform.RunCommandWithVersion(runtimematchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), runtimematchers.AnyMapOfStringToString(), runtimematchers.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(runtimematchers.AnyCommandProjectContext(), Any[string](), Any[[]string](), runtimematchers.AnyMapOfStringToString(), runtimematchers.AnyPtrToGoVersionVersion(), Any[string]())).
 		ThenReturn("output", nil)
 	output, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
 	Ok(t, err)

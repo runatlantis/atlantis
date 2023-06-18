@@ -137,7 +137,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Equals(t, c.ExpDescription, desc)
 			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 			projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
-				runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(expOut), EqBool(false))
+				runtimematchers.AnyModelsWorkflowHookCommandContext(), Eq(expOut), EqBool(false))
 		})
 	}
 }

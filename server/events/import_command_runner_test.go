@@ -79,7 +79,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 
 			Assert(t, ctx.PullRequestStatus.Mergeable == true, "PullRequestStatus must be set for import_requirements")
 			if tt.expNoComment {
-				vcsClient.VerifyWasCalled(Never()).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
+				vcsClient.VerifyWasCalled(Never()).CreateComment(AnyRepo(), Any[int](), Any[string](), Any[string]())
 			} else {
 				vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, modelPull.Num, tt.expComment, "import")
 			}

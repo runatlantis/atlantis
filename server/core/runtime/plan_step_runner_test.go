@@ -182,11 +182,11 @@ Terraform will perform the following actions:
 	s := runtime.NewPlanStepRunner(terraform, tfVersion, commitStatusUpdater, asyncTfExec)
 	When(terraform.RunCommandWithVersion(
 		matchers.AnyCommandProjectContext(),
-		AnyString(),
-		AnyStringSlice(),
+		Any[string](),
+		Any[[]string](),
 		matchers2.AnyMapOfStringToString(),
 		matchers2.AnyPtrToGoVersionVersion(),
-		AnyString())).
+		Any[string]())).
 		Then(func(params []Param) ReturnValues {
 			// This code allows us to return different values depending on the
 			// tf command being run while still using the wildcard matchers above.
@@ -235,11 +235,11 @@ func TestRun_OutputOnErr(t *testing.T) {
 	expErrMsg := "error!"
 	When(terraform.RunCommandWithVersion(
 		matchers.AnyCommandProjectContext(),
-		AnyString(),
-		AnyStringSlice(),
+		Any[string](),
+		Any[[]string](),
 		matchers2.AnyMapOfStringToString(),
 		matchers2.AnyPtrToGoVersionVersion(),
-		AnyString())).
+		Any[string]())).
 		Then(func(params []Param) ReturnValues {
 			// This code allows us to return different values depending on the
 			// tf command being run while still using the wildcard matchers above.
@@ -296,11 +296,11 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 			asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 			When(terraform.RunCommandWithVersion(
 				matchers.AnyCommandProjectContext(),
-				AnyString(),
-				AnyStringSlice(),
+				Any[string](),
+				Any[[]string](),
 				matchers2.AnyMapOfStringToString(),
 				matchers2.AnyPtrToGoVersionVersion(),
-				AnyString())).ThenReturn("output", nil)
+				Any[string]())).ThenReturn("output", nil)
 
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			s := runtime.NewPlanStepRunner(terraform, tfVersion, commitStatusUpdater, asyncTfExec)
