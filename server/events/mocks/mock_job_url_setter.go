@@ -31,11 +31,11 @@ func (mock *MockJobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cm
 		panic("mock must not be nil. Use myMock := NewMockJobURLSetter().")
 	}
 	params := []pegomock.Param{ctx, cmdName, status, result}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("SetJobURLWithStatus", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	pegomockResult := pegomock.GetGenericMockFrom(mock).Invoke("SetJobURLWithStatus", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(error)
+	if len(pegomockResult) != 0 {
+		if pegomockResult[0] != nil {
+			ret0 = pegomockResult[0].(error)
 		}
 	}
 	return ret0

@@ -31,11 +31,11 @@ func (mock *MockStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName
 		panic("mock must not be nil. Use myMock := NewMockStatusUpdater().")
 	}
 	params := []pegomock.Param{ctx, cmdName, status, url, result}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdateProject", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	pegomockResult := pegomock.GetGenericMockFrom(mock).Invoke("UpdateProject", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(error)
+	if len(pegomockResult) != 0 {
+		if pegomockResult[0] != nil {
+			ret0 = pegomockResult[0].(error)
 		}
 	}
 	return ret0
