@@ -27,7 +27,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -65,17 +64,17 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
-		matchers.AnyLoggingSimpleLogging(),
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
 		Any[string](),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
-		matchers.AnyLoggingSimpleLogging(),
-		matchers.AnyModelsPullRequest(),
-		matchers.AnyModelsUser(),
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
 		Any[string](),
-		matchers.AnyModelsProject(),
+		Any[models.Project](),
 		AnyBool(),
 	)).ThenReturn(&events.TryLockResponse{
 		LockAcquired: true,
@@ -219,8 +218,8 @@ func TestProjectOutputWrapper(t *testing.T) {
 				expCommitStatus = models.FailedCommitStatus
 			}
 
-			When(mockProjectCommandRunner.Plan(matchers.AnyCommandProjectContext())).ThenReturn(prjResult)
-			When(mockProjectCommandRunner.Apply(matchers.AnyCommandProjectContext())).ThenReturn(prjResult)
+			When(mockProjectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(prjResult)
+			When(mockProjectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(prjResult)
 
 			switch c.CommandName {
 			case command.Plan:
@@ -434,8 +433,8 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			}
 			repoDir := t.TempDir()
 			When(mockWorkingDir.GetWorkingDir(
-				matchers.AnyModelsRepo(),
-				matchers.AnyModelsPullRequest(),
+				Any[models.Repo](),
+				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
 
@@ -505,8 +504,8 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	}
 	repoDir := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
 		Any[string](),
 	)).ThenReturn(repoDir, nil)
 
@@ -563,17 +562,17 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
-		matchers.AnyLoggingSimpleLogging(),
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
 		Any[string](),
 	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
-		matchers.AnyLoggingSimpleLogging(),
-		matchers.AnyModelsPullRequest(),
-		matchers.AnyModelsUser(),
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
 		Any[string](),
-		matchers.AnyModelsProject(),
+		Any[models.Project](),
 		AnyBool(),
 	)).ThenReturn(&events.TryLockResponse{
 		LockAcquired: true,
@@ -650,11 +649,11 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			},
 			setup: func(repoDir string, ctx command.ProjectContext, mockLocker *mocks.MockProjectLocker, mockInit *mocks.MockStepRunner, mockImport *mocks.MockStepRunner) {
 				When(mockLocker.TryLock(
-					matchers.AnyLoggingSimpleLogging(),
-					matchers.AnyModelsPullRequest(),
-					matchers.AnyModelsUser(),
+					Any[logging.SimpleLogging](),
+					Any[models.PullRequest](),
+					Any[models.User](),
 					Any[string](),
-					matchers.AnyModelsProject(),
+					Any[models.Project](),
 					AnyBool(),
 				)).ThenReturn(&events.TryLockResponse{
 					LockAcquired: true,
@@ -718,9 +717,9 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			}
 			repoDir := t.TempDir()
 			When(mockWorkingDir.Clone(
-				matchers.AnyLoggingSimpleLogging(),
-				matchers.AnyModelsRepo(),
-				matchers.AnyModelsPullRequest(),
+				Any[logging.SimpleLogging](),
+				Any[models.Repo](),
+				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, false, nil)
 			if c.setup != nil {
@@ -1207,16 +1206,16 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			}
 			repoDir := t.TempDir()
 			When(mockWorkingDir.GetWorkingDir(
-				matchers.AnyModelsRepo(),
-				matchers.AnyModelsPullRequest(),
+				Any[models.Repo](),
+				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
 			When(mockLocker.TryLock(
-				matchers.AnyLoggingSimpleLogging(),
-				matchers.AnyModelsPullRequest(),
-				matchers.AnyModelsUser(),
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
 				Any[string](),
-				matchers.AnyModelsProject(),
+				Any[models.Project](),
 				AnyBool(),
 			)).ThenReturn(&events.TryLockResponse{
 				LockAcquired: true,

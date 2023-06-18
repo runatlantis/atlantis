@@ -9,7 +9,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -132,19 +131,19 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(AnyRepo(), Any[int](), Any[string](), Any[string]())
 			if c.ExpVCSStatusSet {
 				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-					matchers.AnyModelsRepo(),
-					matchers.AnyModelsPullRequest(),
-					matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-					matchers.EqCommandName(command.Plan),
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Eq[models.CommitStatus](models.SuccessCommitStatus),
+					Eq[command.Name](command.Plan),
 					Eq(c.ExpVCSStatusSucc),
 					Eq(c.ExpVCSStatusTotal),
 				)
 			} else {
 				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-					matchers.AnyModelsRepo(),
-					matchers.AnyModelsPullRequest(),
-					matchers.AnyModelsCommitStatus(),
-					matchers.EqCommandName(command.Plan),
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Any[models.CommitStatus](),
+					Eq[command.Name](command.Plan),
 					Any[int](),
 					Any[int](),
 				)

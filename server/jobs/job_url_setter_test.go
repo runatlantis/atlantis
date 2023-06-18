@@ -9,7 +9,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/jobs/mocks"
-	"github.com/runatlantis/atlantis/server/jobs/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +24,7 @@ func TestJobURLSetter(t *testing.T) {
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
 		result := &command.ProjectResult{}
 
-		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqCommandProjectContext(ctx))).ThenReturn(url, nil)
+		When(projectJobURLGenerator.GenerateProjectJobURL(Eq[command.ProjectContext](ctx))).ThenReturn(url, nil)
 		When(projectStatusUpdater.UpdateProject(ctx, command.Plan, models.PendingCommitStatus, url, nil)).ThenReturn(nil)
 		err := jobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus, result)
 		Ok(t, err)
@@ -39,7 +38,7 @@ func TestJobURLSetter(t *testing.T) {
 		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
 
-		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqCommandProjectContext(ctx))).ThenReturn("url-to-project-jobs", errors.New("some error"))
+		When(projectJobURLGenerator.GenerateProjectJobURL(Eq[command.ProjectContext](ctx))).ThenReturn("url-to-project-jobs", errors.New("some error"))
 		err := jobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus, nil)
 		assert.Error(t, err)
 	})

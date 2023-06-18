@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -73,7 +72,7 @@ func TestShellCommandRunner_Run(t *testing.T) {
 			output, err = runner.Run(ctx)
 			Ok(t, err)
 			Equals(t, expectedOutput, output)
-			projectCmdOutputHandler.VerifyWasCalled(Never()).Send(matchers.AnyCommandProjectContext(), Any[string](), EqBool(false))
+			projectCmdOutputHandler.VerifyWasCalled(Never()).Send(Any[command.ProjectContext](), Any[string](), Eq(false))
 
 			log.VerifyWasCalled(Twice()).With(Eq("duration"), Any[interface{}]())
 		})

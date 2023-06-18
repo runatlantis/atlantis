@@ -25,17 +25,14 @@ import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
-	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	vcsmatchers "github.com/runatlantis/atlantis/server/events/vcs/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -580,7 +577,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
 			When(githubGetter.GetPullRequest(AnyRepo(), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
-			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(AnyRepo(), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -613,9 +610,9 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			expNumHooks := len(c.Comments) + 1 - c.ExpParseFailedCount
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), Eq("some dummy command"), Any[string]())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](), Eq("some dummy command"), Any[string]())
 			// Let's verify the post-workflow hook was called for each comment including the pull request opened event
-			mockPostWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), Eq("some post dummy command"), Any[string]())
+			mockPostWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](), Eq("some post dummy command"), Any[string]())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -639,9 +636,9 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalledOnce().MergePull(Any[models.PullRequest](), Any[models.PullRequestOptions]())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalled(Never()).MergePull(Any[models.PullRequest](), Any[models.PullRequestOptions]())
 			}
 		})
 	}
@@ -745,7 +742,7 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
 			When(githubGetter.GetPullRequest(AnyRepo(), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
-			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(AnyRepo(), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -797,7 +794,7 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 			}
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), Eq("some dummy command"), Any[string]())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(Any[models.WorkflowHookCommandContext](), Eq("some dummy command"), Any[string]())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -995,12 +992,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest(), Eq("atlantis-test"))).ThenReturn(true, nil)
-			When(vcsClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(models.ApprovalStatus{
+			When(vcsClient.PullIsMergeable(AnyRepo(), Any[models.PullRequest](), Eq("atlantis-test"))).ThenReturn(true, nil)
+			When(vcsClient.PullIsApproved(AnyRepo(), Any[models.PullRequest]())).ThenReturn(models.ApprovalStatus{
 				IsApproved: true,
 			}, nil)
 			When(githubGetter.GetPullRequest(AnyRepo(), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
-			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(AnyRepo(), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -1056,9 +1053,9 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalledOnce().MergePull(Any[models.PullRequest](), Any[models.PullRequestOptions]())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalled(Never()).MergePull(Any[models.PullRequest](), Any[models.PullRequestOptions]())
 			}
 		})
 	}

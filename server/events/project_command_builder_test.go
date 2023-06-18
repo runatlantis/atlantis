@@ -14,7 +14,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -125,7 +124,7 @@ projects:
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -135,9 +134,9 @@ projects:
 			})
 
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(tmpDir, false, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 			if c.AtlantisYAML != "" {
 				err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
@@ -423,10 +422,10 @@ projects:
 				})
 
 				workingDir := mocks.NewMockWorkingDir()
-				When(workingDir.Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(tmpDir, false, nil)
-				When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(tmpDir, nil)
+				When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
+				When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 				vcsClient := vcsmocks.NewMockClient()
-				When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+				When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 				if c.AtlantisYAML != "" {
 					err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 					Ok(t, err)
@@ -440,7 +439,7 @@ projects:
 				}
 
 				terraformClient := terraform_mocks.NewMockClient()
-				When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+				When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 				builder := events.NewProjectCommandBuilder(
 					false,
@@ -605,10 +604,10 @@ projects:
 			tmpDir := DirStructure(t, c.DirectoryStructure)
 
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(tmpDir, false, nil)
-			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(tmpDir, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
+			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
 				err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
@@ -622,7 +621,7 @@ projects:
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+			When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -791,10 +790,10 @@ projects:
 			tmpDir := DirStructure(t, c.DirStructure)
 
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(tmpDir, false, nil)
-			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(tmpDir, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
+			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
 				err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
@@ -808,7 +807,7 @@ projects:
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+			When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -892,8 +891,8 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.GetPullDir(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest())).
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
 		ThenReturn(tmpDir, nil)
 
 	logger := logging.NewNoopLogger(t)
@@ -907,7 +906,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -979,13 +978,13 @@ projects:
 	Ok(t, err)
 
 	When(workingDir.Clone(
-		matchers.AnyLoggingSimpleLogging(),
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, false, nil)
 	When(workingDir.GetWorkingDir(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
@@ -997,7 +996,7 @@ projects:
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1069,10 +1068,10 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			})
 
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(tmpDir, false, nil)
-			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(tmpDir, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
+			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:  true,
@@ -1082,7 +1081,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+			When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1219,18 +1218,18 @@ projects:
 			tmpDir := DirStructure(t, testCase.DirStructure)
 
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(testCase.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(testCase.ModifiedFiles, nil)
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(
-				matchers.AnyLoggingSimpleLogging(),
-				matchers.AnyModelsRepo(),
-				matchers.AnyModelsPullRequest(),
+				Any[logging.SimpleLogging](),
+				Any[models.Repo](),
+				Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmpDir, false, nil)
 
 			When(workingDir.GetWorkingDir(
-				matchers.AnyModelsRepo(),
-				matchers.AnyModelsPullRequest(),
+				Any[models.Repo](),
+				Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmpDir, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
@@ -1241,7 +1240,7 @@ projects:
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.DetectVersion(matchers.AnyLoggingSimpleLogging(), Any[string]())).Then(func(params []Param) ReturnValues {
+			When(terraformClient.DetectVersion(Any[logging.SimpleLogging](), Any[string]())).Then(func(params []Param) ReturnValues {
 				projectName := filepath.Base(params[1].(string))
 				testVersion := testCase.Exp[projectName]
 				if testVersion != "" {
@@ -1328,9 +1327,9 @@ parallel_plan: true`,
 	for _, c := range cases {
 		RegisterMockTestingT(t)
 		vcsClient := vcsmocks.NewMockClient()
-		When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
-		When(vcsClient.SupportsSingleFileDownload(matchers.AnyModelsRepo())).ThenReturn(true)
-		When(vcsClient.GetFileContent(matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
+		When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
+		When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(true)
+		When(vcsClient.GetFileContent(Any[models.PullRequest](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
 		workingDir := mocks.NewMockWorkingDir()
 
 		logger := logging.NewNoopLogger(t)
@@ -1343,7 +1342,7 @@ parallel_plan: true`,
 		}
 		scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 		terraformClient := terraform_mocks.NewMockClient()
-		When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+		When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 		builder := events.NewProjectCommandBuilder(
 			false,
@@ -1380,7 +1379,7 @@ parallel_plan: true`,
 		})
 		Ok(t, err)
 		Equals(t, c.ExpectedCtxs, len(actCtxs))
-		workingDir.VerifyWasCalled(c.ExpectedClones).Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())
+		workingDir.VerifyWasCalled(c.ExpectedClones).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
 	}
 }
 
@@ -1394,9 +1393,9 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	workingDir := mocks.NewMockWorkingDir()
-	When(workingDir.Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), Any[string]())).ThenReturn(tmpDir, false, nil)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
 	vcsClient := vcsmocks.NewMockClient()
-	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+	When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg:  false,
@@ -1407,7 +1406,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 
 	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		true,
@@ -1480,8 +1479,8 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.GetPullDir(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest())).
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
 		ThenReturn(tmpDir, nil)
 
 	logger := logging.NewNoopLogger(t)
@@ -1494,7 +1493,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		UnDivergedReq: false,
 	}
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(matchers.AnyLoggingSimpleLogging())).ThenReturn([]string{}, nil)
+	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
