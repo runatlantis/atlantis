@@ -25,11 +25,11 @@ func NewMockPostWorkflowHookRunner(options ...pegomock.Option) *MockPostWorkflow
 func (mock *MockPostWorkflowHookRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPostWorkflowHookRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPostWorkflowHookRunner) Run(_param0 models.WorkflowHookCommandContext, _param1 string, _param2 string) (string, string, error) {
+func (mock *MockPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPostWorkflowHookRunner().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2}
+	params := []pegomock.Param{ctx, command, path}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 string
@@ -85,8 +85,8 @@ type VerifierMockPostWorkflowHookRunner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockPostWorkflowHookRunner) Run(_param0 models.WorkflowHookCommandContext, _param1 string, _param2 string) *MockPostWorkflowHookRunner_Run_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2}
+func (verifier *VerifierMockPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) *MockPostWorkflowHookRunner_Run_OngoingVerification {
+	params := []pegomock.Param{ctx, command, path}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
 	return &MockPostWorkflowHookRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -97,8 +97,8 @@ type MockPostWorkflowHookRunner_Run_OngoingVerification struct {
 }
 
 func (c *MockPostWorkflowHookRunner_Run_OngoingVerification) GetCapturedArguments() (models.WorkflowHookCommandContext, string, string) {
-	_param0, _param1, _param2 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
+	ctx, command, path := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], command[len(command)-1], path[len(path)-1]
 }
 
 func (c *MockPostWorkflowHookRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.WorkflowHookCommandContext, _param1 []string, _param2 []string) {

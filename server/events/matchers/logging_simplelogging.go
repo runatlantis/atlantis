@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
+
+	pegomock "github.com/petergtz/pegomock/v4"
 
 	logging "github.com/runatlantis/atlantis/server/logging"
 )

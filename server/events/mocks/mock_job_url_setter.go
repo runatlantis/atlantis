@@ -26,11 +26,11 @@ func NewMockJobURLSetter(options ...pegomock.Option) *MockJobURLSetter {
 func (mock *MockJobURLSetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockJobURLSetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockJobURLSetter) SetJobURLWithStatus(_param0 command.ProjectContext, _param1 command.Name, _param2 models.CommitStatus, _param3 *command.ProjectResult) error {
+func (mock *MockJobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, result *command.ProjectResult) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockJobURLSetter().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2, _param3}
+	params := []pegomock.Param{ctx, cmdName, status, result}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("SetJobURLWithStatus", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -78,8 +78,8 @@ type VerifierMockJobURLSetter struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockJobURLSetter) SetJobURLWithStatus(_param0 command.ProjectContext, _param1 command.Name, _param2 models.CommitStatus, _param3 *command.ProjectResult) *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2, _param3}
+func (verifier *VerifierMockJobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, result *command.ProjectResult) *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification {
+	params := []pegomock.Param{ctx, cmdName, status, result}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "SetJobURLWithStatus", params, verifier.timeout)
 	return &MockJobURLSetter_SetJobURLWithStatus_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -90,8 +90,8 @@ type MockJobURLSetter_SetJobURLWithStatus_OngoingVerification struct {
 }
 
 func (c *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification) GetCapturedArguments() (command.ProjectContext, command.Name, models.CommitStatus, *command.ProjectResult) {
-	_param0, _param1, _param2, _param3 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1], _param3[len(_param3)-1]
+	ctx, cmdName, status, result := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], cmdName[len(cmdName)-1], status[len(status)-1], result[len(result)-1]
 }
 
 func (c *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []command.Name, _param2 []models.CommitStatus, _param3 []*command.ProjectResult) {
