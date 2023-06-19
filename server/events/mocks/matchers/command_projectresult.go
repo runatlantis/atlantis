@@ -2,7 +2,7 @@
 package matchers
 
 import (
-	pegomock "github.com/petergtz/pegomock/v3"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 
 	command "github.com/runatlantis/atlantis/server/events/command"

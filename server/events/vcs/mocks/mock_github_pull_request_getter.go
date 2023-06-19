@@ -5,7 +5,7 @@ package mocks
 
 import (
 	github "github.com/google/go-github/v53/github"
-	pegomock "github.com/petergtz/pegomock/v3"
+	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"

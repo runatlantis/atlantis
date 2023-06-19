@@ -6,7 +6,7 @@ package mocks
 import (
 	github "github.com/google/go-github/v53/github"
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
-	pegomock "github.com/petergtz/pegomock/v3"
+	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	go_gitlab "github.com/xanzy/go-gitlab"
 	"reflect"
