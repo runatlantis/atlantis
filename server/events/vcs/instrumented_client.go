@@ -29,7 +29,7 @@ func NewInstrumentedGithubClient(client *GithubClient, statsScope tally.Scope, l
 	}
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_github_pull_request_getter.go GithubPullRequestGetter
+//go:generate pegomock generate --package mocks -o mocks/mock_github_pull_request_getter.go GithubPullRequestGetter
 
 type GithubPullRequestGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
@@ -128,7 +128,7 @@ func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, commen
 	return nil
 }
 
-func (c *InstrumentedClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error {
+func (c *InstrumentedClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {
 	scope := c.StatsScope.SubScope("react_to_comment")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
@@ -137,7 +137,7 @@ func (c *InstrumentedClient) ReactToComment(repo models.Repo, commentID int64, r
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	if err := c.Client.ReactToComment(repo, commentID, reaction); err != nil {
+	if err := c.Client.ReactToComment(repo, pullNum, commentID, reaction); err != nil {
 		executionError.Inc(1)
 		c.Logger.Err("Unable to react to comment, error: %s", err.Error())
 		return err

@@ -4,12 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/petergtz/pegomock"
+	"github.com/hashicorp/go-version"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -92,7 +90,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 
 		RegisterMockTestingT(t)
 		terraform := mocks.NewMockClient()
-		When(terraform.EnsureVersion(matchers.AnyLoggingSimpleLogging(), matchers2.AnyPtrToGoVersionVersion())).
+		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[*version.Version]())).
 			ThenReturn(nil)
 
 		logger := logging.NewNoopLogger(t)
@@ -137,7 +135,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Equals(t, c.ExpDescription, desc)
 			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 			projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
-				runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(expOut), EqBool(false))
+				Any[models.WorkflowHookCommandContext](), Eq(expOut), Eq(false))
 		})
 	}
 }

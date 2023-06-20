@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime/cache/mocks"
 	models_mocks "github.com/runatlantis/atlantis/server/core/runtime/models/mocks"
@@ -37,10 +37,10 @@ func TestConfTestVersionDownloader(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 
-		When(mockDownloader.GetFile(EqString(destPath), EqString(fullURL))).ThenReturn(nil)
+		When(mockDownloader.GetFile(Eq(destPath), Eq(fullURL))).ThenReturn(nil)
 		binPath, err := subject.downloadConfTestVersion(version, destPath)
 
-		mockDownloader.VerifyWasCalledOnce().GetAny(EqString(destPath), EqString(fullURL))
+		mockDownloader.VerifyWasCalledOnce().GetAny(Eq(destPath), Eq(fullURL))
 
 		Ok(t, err)
 
@@ -49,7 +49,7 @@ func TestConfTestVersionDownloader(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 
-		When(mockDownloader.GetAny(EqString(destPath), EqString(fullURL))).ThenReturn(errors.New("err"))
+		When(mockDownloader.GetAny(Eq(destPath), Eq(fullURL))).ThenReturn(errors.New("err"))
 		_, err := subject.downloadConfTestVersion(version, destPath)
 
 		Assert(t, err != nil, "err is expected")
@@ -73,7 +73,7 @@ func TestEnsureExecutorVersion(t *testing.T) {
 			Exec:         mockExec,
 		}
 
-		When(mockExec.LookPath(AnyString())).ThenReturn("", errors.New("not found"))
+		When(mockExec.LookPath(Any[string]())).ThenReturn("", errors.New("not found"))
 		_, err := subject.EnsureExecutorVersion(log, nil)
 
 		Assert(t, err != nil, "expected error finding version")
@@ -84,7 +84,7 @@ func TestEnsureExecutorVersion(t *testing.T) {
 			VersionCache: mockCache,
 			Exec:         mockExec,
 		}
-		When(mockExec.LookPath(AnyString())).ThenReturn(expectedPath, nil)
+		When(mockExec.LookPath(Any[string]())).ThenReturn(expectedPath, nil)
 		path, err := subject.EnsureExecutorVersion(log, nil)
 		Ok(t, err)
 		Assert(t, path == expectedPath, "path is expected")
