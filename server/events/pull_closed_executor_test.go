@@ -24,12 +24,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	bolt "go.etcd.io/bbolt"
 
-	. "github.com/petergtz/pegomock/v3"
+	. "github.com/petergtz/pegomock/v4"
 	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -93,7 +92,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
 	err = pce.CleanUpPull(testdata.GithubRepo, testdata.Pull)
 	Ok(t, err)
-	cp.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	cp.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
 func TestCleanUpPullComments(t *testing.T) {
@@ -179,7 +178,7 @@ func TestCleanUpPullComments(t *testing.T) {
 			When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(c.Locks, nil)
 			err = pce.CleanUpPull(testdata.GithubRepo, testdata.Pull)
 			Ok(t, err)
-			_, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString()).GetCapturedArguments()
+			_, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
 
 			expected := "Locks and plans deleted for the projects and workspaces modified in this pull request:\n\n" + c.Exp
 			Equals(t, expected, comment)
@@ -272,7 +271,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		Ok(t, err)
 
 		close(prjCmdOutput)
-		_, _, comment, _ := client.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString()).GetCapturedArguments()
+		_, _, comment, _ := client.VerifyWasCalledOnce().CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
 		expectedComment := "Locks and plans deleted for the projects and workspaces modified in this pull request:\n\n" + "- dir: `.` workspace: `default`"
 		Equals(t, expectedComment, comment)
 
