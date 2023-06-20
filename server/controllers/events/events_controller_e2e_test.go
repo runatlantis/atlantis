@@ -894,6 +894,21 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			},
 		},
 		{
+			Description:   "failing policy without policies passing and custom run steps",
+			RepoDir:       "policy-checks-custom-run-steps",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
 			Description:   "failing policy additional apply requirements specified",
 			RepoDir:       "policy-checks-apply-reqs",
 			ModifiedFiles: []string{"main.tf"},
