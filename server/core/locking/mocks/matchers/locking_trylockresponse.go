@@ -2,7 +2,7 @@
 package matchers
 
 import (
-	"github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v3"
 	"reflect"
 
 	locking "github.com/runatlantis/atlantis/server/core/locking"

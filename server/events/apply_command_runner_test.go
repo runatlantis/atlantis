@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v52/github"
-	. "github.com/petergtz/pegomock"
+	"github.com/google/go-github/v53/github"
+	. "github.com/petergtz/pegomock/v3"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
@@ -437,12 +437,12 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "Don't block when abortOnExcecutionOrderFail is not set",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
+					ExecutionOrderGroup: 0,
+					ProjectName:         "First",
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Second",
+					ExecutionOrderGroup: 1,
+					ProjectName:         "Second",
 				},
 			},
 			ProjectResults: []command.ProjectResult{

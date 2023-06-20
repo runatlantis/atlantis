@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v3"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	runtime_mocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"

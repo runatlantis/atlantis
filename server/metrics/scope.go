@@ -5,13 +5,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cactus/go-statsd-client/statsd"
+	"github.com/cactus/go-statsd-client/v5/statsd"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
-	tallyprom "github.com/uber-go/tally/prometheus"
-	tallystatsd "github.com/uber-go/tally/statsd"
+	tally "github.com/uber-go/tally/v4"
+	tallyprom "github.com/uber-go/tally/v4/prometheus"
+	tallystatsd "github.com/uber-go/tally/v4/statsd"
 )
 
 func NewLoggingScope(logger logging.SimpleLogging, statsNamespace string) (tally.Scope, io.Closer, error) {

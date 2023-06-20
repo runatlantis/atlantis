@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v3"
 	models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"reflect"
 	"time"

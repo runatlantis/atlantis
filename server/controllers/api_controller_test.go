@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v3"
 	"github.com/runatlantis/atlantis/server/controllers"
 	. "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"

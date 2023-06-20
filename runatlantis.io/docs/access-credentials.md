@@ -51,6 +51,10 @@ Available in Atlantis versions **newer** than 0.13.0.
 Only a single installation per GitHub App is supported at the moment.
 :::
 
+::: tip NOTE
+GitHub App handles the webhook calls by itself, hence there is no need to create wehbooks separately. If webhooks were created manually, those should be removed when using GitHub App. Otherwise, there would be 2 calls to Atlantis resulting in locking errors on path/workspace.
+:::
+
 #### Permissions
 
 GitHub App needs these permissions. These are automatically set when a GitHub app is created.

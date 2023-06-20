@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
-ARG ALPINE_TAG=3.18.0
-ARG DEBIAN_TAG=11.7-slim
+ARG ALPINE_TAG=3.18.2
+ARG DEBIAN_TAG=12.0-slim
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.20.4-alpine AS builder
+FROM golang:1.20.5-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -62,7 +62,7 @@ WORKDIR /tmp/build
 
 # install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV DEFAULT_CONFTEST_VERSION=0.43.0
+ENV DEFAULT_CONFTEST_VERSION=0.43.1
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
     case ${TARGETPLATFORM} in \
@@ -123,10 +123,11 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.4.6
+ENV DEFAULT_TERRAFORM_VERSION=1.5.0
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
-RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
+# Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
+RUN AVAILABLE_TERRAFORM_VERSIONS="1.2.9 1.3.9 1.4.6 ${DEFAULT_TERRAFORM_VERSION}" && \
     case "${TARGETPLATFORM}" in \
         "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
         "linux/arm64") TERRAFORM_ARCH=arm64 ;; \

@@ -130,7 +130,7 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	return nil
 }
 
-func (g *AzureDevopsClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error { //nolint: revive
+func (g *AzureDevopsClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { //nolint: revive
 	return nil
 }
 
