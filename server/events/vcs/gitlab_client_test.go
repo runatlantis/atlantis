@@ -6,10 +6,13 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path"
+	"strings"
 	"testing"
 	"time"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	gitlab "github.com/xanzy/go-gitlab"
@@ -427,6 +430,123 @@ func TestGitlabClient_MarkdownPullLink(t *testing.T) {
 	s, _ := client.MarkdownPullLink(pull)
 	exp := "!1"
 	Equals(t, exp, s)
+}
+
+func TestGitlabClient_HideOldComments(t *testing.T) {
+	type notePutCallDetails struct {
+		noteID  string
+		comment []string
+	}
+	type jsonBody struct {
+		Body string
+	}
+
+	authorID := 1
+	authorUserName := "pipin"
+	authorEmail := "admin@example.com"
+	pullNum := 123
+
+	userCommentIDs := [1]string{"1"}
+	planCommentIDs := [2]string{"3", "5"}
+	systemCommentIDs := [1]string{"4"}
+	summaryCommentIDs := [1]string{"2"}
+	planComments := [3]string{"plan comment 1", "plan comment 2", "plan comment 3"}
+	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>",
+		command.Plan.TitleString())
+	summaryFooter := "</details>"
+	lineFeed := "\\n"
+
+	issueResp := "[" +
+		fmt.Sprintf(`{"id":%s,"body":"User comment","author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
+			userCommentIDs[0], authorID, authorUserName, authorEmail, pullNum) + "," +
+		fmt.Sprintf(`{"id":%s,"body":"%s","author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
+			summaryCommentIDs[0], summaryHeader+lineFeed+planComments[2]+lineFeed+summaryFooter, authorID, authorUserName, authorEmail, pullNum) + "," +
+		fmt.Sprintf(`{"id":%s,"body":"%s","author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
+			planCommentIDs[0], planComments[0], authorID, authorUserName, authorEmail, pullNum) + "," +
+		fmt.Sprintf(`{"id":%s,"body":"System comment","author":{"id": %d, "username":"%s", "email":"%s"},"system": true,"project_id": %d}`,
+			systemCommentIDs[0], authorID, authorUserName, authorEmail, pullNum) + "," +
+		fmt.Sprintf(`{"id":%s,"body":"%s","author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
+			planCommentIDs[1], planComments[1], authorID, authorUserName, authorEmail, pullNum) +
+		"]"
+
+	gitlabClientUnderTest = true
+	defer func() { gitlabClientUnderTest = false }()
+	gotNotePutCalls := make([]notePutCallDetails, 0, 1)
+	testServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case "GET":
+				switch r.RequestURI {
+				case "/api/v4/user":
+					w.WriteHeader(http.StatusOK)
+					w.Header().Set("Content-Type", "application/json")
+					response := fmt.Sprintf(`{"id": %d,"username": "%s", "email": "%s"}`, authorID, authorUserName, authorEmail)
+					w.Write([]byte(response)) // nolint: errcheck
+				case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%d/notes?order_by=created_at&sort=asc", pullNum):
+					w.WriteHeader(http.StatusOK)
+					response := issueResp
+					w.Write([]byte(response)) // nolint: errcheck
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+				}
+			case "PUT":
+				switch {
+				case strings.HasPrefix(r.RequestURI, fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%d/notes/", pullNum)):
+					w.WriteHeader(http.StatusOK)
+					var body jsonBody
+					json.NewDecoder(r.Body).Decode(&body)
+					notePutCallDetail := notePutCallDetails{
+						noteID:  path.Base(r.RequestURI),
+						comment: strings.Split(body.Body, "\n"),
+					}
+					gotNotePutCalls = append(gotNotePutCalls, notePutCallDetail)
+					response := "{}"
+					w.Write([]byte(response)) // nolint: errcheck
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+				}
+			default:
+				t.Errorf("got unexpected method at %q", r.Method)
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		}),
+	)
+
+	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+	Ok(t, err)
+	client := &GitlabClient{
+		Client:  internalClient,
+		Version: nil,
+		logger:  logging.NewNoopLogger(t),
+	}
+
+	repo := models.Repo{
+		FullName: "runatlantis/atlantis",
+		Owner:    "runatlantis",
+		Name:     "atlantis",
+		VCSHost: models.VCSHost{
+			Type:     models.Gitlab,
+			Hostname: "gitlab.com",
+		},
+	}
+
+	err = client.HidePrevCommandComments(repo, pullNum, command.Plan.TitleString())
+	Ok(t, err)
+
+	// Check the correct number of plan comments have been processed
+	Equals(t, len(planCommentIDs), len(gotNotePutCalls))
+	// Check the first plan comment has been currectly summarised
+	Equals(t, planCommentIDs[0], gotNotePutCalls[0].noteID)
+	Equals(t, summaryHeader, gotNotePutCalls[0].comment[0])
+	Equals(t, planComments[0], gotNotePutCalls[0].comment[1])
+	Equals(t, summaryFooter, gotNotePutCalls[0].comment[2])
+	// Check the second plan comment has been currectly summarised
+	Equals(t, planCommentIDs[1], gotNotePutCalls[1].noteID)
+	Equals(t, summaryHeader, gotNotePutCalls[1].comment[0])
+	Equals(t, planComments[1], gotNotePutCalls[1].comment[1])
+	Equals(t, summaryFooter, gotNotePutCalls[1].comment[2])
 }
 
 var mergeSuccess = `{"id":22461274,"iid":13,"project_id":4580910,"title":"Update main.tf","description":"","state":"merged","created_at":"2019-01-15T18:27:29.375Z","updated_at":"2019-01-25T17:28:01.437Z","merged_by":{"id":1755902,"name":"Luke Kysow","username":"lkysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80\u0026d=identicon","web_url":"https://gitlab.com/lkysow"},"merged_at":"2019-01-25T17:28:01.459Z","closed_by":null,"closed_at":null,"target_branch":"patch-1","source_branch":"patch-1-merger","upvotes":0,"downvotes":0,"author":{"id":1755902,"name":"Luke Kysow","username":"lkysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80\u0026d=identicon","web_url":"https://gitlab.com/lkysow"},"assignee":null,"source_project_id":4580910,"target_project_id":4580910,"labels":[],"work_in_progress":false,"milestone":null,"merge_when_pipeline_succeeds":false,"merge_status":"can_be_merged","detailed_merge_status":"mergeable","sha":"cb86d70f464632bdfbe1bb9bc0f2f9d847a774a0","merge_commit_sha":"c9b336f1c71d3e64810b8cfa2abcfab232d6bff6","user_notes_count":0,"discussion_locked":null,"should_remove_source_branch":null,"force_remove_source_branch":false,"web_url":"https://gitlab.com/lkysow/atlantis-example/merge_requests/13","time_stats":{"time_estimate":0,"total_time_spent":0,"human_time_estimate":null,"human_total_time_spent":null},"squash":false,"subscribed":true,"changes_count":"1","latest_build_started_at":null,"latest_build_finished_at":null,"first_deployed_to_production_at":null,"pipeline":null,"diff_refs":{"base_sha":"67cb91d3f6198189f433c045154a885784ba6977","head_sha":"cb86d70f464632bdfbe1bb9bc0f2f9d847a774a0","start_sha":"67cb91d3f6198189f433c045154a885784ba6977"},"merge_error":null,"approvals_before_merge":null}`

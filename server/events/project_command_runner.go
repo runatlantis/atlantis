@@ -485,14 +485,30 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		}
 	}
 
+	// Separate output from custom run steps
+	var index int
+	var preConftestOutput []string
+	var postConftestOutput []string
 	var policySetResults []models.PolicySetResult
-	err = json.Unmarshal([]byte(strings.Join(outputs, "\n")), &policySetResults)
-	if err != nil {
-		return nil, "", err
+	for i, output := range outputs {
+		index = i
+		err = json.Unmarshal([]byte(strings.Join([]string{output}, "\n")), &policySetResults)
+		if err == nil {
+			break
+		}
+		preConftestOutput = append(preConftestOutput, output)
+	}
+	if policySetResults == nil {
+		return nil, "", errors.New("unable to unmarshal conftest output")
+	}
+	if len(outputs) > 0 {
+		postConftestOutput = outputs[(index + 1):]
 	}
 
 	result := &models.PolicyCheckResults{
 		LockURL:            p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		PreConftestOutput:  strings.Join(preConftestOutput, "\n"),
+		PostConftestOutput: strings.Join(postConftestOutput, "\n"),
 		PolicySetResults:   policySetResults,
 		RePlanCmd:          ctx.RePlanCmd,
 		ApplyCmd:           ctx.ApplyCmd,
