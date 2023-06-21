@@ -32,6 +32,8 @@ func TestMultiEnvStepRunner_Run_parser(t *testing.T) {
 			`FOO="bar",QUUX='baz'`: {"FOO", "bar", "QUUX", "baz"},
 			`FOO='bar',QUUX="baz"`: {"FOO", "bar", "QUUX", "baz"},
 
+			"FOO=\"bar\nbaz\"": {"FOO", "bar\nbaz"},
+
 			`KEY="foo='bar',lorem=ipsum"`: {"KEY", "foo='bar',lorem=ipsum"},
 			`FOO=bar,QUUX="lorem ipsum"`:  {"FOO", "bar", "QUUX", "lorem ipsum"},
 
