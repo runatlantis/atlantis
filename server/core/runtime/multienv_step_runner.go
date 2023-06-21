@@ -29,19 +29,18 @@ func (r *MultiEnvStepRunner) Run(ctx command.ProjectContext, command string, pat
 	var sb strings.Builder
 	sb.WriteString("Dynamic environment variables added:\n")
 
-	envVars := strings.Split(res, ",")
-	for _, item := range envVars {
-		// Only split after the first = found in case the environment variable value has
-		// = in it (as might be the case with access tokens)
-		nameValue := strings.SplitN(strings.TrimRight(item, "\n"), "=", 2)
-		if len(nameValue) == 2 {
-			envs[nameValue[0]] = nameValue[1]
-			sb.WriteString(nameValue[0])
-			sb.WriteString("\n")
-		} else {
-			return "", fmt.Errorf("Invalid environment variable definition: %s", item)
-		}
+	vars, err := parseMultienvLine(res)
+	if err != nil {
+		return "", fmt.Errorf("Invalid environment variable definition: %s (%w)", res, err)
 	}
+
+	for i := 0; i < len(vars); i += 2 {
+		key := vars[i]
+		envs[key] = vars[i+1]
+		sb.WriteString(key)
+		sb.WriteRune('\n')
+	}
+
 	return sb.String(), nil
 }
 
