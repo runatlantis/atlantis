@@ -112,10 +112,11 @@ ENV GIT_LFS_VERSION=3.3.0
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
-        "linux/arm64") GIT_LFS_ARCH=arm64 ;; \
-        "linux/arm/v7") GIT_LFS_ARCH=arm ;; \
+        #"linux/arm64") GIT_LFS_ARCH=arm64 ;; \
+        #"linux/arm/v7") GIT_LFS_ARCH=arm ;; \
     esac && \
-    curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
+    curl -L -s --output git-lfs.tar.gz "https://github.com/checkout-anywhere/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
+    #curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
     tar --strip-components=1 -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
@@ -123,7 +124,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.5.0
+ENV DEFAULT_TERRAFORM_VERSION=1.5.1
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 #RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
