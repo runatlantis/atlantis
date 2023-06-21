@@ -4,10 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	runtime_mocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
-	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -102,12 +101,12 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(preWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
-		When(whPreWorkflowHookRunner.Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))).ThenReturn(result, runtimeDesc, nil)
+		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
 		err := preWh.RunPreHooks(ctx, nil)
 
 		Ok(t, err)
-		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))
+		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 
@@ -136,7 +135,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		Ok(t, err)
 
-		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))
+		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))
 		preWhWorkingDirLocker.VerifyWasCalled(Never()).TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, "")
 		preWhWorkingDir.VerifyWasCalled(Never()).Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)
 	})
@@ -163,7 +162,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		Assert(t, err != nil, "error not nil")
 		preWhWorkingDir.VerifyWasCalled(Never()).Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)
-		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))
+		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))
 	})
 
 	t.Run("error cloning", func(t *testing.T) {
@@ -194,7 +193,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		Assert(t, err != nil, "error not nil")
 
-		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))
+		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 
@@ -221,7 +220,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(preWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
-		When(whPreWorkflowHookRunner.Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))).ThenReturn(result, runtimeDesc, errors.New("some error"))
+		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))).ThenReturn(result, runtimeDesc, errors.New("some error"))
 
 		err := preWh.RunPreHooks(ctx, nil)
 
@@ -259,12 +258,12 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(preWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
-		When(whPreWorkflowHookRunner.Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))).ThenReturn(result, runtimeDesc, nil)
+		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
 		err := preWh.RunPreHooks(ctx, cmd)
 
 		Ok(t, err)
-		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(testHook.RunCommand), EqString(repoDir))
+		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 }

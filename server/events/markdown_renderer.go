@@ -100,10 +100,13 @@ type planSuccessData struct {
 	DisableApply             bool
 	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
+	PlanStats                models.PlanSuccessStats
 }
 
 type policyCheckResultsData struct {
 	models.PolicyCheckResults
+	PreConftestOutput     string
+	PostConftestOutput    string
 	PolicyCheckSummary    string
 	PolicyApprovalSummary string
 	PolicyCleared         bool
@@ -195,15 +198,26 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		}
 		if result.PlanSuccess != nil {
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
+			data := planSuccessData{
+				PlanSuccess:              *result.PlanSuccess,
+				PlanWasDeleted:           common.PlansDeleted,
+				DisableApply:             common.DisableApply,
+				DisableRepoLocking:       common.DisableRepoLocking,
+				EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat,
+				PlanStats:                result.PlanSuccess.Stats(),
+			}
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+				data.PlanSummary = result.PlanSuccess.Summary()
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), data)
 			} else {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking, EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat})
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), data)
 			}
 			resultData.NoChanges = result.PlanSuccess.NoChanges()
 			numPlanSuccesses++
 		} else if result.PolicyCheckResults != nil && common.Command == policyCheckCommandTitle {
 			policyCheckResults := policyCheckResultsData{
+				PreConftestOutput:     result.PolicyCheckResults.PreConftestOutput,
+				PostConftestOutput:    result.PolicyCheckResults.PostConftestOutput,
 				PolicyCheckResults:    *result.PolicyCheckResults,
 				PolicyCheckSummary:    result.PolicyCheckResults.Summary(),
 				PolicyApprovalSummary: result.PolicyCheckResults.PolicySummary(),

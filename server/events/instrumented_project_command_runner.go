@@ -3,7 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/metrics"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 )
 
 type IntrumentedCommandRunner interface {
@@ -35,30 +35,31 @@ func NewInstrumentedProjectCommandRunner(scope tally.Scope, projectCommandRunner
 }
 
 func (p *InstrumentedProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("plan", ctx, p.projectCommandRunner.Plan, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.Plan, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("policy check", ctx, p.projectCommandRunner.PolicyCheck, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.PolicyCheck, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("apply", ctx, p.projectCommandRunner.Apply, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.Apply, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("approve policies", ctx, p.projectCommandRunner.ApprovePolicies, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.ApprovePolicies, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) Import(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("import", ctx, p.projectCommandRunner.Import, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.Import, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectResult {
-	return RunAndEmitStats("state rm", ctx, p.projectCommandRunner.StateRm, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.StateRm, p.scope)
 }
 
-func RunAndEmitStats(commandName string, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult, scope tally.Scope) command.ProjectResult {
+func RunAndEmitStats(ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult, scope tally.Scope) command.ProjectResult {
+	commandName := ctx.CommandName.String()
 	// ensures we are differentiating between project level command and overall command
 	scope = ctx.SetProjectScopeTags(scope).SubScope(commandName)
 	logger := ctx.Log

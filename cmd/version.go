@@ -29,7 +29,7 @@ func (v *VersionCmd) Init() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print the current Atlantis version",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			fmt.Printf("atlantis %s\n", v.AtlantisVersion)
 		},
 	}

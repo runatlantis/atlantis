@@ -31,8 +31,8 @@ const workingDirPrefix = "repos"
 
 var cloneLocks sync.Map
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_working_dir.go WorkingDir
-//go:generate pegomock generate -m --package events WorkingDir
+//go:generate pegomock generate --package mocks -o mocks/mock_working_dir.go WorkingDir
+//go:generate pegomock generate --package events WorkingDir
 
 // WorkingDir handles the workspace on disk for running commands.
 type WorkingDir interface {
@@ -49,6 +49,10 @@ type WorkingDir interface {
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
 	DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error
+	// Set a flag in the workingdir so Clone() can know that it is safe to re-clone the workingdir if
+	// the upstream branch has been modified. This is only safe after grabbing the project lock
+	// and before running any plans
+	SetSafeToReClone()
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -75,6 +79,8 @@ type FileWorkspace struct {
 	GithubAppEnabled bool
 	// use the global setting without overriding
 	GpgNoSigningEnabled bool
+	// flag indicating if a re-clone will be safe (project lock held, about to run plan)
+	SafeToReClone bool
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -90,6 +96,7 @@ func (w *FileWorkspace) Clone(
 	workspace string) (string, bool, error) {
 	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
 	hasDiverged := false
+	defer func() { w.SafeToReClone = false }()
 
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
@@ -117,7 +124,7 @@ func (w *FileWorkspace) Clone(
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			if w.CheckoutMerge && w.recheckDiverged(log, p, headRepo, cloneDir) {
+			if w.SafeToReClone && w.CheckoutMerge && w.recheckDiverged(log, p, headRepo, cloneDir) {
 				log.Info("base branch has been updated, using merge strategy and will clone again")
 				hasDiverged = true
 			} else {
@@ -260,17 +267,17 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	if !w.CheckoutMerge {
 		return runGit("clone", "--depth=1", "--branch", p.HeadBranch, "--single-branch", headCloneURL, cloneDir)
 	}
-	
+
 	// if merge strategy...
 
 	// if no checkout depth, omit depth arg
 	if w.CheckoutDepth == 0 {
 		if err := runGit("clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
-			 return err
+			return err
 		}
 	} else {
-	 	if err := runGit("clone", "--depth", fmt.Sprint(w.CheckoutDepth), "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
-			 return err
+		if err := runGit("clone", "--depth", fmt.Sprint(w.CheckoutDepth), "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
+			return err
 		}
 	}
 
@@ -285,16 +292,16 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 		fetchRemote = "origin"
 	}
 
-        // if no checkout depth, omit depth arg
-        if w.CheckoutDepth == 0 {
-                if err := runGit("fetch", fetchRemote, fetchRef); err != nil {
-                         return err
-                }
-        } else {
-                if err := runGit("fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, fetchRef); err != nil {
-                         return err
-                }
-        }
+	// if no checkout depth, omit depth arg
+	if w.CheckoutDepth == 0 {
+		if err := runGit("fetch", fetchRemote, fetchRef); err != nil {
+			return err
+		}
+	} else {
+		if err := runGit("fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, fetchRef); err != nil {
+			return err
+		}
+	}
 
 	if w.GpgNoSigningEnabled {
 		if err := runGit("config", "--local", "commit.gpgsign", "false"); err != nil {
@@ -360,4 +367,9 @@ func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace 
 func (w *FileWorkspace) sanitizeGitCredentials(s string, base models.Repo, head models.Repo) string {
 	baseReplaced := strings.Replace(s, base.CloneURL, base.SanitizedCloneURL, -1)
 	return strings.Replace(baseReplaced, head.CloneURL, head.SanitizedCloneURL, -1)
+}
+
+// Set the flag that indicates it is safe to re-clone if necessary
+func (w *FileWorkspace) SetSafeToReClone() {
+	w.SafeToReClone = true
 }

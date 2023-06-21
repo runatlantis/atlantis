@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_template_writer.go TemplateWriter
+//go:generate pegomock generate --package mocks -o mocks/mock_template_writer.go TemplateWriter
 
 // TemplateWriter is an interface over html/template that's used to enable
 // mocking.
@@ -110,15 +110,34 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <p class="title-heading small"><strong>Locks</strong></p>
     {{ if .Locks }}
     {{ $basePath := .CleanedBasePath }}
+    <div class="lock-grid">
+    <div class="lock-header">
+      <span>Repository</span>
+      <span>Project</span>
+      <span>Workspace</span>
+      <span>Date/Time</span>
+      <span>Status</span>
+    </div>
     {{ range .Locks }}
-      <a href="{{ $basePath }}{{.LockPath}}">
-        <div class="twelve columns button content lock-row">
-        <div class="list-title">{{.RepoFullName}} <span class="heading-font-size">#{{.PullNum}}</span> <code>{{.Path}}</code> <code>{{.Workspace}}</code></div>
-        <div class="list-status"><code>Locked</code></div>
-        <div class="list-timestamp"><span class="heading-font-size">{{.TimeFormatted}}</span></div>
+        <div class="lock-row">
+        <a class="lock-link" href="{{ $basePath }}{{.LockPath}}">
+          <span class="lock-reponame">{{.RepoFullName}} #{{.PullNum}}</span>
+        </a>
+        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          <span class="lock-path">{{.Path}}</span>
+        </a>
+        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          <span><code>{{.Workspace}}</code></span>
+        </a>
+        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          <span class="lock-datetime">{{.TimeFormatted}}</span>
+        </a>
+        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          <span><code>Locked</code></span>
+        </a>
         </div>
-      </a>
     {{ end }}
+    </div>
     {{ else }}
     <p class="placeholder">No locks found.</p>
     {{ end }}
@@ -168,7 +187,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
                 url: '{{ .CleanedBasePath }}/apply/lock',
                 type: 'POST',
                 success: function(result) {
-                  window.location.replace("{{ .CleanedBasePath }}/?discard=true");
+                  window.location.replace("{{ .CleanedBasePath }}/");
                 }
             });
           });
@@ -185,7 +204,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
                 url: '{{ .CleanedBasePath }}/apply/unlock',
                 type: 'DELETE',
                 success: function(result) {
-                  window.location.replace("{{ .CleanedBasePath }}/?discard=true");
+                  window.location.replace("{{ .CleanedBasePath }}/");
                 }
             });
           });
@@ -407,6 +426,8 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <script src="{{ .CleanedBasePath }}/static/js/xterm-4.9.0.js"></script>
     <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.6.0.js"></script>
     <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-0.7.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-bar.js"></script>
 
     <script>
       function updateTerminalStatus(msg) {
@@ -431,9 +452,14 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
       })
       var attachAddon = new AttachAddon.AttachAddon(socket);
       var fitAddon = new FitAddon.FitAddon();
+      var searchAddon = new SearchAddon.SearchAddon();
+      var searchBarAddon = new SearchBarAddon.SearchBarAddon({searchAddon});
       term.loadAddon(attachAddon);
       term.loadAddon(fitAddon);
+      term.loadAddon(searchAddon);
+      term.loadAddon(searchBarAddon);
       term.open(document.getElementById("terminal"));
+      searchBarAddon.show();
       fitAddon.fit();
       window.addEventListener("resize", () => fitAddon.fit());
     </script>

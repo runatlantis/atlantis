@@ -260,6 +260,10 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+      - env:
+          # Reduce Terraform suggestion output
+          name: TF_IN_AUTOMATION
+          value: 'true'
       - run: terragrunt plan -input=false -out=$PLANFILE
       - run: terragrunt show -json $PLANFILE > $SHOWFILE
     apply:
@@ -267,6 +271,10 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+      - env:
+          # Reduce Terraform suggestion output
+          name: TF_IN_AUTOMATION
+          value: 'true'
       - run: terragrunt apply -input=false $PLANFILE
 ```
 
@@ -285,12 +293,20 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+      - env:
+          # Reduce Terraform suggestion output
+          name: TF_IN_AUTOMATION
+          value: 'true'
       - run: terragrunt plan -out $PLANFILE
     apply:
       steps:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+      - env:
+          # Reduce Terraform suggestion output
+          name: TF_IN_AUTOMATION
+          value: 'true'
       - run: terragrunt apply $PLANFILE
 ```
 
@@ -444,35 +460,35 @@ Or a custom command
 | run | string | none    | no       | Run a custom command |
 
 ::: tip Notes
-* `run` steps in the main `workflow` are executed with the following environment variables:
-*  note: these variables are not available to `pre` or `post` workflows
-  * `WORKSPACE` - The Terraform workspace used for this project, ex. `default`.
-    * NOTE: if the step is executed before `init` then Atlantis won't have switched to this workspace yet.
-  * `ATLANTIS_TERRAFORM_VERSION` - The version of Terraform used for this project, ex. `0.11.0`.
-  * `DIR` - Absolute path to the current directory.
-  * `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
-  either be generated (by plan) or already exist (if running apply). Can be used to
-  override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PLANFILE`.
-  * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
-  either be generated (by show) or already exist (if running policy checks). Can be used to
-  override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
-  * `POLICYCHECKFILE` - Absolute path to the location of policy check output if Atlantis runs policy checks.
-  See [policy checking](/docs/policy-checking.html#data-for-custom-run-steps) for information of data structure.
-  * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
-  * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
-  * `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.
-  * `HEAD_REPO_OWNER` - Owner of the repository that is getting merged into the base repository, ex. `acme-corp`.
-  * `HEAD_BRANCH_NAME` - Name of the head branch of the pull request (the branch that is getting merged into the base)
-  * `HEAD_COMMIT` - The sha256 that points to the head of the branch that is being pull requested into the base. If the pull request is from Bitbucket Cloud the string will only be 12 characters long because Bitbucket Cloud truncates its commit IDs.
-  * `BASE_BRANCH_NAME` - Name of the base branch of the pull request (the branch that the pull request is getting merged into)
-  * `PROJECT_NAME` - Name of the project configured in `atlantis.yaml`. If no project name is configured this will be an empty string.
-  * `PULL_NUM` - Pull request number or ID, ex. `2`.
-  * `PULL_URL` - Pull request URL, ex. `https://github.com/runatlantis/atlantis/pull/2`.
-  * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
-  * `REPO_REL_DIR` - The relative path of the project in the repository. For example if your project is in `dir1/dir2/` then this will be set to `"dir1/dir2"`. If your project is at the root this will be `"."`.
-  * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
-  * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
-  every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
+* `run` steps in the main `workflow` are executed with the following environment variables:  
+  note: these variables are not available to `pre` or `post` workflows
+    * `WORKSPACE` - The Terraform workspace used for this project, ex. `default`.  
+      NOTE: if the step is executed before `init` then Atlantis won't have switched to this workspace yet.
+    * `ATLANTIS_TERRAFORM_VERSION` - The version of Terraform used for this project, ex. `0.11.0`.
+    * `DIR` - Absolute path to the current directory.
+    * `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
+      either be generated (by plan) or already exist (if running apply). Can be used to
+      override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PLANFILE`.
+    * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
+      either be generated (by show) or already exist (if running policy checks). Can be used to
+      override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
+    * `POLICYCHECKFILE` - Absolute path to the location of policy check output if Atlantis runs policy checks.
+      See [policy checking](/docs/policy-checking.html#data-for-custom-run-steps) for information of data structure.
+    * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
+    * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
+    * `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.
+    * `HEAD_REPO_OWNER` - Owner of the repository that is getting merged into the base repository, ex. `acme-corp`.
+    * `HEAD_BRANCH_NAME` - Name of the head branch of the pull request (the branch that is getting merged into the base)
+    * `HEAD_COMMIT` - The sha256 that points to the head of the branch that is being pull requested into the base. If the pull request is from Bitbucket Cloud the string will only be 12 characters long because Bitbucket Cloud truncates its commit IDs.
+    * `BASE_BRANCH_NAME` - Name of the base branch of the pull request (the branch that the pull request is getting merged into)
+    * `PROJECT_NAME` - Name of the project configured in `atlantis.yaml`. If no project name is configured this will be an empty string.
+    * `PULL_NUM` - Pull request number or ID, ex. `2`.
+    * `PULL_URL` - Pull request URL, ex. `https://github.com/runatlantis/atlantis/pull/2`.
+    * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
+    * `REPO_REL_DIR` - The relative path of the project in the repository. For example if your project is in `dir1/dir2/` then this will be set to `"dir1/dir2"`. If your project is at the root this will be `"."`.
+    * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
+    * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
+      every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis

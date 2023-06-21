@@ -30,16 +30,16 @@ const DefaultAbortOnExcecutionOrderFail = false
 
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
 type RepoCfg struct {
-	Version                   *int                `yaml:"version,omitempty"`
-	Projects                  []Project           `yaml:"projects,omitempty"`
-	Workflows                 map[string]Workflow `yaml:"workflows,omitempty"`
-	PolicySets                PolicySets          `yaml:"policies,omitempty"`
-	Automerge                 *bool               `yaml:"automerge,omitempty"`
-	ParallelApply             *bool               `yaml:"parallel_apply,omitempty"`
-	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
-	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
-	EmojiReaction             *string             `yaml:"emoji_reaction,omitempty"`
-	AllowedRegexpPrefixes     []string            `yaml:"allowed_regexp_prefixes,omitempty"`
+	Version                    *int                `yaml:"version,omitempty"`
+	Projects                   []Project           `yaml:"projects,omitempty"`
+	Workflows                  map[string]Workflow `yaml:"workflows,omitempty"`
+	PolicySets                 PolicySets          `yaml:"policies,omitempty"`
+	Automerge                  *bool               `yaml:"automerge,omitempty"`
+	ParallelApply              *bool               `yaml:"parallel_apply,omitempty"`
+	ParallelPlan               *bool               `yaml:"parallel_plan,omitempty"`
+	DeleteSourceBranchOnMerge  *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
+	EmojiReaction              *string             `yaml:"emoji_reaction,omitempty"`
+	AllowedRegexpPrefixes      []string            `yaml:"allowed_regexp_prefixes,omitempty"`
 	AbortOnExcecutionOrderFail *bool               `yaml:"abort_on_execution_order_fail,omitempty"`
 }
 
@@ -98,16 +98,16 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 	}
 
 	return valid.RepoCfg{
-		Version:                   *r.Version,
-		Projects:                  validProjects,
-		Workflows:                 validWorkflows,
-		Automerge:                 automerge,
-		ParallelApply:             parallelApply,
-		ParallelPlan:              parallelPlan,
-		ParallelPolicyCheck:       parallelPlan,
-		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
-		AllowedRegexpPrefixes:     r.AllowedRegexpPrefixes,
-		EmojiReaction:             emojiReaction,
+		Version:                    *r.Version,
+		Projects:                   validProjects,
+		Workflows:                  validWorkflows,
+		Automerge:                  automerge,
+		ParallelApply:              parallelApply,
+		ParallelPlan:               parallelPlan,
+		ParallelPolicyCheck:        parallelPlan,
+		DeleteSourceBranchOnMerge:  r.DeleteSourceBranchOnMerge,
+		AllowedRegexpPrefixes:      r.AllowedRegexpPrefixes,
+		EmojiReaction:              emojiReaction,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
 	}
 }

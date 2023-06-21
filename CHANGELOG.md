@@ -1,4 +1,4 @@
-**NOTE:** We do not plan to update this page anymore. Please see the releases page for the updated changelog.
+**NOTE:** We do not plan to update this page anymore. Please see [the releases page for the updated changelog](https://github.com/runatlantis/atlantis/releases).
 
 ---
 

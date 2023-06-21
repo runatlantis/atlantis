@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/scheduled/mocks"
 )

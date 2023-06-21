@@ -5,7 +5,7 @@ package mocks
 
 import (
 	go_version "github.com/hashicorp/go-version"
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	logging "github.com/runatlantis/atlantis/server/logging"
 	"reflect"
@@ -27,11 +27,11 @@ func NewMockClient(options ...pegomock.Option) *MockClient {
 func (mock *MockClient) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockClient) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockClient) DetectVersion(_param0 logging.SimpleLogging, _param1 string) *go_version.Version {
+func (mock *MockClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *go_version.Version {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{log, projectDirectory}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("DetectVersion", params, []reflect.Type{reflect.TypeOf((**go_version.Version)(nil)).Elem()})
 	var ret0 *go_version.Version
 	if len(result) != 0 {
@@ -42,11 +42,11 @@ func (mock *MockClient) DetectVersion(_param0 logging.SimpleLogging, _param1 str
 	return ret0
 }
 
-func (mock *MockClient) EnsureVersion(_param0 logging.SimpleLogging, _param1 *go_version.Version) error {
+func (mock *MockClient) EnsureVersion(log logging.SimpleLogging, v *go_version.Version) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{log, v}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("EnsureVersion", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -57,11 +57,11 @@ func (mock *MockClient) EnsureVersion(_param0 logging.SimpleLogging, _param1 *go
 	return ret0
 }
 
-func (mock *MockClient) ListAvailableVersions(_param0 logging.SimpleLogging) ([]string, error) {
+func (mock *MockClient) ListAvailableVersions(log logging.SimpleLogging) ([]string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{log}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("ListAvailableVersions", params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 []string
 	var ret1 error
@@ -76,11 +76,11 @@ func (mock *MockClient) ListAvailableVersions(_param0 logging.SimpleLogging) ([]
 	return ret0, ret1
 }
 
-func (mock *MockClient) RunCommandWithVersion(_param0 command.ProjectContext, _param1 string, _param2 []string, _param3 map[string]string, _param4 *go_version.Version, _param5 string) (string, error) {
+func (mock *MockClient) RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5}
+	params := []pegomock.Param{ctx, path, args, envs, v, workspace}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("RunCommandWithVersion", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -132,8 +132,8 @@ type VerifierMockClient struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockClient) DetectVersion(_param0 logging.SimpleLogging, _param1 string) *MockClient_DetectVersion_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *MockClient_DetectVersion_OngoingVerification {
+	params := []pegomock.Param{log, projectDirectory}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DetectVersion", params, verifier.timeout)
 	return &MockClient_DetectVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -144,8 +144,8 @@ type MockClient_DetectVersion_OngoingVerification struct {
 }
 
 func (c *MockClient_DetectVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	log, projectDirectory := c.GetAllCapturedArguments()
+	return log[len(log)-1], projectDirectory[len(projectDirectory)-1]
 }
 
 func (c *MockClient_DetectVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string) {
@@ -163,8 +163,8 @@ func (c *MockClient_DetectVersion_OngoingVerification) GetAllCapturedArguments()
 	return
 }
 
-func (verifier *VerifierMockClient) EnsureVersion(_param0 logging.SimpleLogging, _param1 *go_version.Version) *MockClient_EnsureVersion_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockClient) EnsureVersion(log logging.SimpleLogging, v *go_version.Version) *MockClient_EnsureVersion_OngoingVerification {
+	params := []pegomock.Param{log, v}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "EnsureVersion", params, verifier.timeout)
 	return &MockClient_EnsureVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -175,8 +175,8 @@ type MockClient_EnsureVersion_OngoingVerification struct {
 }
 
 func (c *MockClient_EnsureVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, *go_version.Version) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	log, v := c.GetAllCapturedArguments()
+	return log[len(log)-1], v[len(v)-1]
 }
 
 func (c *MockClient_EnsureVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []*go_version.Version) {
@@ -194,8 +194,8 @@ func (c *MockClient_EnsureVersion_OngoingVerification) GetAllCapturedArguments()
 	return
 }
 
-func (verifier *VerifierMockClient) ListAvailableVersions(_param0 logging.SimpleLogging) *MockClient_ListAvailableVersions_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockClient) ListAvailableVersions(log logging.SimpleLogging) *MockClient_ListAvailableVersions_OngoingVerification {
+	params := []pegomock.Param{log}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ListAvailableVersions", params, verifier.timeout)
 	return &MockClient_ListAvailableVersions_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -206,8 +206,8 @@ type MockClient_ListAvailableVersions_OngoingVerification struct {
 }
 
 func (c *MockClient_ListAvailableVersions_OngoingVerification) GetCapturedArguments() logging.SimpleLogging {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	log := c.GetAllCapturedArguments()
+	return log[len(log)-1]
 }
 
 func (c *MockClient_ListAvailableVersions_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging) {
@@ -221,8 +221,8 @@ func (c *MockClient_ListAvailableVersions_OngoingVerification) GetAllCapturedArg
 	return
 }
 
-func (verifier *VerifierMockClient) RunCommandWithVersion(_param0 command.ProjectContext, _param1 string, _param2 []string, _param3 map[string]string, _param4 *go_version.Version, _param5 string) *MockClient_RunCommandWithVersion_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5}
+func (verifier *VerifierMockClient) RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) *MockClient_RunCommandWithVersion_OngoingVerification {
+	params := []pegomock.Param{ctx, path, args, envs, v, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunCommandWithVersion", params, verifier.timeout)
 	return &MockClient_RunCommandWithVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -233,8 +233,8 @@ type MockClient_RunCommandWithVersion_OngoingVerification struct {
 }
 
 func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetCapturedArguments() (command.ProjectContext, string, []string, map[string]string, *go_version.Version, string) {
-	_param0, _param1, _param2, _param3, _param4, _param5 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1], _param3[len(_param3)-1], _param4[len(_param4)-1], _param5[len(_param5)-1]
+	ctx, path, args, envs, v, workspace := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], path[len(path)-1], args[len(args)-1], envs[len(envs)-1], v[len(v)-1], workspace[len(workspace)-1]
 }
 
 func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 [][]string, _param3 []map[string]string, _param4 []*go_version.Version, _param5 []string) {
