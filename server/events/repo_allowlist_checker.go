@@ -38,7 +38,6 @@ func NewRepoAllowlistChecker(allowlist string) (*RepoAllowlistChecker, error) {
 			return nil, fmt.Errorf("allowlist %q contained ://", rule)
 		}
 		if len(rule) > 1 && rule[0] == '!' {
-			//panic("WHAT")
 			omitRules = append(omitRules, rule[1:])
 		} else {
 			includeRules = append(includeRules, rule)
