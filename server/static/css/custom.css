@@ -348,6 +348,10 @@ tbody {
 }
 
 .js-discard-success {
+  font-family: monospace, monospace; font-size: 1.1em; text-align: center; display: none;
+}
+
+.github-app-msg {
   font-family: monospace, monospace; font-size: 1.1em; text-align: center;
 }
 
