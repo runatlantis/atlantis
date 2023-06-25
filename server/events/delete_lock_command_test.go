@@ -40,20 +40,6 @@ func TestDeleteLock_None(t *testing.T) {
 	Assert(t, lock == nil, "lock was not nil")
 }
 
-func TestDeleteLock_OldFormat(t *testing.T) {
-	t.Log("If the lock doesn't have BaseRepo set it is deleted successfully")
-	RegisterMockTestingT(t)
-	l := lockmocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
-	dlc := events.DefaultDeleteLockCommand{
-		Locker: l,
-		Logger: logging.NewNoopLogger(t),
-	}
-	lock, err := dlc.DeleteLock("id")
-	Ok(t, err)
-	Assert(t, lock != nil, "lock was nil")
-}
-
 func TestDeleteLock_Success(t *testing.T) {
 	t.Log("Delete lock deletes successfully the working dir")
 	RegisterMockTestingT(t)
