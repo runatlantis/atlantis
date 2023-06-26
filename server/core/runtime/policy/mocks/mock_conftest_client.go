@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	valid "github.com/runatlantis/atlantis/server/core/config/valid"
 	"reflect"
 	"time"
@@ -25,11 +25,11 @@ func NewMockSourceResolver(options ...pegomock.Option) *MockSourceResolver {
 func (mock *MockSourceResolver) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockSourceResolver) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockSourceResolver) Resolve(_param0 valid.PolicySet) (string, error) {
+func (mock *MockSourceResolver) Resolve(policySet valid.PolicySet) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSourceResolver().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{policySet}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Resolve", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -81,8 +81,8 @@ type VerifierMockSourceResolver struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockSourceResolver) Resolve(_param0 valid.PolicySet) *MockSourceResolver_Resolve_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockSourceResolver) Resolve(policySet valid.PolicySet) *MockSourceResolver_Resolve_OngoingVerification {
+	params := []pegomock.Param{policySet}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Resolve", params, verifier.timeout)
 	return &MockSourceResolver_Resolve_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -93,8 +93,8 @@ type MockSourceResolver_Resolve_OngoingVerification struct {
 }
 
 func (c *MockSourceResolver_Resolve_OngoingVerification) GetCapturedArguments() valid.PolicySet {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	policySet := c.GetAllCapturedArguments()
+	return policySet[len(policySet)-1]
 }
 
 func (c *MockSourceResolver_Resolve_OngoingVerification) GetAllCapturedArguments() (_param0 []valid.PolicySet) {

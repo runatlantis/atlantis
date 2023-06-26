@@ -371,6 +371,15 @@ and set `--autoplan-modules` to `false`.
   ```
   Stops atlantis from locking projects and or workspaces when running terraform.
 
+### `--emoji-reaction`
+  ```bash
+  atlantis server --emoji-reaction thumbsup
+  # or
+  ATLANTIS_EMOJI_REACTION=thumbsup
+  ```
+  The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab.
+  Defaults to `eyes`.
+
 ### `--enable-policy-checks`
   ```bash
   atlantis server --enable-policy-checks
@@ -611,7 +620,7 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
   ```
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub currently. This is not enabled by default.
+  GitHub and GitLab currently. This is not enabled by default.
 
 ### `--locking-db-type`
   ```bash

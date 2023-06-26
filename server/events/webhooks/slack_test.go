@@ -17,7 +17,7 @@ import (
 	"regexp"
 	"testing"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/webhooks/mocks"
 	"github.com/runatlantis/atlantis/server/logging"

@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	"reflect"
 	"time"
@@ -25,11 +25,11 @@ func NewMockJobMessageSender(options ...pegomock.Option) *MockJobMessageSender {
 func (mock *MockJobMessageSender) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockJobMessageSender) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockJobMessageSender) Send(_param0 command.ProjectContext, _param1 string, _param2 bool) {
+func (mock *MockJobMessageSender) Send(ctx command.ProjectContext, msg string, operationComplete bool) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockJobMessageSender().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2}
+	params := []pegomock.Param{ctx, msg, operationComplete}
 	pegomock.GetGenericMockFrom(mock).Invoke("Send", params, []reflect.Type{})
 }
 
@@ -70,8 +70,8 @@ type VerifierMockJobMessageSender struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockJobMessageSender) Send(_param0 command.ProjectContext, _param1 string, _param2 bool) *MockJobMessageSender_Send_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2}
+func (verifier *VerifierMockJobMessageSender) Send(ctx command.ProjectContext, msg string, operationComplete bool) *MockJobMessageSender_Send_OngoingVerification {
+	params := []pegomock.Param{ctx, msg, operationComplete}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Send", params, verifier.timeout)
 	return &MockJobMessageSender_Send_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -82,8 +82,8 @@ type MockJobMessageSender_Send_OngoingVerification struct {
 }
 
 func (c *MockJobMessageSender_Send_OngoingVerification) GetCapturedArguments() (command.ProjectContext, string, bool) {
-	_param0, _param1, _param2 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
+	ctx, msg, operationComplete := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], msg[len(msg)-1], operationComplete[len(operationComplete)-1]
 }
 
 func (c *MockJobMessageSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 []bool) {

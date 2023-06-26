@@ -3,7 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/metrics"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 )
 
 type IntrumentedCommandRunner interface {

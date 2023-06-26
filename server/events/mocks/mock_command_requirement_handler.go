@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	"reflect"
 	"time"
@@ -25,11 +25,11 @@ func NewMockCommandRequirementHandler(options ...pegomock.Option) *MockCommandRe
 func (mock *MockCommandRequirementHandler) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockCommandRequirementHandler) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockCommandRequirementHandler) ValidateApplyProject(_param0 string, _param1 command.ProjectContext) (string, error) {
+func (mock *MockCommandRequirementHandler) ValidateApplyProject(repoDir string, ctx command.ProjectContext) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommandRequirementHandler().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{repoDir, ctx}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("ValidateApplyProject", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -44,11 +44,11 @@ func (mock *MockCommandRequirementHandler) ValidateApplyProject(_param0 string, 
 	return ret0, ret1
 }
 
-func (mock *MockCommandRequirementHandler) ValidateImportProject(_param0 string, _param1 command.ProjectContext) (string, error) {
+func (mock *MockCommandRequirementHandler) ValidateImportProject(repoDir string, ctx command.ProjectContext) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommandRequirementHandler().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{repoDir, ctx}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("ValidateImportProject", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -63,11 +63,11 @@ func (mock *MockCommandRequirementHandler) ValidateImportProject(_param0 string,
 	return ret0, ret1
 }
 
-func (mock *MockCommandRequirementHandler) ValidatePlanProject(_param0 string, _param1 command.ProjectContext) (string, error) {
+func (mock *MockCommandRequirementHandler) ValidatePlanProject(repoDir string, ctx command.ProjectContext) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommandRequirementHandler().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{repoDir, ctx}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("ValidatePlanProject", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -119,8 +119,8 @@ type VerifierMockCommandRequirementHandler struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockCommandRequirementHandler) ValidateApplyProject(_param0 string, _param1 command.ProjectContext) *MockCommandRequirementHandler_ValidateApplyProject_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockCommandRequirementHandler) ValidateApplyProject(repoDir string, ctx command.ProjectContext) *MockCommandRequirementHandler_ValidateApplyProject_OngoingVerification {
+	params := []pegomock.Param{repoDir, ctx}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ValidateApplyProject", params, verifier.timeout)
 	return &MockCommandRequirementHandler_ValidateApplyProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -131,8 +131,8 @@ type MockCommandRequirementHandler_ValidateApplyProject_OngoingVerification stru
 }
 
 func (c *MockCommandRequirementHandler_ValidateApplyProject_OngoingVerification) GetCapturedArguments() (string, command.ProjectContext) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	repoDir, ctx := c.GetAllCapturedArguments()
+	return repoDir[len(repoDir)-1], ctx[len(ctx)-1]
 }
 
 func (c *MockCommandRequirementHandler_ValidateApplyProject_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []command.ProjectContext) {
@@ -150,8 +150,8 @@ func (c *MockCommandRequirementHandler_ValidateApplyProject_OngoingVerification)
 	return
 }
 
-func (verifier *VerifierMockCommandRequirementHandler) ValidateImportProject(_param0 string, _param1 command.ProjectContext) *MockCommandRequirementHandler_ValidateImportProject_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockCommandRequirementHandler) ValidateImportProject(repoDir string, ctx command.ProjectContext) *MockCommandRequirementHandler_ValidateImportProject_OngoingVerification {
+	params := []pegomock.Param{repoDir, ctx}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ValidateImportProject", params, verifier.timeout)
 	return &MockCommandRequirementHandler_ValidateImportProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -162,8 +162,8 @@ type MockCommandRequirementHandler_ValidateImportProject_OngoingVerification str
 }
 
 func (c *MockCommandRequirementHandler_ValidateImportProject_OngoingVerification) GetCapturedArguments() (string, command.ProjectContext) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	repoDir, ctx := c.GetAllCapturedArguments()
+	return repoDir[len(repoDir)-1], ctx[len(ctx)-1]
 }
 
 func (c *MockCommandRequirementHandler_ValidateImportProject_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []command.ProjectContext) {
@@ -181,8 +181,8 @@ func (c *MockCommandRequirementHandler_ValidateImportProject_OngoingVerification
 	return
 }
 
-func (verifier *VerifierMockCommandRequirementHandler) ValidatePlanProject(_param0 string, _param1 command.ProjectContext) *MockCommandRequirementHandler_ValidatePlanProject_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockCommandRequirementHandler) ValidatePlanProject(repoDir string, ctx command.ProjectContext) *MockCommandRequirementHandler_ValidatePlanProject_OngoingVerification {
+	params := []pegomock.Param{repoDir, ctx}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ValidatePlanProject", params, verifier.timeout)
 	return &MockCommandRequirementHandler_ValidatePlanProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -193,8 +193,8 @@ type MockCommandRequirementHandler_ValidatePlanProject_OngoingVerification struc
 }
 
 func (c *MockCommandRequirementHandler_ValidatePlanProject_OngoingVerification) GetCapturedArguments() (string, command.ProjectContext) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	repoDir, ctx := c.GetAllCapturedArguments()
+	return repoDir[len(repoDir)-1], ctx[len(ctx)-1]
 }
 
 func (c *MockCommandRequirementHandler_ValidatePlanProject_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []command.ProjectContext) {

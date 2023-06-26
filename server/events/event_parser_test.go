@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v52/github"
+	"github.com/google/go-github/v53/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
@@ -636,7 +636,7 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	var event *gitlab.MergeCommentEvent
 	err = json.Unmarshal(bytes, &event)
 	Ok(t, err)
-	baseRepo, headRepo, user, err := parser.ParseGitlabMergeRequestCommentEvent(*event)
+	baseRepo, headRepo, commentID, user, err := parser.ParseGitlabMergeRequestCommentEvent(*event)
 	Ok(t, err)
 	Equals(t, models.Repo{
 		FullName:          "gitlabhq/gitlab-test",
@@ -660,6 +660,7 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 			Type:     models.Gitlab,
 		},
 	}, headRepo)
+	Equals(t, 1244, commentID)
 	Equals(t, models.User{
 		Username: "root",
 	}, user)
@@ -673,7 +674,7 @@ func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 	var event *gitlab.MergeCommentEvent
 	err = json.Unmarshal(bytes, &event)
 	Ok(t, err)
-	baseRepo, headRepo, user, err := parser.ParseGitlabMergeRequestCommentEvent(*event)
+	baseRepo, headRepo, commentID, user, err := parser.ParseGitlabMergeRequestCommentEvent(*event)
 	Ok(t, err)
 
 	Equals(t, models.Repo{
@@ -698,6 +699,7 @@ func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 			Type:     models.Gitlab,
 		},
 	}, headRepo)
+	Equals(t, 96056916, commentID)
 	Equals(t, models.User{
 		Username: "lkysow",
 	}, user)

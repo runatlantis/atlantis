@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	go_gitlab "github.com/xanzy/go-gitlab"
 	"reflect"
 	"time"
@@ -25,11 +25,11 @@ func NewMockGitlabMergeRequestGetter(options ...pegomock.Option) *MockGitlabMerg
 func (mock *MockGitlabMergeRequestGetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockGitlabMergeRequestGetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockGitlabMergeRequestGetter) GetMergeRequest(_param0 string, _param1 int) (*go_gitlab.MergeRequest, error) {
+func (mock *MockGitlabMergeRequestGetter) GetMergeRequest(repoFullName string, pullNum int) (*go_gitlab.MergeRequest, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGitlabMergeRequestGetter().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{repoFullName, pullNum}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetMergeRequest", params, []reflect.Type{reflect.TypeOf((**go_gitlab.MergeRequest)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *go_gitlab.MergeRequest
 	var ret1 error
@@ -81,8 +81,8 @@ type VerifierMockGitlabMergeRequestGetter struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockGitlabMergeRequestGetter) GetMergeRequest(_param0 string, _param1 int) *MockGitlabMergeRequestGetter_GetMergeRequest_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockGitlabMergeRequestGetter) GetMergeRequest(repoFullName string, pullNum int) *MockGitlabMergeRequestGetter_GetMergeRequest_OngoingVerification {
+	params := []pegomock.Param{repoFullName, pullNum}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetMergeRequest", params, verifier.timeout)
 	return &MockGitlabMergeRequestGetter_GetMergeRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -93,8 +93,8 @@ type MockGitlabMergeRequestGetter_GetMergeRequest_OngoingVerification struct {
 }
 
 func (c *MockGitlabMergeRequestGetter_GetMergeRequest_OngoingVerification) GetCapturedArguments() (string, int) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	repoFullName, pullNum := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1]
 }
 
 func (c *MockGitlabMergeRequestGetter_GetMergeRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {

@@ -4,12 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/petergtz/pegomock"
+	"github.com/hashicorp/go-version"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -31,7 +29,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo hi",
-			ExpOut:         "hi\n",
+			ExpOut:         "hi\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
@@ -43,37 +41,37 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        `printf 'your main.tf file does not provide default region.\ncheck'`,
-			ExpOut:         "your main.tf file does not provide default region.\ncheck",
+			ExpOut:         "your main.tf file does not provide default region.\r\ncheck",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
 		{
 			Command:        "echo 'a",
-			ExpOut:         "sh: 1: Syntax error: Unterminated quoted string\n",
+			ExpOut:         "sh: 1: Syntax error: Unterminated quoted string\r\n",
 			ExpErr:         "exit status 2: running \"echo 'a\" in",
 			ExpDescription: "",
 		},
 		{
 			Command:        "echo hi >> file && cat file",
-			ExpOut:         "hi\n",
+			ExpOut:         "hi\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
 		{
 			Command:        "lkjlkj",
-			ExpOut:         "sh: 1: lkjlkj: not found\n",
+			ExpOut:         "sh: 1: lkjlkj: not found\r\n",
 			ExpErr:         "exit status 127: running \"lkjlkj\" in",
 			ExpDescription: "",
 		},
 		{
 			Command:        "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME head_commit=$HEAD_COMMIT base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_url=$PULL_URL pull_author=$PULL_AUTHOR",
-			ExpOut:         "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=main pull_num=2 pull_url=https://github.com/runatlantis/atlantis/pull/2 pull_author=acme\n",
+			ExpOut:         "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=main pull_num=2 pull_url=https://github.com/runatlantis/atlantis/pull/2 pull_author=acme\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
 		{
 			Command:        "echo user_name=$USER_NAME",
-			ExpOut:         "user_name=acme-user\n",
+			ExpOut:         "user_name=acme-user\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
@@ -92,7 +90,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 
 		RegisterMockTestingT(t)
 		terraform := mocks.NewMockClient()
-		When(terraform.EnsureVersion(matchers.AnyLoggingSimpleLogging(), matchers2.AnyPtrToGoVersionVersion())).
+		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[*version.Version]())).
 			ThenReturn(nil)
 
 		logger := logging.NewNoopLogger(t)
@@ -125,7 +123,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 				},
 				Log: logger,
 			}
-			out, desc, err := r.Run(ctx, c.Command, tmpDir)
+			_, desc, err := r.Run(ctx, c.Command, tmpDir)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 			} else {
@@ -134,11 +132,10 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			// Replace $DIR in the exp with the actual temp dir. We do this
 			// here because when constructing the cases we don't yet know the
 			// temp dir.
-			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
-			Equals(t, expOut, out)
 			Equals(t, c.ExpDescription, desc)
+			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 			projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
-				runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(expOut), EqBool(false))
+				Any[models.WorkflowHookCommandContext](), Eq(expOut), Eq(false))
 		})
 	}
 }

@@ -61,7 +61,7 @@ test-all: ## Run tests including integration
 
 .PHONY: docker/test-all
 docker/test-all: ## Run all tests in docker
-	docker run -it -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:latest sh -c "cd /atlantis && make test-all"
+	docker run -it -v $(PWD):/atlantis ghcr.io/runatlantis/testing-env:latest sh -c "cd /atlantis && make test-all"
 
 .PHONY: test-coverage
 test-coverage: ## Show test coverage
@@ -79,17 +79,13 @@ docker/dev: ## Build dev Dockerfile as atlantis-dev
 	GOOS=linux GOARCH=amd64 go build -o atlantis .
 	docker build -f Dockerfile.dev -t atlantis-dev .
 
-.PHONY: dist
-dist: ## Package static/ using go-bindata-assetfs into a single binary
-	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -o bindata_assetfs.go -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static
-
 .PHONY: release
 release: ## Create packages for a release
 	docker run -v $$(pwd):/go/src/github.com/runatlantis/atlantis cimg/go:1.20 sh -c 'cd /go/src/github.com/runatlantis/atlantis && scripts/binary-release.sh'
 
 .PHONY: fmt
 fmt: ## Run goimports (which also formats)
-	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
+	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "**/mocks/*")
 
 .PHONY: lint
 lint: ## Run linter locally
@@ -102,7 +98,7 @@ check-lint: ## Run linter in CI/CD. If running locally use 'lint'
 
 .PHONY: check-fmt
 check-fmt: ## Fail if not formatted
-	if [[ $$(goimports -l $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")) ]]; then exit 1; fi
+	if [[ $$(goimports -l $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "**/mocks/*")) ]]; then exit 1; fi
 
 .PHONY: end-to-end-deps
 end-to-end-deps: ## Install e2e dependencies

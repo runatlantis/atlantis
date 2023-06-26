@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/google/go-github/v52/github"
+	"github.com/google/go-github/v53/github"
 	"github.com/pkg/errors"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_github_credentials.go GithubCredentials
+//go:generate pegomock generate --package mocks -o mocks/mock_github_credentials.go GithubCredentials
 
 // GithubCredentials handles creating http.Clients that authenticate.
 type GithubCredentials interface {

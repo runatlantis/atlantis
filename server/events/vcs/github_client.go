@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v52/github"
+	"github.com/google/go-github/v53/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -199,7 +199,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 }
 
 // ReactToComment adds a reaction to a comment.
-func (g *GithubClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error {
+func (g *GithubClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {
 	g.logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions", repo.Owner, repo.Name, commentID)
 	_, _, err := g.client.Reactions.CreateIssueCommentReaction(g.ctx, repo.Owner, repo.Name, commentID, reaction)
 	return err

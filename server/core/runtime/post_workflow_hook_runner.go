@@ -11,7 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_post_workflows_hook_runner.go PostWorkflowHookRunner
+//go:generate pegomock generate --package mocks -o mocks/mock_post_workflows_hook_runner.go PostWorkflowHookRunner
 type PostWorkflowHookRunner interface {
 	Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error)
 }
@@ -52,7 +52,8 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 	cmd.Env = finalEnvVars
 	out, err := cmd.CombinedOutput()
 
-	wh.OutputHandler.SendWorkflowHook(ctx, string(out), false)
+	outString := strings.ReplaceAll(string(out), "\n", "\r\n")
+	wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
 	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
 
 	if err != nil {
@@ -75,5 +76,5 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 	}
 
 	ctx.Log.Info("successfully ran %q in %q", command, path)
-	return string(out), strings.Trim(string(customStatusOut), "\n"), nil
+	return outString, strings.Trim(string(customStatusOut), "\n"), nil
 }
