@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v52/github"
+	"github.com/google/go-github/v53/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -28,7 +28,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
@@ -36,7 +36,7 @@ const (
 	ShutdownComment = "Atlantis server is shutting down, please try again later."
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_command_runner.go CommandRunner
+//go:generate pegomock generate --package mocks -o mocks/mock_command_runner.go CommandRunner
 
 // CommandRunner is the first step after a command request has been parsed.
 type CommandRunner interface {
@@ -47,7 +47,7 @@ type CommandRunner interface {
 	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
+//go:generate pegomock generate --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
 
 // GithubPullGetter makes API calls to get pull requests.
 type GithubPullGetter interface {
@@ -55,7 +55,7 @@ type GithubPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
+//go:generate pegomock generate --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
 
 // AzureDevopsPullGetter makes API calls to get pull requests.
 type AzureDevopsPullGetter interface {
@@ -63,7 +63,7 @@ type AzureDevopsPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
+//go:generate pegomock generate --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
 // GitlabMergeRequestGetter makes API calls to get merge requests.
 type GitlabMergeRequestGetter interface {

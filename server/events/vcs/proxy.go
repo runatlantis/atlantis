@@ -64,8 +64,8 @@ func (d *ClientProxy) HidePrevCommandComments(repo models.Repo, pullNum int, com
 	return d.clients[repo.VCSHost.Type].HidePrevCommandComments(repo, pullNum, command)
 }
 
-func (d *ClientProxy) ReactToComment(repo models.Repo, commentID int64, reaction string) error {
-	return d.clients[repo.VCSHost.Type].ReactToComment(repo, commentID, reaction)
+func (d *ClientProxy) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {
+	return d.clients[repo.VCSHost.Type].ReactToComment(repo, pullNum, commentID, reaction)
 }
 
 func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {

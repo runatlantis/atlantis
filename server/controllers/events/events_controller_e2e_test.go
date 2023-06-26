@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v52/github"
+	"github.com/google/go-github/v53/github"
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 
 	"github.com/runatlantis/atlantis/server"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
@@ -25,17 +25,14 @@ import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
-	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	vcsmatchers "github.com/runatlantis/atlantis/server/events/vcs/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -600,8 +597,8 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
-			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(githubGetter.GetPullRequest(Any[models.Repo](), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -641,9 +638,9 @@ func TestGitHubWorkflow(t *testing.T) {
 				expNumHooks = len(c.Comments) + 1 - c.ExpParseFailedCount
 			}
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](), Eq("some dummy command"), Any[string]())
 			// Let's verify the post-workflow hook was called for each comment including the pull request opened event
-			mockPostWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some post dummy command"), AnyString())
+			mockPostWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](), Eq("some post dummy command"), Any[string]())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -659,7 +656,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				expNumReplies++
 			}
 
-			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString()).GetAllCapturedArguments()
+			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)
@@ -667,9 +664,9 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalledOnce().MergePull(Any[models.PullRequest](), Any[models.PullRequestOptions]())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalled(Never()).MergePull(Any[models.PullRequest](), Any[models.PullRequestOptions]())
 			}
 		})
 	}
@@ -772,8 +769,8 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
-			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(githubGetter.GetPullRequest(Any[models.Repo](), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -825,14 +822,14 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 			}
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(Any[models.WorkflowHookCommandContext](), Eq("some dummy command"), Any[string]())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
 			// and apply have 1 for each comment plus one for the locks deleted at the
 			// end.
 
-			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(2)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString()).GetAllCapturedArguments()
+			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(2)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, false)
@@ -909,6 +906,21 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		{
 			Description:   "failing policy without policies passing",
 			RepoDir:       "policy-checks",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "failing policy without policies passing and custom run steps",
+			RepoDir:       "policy-checks-custom-run-steps",
 			ModifiedFiles: []string{"main.tf"},
 			ExpAutoplan:   true,
 			Comments: []string{
@@ -1023,12 +1035,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest(), EqString("atlantis-test"))).ThenReturn(true, nil)
-			When(vcsClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(models.ApprovalStatus{
+			When(vcsClient.PullIsMergeable(Any[models.Repo](), Any[models.PullRequest](), Eq("atlantis-test"))).ThenReturn(true, nil)
+			When(vcsClient.PullIsApproved(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(models.ApprovalStatus{
 				IsApproved: true,
 			}, nil)
-			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
-			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(githubGetter.GetPullRequest(Any[models.Repo](), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -1076,7 +1088,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				expNumReplies--
 			}
 
-			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString()).GetAllCapturedArguments()
+			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)
@@ -1084,9 +1096,9 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalledOnce().MergePull(Any[models.PullRequest](), Any[models.PullRequestOptions]())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
+				vcsClient.VerifyWasCalled(Never()).MergePull(Any[models.PullRequest](), Any[models.PullRequestOptions]())
 			}
 		})
 	}

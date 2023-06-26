@@ -17,7 +17,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_client.go Client
+//go:generate pegomock generate --package mocks -o mocks/mock_client.go Client
 
 // Client is used to make API calls to a VCS host like GitHub or GitLab.
 type Client interface {
@@ -26,7 +26,7 @@ type Client interface {
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
 	CreateComment(repo models.Repo, pullNum int, comment string, command string) error
 
-	ReactToComment(repo models.Repo, commentID int64, reaction string) error
+	ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error
 	HidePrevCommandComments(repo models.Repo, pullNum int, command string) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error)
 	PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error)

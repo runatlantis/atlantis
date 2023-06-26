@@ -16,7 +16,6 @@ package events_test
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -28,16 +27,14 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
-	"github.com/google/go-github/v52/github"
-	. "github.com/petergtz/pegomock"
+	"github.com/google/go-github/v53/github"
+	. "github.com/petergtz/pegomock/v4"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	vcsmatchers "github.com/runatlantis/atlantis/server/events/vcs/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -72,11 +69,6 @@ var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
-
-func AnyRepo() models.Repo {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.Repo{})))
-	return models.Repo{}
-}
 
 type TestConfig struct {
 	parallelPoolSize           int
@@ -234,11 +226,11 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
 
-	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyPtrToCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn(nil)
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
 
 	postWorkflowHooksCommandRunner = mocks.NewMockPostWorkflowHooksCommandRunner()
 
-	When(postWorkflowHooksCommandRunner.RunPostHooks(matchers.AnyPtrToCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn(nil)
+	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
 
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
@@ -270,7 +262,7 @@ func TestRunCommentCommand_LogPanics(t *testing.T) {
 	vcsClient := setup(t)
 	When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, 1, &events.CommentCommand{Name: command.Plan})
-	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString()).GetCapturedArguments()
+	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), fmt.Sprintf("comment should be about a goroutine panic but was %q", comment))
 }
 
@@ -376,7 +368,7 @@ func TestRunCommentCommand_ForkPRDisabled_SilenceEnabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, headRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
 func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
@@ -389,14 +381,14 @@ func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-		matchers.EqCommandName(command.Plan),
-		EqInt(0),
-		EqInt(0),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.Plan),
+		Eq(0),
+		Eq(0),
 	)
 }
 
@@ -411,14 +403,14 @@ func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "meow"})
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-		matchers.EqCommandName(command.Plan),
-		EqInt(0),
-		EqInt(0),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.Plan),
+		Eq(0),
+		Eq(0),
 	)
 }
 
@@ -432,14 +424,14 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-		matchers.EqCommandName(command.Apply),
-		EqInt(0),
-		EqInt(0),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.Apply),
+		Eq(0),
+		Eq(0),
 	)
 }
 
@@ -453,14 +445,14 @@ func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) 
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-		matchers.EqCommandName(command.PolicyCheck),
-		EqInt(0),
-		EqInt(0),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.PolicyCheck),
+		Eq(0),
+		Eq(0),
 	)
 }
 
@@ -474,7 +466,7 @@ func TestRunCommentCommandUnlock_NoProjects_SilenceEnabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Unlock})
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
 func TestRunCommentCommandImport_NoProjects_SilenceEnabled(t *testing.T) {
@@ -487,7 +479,7 @@ func TestRunCommentCommandImport_NoProjects_SilenceEnabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Import})
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
 func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
@@ -512,7 +504,7 @@ func TestRunCommentCommand_DisableDisableAutoplan(t *testing.T) {
 	ch.DisableAutoplan = true
 	defer func() { ch.DisableAutoplan = false }()
 
-	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToCommandContext())).
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{
 			{
 				CommandName: command.Plan,
@@ -523,7 +515,7 @@ func TestRunCommentCommand_DisableDisableAutoplan(t *testing.T) {
 		}, nil)
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(matchers.AnyPtrToCommandContext())
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
 }
 
 func TestRunCommentCommand_ClosedPull(t *testing.T) {
@@ -572,7 +564,7 @@ func TestRunCommentCommand_UnmatchedBranch(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
 func TestRunUnlockCommand_VCSComment(t *testing.T) {
@@ -640,7 +632,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToCommandContext())).
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{
 			{
 				CommandName: command.Plan,
@@ -649,8 +641,8 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(matchers.AnyCommandProjectContext())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
-	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
@@ -667,8 +659,8 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(matchers.AnyCommandProjectContext())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
-	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.String("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
@@ -689,8 +681,8 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(matchers.AnyCommandProjectContext())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
-	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "default"})
 	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(tmp)
@@ -709,7 +701,7 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToCommandContext())).
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{
 			{
 				CommandName: command.Plan,
@@ -719,7 +711,7 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 			},
 		}, nil)
 	callCount := 0
-	When(projectCommandRunner.Plan(matchers.AnyCommandProjectContext())).Then(func(_ []Param) ReturnValues {
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).Then(func(_ []Param) ReturnValues {
 		if callCount == 0 {
 			// The first call, we return a successful result.
 			callCount++
@@ -737,14 +729,14 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 		}
 	})
 
-	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).
 		ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	// gets called twice: the first time before the plan starts, the second time after the plan errors
 	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(tmp)
 
-	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())
+	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[models.Repo](), Any[models.PullRequest]())
 }
 
 func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
@@ -760,8 +752,8 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(matchers.AnyCommandProjectContext())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
-	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.String("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
@@ -771,7 +763,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 
-	vcsClient.VerifyWasCalledOnce().DiscardReviews(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())
+	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[models.Repo](), Any[models.PullRequest]())
 }
 
 func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
@@ -797,7 +789,7 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
-	When(projectCommandBuilder.BuildApprovePoliciesCommands(matchers.AnyPtrToCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn([]command.ProjectContext{
+	When(projectCommandBuilder.BuildApprovePoliciesCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{
 		{
 			CommandName: command.ApprovePolicies,
 		},
@@ -810,12 +802,12 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &testdata.Pull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-		matchers.EqCommandName(command.PolicyCheck),
-		EqInt(0),
-		EqInt(2),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.PolicyCheck),
+		Eq(0),
+		Eq(2),
 	)
 }
 
@@ -842,7 +834,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
-	When(projectCommandBuilder.BuildApprovePoliciesCommands(matchers.AnyPtrToCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn([]command.ProjectContext{
+	When(projectCommandBuilder.BuildApprovePoliciesCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{
 		{
 			CommandName: command.ApprovePolicies,
 			PolicySets: valid.PolicySets{
@@ -854,7 +846,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	}, nil)
 
 	When(workingDir.GetPullDir(testdata.GithubRepo, testdata.Pull)).ThenReturn(tmp, nil)
-	When(projectCommandRunner.ApprovePolicies(matchers.AnyCommandProjectContext())).Then(func(_ []Param) ReturnValues {
+	When(projectCommandRunner.ApprovePolicies(Any[command.ProjectContext]())).Then(func(_ []Param) ReturnValues {
 		return ReturnValues{
 			command.ProjectResult{
 				Command:            command.PolicyCheck,
@@ -865,12 +857,12 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &testdata.Pull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-		matchers.EqCommandName(command.PolicyCheck),
-		EqInt(1),
-		EqInt(1),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.PolicyCheck),
+		Eq(1),
+		Eq(1),
 	)
 }
 
@@ -909,7 +901,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 
 	When(ch.VCSClient.PullIsMergeable(testdata.GithubRepo, modelPull, "atlantis-test")).ThenReturn(true, nil)
 
-	When(projectCommandBuilder.BuildApplyCommands(matchers.AnyPtrToCommandContext(), matchers.AnyPtrToEventsCommentCommand())).Then(func(args []Param) ReturnValues {
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
 		return ReturnValues{
 			[]command.ProjectContext{
 				{
@@ -980,11 +972,11 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	}
 	When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(ghPull, nil)
 	When(eventParsing.ParseGithubPull(ghPull)).ThenReturn(pull, pull.BaseRepo, testdata.GithubRepo, nil)
-	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).
 		ThenReturn(tmp, nil)
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &pull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
 
-	vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), vcsmatchers.AnyModelsPullRequestOptions())
+	vcsClient.VerifyWasCalled(Never()).MergePull(Any[models.PullRequest](), Any[models.PullRequestOptions]())
 }
 
 func TestRunCommentCommand_DrainOngoing(t *testing.T) {
@@ -1016,8 +1008,8 @@ func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
 	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occurred")
 	setup(t)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
-	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToCommandContext())).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(matchers.AnyPtrToCommandContext())
+	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(Any[*command.Context]())
 	Equals(t, 0, drainer.GetStatus().InProgressOps)
 }
