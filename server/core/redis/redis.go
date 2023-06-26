@@ -112,6 +112,97 @@ func (r *RedisDB) Unlock(project models.Project, workspace string) (*models.Proj
 	}
 }
 
+// TryLockFilePath attempts to create a new lock on a file path changed in the MR. If the lock is
+// acquired, it will return true and the lock returned will be newLock.
+// If the lock is not acquired, it will return false and the current
+// lock that is preventing this lock from being acquired.
+func (r *RedisDB) TryLockFilePath(pullKey string, workspaceKey string) (bool, error) {
+	_, pullKeyErr := r.client.Get(ctx, pullKey).Result()
+	_, workspaceKeyErr := r.client.Get(ctx, workspaceKey).Result()
+
+	if pullKeyErr == redis.Nil && workspaceKeyErr == redis.Nil {
+		workspaceKeySetErr := r.client.Set(ctx, workspaceKey, pullKey, 0).Err()
+		if workspaceKeySetErr != nil {
+			return false, errors.Wrap(workspaceKeySetErr, "db transaction failed")
+		}
+		return true, nil
+	} else if pullKeyErr != redis.Nil {
+		// otherwise the lock fails, return to caller the run that's holding the lock
+		return false, errors.Wrap(pullKeyErr, "db transaction failed")
+	} else if workspaceKeyErr != redis.Nil {
+		// otherwise the lock fails, return to caller the run that's holding the lock
+		return false, errors.Wrap(workspaceKeyErr, "db transaction failed")
+	} else {
+		//if err := json.Unmarshal([]byte(pullKeyVal), pullKey); err != nil {
+		//	return false, errors.Wrap(err, "failed to deserialize current lock")
+		//}
+		return false, nil
+	}
+}
+
+// UnlockFilePath attempts to unlock the FilePath.
+// If there is no lock, then it will return true and no error.
+// If there is a lock, then it will delete it, and then return true and no error.
+func (r *RedisDB) UnlockFilePath(workspaceKey string) (bool, error) {
+	_, err := r.client.Get(ctx, workspaceKey).Result()
+	if err == redis.Nil {
+		return true, nil
+	} else if err != nil {
+		return false, errors.Wrap(err, "db transaction failed")
+	} else {
+		//if err := json.Unmarshal([]byte(workspaceKeyVal), &lock); err != nil {
+		//	return nil, errors.Wrap(err, "failed to deserialize current lock")
+		//}
+		//return &lock, nil
+		r.client.Del(ctx, workspaceKey)
+		return true, nil
+	}
+	return false, nil
+}
+
+func (r *RedisDB) TryLockPullFilePath(pullKey string) (bool, error) {
+	_, pullKeyErr := r.client.Get(ctx, pullKey).Result()
+
+	pullKeyPrefix := pullKey + "/*"
+	_, pullKeyPrefixErr := r.client.Keys(ctx, pullKeyPrefix).Result()
+
+	if pullKeyErr == redis.Nil && pullKeyPrefixErr == nil {
+		pullKeySetErr := r.client.Set(ctx, pullKey, "locked", 0).Err()
+		if pullKeySetErr != nil {
+			return false, errors.Wrap(pullKeySetErr, "db transaction failed")
+		}
+		return true, nil
+	} else if pullKeyErr != redis.Nil {
+		// otherwise the lock fails, return to caller with false value since lock is not acquired
+		return false, errors.Wrap(pullKeyErr, "db transaction failed")
+	} else if pullKeyPrefixErr != nil {
+		// otherwise the lock fails, return to caller with false value since lock is not acquired
+		return false, errors.Wrap(pullKeyPrefixErr, "db transaction failed")
+	} else {
+		//if err := json.Unmarshal([]byte(pullKeyVal), pullKey); err != nil {
+		//	return false, errors.Wrap(err, "failed to deserialize current lock")
+		//}
+		return false, nil
+	}
+}
+
+func (r *RedisDB) UnlockLockPullFilePath(pullKey string) (bool, error) {
+	_, err := r.client.Get(ctx, pullKey).Result()
+	if err == redis.Nil {
+		return true, nil
+	} else if err != nil {
+		return false, errors.Wrap(err, "db transaction failed")
+	} else {
+		//if err := json.Unmarshal([]byte(workspaceKeyVal), &lock); err != nil {
+		//	return nil, errors.Wrap(err, "failed to deserialize current lock")
+		//}
+		r.client.Del(ctx, pullKey)
+		//return &lock, nil
+		return true, nil
+	}
+	return false, nil
+}
+
 // List lists all current locks.
 func (r *RedisDB) List() ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock

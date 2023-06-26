@@ -24,6 +24,26 @@ type BoltDB struct {
 	globalLocksBucketName []byte
 }
 
+func (b *BoltDB) TryLockPullFilePath(pullKey string) (bool, error) {
+	//TODO implement me
+	panic("Method not implemented for locking-db-type boltdb")
+}
+
+func (b *BoltDB) UnlockLockPullFilePath(pullKey string) (bool, error) {
+	//TODO implement me
+	panic("Method not implemented for locking-db-type boltdb")
+}
+
+func (b *BoltDB) TryLockFilePath(pullKey string, workspaceKey string) (bool, error) {
+	//TODO implement me
+	panic("Method not implemented for locking-db-type boltdb")
+}
+
+func (b *BoltDB) UnlockFilePath(workspaceKey string) (bool, error) {
+	//TODO implement me
+	panic("Method not implemented for locking-db-type boltdb")
+}
+
 const (
 	locksBucketName       = "runLocks"
 	pullsBucketName       = "pulls"

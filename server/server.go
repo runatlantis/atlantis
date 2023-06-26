@@ -419,13 +419,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	if userConfig.DisableRepoLocking {
 		logger.Info("Repo Locking is disabled")
-		lockingClient = locking.NewNoOpLocker()
+		// lockingClient = locking.NewNoOpLocker()
 	} else {
 		lockingClient = locking.NewClient(backend)
 	}
 
 	applyLockingClient = locking.NewApplyClient(backend, userConfig.DisableApply)
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := events.NewDefaultWorkingDirLocker(lockingClient)
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
 		DataDir:          userConfig.DataDir,

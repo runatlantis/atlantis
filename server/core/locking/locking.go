@@ -32,6 +32,10 @@ import (
 type Backend interface {
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
 	Unlock(project models.Project, workspace string) (*models.ProjectLock, error)
+	TryLockFilePath(pullKey string, workspaceKey string) (bool, error)
+	UnlockFilePath(workspaceKey string) (bool, error)
+	TryLockPullFilePath(pullKey string) (bool, error)
+	UnlockLockPullFilePath(pullKey string) (bool, error)
 	List() ([]models.ProjectLock, error)
 	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
@@ -68,6 +72,10 @@ type Locker interface {
 	List() (map[string]models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
 	GetLock(key string) (*models.ProjectLock, error)
+	TryLockFilePath(pullKey string, workspaceKey string) (bool, error)
+	UnlockFilePath(workspaceKey string) (bool, error)
+	TryLockPullFilePath(pullKey string) (bool, error)
+	UnlockLockPullFilePath(pullKey string) (bool, error)
 }
 
 // NewClient returns a new locking client.
@@ -106,6 +114,35 @@ func (c *Client) Unlock(key string) (*models.ProjectLock, error) {
 		return nil, err
 	}
 	return c.backend.Unlock(project, workspace)
+}
+
+// TryLockFilePath attempts to acquire a lock to a file path
+func (c *Client) TryLockFilePath(pullKey string, workspaceKey string) (bool, error) {
+	isLockAcquired, err := c.backend.TryLockFilePath(pullKey, workspaceKey)
+
+	if err != nil {
+		return false, err
+	}
+	return isLockAcquired, nil
+
+}
+
+// UnlockFilePath removes a lock to a file path
+func (c *Client) UnlockFilePath(workspaceKey string) (bool, error) {
+	return c.backend.UnlockFilePath(workspaceKey)
+}
+
+func (c *Client) TryLockPullFilePath(pullKey string) (bool, error) {
+	isLockAcquired, err := c.backend.TryLockPullFilePath(pullKey)
+
+	if err != nil {
+		return false, err
+	}
+	return isLockAcquired, nil
+}
+
+func (c *Client) UnlockLockPullFilePath(pullKey string) (bool, error) {
+	return c.backend.UnlockLockPullFilePath(pullKey)
 }
 
 // List returns a map of all locks with their lock key as the map key.

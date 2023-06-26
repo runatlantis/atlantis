@@ -15,7 +15,7 @@ package events
 
 import (
 	"fmt"
-	"strings"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"sync"
 )
 
@@ -48,12 +48,15 @@ type DefaultWorkingDirLocker struct {
 	// locks is a list of the keys that are locked. We then use prefix
 	// matching to determine if something is locked. It's naive but that's okay
 	// because there won't be many locks at one time.
-	locks []string
+	locks  []string
+	Locker locking.Locker
 }
 
 // NewDefaultWorkingDirLocker is a constructor.
-func NewDefaultWorkingDirLocker() *DefaultWorkingDirLocker {
-	return &DefaultWorkingDirLocker{}
+func NewDefaultWorkingDirLocker(locker locking.Locker) *DefaultWorkingDirLocker {
+	return &DefaultWorkingDirLocker{
+		Locker: locker,
+	}
 }
 
 func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int) (func(), error) {
@@ -61,14 +64,28 @@ func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int) 
 	defer d.mutex.Unlock()
 
 	pullKey := d.pullKey(repoFullName, pullNum)
-	for _, l := range d.locks {
-		if l == pullKey || strings.HasPrefix(l, pullKey+"/") {
-			return func() {}, fmt.Errorf("The Atlantis working dir is currently locked by another" +
-				" command that is running for this pull request.\n" +
-				"Wait until the previous command is complete and try again.")
-		}
+
+	lockAcquired, err := d.Locker.TryLockPullFilePath(pullKey)
+
+	if err != nil {
+		return func() {}, fmt.Errorf("got error while acquiring lock for %s repo"+
+			"Please fix the error %s before proceeding ahead", repoFullName, err)
 	}
-	d.locks = append(d.locks, pullKey)
+
+	if lockAcquired == false {
+		return func() {}, fmt.Errorf("The Atlantis working dir is currently locked by another" +
+			" command that is running for this pull request.\n" +
+			"Wait until the previous command is complete and try again.")
+	}
+
+	//for _, l := range d.locks {
+	//	if l == pullKey || strings.HasPrefix(l, pullKey+"/") {
+	//		return func() {}, fmt.Errorf("The Atlantis working dir is currently locked by another" +
+	//			" command that is running for this pull request.\n" +
+	//			"Wait until the previous command is complete and try again.")
+	//	}
+	//}
+	//d.locks = append(d.locks, pullKey)
 	return func() {
 		d.UnlockPull(repoFullName, pullNum)
 	}, nil
@@ -80,18 +97,40 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 
 	pullKey := d.pullKey(repoFullName, pullNum)
 	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path)
-	for _, l := range d.locks {
-		if l == pullKey || l == workspaceKey {
-			return func() {}, fmt.Errorf("The %s workspace at path %s is currently locked by another"+
-				" command that is running for this pull request.\n"+
-				"Wait until the previous command is complete and try again.", workspace, path)
-		}
+
+	lockAcquired, err := d.Locker.TryLockFilePath(pullKey, workspaceKey)
+	if err != nil {
+		return func() {}, fmt.Errorf("got error while acquiring lock for %s workspace at path %s."+
+			"Please fix the error %s before proceeding ahead", workspace, path, err)
 	}
-	d.locks = append(d.locks, workspaceKey)
+
+	if lockAcquired == false {
+		return func() {}, fmt.Errorf("The %s workspace at path %s is currently locked by another"+
+			" command that is running for this pull request.\n"+
+			"Wait until the previous command is complete and try again.", workspace, path)
+	}
+
+	//for _, l := range d.locks {
+	//	if l == pullKey || l == workspaceKey {
+	//		return func() {}, fmt.Errorf("The %s workspace at path %s is currently locked by another"+
+	//			" command that is running for this pull request.\n"+
+	//			"Wait until the previous command is complete and try again.", workspace, path)
+	//	}
+	//}
+	//d.locks = append(d.locks, workspaceKey)
 	return func() {
 		d.unlock(repoFullName, pullNum, workspace, path)
 	}, nil
 }
+
+//// Unlock unlocks the workspace for this pull.
+//func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, workspace string, path string) {
+//	d.mutex.Lock()
+//	defer d.mutex.Unlock()
+//
+//	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path)
+//	d.removeLock(workspaceKey)
+//}
 
 // Unlock unlocks the workspace for this pull.
 func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, workspace string, path string) {
@@ -99,16 +138,25 @@ func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, works
 	defer d.mutex.Unlock()
 
 	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path)
-	d.removeLock(workspaceKey)
+	d.Locker.UnlockFilePath(workspaceKey)
 }
 
-// Unlock unlocks all workspaces for this pull.
+//// UnlockPull unlocks all workspaces for this pull.
+//func (d *DefaultWorkingDirLocker) UnlockPull(repoFullName string, pullNum int) {
+//	d.mutex.Lock()
+//	defer d.mutex.Unlock()
+//
+//	pullKey := d.pullKey(repoFullName, pullNum)
+//	d.removeLock(pullKey)
+//}
+
+// UnlockPull unlocks all workspaces for this pull.
 func (d *DefaultWorkingDirLocker) UnlockPull(repoFullName string, pullNum int) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	pullKey := d.pullKey(repoFullName, pullNum)
-	d.removeLock(pullKey)
+	d.Locker.UnlockLockPullFilePath(pullKey)
 }
 
 func (d *DefaultWorkingDirLocker) removeLock(key string) {
