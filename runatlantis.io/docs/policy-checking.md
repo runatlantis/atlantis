@@ -23,7 +23,7 @@ Any failures need to either be addressed in a successive commit, or approved by 
 
 Policy approvals may be cleared either by re-planing, or by issuing the following command:
 ```
-atlantis approve_policies --clear-policy-approvals
+atlantis approve_policies --clear-policy-approval
 ```
 
 ::: warning

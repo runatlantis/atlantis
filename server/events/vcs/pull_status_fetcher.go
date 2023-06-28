@@ -5,7 +5,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_pull_req_status_fetcher.go PullReqStatusFetcher
+//go:generate pegomock generate --package mocks -o mocks/mock_pull_req_status_fetcher.go PullReqStatusFetcher
 
 type PullReqStatusFetcher interface {
 	FetchPullStatus(pull models.PullRequest) (models.PullReqStatus, error)
