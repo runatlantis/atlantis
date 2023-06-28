@@ -35,7 +35,7 @@ type TerraformExec interface {
 // It's split from TerraformExec because due to a bug in pegomock with channels,
 // we can't generate a mock for it so we hand-write it for this specific method.
 //
-//go:generate pegomock generate -m --package mocks -o mocks/mock_async_tfexec.go AsyncTFExec
+//go:generate pegomock generate --package mocks -o mocks/mock_async_tfexec.go AsyncTFExec
 type AsyncTFExec interface {
 	// RunCommandAsync runs terraform with args. It immediately returns an
 	// input and output channel. Callers can use the output channel to
@@ -49,14 +49,14 @@ type AsyncTFExec interface {
 // StatusUpdater brings the interface from CommitStatusUpdater into this package
 // without causing circular imports.
 //
-//go:generate pegomock generate -m --package mocks -o mocks/mock_status_updater.go StatusUpdater
+//go:generate pegomock generate --package mocks -o mocks/mock_status_updater.go StatusUpdater
 type StatusUpdater interface {
 	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectResult) error
 }
 
 // Runner mirrors events.StepRunner as a way to bring it into this package
 //
-//go:generate pegomock generate -m --package mocks -o mocks/mock_runner.go Runner
+//go:generate pegomock generate --package mocks -o mocks/mock_runner.go Runner
 type Runner interface {
 	Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }

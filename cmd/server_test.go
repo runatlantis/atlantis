@@ -66,7 +66,7 @@ var testFlags = map[string]interface{}{
 	BitbucketTokenFlag:               "bitbucket-token",
 	BitbucketUserFlag:                "bitbucket-user",
 	BitbucketWebhookSecretFlag:       "bitbucket-secret",
-	CheckoutStrategyFlag:             "merge",
+	CheckoutStrategyFlag:             CheckoutStrategyMerge,
 	DataDirFlag:                      "/path",
 	DefaultTFVersionFlag:             "v0.11.0",
 	DisableApplyAllFlag:              true,

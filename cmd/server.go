@@ -33,6 +33,12 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
+// checkout strategies
+const (
+	CheckoutStrategyBranch = "branch"
+	CheckoutStrategyMerge  = "merge"
+)
+
 // To add a new flag you must:
 // 1. Add a const with the flag name (in alphabetic order).
 // 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
@@ -143,7 +149,7 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
-	DefaultCheckoutStrategy             = "branch"
+	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
@@ -555,7 +561,7 @@ var boolFlags = map[string]boolFlag{
 }
 var intFlags = map[string]intFlag{
 	CheckoutDepthFlag: {
-		description: fmt.Sprintf("Used only if --%s=merge.", CheckoutStrategyFlag) +
+		description: fmt.Sprintf("Used only if --%s=%s.", CheckoutStrategyFlag, CheckoutStrategyMerge) +
 			" How many commits to include in each of base and feature branches when cloning repository." +
 			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
 		defaultValue: DefaultCheckoutDepth,
@@ -862,8 +868,9 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 
 	checkoutStrategy := userConfig.CheckoutStrategy
-	if checkoutStrategy != "branch" && checkoutStrategy != "merge" {
-		return errors.New("invalid checkout strategy: not one of branch or merge")
+	if checkoutStrategy != CheckoutStrategyBranch && checkoutStrategy != CheckoutStrategyMerge {
+		return fmt.Errorf("invalid checkout strategy: not one of %s or %s",
+			CheckoutStrategyBranch, CheckoutStrategyMerge)
 	}
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
