@@ -215,7 +215,7 @@ func (s Step) Validate() error {
 				}
 				// Sort so tests can be deterministic.
 				sort.Strings(argKeys)
-				return fmt.Errorf("env steps only support keys %q, %q and %q, found extra keys %q", RunStepName, CommandArgKey, OutputArgKey, strings.Join(argKeys, ","))
+				return fmt.Errorf("run steps only support keys %q, %q and %q, found extra keys %q", RunStepName, CommandArgKey, OutputArgKey, strings.Join(argKeys, ","))
 			}
 		default:
 			return fmt.Errorf("%q is not a valid step type", stepName)

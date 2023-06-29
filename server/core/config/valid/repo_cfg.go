@@ -150,6 +150,7 @@ type Autoplan struct {
 	Enabled      bool
 }
 
+// PostProcessRunOutputOption is an enum of options for post-processing RunCommand output
 type PostProcessRunOutputOption string
 
 const (
