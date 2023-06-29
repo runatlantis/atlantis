@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock/v3"
+	pegomock "github.com/petergtz/pegomock/v4"
 	valid "github.com/runatlantis/atlantis/server/core/config/valid"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	"reflect"
@@ -26,11 +26,11 @@ func NewMockCustomStepRunner(options ...pegomock.Option) *MockCustomStepRunner {
 func (mock *MockCustomStepRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockCustomStepRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockCustomStepRunner) Run(_param0 command.ProjectContext, _param1 string, _param2 string, _param3 map[string]string, _param4 bool, _param5 valid.PostProcessRunOutputOption) (string, error) {
+func (mock *MockCustomStepRunner) Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCustomStepRunner().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5}
+	params := []pegomock.Param{ctx, cmd, path, envs, streamOutput, postProcessOutput}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -82,8 +82,8 @@ type VerifierMockCustomStepRunner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockCustomStepRunner) Run(_param0 command.ProjectContext, _param1 string, _param2 string, _param3 map[string]string, _param4 bool, _param5 valid.PostProcessRunOutputOption) *MockCustomStepRunner_Run_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5}
+func (verifier *VerifierMockCustomStepRunner) Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) *MockCustomStepRunner_Run_OngoingVerification {
+	params := []pegomock.Param{ctx, cmd, path, envs, streamOutput, postProcessOutput}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
 	return &MockCustomStepRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -94,8 +94,8 @@ type MockCustomStepRunner_Run_OngoingVerification struct {
 }
 
 func (c *MockCustomStepRunner_Run_OngoingVerification) GetCapturedArguments() (command.ProjectContext, string, string, map[string]string, bool, valid.PostProcessRunOutputOption) {
-	_param0, _param1, _param2, _param3, _param4, _param5 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1], _param3[len(_param3)-1], _param4[len(_param4)-1], _param5[len(_param5)-1]
+	ctx, cmd, path, envs, streamOutput, postProcessOutput := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], cmd[len(cmd)-1], path[len(path)-1], envs[len(envs)-1], streamOutput[len(streamOutput)-1], postProcessOutput[len(postProcessOutput)-1]
 }
 
 func (c *MockCustomStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 []string, _param3 []map[string]string, _param4 []bool, _param5 []valid.PostProcessRunOutputOption) {
