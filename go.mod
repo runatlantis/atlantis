@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/alicebob/miniredis/v2 v2.30.3
+	github.com/alicebob/miniredis/v2 v2.30.4
 	github.com/bradleyfalzon/ghinstallation/v2 v2.5.0
 	github.com/briandowns/spinner v1.23.0
 	github.com/cactus/go-statsd-client/v5 v5.0.0
