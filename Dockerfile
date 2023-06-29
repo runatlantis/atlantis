@@ -124,7 +124,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.5.1
+ENV DEFAULT_TERRAFORM_VERSION=1.5.2
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 #RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
