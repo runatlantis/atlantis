@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -21,7 +22,7 @@ type RunStepRunner struct {
 	ProjectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
 
-func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, streamOutput bool) (string, error) {
+func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -75,5 +76,15 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
-	return output, nil
+
+	switch postProcessOutput {
+	case valid.PostProcessRunOutputHide:
+		return "", nil
+	case valid.PostProcessRunOutputStripRefreshing:
+		return StripRefreshingFromPlanOutput(output, tfVersion), nil
+	case valid.PostProcessRunOutputShow:
+		return output, nil
+	default:
+		return output, nil
+	}
 }

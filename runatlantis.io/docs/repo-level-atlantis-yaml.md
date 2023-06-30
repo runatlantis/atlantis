@@ -72,6 +72,9 @@ workflows:
     plan:
       steps:
       - run: my-custom-command arg1 arg2
+      - run:
+          command: my-custom-command arg1 arg2
+          output: hide
       - init
       - plan:
           extra_args: ["-lock", "false"]
