@@ -860,7 +860,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ApplyDisabled:                   disableApply,
 		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
 		GithubRequestValidator:          &events_controllers.DefaultGithubRequestValidator{},
-		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{Logger: logger},
+		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
 		RepoAllowlistChecker:            repoAllowlist,
 		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
