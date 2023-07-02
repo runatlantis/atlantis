@@ -1,11 +1,7 @@
 package events
 
 import (
-	"os"
-	"path/filepath"
-
 	"github.com/runatlantis/atlantis/server/core/locking"
-	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -36,20 +32,16 @@ func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, e
 	if lock == nil {
 		return nil, nil
 	}
-	repoDir, err := l.WorkingDir.GetWorkingDir(lock.Pull.BaseRepo, lock.Pull, lock.Workspace)
-	if err != nil {
-		return nil, err
-	}
 
-	// The locks controller currently has no implementation of Atlantis project names, so this
-	// is hardcoded to an empty string.
+	// The locks controller currently has no implementation of Atlantis project names, so this is hardcoded to an empty string.
 	projectName := ""
-	planPath := filepath.Join(repoDir, lock.Project.Path, runtime.GetPlanFilename(lock.Workspace, projectName))
-	l.Logger.Info("Deleting plan: " + planPath)
 
-	if removeErr := os.Remove(planPath); removeErr != nil {
+	removeErr := l.WorkingDir.DeletePlan(lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, projectName)
+	if removeErr != nil {
 		l.Logger.Warn("Failed to delete plan: %s", removeErr)
+		return nil, removeErr
 	}
+
 	return lock, nil
 }
 
