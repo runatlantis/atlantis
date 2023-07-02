@@ -197,7 +197,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 		Logger:                       logger,
 		Scope:                        scope,
 		CommentParser:                &events.CommentParser{ExecutableName: "atlantis"},
-		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{},
+		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{Logger: logger},
 		Parser:                       &events.EventParser{},
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab},
 		RepoAllowlistChecker:         &events.RepoAllowlistChecker{},
@@ -225,15 +225,17 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	e := events_controllers.VCSEventsController{
-		Logger:                       logger,
-		Scope:                        scope,
-		CommentParser:                &events.CommentParser{ExecutableName: "atlantis"},
-		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{},
-		Parser:                       &events.EventParser{},
-		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab},
-		RepoAllowlistChecker:         &events.RepoAllowlistChecker{},
-		VCSClient:                    vcsClient,
-		SilenceAllowlistErrors:       true,
+		Logger:        logger,
+		Scope:         scope,
+		CommentParser: &events.CommentParser{ExecutableName: "atlantis"},
+		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{
+			Logger: logger,
+		},
+		Parser:                 &events.EventParser{},
+		SupportedVCSHosts:      []models.VCSHostType{models.Gitlab},
+		RepoAllowlistChecker:   &events.RepoAllowlistChecker{},
+		VCSClient:              vcsClient,
+		SilenceAllowlistErrors: true,
 	}
 	requestJSON, err := os.ReadFile(filepath.Join("testdata", "gitlabMergeCommentEvent_notAllowlisted.json"))
 	Ok(t, err)
