@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/alicebob/miniredis/v2 v2.30.3
+	github.com/alicebob/miniredis/v2 v2.30.4
 	github.com/bradleyfalzon/ghinstallation/v2 v2.5.0
 	github.com/briandowns/spinner v1.23.0
 	github.com/cactus/go-statsd-client/v5 v5.0.0
@@ -41,7 +41,7 @@ require (
 	github.com/uber-go/tally/v4 v4.1.7
 	github.com/urfave/negroni/v3 v3.0.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
-	github.com/xanzy/go-gitlab v0.85.0
+	github.com/xanzy/go-gitlab v0.86.0
 	go.etcd.io/bbolt v1.3.7
 	go.uber.org/zap v1.24.0
 	golang.org/x/term v0.9.0
