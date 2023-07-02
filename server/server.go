@@ -851,16 +851,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
-		CommandRunner:                   commandRunner,
-		PullCleaner:                     pullClosedExecutor,
-		Parser:                          eventParser,
-		CommentParser:                   commentParser,
-		Logger:                          logger,
-		Scope:                           statsScope,
-		ApplyDisabled:                   disableApply,
-		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
-		GithubRequestValidator:          &events_controllers.DefaultGithubRequestValidator{},
-		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{},
+		CommandRunner:          commandRunner,
+		PullCleaner:            pullClosedExecutor,
+		Parser:                 eventParser,
+		CommentParser:          commentParser,
+		Logger:                 logger,
+		Scope:                  statsScope,
+		ApplyDisabled:          disableApply,
+		GithubWebhookSecret:    []byte(userConfig.GithubWebhookSecret),
+		GithubRequestValidator: &events_controllers.DefaultGithubRequestValidator{},
+		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{
+			Logger: logger,
+		},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
 		RepoAllowlistChecker:            repoAllowlist,
 		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,

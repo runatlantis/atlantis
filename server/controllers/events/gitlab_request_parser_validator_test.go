@@ -21,15 +21,17 @@ import (
 
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers/events"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
-var parser = events.DefaultGitlabRequestParserValidator{}
-
 func TestValidate_InvalidSecret(t *testing.T) {
 	t.Log("If the secret header is set and doesn't match expected an error is returned")
 	RegisterMockTestingT(t)
+	parser := events.DefaultGitlabRequestParserValidator{
+		Logger: logging.NewNoopLogger(t),
+	}
 	buf := bytes.NewBufferString("")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -40,34 +42,41 @@ func TestValidate_InvalidSecret(t *testing.T) {
 }
 
 func TestValidate_ValidSecret(t *testing.T) {
-	t.Log("If the secret header matches then the event is returned")
+	t.Log("If the secret header matches then the function doesn't error")
 	RegisterMockTestingT(t)
-	buf := bytes.NewBufferString(mergeEventJSON)
+	parser := events.DefaultGitlabRequestParserValidator{
+		Logger: logging.NewNoopLogger(t),
+	}
+	buf := bytes.NewBufferString(mergeEventCodeUpdateJSON)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Token", "secret")
 	req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
-	b, err := parser.ParseAndValidate(req, []byte("secret"))
+	_, err = parser.ParseAndValidate(req, []byte("secret"))
 	Ok(t, err)
-	Equals(t, "atlantis-example", b.(gitlab.MergeEvent).Project.Name)
 }
 
 func TestValidate_NoSecret(t *testing.T) {
-	t.Log("If there is no secret then we ignore the secret header and return the event")
+	t.Log("If there is no secret then we ignore the secret header and don't error")
 	RegisterMockTestingT(t)
-	buf := bytes.NewBufferString(mergeEventJSON)
+	parser := events.DefaultGitlabRequestParserValidator{
+		Logger: logging.NewNoopLogger(t),
+	}
+	buf := bytes.NewBufferString(mergeEventCodeUpdateJSON)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Token", "random secret")
 	req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
-	b, err := parser.ParseAndValidate(req, nil)
+	_, err = parser.ParseAndValidate(req, nil)
 	Ok(t, err)
-	Equals(t, "atlantis-example", b.(gitlab.MergeEvent).Project.Name)
 }
 
 func TestValidate_InvalidMergeEvent(t *testing.T) {
 	t.Log("If the merge event is malformed there should be an error")
 	RegisterMockTestingT(t)
+	parser := events.DefaultGitlabRequestParserValidator{
+		Logger: logging.NewNoopLogger(t),
+	}
 	buf := bytes.NewBufferString("{")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -80,6 +89,9 @@ func TestValidate_InvalidMergeEvent(t *testing.T) {
 func TestValidate_InvalidMergeCommentEvent(t *testing.T) {
 	t.Log("If the merge comment event is malformed there should be an error")
 	RegisterMockTestingT(t)
+	parser := events.DefaultGitlabRequestParserValidator{
+		Logger: logging.NewNoopLogger(t),
+	}
 	buf := bytes.NewBufferString("{")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -92,6 +104,9 @@ func TestValidate_InvalidMergeCommentEvent(t *testing.T) {
 func TestValidate_UnrecognizedEvent(t *testing.T) {
 	t.Log("If the event is not one we care about we return nil")
 	RegisterMockTestingT(t)
+	parser := events.DefaultGitlabRequestParserValidator{
+		Logger: logging.NewNoopLogger(t),
+	}
 	buf := bytes.NewBufferString("")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -101,10 +116,13 @@ func TestValidate_UnrecognizedEvent(t *testing.T) {
 	Equals(t, nil, event)
 }
 
-func TestValidate_ValidMergeEvent(t *testing.T) {
-	t.Log("If the merge event is valid it should be returned")
+func TestValidate_ValidMergeEventCodeUpdate(t *testing.T) {
+	t.Log("If the merge event is a valid 'code update' it should be returned")
 	RegisterMockTestingT(t)
-	buf := bytes.NewBufferString(mergeEventJSON)
+	parser := events.DefaultGitlabRequestParserValidator{
+		Logger: logging.NewNoopLogger(t),
+	}
+	buf := bytes.NewBufferString(mergeEventCodeUpdateJSON)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
@@ -113,10 +131,27 @@ func TestValidate_ValidMergeEvent(t *testing.T) {
 	Equals(t, "atlantis-example", b.(gitlab.MergeEvent).Project.Name)
 }
 
-// If the comment was on a commit instead of a merge request, make sure we
-// return the right object.
-func TestValidate_CommitCommentEvent(t *testing.T) {
+func TestValidate_ValidMergeEventNonCodeUpdate(t *testing.T) {
+	t.Log("If the merge event is a valid 'non code update' nothing should be returned with no error")
 	RegisterMockTestingT(t)
+	parser := events.DefaultGitlabRequestParserValidator{
+		Logger: logging.NewNoopLogger(t),
+	}
+	buf := bytes.NewBufferString(mergeEventNonCodeUpdateJSON)
+	req, err := http.NewRequest("POST", "http://localhost/event", buf)
+	Ok(t, err)
+	req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
+	b, err := parser.ParseAndValidate(req, nil)
+	Ok(t, err)
+	Equals(t, nil, b)
+}
+
+func TestValidate_CommitCommentEvent(t *testing.T) {
+	t.Log("If the comment was on a commit instead of a merge request, make sure we return the right object.")
+	RegisterMockTestingT(t)
+	parser := events.DefaultGitlabRequestParserValidator{
+		Logger: logging.NewNoopLogger(t),
+	}
 	buf := bytes.NewBufferString(commitCommentEventJSON)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -129,6 +164,9 @@ func TestValidate_CommitCommentEvent(t *testing.T) {
 func TestValidate_ValidMergeCommentEvent(t *testing.T) {
 	t.Log("If the merge comment event is valid it should be returned")
 	RegisterMockTestingT(t)
+	parser := events.DefaultGitlabRequestParserValidator{
+		Logger: logging.NewNoopLogger(t),
+	}
 	buf := bytes.NewBufferString(mergeCommentEventJSON)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -138,7 +176,133 @@ func TestValidate_ValidMergeCommentEvent(t *testing.T) {
 	Equals(t, "Gitlab Test", b.(gitlab.MergeCommentEvent).Project.Name)
 }
 
-var mergeEventJSON = `{
+var mergeEventCodeUpdateJSON = `{
+  "object_kind": "merge_request",
+  "event_type": "merge_request",
+  "user": {
+    "name": "Luke Kysow",
+    "username": "lkysow",
+    "avatar_url": "https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon"
+  },
+  "project": {
+    "id": 4580910,
+    "name": "atlantis-example",
+    "description": "",
+    "web_url": "https://gitlab.com/lkysow/atlantis-example",
+    "avatar_url": null,
+    "git_ssh_url": "git@gitlab.com:lkysow/atlantis-example.git",
+    "git_http_url": "https://gitlab.com/lkysow/atlantis-example.git",
+    "namespace": "lkysow",
+    "visibility_level": 20,
+    "path_with_namespace": "lkysow/atlantis-example",
+    "default_branch": "main",
+    "ci_config_path": null,
+    "homepage": "https://gitlab.com/lkysow/atlantis-example",
+    "url": "git@gitlab.com:lkysow/atlantis-example.git",
+    "ssh_url": "git@gitlab.com:lkysow/atlantis-example.git",
+    "http_url": "https://gitlab.com/lkysow/atlantis-example.git"
+  },
+  "object_attributes": {
+    "assignee_id": null,
+    "author_id": 1755902,
+    "created_at": "2018-12-12 16:15:21 UTC",
+    "description": "",
+    "head_pipeline_id": null,
+    "id": 20809239,
+    "iid": 12,
+    "last_edited_at": null,
+    "last_edited_by_id": null,
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_params": {
+      "force_remove_source_branch": false
+    },
+    "merge_status": "unchecked",
+    "merge_user_id": null,
+    "merge_when_pipeline_succeeds": false,
+    "milestone_id": null,
+    "source_branch": "patch-1",
+    "source_project_id": 4580910,
+    "state": "opened",
+    "target_branch": "main",
+    "target_project_id": 4580910,
+    "time_estimate": 0,
+    "title": "Update main.tf",
+    "updated_at": "2018-12-12 16:15:21 UTC",
+    "updated_by_id": null,
+    "url": "https://gitlab.com/lkysow/atlantis-example/merge_requests/12",
+    "source": {
+      "id": 4580910,
+      "name": "atlantis-example",
+      "description": "",
+      "web_url": "https://gitlab.com/sourceorg/atlantis-example",
+      "avatar_url": null,
+      "git_ssh_url": "git@gitlab.com:sourceorg/atlantis-example.git",
+      "git_http_url": "https://gitlab.com/sourceorg/atlantis-example.git",
+      "namespace": "sourceorg",
+      "visibility_level": 20,
+      "path_with_namespace": "sourceorg/atlantis-example",
+      "default_branch": "main",
+      "ci_config_path": null,
+      "homepage": "https://gitlab.com/sourceorg/atlantis-example",
+      "url": "git@gitlab.com:sourceorg/atlantis-example.git",
+      "ssh_url": "git@gitlab.com:sourceorg/atlantis-example.git",
+      "http_url": "https://gitlab.com/sourceorg/atlantis-example.git"
+    },
+    "target": {
+      "id": 4580910,
+      "name": "atlantis-example",
+      "description": "",
+      "web_url": "https://gitlab.com/lkysow/atlantis-example",
+      "avatar_url": null,
+      "git_ssh_url": "git@gitlab.com:lkysow/atlantis-example.git",
+      "git_http_url": "https://gitlab.com/lkysow/atlantis-example.git",
+      "namespace": "lkysow",
+      "visibility_level": 20,
+      "path_with_namespace": "lkysow/atlantis-example",
+      "default_branch": "main",
+      "ci_config_path": null,
+      "homepage": "https://gitlab.com/lkysow/atlantis-example",
+      "url": "git@gitlab.com:lkysow/atlantis-example.git",
+      "ssh_url": "git@gitlab.com:lkysow/atlantis-example.git",
+      "http_url": "https://gitlab.com/lkysow/atlantis-example.git"
+    },
+    "last_commit": {
+      "id": "d2eae324ca26242abca45d7b49d582cddb2a4f15",
+      "message": "Update main.tf",
+      "timestamp": "2018-12-12T16:15:10Z",
+      "url": "https://gitlab.com/lkysow/atlantis-example/commit/d2eae324ca26242abca45d7b49d582cddb2a4f15",
+      "author": {
+        "name": "Luke Kysow",
+        "email": "lkysow@gmail.com"
+      }
+    },
+    "work_in_progress": false,
+    "total_time_spent": 0,
+    "human_total_time_spent": null,
+    "human_time_estimate": null,
+    "action": "open",
+    "oldrev": "c859acd402f6d8fcd70452b4537c5b8516f59ddf"
+  },
+  "labels": [
+
+  ],
+  "changes": {
+    "updated_at": {
+      "previous": null,
+      "current": "2018-12-12 16:15:21 UTC"
+    }
+  },
+  "repository": {
+    "name": "atlantis-example",
+    "url": "git@gitlab.com:lkysow/atlantis-example.git",
+    "description": "",
+    "homepage": "https://gitlab.com/lkysow/atlantis-example"
+  }
+}
+`
+
+var mergeEventNonCodeUpdateJSON = `{
   "object_kind": "merge_request",
   "event_type": "merge_request",
   "user": {

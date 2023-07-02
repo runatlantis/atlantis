@@ -20,6 +20,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/runatlantis/atlantis/server/logging"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
@@ -52,7 +53,9 @@ type GitlabRequestParserValidator interface {
 }
 
 // DefaultGitlabRequestParserValidator parses and validates GitLab requests.
-type DefaultGitlabRequestParserValidator struct{}
+type DefaultGitlabRequestParserValidator struct {
+	Logger logging.SimpleLogging
+}
 
 // ParseAndValidate returns the JSON payload of the request.
 // See GitlabRequestParserValidator.ParseAndValidate().
@@ -72,14 +75,22 @@ func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, 
 	if err != nil {
 		return nil, err
 	}
+	d.Logger.Debug("Webhook payload: %s", string(bytes))
 	switch r.Header.Get(gitlabHeader) {
 	case mergeEventHeader:
+		d.Logger.Debug("Parsing merge event")
 		var m gitlab.MergeEvent
 		if err := json.Unmarshal(bytes, &m); err != nil {
 			return nil, err
 		}
+		// The 'object_attributes.oldrev' attribute is only set on actual code change events
+		if m.ObjectAttributes.OldRev == "" {
+			d.Logger.Debug("Not a 'code update' merge event, ignoring")
+			return nil, nil
+		}
 		return m, nil
 	case noteEventHeader:
+		d.Logger.Debug("Parsing note event")
 		// First, parse a small part of the json to determine if this is a
 		// comment on a merge request or a commit.
 		var subset struct {
@@ -94,10 +105,12 @@ func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, 
 		// We then parse into the correct comment event type.
 		switch subset.ObjectAttributes.NoteableType {
 		case "Commit":
+			d.Logger.Debug("Parsing commit comment event")
 			var e gitlab.CommitCommentEvent
 			err := json.Unmarshal(bytes, &e)
 			return e, err
 		case "MergeRequest":
+			d.Logger.Debug("Parsing merge comment event")
 			var e gitlab.MergeCommentEvent
 			err := json.Unmarshal(bytes, &e)
 			return e, err
