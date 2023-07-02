@@ -61,7 +61,7 @@ test-all: ## Run tests including integration
 
 .PHONY: docker/test-all
 docker/test-all: ## Run all tests in docker
-	docker run -it -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:latest sh -c "cd /atlantis && make test-all"
+	docker run -it -v $(PWD):/atlantis ghcr.io/runatlantis/testing-env:latest sh -c "cd /atlantis && make test-all"
 
 .PHONY: test-coverage
 test-coverage: ## Show test coverage

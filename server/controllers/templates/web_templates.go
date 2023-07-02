@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_template_writer.go TemplateWriter
+//go:generate pegomock generate --package mocks -o mocks/mock_template_writer.go TemplateWriter
 
 // TemplateWriter is an interface over html/template that's used to enable
 // mocking.
@@ -297,17 +297,15 @@ var LockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
     <div class="navbar-spacer"></div>
     <br>
     <section>
-      <div class="eight columns">
-        <h6><code>Repo Owner</code>: <strong>{{.RepoOwner}}</strong></h6>
-        <h6><code>Repo Name</code>: <strong>{{.RepoName}}</strong></h6>
-        <h6><code>Pull Request Link</code>: <a href="{{.PullRequestLink}}" target="_blank"><strong>{{.PullRequestLink}}</strong></a></h6>
-        <h6><code>Locked By</code>: <strong>{{.LockedBy}}</strong></h6>
-        <h6><code>Workspace</code>: <strong>{{.Workspace}}</strong></h6>
-        <br>
+      <div class="lock-detail-grid">
+        <div><strong>Repo Owner:</strong></div><div>{{.RepoOwner}}</div>
+        <div><strong>Repo Name:</strong></div><div>{{.RepoName}}</div>
+        <div><strong>Pull Request Link:</strong></div><div><a href="{{.PullRequestLink}}" target="_blank">{{.PullRequestLink}}</a></div>
+        <div><strong>Locked By:</strong></div><div>{{.LockedBy}}</div>
+        <div><strong>Workspace:</strong></div><div>{{.Workspace}}</div>
       </div>
-      <div class="four columns">
-        <a class="button button-default" id="discardPlanUnlock">Discard Plan & Unlock</a>
-      </div>
+      <br>
+        <a class="button button-primary" id="discardPlanUnlock">Discard Plan & Unlock</a>
     </section>
   </div>
   <div id="discardMessageModal" class="modal">
