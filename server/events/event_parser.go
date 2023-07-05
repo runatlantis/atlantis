@@ -585,7 +585,9 @@ func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, e
 // ParseGitlabMergeRequestUpdateEvent dives deeper into Gitlab merge request update events
 func (e *EventParser) ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent) models.PullRequestEventType {
 	// New commit to opened MR
-	if len(event.ObjectAttributes.OldRev) > 0 {
+	if len(event.ObjectAttributes.OldRev) > 0 ||
+		// Check for MR that has been marked as ready
+		(strings.HasPrefix(event.Changes.Title.Previous, "Draft:") && !strings.HasPrefix(event.Changes.Title.Current, "Draft:")) {
 		return models.UpdatedPullEvent
 	} else {
 		return models.OtherPullEvent

@@ -502,6 +502,10 @@ func TestParseGitlabMergeEvent_Update_ActionType(t *testing.T) {
 			filename: "gitlab-merge-request-event-update-milestone.json",
 			exp:      models.OtherPullEvent,
 		},
+		{
+			filename: "gitlab-merge-request-event-mark-as-ready.json",
+			exp:      models.UpdatedPullEvent,
+		},
 	}
 
 	for _, c := range cases {
