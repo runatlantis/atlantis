@@ -395,7 +395,6 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
         left: 0px;
         bottom: 0px;
         right: 0px;
-        overflow: auto;
         border: 5px solid white;
         }
 
