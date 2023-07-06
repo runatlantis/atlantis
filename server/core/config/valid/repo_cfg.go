@@ -134,6 +134,7 @@ type Project struct {
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
 	ExecutionOrderGroup       int
+	PolicyCheck               *bool
 }
 
 // GetName returns the name of the project or an empty string if there is no
