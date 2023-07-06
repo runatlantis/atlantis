@@ -34,6 +34,7 @@ type Repo struct {
 	AllowCustomWorkflows      *bool          `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
 	DeleteSourceBranchOnMerge *bool          `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
 	RepoLocking               *bool          `yaml:"repo_locking,omitempty" json:"repo_locking,omitempty"`
+	PolicyCheck               *bool          `yaml:"policy_check,omitempty" json:"policy_check,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -191,8 +192,8 @@ func (r Repo) Validate() error {
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey {
-				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q, %q and %q are supported", o, valid.PlanRequirementsKey, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey)
+			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey && o != valid.PolicyCheckKey {
+				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q, %q, %q and %q are supported", o, valid.PlanRequirementsKey, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey, valid.PolicyCheckKey)
 			}
 		}
 		return nil
@@ -277,6 +278,11 @@ OuterGlobalPlanReqs:
 				continue OuterGlobalPlanReqs
 			}
 		}
+
+		// dont add policy_check step if repo have it explicitly disabled
+		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && *r.PolicyCheck == false {
+			continue
+		}
 		mergedPlanReqs = append(mergedPlanReqs, globalReq)
 	}
 OuterGlobalApplyReqs:
@@ -286,6 +292,11 @@ OuterGlobalApplyReqs:
 				continue OuterGlobalApplyReqs
 			}
 		}
+
+		// dont add policy_check step if repo have it explicitly disabled
+		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && *r.PolicyCheck == false {
+			continue
+		}
 		mergedApplyReqs = append(mergedApplyReqs, globalReq)
 	}
 OuterGlobalImportReqs:
@@ -294,6 +305,11 @@ OuterGlobalImportReqs:
 			if globalReq == currReq {
 				continue OuterGlobalImportReqs
 			}
+		}
+
+		// dont add policy_check step if repo have it explicitly disabled
+		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && *r.PolicyCheck == false {
+			continue
 		}
 		mergedImportReqs = append(mergedImportReqs, globalReq)
 	}
@@ -314,5 +330,6 @@ OuterGlobalImportReqs:
 		AllowCustomWorkflows:      r.AllowCustomWorkflows,
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 		RepoLocking:               r.RepoLocking,
+		PolicyCheck:               r.PolicyCheck,
 	}
 }
