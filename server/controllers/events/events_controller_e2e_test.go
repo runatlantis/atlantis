@@ -901,10 +901,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			},
 		},
 		{
-			Description:   "failing policy without policies passing and custom run steps",
-			RepoDir:       "policy-checks-custom-run-steps",
-			ModifiedFiles: []string{"main.tf"},
-			ExpAutoplan:   true,
+			Description:     "failing policy without policies passing and custom run steps",
+			RepoDir:         "policy-checks-custom-run-steps",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
 			Comments: []string{
 				"atlantis apply",
 			},
@@ -1160,10 +1162,10 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				expNumReplies--
 			}
 
-			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
 			if !c.ExpPolicyChecks {
 				expNumReplies--
 			}
+			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
 
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
