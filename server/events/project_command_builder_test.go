@@ -1398,10 +1398,11 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  false,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
+		AllowRepoCfg:       false,
+		MergeableReq:       false,
+		ApprovedReq:        false,
+		UnDivergedReq:      false,
+		PolicyCheckEnabled: true,
 	}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
