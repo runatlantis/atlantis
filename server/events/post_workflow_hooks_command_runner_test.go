@@ -129,7 +129,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Any[string](),
 			Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
-		err := postWh.RunPostHooks(ctx, nil)
+		err := postWh.RunPostHooks(ctx, cmd)
 
 		Ok(t, err)
 		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
@@ -325,7 +325,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHookWithShell.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
-		err := postWh.RunPostHooks(ctx, nil)
+		err := postWh.RunPostHooks(ctx, cmd)
 
 		Ok(t, err)
 		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
@@ -359,7 +359,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
-		err := postWh.RunPostHooks(ctx, nil)
+		err := postWh.RunPostHooks(ctx, cmd)
 
 		Ok(t, err)
 		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
@@ -393,7 +393,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](),
 			Eq(testHookWithShellandShellArgs.RunCommand), Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
-		err := postWh.RunPostHooks(ctx, nil)
+		err := postWh.RunPostHooks(ctx, cmd)
 
 		Ok(t, err)
 		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),

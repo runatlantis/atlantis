@@ -60,6 +60,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			ExpDescription: "",
 		},
 		{
+			Command:        "echo 'a",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         "sh: 1: Syntax error: Unterminated quoted string\r\n",
