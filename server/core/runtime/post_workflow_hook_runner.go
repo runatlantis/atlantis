@@ -42,6 +42,7 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		"PULL_URL":           ctx.Pull.URL,
 		"USER_NAME":          ctx.User.Username,
 		"OUTPUT_STATUS_FILE": outputFilePath,
+		"COMMAND_NAME":       ctx.CommandName,
 	}
 
 	finalEnvVars := baseEnvVars

@@ -67,13 +67,18 @@ func TestRunPostHooks_Clone(t *testing.T) {
 	runtimeDesc := ""
 
 	pCtx := models.WorkflowHookCommandContext{
-		BaseRepo: testdata.GithubRepo,
-		HeadRepo: testdata.GithubRepo,
-		Pull:     newPull,
-		Log:      log,
-		User:     testdata.User,
-		Verbose:  false,
-		HookID:   uuid.NewString(),
+		BaseRepo:    testdata.GithubRepo,
+		HeadRepo:    testdata.GithubRepo,
+		Pull:        newPull,
+		Log:         log,
+		User:        testdata.User,
+		Verbose:     false,
+		HookID:      uuid.NewString(),
+		CommandName: "plan",
+	}
+
+	cmd := &events.CommentCommand{
+		Name: command.Plan,
 	}
 
 	t.Run("success hooks in cfg", func(t *testing.T) {
@@ -100,8 +105,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
 		When(whPostWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, runtimeDesc, nil)
-
-		err := postWh.RunPostHooks(ctx, nil)
+		err := postWh.RunPostHooks(ctx, cmd)
 
 		Ok(t, err)
 		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))
@@ -128,7 +132,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		postWh.GlobalCfg = globalCfg
 
-		err := postWh.RunPostHooks(ctx, nil)
+		err := postWh.RunPostHooks(ctx, cmd)
 
 		Ok(t, err)
 
@@ -154,7 +158,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(func() {}, errors.New("some error"))
 
-		err := postWh.RunPostHooks(ctx, nil)
+		err := postWh.RunPostHooks(ctx, cmd)
 
 		Assert(t, err != nil, "error not nil")
 		postWhWorkingDir.VerifyWasCalled(Never()).Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)
@@ -185,7 +189,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, errors.New("some error"))
 
-		err := postWh.RunPostHooks(ctx, nil)
+		err := postWh.RunPostHooks(ctx, cmd)
 
 		Assert(t, err != nil, "error not nil")
 
@@ -218,7 +222,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDir.Clone(log, testdata.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Eq(repoDir))).ThenReturn(result, runtimeDesc, errors.New("some error"))
 
-		err := postWh.RunPostHooks(ctx, nil)
+		err := postWh.RunPostHooks(ctx, cmd)
 
 		Assert(t, err != nil, "error not nil")
 		Assert(t, *unlockCalled == true, "unlock function called")
@@ -244,6 +248,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		}
 
 		cmd := &events.CommentCommand{
+			Name:  command.Plan,
 			Flags: []string{"comment", "args"},
 		}
 

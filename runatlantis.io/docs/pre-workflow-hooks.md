@@ -61,6 +61,7 @@ command](custom-workflows.html#custom-run-command).
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
+  * `COMMAND_NAME` - The name of the command that is being executed, i.e. `plan`, `apply` etc.
   * `OUTPUT_STATUS_FILE` - An output file to customize the success or failure status. ex. `echo 'failure' > $OUTPUT_STATUS_FILE`.
 :::
 
