@@ -62,11 +62,16 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 	RegisterMockTestingT(t)
 	locker := NewMockLocker()
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	parser := NewMockEventParsing()
-	vcsClient := NewMockClient()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
+	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	vcsClient := NewMockClient()
+	workingDir := NewMockWorkingDir()
 	Ok(t, err)
+
+	workingDirLocker := NewMockWorkingDirLocker()
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir))).
+		ThenReturn(func() {}, nil)
 
 	projectCommandBuilder := NewMockProjectCommandBuilder()
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -90,13 +95,15 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 		APISecret:                 []byte(atlantisToken),
 		Locker:                    locker,
 		Logger:                    logger,
-		Scope:                     scope,
 		Parser:                    parser,
 		ProjectCommandBuilder:     projectCommandBuilder,
 		ProjectPlanCommandRunner:  projectCommandRunner,
 		ProjectApplyCommandRunner: projectCommandRunner,
-		VCSClient:                 vcsClient,
 		RepoAllowlistChecker:      repoAllowlistChecker,
+		Scope:                     scope,
+		VCSClient:                 vcsClient,
+		WorkingDir:                workingDir,
+		WorkingDirLocker:          workingDirLocker,
 	}
 	return ac, projectCommandBuilder, projectCommandRunner
 }

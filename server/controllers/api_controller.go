@@ -30,6 +30,8 @@ type APIController struct {
 	RepoAllowlistChecker      *events.RepoAllowlistChecker
 	Scope                     tally.Scope
 	VCSClient                 vcs.Client
+	WorkingDir                events.WorkingDir
+	WorkingDirLocker          events.WorkingDirLocker
 }
 
 type APIRequest struct {
@@ -87,12 +89,18 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = a.apiSetup(ctx)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	result, err := a.apiPlan(request, ctx)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0) // nolint: errcheck
+	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
 	if result.HasErrors() {
 		code = http.StatusInternalServerError
 	}
@@ -121,7 +129,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0) // nolint: errcheck
+	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
 
 	// We can now prepare and run the apply step
 	result, err := a.apiApply(request, ctx)
@@ -139,6 +147,27 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.respond(w, logging.Debug, code, string(response))
+}
+
+func (a *APIController) apiSetup(ctx *command.Context) error {
+	pull := ctx.Pull
+	baseRepo := ctx.Pull.BaseRepo
+	headRepo := ctx.HeadRepo
+
+	unlockFn, err := a.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)
+	if err != nil {
+		return err
+	}
+	ctx.Log.Debug("got workspace lock")
+	defer unlockFn()
+
+	// ensure workingDir is present
+	_, _, err = a.WorkingDir.Clone(ctx.Log, headRepo, pull, events.DefaultWorkspace)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
