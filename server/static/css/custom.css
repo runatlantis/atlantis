@@ -311,6 +311,14 @@ tbody {
     background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
 }
 
+.lock-detail-grid {
+  display: grid;
+  grid-template-columns: 130px auto;
+  border: 1px solid #dbeaf4;
+  width: 100%;
+  font-size: 14px;
+}
+
 /* Modal Header */
 .modal-header {
     padding: 8px 12px;
@@ -348,6 +356,10 @@ tbody {
 }
 
 .js-discard-success {
+  font-family: monospace, monospace; font-size: 1.1em; text-align: center; display: none;
+}
+
+.github-app-msg {
   font-family: monospace, monospace; font-size: 1.1em; text-align: center;
 }
 
