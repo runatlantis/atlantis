@@ -121,7 +121,8 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 				User: models.User{
 					Username: "acme-user",
 				},
-				Log: logger,
+				Log:         logger,
+				CommandName: "plan",
 			}
 			_, desc, err := r.Run(ctx, c.Command, tmpDir)
 			if c.ExpErr != "" {
