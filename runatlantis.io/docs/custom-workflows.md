@@ -142,7 +142,11 @@ workflows:
   myworkflow:
     plan:
       steps:
-      - run: terraform init -input=false
+      # If you want to hide command output from Atlantis's PR comment, use
+      # the output option on the run step's expanded form.
+      - run:
+          command: terraform init -input=false
+          output: hide
       
       # If you're using workspaces you need to select the workspace using the
       # $WORKSPACE environment variable.
@@ -264,7 +268,9 @@ workflows:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
           value: 'true'
-      - run: terragrunt plan -input=false -out=$PLANFILE
+      - run:
+          command: terragrunt plan -input=false -out=$PLANFILE
+          output: strip_refreshing
       - run: terragrunt show -json $PLANFILE > $SHOWFILE
     apply:
       steps:
@@ -297,7 +303,9 @@ workflows:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
           value: 'true'
-      - run: terragrunt plan -out $PLANFILE
+      - run:
+          command: terragrunt plan -input=false -out=$PLANFILE
+          output: strip_refreshing
     apply:
       steps:
       - env:
@@ -451,13 +459,27 @@ A map from string to `extra_args` for a built-in command with extra arguments.
 | init/plan/apply/import/state_rm | map[`extra_args` -> array[string]] | none    | no       | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
 
 #### Custom `run` Command
-Or a custom command
+A custom command can be written in 2 ways
+
+Compact:
 ```yaml
-- run: custom-command
+- run: custom-command arg1 arg2
 ```
 | Key | Type   | Default | Required | Description          |
 |-----|--------|---------|----------|----------------------|
 | run | string | none    | no       | Run a custom command |
+
+Full
+```yaml
+- run: 
+    command: custom-command arg1 arg2
+    output: show
+```
+| Key | Type                                                         | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                             |
+|-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| run | map[string -> string] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
+| run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
+| run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>* `show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
 
 ::: tip Notes
 * `run` steps in the main `workflow` are executed with the following environment variables:  
@@ -513,9 +535,12 @@ as the environment variable value.
     name: ENV_NAME_2
     command: 'echo "dynamic-value-$(date)"'
 ```
-| Key             | Type                               | Default | Required | Description                                                                                                                                         |
-|-----------------|------------------------------------|---------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
-| env | map[`name` -> string, `value` -> string, `command` -> string] | none    | no       | Set environment variables for subsequent steps |
+| Key             | Type                  | Default | Required | Description                                                                                                     |
+|-----------------|-----------------------|---------|----------|-----------------------------------------------------------------------------------------------------------------|
+| env | map[string -> string] | none    | no       | Set environment variables for subsequent steps                                                                  |
+| env.name | string | none | yes | Name of the environment variable                                                                                |
+| env.value | string | none | no | Set the value of the environment variable to a hard-coded string. Cannot be set at the same time as `command`   |
+| env.command | string | none | no | Set the value of the environment variable to the output of a command. Cannot be set at the same time as `value` |
 
 ::: tip Notes
 * `env` `command`'s can use any of the built-in environment variables available

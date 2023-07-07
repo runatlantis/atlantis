@@ -995,9 +995,9 @@ repos:
 				},
 				Pull:               pull,
 				ProjectName:        "",
-				PlanRequirements:   []string{},
-				ApplyRequirements:  []string{},
-				ImportRequirements: []string{},
+				PlanRequirements:   []string{"policies_passed"},
+				ApplyRequirements:  []string{"policies_passed"},
+				ImportRequirements: []string{"policies_passed"},
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
 				User:               models.User{},
@@ -1057,13 +1057,13 @@ workflows:
 				},
 				Pull:               pull,
 				ProjectName:        "",
-				PlanRequirements:   []string{},
+				PlanRequirements:   []string{"policies_passed"},
 				ApplyRequirements:  []string{},
-				ImportRequirements: []string{},
+				ImportRequirements: []string{"policies_passed"},
 				RepoConfigVersion:  3,
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
-				TerraformVersion:   mustVersion("10.0"),
+				TerraformVersion:   mustVersion("v10.0"),
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
@@ -1098,10 +1098,11 @@ workflows:
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowRepoCfg:       false,
+				MergeableReq:       false,
+				ApprovedReq:        false,
+				UnDivergedReq:      false,
+				PolicyCheckEnabled: true,
 			}
 
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
