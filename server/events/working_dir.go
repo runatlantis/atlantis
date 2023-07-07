@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -53,6 +54,8 @@ type WorkingDir interface {
 	// the upstream branch has been modified. This is only safe after grabbing the project lock
 	// and before running any plans
 	SetSafeToReClone()
+	// DeletePlan deletes the plan for this repo, pull, workspace path and project name
+	DeletePlan(r models.Repo, p models.PullRequest, workspace string, path string, projectName string) error
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -81,6 +84,7 @@ type FileWorkspace struct {
 	GpgNoSigningEnabled bool
 	// flag indicating if a re-clone will be safe (project lock held, about to run plan)
 	SafeToReClone bool
+	Logger        logging.SimpleLogging
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -372,4 +376,10 @@ func (w *FileWorkspace) sanitizeGitCredentials(s string, base models.Repo, head 
 // Set the flag that indicates it is safe to re-clone if necessary
 func (w *FileWorkspace) SetSafeToReClone() {
 	w.SafeToReClone = true
+}
+
+func (w *FileWorkspace) DeletePlan(r models.Repo, p models.PullRequest, workspace string, projectPath string, projectName string) error {
+	planPath := filepath.Join(w.cloneDir(r, p, workspace), projectPath, runtime.GetPlanFilename(workspace, projectName))
+	w.Logger.Info("Deleting plan: " + planPath)
+	return os.Remove(planPath)
 }
