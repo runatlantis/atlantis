@@ -611,10 +611,10 @@ func TestGitHubWorkflow(t *testing.T) {
 			expNumHooks := len(c.Comments) + 1 - c.ExpParseFailedCount
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
 			mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](),
-				Eq("some dummy command"), Any[String](), Any[String](), Any[String]())
+				Eq("some dummy command"), Any[string](), Any[string](), Any[string]())
 			// Let's verify the post-workflow hook was called for each comment including the pull request opened event
 			mockPostWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](),
-				Eq("some post dummy command"), Any[String](), Any[String](), Any[String]())
+				Eq("some post dummy command"), Any[string](), Any[string](), Any[string]())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -797,7 +797,7 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
 			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(Any[models.WorkflowHookCommandContext](),
-				Eq("some dummy command"), Any[String](), Any[String](), Any[String]())
+				Eq("some dummy command"), Any[string](), Any[string](), Any[string]())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
