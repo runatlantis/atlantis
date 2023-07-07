@@ -18,10 +18,10 @@ type RepoCfg struct {
 	Projects                   []Project
 	Workflows                  map[string]Workflow
 	PolicySets                 PolicySets
-	Automerge                  bool
-	ParallelApply              bool
-	ParallelPlan               bool
-	ParallelPolicyCheck        bool
+	Automerge                  *bool
+	ParallelApply              *bool
+	ParallelPlan               *bool
+	ParallelPolicyCheck        *bool
 	DeleteSourceBranchOnMerge  *bool
 	RepoLocking                *bool
 	EmojiReaction              string
