@@ -34,6 +34,7 @@ type Project struct {
 	DeleteSourceBranchOnMerge *bool     `yaml:"delete_source_branch_on_merge,omitempty"`
 	RepoLocking               *bool     `yaml:"repo_locking,omitempty"`
 	ExecutionOrderGroup       *int      `yaml:"execution_order_group,omitempty"`
+	PolicyCheck               *bool     `yaml:"policy_check,omitempty"`
 }
 
 func (p Project) Validate() error {
@@ -131,6 +132,10 @@ func (p Project) ToValid() valid.Project {
 
 	if p.ExecutionOrderGroup != nil {
 		v.ExecutionOrderGroup = *p.ExecutionOrderGroup
+	}
+
+	if p.PolicyCheck != nil {
+		v.PolicyCheck = p.PolicyCheck
 	}
 
 	return v
