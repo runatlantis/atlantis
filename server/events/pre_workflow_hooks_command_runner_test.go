@@ -324,7 +324,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHookWithShell.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
-		err := preWh.RunPreHooks(ctx, nil)
+		err := preWh.RunPreHooks(ctx, cmd)
 
 		Ok(t, err)
 		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
@@ -358,7 +358,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
-		err := preWh.RunPreHooks(ctx, nil)
+		err := preWh.RunPreHooks(ctx, cmd)
 
 		Ok(t, err)
 		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
@@ -392,7 +392,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](),
 			Eq(testHookWithShellandShellArgs.RunCommand), Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
-		err := preWh.RunPreHooks(ctx, nil)
+		err := preWh.RunPreHooks(ctx, cmd)
 
 		Ok(t, err)
 		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
