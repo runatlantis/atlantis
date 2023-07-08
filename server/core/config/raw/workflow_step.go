@@ -76,6 +76,8 @@ func (s WorkflowHook) ToValid() *valid.WorkflowHook {
 			StepName:        RunStepName,
 			RunCommand:      s.StringVal["run"],
 			StepDescription: s.StringVal["description"],
+			Shell:           s.StringVal["shell"],
+			ShellArgs:       s.StringVal["shellArgs"],
 		}
 	}
 

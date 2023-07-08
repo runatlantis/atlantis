@@ -24,3 +24,6 @@ dist/
 tmp-CHANGELOG.md
 
 .envrc
+
+# IDE files
+*.code-workspace

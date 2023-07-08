@@ -94,6 +94,8 @@ var testFlags = map[string]interface{}{
 	AllowDraftPRs:                    true,
 	PortFlag:                         8181,
 	ParallelPoolSize:                 100,
+	ParallelPlanFlag:                 true,
+	ParallelApplyFlag:                true,
 	RepoAllowlistFlag:                "github.com/runatlantis/atlantis",
 	RequireApprovalFlag:              true,
 	RequireMergeableFlag:             true,

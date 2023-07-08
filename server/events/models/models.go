@@ -625,6 +625,8 @@ type WorkflowHookCommandContext struct {
 	EscapedCommentArgs []string
 	// UUID for reference
 	HookID string
+	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
+	CommandName string
 }
 
 // PlanSuccessStats holds stats for a plan.

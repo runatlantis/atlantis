@@ -7,21 +7,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
-// DefaultAutomerge is the default setting for automerge.
-const DefaultAutomerge = false
-
-// DefaultParallelApply is the default setting for parallel apply
-const DefaultParallelApply = false
-
-// DefaultParallelPlan is the default setting for parallel plan
-const DefaultParallelPlan = false
-
-// DefaultParallelPolicyCheck is the default setting for parallel plan
-const DefaultParallelPolicyCheck = false
-
-// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
-const DefaultDeleteSourceBranchOnMerge = false
-
 // DefaultEmojiReaction is the default emoji reaction for repos
 const DefaultEmojiReaction = ""
 
@@ -72,20 +57,9 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		validProjects = append(validProjects, p.ToValid())
 	}
 
-	automerge := DefaultAutomerge
-	if r.Automerge != nil {
-		automerge = *r.Automerge
-	}
-
-	parallelApply := DefaultParallelApply
-	if r.ParallelApply != nil {
-		parallelApply = *r.ParallelApply
-	}
-
-	parallelPlan := DefaultParallelPlan
-	if r.ParallelPlan != nil {
-		parallelPlan = *r.ParallelPlan
-	}
+	automerge := r.Automerge
+	parallelApply := r.ParallelApply
+	parallelPlan := r.ParallelPlan
 
 	emojiReaction := DefaultEmojiReaction
 	if r.EmojiReaction != nil {

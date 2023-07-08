@@ -161,6 +161,9 @@ projects:
 				&events.CommentParser{ExecutableName: "atlantis"},
 				false,
 				false,
+				false,
+				false,
+				false,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
@@ -192,19 +195,23 @@ projects:
 // Test building a plan and apply command for one project.
 func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) {
 	cases := []struct {
-		Description      string
-		AtlantisYAML     string
-		Cmd              events.CommentCommand
-		Silenced         bool
-		ExpCommentArgs   []string
-		ExpWorkspace     string
-		ExpDir           string
-		ExpProjectName   string
-		ExpErr           string
-		ExpApplyReqs     []string
-		ExpParallelApply bool
-		ExpParallelPlan  bool
-		ExpNoProjects    bool
+		Description                string
+		AtlantisYAML               string
+		Cmd                        events.CommentCommand
+		Silenced                   bool
+		ExpCommentArgs             []string
+		ExpWorkspace               string
+		ExpDir                     string
+		ExpProjectName             string
+		ExpErr                     string
+		ExpApplyReqs               []string
+		EnableAutoMergeUserCfg     bool
+		EnableParallelPlanUserCfg  bool
+		EnableParallelApplyUserCfg bool
+		ExpAutoMerge               bool
+		ExpParallelPlan            bool
+		ExpParallelApply           bool
+		ExpNoProjects              bool
 	}{
 		{
 			Description: "no atlantis.yaml",
@@ -407,6 +414,61 @@ projects:
 			ExpProjectName:   "myproject",
 			ExpApplyReqs:     []string{},
 		},
+		{
+			Description: "atlantis.yaml with ParallelPlan/apply and Automerge not set, but set in user conf",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				RepoRelDir:  ".",
+				Workspace:   "default",
+				ProjectName: "myproject",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- name: myproject
+  dir: .
+  workspace: myworkspace
+`,
+			EnableAutoMergeUserCfg:     true,
+			EnableParallelPlanUserCfg:  true,
+			EnableParallelApplyUserCfg: true,
+			ExpAutoMerge:               true,
+			ExpParallelPlan:            true,
+			ExpParallelApply:           true,
+			ExpDir:                     ".",
+			ExpWorkspace:               "myworkspace",
+			ExpProjectName:             "myproject",
+			ExpApplyReqs:               []string{},
+		},
+		{
+			Description: "atlantis.yaml with ParallelPlan/apply and Automerge set to false, but set to true in user conf",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				RepoRelDir:  ".",
+				Workspace:   "default",
+				ProjectName: "myproject",
+			},
+			AtlantisYAML: `
+version: 3
+automerge: false
+parallel_plan: false
+parallel_apply: false
+projects:
+- name: myproject
+  dir: .
+  workspace: myworkspace
+`,
+			EnableAutoMergeUserCfg:     true,
+			EnableParallelPlanUserCfg:  true,
+			EnableParallelApplyUserCfg: true,
+			ExpAutoMerge:               false,
+			ExpParallelPlan:            false,
+			ExpParallelApply:           false,
+			ExpDir:                     ".",
+			ExpWorkspace:               "myworkspace",
+			ExpProjectName:             "myproject",
+			ExpApplyReqs:               []string{},
+		},
 	}
 
 	logger := logging.NewNoopLogger(t)
@@ -453,6 +515,9 @@ projects:
 					&events.CommentParser{ExecutableName: "atlantis"},
 					false,
 					true,
+					c.EnableAutoMergeUserCfg,
+					c.EnableParallelPlanUserCfg,
+					c.EnableParallelApplyUserCfg,
 					"",
 					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 					false,
@@ -489,8 +554,9 @@ projects:
 				Equals(t, c.ExpCommentArgs, actCtx.EscapedCommentArgs)
 				Equals(t, c.ExpProjectName, actCtx.ProjectName)
 				Equals(t, c.ExpApplyReqs, actCtx.ApplyRequirements)
-				Equals(t, c.ExpParallelApply, actCtx.ParallelApplyEnabled)
+				Equals(t, c.ExpAutoMerge, actCtx.AutomergeEnabled)
 				Equals(t, c.ExpParallelPlan, actCtx.ParallelPlanEnabled)
+				Equals(t, c.ExpParallelApply, actCtx.ParallelApplyEnabled)
 			})
 		}
 	}
@@ -635,6 +701,9 @@ projects:
 				&events.CommentParser{ExecutableName: "atlantis"},
 				false,
 				true,
+				false,
+				false,
+				false,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				true,
@@ -666,18 +735,21 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 	// Since we're focused on autoplanning here, we don't validate all the
 	// fields so the tests are more obvious and targeted.
 	type expCtxFields struct {
-		ProjectName          string
-		RepoRelDir           string
-		Workspace            string
-		Automerge            bool
-		ParallelPlanEnabled  bool
-		ParallelApplyEnabled bool
+		ProjectName      string
+		RepoRelDir       string
+		Workspace        string
+		Automerge        bool
+		ExpParallelPlan  bool
+		ExpParallelApply bool
 	}
 	cases := map[string]struct {
-		DirStructure  map[string]interface{}
-		AtlantisYAML  string
-		ModifiedFiles []string
-		Exp           []expCtxFields
+		AutoMergeUserCfg            bool
+		ParallelPlanEnabledUserCfg  bool
+		ParallelApplyEnabledUserCfg bool
+		DirStructure                map[string]interface{}
+		AtlantisYAML                string
+		ModifiedFiles               []string
+		Exp                         []expCtxFields
 	}{
 		"no atlantis.yaml": {
 			DirStructure: map[string]interface{}{
@@ -702,7 +774,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 				},
 			},
 		},
-		"no projects in atlantis.yaml": {
+		"no projects in atlantis.yaml with parallel operations in atlantis.yaml": {
 			DirStructure: map[string]interface{}{
 				"project1": map[string]interface{}{
 					"main.tf": nil,
@@ -720,20 +792,93 @@ parallel_apply: true
 			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
 			Exp: []expCtxFields{
 				{
-					ProjectName:          "",
-					RepoRelDir:           "project1",
-					Workspace:            "default",
-					Automerge:            true,
-					ParallelApplyEnabled: true,
-					ParallelPlanEnabled:  true,
+					ProjectName:      "",
+					RepoRelDir:       "project1",
+					Workspace:        "default",
+					Automerge:        true,
+					ExpParallelApply: true,
+					ExpParallelPlan:  true,
 				},
 				{
-					ProjectName:          "",
-					RepoRelDir:           "project2",
-					Workspace:            "default",
-					Automerge:            true,
-					ParallelApplyEnabled: true,
-					ParallelPlanEnabled:  true,
+					ProjectName:      "",
+					RepoRelDir:       "project2",
+					Workspace:        "default",
+					Automerge:        true,
+					ExpParallelApply: true,
+					ExpParallelPlan:  true,
+				},
+			},
+		},
+		"no projects in atlantis.yaml with parallel operations and automerge not in atlantis.yaml, but in user conf": {
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `
+version: 3
+`,
+			AutoMergeUserCfg:            true,
+			ParallelPlanEnabledUserCfg:  true,
+			ParallelApplyEnabledUserCfg: true,
+			ModifiedFiles:               []string{"project1/main.tf", "project2/main.tf"},
+			Exp: []expCtxFields{
+				{
+					ProjectName:      "",
+					RepoRelDir:       "project1",
+					Workspace:        "default",
+					Automerge:        true,
+					ExpParallelApply: true,
+					ExpParallelPlan:  true,
+				},
+				{
+					ProjectName:      "",
+					RepoRelDir:       "project2",
+					Workspace:        "default",
+					Automerge:        true,
+					ExpParallelApply: true,
+					ExpParallelPlan:  true,
+				},
+			},
+		},
+		"no projects in atlantis.yaml with parallel operations and automerge set to false in atlantis.yaml and true in user conf": {
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `
+version: 3
+automerge: false
+parallel_plan: false
+parallel_apply: false
+`,
+			AutoMergeUserCfg:            true,
+			ParallelPlanEnabledUserCfg:  true,
+			ParallelApplyEnabledUserCfg: true,
+			ModifiedFiles:               []string{"project1/main.tf", "project2/main.tf"},
+			Exp: []expCtxFields{
+				{
+					ProjectName:      "",
+					RepoRelDir:       "project1",
+					Workspace:        "default",
+					Automerge:        false,
+					ExpParallelApply: false,
+					ExpParallelPlan:  false,
+				},
+				{
+					ProjectName:      "",
+					RepoRelDir:       "project2",
+					Workspace:        "default",
+					Automerge:        false,
+					ExpParallelApply: false,
+					ExpParallelPlan:  false,
 				},
 			},
 		},
@@ -821,6 +966,9 @@ projects:
 				&events.CommentParser{ExecutableName: "atlantis"},
 				false,
 				false,
+				false,
+				c.ParallelPlanEnabledUserCfg,
+				c.ParallelApplyEnabledUserCfg,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
@@ -850,8 +998,8 @@ projects:
 				Equals(t, expCtx.ProjectName, actCtx.ProjectName)
 				Equals(t, expCtx.RepoRelDir, actCtx.RepoRelDir)
 				Equals(t, expCtx.Workspace, actCtx.Workspace)
-				Equals(t, expCtx.ParallelPlanEnabled, actCtx.ParallelPlanEnabled)
-				Equals(t, expCtx.ParallelApplyEnabled, actCtx.ParallelApplyEnabled)
+				Equals(t, expCtx.ExpParallelPlan, actCtx.ParallelPlanEnabled)
+				Equals(t, expCtx.ExpParallelApply, actCtx.ParallelApplyEnabled)
 			}
 		})
 	}
@@ -918,6 +1066,9 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{ExecutableName: "atlantis"},
+		false,
+		false,
+		false,
 		false,
 		false,
 		"",
@@ -1010,6 +1161,9 @@ projects:
 		&events.CommentParser{ExecutableName: "atlantis"},
 		false,
 		false,
+		false,
+		false,
+		false,
 		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		false,
@@ -1093,6 +1247,9 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{ExecutableName: "atlantis"},
+				false,
+				false,
+				false,
 				false,
 				false,
 				"",
@@ -1262,6 +1419,9 @@ projects:
 				&events.CommentParser{ExecutableName: "atlantis"},
 				false,
 				false,
+				false,
+				false,
+				false,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
@@ -1356,6 +1516,9 @@ parallel_plan: true`,
 			&events.CommentParser{ExecutableName: "atlantis"},
 			true,
 			false,
+			false,
+			false,
+			false,
 			"",
 			"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 			false,
@@ -1419,6 +1582,9 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		globalCfg,
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{ExecutableName: "atlantis"},
+		false,
+		false,
+		false,
 		false,
 		false,
 		"",
@@ -1506,6 +1672,9 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{ExecutableName: "atlantis"},
+		false,
+		false,
+		false,
 		false,
 		false,
 		"",

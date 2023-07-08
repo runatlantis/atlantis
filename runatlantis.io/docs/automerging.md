@@ -7,8 +7,7 @@ been successfully applied.
 
 ## How To Enable
 Automerging can be enabled either by:
-1. Passing the `--automerge` flag to `atlantis server`. This will cause all
-   pull requests to be automerged and any repo config will be ignored.
+1. Passing the `--automerge` flag to `atlantis server`. This sets the parameter globally; however, explicit declaration in the repo config will be respected and take priority.
 1. Setting `automerge: true` in the repo's `atlantis.yaml` file:
     ```yaml
     version: 3
