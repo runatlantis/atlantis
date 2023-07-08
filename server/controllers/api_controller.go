@@ -126,6 +126,12 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = a.apiSetup(ctx)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	// We must first make the plan for all projects
 	_, err = a.apiPlan(request, ctx)
 	if err != nil {
