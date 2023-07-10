@@ -46,14 +46,10 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 
 // automergeEnabled returns true if automerging is enabled in this context.
 func (c *AutoMerger) automergeEnabled(projectCmds []command.ProjectContext) bool {
-	// only automerge if all projects have automerge set; or if global automerge is set and there are no projects.
+	// Use project automerge settings if projects exist; otherwise, use global automerge settings.
 	automerge := c.GlobalAutomerge
 	if len(projectCmds) > 0 {
-		for _, prjCmd := range projectCmds {
-			if !prjCmd.AutomergeEnabled {
-				automerge = false
-			}
-		}
+		automerge = projectCmds[0].AutomergeEnabled
 	}
 	return automerge
 }
