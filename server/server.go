@@ -1036,7 +1036,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			PullNum:       v.Pull.Num,
 			Path:          v.Project.Path,
 			Workspace:     v.Workspace,
-			LockedBy:	   v.Pull.Author,
+			LockedBy:      v.Pull.Author,
 			Time:          v.Time,
 			TimeFormatted: v.Time.Format("02-01-2006 15:04:05"),
 		})
