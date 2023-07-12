@@ -70,11 +70,15 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
   <script>
     $(document).ready(function () {
-      $("p.js-discard-success").toggle(document.URL.indexOf("discard=true") !== -1);
+      if (document.URL.indexOf("discard=true") !== -1) {
+        $("p.js-discard-success").show();
+        setTimeout(function() {
+          $("p.js-discard-success").fadeOut('slow',function(){
+            window.location.href = "/";
+          })
+        }, 5000); // <-- time in milliseconds
+      }
     });
-    setTimeout(function() {
-        $("p.js-discard-success").fadeOut('slow');
-    }, 5000); // <-- time in milliseconds
   </script>
   <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
   <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
@@ -395,7 +399,6 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
         left: 0px;
         bottom: 0px;
         right: 0px;
-        overflow: auto;
         border: 5px solid white;
         }
 
@@ -599,7 +602,7 @@ var GithubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").
     <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
 
-    <p class="js-discard-success"><strong>
+    <p class="github-app-msg"><strong>
     {{ if .Target }}
       Create a github app
     {{ else }}

@@ -166,7 +166,12 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
 	terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
-	ctx.Log.Debug("PolicyChecks are enabled")
+	if prjCfg.PolicyCheck {
+		ctx.Log.Debug("PolicyChecks are enabled")
+	} else {
+		// PolicyCheck is disabled at repository level
+		ctx.Log.Debug("PolicyChecks are disabled on this repository")
+	}
 
 	// If TerraformVersion not defined in config file look for a
 	// terraform.require_version block.
@@ -189,7 +194,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		terraformClient,
 	)
 
-	if cmdName == command.Plan {
+	if cmdName == command.Plan && prjCfg.PolicyCheck != false {
 		ctx.Log.Debug("Building project command context for %s", command.PolicyCheck)
 		steps := prjCfg.Workflow.PolicyCheck.Steps
 

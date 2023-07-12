@@ -81,6 +81,9 @@ repos:
   post_workflow_hooks: 
     - run: my-post-workflow-hook-command arg1
 
+  # policy_check defines if policy checking should be enable on this repository.
+  policy_check: false
+
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
 
@@ -483,7 +486,8 @@ If you set a workflow with the key `default`, it will override this.
 | allowed_workflows             | []string | none    | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                                                                                           |
 | allow_custom_workflows        | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                                                                                        |
 | delete_source_branch_on_merge | bool     | false   | no       | Whether or not to delete the source branch on merge.                                                                                                                                                                                                                                                      |
-| repo_locking                  | bool     | false   | no       | Whether or not to get a lock                                                                                                                                                                                                                                                                              |
+| repo_locking                  | bool     | false   | no       | Whether or not to get a lock.                                                                                                                                                                                                                                                                             |
+| policy_check                  | bool     | false   | no       | Whether or not to run policy checks on this repository.                                                                                                                                                                                                                                                   |
 
 
 :::tip Notes

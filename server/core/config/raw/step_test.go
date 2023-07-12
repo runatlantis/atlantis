@@ -81,7 +81,7 @@ env:
   value: direct_value
   name: test`,
 			exp: raw.Step{
-				Env: EnvType{
+				EnvOrRun: EnvOrRunType{
 					"env": {
 						"value": "direct_value",
 						"name":  "test",
@@ -96,7 +96,7 @@ env:
   command: echo 123
   name: test`,
 			exp: raw.Step{
-				Env: EnvType{
+				EnvOrRun: EnvOrRunType{
 					"env": {
 						"command": "echo 123",
 						"name":    "test",
@@ -137,7 +137,7 @@ key: value`,
 				Key:       nil,
 				Map:       nil,
 				StringVal: nil,
-				Env:       nil,
+				EnvOrRun:  nil,
 			},
 		},
 
@@ -227,7 +227,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "env",
 			input: raw.Step{
-				Env: EnvType{
+				EnvOrRun: EnvOrRunType{
 					"env": {
 						"name":    "test",
 						"command": "echo 123",
@@ -283,7 +283,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "multiple keys in env",
 			input: raw.Step{
-				Env: EnvType{
+				EnvOrRun: EnvOrRunType{
 					"key1": nil,
 					"key2": nil,
 				},
@@ -312,7 +312,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "invalid key in env",
 			input: raw.Step{
-				Env: EnvType{
+				EnvOrRun: EnvOrRunType{
 					"invalid": nil,
 				},
 			},
@@ -353,7 +353,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "env step with no name key set",
 			input: raw.Step{
-				Env: EnvType{
+				EnvOrRun: EnvOrRunType{
 					"env": {
 						"value": "value",
 					},
@@ -364,7 +364,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "env step with invalid key",
 			input: raw.Step{
-				Env: EnvType{
+				EnvOrRun: EnvOrRunType{
 					"env": {
 						"abc":      "",
 						"invalid2": "",
@@ -376,7 +376,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "env step with both command and value set",
 			input: raw.Step{
-				Env: EnvType{
+				EnvOrRun: EnvOrRunType{
 					"env": {
 						"name":    "name",
 						"command": "command",
@@ -454,7 +454,7 @@ func TestStep_ToValid(t *testing.T) {
 		{
 			description: "env step",
 			input: raw.Step{
-				Env: EnvType{
+				EnvOrRun: EnvOrRunType{
 					"env": {
 						"name":    "test",
 						"command": "echo 123",
@@ -558,6 +558,22 @@ func TestStep_ToValid(t *testing.T) {
 				RunCommand: "my 'run command'",
 			},
 		},
+		{
+			description: "run step with output",
+			input: raw.Step{
+				EnvOrRun: EnvOrRunType{
+					"run": {
+						"command": "my 'run command'",
+						"output":  "hide",
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:   "run",
+				RunCommand: "my 'run command'",
+				Output:     "hide",
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
@@ -567,4 +583,4 @@ func TestStep_ToValid(t *testing.T) {
 }
 
 type MapType map[string]map[string][]string
-type EnvType map[string]map[string]string
+type EnvOrRunType map[string]map[string]string
