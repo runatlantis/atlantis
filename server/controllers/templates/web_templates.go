@@ -36,6 +36,7 @@ type LockIndexData struct {
 	PullNum       int
 	Path          string
 	Workspace     string
+  LockedBy      string
 	Time          time.Time
 	TimeFormatted string
 }
@@ -119,6 +120,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
       <span>Repository</span>
       <span>Project</span>
       <span>Workspace</span>
+      <span>Locked By</span>
       <span>Date/Time</span>
       <span>Status</span>
     </div>
@@ -129,6 +131,9 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
           <span class="lock-path">{{.Path}}</span>
+        </a>
+        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          <span class="lock-usernmae">{{.LockedBy}}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
           <span><code>{{.Workspace}}</code></span>
