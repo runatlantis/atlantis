@@ -36,7 +36,7 @@ type LockIndexData struct {
 	PullNum       int
 	Path          string
 	Workspace     string
-  LockedBy      string
+        LockedBy      string
 	Time          time.Time
 	TimeFormatted string
 }
