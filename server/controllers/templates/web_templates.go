@@ -133,7 +133,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
           <span class="lock-path">{{.Path}}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
-          <span class="lock-usernmae">{{.LockedBy}}</span>
+          <span class="lock-username">{{.LockedBy}}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
           <span><code>{{.Workspace}}</code></span>
