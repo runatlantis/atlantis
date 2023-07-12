@@ -36,6 +36,7 @@ type LockIndexData struct {
 	PullNum       int
 	Path          string
 	Workspace     string
+  LockedBy      string
 	Time          time.Time
 	TimeFormatted string
 }
@@ -70,15 +71,11 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
   <script>
     $(document).ready(function () {
-      if (document.URL.indexOf("discard=true") !== -1) {
-        $("p.js-discard-success").show();
-        setTimeout(function() {
-          $("p.js-discard-success").fadeOut('slow',function(){
-            window.location.href = "/";
-          })
-        }, 5000); // <-- time in milliseconds
-      }
+      $("p.js-discard-success").toggle(document.URL.indexOf("discard=true") !== -1);
     });
+    setTimeout(function() {
+        $("p.js-discard-success").fadeOut('slow');
+    }, 5000); // <-- time in milliseconds
   </script>
   <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
   <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
@@ -119,6 +116,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
       <span>Repository</span>
       <span>Project</span>
       <span>Workspace</span>
+      <span>Locked By</span>
       <span>Date/Time</span>
       <span>Status</span>
     </div>
@@ -134,6 +132,9 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
           <span><code>{{.Workspace}}</code></span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          <span><code>{{.LockedBy}}</code></span>
+        </a>
+        <a class="lock-username" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
           <span class="lock-datetime">{{.TimeFormatted}}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
@@ -263,8 +264,8 @@ type LockDetailData struct {
 	RepoOwner       string
 	RepoName        string
 	PullRequestLink string
-	LockedBy        string
 	Workspace       string
+  LockedBy        string
 	AtlantisVersion string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
 	// not using a path-based proxy, this will be an empty string. Never ends
@@ -399,6 +400,7 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
         left: 0px;
         bottom: 0px;
         right: 0px;
+        overflow: auto;
         border: 5px solid white;
         }
 
@@ -602,7 +604,7 @@ var GithubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").
     <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
 
-    <p class="github-app-msg"><strong>
+    <p class="js-discard-success"><strong>
     {{ if .Target }}
       Create a github app
     {{ else }}
