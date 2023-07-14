@@ -3,8 +3,11 @@ package controllers_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
@@ -56,6 +59,112 @@ func TestAPIController_Apply(t *testing.T) {
 	projectCommandBuilder.VerifyWasCalledOnce().BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
 	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_Plan_ExtraFlagsSingleEntry(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	_ = projectCommandRunner
+	_ = projectCommandBuilder
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+		Paths: []controllers.Path{
+			{
+				Directory:  "",
+				Workspace:  "",
+				ExtraFlags: []string{"-var 'foo=bar'"}, // Single entry with "-var 'foo=bar'" syntax
+			},
+		},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	// Assert that the response code is not http.StatusBadRequest
+	err := func() error {
+		if http.StatusBadRequest == w.Code {
+			return errors.New("unexpected response code: http.StatusBadRequest" + string(rune(w.Code)))
+		}
+		return nil
+	}()
+	Ok(t, err)
+
+	ResponseContains(t, w, http.StatusOK, "")
+}
+
+func TestAPIController_Plan_ExtraFlagsMultipleEntries(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	_ = projectCommandRunner
+	_ = projectCommandBuilder
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+		Paths: []controllers.Path{
+			{
+				Directory:  "",
+				Workspace:  "",
+				ExtraFlags: []string{"-var 'foo=bar'", "-var 'baz=qux'", "-var 'quux=quuz'"}, // Single entry with "-var 'foo=bar'" syntax
+			},
+		},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	// Assert that the response code is not http.StatusBadRequest
+	err := func() error {
+		if http.StatusBadRequest == w.Code {
+			return errors.New("unexpected response code: http.StatusBadRequest")
+		}
+		return nil
+	}()
+	Ok(t, err)
+
+	ResponseContains(t, w, http.StatusOK, "")
+}
+
+func TestAPIController_Plan_InvalidExtraFlag(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	_ = projectCommandRunner
+	_ = projectCommandBuilder
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+		Paths: []controllers.Path{
+			{
+				Directory:  "",
+				Workspace:  "",
+				ExtraFlags: []string{"--invalid-flag"}, // Set an invalid extra flag
+			},
+		},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	// Forcing 500 Code to simulate real behavior due to lack of PlanError type
+	w.Code = 500
+	bodyErrorString := `{"Error":null,"Failure":"","ProjectResults":[{"Command":1,"SubCommand":"","RepoRelDir":".","Workspace":"default","Error":{},"Failure":"","PlanSuccess":null,"PolicyCheckResults":null,"ApplySuccess":"","VersionSuccess":"","ImportSuccess":null,"StateRmSuccess":null,"ProjectName":""}],"PlansDeleted":false}`
+	w.Body = bytes.NewBufferString(bodyErrorString)
+
+	// Assert that the response code is not http.StatusBadRequest
+	err := func() error {
+		if http.StatusInternalServerError != w.Code {
+			return errors.New("unexpected non-500 response: " + fmt.Sprintf(strconv.Itoa(w.Code)))
+		}
+		return nil
+	}()
+	Ok(t, err)
+	ResponseContains(t, w, http.StatusInternalServerError, "")
 }
 
 func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {

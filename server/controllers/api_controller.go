@@ -38,10 +38,13 @@ type APIRequest struct {
 	Type       string `validate:"required"`
 	PR         int
 	Projects   []string
-	Paths      []struct {
-		Directory string
-		Workspace string
-	}
+	Paths      []Path
+}
+
+type Path struct {
+	Directory  string
+	Workspace  string
+	ExtraFlags []string
 }
 
 func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, error) {
@@ -56,6 +59,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.
 		cc = append(cc, &events.CommentCommand{
 			RepoRelDir: strings.TrimRight(path.Directory, "/"),
 			Workspace:  path.Workspace,
+			Flags:      path.ExtraFlags,
 		})
 	}
 
@@ -232,3 +236,4 @@ func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, res
 	w.WriteHeader(responseCode)
 	fmt.Fprintln(w, response)
 }
+
