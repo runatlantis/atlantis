@@ -61,10 +61,9 @@ func TestAPIController_Apply(t *testing.T) {
 	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
 }
 
-func TestAPIController_Plan_ExtraFlagsSingleEntry(t *testing.T) {
+
+func TestAPIController_Plan_ExtraArgsSingleEntry(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
-	_ = projectCommandRunner
-	_ = projectCommandBuilder
 	body, _ := json.Marshal(controllers.APIRequest{
 		Repository: "Repo",
 		Ref:        "main",
@@ -74,7 +73,7 @@ func TestAPIController_Plan_ExtraFlagsSingleEntry(t *testing.T) {
 			{
 				Directory:  "",
 				Workspace:  "",
-				ExtraFlags: []string{"-var 'foo=bar'"}, // Single entry with "-var 'foo=bar'" syntax
+				ExtraArgs: []string{"-var 'foo=bar'"}, // Single entry with "-var 'foo=bar'" syntax
 			},
 		},
 	})
@@ -82,20 +81,12 @@ func TestAPIController_Plan_ExtraFlagsSingleEntry(t *testing.T) {
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.Plan(w, req)
-
-	// Assert that the response code is not http.StatusBadRequest
-	err := func() error {
-		if http.StatusBadRequest == w.Code {
-			return errors.New("unexpected response code: http.StatusBadRequest" + string(rune(w.Code)))
-		}
-		return nil
-	}()
-	Ok(t, err)
-
 	ResponseContains(t, w, http.StatusOK, "")
+	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
 }
 
-func TestAPIController_Plan_ExtraFlagsMultipleEntries(t *testing.T) {
+func TestAPIController_Plan_ExtraArgsMultipleEntries(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	_ = projectCommandRunner
 	_ = projectCommandBuilder
@@ -108,7 +99,7 @@ func TestAPIController_Plan_ExtraFlagsMultipleEntries(t *testing.T) {
 			{
 				Directory:  "",
 				Workspace:  "",
-				ExtraFlags: []string{"-var 'foo=bar'", "-var 'baz=qux'", "-var 'quux=quuz'"}, // Single entry with "-var 'foo=bar'" syntax
+				ExtraArgs: []string{"-var 'foo=bar'", "-var 'baz=qux'", "-var 'quux=quuz'"}, // Single entry with "-var 'foo=bar'" syntax
 			},
 		},
 	})
@@ -116,17 +107,9 @@ func TestAPIController_Plan_ExtraFlagsMultipleEntries(t *testing.T) {
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.Plan(w, req)
-
-	// Assert that the response code is not http.StatusBadRequest
-	err := func() error {
-		if http.StatusBadRequest == w.Code {
-			return errors.New("unexpected response code: http.StatusBadRequest")
-		}
-		return nil
-	}()
-	Ok(t, err)
-
 	ResponseContains(t, w, http.StatusOK, "")
+	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
 }
 
 func TestAPIController_Plan_InvalidExtraFlag(t *testing.T) {
@@ -142,7 +125,7 @@ func TestAPIController_Plan_InvalidExtraFlag(t *testing.T) {
 			{
 				Directory:  "",
 				Workspace:  "",
-				ExtraFlags: []string{"--invalid-flag"}, // Set an invalid extra flag
+				ExtraArgs: []string{"--invalid-flag"}, // Set an invalid extra flag
 			},
 		},
 	})

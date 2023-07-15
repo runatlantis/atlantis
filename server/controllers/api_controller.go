@@ -44,7 +44,7 @@ type APIRequest struct {
 type Path struct {
 	Directory  string
 	Workspace  string
-	ExtraFlags []string
+	ExtraArgs  []string
 }
 
 func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, error) {
@@ -59,7 +59,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.
 		cc = append(cc, &events.CommentCommand{
 			RepoRelDir: strings.TrimRight(path.Directory, "/"),
 			Workspace:  path.Workspace,
-			Flags:      path.ExtraFlags,
+			Flags:      path.ExtraArgs,
 		})
 	}
 
