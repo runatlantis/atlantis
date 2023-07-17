@@ -123,7 +123,6 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 
 		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.PendingCommitStatus, hookDescription, "", url); err != nil {
 			ctx.Log.Warn("unable to pre workflow hook status: %s", err)
-			return err
 		}
 
 		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
