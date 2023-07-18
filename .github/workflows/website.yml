@@ -60,6 +60,8 @@ jobs:
 
       - run: |
           ./muffet \
+            # rate limited 429
+            -e 'https://medium.com/runatlantis'
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             --header 'Accept-Encoding:deflate, gzip' \

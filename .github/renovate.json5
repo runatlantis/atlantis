@@ -27,9 +27,10 @@
   packageRules: [
     // For vuepress
     {
-      "packageNames": ["vuepress", "@vuepress/client", "@vuepress/markdown", "@vuepress/utils"],
-      "allowedVersions": "!/pre.*$/"
-    }
+      "matchPackageNames": ["vuepress", "@vuepress/client", "@vuepress/markdown", "@vuepress/utils"],
+      "groupName": "vuepress",
+      "allowedVersions": "!/pre.*$/",
+    },
     // e2e test depends on testing/Dockefile testing-image which has conftest specific version.
     // to upgrade conftest versions, we need following PRs.
     // 1. update testing/Dockerfile conftest version
