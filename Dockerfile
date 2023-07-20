@@ -121,7 +121,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.5.2
+ENV DEFAULT_TERRAFORM_VERSION=1.5.3
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 # Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
