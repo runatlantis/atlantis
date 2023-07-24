@@ -385,7 +385,7 @@ type PolicySetStatus struct {
 // Summary regexes
 var (
 	reChangesOutside = regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
-	rePlanChanges    = regexp.MustCompile(`Plan: (\d+) to add, (\d+) to change, (\d+) to destroy.`)
+	rePlanChanges    = regexp.MustCompile(`Plan: (?:(?:(\d+) to import, )|(?:))(\d+) to add, (\d+) to change, (\d+) to destroy.`)
 	reNoChanges      = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 )
 
@@ -631,8 +631,8 @@ type WorkflowHookCommandContext struct {
 
 // PlanSuccessStats holds stats for a plan.
 type PlanSuccessStats struct {
-	Add, Change, Destroy    int
-	Changes, ChangesOutside bool
+	Import, Add, Change, Destroy int
+	Changes, ChangesOutside      bool
 }
 
 func NewPlanSuccessStats(output string) PlanSuccessStats {
@@ -647,9 +647,10 @@ func NewPlanSuccessStats(output string) PlanSuccessStats {
 		// We can skip checking the error here as we can assume
 		// Terraform output will always render an integer on these
 		// blocks.
-		s.Add, _ = strconv.Atoi(m[1])
-		s.Change, _ = strconv.Atoi(m[2])
-		s.Destroy, _ = strconv.Atoi(m[3])
+		s.Import, _ = strconv.Atoi(m[1])
+		s.Add, _ = strconv.Atoi(m[2])
+		s.Change, _ = strconv.Atoi(m[3])
+		s.Destroy, _ = strconv.Atoi(m[4])
 	}
 
 	return s
