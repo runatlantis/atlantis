@@ -385,7 +385,7 @@ type PolicySetStatus struct {
 // Summary regexes
 var (
 	reChangesOutside = regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
-	rePlanChanges    = regexp.MustCompile(`Plan: (?:(?:(\d+) to import, )|(?:))(\d+) to add, (\d+) to change, (\d+) to destroy.`)
+	rePlanChanges    = regexp.MustCompile(`Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy.`)
 	reNoChanges      = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 )
 
