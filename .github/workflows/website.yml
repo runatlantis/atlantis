@@ -61,7 +61,7 @@ jobs:
       # medium.com => was being rate limited: HTTP 429
       - run: |
           ./muffet \
-            -e 'https://medium.com/runatlantis'
+            -e 'https://medium.com/runatlantis' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             --header 'Accept-Encoding:deflate, gzip' \
