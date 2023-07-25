@@ -306,6 +306,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	if userConfig.WriteGitCreds {
+		if err := os.MkdirAll(home, 0700); err != nil {
+			return nil, errors.Wrapf(err, "unable to create dir %q", home)
+		}
+
 		if userConfig.GithubUser != "" {
 			if err := vcs.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger, false); err != nil {
 				return nil, err
