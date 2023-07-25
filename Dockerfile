@@ -170,14 +170,13 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Install packages needed for running Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
-RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main/ \
-        git~=2.40 && \
-    apk add --no-cache \
+RUN apk add --no-cache \
         ca-certificates~=20230506 \
-        curl~=8.1 \
+        curl~=8.2 \
+        git~=2.40 \
         unzip~=6.0 \
         bash~=5.2 \
-        openssh~=9.3_p1 \
+        openssh~=9.3_p2 \
         libcap~=2.69 \
         dumb-init~=1.2 \
         gcompat~=1.1

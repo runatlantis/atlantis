@@ -35,9 +35,3 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - run: 'echo "No build required"'
-
-  website_link_check:
-    if: github.event.pull_request.draft == false
-    runs-on: ubuntu-22.04
-    steps:
-      - run: 'echo "No build required"'
