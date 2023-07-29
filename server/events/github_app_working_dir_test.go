@@ -12,7 +12,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsMocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
-	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -44,9 +43,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 		GithubHostname: testServer,
 	}
 
-	logger := logging.NewNoopLogger(t)
-
-	cloneDir, _, err := gwd.Clone(logger, models.Repo{}, models.PullRequest{
+	cloneDir, _, err := gwd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
@@ -80,8 +77,6 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 		"",
 	)
 
-	logger := logging.NewNoopLogger(t)
-
 	headRepo := baseRepo
 
 	modifiedBaseRepo := baseRepo
@@ -90,13 +85,13 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 	modifiedBaseRepo.SanitizedCloneURL = "https://github.com/runatlantis/atlantis.git"
 
 	When(credentials.GetToken()).ThenReturn("token", nil)
-	When(workingDir.Clone(logger, modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")).ThenReturn(
+	When(workingDir.Clone(modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")).ThenReturn(
 		"", true, nil,
 	)
 
-	_, success, _ := ghAppWorkingDir.Clone(logger, headRepo, models.PullRequest{BaseRepo: baseRepo}, "default")
+	_, success, _ := ghAppWorkingDir.Clone(headRepo, models.PullRequest{BaseRepo: baseRepo}, "default")
 
-	workingDir.VerifyWasCalledOnce().Clone(logger, modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")
+	workingDir.VerifyWasCalledOnce().Clone(modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")
 
 	Assert(t, success == true, "clone url mutation error")
 }
