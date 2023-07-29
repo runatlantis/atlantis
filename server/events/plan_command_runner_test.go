@@ -496,7 +496,6 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			}
 
 			planCommandRunner.Run(ctx, cmd)
-			type RepoModel interface{ models.Repo }
 
 			for i := range c.ProjectContexts {
 				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Plan(c.ProjectContexts[i])

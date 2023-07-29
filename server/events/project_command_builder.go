@@ -734,7 +734,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		if repoCfgPtr.ParallelPlan != nil {
 			parallelPlan = *repoCfgPtr.ParallelPlan
 		}
-		abortOnExcecutionOrderFail = *&repoCfgPtr.AbortOnExcecutionOrderFail
+		abortOnExcecutionOrderFail = repoCfgPtr.AbortOnExcecutionOrderFail
 	}
 
 	if len(matchingProjects) > 0 {
