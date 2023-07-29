@@ -12,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsMocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -23,10 +24,13 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 
 	dataDir := t.TempDir()
 
+	logger := logging.NewNoopLogger(t)
+
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		Logger:                      logger,
 	}
 
 	defer disableSSLVerification()()
