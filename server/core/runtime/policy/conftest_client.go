@@ -148,7 +148,7 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 
 	if err != nil {
 		// conftest default versions are not essential to service startup so let's not block on it.
-		log.Warn("failed to get default conftest version. Will attempt request scoped lazy loads %s", err.Error())
+		log.Info("failed to get default conftest version. Will attempt request scoped lazy loads %s", err.Error())
 	}
 
 	versionCache := cache.NewExecutionVersionLayeredLoadingCache(

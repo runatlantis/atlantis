@@ -5,9 +5,9 @@ go 1.20
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/alicebob/miniredis/v2 v2.30.4
-	github.com/bradleyfalzon/ghinstallation/v2 v2.5.0
+	github.com/bradleyfalzon/ghinstallation/v2 v2.6.0
 	github.com/briandowns/spinner v1.23.0
-	github.com/cactus/go-statsd-client/v5 v5.0.0
+	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-playground/validator/v10 v10.14.1
 	github.com/go-test/deep v1.1.0
@@ -24,7 +24,7 @@ require (
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20230614215431-f32df32a01cd
 	github.com/kr/pretty v0.3.1
 	github.com/mcdafydd/go-azuredevops v0.12.1
-	github.com/microcosm-cc/bluemonday v1.0.24
+	github.com/microcosm-cc/bluemonday v1.0.25
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/patternmatcher v0.5.0
@@ -42,7 +42,7 @@ require (
 	github.com/uber-go/tally/v4 v4.1.7
 	github.com/urfave/negroni/v3 v3.0.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
-	github.com/xanzy/go-gitlab v0.86.0
+	github.com/xanzy/go-gitlab v0.88.0
 	go.etcd.io/bbolt v1.3.7
 	go.uber.org/zap v1.24.0
 	golang.org/x/term v0.10.0
@@ -121,8 +121,8 @@ require (
 	github.com/yuin/gopher-lua v1.1.0 // indirect
 	github.com/zclconf/go-cty v1.13.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.9.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
+	golang.org/x/crypto v0.11.0 // indirect
+	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
