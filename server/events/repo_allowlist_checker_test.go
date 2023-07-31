@@ -175,6 +175,20 @@ func TestRepoAllowlistChecker_IsAllowlisted(t *testing.T) {
 			"github.com",
 			true,
 		},
+		{
+			"should exclude with negative match",
+			"github.com/owner/*,!github.com/owner/badrepo",
+			"owner/badrepo",
+			"github.com",
+			false,
+		},
+		{
+			"should match if with negative rule doesn't match",
+			"github.com/owner/*,!github.com/owner/badrepo",
+			"owner/otherrepo",
+			"github.com",
+			true,
+		},
 	}
 
 	for _, c := range cases {

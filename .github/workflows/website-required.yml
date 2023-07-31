@@ -1,0 +1,38 @@
+name: website
+
+on:
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - '**.js'
+      - 'yarn.lock'
+      - 'package.json'
+      - '.github/workflows/website.yml'
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    branches:
+      - "main"
+    paths-ignore:
+      - '**.js'
+      - 'yarn.lock'
+      - 'package.json'
+      - '.github/workflows/website.yml'
+ 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # Check that there's no missing links for the website.
+  # This job builds the website, starts a server to serve it, and then uses
+  # muffet (https://github.com/raviqqe/muffet) to perform the link check.
+  link_check:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No testing required"'

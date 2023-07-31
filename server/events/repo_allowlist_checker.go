@@ -24,20 +24,28 @@ const Wildcard = "*"
 // RepoAllowlistChecker implements checking if repos are allowlisted to be used with
 // this Atlantis.
 type RepoAllowlistChecker struct {
-	rules []string
+	includeRules []string
+	omitRules    []string
 }
 
 // NewRepoAllowlistChecker constructs a new checker and validates that the
 // allowlist isn't malformed.
 func NewRepoAllowlistChecker(allowlist string) (*RepoAllowlistChecker, error) {
-	rules := strings.Split(allowlist, ",")
-	for _, rule := range rules {
+	includeRules := make([]string, 0)
+	omitRules := make([]string, 0)
+	for _, rule := range strings.Split(allowlist, ",") {
 		if strings.Contains(rule, "://") {
 			return nil, fmt.Errorf("allowlist %q contained ://", rule)
 		}
+		if len(rule) > 1 && rule[0] == '!' {
+			omitRules = append(omitRules, rule[1:])
+		} else {
+			includeRules = append(includeRules, rule)
+		}
 	}
 	return &RepoAllowlistChecker{
-		rules: rules,
+		includeRules: includeRules,
+		omitRules:    omitRules,
 	}, nil
 }
 
@@ -45,7 +53,13 @@ func NewRepoAllowlistChecker(allowlist string) (*RepoAllowlistChecker, error) {
 // otherwise.
 func (r *RepoAllowlistChecker) IsAllowlisted(repoFullName string, vcsHostname string) bool {
 	candidate := fmt.Sprintf("%s/%s", vcsHostname, repoFullName)
-	for _, rule := range r.rules {
+	shouldInclude := r.matchesAtLeastOneRule(r.includeRules, candidate)
+	shouldOmit := r.matchesAtLeastOneRule(r.omitRules, candidate)
+	return shouldInclude && !shouldOmit
+}
+
+func (r *RepoAllowlistChecker) matchesAtLeastOneRule(rules []string, candidate string) bool {
+	for _, rule := range rules {
 		if r.matchesRule(rule, candidate) {
 			return true
 		}

@@ -46,6 +46,7 @@ For example:
 * Specific repositories: `--repo-allowlist=github.com/runatlantis/atlantis,github.com/runatlantis/atlantis-tests`
 * Your whole organization: `--repo-allowlist=github.com/runatlantis/*`
 * Every repository in your GitHub Enterprise install: `--repo-allowlist=github.yourcompany.com/*`
+* You can also omit specific repos: `--repo-allowlist='github.com/runatlantis/*,!github.com/runatlantis/untrusted-repo'`
 * All repositories: `--repo-allowlist=*`. Useful for when you're in a protected network but dangerous without also setting a webhook secret.
 
 This flag ensures your Atlantis install isn't being used with repositories you don't control. See `atlantis server --help` for more details.

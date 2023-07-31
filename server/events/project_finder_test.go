@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -483,6 +484,22 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 				},
 			},
 			modified:     []string{"project2/terraform.tfvars"},
+			expProjPaths: []string{"project2"},
+		},
+		{
+			description: ".terraform.lock.hcl file modified",
+			config: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir: "project2",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: raw.DefaultAutoPlanWhenModified,
+						},
+					},
+				},
+			},
+			modified:     []string{"project2/.terraform.lock.hcl"},
 			expProjPaths: []string{"project2"},
 		},
 		{

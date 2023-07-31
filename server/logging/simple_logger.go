@@ -154,13 +154,13 @@ func (l *StructuredLogger) Err(format string, a ...interface{}) {
 func (l *StructuredLogger) Log(level LogLevel, format string, a ...interface{}) {
 	switch level {
 	case Debug:
-		l.Debug(format, a...)
+		l.z.Debugf(format, a...)
 	case Info:
-		l.Info(format, a...)
+		l.z.Infof(format, a...)
 	case Warn:
-		l.Warn(format, a...)
+		l.z.Warnf(format, a...)
 	case Error:
-		l.Err(format, a...)
+		l.z.Errorf(format, a...)
 	}
 }
 

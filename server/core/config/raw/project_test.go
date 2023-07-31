@@ -349,7 +349,7 @@ func TestProject_ToValid(t *testing.T) {
 				WorkflowName:     nil,
 				TerraformVersion: nil,
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+					WhenModified: raw.DefaultAutoPlanWhenModified,
 					Enabled:      true,
 				},
 				ApplyRequirements: nil,
@@ -396,7 +396,7 @@ func TestProject_ToValid(t *testing.T) {
 				Workspace:        "default",
 				TerraformVersion: tfVersionPointEleven,
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+					WhenModified: raw.DefaultAutoPlanWhenModified,
 					Enabled:      true,
 				},
 			},
@@ -411,7 +411,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+					WhenModified: raw.DefaultAutoPlanWhenModified,
 					Enabled:      true,
 				},
 			},
@@ -425,7 +425,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       "a/b/c",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+					WhenModified: raw.DefaultAutoPlanWhenModified,
 					Enabled:      true,
 				},
 			},
@@ -439,7 +439,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       "mydir",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+					WhenModified: raw.DefaultAutoPlanWhenModified,
 					Enabled:      true,
 				},
 			},
@@ -454,7 +454,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       "mydir",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+					WhenModified: raw.DefaultAutoPlanWhenModified,
 					Enabled:      true,
 				},
 			},
@@ -468,7 +468,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+					WhenModified: raw.DefaultAutoPlanWhenModified,
 					Enabled:      true,
 				},
 			},
@@ -482,7 +482,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+					WhenModified: raw.DefaultAutoPlanWhenModified,
 					Enabled:      true,
 				},
 			},
@@ -496,7 +496,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+					WhenModified: raw.DefaultAutoPlanWhenModified,
 					Enabled:      true,
 				},
 			},
@@ -512,7 +512,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+					WhenModified: raw.DefaultAutoPlanWhenModified,
 					Enabled:      true,
 				},
 			},
