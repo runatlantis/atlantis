@@ -24,7 +24,7 @@ sleep 2
 sleep 2
 
 # find out what URL ngrok has given us
-export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[] | select(.proto=="http") | .public_url')
+export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[] | select(.proto=="https") | .public_url')
 
 # Now we can start the e2e tests
 echo "Running 'make build'"

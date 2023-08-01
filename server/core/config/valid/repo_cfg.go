@@ -14,18 +14,19 @@ import (
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
 type RepoCfg struct {
 	// Version is the version of the atlantis YAML file.
-	Version                   int
-	Projects                  []Project
-	Workflows                 map[string]Workflow
-	PolicySets                PolicySets
-	Automerge                 bool
-	ParallelApply             bool
-	ParallelPlan              bool
-	ParallelPolicyCheck       bool
-	DeleteSourceBranchOnMerge *bool
-	RepoLocking               *bool
-	EmojiReaction             string
-	AllowedRegexpPrefixes     []string
+	Version                    int
+	Projects                   []Project
+	Workflows                  map[string]Workflow
+	PolicySets                 PolicySets
+	Automerge                  *bool
+	ParallelApply              *bool
+	ParallelPlan               *bool
+	ParallelPolicyCheck        *bool
+	DeleteSourceBranchOnMerge  *bool
+	RepoLocking                *bool
+	EmojiReaction              string
+	AllowedRegexpPrefixes      []string
+	AbortOnExcecutionOrderFail bool
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
@@ -133,6 +134,7 @@ type Project struct {
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
 	ExecutionOrderGroup       int
+	PolicyCheck               *bool
 }
 
 // GetName returns the name of the project or an empty string if there is no
@@ -149,6 +151,15 @@ type Autoplan struct {
 	Enabled      bool
 }
 
+// PostProcessRunOutputOption is an enum of options for post-processing RunCommand output
+type PostProcessRunOutputOption string
+
+const (
+	PostProcessRunOutputShow            = "show"
+	PostProcessRunOutputHide            = "hide"
+	PostProcessRunOutputStripRefreshing = "strip_refreshing"
+)
+
 type Stage struct {
 	Steps []Step
 }
@@ -159,6 +170,8 @@ type Step struct {
 	// RunCommand is either a custom run step or the command to run
 	// during an env step to populate the environment variable dynamically.
 	RunCommand string
+	// Output is option for post-processing a RunCommand output
+	Output PostProcessRunOutputOption
 	// EnvVarName is the name of the
 	// environment variable that should be set by this step.
 	EnvVarName string

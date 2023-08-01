@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers/events"
 	. "github.com/runatlantis/atlantis/testing"
 )

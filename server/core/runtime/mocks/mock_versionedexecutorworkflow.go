@@ -5,7 +5,7 @@ package mocks
 
 import (
 	go_version "github.com/hashicorp/go-version"
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	logging "github.com/runatlantis/atlantis/server/logging"
 	"reflect"
@@ -27,11 +27,11 @@ func NewMockVersionedExecutorWorkflow(options ...pegomock.Option) *MockVersioned
 func (mock *MockVersionedExecutorWorkflow) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockVersionedExecutorWorkflow) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockVersionedExecutorWorkflow) EnsureExecutorVersion(_param0 logging.SimpleLogging, _param1 *go_version.Version) (string, error) {
+func (mock *MockVersionedExecutorWorkflow) EnsureExecutorVersion(log logging.SimpleLogging, v *go_version.Version) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockVersionedExecutorWorkflow().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{log, v}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("EnsureExecutorVersion", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -46,11 +46,11 @@ func (mock *MockVersionedExecutorWorkflow) EnsureExecutorVersion(_param0 logging
 	return ret0, ret1
 }
 
-func (mock *MockVersionedExecutorWorkflow) Run(_param0 command.ProjectContext, _param1 string, _param2 map[string]string, _param3 string, _param4 []string) (string, error) {
+func (mock *MockVersionedExecutorWorkflow) Run(ctx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockVersionedExecutorWorkflow().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4}
+	params := []pegomock.Param{ctx, executablePath, envs, workdir, extraArgs}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -102,8 +102,8 @@ type VerifierMockVersionedExecutorWorkflow struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockVersionedExecutorWorkflow) EnsureExecutorVersion(_param0 logging.SimpleLogging, _param1 *go_version.Version) *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockVersionedExecutorWorkflow) EnsureExecutorVersion(log logging.SimpleLogging, v *go_version.Version) *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification {
+	params := []pegomock.Param{log, v}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "EnsureExecutorVersion", params, verifier.timeout)
 	return &MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -114,8 +114,8 @@ type MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification str
 }
 
 func (c *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, *go_version.Version) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	log, v := c.GetAllCapturedArguments()
+	return log[len(log)-1], v[len(v)-1]
 }
 
 func (c *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []*go_version.Version) {
@@ -133,8 +133,8 @@ func (c *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification
 	return
 }
 
-func (verifier *VerifierMockVersionedExecutorWorkflow) Run(_param0 command.ProjectContext, _param1 string, _param2 map[string]string, _param3 string, _param4 []string) *MockVersionedExecutorWorkflow_Run_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4}
+func (verifier *VerifierMockVersionedExecutorWorkflow) Run(ctx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) *MockVersionedExecutorWorkflow_Run_OngoingVerification {
+	params := []pegomock.Param{ctx, executablePath, envs, workdir, extraArgs}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
 	return &MockVersionedExecutorWorkflow_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -145,8 +145,8 @@ type MockVersionedExecutorWorkflow_Run_OngoingVerification struct {
 }
 
 func (c *MockVersionedExecutorWorkflow_Run_OngoingVerification) GetCapturedArguments() (command.ProjectContext, string, map[string]string, string, []string) {
-	_param0, _param1, _param2, _param3, _param4 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1], _param3[len(_param3)-1], _param4[len(_param4)-1]
+	ctx, executablePath, envs, workdir, extraArgs := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], executablePath[len(executablePath)-1], envs[len(envs)-1], workdir[len(workdir)-1], extraArgs[len(extraArgs)-1]
 }
 
 func (c *MockVersionedExecutorWorkflow_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 []map[string]string, _param3 []string, _param4 [][]string) {

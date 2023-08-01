@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -28,14 +28,10 @@ const (
 	// DefaultWorkspace is the default Terraform workspace we run commands in.
 	// This is also Terraform's default workspace.
 	DefaultWorkspace = "default"
-	// DefaultAutomergeEnabled is the default for the automerge setting.
-	DefaultAutomergeEnabled = false
-	// DefaultParallelApplyEnabled is the default for the parallel apply setting.
-	DefaultParallelApplyEnabled = false
-	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
-	DefaultParallelPlanEnabled = false
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
+	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
+	DefaultAbortOnExcecutionOrderFail = false
 )
 
 func NewInstrumentedProjectCommandBuilder(
@@ -50,6 +46,9 @@ func NewInstrumentedProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
+	EnableAutoMerge bool,
+	EnableParallelPlan bool,
+	EnableParallelApply bool,
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	RestrictFileList bool,
@@ -77,6 +76,9 @@ func NewInstrumentedProjectCommandBuilder(
 			commentBuilder,
 			skipCloneNoChanges,
 			EnableRegExpCmd,
+			EnableAutoMerge,
+			EnableParallelPlan,
+			EnableParallelApply,
 			AutoDetectModuleFiles,
 			AutoplanFileList,
 			RestrictFileList,
@@ -102,6 +104,9 @@ func NewProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
+	EnableAutoMerge bool,
+	EnableParallelPlan bool,
+	EnableParallelApply bool,
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	RestrictFileList bool,
@@ -120,6 +125,9 @@ func NewProjectCommandBuilder(
 		PendingPlanFinder:     pendingPlanFinder,
 		SkipCloneNoChanges:    skipCloneNoChanges,
 		EnableRegExpCmd:       EnableRegExpCmd,
+		EnableAutoMerge:       EnableAutoMerge,
+		EnableParallelPlan:    EnableParallelPlan,
+		EnableParallelApply:   EnableParallelApply,
 		AutoDetectModuleFiles: AutoDetectModuleFiles,
 		AutoplanFileList:      AutoplanFileList,
 		RestrictFileList:      RestrictFileList,
@@ -176,7 +184,7 @@ type ProjectStateCommandBuilder interface {
 	BuildStateRmCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
+//go:generate pegomock generate --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
@@ -202,6 +210,9 @@ type DefaultProjectCommandBuilder struct {
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	SkipCloneNoChanges           bool
 	EnableRegExpCmd              bool
+	EnableAutoMerge              bool
+	EnableParallelPlan           bool
+	EnableParallelApply          bool
 	AutoDetectModuleFiles        string
 	AutoplanFileList             string
 	EnableDiffMarkdownFormat     bool
@@ -330,7 +341,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	repoDir, _, err := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -361,6 +372,23 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	}
 	ctx.Log.Debug("moduleInfo for %s (matching %q) = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
 
+	automerge := p.EnableAutoMerge
+	parallelApply := p.EnableParallelApply
+	parallelPlan := p.EnableParallelPlan
+	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
+	if hasRepoCfg {
+		if repoCfg.Automerge != nil {
+			automerge = *repoCfg.Automerge
+		}
+		if repoCfg.ParallelApply != nil {
+			parallelApply = *repoCfg.ParallelApply
+		}
+		if repoCfg.ParallelPlan != nil {
+			parallelPlan = *repoCfg.ParallelPlan
+		}
+		abortOnExcecutionOrderFail = repoCfg.AbortOnExcecutionOrderFail
+	}
+
 	if len(repoCfg.Projects) > 0 {
 		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir, moduleInfo)
 		if err != nil {
@@ -380,10 +408,11 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					mergedCfg,
 					commentFlags,
 					repoDir,
-					repoCfg.Automerge,
-					repoCfg.ParallelApply,
-					repoCfg.ParallelPlan,
+					automerge,
+					parallelApply,
+					parallelPlan,
 					verbose,
+					repoCfg.AbortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -404,14 +433,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			if err != nil {
 				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", repoDir)
 			}
-			automerge := DefaultAutomergeEnabled
-			parallelApply := DefaultParallelApplyEnabled
-			parallelPlan := DefaultParallelPlanEnabled
-			if hasRepoCfg {
-				automerge = repoCfg.Automerge
-				parallelApply = repoCfg.ParallelApply
-				parallelPlan = repoCfg.ParallelPlan
-			}
+
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)
 
 			projCtxs = append(projCtxs,
@@ -426,6 +448,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
+					abortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -513,7 +536,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	defer unlockFn()
 
 	ctx.Log.Debug("cloning repository")
-	_, _, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return pcc, err
 	}
@@ -697,13 +720,21 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	}
 	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
-	automerge := DefaultAutomergeEnabled
-	parallelApply := DefaultParallelApplyEnabled
-	parallelPlan := DefaultParallelPlanEnabled
+	automerge := p.EnableAutoMerge
+	parallelApply := p.EnableParallelApply
+	parallelPlan := p.EnableParallelPlan
+	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
 	if repoCfgPtr != nil {
-		automerge = repoCfgPtr.Automerge
-		parallelApply = repoCfgPtr.ParallelApply
-		parallelPlan = repoCfgPtr.ParallelPlan
+		if repoCfgPtr.Automerge != nil {
+			automerge = *repoCfgPtr.Automerge
+		}
+		if repoCfgPtr.ParallelApply != nil {
+			parallelApply = *repoCfgPtr.ParallelApply
+		}
+		if repoCfgPtr.ParallelPlan != nil {
+			parallelPlan = *repoCfgPtr.ParallelPlan
+		}
+		abortOnExcecutionOrderFail = *&repoCfgPtr.AbortOnExcecutionOrderFail
 	}
 
 	if len(matchingProjects) > 0 {
@@ -728,6 +759,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					parallelApply,
 					parallelPlan,
 					verbose,
+					abortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -751,6 +783,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				parallelApply,
 				parallelPlan,
 				verbose,
+				abortOnExcecutionOrderFail,
 				p.TerraformExecutor,
 			)...)
 	}

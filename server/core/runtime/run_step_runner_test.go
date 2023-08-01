@@ -6,13 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	version "github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	"github.com/hashicorp/go-version"
+	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -105,7 +104,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 
 		RegisterMockTestingT(t)
 		terraform := mocks.NewMockClient()
-		When(terraform.EnsureVersion(matchers.AnyLoggingSimpleLogging(), matchers2.AnyPtrToGoVersionVersion())).
+		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[*version.Version]())).
 			ThenReturn(nil)
 
 		logger := logging.NewNoopLogger(t)
@@ -146,7 +145,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				ProjectName:        c.ProjectName,
 				EscapedCommentArgs: []string{"-target=resource1", "-target=resource2"},
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"}, true)
+			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

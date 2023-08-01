@@ -23,6 +23,7 @@ import (
 	"net/url"
 	paths "path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -384,7 +385,7 @@ type PolicySetStatus struct {
 // Summary regexes
 var (
 	reChangesOutside = regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
-	rePlanChanges    = regexp.MustCompile(`Plan: \d+ to add, \d+ to change, \d+ to destroy.`)
+	rePlanChanges    = regexp.MustCompile(`Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy.`)
 	reNoChanges      = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 )
 
@@ -426,8 +427,15 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 	return strings.TrimSpace(formattedTerraformOutput)
 }
 
+// Stats returns plan change stats and contextual information.
+func (p PlanSuccess) Stats() PlanSuccessStats {
+	return NewPlanSuccessStats(p.TerraformOutput)
+}
+
 // PolicyCheckResults is the result of a successful policy check run.
 type PolicyCheckResults struct {
+	PreConftestOutput  string
+	PostConftestOutput string
 	// PolicySetResults is the output from policy check binary(conftest|opa)
 	PolicySetResults []PolicySetResult
 	// LockURL is the full URL to the lock held by this policy check.
@@ -622,4 +630,33 @@ type WorkflowHookCommandContext struct {
 	EscapedCommentArgs []string
 	// UUID for reference
 	HookID string
+	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
+	CommandName string
+}
+
+// PlanSuccessStats holds stats for a plan.
+type PlanSuccessStats struct {
+	Import, Add, Change, Destroy int
+	Changes, ChangesOutside      bool
+}
+
+func NewPlanSuccessStats(output string) PlanSuccessStats {
+	m := rePlanChanges.FindStringSubmatch(output)
+
+	s := PlanSuccessStats{
+		ChangesOutside: reChangesOutside.MatchString(output),
+		Changes:        len(m) > 0,
+	}
+
+	if s.Changes {
+		// We can skip checking the error here as we can assume
+		// Terraform output will always render an integer on these
+		// blocks.
+		s.Import, _ = strconv.Atoi(m[1])
+		s.Add, _ = strconv.Atoi(m[2])
+		s.Change, _ = strconv.Atoi(m[3])
+		s.Destroy, _ = strconv.Atoi(m[4])
+	}
+
+	return s
 }

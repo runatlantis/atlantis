@@ -78,7 +78,7 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 
 // SourceResolver resolves the policy set to a local fs path
 //
-//go:generate pegomock generate -m --package mocks -o mocks/mock_conftest_client.go SourceResolver
+//go:generate pegomock generate --package mocks -o mocks/mock_conftest_client.go SourceResolver
 type SourceResolver interface {
 	Resolve(policySet valid.PolicySet) (string, error)
 }
@@ -148,7 +148,7 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 
 	if err != nil {
 		// conftest default versions are not essential to service startup so let's not block on it.
-		log.Warn("failed to get default conftest version. Will attempt request scoped lazy loads %s", err.Error())
+		log.Info("failed to get default conftest version. Will attempt request scoped lazy loads %s", err.Error())
 	}
 
 	versionCache := cache.NewExecutionVersionLayeredLoadingCache(

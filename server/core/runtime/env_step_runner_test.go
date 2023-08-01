@@ -11,7 +11,7 @@ import (
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	. "github.com/runatlantis/atlantis/testing"
 )
 

@@ -23,8 +23,8 @@ import (
 	"time"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/petergtz/pegomock"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
@@ -211,7 +211,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 	defer tempSetEnv(t, "PATH", "")()
 
 	mockDownloader := mocks.NewMockDownloader()
-	When(mockDownloader.GetFile(AnyString(), AnyString())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+	When(mockDownloader.GetFile(Any[string](), Any[string]())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
 		err := os.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0700) // #nosec G306
 		return []pegomock.ReturnValue{err}
 	})

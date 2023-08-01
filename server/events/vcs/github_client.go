@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v52/github"
+	"github.com/google/go-github/v53/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -199,7 +199,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 }
 
 // ReactToComment adds a reaction to a comment.
-func (g *GithubClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error {
+func (g *GithubClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {
 	g.logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions", repo.Owner, repo.Name, commentID)
 	_, _, err := g.client.Reactions.CreateIssueCommentReaction(g.ctx, repo.Owner, repo.Name, commentID, reaction)
 	return err
@@ -397,7 +397,7 @@ func isRequiredCheck(check string, required []string) bool {
 // GetCombinedStatusMinusApply checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
 func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest, vcstatusname string) (bool, error) {
 	//check combined status api
-	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, *pull.Head.Ref, nil)
+	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
 	if err != nil {
 		return false, errors.Wrap(err, "getting combined status")
 	}
@@ -419,7 +419,7 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 	}
 
 	//check check suite/check run api
-	checksuites, _, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), repo.Owner, repo.Name, *pull.Head.Ref, nil)
+	checksuites, _, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
 	if err != nil {
 		return false, errors.Wrap(err, "getting check suites for ref")
 	}
@@ -428,7 +428,7 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 	for _, c := range checksuites.CheckSuites {
 		if *c.Status == "completed" {
 			//iterate over the runs inside the suite
-			suite, _, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), repo.Owner, repo.Name, *c.ID, nil)
+			suite, _, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *c.ID, nil)
 			if err != nil {
 				return false, errors.Wrap(err, "getting check runs for check suite")
 			}

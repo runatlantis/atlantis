@@ -10,7 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_pending_plan_finder.go PendingPlanFinder
+//go:generate pegomock generate --package mocks -o mocks/mock_pending_plan_finder.go PendingPlanFinder
 
 type PendingPlanFinder interface {
 	Find(pullDir string) ([]PendingPlan, error)

@@ -9,7 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 )
 
 const (
@@ -111,6 +111,8 @@ type ProjectContext struct {
 	JobID string
 	// The index of order group. Before planning/applying it will use to sort projects. Default is 0.
 	ExecutionOrderGroup int
+	// If plans/applies should be aborted if any prior plan/apply fails
+	AbortOnExcecutionOrderFail bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

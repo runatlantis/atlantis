@@ -259,43 +259,48 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "automerge and parallel_apply omitted",
+			description: "automerge, parallel_apply and abort_on_execution_order_fail omitted",
 			input: raw.RepoCfg{
 				Version: Int(2),
 			},
 			exp: valid.RepoCfg{
-				Version:       2,
-				Automerge:     false,
-				ParallelApply: false,
-				Workflows:     map[string]valid.Workflow{},
+				Version:                    2,
+				Automerge:                  nil,
+				ParallelApply:              nil,
+				AbortOnExcecutionOrderFail: false,
+				Workflows:                  map[string]valid.Workflow{},
 			},
 		},
 		{
-			description: "automerge and parallel_apply true",
+			description: "automerge, parallel_apply and abort_on_execution_order_fail true",
 			input: raw.RepoCfg{
-				Version:       Int(2),
-				Automerge:     Bool(true),
-				ParallelApply: Bool(true),
+				Version:                    Int(2),
+				Automerge:                  Bool(true),
+				ParallelApply:              Bool(true),
+				AbortOnExcecutionOrderFail: Bool(true),
 			},
 			exp: valid.RepoCfg{
-				Version:       2,
-				Automerge:     true,
-				ParallelApply: true,
-				Workflows:     map[string]valid.Workflow{},
+				Version:                    2,
+				Automerge:                  Bool(true),
+				ParallelApply:              Bool(true),
+				AbortOnExcecutionOrderFail: true,
+				Workflows:                  map[string]valid.Workflow{},
 			},
 		},
 		{
-			description: "automerge and parallel_apply false",
+			description: "automerge, parallel_apply and abort_on_execution_order_fail false",
 			input: raw.RepoCfg{
-				Version:       Int(2),
-				Automerge:     Bool(false),
-				ParallelApply: Bool(false),
+				Version:                    Int(2),
+				Automerge:                  Bool(false),
+				ParallelApply:              Bool(false),
+				AbortOnExcecutionOrderFail: Bool(false),
 			},
 			exp: valid.RepoCfg{
-				Version:       2,
-				Automerge:     false,
-				ParallelApply: false,
-				Workflows:     map[string]valid.Workflow{},
+				Version:                    2,
+				Automerge:                  Bool(false),
+				ParallelApply:              Bool(false),
+				AbortOnExcecutionOrderFail: false,
+				Workflows:                  map[string]valid.Workflow{},
 			},
 		},
 		{
@@ -314,8 +319,8 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 			exp: valid.RepoCfg{
 				Version:       2,
-				Automerge:     false,
-				ParallelApply: false,
+				Automerge:     nil,
+				ParallelApply: nil,
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
 						Name:        "myworkflow",
@@ -381,8 +386,8 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 			exp: valid.RepoCfg{
 				Version:       2,
-				Automerge:     true,
-				ParallelApply: true,
+				Automerge:     Bool(true),
+				ParallelApply: Bool(true),
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
 						Name: "myworkflow",
@@ -428,7 +433,7 @@ func TestConfig_ToValid(t *testing.T) {
 						Dir:       "mydir",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},

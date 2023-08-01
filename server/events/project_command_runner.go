@@ -14,12 +14,11 @@
 package events
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"encoding/json"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -44,7 +43,7 @@ func (d DirNotExistErr) Error() string {
 	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
+//go:generate pegomock generate --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
 
 // LockURLGenerator generates urls to locks.
 type LockURLGenerator interface {
@@ -52,7 +51,7 @@ type LockURLGenerator interface {
 	GenerateLockURL(lockID string) string
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_step_runner.go StepRunner
+//go:generate pegomock generate --package mocks -o mocks/mock_step_runner.go StepRunner
 
 // StepRunner runs steps. Steps are individual pieces of execution like
 // `terraform plan`.
@@ -61,15 +60,15 @@ type StepRunner interface {
 	Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
+//go:generate pegomock generate --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
 
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool) (string, error)
+	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
+//go:generate pegomock generate --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
 
 // EnvStepRunner runs env steps.
 type EnvStepRunner interface {
@@ -82,7 +81,7 @@ type MultiEnvStepRunner interface {
 	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
+//go:generate pegomock generate --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
 
 // WebhooksSender sends webhook.
 type WebhooksSender interface {
@@ -90,7 +89,7 @@ type WebhooksSender interface {
 	Send(log logging.SimpleLogging, res webhooks.ApplyResult) error
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
+//go:generate pegomock generate --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
 
 type ProjectPlanCommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
@@ -139,7 +138,7 @@ type ProjectCommandRunner interface {
 	ProjectStateCommandRunner
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_job_url_setter.go JobURLSetter
+//go:generate pegomock generate --package mocks -o mocks/mock_job_url_setter.go JobURLSetter
 
 type JobURLSetter interface {
 	// SetJobURLWithStatus sets the commit status for the project represented by
@@ -147,7 +146,7 @@ type JobURLSetter interface {
 	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, result *command.ProjectResult) error
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
+//go:generate pegomock generate --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
 
 type JobMessageSender interface {
 	Send(ctx command.ProjectContext, msg string, operationComplete bool)
@@ -485,14 +484,30 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		}
 	}
 
+	// Separate output from custom run steps
+	var index int
+	var preConftestOutput []string
+	var postConftestOutput []string
 	var policySetResults []models.PolicySetResult
-	err = json.Unmarshal([]byte(strings.Join(outputs, "\n")), &policySetResults)
-	if err != nil {
-		return nil, "", err
+	for i, output := range outputs {
+		index = i
+		err = json.Unmarshal([]byte(strings.Join([]string{output}, "\n")), &policySetResults)
+		if err == nil {
+			break
+		}
+		preConftestOutput = append(preConftestOutput, output)
+	}
+	if policySetResults == nil {
+		return nil, "", errors.New("unable to unmarshal conftest output")
+	}
+	if len(outputs) > 0 {
+		postConftestOutput = outputs[(index + 1):]
 	}
 
 	result := &models.PolicyCheckResults{
 		LockURL:            p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		PreConftestOutput:  strings.Join(preConftestOutput, "\n"),
+		PostConftestOutput: strings.Join(postConftestOutput, "\n"),
 		PolicySetResults:   policySetResults,
 		RePlanCmd:          ctx.RePlanCmd,
 		ApplyCmd:           ctx.ApplyCmd,
@@ -528,8 +543,9 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	}
 	defer unlockFn()
 
+	p.WorkingDir.SetSafeToReClone()
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -637,7 +653,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 
 func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out *models.ImportSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}
@@ -683,7 +699,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 
 func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out *models.StateRmSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}
@@ -747,7 +763,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs, true)
+			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs, true, step.Output)
 		case "env":
 			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out

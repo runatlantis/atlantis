@@ -50,6 +50,7 @@ automerge: true
 delete_source_branch_on_merge: true
 parallel_plan: true
 parallel_apply: true
+abort_on_execution_order_fail: true
 projects:
 - name: my-project-name
   branch: /main/
@@ -59,17 +60,21 @@ projects:
   delete_source_branch_on_merge: true
   repo_locking: true
   autoplan:
-    when_modified: ["*.tf", "../modules/**/*.tf"]
+    when_modified: ["*.tf", "../modules/**/*.tf", ".terraform.lock.hcl"]
     enabled: true
   plan_requirements: [mergeable, approved, undiverged]
   apply_requirements: [mergeable, approved, undiverged]
   import_requirements: [mergeable, approved, undiverged]
+  execution_order_group: 1
   workflow: myworkflow
 workflows:
   myworkflow:
     plan:
       steps:
       - run: my-custom-command arg1 arg2
+      - run:
+          command: my-custom-command arg1 arg2
+          output: hide
       - init
       - plan:
           extra_args: ["-lock", "false"]
@@ -96,6 +101,7 @@ projects:
       when_modified:
         - "./terraform/modules/**/*.tf"
         - "**/*.tf"
+        - ".terraform.lock.hcl"
 
   - <<: *template
     name: ue1-prod-titan
@@ -182,7 +188,7 @@ version: 3
 projects:
 - dir: project1
   autoplan:
-    when_modified: ["../modules/**/*.tf", "*.tf*"]
+    when_modified: ["../modules/**/*.tf", "*.tf*", ".terraform.lock.hcl"]
 ```
 
 Note:
@@ -259,6 +265,7 @@ to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-si
 ### Order of planning/applying
 ```yaml
 version: 3
+abort_on_execution_order_fail: true
 projects:
 - dir: project1
   execution_order_group: 2
@@ -268,7 +275,10 @@ projects:
 With this config above, Atlantis runs planning/applying for project2 first, then for project1.
 Several projects can have same `execution_order_group`. Any order in one group isn't guaranteed.
 `parallel_plan` and `parallel_apply` respect these order groups, so parallel planning/applying works
-in each group one by one.
+in each group one by one. 
+
+If any plan/apply fails and `abort_on_execution_order_fail` is set to true on a repo level, all the 
+following groups will be aborted. For this example, if project2 fails then project1 will not run.
 
 ### Custom Backend Config
 See [Custom Workflow Use Cases: Custom Backend Config](custom-workflows.html#custom-backend-config)
@@ -334,7 +344,7 @@ Atlantis supports this but requires the `name` key to be specified. See [Custom 
 ### Autoplan
 ```yaml
 enabled: true
-when_modified: ["*.tf", "terragrunt.hcl"]
+when_modified: ["*.tf", "terragrunt.hcl", ".terraform.lock.hcl"]
 ```
 | Key                   | Type          | Default        | Required | Description                                                                                                                                                                                                                                                       |
 |-----------------------|---------------|----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
