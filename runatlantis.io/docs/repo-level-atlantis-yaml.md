@@ -344,7 +344,7 @@ Atlantis supports this but requires the `name` key to be specified. See [Custom 
 ### Autoplan
 ```yaml
 enabled: true
-when_modified: ["*.tf", "terragrunt.hcl"]
+when_modified: ["*.tf", "terragrunt.hcl", ".terraform.lock.hcl"]
 ```
 | Key                   | Type          | Default        | Required | Description                                                                                                                                                                                                                                                       |
 |-----------------------|---------------|----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

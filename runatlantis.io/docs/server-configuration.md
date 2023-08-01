@@ -810,6 +810,7 @@ This is useful when you have many projects and want to keep the pull request cle
   * Accepts a comma separated list, ex. `definition1,definition2`
   * Format is `{hostname}/{owner}/{repo}`, ex. `github.com/runatlantis/atlantis`
   * `*` matches any characters, ex. `github.com/runatlantis/*` will match all repos in the runatlantis organization
+  * An entry beginning with `!` negates it, ex. `github.com/foo/*,!github.com/foo/bar` will match all github repos in the `foo` owner *except* `bar`.
   * For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
     * User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
   * For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
@@ -820,6 +821,8 @@ This is useful when you have many projects and want to keep the pull request cle
     * `--repo-allowlist=github.com/myorg/repo1,github.com/myorg/repo2`
   * Allowlist all repos under `myorg` on `github.com`
     * `--repo-allowlist='github.com/myorg/*'`
+  * Allowlist all repos under `myorg` on `github.com`, excluding `myorg/untrusted-repo`
+    * `--repo-allowlist='github.com/myorg/*,!github.com/myorg/untrusted-repo'`
   * Allowlist all repos in my GitHub Enterprise installation
     * `--repo-allowlist='github.yourcompany.com/*'`
   * Allowlist all repos under `myorg` project `myproject` on Azure DevOps
