@@ -692,19 +692,19 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
-					case "/api/v3/repos/owner/repo/pulls/1":
+					case "/api/v3/repos/octocat/repo/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
 						return
-					case "/api/v3/repos/owner/repo/pulls/1/reviews?per_page=300":
+					case "/api/v3/repos/octocat/repo/pulls/1/reviews?per_page=300":
 						w.Write([]byte("[]")) // nolint: errcheck
 						return
-					case "/api/v3/repos/owner/repo/commits/new-topic/status":
+					case "/api/v3/repos/octocat/repo/commits/new-topic/status":
 						w.Write([]byte(commitJSON)) // nolint: errcheck
 					case "/api/graphql":
 						w.Write([]byte(reviewDecision)) // nolint: errcheck
-					case "/api/v3/repos/owner/repo/branches/main/protection":
+					case "/api/v3/repos/octocat/repo/branches/main/protection":
 						w.Write([]byte(branchProtectionJSON)) // nolint: errcheck
-					case "/api/v3/repos/owner/repo/commits/new-topic/check-suites":
+					case "/api/v3/repos/octocat/repo/commits/new-topic/check-suites":
 						w.Write([]byte(checkSuites)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -719,8 +719,8 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			defer disableSSLVerification()()
 
 			actMergeable, err := client.PullIsMergeable(models.Repo{
-				FullName:          "owner/repo",
-				Owner:             "owner",
+				FullName:          "octocat/repo",
+				Owner:             "octocat",
 				Name:              "repo",
 				CloneURL:          "",
 				SanitizedCloneURL: "",

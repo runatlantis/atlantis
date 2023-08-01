@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
 ARG ALPINE_TAG=3.18.2
-ARG DEBIAN_TAG=12.0-slim
+ARG DEBIAN_TAG=12.1-slim
 
 # Stage 1: build artifact and download deps
 
@@ -106,7 +106,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.3.0
+ENV GIT_LFS_VERSION=3.4.0
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
@@ -121,7 +121,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.5.3
+ENV DEFAULT_TERRAFORM_VERSION=1.5.4
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 # Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
