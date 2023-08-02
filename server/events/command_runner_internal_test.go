@@ -10,16 +10,14 @@ import (
 
 func TestApplyUpdateCommitStatus(t *testing.T) {
 	cases := map[string]struct {
-		cmd                                        command.Name
-		SetAtlantisApplyCheckSuccessfulIfNoChanges bool
-		pullStatus                                 models.PullStatus
-		expStatus                                  models.CommitStatus
-		expNumSuccess                              int
-		expNumTotal                                int
+		cmd           command.Name
+		pullStatus    models.PullStatus
+		expStatus     models.CommitStatus
+		expNumSuccess int
+		expNumTotal   int
 	}{
 		"apply, one pending": {
 			cmd: command.Apply,
-			SetAtlantisApplyCheckSuccessfulIfNoChanges: false,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -36,7 +34,6 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 		},
 		"apply, all successful": {
 			cmd: command.Apply,
-			SetAtlantisApplyCheckSuccessfulIfNoChanges: false,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -53,7 +50,6 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 		},
 		"apply, one errored, one pending": {
 			cmd: command.Apply,
-			SetAtlantisApplyCheckSuccessfulIfNoChanges: false,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -73,24 +69,6 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 		},
 		"apply, one planned no changes": {
 			cmd: command.Apply,
-			SetAtlantisApplyCheckSuccessfulIfNoChanges: false,
-			pullStatus: models.PullStatus{
-				Projects: []models.ProjectStatus{
-					{
-						Status: models.AppliedPlanStatus,
-					},
-					{
-						Status: models.PlannedNoChangesPlanStatus,
-					},
-				},
-			},
-			expStatus:     models.PendingCommitStatus,
-			expNumSuccess: 1,
-			expNumTotal:   2,
-		},
-		"apply, one planned no changes, skip apply when no changes": {
-			cmd: command.Apply,
-			SetAtlantisApplyCheckSuccessfulIfNoChanges: true,
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
 					{
@@ -111,8 +89,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			csu := &MockCSU{}
 			cr := &ApplyCommandRunner{
-				commitStatusUpdater:                        csu,
-				SetAtlantisApplyCheckSuccessfulIfNoChanges: c.SetAtlantisApplyCheckSuccessfulIfNoChanges,
+				commitStatusUpdater: csu,
 			}
 			cr.updateCommitStatus(&command.Context{}, c.pullStatus)
 			Equals(t, models.Repo{}, csu.CalledRepo)
@@ -271,8 +248,7 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			csu := &MockCSU{}
 			cr := &PlanCommandRunner{
-				commitStatusUpdater:                        csu,
-				SetAtlantisApplyCheckSuccessfulIfNoChanges: true,
+				commitStatusUpdater: csu,
 			}
 			cr.updateCommitStatus(&command.Context{}, c.pullStatus, command.Apply)
 			Equals(t, models.Repo{}, csu.CalledRepo)

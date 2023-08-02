@@ -102,27 +102,26 @@ type UserConfig struct {
 	SilenceVCSStatusNoProjects bool `mapstructure:"silence-vcs-status-no-projects"`
 	SilenceAllowlistErrors     bool `mapstructure:"silence-allowlist-errors"`
 	// SilenceWhitelistErrors is deprecated in favour of SilenceAllowlistErrors
-	SilenceWhitelistErrors                     bool            `mapstructure:"silence-whitelist-errors"`
-	SetAtlantisApplyCheckSuccessfulIfNoChanges bool            `mapstructure:"set-atlantis-apply-check-successful-if-no-changes"`
-	SkipCloneNoChanges                         bool            `mapstructure:"skip-clone-no-changes"`
-	SlackToken                                 string          `mapstructure:"slack-token"`
-	SSLCertFile                                string          `mapstructure:"ssl-cert-file"`
-	SSLKeyFile                                 string          `mapstructure:"ssl-key-file"`
-	RestrictFileList                           bool            `mapstructure:"restrict-file-list"`
-	TFDownload                                 bool            `mapstructure:"tf-download"`
-	TFDownloadURL                              string          `mapstructure:"tf-download-url"`
-	TFEHostname                                string          `mapstructure:"tfe-hostname"`
-	TFELocalExecutionMode                      bool            `mapstructure:"tfe-local-execution-mode"`
-	TFEToken                                   string          `mapstructure:"tfe-token"`
-	VarFileAllowlist                           string          `mapstructure:"var-file-allowlist"`
-	VCSStatusName                              string          `mapstructure:"vcs-status-name"`
-	DefaultTFVersion                           string          `mapstructure:"default-tf-version"`
-	Webhooks                                   []WebhookConfig `mapstructure:"webhooks"`
-	WebBasicAuth                               bool            `mapstructure:"web-basic-auth"`
-	WebUsername                                string          `mapstructure:"web-username"`
-	WebPassword                                string          `mapstructure:"web-password"`
-	WriteGitCreds                              bool            `mapstructure:"write-git-creds"`
-	WebsocketCheckOrigin                       bool            `mapstructure:"websocket-check-origin"`
+	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
+	SkipCloneNoChanges     bool            `mapstructure:"skip-clone-no-changes"`
+	SlackToken             string          `mapstructure:"slack-token"`
+	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
+	RestrictFileList       bool            `mapstructure:"restrict-file-list"`
+	TFDownload             bool            `mapstructure:"tf-download"`
+	TFDownloadURL          string          `mapstructure:"tf-download-url"`
+	TFEHostname            string          `mapstructure:"tfe-hostname"`
+	TFELocalExecutionMode  bool            `mapstructure:"tfe-local-execution-mode"`
+	TFEToken               string          `mapstructure:"tfe-token"`
+	VarFileAllowlist       string          `mapstructure:"var-file-allowlist"`
+	VCSStatusName          string          `mapstructure:"vcs-status-name"`
+	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
+	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
+	WebBasicAuth           bool            `mapstructure:"web-basic-auth"`
+	WebUsername            string          `mapstructure:"web-username"`
+	WebPassword            string          `mapstructure:"web-password"`
+	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
+	WebsocketCheckOrigin   bool            `mapstructure:"websocket-check-origin"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName

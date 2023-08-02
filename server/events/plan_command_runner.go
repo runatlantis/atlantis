@@ -26,7 +26,6 @@ func NewPlanCommandRunner(
 	lockingLocker locking.Locker,
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
-	SetAtlantisApplyCheckSuccessfulIfNoChanges bool,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -47,7 +46,6 @@ func NewPlanCommandRunner(
 		lockingLocker:              lockingLocker,
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
-		SetAtlantisApplyCheckSuccessfulIfNoChanges: SetAtlantisApplyCheckSuccessfulIfNoChanges,
 	}
 }
 
@@ -76,9 +74,8 @@ type PlanCommandRunner struct {
 	lockingLocker              locking.Locker
 	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
 	// a plan.
-	DiscardApprovalOnPlan                      bool
-	pullReqStatusFetcher                       vcs.PullReqStatusFetcher
-	SetAtlantisApplyCheckSuccessfulIfNoChanges bool
+	DiscardApprovalOnPlan bool
+	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -152,9 +149,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
-	if p.SetAtlantisApplyCheckSuccessfulIfNoChanges {
-		p.updateCommitStatus(ctx, pullStatus, command.Apply)
-	}
+	p.updateCommitStatus(ctx, pullStatus, command.Apply)
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
 	if len(policyCheckCmds) > 0 &&
@@ -279,9 +274,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
-	if p.SetAtlantisApplyCheckSuccessfulIfNoChanges {
-		p.updateCommitStatus(ctx, pullStatus, command.Apply)
-	}
+	p.updateCommitStatus(ctx, pullStatus, command.Apply)
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.

@@ -115,15 +115,14 @@ const (
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
-	RepoWhitelistFlag                          = "repo-whitelist"
-	RepoAllowlistFlag                          = "repo-allowlist"
-	RequireApprovalFlag                        = "require-approval"
-	RequireMergeableFlag                       = "require-mergeable"
-	SetAtlantisApplyCheckSuccessfulIfNoChanges = "set-atlantis-apply-check-successful-if-no-changes"
-	SilenceNoProjectsFlag                      = "silence-no-projects"
-	SilenceForkPRErrorsFlag                    = "silence-fork-pr-errors"
-	SilenceVCSStatusNoPlans                    = "silence-vcs-status-no-plans"
-	SilenceAllowlistErrorsFlag                 = "silence-allowlist-errors"
+	RepoWhitelistFlag          = "repo-whitelist"
+	RepoAllowlistFlag          = "repo-allowlist"
+	RequireApprovalFlag        = "require-approval"
+	RequireMergeableFlag       = "require-mergeable"
+	SilenceNoProjectsFlag      = "silence-no-projects"
+	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
+	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
+	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
 	// SilenceWhitelistErrorsFlag is deprecated for SilenceAllowlistErrorsFlag.
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
 	SkipCloneNoChanges         = "skip-clone-no-changes"
@@ -500,10 +499,6 @@ var boolFlags = map[string]boolFlag{
 		description:  "Require pull requests to be mergeable before allowing the apply command to be run.",
 		defaultValue: false,
 		hidden:       true,
-	},
-	SetAtlantisApplyCheckSuccessfulIfNoChanges: {
-		description:  "Set the `atlantis/apply` pull request status check to \"passing\" if \"No Changes\" are detected.",
-		defaultValue: false,
 	},
 	SilenceNoProjectsFlag: {
 		description:  "Silences Atlants from responding to PRs when it finds no projects.",

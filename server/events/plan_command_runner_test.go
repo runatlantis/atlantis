@@ -152,7 +152,6 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 	}
 }
 
-
 func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
@@ -510,41 +509,190 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 	}
 }
 
-func TestPlanCommandRunner_IsSetAtlantisApplyStatus(t *testing.T) {
+func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 
 	cases := []struct {
-		Description                                string
-		PrevPlanStored                             bool
-		SetAtlantisApplyCheckSuccessfulIfNoChanges bool
-		ExpVCSApplyStatusSet                       bool
-		ExpVCSApplyStatusTotal                     int
-		ExpVCSApplyStatusSucc                      int
+		Description            string
+		ProjectContexts        []command.ProjectContext
+		ProjectResults         []command.ProjectResult
+		PrevPlanStored         bool // stores a previous "No changes" plan in the backend
+		ExpVCSApplyStatusTotal int
+		ExpVCSApplyStatusSucc  int
 	}{
 		{
-			Description: "When planning without the flag, don't set the atlantis/apply VCS status",
+			Description: "When planning with changes, set the 0/1 apply status",
+			ProjectContexts: []command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "mydir",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					RepoRelDir: "mydir",
+					Command:    command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+					},
+				},
+			},
+			ExpVCSApplyStatusTotal: 1,
+			ExpVCSApplyStatusSucc:  0,
 		},
 		{
-			Description: "When planning with the flag, set the atlantis/apply VCS status to 0/0",
-			SetAtlantisApplyCheckSuccessfulIfNoChanges: true,
-			ExpVCSApplyStatusSet:                       true,
-			ExpVCSApplyStatusTotal:                     0,
-			ExpVCSApplyStatusSucc:                      0,
+			Description: "When planning with no changes, set the 1/1 apply status",
+			ProjectContexts: []command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "mydir",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					RepoRelDir: "mydir",
+					Command:    command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					},
+				},
+			},
+			ExpVCSApplyStatusTotal: 1,
+			ExpVCSApplyStatusSucc:  1,
 		},
 		{
-			Description:    "When planning with the previous plan that results in No Changes and without the flag, don't set the atlantis/apply VCS status",
-			PrevPlanStored: true,
-			SetAtlantisApplyCheckSuccessfulIfNoChanges: false,
-			ExpVCSApplyStatusSet:                       false,
+			Description: "When planning with no changes and previous plan with no changes, set the 1/2 apply status",
+			ProjectContexts: []command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "mydir",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					RepoRelDir: "mydir",
+					Command:    command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+					},
+				},
+			},
+			PrevPlanStored:         true,
+			ExpVCSApplyStatusTotal: 2,
+			ExpVCSApplyStatusSucc:  1,
 		},
 		{
-			Description:    "When planning with the previous plan that results in No Changes and setting the flag, set the atlantis/apply VCS status to 1/1",
-			PrevPlanStored: true,
-			SetAtlantisApplyCheckSuccessfulIfNoChanges: true,
-			ExpVCSApplyStatusSet:                       true,
-			ExpVCSApplyStatusTotal:                     1,
-			ExpVCSApplyStatusSucc:                      1,
+			Description: "When planning with no changes and previous 'No changes' plan, set the 2/2 apply status",
+			ProjectContexts: []command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "mydir",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					RepoRelDir: "mydir",
+					Command:    command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					},
+				},
+			},
+			PrevPlanStored:         true,
+			ExpVCSApplyStatusTotal: 2,
+			ExpVCSApplyStatusSucc:  2,
+		},
+		{
+			Description: "When planning again with changes following a previous 'No changes' plan, set the 0/1 apply status",
+			ProjectContexts: []command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "prevdir",
+					Workspace:   "default",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					RepoRelDir: "prevdir",
+					Workspace:  "default",
+					Command:    command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+					},
+				},
+			},
+			PrevPlanStored:         true,
+			ExpVCSApplyStatusTotal: 1,
+			ExpVCSApplyStatusSucc:  0,
+		},
+		{
+			Description: "When planning again with changes following a previous 'No changes' plan, while another plan with 'No changes', set the 1/2 apply status.",
+			ProjectContexts: []command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "prevdir",
+					Workspace:   "default",
+				},
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "mydir",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					RepoRelDir: "prevdir",
+					Workspace:  "default",
+					Command:    command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+					},
+				},
+				{
+					RepoRelDir: "mydir",
+					Command:    command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					},
+				},
+			},
+			PrevPlanStored:         true,
+			ExpVCSApplyStatusTotal: 2,
+			ExpVCSApplyStatusSucc:  1,
+		},
+		{
+			Description: "When planning again with no changes following a previous 'No changes' plan, while another plan also with 'No changes', set the 2/2 apply status.",
+			ProjectContexts: []command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "prevdir",
+					Workspace:   "default",
+				},
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "mydir",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					RepoRelDir: "prevdir",
+					Workspace:  "default",
+					Command:    command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					},
+				},
+				{
+					RepoRelDir: "mydir",
+					Command:    command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					},
+				},
+			},
+			PrevPlanStored:         true,
+			ExpVCSApplyStatusTotal: 2,
+			ExpVCSApplyStatusSucc:  2,
 		},
 	}
 
@@ -556,7 +704,6 @@ func TestPlanCommandRunner_IsSetAtlantisApplyStatus(t *testing.T) {
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {
-				tc.SetAtlantisApplyCheckSuccessfulIfNoChanges = c.SetAtlantisApplyCheckSuccessfulIfNoChanges
 				tc.backend = db
 			})
 
@@ -564,6 +711,7 @@ func TestPlanCommandRunner_IsSetAtlantisApplyStatus(t *testing.T) {
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
 			cmd := &events.CommentCommand{Name: command.Plan}
+
 			ctx := &command.Context{
 				User:     testdata.User,
 				Log:      logging.NewNoopLogger(t),
@@ -572,6 +720,7 @@ func TestPlanCommandRunner_IsSetAtlantisApplyStatus(t *testing.T) {
 				HeadRepo: testdata.GithubRepo,
 				Trigger:  command.CommentTrigger,
 			}
+
 			if c.PrevPlanStored {
 				_, err = db.UpdatePullWithResults(modelPull, []command.ProjectResult{
 					{
@@ -586,38 +735,29 @@ func TestPlanCommandRunner_IsSetAtlantisApplyStatus(t *testing.T) {
 				Ok(t, err)
 			}
 
-			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
-				return ReturnValues{[]command.ProjectContext{}, nil}
-			})
+			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
+
+			for i := range c.ProjectContexts {
+				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectResults[i])
+			}
 
 			planCommandRunner.Run(ctx, cmd)
 
-			vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
+			vcsClient.VerifyWasCalledOnce().CreateComment(Any[models.Repo](), AnyInt(), AnyString(), AnyString())
 
 			ExpCommitStatus := models.SuccessCommitStatus
 			if c.ExpVCSApplyStatusSucc != c.ExpVCSApplyStatusTotal {
 				ExpCommitStatus = models.PendingCommitStatus
 			}
 
-			if c.ExpVCSApplyStatusSet {
-				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-					matchers.AnyModelsRepo(),
-					matchers.AnyModelsPullRequest(),
-					matchers.EqModelsCommitStatus(ExpCommitStatus),
-					matchers.EqCommandName(command.Apply),
-					EqInt(c.ExpVCSApplyStatusSucc),
-					EqInt(c.ExpVCSApplyStatusTotal),
-				)
-			} else {
-				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-					matchers.AnyModelsRepo(),
-					matchers.AnyModelsPullRequest(),
-					matchers.AnyModelsCommitStatus(),
-					matchers.EqCommandName(command.Apply),
-					AnyInt(),
-					AnyInt(),
-				)
-			}
+			commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Eq[models.CommitStatus](ExpCommitStatus),
+				Eq[command.Name](command.Apply),
+				Eq(c.ExpVCSApplyStatusSucc),
+				Eq(c.ExpVCSApplyStatusTotal),
+			)
 		})
 	}
 }

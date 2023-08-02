@@ -706,7 +706,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
-		userConfig.SetAtlantisApplyCheckSuccessfulIfNoChanges,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -724,7 +723,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
-		userConfig.SetAtlantisApplyCheckSuccessfulIfNoChanges,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(

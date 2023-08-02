@@ -70,14 +70,13 @@ var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 
 type TestConfig struct {
-	parallelPoolSize                           int
-	SilenceNoProjects                          bool
-	silenceVCSStatusNoPlans                    bool
-	silenceVCSStatusNoProjects                 bool
-	StatusName                                 string
-	discardApprovalOnPlan                      bool
-	SetAtlantisApplyCheckSuccessfulIfNoChanges bool
-	backend                                    locking.Backend
+	parallelPoolSize           int
+	SilenceNoProjects          bool
+	silenceVCSStatusNoPlans    bool
+	silenceVCSStatusNoProjects bool
+	StatusName                 string
+	discardApprovalOnPlan      bool
+	backend                    locking.Backend
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -93,8 +92,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		SilenceNoProjects:     false,
 		StatusName:            "atlantis-test",
 		discardApprovalOnPlan: false,
-		SetAtlantisApplyCheckSuccessfulIfNoChanges: false,
-		backend: defaultBoltDB,
+		backend:               defaultBoltDB,
 	}
 
 	for _, op := range options {
@@ -163,7 +161,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		lockingLocker,
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
-		testConfig.SetAtlantisApplyCheckSuccessfulIfNoChanges,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -181,7 +178,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.SilenceNoProjects,
 		testConfig.silenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
-		testConfig.SetAtlantisApplyCheckSuccessfulIfNoChanges,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
