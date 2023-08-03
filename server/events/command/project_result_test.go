@@ -81,6 +81,15 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 		},
 		{
 			p: command.ProjectResult{
+				Command: command.Plan,
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "No changes. Infrastructure is up-to-date.",
+				},
+			},
+			expStatus: models.PlannedNoChangesPlanStatus,
+		},
+		{
+			p: command.ProjectResult{
 				Command: command.Apply,
 				Error:   errors.New("err"),
 			},
