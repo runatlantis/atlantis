@@ -187,10 +187,10 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 			if c.ExpOut != "" {
 				expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 				projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
-					runtimematchers.AnyModelsWorkflowHookCommandContext(), EqString(expOut), EqBool(false))
+					Any[models.WorkflowHookCommandContext](), Eq(expOut), Eq(false))
 			} else {
 				projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
-					runtimematchers.AnyModelsWorkflowHookCommandContext(), AnyString(), EqBool(false))
+					Any[models.WorkflowHookCommandContext](), Any[string](), Eq(false))
 			}
 		})
 	}
