@@ -69,6 +69,20 @@ func TestNewWebhooksManager_InvalidBranchRegex(t *testing.T) {
 	Assert(t, strings.Contains(err.Error(), "error parsing regexp"), "expected regex error")
 }
 
+func TestNewWebhooksManager_InvalidBranchAndWorkspaceRegex(t *testing.T) {
+	t.Log("When given an invalid branch and invalid workspace regex in a config, an error is returned")
+	RegisterMockTestingT(t)
+	client := mocks.NewMockSlackClient()
+
+	invalidRegex := "("
+	configs := validConfigs()
+	configs[0].WorkspaceRegex = invalidRegex
+	configs[0].BranchRegex = invalidRegex
+	_, err := webhooks.NewMultiWebhookSender(configs, client)
+	Assert(t, err != nil, "expected error")
+	Assert(t, strings.Contains(err.Error(), "error parsing regexp"), "expected regex error")
+}
+
 func TestNewWebhooksManager_NoEvent(t *testing.T) {
 	t.Log("When the event key is not specified in a config, an error is returned")
 	RegisterMockTestingT(t)
