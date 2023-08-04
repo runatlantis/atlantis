@@ -463,6 +463,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:    userConfig.CheckoutDepth,
 		GithubAppEnabled: githubAppEnabled,
+		Logger:           logger,
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(
@@ -583,6 +584,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commentParser,
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
+		userConfig.Automerge,
+		userConfig.ParallelPlan,
+		userConfig.ParallelApply,
 		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
@@ -1033,6 +1037,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			// query params as part of the lock URL.
 			LockPath:      lockURL.String(),
 			RepoFullName:  v.Project.RepoFullName,
+			LockedBy:      v.Pull.Author,
 			PullNum:       v.Pull.Num,
 			Path:          v.Project.Path,
 			Workspace:     v.Workspace,

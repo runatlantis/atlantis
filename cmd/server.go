@@ -55,6 +55,8 @@ const (
 	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutomergeFlag                    = "automerge"
+	ParallelPlanFlag                 = "parallel-plan"
+	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
 	AutoplanModulesFromProjects      = "autoplan-modules-from-projects"
 	AutoplanFileListFlag             = "autoplan-file-list"
@@ -466,6 +468,14 @@ var boolFlags = map[string]boolFlag{
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
+	ParallelPlanFlag: {
+		description:  "Run plan operations in parallel.",
+		defaultValue: false,
+	},
+	ParallelApplyFlag: {
+		description:  "Run apply operations in parallel.",
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {
