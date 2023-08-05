@@ -109,5 +109,5 @@ func (d *ClientProxy) GetCloneURL(VCSHostType models.VCSHostType, repo string) (
 }
 
 func (d *ClientProxy) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
-	return []string{}, nil
+	return d.clients[repo.VCSHost.Type].GetPullLabels(repo, pull)
 }

@@ -517,5 +517,11 @@ func (g *GitlabClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) 
 }
 
 func (g *GitlabClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
-	return []string{}, nil
+	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mr.Labels, nil
 }
