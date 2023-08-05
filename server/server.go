@@ -798,6 +798,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SilenceForkPRErrors:            userConfig.SilenceForkPRErrors,
 		SilenceForkPRErrorsFlag:        config.SilenceForkPRErrorsFlag,
 		DisableAutoplan:                userConfig.DisableAutoplan,
+		DisableAutoplanLabel:           userConfig.DisableAutoplanLabel,
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,

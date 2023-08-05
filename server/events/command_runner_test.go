@@ -498,6 +498,8 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 func TestRunCommentCommand_DisableDisableAutoplan(t *testing.T) {
 	t.Log("if \"DisableAutoplan is true\" are disabled and we are silencing return and do not comment with error")
 	setup(t)
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "main"}
+
 	ch.DisableAutoplan = true
 	defer func() { ch.DisableAutoplan = false }()
 
@@ -511,8 +513,32 @@ func TestRunCommentCommand_DisableDisableAutoplan(t *testing.T) {
 			},
 		}, nil)
 
-	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
+}
+
+func TestRunCommentCommand_DisableDisableAutoplanLabel(t *testing.T) {
+	t.Log("if \"DisableAutoplanLabel\" is present, auto plans are disabled and we are silencing return and do not comment with error")
+	vcsClient := setup(t)
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "main"}
+
+	ch.DisableAutoplanLabel = "disable-auto-plan"
+	defer func() { ch.DisableAutoplanLabel = "" }()
+
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+			},
+			{
+				CommandName: command.Plan,
+			},
+		}, nil)
+	When(ch.VCSClient.GetPullLabels(testdata.GithubRepo, modelPull)).ThenReturn([]string{"disable-auto-plan"}, nil)
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
+	vcsClient.VerifyWasCalledOnce().GetPullLabels(testdata.GithubRepo, modelPull)
 }
 
 func TestRunCommentCommand_ClosedPull(t *testing.T) {

@@ -281,3 +281,7 @@ func (b *Client) GetFileContent(pull models.PullRequest, fileName string) (bool,
 func (b *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
 	return "", fmt.Errorf("not yet implemented")
 }
+
+func (b *Client) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+	return []string{}, nil
+}

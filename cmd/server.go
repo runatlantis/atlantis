@@ -72,6 +72,7 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableApplyFlag                 = "disable-apply"
 	DisableAutoplanFlag              = "disable-autoplan"
+	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
@@ -253,6 +254,10 @@ var stringFlags = map[string]stringFlag{
 	DataDirFlag: {
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	DisableAutoplanLabelFlag: {
+		description:  "Pull request label to disable atlantis auto planning feature only if present.",
+		defaultValue: "",
 	},
 	EmojiReaction: {
 		description:  "Emoji Reaction to use to react to comments",

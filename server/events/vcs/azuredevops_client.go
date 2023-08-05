@@ -424,3 +424,7 @@ func GitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
 func (g *AzureDevopsClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
 	return "", fmt.Errorf("not yet implemented")
 }
+
+func (g *AzureDevopsClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+	return []string{}, nil
+}
