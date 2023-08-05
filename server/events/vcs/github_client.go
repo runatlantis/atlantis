@@ -418,6 +418,10 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 		return false, errors.Wrap(err, "getting required status checks")
 	}
 
+	if required.RequiredStatusChecks == nil {
+		return true, nil
+	}
+
 	//check check suite/check run api
 	checksuites, _, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
 	if err != nil {
