@@ -353,7 +353,7 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_DISABLE_AUTOPLAN=true
   ```
-Disable atlantis auto planning.
+  Disable atlantis auto planning.
 
 ### `--disable-autoplan-label`
   ```bash
