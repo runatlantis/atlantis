@@ -359,7 +359,7 @@ and set `--autoplan-modules` to `false`.
   ```bash
   atlantis server --disable-autoplan-label="no-autoplan"
   # or
-  ATLANTIS_DISABLE_AUTOPLAN="no-autoplan"
+  ATLANTIS_DISABLE_AUTOPLAN_LABEL="no-autoplan"
   ```
   Disable atlantis auto planning only on pull request with the specified label. Disabled by default.
 
