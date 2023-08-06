@@ -323,8 +323,8 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	gitlabVersionUnder15_6 := "15.3.2-ce"
 	gitlabServerVersions := []string{gitlabVersionOver15_6, gitlabVersion15_6, gitlabVersionUnder15_6}
 	vcsStatusName := "atlantis-test"
-	defaultMR = 1
-	noHeadPipelineMR = 2
+	defaultMr := 1
+	noHeadPipelineMR := 2
 	cases := []struct {
 		statusName    string
 		status        models.CommitStatus
