@@ -75,5 +75,5 @@ func (a *NotConfiguredVCSClient) GetCloneURL(VCSHostType models.VCSHostType, rep
 }
 
 func (a *NotConfiguredVCSClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
-	return []string{}, a.err()
+	return nil, a.err()
 }

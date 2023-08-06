@@ -361,7 +361,7 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_DISABLE_AUTOPLAN_LABEL="no-autoplan"
   ```
-  Disable atlantis auto planning only on pull request with the specified label. Disabled by default.
+  Disable atlantis auto planning only on pull requests with the specified label.
 
   If `disable-autoplan` property is `true`, this flag has no effect.
 

@@ -496,7 +496,7 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 }
 
 func TestRunCommentCommand_DisableAutoplan(t *testing.T) {
-	t.Log("if \"DisableAutoplan is true\" are disabled and we are silencing return and do not comment with error")
+	t.Log("if \"DisableAutoplan\" is true, auto plans are disabled and we are silencing return and do not comment with error")
 	setup(t)
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "main"}
 
@@ -518,7 +518,7 @@ func TestRunCommentCommand_DisableAutoplan(t *testing.T) {
 }
 
 func TestRunCommentCommand_DisableAutoplanLabel(t *testing.T) {
-	t.Log("if \"DisableAutoplanLabel\" is present, auto plans are disabled and we are silencing return and do not comment with error")
+	t.Log("if \"DisableAutoplanLabel\" is present and pull request has that label, auto plans are disabled and we are silencing return and do not comment with error")
 	vcsClient := setup(t)
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "main"}
 
@@ -542,7 +542,7 @@ func TestRunCommentCommand_DisableAutoplanLabel(t *testing.T) {
 }
 
 func TestRunCommentCommand_DisableAutoplanLabel_PullNotLabeled(t *testing.T) {
-	t.Log("if \"DisableAutoplanLabel\" is present, auto plans are disabled and we are silencing return and do not comment with error")
+	t.Log("if \"DisableAutoplanLabel\" is present but pull request doesn't have that label, auto plans run")
 	vcsClient := setup(t)
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "main"}
 

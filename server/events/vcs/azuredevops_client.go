@@ -426,5 +426,5 @@ func (g *AzureDevopsClient) GetCloneURL(VCSHostType models.VCSHostType, repo str
 }
 
 func (g *AzureDevopsClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
-	return []string{}, nil
+	return nil, fmt.Errorf("not yet implemented")
 }
