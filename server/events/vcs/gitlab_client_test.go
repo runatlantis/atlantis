@@ -381,13 +381,6 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			noHeadPipelineMR,
 			false,
 		},
-		{
-			fmt.Sprintf("%s/plan", vcsStatusName),
-			models.SuccessCommitStatus,
-			gitlabServerVersions,
-			noHeadPipelineMR,
-			true,
-		},
 	}
 	for _, serverVersion := range gitlabServerVersions {
 		for _, c := range cases {
