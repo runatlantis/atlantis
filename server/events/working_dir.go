@@ -240,36 +240,34 @@ func (w *FileWorkspace) forceClone(cloneDir string, headRepo models.Repo, p mode
 		baseCloneURL = w.TestingOverrideBaseCloneURL
 	}
 
-	runGit := w.makeGitRunner(cloneDir, headRepo, p)
-
 	// if branch strategy, use depth=1
 	if !w.CheckoutMerge {
-		return runGit("clone", "--depth=1", "--branch", p.HeadBranch, "--single-branch", headCloneURL, cloneDir)
+		return w.runGit(cloneDir, headRepo, p, "clone", "--depth=1", "--branch", p.HeadBranch, "--single-branch", headCloneURL, cloneDir)
 	}
 
 	// if merge strategy...
 
 	// if no checkout depth, omit depth arg
 	if w.CheckoutDepth == 0 {
-		if err := runGit("clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
+		if err := w.runGit(cloneDir, headRepo, p, "clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
 			return err
 		}
 	} else {
-		if err := runGit("clone", "--depth", fmt.Sprint(w.CheckoutDepth), "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
+		if err := w.runGit(cloneDir, headRepo, p, "clone", "--depth", fmt.Sprint(w.CheckoutDepth), "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
 			return err
 		}
 	}
 
-	if err := runGit("remote", "add", "head", headCloneURL); err != nil {
+	if err := w.runGit(cloneDir, headRepo, p, "remote", "add", "head", headCloneURL); err != nil {
 		return err
 	}
 	if w.GpgNoSigningEnabled {
-		if err := runGit("config", "--local", "commit.gpgsign", "false"); err != nil {
+		if err := w.runGit(cloneDir, headRepo, p, "config", "--local", "commit.gpgsign", "false"); err != nil {
 			return err
 		}
 	}
 
-	return w.mergeToBaseBranch(p, runGit)
+	return w.mergeToBaseBranch(cloneDir, headRepo, p)
 }
 
 // There is a new upstream update that we need, and we want to update to it
@@ -284,41 +282,37 @@ func (w *FileWorkspace) mergeAgain(cloneDir string, headRepo models.Repo, p mode
 		return nil
 	}
 
-	runGit := w.makeGitRunner(cloneDir, headRepo, p)
-
 	// Reset branch as if it was cloned again
-	if err := runGit("reset", "--hard", fmt.Sprintf("refs/remotes/head/%s", p.BaseBranch)); err != nil {
+	if err := w.runGit(cloneDir, headRepo, p, "reset", "--hard", fmt.Sprintf("refs/remotes/head/%s", p.BaseBranch)); err != nil {
 		return err
 	}
 
-	return w.mergeToBaseBranch(p, runGit)
+	return w.mergeToBaseBranch(cloneDir, headRepo, p)
 }
 
-func (w *FileWorkspace) makeGitRunner(cloneDir string, headRepo models.Repo, p models.PullRequest) func(args ...string) error {
-	return func(args ...string) error {
-		cmd := exec.Command("git", args...) // nolint: gosec
-		cmd.Dir = cloneDir
-		// The git merge command requires these env vars are set.
-		cmd.Env = append(os.Environ(), []string{
-			"EMAIL=atlantis@runatlantis.io",
-			"GIT_AUTHOR_NAME=atlantis",
-			"GIT_COMMITTER_NAME=atlantis",
-		}...)
+func (w *FileWorkspace) runGit(cloneDir string, headRepo models.Repo, p models.PullRequest, args ...string) error {
+	cmd := exec.Command("git", args...) // nolint: gosec
+	cmd.Dir = cloneDir
+	// The git merge command requires these env vars are set.
+	cmd.Env = append(os.Environ(), []string{
+		"EMAIL=atlantis@runatlantis.io",
+		"GIT_AUTHOR_NAME=atlantis",
+		"GIT_COMMITTER_NAME=atlantis",
+	}...)
 
-		cmdStr := w.sanitizeGitCredentials(strings.Join(cmd.Args, " "), p.BaseRepo, headRepo)
-		output, err := cmd.CombinedOutput()
-		sanitizedOutput := w.sanitizeGitCredentials(string(output), p.BaseRepo, headRepo)
-		if err != nil {
-			sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
-			return fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
-		}
-		w.Logger.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
-		return nil
+	cmdStr := w.sanitizeGitCredentials(strings.Join(cmd.Args, " "), p.BaseRepo, headRepo)
+	output, err := cmd.CombinedOutput()
+	sanitizedOutput := w.sanitizeGitCredentials(string(output), p.BaseRepo, headRepo)
+	if err != nil {
+		sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
+		return fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
 	}
+	w.Logger.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
+	return nil
 }
 
 // Merge the PR into the base branch.
-func (w *FileWorkspace) mergeToBaseBranch(p models.PullRequest, runGit func(args ...string) error) error {
+func (w *FileWorkspace) mergeToBaseBranch(cloneDir string, headRepo models.Repo, p models.PullRequest) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", p.HeadBranch)
 	fetchRemote := "head"
 	if w.GithubAppEnabled {
@@ -328,19 +322,19 @@ func (w *FileWorkspace) mergeToBaseBranch(p models.PullRequest, runGit func(args
 
 	// if no checkout depth, omit depth arg
 	if w.CheckoutDepth == 0 {
-		if err := runGit("fetch", fetchRemote, fetchRef); err != nil {
+		if err := w.runGit(cloneDir, headRepo, p, "fetch", fetchRemote, fetchRef); err != nil {
 			return err
 		}
 	} else {
-		if err := runGit("fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, fetchRef); err != nil {
+		if err := w.runGit(cloneDir, headRepo, p, "fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, fetchRef); err != nil {
 			return err
 		}
 	}
 
-	if err := runGit("merge-base", p.BaseBranch, "FETCH_HEAD"); err != nil {
+	if err := w.runGit(cloneDir, headRepo, p, "merge-base", p.BaseBranch, "FETCH_HEAD"); err != nil {
 		// git merge-base returning error means that we did not receive enough commits in shallow clone.
 		// Fall back to retrieving full repo history.
-		if err := runGit("fetch", "--unshallow"); err != nil {
+		if err := w.runGit(cloneDir, headRepo, p, "fetch", "--unshallow"); err != nil {
 			return err
 		}
 	}
@@ -351,7 +345,7 @@ func (w *FileWorkspace) mergeToBaseBranch(p models.PullRequest, runGit func(args
 	// git rev-parse HEAD^2 to get the head commit because it will
 	// always succeed whereas without --no-ff, if the merge was fast
 	// forwarded then git rev-parse HEAD^2 would fail.
-	return runGit("merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+	return w.runGit(cloneDir, headRepo, p, "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
 }
 
 // GetWorkingDir returns the path to the workspace for this repo and pull.
