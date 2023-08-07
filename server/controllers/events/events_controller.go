@@ -366,7 +366,8 @@ func (e *VCSEventsController) handleBitbucketCloudPullRequestEvent(w http.Respon
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType)
+	e.Logger.Debug("SHA is %q", pull.HeadCommit)
+	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType, pull.HeadCommit, pull.URL)
 	e.Logger.Info("identified event as type %q", pullEventType.String())
 	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType)
 
@@ -515,12 +516,12 @@ func (e *VCSEventsController) handleGitlabPost(w http.ResponseWriter, r *http.Re
 // commands can come from. It's exported to make testing easier.
 func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event gitlab.MergeCommentEvent) {
 	// todo: can gitlab return the pull request here too?
-	baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeRequestCommentEvent(event)
+	baseRepo, headRepo, commentID, user, err := e.Parser.ParseGitlabMergeRequestCommentEvent(event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, nil, user, event.MergeRequest.IID, event.ObjectAttributes.Note, -1, models.Gitlab)
+	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, nil, user, event.MergeRequest.IID, event.ObjectAttributes.Note, int64(commentID), models.Gitlab)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -567,7 +568,7 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 
 	// It's a comment we're gonna react to, so add a reaction.
 	if e.EmojiReaction != "" {
-		err := e.VCSClient.ReactToComment(baseRepo, commentID, e.EmojiReaction)
+		err := e.VCSClient.ReactToComment(baseRepo, pullNum, commentID, e.EmojiReaction)
 		if err != nil {
 			logger.Warn("Failed to react to comment: %s", err)
 		}

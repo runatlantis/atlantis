@@ -46,10 +46,12 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 
 // automergeEnabled returns true if automerging is enabled in this context.
 func (c *AutoMerger) automergeEnabled(projectCmds []command.ProjectContext) bool {
-	// If the global automerge is set, we always automerge.
-	return c.GlobalAutomerge ||
-		// Otherwise we check if this repo is configured for automerging.
-		(len(projectCmds) > 0 && projectCmds[0].AutomergeEnabled)
+	// Use project automerge settings if projects exist; otherwise, use global automerge settings.
+	automerge := c.GlobalAutomerge
+	if len(projectCmds) > 0 {
+		automerge = projectCmds[0].AutomergeEnabled
+	}
+	return automerge
 }
 
 // deleteSourceBranchOnMergeEnabled returns true if we should delete the source branch on merge in this context.

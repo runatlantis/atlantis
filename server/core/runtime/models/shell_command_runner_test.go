@@ -6,12 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/jobs/mocks"
-	"github.com/runatlantis/atlantis/server/logging"
+	logmocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -37,8 +36,10 @@ func TestShellCommandRunner_Run(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Command, func(t *testing.T) {
 			RegisterMockTestingT(t)
+			log := logmocks.NewMockSimpleLogging()
+			When(log.With(Any[string](), Any[interface{}]())).ThenReturn(log)
 			ctx := command.ProjectContext{
-				Log:        logging.NewNoopLogger(t),
+				Log:        log,
 				Workspace:  "default",
 				RepoRelDir: ".",
 			}
@@ -61,6 +62,8 @@ func TestShellCommandRunner_Run(t *testing.T) {
 				projectCmdOutputHandler.VerifyWasCalledOnce().Send(ctx, line, false)
 			}
 
+			log.VerifyWasCalledOnce().With(Eq("duration"), Any[interface{}]())
+
 			// And again with streaming disabled. Everything should be the same except the
 			// command output handler should not have received anything
 
@@ -69,7 +72,9 @@ func TestShellCommandRunner_Run(t *testing.T) {
 			output, err = runner.Run(ctx)
 			Ok(t, err)
 			Equals(t, expectedOutput, output)
-			projectCmdOutputHandler.VerifyWasCalled(Never()).Send(matchers.AnyCommandProjectContext(), AnyString(), EqBool(false))
+			projectCmdOutputHandler.VerifyWasCalled(Never()).Send(Any[command.ProjectContext](), Any[string](), Eq(false))
+
+			log.VerifyWasCalled(Twice()).With(Eq("duration"), Any[interface{}]())
 		})
 	}
 }

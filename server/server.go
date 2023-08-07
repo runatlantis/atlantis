@@ -18,6 +18,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"embed"
 	"flag"
 	"fmt"
 	"io"
@@ -45,7 +46,6 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
 
-	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
@@ -64,7 +64,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/static"
 )
 
 const (
@@ -148,6 +147,9 @@ type WebhookConfig struct {
 	// slack webhooks. Should be without '#'.
 	Channel string `mapstructure:"channel"`
 }
+
+//go:embed static
+var staticAssets embed.FS
 
 // NewServer returns a new server. If there are issues starting the server or
 // its dependencies an error will be returned. This is like the main() function
@@ -461,6 +463,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:    userConfig.CheckoutDepth,
 		GithubAppEnabled: githubAppEnabled,
+		Logger:           logger,
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(
@@ -581,6 +584,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commentParser,
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
+		userConfig.Automerge,
+		userConfig.ParallelPlan,
+		userConfig.ParallelApply,
 		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
@@ -921,7 +927,7 @@ func (s *Server) Start() error {
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
-	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
+	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
@@ -1031,6 +1037,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			// query params as part of the lock URL.
 			LockPath:      lockURL.String(),
 			RepoFullName:  v.Project.RepoFullName,
+			LockedBy:      v.Pull.Author,
 			PullNum:       v.Pull.Num,
 			Path:          v.Project.Path,
 			Workspace:     v.Workspace,

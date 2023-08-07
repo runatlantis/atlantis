@@ -35,14 +35,17 @@ func TestClone_NoneExisting(t *testing.T) {
 
 	dataDir := t.TempDir()
 
+	logger := logging.NewNoopLogger(t)
+
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 		GpgNoSigningEnabled:         true,
+		Logger:                      logger,
 	}
 
-	cloneDir, _, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
@@ -80,6 +83,8 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	runCmd(t, repoDir, "git", "merge", "-m", "atlantis-merge", "branch")
 	expLsOutput := runCmd(t, repoDir, "ls")
 
+	logger := logging.NewNoopLogger(t)
+
 	dataDir := t.TempDir()
 
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
@@ -90,9 +95,10 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
 		GpgNoSigningEnabled:         true,
+		Logger:                      logger,
 	}
 
-	cloneDir, mergedAgain, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -129,6 +135,8 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	runCmd(t, repoDir, "git", "add", "main-file")
 	runCmd(t, repoDir, "git", "commit", "-m", "main-commit")
 
+	logger := logging.NewNoopLogger(t)
+
 	// Run the clone for the first time.
 	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
@@ -139,9 +147,10 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
 		GpgNoSigningEnabled:         true,
+		Logger:                      logger,
 	}
 
-	_, mergedAgain, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	_, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -153,7 +162,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, mergedAgain, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -179,6 +188,8 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	runCmd(t, repoDir, "git", "add", "branch-file")
 	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
 
+	logger := logging.NewNoopLogger(t)
+
 	// Run the clone for the first time.
 	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
@@ -189,9 +200,10 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
 		GpgNoSigningEnabled:         true,
+		Logger:                      logger,
 	}
 
-	_, mergedAgain, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	_, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -203,7 +215,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, mergedAgain, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -234,6 +246,8 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 	runCmd(t, repoDir, "git", "add", "file")
 	runCmd(t, repoDir, "git", "commit", "-m", "commit")
 
+	logger := logging.NewNoopLogger(t)
+
 	// We're set up, now trigger the Atlantis clone.
 	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
@@ -244,9 +258,10 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
 		GpgNoSigningEnabled:         true,
+		Logger:                      logger,
 	}
 
-	_, _, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	_, _, err := wd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -289,6 +304,8 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 	// Test that we don't check out full repo if using CheckoutMerge strategy
 	t.Run("Shallow", func(t *testing.T) {
+		logger := logging.NewNoopLogger(t)
+
 		dataDir := t.TempDir()
 
 		wd := &events.FileWorkspace{
@@ -301,9 +318,10 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 			TestingOverrideHeadCloneURL: overrideURL,
 			TestingOverrideBaseCloneURL: overrideURL,
 			GpgNoSigningEnabled:         true,
+			Logger:                      logger,
 		}
 
-		cloneDir, mergedAgain, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
 			BaseRepo:   models.Repo{},
 			HeadBranch: "branch",
 			BaseBranch: "main",
@@ -319,6 +337,8 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 	// Test that we will check out full repo if CheckoutDepth is too small
 	t.Run("FullClone", func(t *testing.T) {
+		logger := logging.NewNoopLogger(t)
+
 		dataDir := t.TempDir()
 
 		wd := &events.FileWorkspace{
@@ -329,9 +349,10 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 			TestingOverrideHeadCloneURL: overrideURL,
 			TestingOverrideBaseCloneURL: overrideURL,
 			GpgNoSigningEnabled:         true,
+			Logger:                      logger,
 		}
 
-		cloneDir, mergedAgain, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+		cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
 			BaseRepo:   models.Repo{},
 			HeadBranch: "branch",
 			BaseBranch: "main",
@@ -358,13 +379,16 @@ func TestClone_NoReclone(t *testing.T) {
 	// Create a file that we can use later to check if the repo was recloned.
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
+	logger := logging.NewNoopLogger(t)
+
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 		GpgNoSigningEnabled:         true,
+		Logger:                      logger,
 	}
-	cloneDir, mergedAgain, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
@@ -400,13 +424,16 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 	Assert(t, err == nil, "creating plan file: %v", err)
 	assert.FileExists(t, planFile)
 
+	logger := logging.NewNoopLogger(t)
+
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 		GpgNoSigningEnabled:         true,
+		Logger:                      logger,
 	}
-	cloneDir, mergedAgain, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		HeadCommit: expCommit,
@@ -470,12 +497,15 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
 	runCmd(t, repoDir, "cp", "-R", secondPRDir, "repos/0/default")
 
+	logger := logging.NewNoopLogger(t)
+
 	// Run the clone.
 	wd := &events.FileWorkspace{
 		DataDir:             repoDir,
 		CheckoutMerge:       false,
 		CheckoutDepth:       50,
 		GpgNoSigningEnabled: true,
+		Logger:              logger,
 	}
 
 	// Pretend terraform has created a plan file, we'll check for it later
@@ -487,7 +517,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 
 	// Run the clone without the checkout merge strategy. It should return
 	// false for mergedAgain
-	_, mergedAgain, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{
+	_, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "second-pr",
 		BaseBranch: "main",
@@ -501,7 +531,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	// Run the clone twice with the merge strategy, the first run should
 	// return true for mergedAgain, subsequent runs should
 	// return false since the first call is supposed to merge.
-	_, mergedAgain, err = wd.Clone(logging.NewNoopLogger(t), models.Repo{CloneURL: repoDir}, models.PullRequest{
+	_, mergedAgain, err = wd.Clone(models.Repo{CloneURL: repoDir}, models.PullRequest{
 		BaseRepo:   models.Repo{CloneURL: repoDir},
 		HeadBranch: "second-pr",
 		BaseBranch: "main",
@@ -511,7 +541,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	Assert(t, mergedAgain == true, "First clone with CheckoutMerge=true with diverged base should have merged")
 
 	wd.SetCheckForUpstreamChanges()
-	_, mergedAgain, err = wd.Clone(logging.NewNoopLogger(t), models.Repo{CloneURL: repoDir}, models.PullRequest{
+	_, mergedAgain, err = wd.Clone(models.Repo{CloneURL: repoDir}, models.PullRequest{
 		BaseRepo:   models.Repo{CloneURL: repoDir},
 		HeadBranch: "second-pr",
 		BaseBranch: "main",
@@ -571,20 +601,23 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	// "git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
 	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
 
+	logger := logging.NewNoopLogger(t)
+
 	// Run the clone.
 	wd := &events.FileWorkspace{
 		DataDir:             repoDir,
 		CheckoutMerge:       true,
 		CheckoutDepth:       50,
 		GpgNoSigningEnabled: true,
+		Logger:              logger,
 	}
-	hasDiverged := wd.HasDiverged(logging.NewNoopLogger(t), repoDir+"/repos/0/default")
+	hasDiverged := wd.HasDiverged(repoDir + "/repos/0/default")
 	Equals(t, hasDiverged, true)
 
 	// Run it again but without the checkout merge strategy. It should return
 	// false.
 	wd.CheckoutMerge = false
-	hasDiverged = wd.HasDiverged(logging.NewNoopLogger(t), repoDir+"/repos/0/default")
+	hasDiverged = wd.HasDiverged(repoDir + "/repos/0/default")
 	Equals(t, hasDiverged, false)
 }
 

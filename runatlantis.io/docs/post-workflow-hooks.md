@@ -6,14 +6,12 @@ workflows](custom-workflows.html#custom-run-command) in that they are run
 outside of Atlantis commands. Which means they do not surface their output
 back to the PR as a comment.
 
-Post workflow hooks also only allow `run` and `description` commands.
-
 [[toc]]
 
 ## Usage
 
 Post workflow hooks can only be specified in the Server-Side Repo Config under
-`repos` key.
+the `repos` key.
 
 ## Use Cases
 
@@ -45,6 +43,25 @@ repos:
       # ...
 ```
 
+## Customizing the Shell
+
+By default, the commands will be run using the 'sh' shell with an argument of '-c'. This
+can be customized using the `shell` and `shellArgs` keys.
+
+Example:
+
+```yaml
+repos:
+    - id: /.*/
+      post_workflow_hooks:
+        - run: |
+            echo 'atlantis.yaml config:'
+            cat atlantis.yaml
+          description: atlantis.yaml report
+          shell: bash
+          shellArgs: -cv
+```
+
 ## Reference
 
 ### Custom `run` Command
@@ -60,6 +77,8 @@ command](custom-workflows.html#custom-run-command).
 | ----------- | ------ | ------- | -------- | --------------------- |
 | run         | string | none    | no       | Run a custom command  |
 | description | string | none    | no       | Post hook description |
+| shell       | string | 'sh'    | no       | The shell to use for running the command |
+| shellArgs   | string | '-c'    | no       | The shell arguments to use for running the command |
 
 ::: tip Notes
 * `run` commands are executed with the following environment variables:
@@ -77,5 +96,6 @@ command](custom-workflows.html#custom-run-command).
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
     every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
+  * `COMMAND_NAME` - The name of the command that is being executed, i.e. `plan`, `apply` etc.
   * `OUTPUT_STATUS_FILE` - An output file to customize the success or failure status. ex. `echo 'failure' > $OUTPUT_STATUS_FILE`.
 :::

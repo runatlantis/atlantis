@@ -34,8 +34,9 @@ import (
 )
 
 // gitlabMaxCommentLength is the maximum number of chars allowed by Gitlab in a
-// single comment.
-const gitlabMaxCommentLength = 1000000
+// single comment, reduced by 100 to allow comments to be hidden with a summary header
+// and footer.
+const gitlabMaxCommentLength = 1000000 - 100
 
 type GitlabClient struct {
 	Client *gitlab.Client
@@ -45,6 +46,8 @@ type GitlabClient struct {
 	PollingInterval time.Duration
 	// PollingInterval is the total duration for which to poll, where applicable.
 	PollingTimeout time.Duration
+	// logger
+	logger logging.SimpleLogging
 }
 
 // commonMarkSupported is a version constraint that is true when this version of
@@ -60,6 +63,7 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 	client := &GitlabClient{
 		PollingInterval: time.Second,
 		PollingTimeout:  time.Second * 30,
+		logger:          logger,
 	}
 
 	// Create the client differently depending on the base URL.
@@ -180,11 +184,68 @@ func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return nil
 }
 
-func (g *GitlabClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error { // nolint: revive
-	return nil
+// ReactToComment adds a reaction to a comment.
+func (g *GitlabClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {
+	_, _, err := g.Client.AwardEmoji.CreateMergeRequestAwardEmojiOnNote(repo.FullName, pullNum, int(commentID), &gitlab.CreateAwardEmojiOptions{Name: reaction})
+	return err
 }
 
 func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	var allComments []*gitlab.Note
+
+	nextPage := 0
+	for {
+		g.logger.Debug("/projects/%v/merge_requests/%d/notes", repo.FullName, pullNum)
+		comments, resp, err := g.Client.Notes.ListMergeRequestNotes(repo.FullName, pullNum,
+			&gitlab.ListMergeRequestNotesOptions{
+				Sort:        gitlab.String("asc"),
+				OrderBy:     gitlab.String("created_at"),
+				ListOptions: gitlab.ListOptions{Page: nextPage},
+			})
+		if err != nil {
+			return errors.Wrap(err, "listing comments")
+		}
+		allComments = append(allComments, comments...)
+		if resp.NextPage == 0 {
+			break
+		}
+		nextPage = resp.NextPage
+	}
+
+	currentUser, _, err := g.Client.Users.CurrentUser()
+	if err != nil {
+		return errors.Wrap(err, "error getting currentuser")
+	}
+
+	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>", command)
+	summaryFooter := "</details>"
+	lineFeed := "\n"
+
+	for _, comment := range allComments {
+		// Only process non-system comments authored by the Atlantis user
+		if comment.System || (comment.Author.Username != "" && !strings.EqualFold(comment.Author.Username, currentUser.Username)) {
+			continue
+		}
+
+		body := strings.Split(comment.Body, "\n")
+		if len(body) == 0 {
+			continue
+		}
+		firstLine := strings.ToLower(body[0])
+		// Skip processing comments that don't contain the command or contain the summary header in the first line
+		if !strings.Contains(firstLine, strings.ToLower(command)) || firstLine == strings.ToLower(summaryHeader) {
+			continue
+		}
+
+		g.logger.Debug("Updating merge request note: Repo: '%s', MR: '%d', comment ID: '%d'", repo.FullName, pullNum, comment.ID)
+		supersededComment := summaryHeader + lineFeed + comment.Body + lineFeed + summaryFooter + lineFeed
+
+		if _, _, err := g.Client.Notes.UpdateMergeRequestNote(repo.FullName, pullNum, comment.ID,
+			&gitlab.UpdateMergeRequestNoteOptions{Body: &supersededComment}); err != nil {
+			return errors.Wrapf(err, "updating comment %d", comment.ID)
+		}
+	}
+
 	return nil
 }
 
@@ -219,6 +280,15 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		return false, err
 	}
 
+	// Prevent nil pointer error when mr.HeadPipeline is empty
+	// See: https://github.com/runatlantis/atlantis/issues/1852
+	commit := pull.HeadCommit
+	isPipelineSkipped := true
+	if mr.HeadPipeline != nil {
+		commit = mr.HeadPipeline.SHA
+		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
+	}
+
 	// Get project configuration
 	project, _, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
 	if err != nil {
@@ -226,7 +296,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	// Get Commit Statuses
-	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, mr.HeadPipeline.SHA, nil)
+	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, commit, nil)
 	if err != nil {
 		return false, err
 	}
@@ -241,7 +311,6 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		}
 	}
 
-	isPipelineSkipped := mr.HeadPipeline.Status == "skipped"
 	allowSkippedPipeline := project.AllowMergeOnSkippedPipeline && isPipelineSkipped
 
 	ok, err := g.SupportsDetailedMergeStatus()

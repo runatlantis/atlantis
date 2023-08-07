@@ -33,6 +33,12 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
+// checkout strategies
+const (
+	CheckoutStrategyBranch = "branch"
+	CheckoutStrategyMerge  = "merge"
+)
+
 // To add a new flag you must:
 // 1. Add a const with the flag name (in alphabetic order).
 // 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
@@ -49,6 +55,8 @@ const (
 	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutomergeFlag                    = "automerge"
+	ParallelPlanFlag                 = "parallel-plan"
+	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
 	AutoplanModulesFromProjects      = "autoplan-modules-from-projects"
 	AutoplanFileListFlag             = "autoplan-file-list"
@@ -141,7 +149,7 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
-	DefaultCheckoutStrategy             = "branch"
+	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
@@ -462,6 +470,14 @@ var boolFlags = map[string]boolFlag{
 			"VCS support is limited to: GitHub.",
 		defaultValue: false,
 	},
+	ParallelPlanFlag: {
+		description:  "Run plan operations in parallel.",
+		defaultValue: false,
+	},
+	ParallelApplyFlag: {
+		description:  "Run apply operations in parallel.",
+		defaultValue: false,
+	},
 	QuietPolicyChecks: {
 		description:  "Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings.",
 		defaultValue: false,
@@ -545,7 +561,7 @@ var boolFlags = map[string]boolFlag{
 }
 var intFlags = map[string]intFlag{
 	CheckoutDepthFlag: {
-		description: fmt.Sprintf("Used only if --%s=merge.", CheckoutStrategyFlag) +
+		description: fmt.Sprintf("Used only if --%s=%s.", CheckoutStrategyFlag, CheckoutStrategyMerge) +
 			" How many commits to include in each of base and feature branches when cloning repository." +
 			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
 		defaultValue: DefaultCheckoutDepth,
@@ -852,8 +868,9 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 
 	checkoutStrategy := userConfig.CheckoutStrategy
-	if checkoutStrategy != "branch" && checkoutStrategy != "merge" {
-		return errors.New("invalid checkout strategy: not one of branch or merge")
+	if checkoutStrategy != CheckoutStrategyBranch && checkoutStrategy != CheckoutStrategyMerge {
+		return fmt.Errorf("invalid checkout strategy: not one of %s or %s",
+			CheckoutStrategyBranch, CheckoutStrategyMerge)
 	}
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
@@ -1079,8 +1096,8 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	}
 	if userConfig.AllowRepoConfig {
 		deprecatedFlags = append(deprecatedFlags, AllowRepoConfigFlag)
-		yamlCfg += "\n  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow]\n  allow_custom_workflows: true"
-		jsonCfg += `, "allowed_overrides":["plan_requirements","apply_requirements","import_requirements","workflow"], "allow_custom_workflows":true`
+		yamlCfg += "\n  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, policy_check]\n  allow_custom_workflows: true"
+		jsonCfg += `, "allowed_overrides":["plan_requirements","apply_requirements","import_requirements","workflow", "policy_check"], "allow_custom_workflows":true`
 	}
 	jsonCfg += "}]}"
 

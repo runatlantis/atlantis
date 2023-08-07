@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -31,8 +32,8 @@ const workingDirPrefix = "repos"
 
 var cloneLocks sync.Map
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_working_dir.go WorkingDir
-//go:generate pegomock generate -m --package events WorkingDir
+//go:generate pegomock generate --package mocks -o mocks/mock_working_dir.go WorkingDir
+//go:generate pegomock generate --package events WorkingDir
 
 // WorkingDir handles the workspace on disk for running commands.
 type WorkingDir interface {
@@ -40,11 +41,11 @@ type WorkingDir interface {
 	// absolute path to the root of the cloned repo. It also returns
 	// a boolean indicating if we should warn users that the branch we're
 	// merging into has been updated since we cloned it.
-	Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
+	Clone(headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
-	HasDiverged(log logging.SimpleLogging, cloneDir string) bool
+	HasDiverged(cloneDir string) bool
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
@@ -53,6 +54,8 @@ type WorkingDir interface {
 	// the upstream branch has been modified. This is only safe after grabbing the project lock
 	// and before running any plans
 	SetCheckForUpstreamChanges()
+	// DeletePlan deletes the plan for this repo, pull, workspace path and project name
+	DeletePlan(r models.Repo, p models.PullRequest, workspace string, path string, projectName string) error
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -81,6 +84,7 @@ type FileWorkspace struct {
 	GpgNoSigningEnabled bool
 	// flag indicating if we have to merge with potential new changes upstream (directly after grabbing project lock)
 	CheckForUpstreamChanges bool
+	Logger                  logging.SimpleLogging
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -90,7 +94,6 @@ type FileWorkspace struct {
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(
-	log logging.SimpleLogging,
 	headRepo models.Repo,
 	p models.PullRequest,
 	workspace string) (string, bool, error) {
@@ -100,7 +103,7 @@ func (w *FileWorkspace) Clone(
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
 	if _, err := os.Stat(cloneDir); err == nil {
-		log.Debug("clone directory %q already exists, checking if it's at the right commit", cloneDir)
+		w.Logger.Debug("clone directory %q already exists, checking if it's at the right commit", cloneDir)
 
 		// We use git rev-parse to see if our repo is at the right commit.
 		// If just checking out the pull request branch, we can use HEAD.
@@ -115,29 +118,29 @@ func (w *FileWorkspace) Clone(
 		revParseCmd.Dir = cloneDir
 		outputRevParseCmd, err := revParseCmd.CombinedOutput()
 		if err != nil {
-			log.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
-			return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
+			w.Logger.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
+			return cloneDir, false, w.forceClone(cloneDir, headRepo, p)
 		}
 		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
 
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			if w.CheckForUpstreamChanges && w.CheckoutMerge && w.recheckDiverged(log, p, headRepo, cloneDir) {
-				log.Info("base branch has been updated, using merge strategy and will merge again")
-				return cloneDir, true, w.mergeAgain(log, cloneDir, headRepo, p)
+			if w.CheckForUpstreamChanges && w.CheckoutMerge && w.recheckDiverged(p, headRepo, cloneDir) {
+				w.Logger.Info("base branch has been updated, using merge strategy and will clone again")
+				return cloneDir, true, w.mergeAgain(cloneDir, headRepo, p)
 			} else {
-				log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
+				w.Logger.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 				return cloneDir, false, nil
 			}
 		} else {
-			log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
+			w.Logger.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
 		}
 		// We'll fall through to re-clone.
 	}
 
 	// Otherwise we clone the repo.
-	return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
+	return cloneDir, false, w.forceClone(cloneDir, headRepo, p)
 }
 
 // recheckDiverged returns true if the branch we're merging into has diverged
@@ -147,7 +150,7 @@ func (w *FileWorkspace) Clone(
 // and we have to perform a new merge.
 // If there are any errors we return false since we prefer things to succeed
 // vs. stopping the plan/apply.
-func (w *FileWorkspace) recheckDiverged(log logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
+func (w *FileWorkspace) recheckDiverged(p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that main has diverged if we're using
 		// the checkout merge strategy. If we're just checking out the branch,
@@ -180,15 +183,15 @@ func (w *FileWorkspace) recheckDiverged(log logging.SimpleLogging, p models.Pull
 		output, err := cmd.CombinedOutput()
 
 		if err != nil {
-			log.Warn("getting remote update failed: %s", string(output))
+			w.Logger.Warn("getting remote update failed: %s", string(output))
 			return false
 		}
 	}
 
-	return w.HasDiverged(log, cloneDir)
+	return w.HasDiverged(cloneDir)
 }
 
-func (w *FileWorkspace) HasDiverged(log logging.SimpleLogging, cloneDir string) bool {
+func (w *FileWorkspace) HasDiverged(cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
 		// we assume false here for 'branch' strategy.
@@ -199,18 +202,14 @@ func (w *FileWorkspace) HasDiverged(log logging.SimpleLogging, cloneDir string) 
 	statusUnoCmd.Dir = cloneDir
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
 	if err != nil {
-		log.Warn("getting repo status has failed: %s", string(outputStatusUno))
+		w.Logger.Warn("getting repo status has failed: %s", string(outputStatusUno))
 		return false
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
 	return hasDiverged
 }
 
-func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
-	cloneDir string,
-	headRepo models.Repo,
-	p models.PullRequest) error {
-
+func (w *FileWorkspace) forceClone(cloneDir string, headRepo models.Repo, p models.PullRequest) error {
 	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
 	mutex := value.(*sync.Mutex)
 
@@ -226,7 +225,7 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	}
 
 	// Create the directory and parents if necessary.
-	log.Info("creating dir %q", cloneDir)
+	w.Logger.Info("creating dir %q", cloneDir)
 	if err := os.MkdirAll(cloneDir, 0700); err != nil {
 		return errors.Wrap(err, "creating new workspace")
 	}
@@ -241,7 +240,7 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 		baseCloneURL = w.TestingOverrideBaseCloneURL
 	}
 
-	runGit := w.makeGitRunner(log, cloneDir, headRepo, p)
+	runGit := w.makeGitRunner(cloneDir, headRepo, p)
 
 	// if branch strategy, use depth=1
 	if !w.CheckoutMerge {
@@ -275,11 +274,7 @@ func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 
 // There is a new upstream update that we need, and we want to update to it
 // without deleting any existing plans
-func (w *FileWorkspace) mergeAgain(log logging.SimpleLogging,
-	cloneDir string,
-	headRepo models.Repo,
-	p models.PullRequest) error {
-
+func (w *FileWorkspace) mergeAgain(cloneDir string, headRepo models.Repo, p models.PullRequest) error {
 	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
 	mutex := value.(*sync.Mutex)
 
@@ -289,7 +284,7 @@ func (w *FileWorkspace) mergeAgain(log logging.SimpleLogging,
 		return nil
 	}
 
-	runGit := w.makeGitRunner(log, cloneDir, headRepo, p)
+	runGit := w.makeGitRunner(cloneDir, headRepo, p)
 
 	// Reset branch as if it was cloned again
 	if err := runGit("reset", "--hard", fmt.Sprintf("refs/remotes/head/%s", p.BaseBranch)); err != nil {
@@ -299,7 +294,7 @@ func (w *FileWorkspace) mergeAgain(log logging.SimpleLogging,
 	return w.mergeToBaseBranch(p, runGit)
 }
 
-func (w *FileWorkspace) makeGitRunner(log logging.SimpleLogging, cloneDir string, headRepo models.Repo, p models.PullRequest) func(args ...string) error {
+func (w *FileWorkspace) makeGitRunner(cloneDir string, headRepo models.Repo, p models.PullRequest) func(args ...string) error {
 	return func(args ...string) error {
 		cmd := exec.Command("git", args...) // nolint: gosec
 		cmd.Dir = cloneDir
@@ -317,7 +312,7 @@ func (w *FileWorkspace) makeGitRunner(log logging.SimpleLogging, cloneDir string
 			sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
 			return fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
 		}
-		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
+		w.Logger.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
 		return nil
 	}
 }
@@ -380,12 +375,16 @@ func (w *FileWorkspace) GetPullDir(r models.Repo, p models.PullRequest) (string,
 
 // Delete deletes the workspace for this repo and pull.
 func (w *FileWorkspace) Delete(r models.Repo, p models.PullRequest) error {
-	return os.RemoveAll(w.repoPullDir(r, p))
+	repoPullDir := w.repoPullDir(r, p)
+	w.Logger.Info("Deleting repo pull directory: " + repoPullDir)
+	return os.RemoveAll(repoPullDir)
 }
 
 // DeleteForWorkspace deletes the working dir for this workspace.
 func (w *FileWorkspace) DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error {
-	return os.RemoveAll(w.cloneDir(r, p, workspace))
+	workspaceDir := w.cloneDir(r, p, workspace)
+	w.Logger.Info("Deleting workspace directory: " + workspaceDir)
+	return os.RemoveAll(workspaceDir)
 }
 
 func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string {
@@ -406,4 +405,10 @@ func (w *FileWorkspace) sanitizeGitCredentials(s string, base models.Repo, head 
 // Set the flag that indicates we need to check for upstream changes (if using merge checkout strategy)
 func (w *FileWorkspace) SetCheckForUpstreamChanges() {
 	w.CheckForUpstreamChanges = true
+}
+
+func (w *FileWorkspace) DeletePlan(r models.Repo, p models.PullRequest, workspace string, projectPath string, projectName string) error {
+	planPath := filepath.Join(w.cloneDir(r, p, workspace), projectPath, runtime.GetPlanFilename(workspace, projectName))
+	w.Logger.Info("Deleting plan: " + planPath)
+	return os.Remove(planPath)
 }

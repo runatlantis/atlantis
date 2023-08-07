@@ -356,7 +356,6 @@ $$$
 
 <details><summary>Show Output</summary>
 
-
 #### Policy Set: $policy1$
 $$$diff
 line

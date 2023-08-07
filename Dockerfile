@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
-ARG ALPINE_TAG=3.18.0
-ARG DEBIAN_TAG=11.7-slim
+ARG ALPINE_TAG=3.18.2
+ARG DEBIAN_TAG=12.1-slim
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.20.5-alpine AS builder
+FROM golang:1.20.7-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -37,20 +37,18 @@ FROM debian:${DEBIAN_TAG} as debian-base
 # We place this last as it will bust less docker layer caches when packages update
 # hadolint ignore explanation
 # DL3008 (pin versions using "=") - Ignored to avoid failing the build
-# SC2261 (multiple redirections) - This is a bug https://github.com/hadolint/hadolint/issues/782
-# hadolint ignore=DL3008,SC2261
+# hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates>=20210119 \
-        curl>=7.74 \
-        git>=1:2.30 \
-        unzip>=6.0 \
-        bash>=5.1 \
-        openssh-server>=1:8.4p1 \
-        libcap2>=1:2.44 \
-        dumb-init>=1.2 \
-        gnupg>=2.2 \
-        openssl>=1.1.1n && \
+        ca-certificates \
+        curl \
+        git \
+        unzip \
+        openssh-server \
+        libcap2 \
+        dumb-init \
+        gnupg \
+        openssl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -62,7 +60,7 @@ WORKDIR /tmp/build
 
 # install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV DEFAULT_CONFTEST_VERSION=0.43.1
+ENV DEFAULT_CONFTEST_VERSION=0.44.1
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
     case ${TARGETPLATFORM} in \
@@ -108,7 +106,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.3.0
+ENV GIT_LFS_VERSION=3.4.0
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
@@ -123,10 +121,11 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.4.6
+ENV DEFAULT_TERRAFORM_VERSION=1.5.4
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
-RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
+# Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
+RUN AVAILABLE_TERRAFORM_VERSIONS="1.2.9 1.3.9 1.4.6 ${DEFAULT_TERRAFORM_VERSION}" && \
     case "${TARGETPLATFORM}" in \
         "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
         "linux/arm64") TERRAFORM_ARCH=arm64 ;; \
@@ -171,14 +170,13 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Install packages needed for running Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
-RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main/ \
-        git~=2.40 && \
-    apk add --no-cache \
+RUN apk add --no-cache \
         ca-certificates~=20230506 \
-        curl~=8.1 \
+        curl~=8.2 \
+        git~=2.40 \
         unzip~=6.0 \
         bash~=5.2 \
-        openssh~=9.3_p1 \
+        openssh~=9.3_p2 \
         libcap~=2.69 \
         dumb-init~=1.2 \
         gcompat~=1.1

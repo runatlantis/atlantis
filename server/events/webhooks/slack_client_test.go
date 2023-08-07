@@ -21,7 +21,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/webhooks/mocks"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	. "github.com/runatlantis/atlantis/testing"
 )
 

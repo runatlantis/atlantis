@@ -1,7 +1,17 @@
 {{ define "policyCheckResultsWrapped" -}}
 <details><summary>Show Output</summary>
 {{- if eq .Command "Policy Check" }}
+{{- if ne .PreConftestOutput "" }}
+```diff
+{{ .PreConftestOutput }}
+```
+{{- end -}}
 {{ template "policyCheck" .PolicySetResults }}
+{{- if ne .PostConftestOutput "" }}
+```diff
+{{ .PostConftestOutput }}
+```
+{{ end -}}
 {{- end }}
 {{- if .PolicyCleared }}
 * :arrow_forward: To **apply** this plan, comment:
