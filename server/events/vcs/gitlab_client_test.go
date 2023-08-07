@@ -445,7 +445,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				mergeable, err := client.PullIsMergeable(repo, models.PullRequest{
 					Num:        c.mrId,
 					BaseRepo:   repo,
-					HeadCommit: "sha",
+					HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
 				}, vcsStatusName)
 
 				Ok(t, err)
