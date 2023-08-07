@@ -558,7 +558,7 @@ func TestRunCommentCommand_DisableAutoplanLabel_PullNotLabeled(t *testing.T) {
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(ch.VCSClient.GetPullLabels(testdata.GithubRepo, modelPull)).ThenReturn([]string{}, nil)
+	When(ch.VCSClient.GetPullLabels(testdata.GithubRepo, modelPull)).ThenReturn(nil, nil)
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 	projectCommandBuilder.VerifyWasCalled(Once()).BuildAutoplanCommands(Any[*command.Context]())

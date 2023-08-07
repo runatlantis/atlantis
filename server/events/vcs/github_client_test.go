@@ -1366,3 +1366,112 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 		})
 	}
 }
+
+func TestGithubClient_GetPullLabels(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	// Mocked GraphQL response for two teams
+	resp := `{
+	  "url": "https://api.github.com/repos/runatlantis/atlantis/pulls/1",
+	  "id": 167530667,
+	  "merge_commit_sha": "3fe6aa34bc25ac3720e639fcad41b428e83bdb37",
+	  "labels": [
+		{
+		  "id": 1303230720,
+		  "node_id": "MDU6TGFiZWwxMzAzMjMwNzIw",
+		  "url": "https://api.github.com/repos/runatlantis/atlantis/labels/docs",
+		  "name": "docs",
+		  "color": "d87165",
+		  "default": false,
+		  "description": "Documentation"
+		},
+		{
+		  "id": 2552271640,
+		  "node_id": "MDU6TGFiZWwyNTUyMjcxNjQw",
+		  "url": "https://api.github.com/repos/runatlantis/atlantis/labels/go",
+		  "name": "go",
+		  "color": "16e2e2",
+		  "default": false,
+		  "description": "Pull requests that update Go code"
+		},
+		{
+		  "id": 2696098981,
+		  "node_id": "MDU6TGFiZWwyNjk2MDk4OTgx",
+		  "url": "https://api.github.com/repos/runatlantis/atlantis/labels/needs%20tests",
+		  "name": "needs tests",
+		  "color": "FBB1DE",
+		  "default": false,
+		  "description": "Change requires tests"
+		},
+		{
+		  "id": 4439792681,
+		  "node_id": "LA_kwDOBy76Zc8AAAABCKHcKQ",
+		  "url": "https://api.github.com/repos/runatlantis/atlantis/labels/work-in-progress",
+		  "name": "work-in-progress",
+		  "color": "B1E20A",
+		  "default": false,
+		  "description": ""
+		}
+	  ]
+	}`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/runatlantis/atlantis/pulls/1":
+				w.Write([]byte(resp)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{}, logger)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	labels, err := client.GetPullLabels(models.Repo{
+		Owner: "runatlantis",
+		Name:  "atlantis",
+	}, models.PullRequest{
+		Num: 1,
+	})
+	Ok(t, err)
+	Equals(t, []string{"docs", "go", "needs tests", "work-in-progress"}, labels)
+}
+
+func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	// Mocked GraphQL response for two teams
+	resp := `{
+	  "url": "https://api.github.com/repos/runatlantis/atlantis/pulls/1",
+	  "id": 167530667,
+	  "merge_commit_sha": "3fe6aa34bc25ac3720e639fcad41b428e83bdb37",
+	  "labels": []
+	}`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/runatlantis/atlantis/pulls/1":
+				w.Write([]byte(resp)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{}, logger)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	labels, err := client.GetPullLabels(models.Repo{
+		Owner: "runatlantis",
+		Name:  "atlantis",
+	}, models.PullRequest{
+		Num: 1,
+	})
+	Ok(t, err)
+	Equals(t, 0, len(labels))
+}
