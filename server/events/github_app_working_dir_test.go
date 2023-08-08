@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
-	pegomock "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/events"
 	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -59,7 +58,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 }
 
 func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
-	pegomock.RegisterMockTestingT(t)
+	RegisterMockTestingT(t)
 
 	workingDir := eventMocks.NewMockWorkingDir()
 
