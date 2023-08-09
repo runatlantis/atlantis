@@ -1369,7 +1369,6 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 
 func TestGithubClient_GetPullLabels(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	// Mocked GraphQL response for two teams
 	resp := `{
 	  "url": "https://api.github.com/repos/runatlantis/atlantis/pulls/1",
 	  "id": 167530667,
@@ -1442,7 +1441,6 @@ func TestGithubClient_GetPullLabels(t *testing.T) {
 
 func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	// Mocked GraphQL response for two teams
 	resp := `{
 	  "url": "https://api.github.com/repos/runatlantis/atlantis/pulls/1",
 	  "id": 167530667,
