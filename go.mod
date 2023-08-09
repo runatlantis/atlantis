@@ -42,7 +42,7 @@ require (
 	github.com/uber-go/tally/v4 v4.1.7
 	github.com/urfave/negroni/v3 v3.0.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
-	github.com/xanzy/go-gitlab v0.89.0
+	github.com/xanzy/go-gitlab v0.90.0
 	go.etcd.io/bbolt v1.3.7
 	go.uber.org/zap v1.25.0
 	golang.org/x/term v0.10.0
