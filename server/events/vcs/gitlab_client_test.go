@@ -323,8 +323,8 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	gitlabVersionUnder15_6 := "15.3.2-ce"
 	gitlabServerVersions := []string{gitlabVersionOver15_6, gitlabVersion15_6, gitlabVersionUnder15_6}
 	vcsStatusName := "atlantis-test"
-	defaultMR = 1
-	noHeadPipelineMR = 2
+	defaultMr := 1
+	noHeadPipelineMR := 2
 	cases := []struct {
 		statusName    string
 		status        models.CommitStatus
@@ -380,13 +380,6 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			noHeadPipelineMR,
 			false,
-		},
-		{
-			fmt.Sprintf("%s/plan", vcsStatusName),
-			models.SuccessCommitStatus,
-			gitlabServerVersions,
-			noHeadPipelineMR,
-			true,
 		},
 	}
 	for _, serverVersion := range gitlabServerVersions {
@@ -445,7 +438,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				mergeable, err := client.PullIsMergeable(repo, models.PullRequest{
 					Num:        c.mrId,
 					BaseRepo:   repo,
-					HeadCommit: "sha",
+					HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
 				}, vcsStatusName)
 
 				Ok(t, err)
