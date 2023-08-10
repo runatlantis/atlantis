@@ -38,7 +38,7 @@ Each ProjectLock has one Project (One to One)
 [Working Dir locks](https://github.com/runatlantis/atlantis/blob/main/server/events/working_dir_locker.go#L29-L52) are not part of the backend DB and thus do not have a model, instead its in-memory in `working_dir_locker`
 
 Currently can lock the entire PR or per workspace + path
-- T[ryLockPull](https://github.com/runatlantis/atlantis/blob/f4fa3138d7a9dfdb494105597dce88366effff9e/server/events/working_dir_locker.go#L59-L75): Repo + PR + workspace
+- [TryLockPull](https://github.com/runatlantis/atlantis/blob/f4fa3138d7a9dfdb494105597dce88366effff9e/server/events/working_dir_locker.go#L59-L75): Repo + PR + workspace
 - [TryLock](https://github.com/runatlantis/atlantis/blob/f4fa3138d7a9dfdb494105597dce88366effff9e/server/events/working_dir_locker.go#L77-L94): Repo + PR + workspace + path
 
 #### Stack Walk Overview
@@ -97,12 +97,11 @@ This is due to a combination of different directories passed to Working Dir when
  
 ### Non-Goals
 - Making changes/improvements to other packages/sub-systems
-- Avoid massive refactor if possible
+  - Moving plan data storage into backend state
+- Avoid massive refactoring if possible
 - Focus on a singular workflow
 
-## Solutions
-
-### Previous attempts
+## Previous attempts
  There have been a couple of PRs submitted that have either been reverted, or grown stale:
 
 - add path to WorkingDir [#2180](https://github.com/runatlantis/atlantis/pull/2180)
@@ -120,34 +119,42 @@ This is due to a combination of different directories passed to Working Dir when
 
 This is not to suggest the revival of these PRs in their current state but to act as a reference for additional focused solutions. 
 
-### Possible Solutions
-**Note**: Some of these solutions will purposely be contradictory to the ADR Goals or Non-Goals in an effort to flesh out alternatives and to assist in the decision-making process.
+## Solution: Clone once + TF_DATA_DIR
 
-### Solution 1: Clone once + TF_DATA_DIR
+Take PR #2921 and re-implement locks on the terraform DATA_DIR only and the entire base repo + PR for git clones. This will focus solely on git operations and Terraform Data Directories. 
 
-**TO-DO**: flesh out
+### Clone once
 
-Take PR #2921 and re-implement locks on the DATA_DIR only for plans and the entire base repo + PR for git clones.
+We should be avoiding altogether re-cloning the repo unless absolutely necessary. We currently attempt to clone 3 times in a single command execution.
 
-#### Pros
- - 
-#### Cons
+1) Pre-Workflow Hooks
+2) <Import/Plan/Apply>CommandRunner
+	a) determintes projects to run plans on
+3) ProjectCommandRunner
+	a) clones before actual plan execution
 
-### Solution 2: Clone once + move plans into state/backend
+We should clone one initially for the entire repo/PR. This will empower multiple workspaces/plans alongside TF_DATA_DIR without needing to re-clone.
 
-Take PR #2921 and remove the concept of locking on workspace/path. Clone only once during Pull Request events (commit updates) and not during Atlantis commands (plan/apply).
+Here are the cases that will trigger a clone:
 
-**TO-DO**: figure out how to process plan files/and where to output other than disk.
+	1) Initial clone of repo
+ 	2) Force Reclone 
+  		a) Error when attempting fetch + pull to update existing local git repo
+    		b) File operation on a path that doesn't exist (data loss/accidental deletes)
 
-### Solution 3: Revert #2131
+In all other situations, we should be utilizing Git for its delta compressions and performing less intensive fetch + pull operations.
 
-The original change that introduced `path` to the WorkingDirLocker could be reverted and fall back on known behavior.
+### TF_DATA_DIR
 
-...
+Terraform currently contains its working directory data at `TF_DATA_DIR` which by default is `.terraform`. Utilizing this environmental override, we can store information about the individual project plans and backend state in separate data directories. This would allow for parallel plans not only per project, but across workspaces, in a single PR.
 
-## Decision
+The proposed new structure would pass through `.terraform-$workspace`. Workspace in this case refers to the terraform workspace specified on a project/repo. If one is not provided, it is set to `default`.
 
-TBD
+### Locking
+
+There has also been a history of issues with colliding locks that disrupts parallel commands running. In this case, locking happens to avoid collison on file operations. We should be locking during Git operations but might not need to during workspace/plan file creation.
+
+*TODO:* dig into locking more thoroughly. 
 
 ## Links
 
