@@ -62,6 +62,84 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 	}, res)
 }
 
+func TestDefaultProjectLocker_TryLockWhenLockedAndEnqueued(t *testing.T) {
+	var githubClient *vcs.GithubClient
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
+	mockLocker := mocks.NewMockLocker()
+	locker := events.DefaultProjectLocker{
+		Locker:    mockLocker,
+		VCSClient: mockClient,
+	}
+	expProject := models.Project{}
+	expWorkspace := "default"
+	expPull := models.PullRequest{}
+	expUser := models.User{}
+
+	lockingPull := models.PullRequest{
+		Num: 2,
+	}
+	When(mockLocker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
+		locking.TryLockResponse{
+			LockAcquired: false,
+			CurrLock: models.ProjectLock{
+				Pull: lockingPull,
+			},
+			EnqueueStatus: &models.EnqueueStatus{
+				Status:     models.Enqueued,
+				QueueDepth: 1,
+			},
+			LockKey: "",
+		},
+		nil,
+	)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
+	link, _ := mockClient.MarkdownPullLink(lockingPull)
+	Ok(t, err)
+	Equals(t, &events.TryLockResponse{
+		LockAcquired:      false,
+		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s. This PR entered the waiting queue :clock130:, number of PRs ahead of you: **%d**.", link, 1),
+	}, res)
+}
+
+func TestDefaultProjectLocker_TryLockWhenLockedAndAlreadyInQueue(t *testing.T) {
+	var githubClient *vcs.GithubClient
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
+	mockLocker := mocks.NewMockLocker()
+	locker := events.DefaultProjectLocker{
+		Locker:    mockLocker,
+		VCSClient: mockClient,
+	}
+	expProject := models.Project{}
+	expWorkspace := "default"
+	expPull := models.PullRequest{}
+	expUser := models.User{}
+
+	lockingPull := models.PullRequest{
+		Num: 2,
+	}
+	When(mockLocker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
+		locking.TryLockResponse{
+			LockAcquired: false,
+			CurrLock: models.ProjectLock{
+				Pull: lockingPull,
+			},
+			EnqueueStatus: &models.EnqueueStatus{
+				Status:     models.AlreadyInTheQueue,
+				QueueDepth: 1,
+			},
+			LockKey: "",
+		},
+		nil,
+	)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
+	link, _ := mockClient.MarkdownPullLink(lockingPull)
+	Ok(t, err)
+	Equals(t, &events.TryLockResponse{
+		LockAcquired:      false,
+		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s. This PR is already in the queue :clock130:, number of PRs ahead of you: **%d**.", link, 1),
+	}, res)
+}
+
 func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 	RegisterMockTestingT(t)
 	var githubClient *vcs.GithubClient

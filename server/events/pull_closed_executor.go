@@ -97,6 +97,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 		}
 	}
 
+	// TODO(Ghais) extend the tests
 	if err := p.WorkingDir.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
@@ -104,7 +105,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	// Finally, delete locks. We do this last because when someone
 	// unlocks a project, right now we don't actually delete the plan
 	// so we might have plans laying around but no locks.
-	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
+	locks, dequeueStatus, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
 		return errors.Wrap(err, "cleaning up locks")
 	}
@@ -124,7 +125,27 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return errors.Wrap(err, "rendering template for comment")
 	}
-	return p.VCSClient.CreateComment(repo, pull.Num, buf.String(), "")
+
+	if err = p.VCSClient.CreateComment(repo, pull.Num, buf.String(), ""); err != nil {
+		return err
+	}
+
+	if dequeueStatus != nil {
+		return p.commentOnDequeuedPullRequests(*dequeueStatus)
+	}
+
+	return nil
+}
+
+func (p *PullClosedExecutor) commentOnDequeuedPullRequests(dequeueStatus models.DequeueStatus) error {
+	locksByPullRequest := groupByPullRequests(dequeueStatus.ProjectLocks)
+	for pullRequestNumber, projectLocks := range locksByPullRequest {
+		planVcsMessage := models.BuildCommentOnDequeuedPullRequest(projectLocks)
+		if err := p.VCSClient.CreateComment(projectLocks[0].Pull.BaseRepo, pullRequestNumber, planVcsMessage, ""); err != nil {
+			return errors.Wrapf(err, "unable to comment on PR %d", pullRequestNumber)
+		}
+	}
+	return nil
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be

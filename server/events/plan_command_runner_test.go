@@ -77,7 +77,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := db.New(tmp, false)
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {
@@ -459,7 +459,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			// vcsClient := setup(t)
 
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := db.New(tmp, false)
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {
@@ -699,7 +699,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := db.New(tmp, false)
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {

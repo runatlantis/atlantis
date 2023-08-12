@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
@@ -222,7 +223,7 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(nil, errors.New("err"))
+	When(dlc.DeleteLock("id")).ThenReturn(nil, nil, errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -238,7 +239,7 @@ func TestDeleteLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 404")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(nil, nil)
+	When(dlc.DeleteLock("id")).ThenReturn(nil, nil, nil)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -255,7 +256,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	RegisterMockTestingT(t)
 	cp := vcsmocks.NewMockClient()
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{}, nil)
+	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{}, nil, nil)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -291,10 +292,10 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			Path:         projectPath,
 			RepoFullName: repoName,
 		},
-	}, nil)
+	}, nil, nil)
 	var backend locking.Backend
 	tmp := t.TempDir()
-	backend, err := db.New(tmp)
+	backend, err := db.New(tmp, false)
 	Ok(t, err)
 	// Seed the DB with a successful plan for that project (that is later discarded).
 	_, err = backend.UpdatePullWithResults(pull, []command.ProjectResult{
@@ -342,13 +343,13 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{FullName: "owner/repo"},
 		},
-	}, nil)
+	}, nil, nil)
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	var backend locking.Backend
 	tmp := t.TempDir()
-	backend, err := db.New(tmp)
+	backend, err := db.New(tmp, false)
 	Ok(t, err)
 	When(cp.CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())).ThenReturn(errors.New("err"))
 	lc := controllers.LocksController{
@@ -375,7 +376,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	var backend locking.Backend
 	tmp := t.TempDir()
-	backend, err := db.New(tmp)
+	backend, err := db.New(tmp, false)
 	Ok(t, err)
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
@@ -387,7 +388,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 			Path:         "path",
 			RepoFullName: "owner/repo",
 		},
-	}, nil)
+	}, nil, nil)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -404,4 +405,52 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	cp.VerifyWasCalled(Once()).CreateComment(pull.BaseRepo, pull.Num,
 		"**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again.", "")
+}
+
+func TestQueueItemIndexData(t *testing.T) {
+	layout := "2006-01-02T15:04:05.000Z"
+	strLockTime := "2020-09-01T00:45:26.371Z"
+	lockTime, _ := time.Parse(layout, strLockTime)
+	tests := []struct {
+		name  string
+		queue models.ProjectLockQueue
+		want  []templates.QueueItemIndexData
+	}{
+		{
+			name:  "empty list",
+			queue: models.ProjectLockQueue{},
+			want:  nil,
+		},
+		{
+			name: "list with one item",
+			queue: models.ProjectLockQueue{
+				{
+					Project:   models.Project{RepoFullName: "org/repo", Path: "path"},
+					Workspace: "workspace",
+					Time:      lockTime,
+					Pull:      models.PullRequest{Num: 15, Author: "pull-author", URL: "org/repo/pull/15"},
+				},
+			},
+			want: []templates.QueueItemIndexData{
+				{
+					LockPath:      "Not yet acquired",
+					RepoFullName:  "org/repo",
+					PullNum:       15,
+					Path:          "path",
+					Workspace:     "workspace",
+					Time:          lockTime,
+					TimeFormatted: "01-09-2020 00:45:26",
+					PullURL:       "org/repo/pull/15",
+					Author:        "pull-author",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := controllers.GetQueueItemIndexData(tt.queue); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetQueueItemIndexData() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

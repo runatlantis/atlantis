@@ -17,12 +17,12 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, we return the error")
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(nil, errors.New("err"))
+	When(l.Unlock("id")).ThenReturn(nil, nil, errors.New("err"))
 	dlc := events.DefaultDeleteLockCommand{
 		Locker: l,
 		Logger: logging.NewNoopLogger(t),
 	}
-	_, err := dlc.DeleteLock("id")
+	_, _, err := dlc.DeleteLock("id")
 	ErrEquals(t, "err", err)
 }
 
@@ -30,12 +30,12 @@ func TestDeleteLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we return nil")
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(nil, nil)
+	When(l.Unlock("id")).ThenReturn(nil, nil, nil)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker: l,
 		Logger: logging.NewNoopLogger(t),
 	}
-	lock, err := dlc.DeleteLock("id")
+	lock, _, err := dlc.DeleteLock("id")
 	Ok(t, err)
 	Assert(t, lock == nil, "lock was not nil")
 }
@@ -44,7 +44,7 @@ func TestDeleteLock_Success(t *testing.T) {
 	t.Log("Delete lock deletes successfully the plan file")
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
+	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, &models.ProjectLock{}, nil)
 	workingDir := events.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	workspace := "workspace"
@@ -60,9 +60,9 @@ func TestDeleteLock_Success(t *testing.T) {
 			Path:         path,
 			RepoFullName: pull.BaseRepo.FullName,
 		},
-	}, nil)
+	}, &models.ProjectLock{}, nil)
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := db.New(tmp, false)
 	Ok(t, err)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:           l,
@@ -71,7 +71,7 @@ func TestDeleteLock_Success(t *testing.T) {
 		WorkingDirLocker: workingDirLocker,
 		WorkingDir:       workingDir,
 	}
-	lock, err := dlc.DeleteLock("id")
+	lock, _, err := dlc.DeleteLock("id")
 	Ok(t, err)
 	Assert(t, lock != nil, "lock was nil")
 	workingDir.VerifyWasCalledOnce().DeletePlan(pull.BaseRepo, pull, workspace, path, projectName)
@@ -84,13 +84,13 @@ func TestDeleteLocksByPull_LockerErr(t *testing.T) {
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
 	workingDir := events.NewMockWorkingDir()
-	When(l.UnlockByPull(repoName, pullNum)).ThenReturn(nil, errors.New("err"))
+	When(l.UnlockByPull(repoName, pullNum)).ThenReturn(nil, nil, errors.New("err"))
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:     l,
 		Logger:     logging.NewNoopLogger(t),
 		WorkingDir: workingDir,
 	}
-	_, err := dlc.DeleteLocksByPull(repoName, pullNum)
+	_, _, err := dlc.DeleteLocksByPull(repoName, pullNum)
 	ErrEquals(t, "err", err)
 	workingDir.VerifyWasCalled(Never()).DeletePlan(Any[models.Repo](), Any[models.PullRequest](), Any[string](), Any[string](), Any[string]())
 }
@@ -102,13 +102,13 @@ func TestDeleteLocksByPull_None(t *testing.T) {
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
 	workingDir := events.NewMockWorkingDir()
-	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{}, nil)
+	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{}, nil, nil)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:     l,
 		Logger:     logging.NewNoopLogger(t),
 		WorkingDir: workingDir,
 	}
-	_, err := dlc.DeleteLocksByPull(repoName, pullNum)
+	_, _, err := dlc.DeleteLocksByPull(repoName, pullNum)
 	Ok(t, err)
 	workingDir.VerifyWasCalled(Never()).DeletePlan(Any[models.Repo](), Any[models.PullRequest](), Any[string](), Any[string](), Any[string]())
 }
@@ -119,11 +119,11 @@ func TestDeleteLocksByPull_OldFormat(t *testing.T) {
 	pullNum := 2
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
-	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{{}}, nil)
+	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{{}}, nil, nil)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker: l,
 		Logger: logging.NewNoopLogger(t),
 	}
-	_, err := dlc.DeleteLocksByPull(repoName, pullNum)
+	_, _, err := dlc.DeleteLocksByPull(repoName, pullNum)
 	Ok(t, err)
 }

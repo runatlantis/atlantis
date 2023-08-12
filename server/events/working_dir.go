@@ -380,5 +380,9 @@ func (w *FileWorkspace) SetSafeToReClone() {
 func (w *FileWorkspace) DeletePlan(r models.Repo, p models.PullRequest, workspace string, projectPath string, projectName string) error {
 	planPath := filepath.Join(w.cloneDir(r, p, workspace), projectPath, runtime.GetPlanFilename(workspace, projectName))
 	w.Logger.Info("Deleting plan: " + planPath)
-	return os.Remove(planPath)
+
+	if err := os.Remove(planPath); !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }

@@ -30,11 +30,14 @@ import (
 
 // Backend is an implementation of the locking API we require.
 type Backend interface {
-	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
-	Unlock(project models.Project, workspace string) (*models.ProjectLock, error)
+	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, *models.EnqueueStatus, error)
+	Unlock(project models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error)
 	List() ([]models.ProjectLock, error)
 	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
-	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
+	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, *models.DequeueStatus, error)
+
+	GetQueueByLock(project models.Project, workspace string) (models.ProjectLockQueue, error)
+
 	UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error
 	GetPullStatus(pull models.PullRequest) (*models.PullStatus, error)
 	DeletePullStatus(pull models.PullRequest) error
@@ -51,6 +54,8 @@ type TryLockResponse struct {
 	LockAcquired bool
 	// CurrLock is what project is currently holding the lock.
 	CurrLock models.ProjectLock
+	// CurrLock is what project is currently holding the lock.
+	EnqueueStatus *models.EnqueueStatus
 	// LockKey is an identified by which to lookup and delete this lock.
 	LockKey string
 }
@@ -64,9 +69,10 @@ type Client struct {
 
 type Locker interface {
 	TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error)
-	Unlock(key string) (*models.ProjectLock, error)
+	Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error)
 	List() (map[string]models.ProjectLock, error)
-	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
+	GetQueueByLock(project models.Project, workspace string) (models.ProjectLockQueue, error)
+	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, *models.DequeueStatus, error)
 	GetLock(key string) (*models.ProjectLock, error)
 }
 
@@ -89,21 +95,22 @@ func (c *Client) TryLock(p models.Project, workspace string, pull models.PullReq
 		User:      user,
 		Pull:      pull,
 	}
-	lockAcquired, currLock, err := c.backend.TryLock(lock)
+	lockAcquired, currLock, enqueueStatus, err := c.backend.TryLock(lock)
 	if err != nil {
 		return TryLockResponse{}, err
 	}
-	return TryLockResponse{lockAcquired, currLock, c.key(p, workspace)}, nil
+	return TryLockResponse{lockAcquired, currLock, enqueueStatus, c.key(p, workspace)}, nil
 }
 
 // Unlock attempts to unlock a project and workspace. If successful,
-// a pointer to the now deleted lock will be returned. Else, that
-// pointer will be nil. An error will only be returned if there was
-// an error deleting the lock (i.e. not if there was no lock).
-func (c *Client) Unlock(key string) (*models.ProjectLock, error) {
+// a pointer to the now deleted lock will be returned, as well as a pointer
+// to the next dequeued lock from the queue (if any). Else, both
+// pointers will be nil. An error will only be returned if there was
+// an error deleting the lock or dequeuing (i.e. not if there was no lock).
+func (c *Client) Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error) {
 	project, workspace, err := c.lockKeyToProjectWorkspace(key)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	return c.backend.Unlock(project, workspace)
 }
@@ -122,8 +129,13 @@ func (c *Client) List() (map[string]models.ProjectLock, error) {
 	return m, nil
 }
 
+func (c *Client) GetQueueByLock(project models.Project, workspace string) (models.ProjectLockQueue, error) {
+	return c.backend.GetQueueByLock(project, workspace)
+}
+
+// TODO(Ghais) extend the tests
 // UnlockByPull deletes all locks associated with that pull request.
-func (c *Client) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+func (c *Client) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, *models.DequeueStatus, error) {
 	return c.backend.UnlockByPull(repoFullName, pullNum)
 }
 
@@ -167,15 +179,15 @@ func NewNoOpLocker() *NoOpLocker {
 
 // TryLock attempts to acquire a lock to a project and workspace.
 func (c *NoOpLocker) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error) {
-	return TryLockResponse{true, models.ProjectLock{}, c.key(p, workspace)}, nil
+	return TryLockResponse{true, models.ProjectLock{}, nil, c.key(p, workspace)}, nil
 }
 
 // Unlock attempts to unlock a project and workspace. If successful,
-// a pointer to the now deleted lock will be returned. Else, that
-// pointer will be nil. An error will only be returned if there was
+// pointers to the now deleted lock and the next dequeued lock (optional) will be returned.
+// Else, both pointers will be nil. An error will only be returned if there was
 // an error deleting the lock (i.e. not if there was no lock).
-func (c *NoOpLocker) Unlock(key string) (*models.ProjectLock, error) {
-	return &models.ProjectLock{}, nil
+func (c *NoOpLocker) Unlock(string) (*models.ProjectLock, *models.ProjectLock, error) {
+	return &models.ProjectLock{}, &models.ProjectLock{}, nil
 }
 
 // List returns a map of all locks with their lock key as the map key.
@@ -185,9 +197,14 @@ func (c *NoOpLocker) List() (map[string]models.ProjectLock, error) {
 	return m, nil
 }
 
+func (c *NoOpLocker) GetQueueByLock(models.Project, string) (models.ProjectLockQueue, error) {
+	m := make(models.ProjectLockQueue, 0)
+	return m, nil
+}
+
 // UnlockByPull deletes all locks associated with that pull request.
-func (c *NoOpLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
-	return []models.ProjectLock{}, nil
+func (c *NoOpLocker) UnlockByPull(_ string, _ int) ([]models.ProjectLock, *models.DequeueStatus, error) {
+	return []models.ProjectLock{}, nil, nil
 }
 
 // GetLock attempts to get the lock stored at key. If successful,
