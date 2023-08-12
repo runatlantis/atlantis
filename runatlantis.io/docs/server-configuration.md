@@ -701,6 +701,14 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
 
+### `--queue-enabled`
+  ```bash
+  atlantis server --queue-enabled
+  # or
+  ATLANTIS_QUEUE_ENABLED=true
+  ```
+  Enable lock queue. Defaults to `false`. 
+
 ### `--redis-host`
   ```bash
   atlantis server --redis-host="localhost"

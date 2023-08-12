@@ -92,7 +92,7 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0) // nolint: errcheck
+	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0, true) // nolint: errcheck
 	if result.HasErrors() {
 		code = http.StatusInternalServerError
 	}
@@ -121,7 +121,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0) // nolint: errcheck
+	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, 0, true) // nolint: errcheck
 
 	// We can now prepare and run the apply step
 	result, err := a.apiApply(request, ctx)

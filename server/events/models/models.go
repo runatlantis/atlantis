@@ -660,3 +660,47 @@ func NewPlanSuccessStats(output string) PlanSuccessStats {
 
 	return s
 }
+
+type ProjectLockQueue []ProjectLock
+
+func (q ProjectLockQueue) FindPullRequest(pullRequestNumber int) int {
+	for i := range q {
+		if q[i].Pull.Num == pullRequestNumber {
+			return i
+		}
+	}
+	return -1
+}
+
+// Dequeue dequeues the next item and returns the dequeued lock and the new queue.
+// if the queue is empty, returns nil and the current queue
+func (q ProjectLockQueue) Dequeue() (*ProjectLock, ProjectLockQueue) {
+	if len(q) == 0 {
+		return nil, q
+	}
+	dequeuedLock := &q[0]
+	newQueue := q[1:]
+	return dequeuedLock, newQueue
+}
+
+type EnqueueStatusType int
+
+const (
+	// Enqueued means the ProjectLock entered the queue
+	Enqueued EnqueueStatusType = iota
+
+	// AlreadyInTheQueue means the ProjectLock is already in the queue
+	AlreadyInTheQueue
+)
+
+type EnqueueStatus struct {
+	// Status is the status of the enqueue operation
+	Status EnqueueStatusType
+	// QueueDepth tells how many PRs are in line before the current one
+	QueueDepth int
+}
+
+type DequeueStatus struct {
+	// the PR's lock that should be planned next
+	ProjectLocks []ProjectLock
+}

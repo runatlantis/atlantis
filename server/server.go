@@ -435,13 +435,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
 		logger.Info("Utilizing Redis DB")
-		backend, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
+		backend, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB, userConfig.QueueEnabled)
 		if err != nil {
 			return nil, err
 		}
 	case "boltdb":
 		logger.Info("Utilizing BoltDB")
-		backend, err = db.New(userConfig.DataDir)
+		backend, err = db.New(userConfig.DataDir, userConfig.QueueEnabled)
 		if err != nil {
 			return nil, err
 		}
@@ -1032,6 +1032,8 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	var lockResults []templates.LockIndexData
 	for id, v := range locks {
 		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
+		queue, _ := s.Locker.GetQueueByLock(v.Project, v.Workspace)
+		queueIndexDataList := controllers.GetQueueItemIndexData(queue)
 		lockResults = append(lockResults, templates.LockIndexData{
 			// NOTE: must use .String() instead of .Path because we need the
 			// query params as part of the lock URL.
@@ -1043,6 +1045,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			Workspace:     v.Workspace,
 			Time:          v.Time,
 			TimeFormatted: v.Time.Format("02-01-2006 15:04:05"),
+			Queue:         queueIndexDataList,
 		})
 	}
 

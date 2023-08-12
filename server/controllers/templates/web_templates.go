@@ -39,6 +39,19 @@ type LockIndexData struct {
 	LockedBy      string
 	Time          time.Time
 	TimeFormatted string
+	Queue         []QueueItemIndexData
+}
+
+type QueueItemIndexData struct {
+	LockPath      string
+	RepoFullName  string
+	PullNum       int
+	Path          string
+	Workspace     string
+	Time          time.Time
+	TimeFormatted string
+	PullURL       string
+	Author        string
 }
 
 // ApplyLockData holds the fields to display in the index view
@@ -123,6 +136,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
       <span>Locked By</span>
       <span>Date/Time</span>
       <span>Status</span>
+      <span>Queue</span>
     </div>
     {{ range .Locks }}
         <div class="lock-row">
@@ -143,6 +157,9 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
           <span><code>Locked</code></span>
+        </a>
+        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          {{ len .Queue }}
         </a>
         </div>
     {{ end }}
@@ -275,6 +292,7 @@ type LockDetailData struct {
 	// not using a path-based proxy, this will be an empty string. Never ends
 	// in a '/' (hence "cleaned").
 	CleanedBasePath string
+	Queue           []QueueItemIndexData
 }
 
 var LockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
@@ -308,6 +326,18 @@ var LockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
         <div><strong>Pull Request Link:</strong></div><div><a href="{{.PullRequestLink}}" target="_blank">{{.PullRequestLink}}</a></div>
         <div><strong>Locked By:</strong></div><div>{{.LockedBy}}</div>
         <div><strong>Workspace:</strong></div><div>{{.Workspace}}</div>
+        {{ if .Queue }}
+		<div><strong>Queue:</strong></div>
+		<div>
+            {{ range .Queue }}
+			<div class="lock-detail-grid">
+				<div><strong>Pull Request Link:</strong></div><div><a href="{{.PullURL}}">{{.PullURL}}</a></div>
+				<div><strong>Author</strong></div><div>{{.Author}}</div>
+				<div><strong>Time:</strong></div><div>{{.TimeFormatted}}</div>
+			</div>
+			{{ end }}
+		</div>
+        {{ end }}
       </div>
       <br>
         <a class="button button-primary" id="discardPlanUnlock">Discard Plan & Unlock</a>

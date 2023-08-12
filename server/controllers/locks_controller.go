@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 
@@ -77,6 +78,10 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// get queues locks for this lock details page
+	var queue models.ProjectLockQueue
+	queue, _ = l.Locker.GetQueueByLock(lock.Project, lock.Workspace)
+	lockDetailQueue := GetQueueItemIndexData(queue)
 	owner, repo := models.SplitRepoFullName(lock.Project.RepoFullName)
 	viewData := templates.LockDetailData{
 		LockKeyEncoded:  id,
@@ -88,6 +93,7 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		CleanedBasePath: l.AtlantisURL.Path,
 		RepoOwner:       owner,
 		RepoName:        repo,
+		Queue:           lockDetailQueue,
 	}
 
 	err = l.LockDetailTemplate.Execute(w, viewData)
@@ -111,7 +117,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lock, err := l.DeleteLockCommand.DeleteLock(idUnencoded)
+	lock, dequeuedLock, err := l.DeleteLockCommand.DeleteLock(idUnencoded)
 	if err != nil {
 		l.respond(w, logging.Error, http.StatusInternalServerError, "deleting lock failed with: %s", err)
 		return
@@ -136,6 +142,10 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		if err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
 			l.Logger.Warn("failed commenting on pull request: %s", err)
 		}
+		if dequeuedLock != nil {
+			l.Logger.Warn("dequeued lock: %s", dequeuedLock)
+			l.commentOnDequeuedPullRequests(*dequeuedLock)
+		}
 	} else {
 		l.Logger.Debug("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
 	}
@@ -149,4 +159,43 @@ func (l *LocksController) respond(w http.ResponseWriter, lvl logging.LogLevel, r
 	l.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)
 	fmt.Fprintln(w, response)
+}
+
+func (l *LocksController) commentOnDequeuedPullRequests(dequeuedLock models.ProjectLock) {
+	planVcsMessage := buildCommentOnDequeuedPullRequest([]models.ProjectLock{dequeuedLock})
+	if commentErr := l.VCSClient.CreateComment(dequeuedLock.Pull.BaseRepo, dequeuedLock.Pull.Num, planVcsMessage, ""); commentErr != nil {
+		l.Logger.Err("unable to comment on PR %d: %s", dequeuedLock.Pull.Num, commentErr)
+	}
+}
+
+func buildCommentOnDequeuedPullRequest(projectLocks []models.ProjectLock) string {
+	var releasedLocksMessages []string
+	for _, lock := range projectLocks {
+		releasedLocksMessages = append(releasedLocksMessages, fmt.Sprintf("* dir: `%s` workspace: `%s`", lock.Project.Path, lock.Workspace))
+	}
+
+	// stick to the first User for now, if needed, create a list of unique users and mention them all
+	lockCreatorMention := "@" + projectLocks[0].User.Username
+	releasedLocksMessage := strings.Join(releasedLocksMessages, "\n")
+
+	return fmt.Sprintf("%s\nThe following locks have been aquired by this PR and can now be planned:\n%s",
+		lockCreatorMention, releasedLocksMessage)
+}
+
+func GetQueueItemIndexData(q models.ProjectLockQueue) []templates.QueueItemIndexData {
+	var queueIndexDataList []templates.QueueItemIndexData
+	for _, projectLock := range q {
+		queueIndexDataList = append(queueIndexDataList, templates.QueueItemIndexData{
+			LockPath:      "Not yet acquired",
+			RepoFullName:  projectLock.Project.RepoFullName,
+			PullNum:       projectLock.Pull.Num,
+			Path:          projectLock.Project.Path,
+			Workspace:     projectLock.Workspace,
+			Time:          projectLock.Time,
+			TimeFormatted: projectLock.Time.Format("02-01-2006 15:04:05"),
+			PullURL:       projectLock.Pull.URL,
+			Author:        projectLock.Pull.Author,
+		})
+	}
+	return queueIndexDataList
 }
