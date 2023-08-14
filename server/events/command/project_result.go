@@ -57,6 +57,8 @@ func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 			return models.ErroredPlanStatus
 		} else if p.Failure != "" {
 			return models.ErroredPlanStatus
+		} else if p.PlanSuccess.NoChanges() {
+			return models.PlannedNoChangesPlanStatus
 		}
 		return models.PlannedPlanStatus
 	case PolicyCheck, ApprovePolicies:

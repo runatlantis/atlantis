@@ -199,7 +199,7 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 	var numErrored int
 	status := models.SuccessCommitStatus
 
-	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus)
+	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
 	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
 	if numErrored > 0 {

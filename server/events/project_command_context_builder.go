@@ -194,7 +194,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		terraformClient,
 	)
 
-	if cmdName == command.Plan && prjCfg.PolicyCheck != false {
+	if cmdName == command.Plan && prjCfg.PolicyCheck {
 		ctx.Log.Debug("Building project command context for %s", command.PolicyCheck)
 		steps := prjCfg.Workflow.PolicyCheck.Steps
 

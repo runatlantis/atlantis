@@ -224,7 +224,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 		// If any of the modified files matches the pattern then this project is
 		// considered modified.
 		for _, file := range modifiedFiles {
-			match, err := pm.Matches(file)
+			match, err := pm.MatchesOrParentMatches(file)
 			if err != nil {
 				log.Debug("match err for file %q: %s", file, err)
 				continue
@@ -266,7 +266,7 @@ func (p *DefaultProjectFinder) filterToFileList(log logging.SimpleLogging, files
 		if p.shouldIgnore(fileName) {
 			continue
 		}
-		match, err := patternMatcher.Matches(fileName)
+		match, err := patternMatcher.MatchesOrParentMatches(fileName)
 		if err != nil {
 			log.Debug("filter err for file %q: %s", fileName, err)
 			continue
