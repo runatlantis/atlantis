@@ -1,0 +1,69 @@
+name: website
+
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - '**.js'
+      - 'yarn.lock'
+      - 'package.json'
+      - '.github/workflows/website.yml'
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    branches:
+      - "main"
+    paths:
+      - '**.js'
+      - 'yarn.lock'
+      - 'package.json'
+      - '.github/workflows/website.yml'
+ 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # Check that the website builds and there's no missing links.
+  # This job builds the website, starts a server to serve it, and then uses
+  # muffet (https://github.com/raviqqe/muffet) to perform the link check.
+  link_check:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+
+      - name: run http-server
+        env:
+          # renovate: datasource=github-releases depName=raviqqe/muffet
+          MUFFET_VERSION: 2.6.3
+        run: |
+          npm install -g yarn
+          # http-server is used to serve the website locally as muffet checks it.
+          yarn global add http-server
+          # install raviqqe/muffet to check for broken links.
+          curl -L https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_${MUFFET_VERSION}_Linux_x86_64.tar.gz | tar -xz
+          yarn install
+          yarn website:build
+          http-server runatlantis.io/.vuepress/dist &
+
+      - name: wait until server listened
+        run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
+
+      # medium.com => was being rate limited: HTTP 429
+      - run: |
+          ./muffet \
+            -e 'https://medium.com/runatlantis' \
+            -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
+            -e 'https://github.com/runatlantis/helm-charts#customization' \
+            --header 'Accept-Encoding:deflate, gzip' \
+            --buffer-size 8192 \
+            http://localhost:8080/

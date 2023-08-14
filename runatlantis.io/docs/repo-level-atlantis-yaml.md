@@ -72,6 +72,9 @@ workflows:
     plan:
       steps:
       - run: my-custom-command arg1 arg2
+      - run:
+          command: my-custom-command arg1 arg2
+          output: hide
       - init
       - plan:
           extra_args: ["-lock", "false"]
@@ -341,7 +344,7 @@ Atlantis supports this but requires the `name` key to be specified. See [Custom 
 ### Autoplan
 ```yaml
 enabled: true
-when_modified: ["*.tf", "terragrunt.hcl"]
+when_modified: ["*.tf", "terragrunt.hcl", ".terraform.lock.hcl"]
 ```
 | Key                   | Type          | Default        | Required | Description                                                                                                                                                                                                                                                       |
 |-----------------------|---------------|----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

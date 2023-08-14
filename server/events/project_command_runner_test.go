@@ -64,7 +64,6 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
-		Any[logging.SimpleLogging](),
 		Any[models.Repo](),
 		Any[models.PullRequest](),
 		Any[string](),
@@ -112,7 +111,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 	When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-	When(mockRun.Run(ctx, "", repoDir, expEnvs, true)).ThenReturn("run", nil)
+	When(mockRun.Run(ctx, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
@@ -128,7 +127,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		case "apply":
 			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 		case "run":
-			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs, true)
+			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs, true, "")
 		}
 	}
 }
@@ -318,7 +317,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	}
 	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
-	When(mockWorkingDir.HasDiverged(log, tmp)).ThenReturn(true)
+	When(mockWorkingDir.HasDiverged(tmp)).ThenReturn(true)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
@@ -457,7 +456,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 			When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, "", repoDir, expEnvs, true)).ThenReturn("run", nil)
+			When(mockRun.Run(ctx, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
 			When(mockEnv.Run(ctx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
 
 			res := runner.Apply(ctx)
@@ -473,7 +472,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				case "apply":
 					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs, true)
+					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs, true, "")
 				case "env":
 					mockEnv.VerifyWasCalledOnce().Run(ctx, "", "value", repoDir, expEnvs)
 				}
@@ -562,7 +561,6 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(
-		Any[logging.SimpleLogging](),
 		Any[models.Repo](),
 		Any[models.PullRequest](),
 		Any[string](),
@@ -717,7 +715,6 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			}
 			repoDir := t.TempDir()
 			When(mockWorkingDir.Clone(
-				Any[logging.SimpleLogging](),
 				Any[models.Repo](),
 				Any[models.PullRequest](),
 				Any[string](),

@@ -1,0 +1,29 @@
+Ran Policy Check for dir: `.` workspace: `default`
+
+**Policy Check Failed**: Some policy sets did not pass.
+#### Policy Set: `test_policy`
+```diff
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions
+
+```
+
+
+#### Policy Approval Status:
+```
+policy set: test_policy: requires: 1 approval(s), have: 0.
+```
+* :heavy_check_mark: To **approve** this project, comment:
+    * `atlantis approve_policies -d .`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * `atlantis plan -d .`
+
+---
+* :heavy_check_mark: To **approve** all unapplied plans from this pull request, comment:
+    * `atlantis approve_policies`
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * `atlantis unlock`
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * `atlantis plan`

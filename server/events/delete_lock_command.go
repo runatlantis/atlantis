@@ -33,7 +33,15 @@ func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, e
 		return nil, nil
 	}
 
-	l.deleteWorkingDir(*lock)
+	// The locks controller currently has no implementation of Atlantis project names, so this is hardcoded to an empty string.
+	projectName := ""
+
+	removeErr := l.WorkingDir.DeletePlan(lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, projectName)
+	if removeErr != nil {
+		l.Logger.Warn("Failed to delete plan: %s", removeErr)
+		return nil, removeErr
+	}
+
 	return lock, nil
 }
 

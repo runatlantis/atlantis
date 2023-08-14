@@ -66,7 +66,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 	log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := w.WorkingDir.Clone(log, headRepo, pull, DefaultWorkspace)
+	repoDir, _, err := w.WorkingDir.Clone(headRepo, pull, DefaultWorkspace)
 	if err != nil {
 		return err
 	}
@@ -85,6 +85,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 			User:               user,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
+			CommandName:        cmd.Name.String(),
 		},
 		postWorkflowHooks, repoDir)
 
@@ -108,6 +109,16 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 		}
 
 		ctx.HookID = uuid.NewString()
+		shell := hook.Shell
+		if shell == "" {
+			ctx.Log.Debug("Setting shell to default: %q", shell)
+			shell = "sh"
+		}
+		shellArgs := hook.ShellArgs
+		if shellArgs == "" {
+			ctx.Log.Debug("Setting shellArgs to default: %q", shellArgs)
+			shellArgs = "-c"
+		}
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
 		if err != nil {
 			return err
@@ -117,7 +128,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 			ctx.Log.Warn("unable to update post workflow hook status: %s", err)
 		}
 
-		_, runtimeDesc, err := w.PostWorkflowHookRunner.Run(ctx, hook.RunCommand, repoDir)
+		_, runtimeDesc, err := w.PostWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
 
 		if err != nil {
 			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Pull, models.FailedCommitStatus, hookDescription, runtimeDesc, url); err != nil {

@@ -698,16 +698,17 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
-	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{
 			{
-				CommandName: command.Plan,
+				CommandName:      command.Plan,
+				AutomergeEnabled: true, // Setting this manually, since this tests bypasses automerge param reconciliation logic and otherwise defaults to false.
 			},
 			{
-				CommandName: command.Plan,
+				CommandName:      command.Plan,
+				AutomergeEnabled: true, // Setting this manually, since this tests bypasses automerge param reconciliation logic and otherwise defaults to false.
 			},
 		}, nil)
 	callCount := 0

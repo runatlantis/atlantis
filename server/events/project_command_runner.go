@@ -14,12 +14,11 @@
 package events
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"encoding/json"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -66,7 +65,7 @@ type StepRunner interface {
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool) (string, error)
+	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
@@ -546,7 +545,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 
 	p.WorkingDir.SetSafeToReClone()
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -654,7 +653,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 
 func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out *models.ImportSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}
@@ -700,7 +699,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 
 func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out *models.StateRmSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}
@@ -764,7 +763,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs, true)
+			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs, true, step.Output)
 		case "env":
 			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out

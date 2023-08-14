@@ -638,9 +638,11 @@ func TestGitHubWorkflow(t *testing.T) {
 				expNumHooks = len(c.Comments) + 1 - c.ExpParseFailedCount
 			}
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](), Eq("some dummy command"), Any[string]())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](),
+				Eq("some dummy command"), Any[string](), Any[string](), Any[string]())
 			// Let's verify the post-workflow hook was called for each comment including the pull request opened event
-			mockPostWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](), Eq("some post dummy command"), Any[string]())
+			mockPostWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](),
+				Eq("some post dummy command"), Any[string](), Any[string](), Any[string]())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -822,7 +824,8 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 			}
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(Any[models.WorkflowHookCommandContext](), Eq("some dummy command"), Any[string]())
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(2)).Run(Any[models.WorkflowHookCommandContext](),
+				Eq("some dummy command"), Any[string](), Any[string](), Any[string]())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -856,10 +859,14 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		ModifiedFiles []string
 		// Comments are what our mock user writes to the pull request.
 		Comments []string
+		// PolicyCheck is true if we expect Atlantis to run policy checking
+		PolicyCheck bool
 		// ExpAutomerge is true if we expect Atlantis to automerge.
 		ExpAutomerge bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
 		ExpAutoplan bool
+		// ExpPolicyChecks is true if we expect Atlantis to execute policy checks
+		ExpPolicyChecks bool
 		// ExpQuietPolicyChecks is true if we expect Atlantis to exclude policy check output
 		// when there's no error
 		ExpQuietPolicyChecks bool
@@ -874,10 +881,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		ExpReplies [][]string
 	}{
 		{
-			Description:   "1 failing policy and 1 passing policy ",
-			RepoDir:       "policy-checks-multi-projects",
-			ModifiedFiles: []string{"dir1/main.tf,", "dir2/main.tf"},
-			ExpAutoplan:   true,
+			Description:     "1 failing policy and 1 passing policy ",
+			RepoDir:         "policy-checks-multi-projects",
+			ModifiedFiles:   []string{"dir1/main.tf,", "dir2/main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
 			Comments: []string{
 				"atlantis apply",
 			},
@@ -889,10 +898,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			},
 		},
 		{
-			Description:   "failing policy without policies passing using extra args",
-			RepoDir:       "policy-checks-extra-args",
-			ModifiedFiles: []string{"main.tf"},
-			ExpAutoplan:   true,
+			Description:     "failing policy without policies passing using extra args",
+			RepoDir:         "policy-checks-extra-args",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
 			Comments: []string{
 				"atlantis apply",
 			},
@@ -904,10 +915,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			},
 		},
 		{
-			Description:   "failing policy without policies passing",
-			RepoDir:       "policy-checks",
-			ModifiedFiles: []string{"main.tf"},
-			ExpAutoplan:   true,
+			Description:     "failing policy without policies passing",
+			RepoDir:         "policy-checks",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
 			Comments: []string{
 				"atlantis apply",
 			},
@@ -919,10 +932,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			},
 		},
 		{
-			Description:   "failing policy without policies passing and custom run steps",
-			RepoDir:       "policy-checks-custom-run-steps",
-			ModifiedFiles: []string{"main.tf"},
-			ExpAutoplan:   true,
+			Description:     "failing policy without policies passing and custom run steps",
+			RepoDir:         "policy-checks-custom-run-steps",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
 			Comments: []string{
 				"atlantis apply",
 			},
@@ -934,10 +949,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			},
 		},
 		{
-			Description:   "failing policy additional apply requirements specified",
-			RepoDir:       "policy-checks-apply-reqs",
-			ModifiedFiles: []string{"main.tf"},
-			ExpAutoplan:   true,
+			Description:     "failing policy additional apply requirements specified",
+			RepoDir:         "policy-checks-apply-reqs",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
 			Comments: []string{
 				"atlantis apply",
 			},
@@ -949,10 +966,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			},
 		},
 		{
-			Description:   "failing policy approved by non owner",
-			RepoDir:       "policy-checks-diff-owner",
-			ModifiedFiles: []string{"main.tf"},
-			ExpAutoplan:   true,
+			Description:     "failing policy approved by non owner",
+			RepoDir:         "policy-checks-diff-owner",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
 			Comments: []string{
 				"atlantis approve_policies",
 				"atlantis apply",
@@ -969,7 +988,9 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			Description:          "successful policy checks with quiet flag enabled",
 			RepoDir:              "policy-checks-success-silent",
 			ModifiedFiles:        []string{"main.tf"},
+			PolicyCheck:          true,
 			ExpAutoplan:          true,
+			ExpPolicyChecks:      true,
 			ExpQuietPolicyChecks: true,
 			Comments: []string{
 				"atlantis apply",
@@ -984,7 +1005,9 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			Description:                "failing policy checks with quiet flag enabled",
 			RepoDir:                    "policy-checks",
 			ModifiedFiles:              []string{"main.tf"},
+			PolicyCheck:                true,
 			ExpAutoplan:                true,
+			ExpPolicyChecks:            true,
 			ExpQuietPolicyChecks:       true,
 			ExpQuietPolicyCheckFailure: true,
 			Comments: []string{
@@ -998,10 +1021,12 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			},
 		},
 		{
-			Description:   "failing policy with approval and policy approval clear",
-			RepoDir:       "policy-checks-clear-approval",
-			ModifiedFiles: []string{"main.tf"},
-			ExpAutoplan:   true,
+			Description:     "failing policy with approval and policy approval clear",
+			RepoDir:         "policy-checks-clear-approval",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
 			Comments: []string{
 				"atlantis approve_policies",
 				"atlantis approve_policies --clear-policy-approval",
@@ -1016,6 +1041,86 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:     "policy checking disabled on specific repo",
+			RepoDir:         "policy-checks-disabled-repo",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: false,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:     "policy checking disabled on specific repo server side",
+			RepoDir:         "policy-checks-disabled-repo-server-side",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: false,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:     "policy checking enabled on specific repo but disabled globally",
+			RepoDir:         "policy-checks-enabled-repo",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     false,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: false,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:     "policy checking enabled on specific repo server side but disabled globally",
+			RepoDir:         "policy-checks-enabled-repo-server-side",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     false,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: false,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:     "policy checking disabled on previous regex match but not on repo",
+			RepoDir:         "policy-checks-disabled-previous-match",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: false,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1024,7 +1129,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			// reset userConfig
 			userConfig = server.UserConfig{}
-			userConfig.EnablePolicyChecksFlag = true
+			userConfig.EnablePolicyChecksFlag = c.PolicyCheck
 			userConfig.QuietPolicyChecks = c.ExpQuietPolicyChecks
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, setupOption{})
@@ -1088,7 +1193,11 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				expNumReplies--
 			}
 
+			if !c.ExpPolicyChecks {
+				expNumReplies--
+			}
 			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
+
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)
@@ -1158,6 +1267,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		TestingOverrideHeadCloneURL: "override-me",
+		Logger:                      logger,
 	}
 
 	defaultTFVersion := terraformClient.DefaultVersion()
@@ -1233,6 +1343,9 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		globalCfg,
 		&events.DefaultPendingPlanFinder{},
 		commentParser,
+		false,
+		false,
+		false,
 		false,
 		false,
 		"",
