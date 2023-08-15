@@ -31,10 +31,10 @@ import (
 // Backend is an implementation of the locking API we require.
 type Backend interface {
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, *models.EnqueueStatus, error)
-	Unlock(project models.Project, workspace string, updateQueue bool) (*models.ProjectLock, *models.ProjectLock, error)
+	Unlock(project models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error)
 	List() ([]models.ProjectLock, error)
 	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
-	UnlockByPull(repoFullName string, pullNum int, updateQueue bool) ([]models.ProjectLock, *models.DequeueStatus, error)
+	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, *models.DequeueStatus, error)
 
 	GetQueueByLock(project models.Project, workspace string) (models.ProjectLockQueue, error)
 
@@ -69,10 +69,10 @@ type Client struct {
 
 type Locker interface {
 	TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error)
-	Unlock(key string, updateQueue bool) (*models.ProjectLock, *models.ProjectLock, error)
+	Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error)
 	List() (map[string]models.ProjectLock, error)
 	GetQueueByLock(project models.Project, workspace string) (models.ProjectLockQueue, error)
-	UnlockByPull(repoFullName string, pullNum int, updateQueue bool) ([]models.ProjectLock, *models.DequeueStatus, error)
+	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, *models.DequeueStatus, error)
 	GetLock(key string) (*models.ProjectLock, error)
 }
 
@@ -107,12 +107,12 @@ func (c *Client) TryLock(p models.Project, workspace string, pull models.PullReq
 // to the next dequeued lock from the queue (if any). Else, both
 // pointers will be nil. An error will only be returned if there was
 // an error deleting the lock or dequeuing (i.e. not if there was no lock).
-func (c *Client) Unlock(key string, updateQueue bool) (*models.ProjectLock, *models.ProjectLock, error) {
+func (c *Client) Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error) {
 	project, workspace, err := c.lockKeyToProjectWorkspace(key)
 	if err != nil {
 		return nil, nil, err
 	}
-	return c.backend.Unlock(project, workspace, updateQueue)
+	return c.backend.Unlock(project, workspace)
 }
 
 // List returns a map of all locks with their lock key as the map key.
@@ -135,8 +135,8 @@ func (c *Client) GetQueueByLock(project models.Project, workspace string) (model
 
 // TODO(Ghais) extend the tests
 // UnlockByPull deletes all locks associated with that pull request.
-func (c *Client) UnlockByPull(repoFullName string, pullNum int, updateQueue bool) ([]models.ProjectLock, *models.DequeueStatus, error) {
-	return c.backend.UnlockByPull(repoFullName, pullNum, updateQueue)
+func (c *Client) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, *models.DequeueStatus, error) {
+	return c.backend.UnlockByPull(repoFullName, pullNum)
 }
 
 // GetLock attempts to get the lock stored at key. If successful,
@@ -186,7 +186,7 @@ func (c *NoOpLocker) TryLock(p models.Project, workspace string, pull models.Pul
 // pointers to the now deleted lock and the next dequeued lock (optional) will be returned.
 // Else, both pointers will be nil. An error will only be returned if there was
 // an error deleting the lock (i.e. not if there was no lock).
-func (c *NoOpLocker) Unlock(string, bool) (*models.ProjectLock, *models.ProjectLock, error) {
+func (c *NoOpLocker) Unlock(string) (*models.ProjectLock, *models.ProjectLock, error) {
 	return &models.ProjectLock{}, &models.ProjectLock{}, nil
 }
 
@@ -203,7 +203,7 @@ func (c *NoOpLocker) GetQueueByLock(models.Project, string) (models.ProjectLockQ
 }
 
 // UnlockByPull deletes all locks associated with that pull request.
-func (c *NoOpLocker) UnlockByPull(_ string, _ int, _ bool) ([]models.ProjectLock, *models.DequeueStatus, error) {
+func (c *NoOpLocker) UnlockByPull(_ string, _ int) ([]models.ProjectLock, *models.DequeueStatus, error) {
 	return []models.ProjectLock{}, nil, nil
 }
 

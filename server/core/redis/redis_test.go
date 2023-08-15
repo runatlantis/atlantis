@@ -297,7 +297,7 @@ func TestListAddRemove(t *testing.T) {
 	rdb := newTestRedis(s)
 	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
-	_, _, err = rdb.Unlock(project, workspace, true)
+	_, _, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
 	ls, err := rdb.List()
@@ -367,7 +367,7 @@ func TestUnlockingNoLocks(t *testing.T) {
 	t.Log("unlocking with no locks should succeed")
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
-	_, _, err := rdb.Unlock(project, workspace, true)
+	_, _, err := rdb.Unlock(project, workspace)
 
 	Ok(t, err)
 }
@@ -379,7 +379,7 @@ func TestUnlocking(t *testing.T) {
 
 	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
-	_, _, err = rdb.Unlock(project, workspace, true)
+	_, _, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
 	// should be no locks listed
@@ -420,13 +420,13 @@ func TestUnlockingMultiple(t *testing.T) {
 	Ok(t, err)
 
 	// now try and unlock them
-	_, _, err = rdb.Unlock(new3.Project, new3.Workspace, true)
+	_, _, err = rdb.Unlock(new3.Project, new3.Workspace)
 	Ok(t, err)
-	_, _, err = rdb.Unlock(new2.Project, workspace, true)
+	_, _, err = rdb.Unlock(new2.Project, workspace)
 	Ok(t, err)
-	_, _, err = rdb.Unlock(new.Project, workspace, true)
+	_, _, err = rdb.Unlock(new.Project, workspace)
 	Ok(t, err)
-	_, _, err = rdb.Unlock(project, workspace, true)
+	_, _, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
 	// should be none left
@@ -440,7 +440,7 @@ func TestUnlockByPullNone(t *testing.T) {
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
 
-	_, _, err := rdb.UnlockByPull("any/repo", 1, true)
+	_, _, err := rdb.UnlockByPull("any/repo", 1)
 	Ok(t, err)
 }
 
@@ -453,7 +453,7 @@ func TestUnlockByPullOne(t *testing.T) {
 
 	t.Log("...delete nothing when its the same repo but a different pull")
 	{
-		_, _, err := rdb.UnlockByPull(project.RepoFullName, pullNum+1, true)
+		_, _, err := rdb.UnlockByPull(project.RepoFullName, pullNum+1)
 		Ok(t, err)
 		ls, err := rdb.List()
 		Ok(t, err)
@@ -461,7 +461,7 @@ func TestUnlockByPullOne(t *testing.T) {
 	}
 	t.Log("...delete nothing when its the same pull but a different repo")
 	{
-		_, _, err := rdb.UnlockByPull("different/repo", pullNum, true)
+		_, _, err := rdb.UnlockByPull("different/repo", pullNum)
 		Ok(t, err)
 		ls, err := rdb.List()
 		Ok(t, err)
@@ -469,7 +469,7 @@ func TestUnlockByPullOne(t *testing.T) {
 	}
 	t.Log("...delete the lock when its the same repo and pull")
 	{
-		_, _, err := rdb.UnlockByPull(project.RepoFullName, pullNum, true)
+		_, _, err := rdb.UnlockByPull(project.RepoFullName, pullNum)
 		Ok(t, err)
 		ls, err := rdb.List()
 		Ok(t, err)
@@ -483,10 +483,10 @@ func TestUnlockByPullAfterUnlock(t *testing.T) {
 	rdb := newTestRedis(s)
 	_, _, _, err := rdb.TryLock(lock)
 	Ok(t, err)
-	_, _, err = rdb.Unlock(project, workspace, true)
+	_, _, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
-	_, _, err = rdb.UnlockByPull(project.RepoFullName, pullNum, true)
+	_, _, err = rdb.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
 	ls, err := rdb.List()
 	Ok(t, err)
@@ -516,7 +516,7 @@ func TestUnlockByPullMatching(t *testing.T) {
 	Equals(t, 3, len(ls))
 
 	// should all be unlocked
-	_, _, err = rdb.UnlockByPull(project.RepoFullName, pullNum, true)
+	_, _, err = rdb.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
 	ls, err = rdb.List()
 	Ok(t, err)
@@ -529,67 +529,57 @@ func TestDequeueAfterUnlock(t *testing.T) {
 	r := newTestRedisQueue(s)
 
 	// first lock acquired
-	_, _, _, err := r.TryLock(lock)
+	firstLock := lock
+	_, _, _, err := r.TryLock(firstLock)
 	Ok(t, err)
 
 	// second lock enqueued
-	new := lock
-	new.Pull.Num = pullNum + 1
-	_, _, _, err = r.TryLock(new)
+	secondLock := firstLock
+	secondLock.Pull.Num = pullNum + 1
+	_, _, _, err = r.TryLock(secondLock)
 	Ok(t, err)
 
 	// third lock enqueued
-	new2 := lock
-	new2.Pull.Num = pullNum + 2
-	_, _, _, err = r.TryLock(new2)
+	thirdLock := firstLock
+	thirdLock.Pull.Num = pullNum + 2
+	_, _, _, err = r.TryLock(thirdLock)
 	Ok(t, err)
-	queue, err := r.GetQueueByLock(lock.Project, lock.Workspace)
+	queue, err := r.GetQueueByLock(firstLock.Project, firstLock.Workspace)
 	Ok(t, err)
 	Equals(t, 2, len(queue))
-	Equals(t, new.Pull, queue[0].Pull)
-	Equals(t, new2.Pull, queue[1].Pull)
+	Equals(t, secondLock.Pull, queue[0].Pull)
+	Equals(t, thirdLock.Pull, queue[1].Pull)
 
 	// first lock unlocked -> second lock dequeued and lock acquired
-	_, dequeuedLock, err := r.Unlock(lock.Project, lock.Workspace, true)
+	_, dequeuedLock, err := r.Unlock(firstLock.Project, firstLock.Workspace)
 	Ok(t, err)
-	queue, err = r.GetQueueByLock(lock.Project, lock.Workspace)
+	queue, err = r.GetQueueByLock(firstLock.Project, firstLock.Workspace)
 	Ok(t, err)
-	Equals(t, new, *dequeuedLock)
+	Equals(t, secondLock, *dequeuedLock)
 	Equals(t, 1, len(queue))
-	Equals(t, new2.Pull, queue[0].Pull)
+	Equals(t, thirdLock.Pull, queue[0].Pull)
 
-	// second lock unlocked without touching the queue
-	_, dequeuedLock, err = r.Unlock(new.Project, new.Workspace, false)
+	// second lock unlocked -> third lock dequeued and lock acquired
+	_, dequeuedLock, err = r.Unlock(secondLock.Project, secondLock.Workspace)
 	Ok(t, err)
-	Assert(t, dequeuedLock == nil, "exp nil")
-	queue, err = r.GetQueueByLock(lock.Project, lock.Workspace)
+	Equals(t, thirdLock, *dequeuedLock)
+	queue, err = r.GetQueueByLock(firstLock.Project, firstLock.Workspace)
 	Ok(t, err)
-	Equals(t, 1, len(queue))
-	Equals(t, new2.Pull, queue[0].Pull)
+	Equals(t, 0, len(queue))
 
 	l, err := r.GetLock(project, workspace)
 	Ok(t, err)
-	Assert(t, l == nil, "exp nil")
-
-	// bring the second lock again
-	_, _, _, err = r.TryLock(new)
-	Ok(t, err)
-
-	// second lock unlocked -> third lock dequeued and lock acquired
-	_, dequeuedLock, err = r.Unlock(new.Project, new.Workspace, true)
-	Ok(t, err)
-	Equals(t, new2, *dequeuedLock)
+	Equals(t, thirdLock, *l)
 
 	// Queue is deleted when empty
-	queue, err = r.GetQueueByLock(new2.Project, new2.Workspace)
+	queue, err = r.GetQueueByLock(thirdLock.Project, thirdLock.Workspace)
 	Ok(t, err)
 	Assert(t, queue == nil, "exp nil")
 
 	// third lock unlocked -> no more locks in the queue
-	_, dequeuedLock, err = r.Unlock(new2.Project, new2.Workspace, true)
+	_, dequeuedLock, err = r.Unlock(thirdLock.Project, thirdLock.Workspace)
 	Ok(t, err)
 	Equals(t, (*models.ProjectLock)(nil), dequeuedLock)
-
 }
 
 func TestDequeueAfterUnlockByPull(t *testing.T) {
@@ -616,7 +606,7 @@ func TestDequeueAfterUnlockByPull(t *testing.T) {
 	_, _, _, err = r.TryLock(lock4)
 	Ok(t, err)
 
-	_, dequeueStatus, err := r.UnlockByPull(project.RepoFullName, pullNum, true)
+	_, dequeueStatus, err := r.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
 
 	Equals(t, 2, len(dequeueStatus.ProjectLocks))

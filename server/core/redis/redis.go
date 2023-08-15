@@ -142,7 +142,7 @@ func (r *RedisDB) enqueue(newLock models.ProjectLock) (*models.EnqueueStatus, er
 // If there is a lock, then it will delete it, and then return a pointer
 // to the deleted lock. If updateQueue is true, it will also grant the
 // lock to the next PR in the queue, update the queue and return the dequeued lock.
-func (r *RedisDB) Unlock(project models.Project, workspace string, updateQueue bool) (*models.ProjectLock, *models.ProjectLock, error) {
+func (r *RedisDB) Unlock(project models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error) {
 	var lock models.ProjectLock
 	lockKey := r.lockKey(project, workspace)
 
@@ -157,7 +157,7 @@ func (r *RedisDB) Unlock(project models.Project, workspace string, updateQueue b
 		}
 		r.client.Del(ctx, lockKey)
 		// Dequeue next item
-		if r.queueEnabled && updateQueue {
+		if r.queueEnabled {
 			dequeuedLock, err := r.dequeue(project, workspace, lockKey)
 			return &lock, dequeuedLock, err
 		}
@@ -254,7 +254,7 @@ func (r *RedisDB) GetLock(project models.Project, workspace string) (*models.Pro
 }
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
-func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int, updateQueue bool) ([]models.ProjectLock, *models.DequeueStatus, error) {
+func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, *models.DequeueStatus, error) {
 	var locks []models.ProjectLock
 	var dequeuedLocks = make([]models.ProjectLock, 0, len(locks))
 
@@ -270,7 +270,7 @@ func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int, updateQueue boo
 		}
 		if lock.Pull.Num == pullNum {
 			locks = append(locks, lock)
-			_, dequeuedLock, err := r.Unlock(lock.Project, lock.Workspace, updateQueue)
+			_, dequeuedLock, err := r.Unlock(lock.Project, lock.Workspace)
 			if err != nil {
 				return locks, nil, errors.Wrapf(err, "unlocking repo %s, path %s, workspace %s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)
 			}

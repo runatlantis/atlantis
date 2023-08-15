@@ -94,7 +94,7 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 		UnlockFn: func() error {
 			// TODO(Ghais) this will be called if there was a plan error and the lock was automatically dropped;
 			//  Should we assure dequeuing of the next PR here too?
-			_, _, err := p.Locker.Unlock(lockAttempt.LockKey, false)
+			_, _, err := p.Locker.Unlock(lockAttempt.LockKey)
 			return err
 		},
 		LockKey: lockAttempt.LockKey,

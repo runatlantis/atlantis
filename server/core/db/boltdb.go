@@ -194,7 +194,7 @@ func (b *BoltDB) enqueue(tx *bolt.Tx, key string, newLock models.ProjectLock) (*
 // If there is a lock, then it will delete it, and then return a pointer
 // to the deleted lock. If updateQueue is true, it will also grant the
 // lock to the next PR in the queue, update the queue and return the dequeued lock.
-func (b *BoltDB) Unlock(p models.Project, workspace string, updateQueue bool) (*models.ProjectLock, *models.ProjectLock, error) {
+func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error) {
 	var lock models.ProjectLock
 	var dequeuedLock *models.ProjectLock
 	foundLock := false
@@ -214,7 +214,7 @@ func (b *BoltDB) Unlock(p models.Project, workspace string, updateQueue bool) (*
 		}
 
 		// Dequeue next item
-		if b.queueEnabled && updateQueue {
+		if b.queueEnabled {
 			var err error
 			dequeuedLock, err = b.dequeue(tx, key)
 			if err != nil {
@@ -406,7 +406,7 @@ func (b *BoltDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
 }
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
-func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int, updateQueue bool) ([]models.ProjectLock, *models.DequeueStatus, error) {
+func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, *models.DequeueStatus, error) {
 	var locks []models.ProjectLock
 	err := b.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(b.locksBucketName).Cursor()
@@ -434,7 +434,7 @@ func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int, updateQueue bool
 	// delete the locks
 	for _, lock := range locks {
 		var dequeuedLock *models.ProjectLock
-		if _, dequeuedLock, err = b.Unlock(lock.Project, lock.Workspace, updateQueue); err != nil {
+		if _, dequeuedLock, err = b.Unlock(lock.Project, lock.Workspace); err != nil {
 			return locks, nil, errors.Wrapf(err, "unlocking repo %s, path %s, workspace %s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)
 		}
 		if dequeuedLock != nil {

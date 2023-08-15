@@ -27,7 +27,7 @@ type DefaultDeleteLockCommand struct {
 func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, *models.ProjectLock, error) {
 	// TODO(Ghais) extend the tests
 	// TODO(Ghais) #9 When the lock(s) has(ve) been explicitly removed, also dequeue the next PR(s)
-	lock, dequeuedLock, err := l.Locker.Unlock(id, true)
+	lock, dequeuedLock, err := l.Locker.Unlock(id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -49,7 +49,7 @@ func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, *
 
 // DeleteLocksByPull handles deleting all locks for the pull request
 func (l *DefaultDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) (int, *models.DequeueStatus, error) {
-	locks, dequeueStatus, err := l.Locker.UnlockByPull(repoFullName, pullNum, true)
+	locks, dequeueStatus, err := l.Locker.UnlockByPull(repoFullName, pullNum)
 	numLocks := len(locks)
 	if err != nil {
 		return numLocks, dequeueStatus, err
