@@ -564,11 +564,6 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   Feature flag to enable ability to use `mergeable` mode with required apply status check.
 
-  ::: warning NOTE
-  If there aren't any required checks set in the Github branch protection settings then this will cause atlantis to fail.
-  See issue https://github.com/runatlantis/atlantis/issues/2663.
-  :::
-
 ### `--gitlab-hostname`
   ```bash
   atlantis server --gitlab-hostname="my.gitlab.enterprise.com"
