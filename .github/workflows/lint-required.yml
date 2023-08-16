@@ -15,7 +15,9 @@ on:
     paths-ignore:
       - '**.go'
       - 'go.*'
-      - '.github/workflows/linter.yml'
+      - '.github/workflows/lint.yml'
+      - '.github/workflows/lint-required.yml'
+      - '.golangci.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -25,20 +27,6 @@ jobs:
   golangci-lint:
     if: github.event.pull_request.draft == false
     name: runner / golangci-lint
-    runs-on: ubuntu-22.04
-    steps:
-      - run: 'echo "No build required"'
-
-  revive:
-    if: github.event.pull_request.draft == false
-    name: runner / revive
-    runs-on: ubuntu-22.04
-    steps:
-      - run: 'echo "No build required"'
-
-  errcheck:
-    if: github.event.pull_request.draft == false
-    name: runner / errcheck
     runs-on: ubuntu-22.04
     steps:
       - run: 'echo "No build required"'
