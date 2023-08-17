@@ -38,11 +38,23 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 		}
 
 		if ghAccessToken {
-			// Need to replace the line.
-			if err := fileLineReplace(config, gitUser, gitHostname, credsFile); err != nil {
-				return errors.Wrap(err, "replacing git credentials line for github app")
+			hasGHToken, err := fileHasGHToken(config, gitUser, gitHostname, credsFile)
+			if err != nil {
+				return err
 			}
-			logger.Info("updated git app credentials in %s", credsFile)
+			if hasGHToken {
+				// Need to replace the line.
+				if err := fileLineReplace(config, gitUser, gitHostname, credsFile); err != nil {
+					return errors.Wrap(err, "replacing git credentials line for github app")
+				}
+				logger.Info("updated git app credentials in %s", credsFile)
+			} else {
+				if err := fileAppend(config, credsFile); err != nil {
+					return err
+				}
+				logger.Info("wrote git credentials to %s", credsFile)
+			}
+
 		} else {
 			// Otherwise we need to append the line.
 			if err := fileAppend(config, credsFile); err != nil {
@@ -112,4 +124,18 @@ func fileLineReplace(line, user, host, filename string) error {
 	}
 
 	return os.WriteFile(filename, []byte(toWrite), 0600)
+}
+
+func fileHasGHToken(line, user, host, filename string) (bool, error) {
+	currContents, err := os.ReadFile(filename) // nolint: gosec
+	if err != nil {
+		return false, err
+	}
+	prevLines := strings.Split(string(currContents), "\n")
+	for _, l := range prevLines {
+		if strings.HasPrefix(l, "https://"+user) && strings.HasSuffix(l, host) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
