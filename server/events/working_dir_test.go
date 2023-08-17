@@ -622,6 +622,45 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	Equals(t, hasDiverged, false)
 }
 
+// Test that if we fetch additional branches after cloning if they are requested.
+func TestClone_FetchAdditionalBranches(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Add two branches that are separate from the head branch and base branch
+	additionalBranches := []string{"additional-branch-1", "additional-branch-2"}
+	runCmd(t, repoDir, "git", "branch", additionalBranches[0])
+	runCmd(t, repoDir, "git", "branch", additionalBranches[1])
+
+	logger := logging.NewNoopLogger(t)
+
+	dataDir := t.TempDir()
+
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		CheckoutDepth:               50,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+		Logger:                      logger,
+	}
+
+	cloneDir, hasDiverged, err := wd.Clone(models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+	}, "default", additionalBranches)
+	Ok(t, err)
+	Equals(t, false, hasDiverged)
+
+	// Check what branches we have fetched.
+	fetchedBranches := runCmd(t, cloneDir, "git", "branch", "-r")
+	Assert(t, strings.Contains(fetchedBranches, fmt.Sprintf("origin/%s", additionalBranches[0])), "should have fetched additional branch")
+	Assert(t, strings.Contains(fetchedBranches, fmt.Sprintf("origin/%s", additionalBranches[1])), "should have fetched additional branch")
+}
+
 func initRepo(t *testing.T) string {
 	repoDir := t.TempDir()
 	runCmd(t, repoDir, "git", "init", "--initial-branch=main")
