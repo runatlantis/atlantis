@@ -84,9 +84,7 @@ type Repo struct {
 	PolicyCheck               *bool
 	CustomPolicyCheck         *bool
 	AutoDiscover              *AutoDiscover
-	// ConfigSourceBranch specifies the branch that we'll use to checkout the atlantis repo
-	// configuration
-	ConfigSourceBranch *string
+	ConfigSourceBranch        *string
 }
 
 type MergedProjectCfg struct {
@@ -180,14 +178,15 @@ var DefaultStateRmStage = Stage{
 }
 
 type GlobalCfgArgs struct {
-	RepoConfigFile string
-	// No longer a user option as of https://github.com/runatlantis/atlantis/pull/3911,
-	// but useful for tests to set to true to not require enumeration of allowed settings
-	// on the repo side
-	AllowAllRepoSettings bool
-	PolicyCheckEnabled   bool
-	PreWorkflowHooks     []*WorkflowHook
-	PostWorkflowHooks    []*WorkflowHook
+	RepoConfigFile     string
+	AllowRepoCfg       bool
+	MergeableReq       bool
+	ApprovedReq        bool
+	UnDivergedReq      bool
+	PolicyCheckEnabled bool
+	PreWorkflowHooks   []*WorkflowHook
+	PostWorkflowHooks  []*WorkflowHook
+	ConfigSourceBranch *string
 }
 
 func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
@@ -240,6 +239,7 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 				PolicyCheck:               &policyCheck,
 				CustomPolicyCheck:         &customPolicyCheck,
 				AutoDiscover:              &autoDiscover,
+				ConfigSourceBranch:        args.ConfigSourceBranch,
 			},
 		},
 		Workflows: map[string]Workflow{
