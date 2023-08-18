@@ -3,7 +3,6 @@ package events
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -734,7 +733,6 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	return
 }
 
-// buildAllProjectCommandsByPlan builds contexts for a command for every project that has
 // prepareWorkspace clones new changes into our repository and checks out the appropriate
 // version of atlantis.yaml.
 func (p *DefaultProjectCommandBuilder) prepareWorkspace(ctx *command.Context, workspace string) (string, error) {
@@ -756,12 +754,9 @@ func (p *DefaultProjectCommandBuilder) prepareWorkspace(ctx *command.Context, wo
 	// If we've specified a source branch for our atlantis.yaml, checkout the file from that
 	// branch before continuing with validation.
 	if configSourceBranch != nil {
-		ctx.Log.Debug("checking out %s from repos config source branch %s", "atlantis.yaml", *configSourceBranch)
-		checkoutCmd := exec.Command("git", "checkout", fmt.Sprintf("origin/%s", *configSourceBranch), "--", "atlantis.yaml")
-		checkoutCmd.Dir = repoDir
-		output, err := checkoutCmd.CombinedOutput()
+		err := p.WorkingDir.CheckoutFile(repoDir, *configSourceBranch, valid.DefaultAtlantisFile)
 		if err != nil {
-			return repoDir, errors.Wrapf(err, "failed to checkout %s from branch %s in %s: %s", "atlantis.yaml", *configSourceBranch, repoDir, string(output))
+			return repoDir, err
 		}
 	}
 

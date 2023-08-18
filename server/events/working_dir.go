@@ -58,6 +58,8 @@ type WorkingDir interface {
 	DeletePlan(r models.Repo, p models.PullRequest, workspace string, path string, projectName string) error
 	// GetGitUntrackedFiles returns a list of Git untracked files in the working dir.
 	GetGitUntrackedFiles(r models.Repo, p models.PullRequest, workspace string) ([]string, error)
+	// CheckoutFile checks out a file from a specified branch
+	CheckoutFile(branch string, file string, repoDir string) error
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -476,4 +478,15 @@ func (w *FileWorkspace) GetGitUntrackedFiles(r models.Repo, p models.PullRequest
 	untrackedFiles := strings.Split(string(output), "\n")[:]
 	w.Logger.Debug("Untracked files: '%s'", strings.Join(untrackedFiles, ","))
 	return untrackedFiles, nil
+}
+
+func (w *FileWorkspace) CheckoutFile(repoDir string, branch string, file string) error {
+	w.Logger.Debug("checking out %s from repos config source branch %s", file, branch)
+	checkoutCmd := exec.Command("git", "checkout", fmt.Sprintf("origin/%s", branch), "--", file) // nolint: gosec
+	checkoutCmd.Dir = repoDir
+	output, err := checkoutCmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrapf(err, "failed to checkout %s from branch %s in %s: %s", file, branch, repoDir, string(output))
+	}
+	return nil
 }

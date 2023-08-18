@@ -25,6 +25,21 @@ func NewMockWorkingDir(options ...pegomock.Option) *MockWorkingDir {
 func (mock *MockWorkingDir) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockWorkingDir) FailHandler() pegomock.FailHandler      { return mock.fail }
 
+func (mock *MockWorkingDir) CheckoutFile(branch string, file string, repoDir string) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+	}
+	params := []pegomock.Param{branch, file, repoDir}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("CheckoutFile", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockWorkingDir) Clone(headRepo models.Repo, p models.PullRequest, workspace string, additionalBranches []string) (string, bool, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
@@ -208,6 +223,41 @@ type VerifierMockWorkingDir struct {
 	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
+}
+
+func (verifier *VerifierMockWorkingDir) CheckoutFile(branch string, file string, repoDir string) *MockWorkingDir_CheckoutFile_OngoingVerification {
+	params := []pegomock.Param{branch, file, repoDir}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CheckoutFile", params, verifier.timeout)
+	return &MockWorkingDir_CheckoutFile_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDir_CheckoutFile_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDir_CheckoutFile_OngoingVerification) GetCapturedArguments() (string, string, string) {
+	branch, file, repoDir := c.GetAllCapturedArguments()
+	return branch[len(branch)-1], file[len(file)-1], repoDir[len(repoDir)-1]
+}
+
+func (c *MockWorkingDir_CheckoutFile_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
+		}
+		_param1 = make([]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(string)
+		}
+		_param2 = make([]string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
+		}
+	}
+	return
 }
 
 func (verifier *VerifierMockWorkingDir) Clone(headRepo models.Repo, p models.PullRequest, workspace string, additionalBranches []string) *MockWorkingDir_Clone_OngoingVerification {
