@@ -38,7 +38,7 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 		}
 
 		if ghAccessToken {
-			hasGHToken, err := fileHasGHToken(config, gitUser, gitHostname, credsFile)
+			hasGHToken, err := fileHasGHToken(gitUser, gitHostname, credsFile)
 			if err != nil {
 				return err
 			}
@@ -126,7 +126,7 @@ func fileLineReplace(line, user, host, filename string) error {
 	return os.WriteFile(filename, []byte(toWrite), 0600)
 }
 
-func fileHasGHToken(line, user, host, filename string) (bool, error) {
+func fileHasGHToken(user, host, filename string) (bool, error) {
 	currContents, err := os.ReadFile(filename) // nolint: gosec
 	if err != nil {
 		return false, err
