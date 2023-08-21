@@ -24,13 +24,13 @@ more details.
 * You can change this behaviour by setting [Server Side Repo Config](server-side-repo-config.html)
 
 ::: danger DANGER
-Atlantis uses the `atlantis.yaml` version from the pull request, similar to other
-CI/CD systems. If you're allowing users to [create custom workflows](server-side-repo-config.html#allow-repos-to-define-their-own-workflows)
+By default, Atlantis uses the `atlantis.yaml` version from the pull request, similar to other
+CI/CD systems. If you enable users to [create custom workflows](server-side-repo-config.html#allow-repos-to-define-their-own-workflows)
 then this means
 anyone that can create a pull request to your repo can run arbitrary code on the
 Atlantis server.
 
-By default, this is not allowed.
+Use the [config_source_branch](server-side-repo-config.html#allow-repos-to-define-their-own-workflows) server side repo config parameter to override the branch from which the `atlantis.yaml` version is used. This allows you to protect against the scenario described above, as well as requiring changes to the repo level `atlantis.yaml` to be reviewed and merged before taking effect.
 :::
 
 ::: warning

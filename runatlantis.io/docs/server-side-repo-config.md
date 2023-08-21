@@ -92,6 +92,9 @@ repos:
   autodiscover:
     mode: auto
 
+  # config_source_branch specifies the branch that will be used to checkout the repo config file.
+  config_source_branch: custom
+
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
 
@@ -502,6 +505,8 @@ If you set a workflow with the key `default`, it will override this.
 | policy_check                  | bool     | false   | no       | Whether or not to run policy checks on this repository.                                                                                                                                                                                                                                                   |
 | custom_policy_check                  | bool     | false   | no       | Whether or not to enable custom policy check tools outside of Conftest on this repository.                                                                                                                                                                                                       |
 | autodiscover                  | AutoDiscover     | none   | no       | Auto discover settings for this repo
+| config_source_branch          | string   | none    | no       | The branch that will be used to checkout the repo level `atlantis.yaml`. By default, this will be the PR branch. |
+
 
 
 :::tip Notes
