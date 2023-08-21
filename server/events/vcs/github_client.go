@@ -442,14 +442,11 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 				if isRequiredCheck(*r.Name, required.RequiredStatusChecks.Contexts) {
 					if *c.Conclusion == "success" {
 						continue
-					} else { //revive:disable-line:superfluous-else
-						return false, nil
 					}
-				} else {
-					//ignore checks that arent required
-					continue
+					return false, nil
 				}
-
+				//ignore checks that arent required
+				continue
 			}
 		}
 	}
