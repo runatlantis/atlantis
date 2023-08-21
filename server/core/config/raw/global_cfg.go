@@ -280,7 +280,7 @@ OuterGlobalPlanReqs:
 		}
 
 		// dont add policy_check step if repo have it explicitly disabled
-		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && *r.PolicyCheck == false {
+		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
 			continue
 		}
 		mergedPlanReqs = append(mergedPlanReqs, globalReq)
@@ -294,7 +294,7 @@ OuterGlobalApplyReqs:
 		}
 
 		// dont add policy_check step if repo have it explicitly disabled
-		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && *r.PolicyCheck == false {
+		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
 			continue
 		}
 		mergedApplyReqs = append(mergedApplyReqs, globalReq)
@@ -308,7 +308,7 @@ OuterGlobalImportReqs:
 		}
 
 		// dont add policy_check step if repo have it explicitly disabled
-		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && *r.PolicyCheck == false {
+		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
 			continue
 		}
 		mergedImportReqs = append(mergedImportReqs, globalReq)

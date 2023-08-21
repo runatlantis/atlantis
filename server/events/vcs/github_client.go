@@ -199,7 +199,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 }
 
 // ReactToComment adds a reaction to a comment.
-func (g *GithubClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {
+func (g *GithubClient) ReactToComment(repo models.Repo, _ int, commentID int64, reaction string) error {
 	g.logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions", repo.Owner, repo.Name, commentID)
 	_, _, err := g.client.Reactions.CreateIssueCommentReaction(g.ctx, repo.Owner, repo.Name, commentID, reaction)
 	return err
@@ -442,7 +442,7 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 				if isRequiredCheck(*r.Name, required.RequiredStatusChecks.Contexts) {
 					if *c.Conclusion == "success" {
 						continue
-					} else {
+					} else { //revive:disable-line:superfluous-else
 						return false, nil
 					}
 				} else {
@@ -582,7 +582,7 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 }
 
 // MergePull merges the pull request.
-func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+func (g *GithubClient) MergePull(pull models.PullRequest, _ models.PullRequestOptions) error {
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
 	g.logger.Debug("GET /repos/%v/%v", pull.BaseRepo.Owner, pull.BaseRepo.Name)
@@ -712,11 +712,11 @@ func (g *GithubClient) GetFileContent(pull models.PullRequest, fileName string) 
 	return true, decodedData, nil
 }
 
-func (g *GithubClient) SupportsSingleFileDownload(repo models.Repo) bool {
+func (g *GithubClient) SupportsSingleFileDownload(_ models.Repo) bool {
 	return true
 }
 
-func (g *GithubClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+func (g *GithubClient) GetCloneURL(_ models.VCSHostType, repo string) (string, error) {
 	parts := strings.Split(repo, "/")
 	repository, _, err := g.client.Repositories.Get(g.ctx, parts[0], parts[1])
 	if err != nil {

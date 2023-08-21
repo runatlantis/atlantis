@@ -25,10 +25,7 @@ type UnlockCommandRunner struct {
 	SilenceNoProjects bool
 }
 
-func (u *UnlockCommandRunner) Run(
-	ctx *command.Context,
-	cmd *CommentCommand,
-) {
+func (u *UnlockCommandRunner) Run(ctx *command.Context, _ *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pullNum := ctx.Pull.Num
 

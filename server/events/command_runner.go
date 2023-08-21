@@ -361,7 +361,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	baseRepo models.Repo,
 	maybeHeadRepo *models.Repo,
 	maybePull *models.PullRequest,
-	user models.User,
+	_ models.User,
 	pullNum int,
 	log logging.SimpleLogging,
 ) (headRepo models.Repo, pull models.PullRequest, err error) {

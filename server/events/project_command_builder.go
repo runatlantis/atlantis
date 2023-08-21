@@ -112,7 +112,7 @@ func NewProjectCommandBuilder(
 	RestrictFileList bool,
 	SilenceNoProjects bool,
 	scope tally.Scope,
-	logger logging.SimpleLogging,
+	_ logging.SimpleLogging,
 	terraformClient terraform.Client,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{

@@ -249,7 +249,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				},
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 			},
 			RunnerInvokeMatch: []*EqMatcher{
@@ -258,7 +258,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---",
+				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---",
 		},
 		{
 			Description: "When first apply fails, the second not will run",
@@ -279,7 +279,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:      command.Apply,
@@ -290,7 +290,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Never(),
 			},
-			ExpComment: "Ran Apply for dir: `` workspace: ``\n\n**Apply Error**\n```\nShabang!\n```",
+			ExpComment: "Ran Apply for dir: `` workspace: ``\n\n**Apply Error**\n```\nshabang\n```",
 		},
 		{
 			Description: "When both in a group of two succeeds, the following two will run",
@@ -324,7 +324,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				},
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:      command.Apply,
@@ -343,7 +343,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---",
+				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---",
 		},
 		{
 			Description: "When one out of two fails, the following two will not run",
@@ -381,7 +381,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				},
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:      command.Apply,
@@ -397,7 +397,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			ExpComment: "Ran Apply for 4 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"3. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---\n### " +
+				"3. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"4. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
 		},
 		{
@@ -417,7 +417,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:      command.Apply,
@@ -429,7 +429,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
 		},
 		{
@@ -447,7 +447,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:      command.Apply,
@@ -459,7 +459,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
 		},
 	}

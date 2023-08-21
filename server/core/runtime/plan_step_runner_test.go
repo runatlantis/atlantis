@@ -359,7 +359,7 @@ locally at this time.
 			tfVersion: "1.1.0",
 			remoteOpsErr: `╷
 │ Error: Saving a generated plan is currently not supported
-│ 
+│
 │ Terraform Cloud does not support saving the generated execution plan
 │ locally at this time.
 ╵
@@ -545,7 +545,7 @@ type remotePlanMock struct {
 	CalledArgs []string
 }
 
-func (r *remotePlanMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line) {
+func (r *remotePlanMock) RunCommandAsync(_ command.ProjectContext, _ string, args []string, _ map[string]string, _ *version.Version, _ string) (chan<- string, <-chan runtimemodels.Line) {
 	r.CalledArgs = args
 	in := make(chan string)
 	out := make(chan runtimemodels.Line)

@@ -56,7 +56,7 @@ func New(hostname string, port int, password string, tlsEnabled bool, insecureSk
 }
 
 // NewWithClient is used for testing.
-func NewWithClient(client *redis.Client, bucket string, globalBucket string) (*RedisDB, error) {
+func NewWithClient(client *redis.Client, _ string, _ string) (*RedisDB, error) {
 	return &RedisDB{
 		client: client,
 	}, nil

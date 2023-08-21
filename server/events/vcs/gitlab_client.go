@@ -170,7 +170,7 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 }
 
 // CreateComment creates a comment on the merge request.
-func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string, _ string) error {
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
@@ -319,7 +319,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	if ((ok && (mr.DetailedMergeStatus == "mergeable" || mr.DetailedMergeStatus == "ci_still_running")) ||
-		(!ok && mr.MergeStatus == "can_be_merged")) &&
+		(!ok && mr.DetailedMergeStatus == "can_be_merged")) &&
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
 		!mr.WorkInProgress &&
@@ -438,7 +438,7 @@ func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 	return fmt.Sprintf("!%d", pull.Num), nil
 }
 
-func (g *GitlabClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (g *GitlabClient) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 	// TODO implement
 	return nil
 }
@@ -482,7 +482,7 @@ func MustConstraint(constraint string) version.Constraints {
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *GitlabClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (g *GitlabClient) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]string, error) {
 	return nil, nil
 }
 
@@ -504,11 +504,11 @@ func (g *GitlabClient) GetFileContent(pull models.PullRequest, fileName string) 
 	return true, bytes, nil
 }
 
-func (g *GitlabClient) SupportsSingleFileDownload(repo models.Repo) bool {
+func (g *GitlabClient) SupportsSingleFileDownload(_ models.Repo) bool {
 	return true
 }
 
-func (g *GitlabClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+func (g *GitlabClient) GetCloneURL(_ models.VCSHostType, repo string) (string, error) {
 	project, _, err := g.Client.Projects.GetProject(repo, nil)
 	if err != nil {
 		return "", err

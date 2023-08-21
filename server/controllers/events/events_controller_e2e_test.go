@@ -53,11 +53,11 @@ var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
 
 var mockPostWorkflowHookRunner *runtimemocks.MockPostWorkflowHookRunner
 
-func (m *NoopTFDownloader) GetFile(dst, src string) error {
+func (m *NoopTFDownloader) GetFile(_, _ string) error {
 	return nil
 }
 
-func (m *NoopTFDownloader) GetAny(dst, src string) error {
+func (m *NoopTFDownloader) GetAny(_, _ string) error {
 	return nil
 }
 
@@ -1541,13 +1541,13 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 type mockLockURLGenerator struct{}
 
-func (m *mockLockURLGenerator) GenerateLockURL(lockID string) string {
+func (m *mockLockURLGenerator) GenerateLockURL(_ string) string {
 	return "lock-url"
 }
 
 type mockWebhookSender struct{}
 
-func (w *mockWebhookSender) Send(log logging.SimpleLogging, result webhooks.ApplyResult) error {
+func (w *mockWebhookSender) Send(_ logging.SimpleLogging, _ webhooks.ApplyResult) error {
 	return nil
 }
 

@@ -95,7 +95,7 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 //
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string, _ string) error {
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
@@ -130,11 +130,11 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	return nil
 }
 
-func (g *AzureDevopsClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { //nolint: revive
+func (g *AzureDevopsClient) ReactToComment(_ models.Repo, _ int, _ int64, _ string) error {
 	return nil
 }
 
-func (g *AzureDevopsClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (g *AzureDevopsClient) HidePrevCommandComments(_ models.Repo, _ int, _ string) error {
 	return nil
 }
 
@@ -170,13 +170,13 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 	return approvalStatus, nil
 }
 
-func (g *AzureDevopsClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (g *AzureDevopsClient) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 	// TODO implement
 	return nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, _ string) (bool, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
@@ -390,16 +390,16 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *AzureDevopsClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (g *AzureDevopsClient) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]string, error) {
 	return nil, nil
 }
 
-func (g *AzureDevopsClient) SupportsSingleFileDownload(repo models.Repo) bool {
+func (g *AzureDevopsClient) SupportsSingleFileDownload(_ models.Repo) bool {
 	return false
 }
 
-func (g *AzureDevopsClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
-	return false, []byte{}, fmt.Errorf("Not Implemented")
+func (g *AzureDevopsClient) GetFileContent(_ models.PullRequest, _ string) (bool, []byte, error) {
+	return false, []byte{}, fmt.Errorf("not implemented")
 }
 
 // GitStatusContextFromSrc parses an Atlantis formatted src string into a context suitable
@@ -421,6 +421,6 @@ func GitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
 	}
 }
 
-func (g *AzureDevopsClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+func (g *AzureDevopsClient) GetCloneURL(_ models.VCSHostType, _ string) (string, error) {
 	return "", fmt.Errorf("not yet implemented")
 }
