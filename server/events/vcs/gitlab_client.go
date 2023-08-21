@@ -319,7 +319,8 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	if ((ok && (mr.DetailedMergeStatus == "mergeable" || mr.DetailedMergeStatus == "ci_still_running")) ||
-		(!ok && mr.DetailedMergeStatus == "can_be_merged")) &&
+		//nolint:staticcheck // SA1019 this check ensures compatibility with older gitlab versions
+		(!ok && mr.MergeStatus == "can_be_merged")) &&
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
 		!mr.WorkInProgress &&
