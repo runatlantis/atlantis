@@ -12,7 +12,6 @@ require (
 	github.com/go-playground/validator/v10 v10.15.0
 	github.com/go-test/deep v1.1.0
 	github.com/golang-jwt/jwt/v5 v5.0.0
-	github.com/google/go-github/v53 v53.2.0
 	github.com/google/go-github/v54 v54.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0
@@ -85,6 +84,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-github/v53 v53.2.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
