@@ -103,6 +103,11 @@ func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.
 				Short: true,
 			},
 			{
+				Title: "Branch",
+				Value: applyResult.Pull.BaseBranch,
+				Short: true,
+			},
+			{
 				Title: "User",
 				Value: applyResult.User.Username,
 				Short: true,
