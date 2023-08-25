@@ -283,7 +283,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	// Prevent nil pointer error when mr.HeadPipeline is empty
 	// See: https://github.com/runatlantis/atlantis/issues/1852
 	commit := pull.HeadCommit
-	isPipelineSkipped := true
+	isPipelineSkipped := false
 	if mr.HeadPipeline != nil {
 		commit = mr.HeadPipeline.SHA
 		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"

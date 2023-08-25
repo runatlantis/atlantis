@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -416,6 +416,10 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 	required, _, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner, repo.Name, *pull.Base.Ref)
 	if err != nil {
 		return false, errors.Wrap(err, "getting required status checks")
+	}
+
+	if required.RequiredStatusChecks == nil {
+		return true, nil
 	}
 
 	//check check suite/check run api
