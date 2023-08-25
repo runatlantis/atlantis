@@ -41,6 +41,7 @@ In your Atlantis configuration you can now add the following:
 webhooks:
 - event: apply
   workspace-regex: .*
+  branch-regex: .*
   kind: slack
   channel: my-channel
 ```
@@ -56,6 +57,7 @@ config: |
    webhooks:
      - event: apply
        workspace-regex: .*
+       branch-regex: .*
        kind: slack
        channel: my-channel
 ```
