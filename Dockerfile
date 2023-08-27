@@ -179,7 +179,8 @@ RUN apk add --no-cache \
         openssh~=9.3_p2 \
         libcap~=2.69 \
         dumb-init~=1.2 \
-        gcompat~=1.1
+        gcompat~=1.1 \
+        aws-cli
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
