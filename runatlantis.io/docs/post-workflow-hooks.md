@@ -25,7 +25,7 @@ can be found in [Using Atlantis](using-atlantis.md).
 ```yaml
 repos:
     - id: /.*/
-      pre_workflow_hooks:
+      post_workflow_hooks:
         - run: ./plan-hook.sh
           description: Plan Hook
           commands: plan
