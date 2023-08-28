@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
-ARG ALPINE_TAG=3.18.2
-ARG DEBIAN_TAG=12.0-slim
+ARG ALPINE_TAG=3.18.3
+ARG DEBIAN_TAG=12.1-slim
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.20.6-alpine AS builder
+FROM golang:1.21.0-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -125,7 +125,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.5.4
+ENV DEFAULT_TERRAFORM_VERSION=1.5.6
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 #RUN AVAILABLE_TERRAFORM_VERSIONS="1.1.9 1.2.9 1.3.9 ${DEFAULT_TERRAFORM_VERSION}" && \
@@ -174,11 +174,10 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Install packages needed for running Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
-RUN apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main/ \
-        git~=2.40 && \
-    apk add --no-cache \
+RUN apk add --no-cache \
         ca-certificates~=20230506 \
         curl~=8.2 \
+        git~=2.40 \
         unzip~=6.0 \
         bash~=5.2 \
         openssh~=9.3_p2 \

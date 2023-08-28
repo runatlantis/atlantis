@@ -280,6 +280,15 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		return false, err
 	}
 
+	// Prevent nil pointer error when mr.HeadPipeline is empty
+	// See: https://github.com/runatlantis/atlantis/issues/1852
+	commit := pull.HeadCommit
+	isPipelineSkipped := false
+	if mr.HeadPipeline != nil {
+		commit = mr.HeadPipeline.SHA
+		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
+	}
+
 	// Get project configuration
 	project, _, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
 	if err != nil {
@@ -287,7 +296,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	// Get Commit Statuses
-	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, mr.HeadPipeline.SHA, nil)
+	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, commit, nil)
 	if err != nil {
 		return false, err
 	}
@@ -302,7 +311,6 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		}
 	}
 
-	isPipelineSkipped := mr.HeadPipeline.Status == "skipped"
 	allowSkippedPipeline := project.AllowMergeOnSkippedPipeline && isPipelineSkipped
 
 	ok, err := g.SupportsDetailedMergeStatus()
