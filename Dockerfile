@@ -61,7 +61,7 @@ WORKDIR /tmp/build
 # install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 #ENV DEFAULT_CONFTEST_VERSION=0.44.1
-ENV DEFAULT_CONFTEST_VERSION=0.44.1-2
+ENV DEFAULT_CONFTEST_VERSION=0.44.1-3
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
     case ${TARGETPLATFORM} in \
@@ -85,7 +85,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 # We use gosu to step down from root and run as the atlantis user
 # renovate: datasource=github-releases depName=tianon/gosu
 #ENV GOSU_VERSION=1.16
-ENV GOSU_VERSION=1.16-6
+ENV GOSU_VERSION=1.16-7
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GOSU_ARCH=amd64 ;; \
@@ -109,7 +109,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.4.0-1
+ENV GIT_LFS_VERSION=3.4.0-2
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
