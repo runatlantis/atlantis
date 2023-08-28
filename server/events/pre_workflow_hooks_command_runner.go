@@ -112,9 +112,9 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			ctx.Log.Debug("Skipping pre workflow hook '%s' as command '%s' is not in Commands [%s]",
 				hookDescription, ctx.CommandName, hook.Commands)
 			continue
-		} else {
-			ctx.Log.Debug("Running pre workflow hook: '%s'", hookDescription)
 		}
+
+		ctx.Log.Debug("Running pre workflow hook: '%s'", hookDescription)
 		ctx.HookID = uuid.NewString()
 		shell := hook.Shell
 		if shell == "" {
