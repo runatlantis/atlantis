@@ -31,7 +31,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/mitchellh/colorstring"
 	"github.com/pkg/errors"
 )

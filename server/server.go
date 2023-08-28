@@ -141,6 +141,10 @@ type WebhookConfig struct {
 	// that is being modified for this event. If the regex matches, we'll
 	// send the webhook, ex. "production.*".
 	WorkspaceRegex string `mapstructure:"workspace-regex"`
+	// BranchRegex is a regex that is used to match against the base branch
+	// that is being modified for this event. If the regex matches, we'll
+	// send the webhook, ex. "main.*".
+	BranchRegex string `mapstructure:"branch-regex"`
 	// Kind is the type of webhook we should send, ex. slack.
 	Kind string `mapstructure:"kind"`
 	// Channel is the channel to send this webhook to. It only applies to
@@ -344,6 +348,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	for _, c := range userConfig.Webhooks {
 		config := webhooks.Config{
 			Channel:        c.Channel,
+			BranchRegex:    c.BranchRegex,
 			Event:          c.Event,
 			Kind:           c.Kind,
 			WorkspaceRegex: c.WorkspaceRegex,
