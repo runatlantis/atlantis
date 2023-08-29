@@ -143,7 +143,7 @@ Values are chosen in this order:
 
 
 ::: warning NOTE
-By default, changes to modules will not trigger autoplanning. See the flags below. 
+By default, changes to modules will not trigger autoplanning. See the flags below.
 :::
 
 ::: warning NOTE
@@ -159,7 +159,7 @@ ATLANTIS_AUTOPLAN_MODULES=true
 ```
 
 Defaults to `false`. When set to `true`, Atlantis will trace the local modules of included projects.
-Included project are projects with files included by `--autoplan-file-list`. 
+Included project are projects with files included by `--autoplan-file-list`.
 After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
 `--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
 
@@ -175,8 +175,8 @@ atlantis server --autoplan-modules-from-projects='**/init.tf'
 ATLANTIS_AUTOPLAN_MODULES_FROM_PROJECTS='**/init.tf'
 ```
 
-Enables auto-planing of projects when a module dependency in the same repository has changed. 
-This is a list of file patterns like `autoplan-file-list`. 
+Enables auto-planing of projects when a module dependency in the same repository has changed.
+This is a list of file patterns like `autoplan-file-list`.
 
 These patterns select **projects** to index based on the files matched. The index maps modules to the projects that depends on them,
 including projects that include the module via other modules. When a module file matching `autoplan-file-list` changes,
@@ -216,7 +216,7 @@ and set `--autoplan-modules` to `false`.
   ```
   Azure DevOps basic authentication password for inbound webhooks (see
   [docs](https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)).
-  
+
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure DevOps org. This means that an
@@ -326,7 +326,7 @@ and set `--autoplan-modules` to `false`.
   Terraform binaries here. If Atlantis loses this directory, [locks](locking.html)
   will be lost and unapplied plans will be lost.
 
-  Note that the atlantis user is restricted to `~/.atlantis`. 
+  Note that the atlantis user is restricted to `~/.atlantis`.
   If you set the `--data-dir` flag to a path outside of Atlantis its home directory, ensure that you grant the atlantis user the correct permissions.
 
 ### `--default-tf-version`
@@ -395,9 +395,9 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_ENABLE_REGEXP_CMD=true
   ```
   Enable Atlantis to use regular expressions to run plan/apply commands against defined project names when `-p` flag is passed with it.
-  
+
   This can be used to run all defined projects (with the `name` key) in `atlantis.yaml` using `atlantis plan -p .*`.
-  
+
   The flag will only allow the regexes listed in the [`allowed_regexp_prefixes`](https://www.runatlantis.io/docs/repo-level-atlantis-yaml.html#reference) key defined in the repo `atlantis.yaml` file. If the key is undefined, its value defaults to `[]` which will allow any regex.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
@@ -435,7 +435,7 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_HIDE_UNCHANGED_PLAN_COMMENTS=true
   ```
-Remove no-changes plan comments from the pull request. 
+Remove no-changes plan comments from the pull request.
 
 This is useful when you have many projects and want to keep the pull request clean from useless comments.
 
@@ -544,13 +544,13 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
   ```
   In versions v0.21.0 and later, the GitHub team name can be a name or a slug.
-  
+
   In versions v0.20.1 and below, the Github team name required the case sensitive team name.
-  
+
   Comma-separated list of GitHub teams and permission pairs.
-  
+
   By default, any team can plan and apply.
-  
+
   ::: warning NOTE
   You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
   i.e., "Engineering Team:plan, Infrastructure Team:apply"
@@ -670,7 +670,7 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_PARALLEL_PLAN=true
   ```
-  Whether to run plan operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precidence.
+  Whether to run plan operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precedence.
 
 ### `--parallel-apply`
   ```bash
@@ -678,7 +678,7 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_PARALLEL_APPLY=true
   ```
-  Whether to run apply operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precidence.
+  Whether to run apply operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precedence.
 
 ### `--port`
   ```bash
@@ -940,7 +940,7 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   An alternative URL to download Terraform versions if they are missing. Useful in an airgapped
   environment where releases.hashicorp.com is not available. Directory structure of the custom
   endpoint should match that of releases.hashicorp.com.
-  
+
   This has no impact if `--tf-download` is set to `false`.
 
 ### `--tfe-hostname`
@@ -999,9 +999,9 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   ```
   Write out a .git-credentials file with the provider user and token to allow
   cloning private modules over HTTPS or SSH. See [here](https://git-scm.com/docs/git-credential-store) for more information.
-  
+
   Follow the `git::ssh` syntax to avoid using a custom `.gitconfig` with an `insteadOf`.
-  
+
   ```hcl
   module "private_submodule" {
     source = "git::ssh://git@github.com/<org>/<repo>//modules/<some-module-name>?ref=v1.2.3"
@@ -1009,7 +1009,7 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
     # ...
   }
   ```
-  
+
   ::: warning SECURITY WARNING
   This does write secrets to disk and should only be enabled in a secure environment.
   :::
