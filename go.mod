@@ -21,7 +21,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.6
-	github.com/hashicorp/terraform-config-inspect v0.0.0-20230808231734-f15f31bf62b3
+	github.com/hashicorp/terraform-config-inspect v0.0.0-20230825013512-b800820f61b8
 	github.com/kr/pretty v0.3.1
 	github.com/mcdafydd/go-azuredevops v0.12.1
 	github.com/microcosm-cc/bluemonday v1.0.25
@@ -34,7 +34,7 @@ require (
 	github.com/redis/go-redis/v9 v9.1.0
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20230704064427-599ae7bbf278
-	github.com/slack-go/slack v0.12.2
+	github.com/slack-go/slack v0.12.3
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.16.0
