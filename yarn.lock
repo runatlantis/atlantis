@@ -138,12 +138,12 @@
   resolved "https://registry.yarnpkg.com/@babel/parser/-/parser-7.22.11.tgz#becf8ee33aad2a35ed5607f521fe6e72a615f905"
   integrity sha512-R5zb8eJIBPJriQtbH/htEQy4k7E2dHWlD2Y2VT07JCzwYZHBxV5ZYtM0UhXSNMT74LyxuM+b1jdL7pSesXbC/g==
 
-"@docsearch/css@3.5.2", "@docsearch/css@^3.5.1":
+"@docsearch/css@3.5.2", "@docsearch/css@^3.5.2":
   version "3.5.2"
   resolved "https://registry.yarnpkg.com/@docsearch/css/-/css-3.5.2.tgz#610f47b48814ca94041df969d9fcc47b91fc5aac"
   integrity sha512-SPiDHaWKQZpwR2siD0KQUwlStvIAnEyK6tAE2h2Wuoq8ue9skzhlyVQ1ddzOxX6khULnAALDiR/isSF3bnuciA==
 
-"@docsearch/js@^3.5.1":
+"@docsearch/js@^3.5.2":
   version "3.5.2"
   resolved "https://registry.yarnpkg.com/@docsearch/js/-/js-3.5.2.tgz#a11cb2e7e62890e9e940283fed6972ecf632629d"
   integrity sha512-p1YFTCDflk8ieHgFJYfmyHBki1D61+U9idwrLh+GQQMrBSP3DLGKpy0XUJtPjAOPltcVbqsTjiPFfH7JImjUNg==
@@ -151,7 +151,7 @@
     "@docsearch/react" "3.5.2"
     preact "^10.0.0"
 
-"@docsearch/react@3.5.2", "@docsearch/react@^3.5.1":
+"@docsearch/react@3.5.2", "@docsearch/react@^3.5.2":
   version "3.5.2"
   resolved "https://registry.yarnpkg.com/@docsearch/react/-/react-3.5.2.tgz#2e6bbee00eb67333b64906352734da6aef1232b9"
   integrity sha512-9Ahcrs5z2jq/DcAvYtvlqEBHImbm4YJI8M9y0x6Tqg598P40HTEkX7hsMcIuThI+hTFxRGZ9hll0Wygm2yEjng==
@@ -699,19 +699,19 @@
     markdown-it "^13.0.1"
     markdown-it-container "^3.0.0"
 
-"@vuepress/plugin-docsearch@2.0.0-beta.66":
-  version "2.0.0-beta.66"
-  resolved "https://registry.yarnpkg.com/@vuepress/plugin-docsearch/-/plugin-docsearch-2.0.0-beta.66.tgz#8fdc1a630783bf90781ac7444f072ef54da12bed"
-  integrity sha512-gUNejbv00wT5uK6fJvlbKGMN9NhFSMqb6lmSH+9s+4z78sD6hwhpkC7PZry3DlzcvbZstrGHqbfnn3NLhyhSzQ==
+"@vuepress/plugin-docsearch@2.0.0-beta.67":
+  version "2.0.0-beta.67"
+  resolved "https://registry.yarnpkg.com/@vuepress/plugin-docsearch/-/plugin-docsearch-2.0.0-beta.67.tgz#dd7c17641c9541cafb982f13001e47b663189a9e"
+  integrity sha512-s1lvIfEN5U7wzNpCLjIUIkHMdrBp4GzogJ+KM0LDNB56NE3DJf2brTB+UbGbcHCe8ispkTqCOXgHAbVFMPKv/Q==
   dependencies:
-    "@docsearch/css" "^3.5.1"
-    "@docsearch/js" "^3.5.1"
-    "@docsearch/react" "^3.5.1"
-    "@vuepress/client" "2.0.0-beta.66"
-    "@vuepress/core" "2.0.0-beta.66"
-    "@vuepress/shared" "2.0.0-beta.66"
-    "@vuepress/utils" "2.0.0-beta.66"
-    "@vueuse/core" "^10.2.1"
+    "@docsearch/css" "^3.5.2"
+    "@docsearch/js" "^3.5.2"
+    "@docsearch/react" "^3.5.2"
+    "@vuepress/client" "2.0.0-beta.67"
+    "@vuepress/core" "2.0.0-beta.67"
+    "@vuepress/shared" "2.0.0-beta.67"
+    "@vuepress/utils" "2.0.0-beta.67"
+    "@vueuse/core" "^10.4.1"
     ts-debounce "^4.0.0"
     vue "^3.3.4"
     vue-router "^4.2.4"
