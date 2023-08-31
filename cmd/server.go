@@ -96,6 +96,7 @@ const (
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
@@ -468,6 +469,10 @@ var boolFlags = map[string]boolFlag{
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
+	IncludeGitUntrackedFiles: {
+		description:  "Include git untracked files in the Atlantis modified file scope.",
 		defaultValue: false,
 	},
 	ParallelPlanFlag: {
