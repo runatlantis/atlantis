@@ -132,6 +132,7 @@ const (
 	RestrictFileList           = "restrict-file-list"
 	TFDownloadFlag             = "tf-download"
 	TFDownloadURLFlag          = "tf-download-url"
+	UsePluginCache             = "use-plugin-cache"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
@@ -557,6 +558,10 @@ var boolFlags = map[string]boolFlag{
 	HideUnchangedPlanComments: {
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
+	},
+	UsePluginCache: {
+		description:  "Enable the use of plugin cache",
+		defaultValue: true,
 	},
 }
 var intFlags = map[string]intFlag{
