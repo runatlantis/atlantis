@@ -429,6 +429,15 @@ and set `--autoplan-modules` to `false`.
 
   This is useful when running multiple Atlantis servers against a single repository.
 
+### `--fail-on-pre-workflow-hook-error`
+  ```bash
+  atlantis server --fail-on-pre-workflow-hook-error
+  # or
+  ATLANTIS_FAIL_ON_PRE_WORKFLOW_HOOK_ERROR=true 
+  ```
+
+  Fail and do not run the requested Atlantis command if any of the pre workflow hooks error.
+
 ### `--hide-unchanged-plan-comments`
   ```bash
   atlantis server --hide-unchanged-plan-comments
