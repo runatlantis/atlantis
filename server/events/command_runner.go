@@ -177,9 +177,9 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
 			return
-		} else {
-			ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", command.Plan)
 		}
+
+		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", command.Plan)
 	}
 
 	autoPlanRunner := buildCommentCommandRunner(c, command.Plan)
@@ -308,9 +308,9 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
 			return
-		} else {
-			ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", cmd.Name.String())
 		}
+
+		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", cmd.Name.String())
 	}
 
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
