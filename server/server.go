@@ -795,6 +795,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsPullGetter:          azuredevopsClient,
 		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
 		EventParser:                    eventParser,
+		FailOnPreWorkflowHookError:     userConfig.FailOnPreWorkflowHookError,
 		Logger:                         logger,
 		GlobalCfg:                      globalCfg,
 		StatsScope:                     statsScope.SubScope("cmd"),
