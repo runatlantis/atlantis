@@ -984,6 +984,9 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
 atlantis server --use--tf-plugin-cache=false
 # or
 ATLANTIS_USE_TF_PLUGIN_CACHE=false
+```
+Set it to false if you want to disable terraform plugin cache
+
 ### `--var-file-allowlist`
   ```bash
   atlantis server --var-file-allowlist='/path/to/tfvars/dir'
