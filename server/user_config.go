@@ -11,37 +11,39 @@ import (
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type UserConfig struct {
-	AllowForkPRs                    bool   `mapstructure:"allow-fork-prs"`
-	AllowRepoConfig                 bool   `mapstructure:"allow-repo-config"`
-	AllowCommands                   string `mapstructure:"allow-commands"`
-	AtlantisURL                     string `mapstructure:"atlantis-url"`
-	Automerge                       bool   `mapstructure:"automerge"`
-	AutoplanFileList                string `mapstructure:"autoplan-file-list"`
-	AutoplanModules                 bool   `mapstructure:"autoplan-modules"`
-	AutoplanModulesFromProjects     string `mapstructure:"autoplan-modules-from-projects"`
-	AzureDevopsToken                string `mapstructure:"azuredevops-token"`
-	AzureDevopsUser                 string `mapstructure:"azuredevops-user"`
-	AzureDevopsWebhookPassword      string `mapstructure:"azuredevops-webhook-password"`
-	AzureDevopsWebhookUser          string `mapstructure:"azuredevops-webhook-user"`
-	AzureDevOpsHostname             string `mapstructure:"azuredevops-hostname"`
-	BitbucketBaseURL                string `mapstructure:"bitbucket-base-url"`
-	BitbucketToken                  string `mapstructure:"bitbucket-token"`
-	BitbucketUser                   string `mapstructure:"bitbucket-user"`
-	BitbucketWebhookSecret          string `mapstructure:"bitbucket-webhook-secret"`
-	CheckoutDepth                   int    `mapstructure:"checkout-depth"`
-	CheckoutStrategy                string `mapstructure:"checkout-strategy"`
-	DataDir                         string `mapstructure:"data-dir"`
-	DisableApplyAll                 bool   `mapstructure:"disable-apply-all"`
-	DisableApply                    bool   `mapstructure:"disable-apply"`
-	DisableAutoplan                 bool   `mapstructure:"disable-autoplan"`
-	DisableMarkdownFolding          bool   `mapstructure:"disable-markdown-folding"`
-	DisableRepoLocking              bool   `mapstructure:"disable-repo-locking"`
-	DiscardApprovalOnPlanFlag       bool   `mapstructure:"discard-approval-on-plan"`
-	EmojiReaction                   string `mapstructure:"emoji-reaction"`
-	EnablePolicyChecksFlag          bool   `mapstructure:"enable-policy-checks"`
-	EnableRegExpCmd                 bool   `mapstructure:"enable-regexp-cmd"`
-	EnableDiffMarkdownFormat        bool   `mapstructure:"enable-diff-markdown-format"`
-	ExecutableName                  string `mapstructure:"executable-name"`
+	AllowForkPRs                bool   `mapstructure:"allow-fork-prs"`
+	AllowRepoConfig             bool   `mapstructure:"allow-repo-config"`
+	AllowCommands               string `mapstructure:"allow-commands"`
+	AtlantisURL                 string `mapstructure:"atlantis-url"`
+	Automerge                   bool   `mapstructure:"automerge"`
+	AutoplanFileList            string `mapstructure:"autoplan-file-list"`
+	AutoplanModules             bool   `mapstructure:"autoplan-modules"`
+	AutoplanModulesFromProjects string `mapstructure:"autoplan-modules-from-projects"`
+	AzureDevopsToken            string `mapstructure:"azuredevops-token"`
+	AzureDevopsUser             string `mapstructure:"azuredevops-user"`
+	AzureDevopsWebhookPassword  string `mapstructure:"azuredevops-webhook-password"`
+	AzureDevopsWebhookUser      string `mapstructure:"azuredevops-webhook-user"`
+	AzureDevOpsHostname         string `mapstructure:"azuredevops-hostname"`
+	BitbucketBaseURL            string `mapstructure:"bitbucket-base-url"`
+	BitbucketToken              string `mapstructure:"bitbucket-token"`
+	BitbucketUser               string `mapstructure:"bitbucket-user"`
+	BitbucketWebhookSecret      string `mapstructure:"bitbucket-webhook-secret"`
+	CheckoutDepth               int    `mapstructure:"checkout-depth"`
+	CheckoutStrategy            string `mapstructure:"checkout-strategy"`
+	DataDir                     string `mapstructure:"data-dir"`
+	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
+	DisableApply                bool   `mapstructure:"disable-apply"`
+	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
+	DisableMarkdownFolding      bool   `mapstructure:"disable-markdown-folding"`
+	DisableRepoLocking          bool   `mapstructure:"disable-repo-locking"`
+	DiscardApprovalOnPlanFlag   bool   `mapstructure:"discard-approval-on-plan"`
+	EmojiReaction               string `mapstructure:"emoji-reaction"`
+	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
+	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
+	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
+	ExecutableName              string `mapstructure:"executable-name"`
+	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
+	FailOnPreWorkflowHookError      bool   `mapstructure:"fail-on-pre-workflow-hook-error"`
 	HideUnchangedPlanComments       bool   `mapstructure:"hide-unchanged-plan-comments"`
 	GithubAllowMergeableBypassApply bool   `mapstructure:"gh-allow-mergeable-bypass-apply"`
 	GithubHostname                  string `mapstructure:"gh-hostname"`
