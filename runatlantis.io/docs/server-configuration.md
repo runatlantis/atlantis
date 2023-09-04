@@ -981,7 +981,7 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
 
 ### `--use-tf-plugin-cache`
 ```bash
-atlantis server --use--tf-plugin-cache=false
+atlantis server --use-tf-plugin-cache=false
 # or
 ATLANTIS_USE_TF_PLUGIN_CACHE=false
 ```
