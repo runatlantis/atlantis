@@ -133,7 +133,7 @@ const (
 	RestrictFileList           = "restrict-file-list"
 	TFDownloadFlag             = "tf-download"
 	TFDownloadURLFlag          = "tf-download-url"
-	UsePluginCache             = "use-plugin-cache"
+	UseTFPluginCache             = "use-tf-plugin-cache"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
@@ -564,8 +564,8 @@ var boolFlags = map[string]boolFlag{
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
 	},
-	UsePluginCache: {
-		description:  "Enable the use of plugin cache",
+	UseTFPluginCache: {
+		description:  "Enable the use of the Terraform plugin cache",
 		defaultValue: true,
 	},
 }

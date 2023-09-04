@@ -979,14 +979,11 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   ```
   A token for Terraform Cloud/Terraform Enterprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
 
-### `--use-plugin-cache`
+### `--use-tf-plugin-cache`
 ```bash
-atlantis server --use-plugin-cache=false
+atlantis server --use--tf-plugin-cache=false
 # or
-ATLANTIS_USE_PLUGIN_CACHE=false
-```
-By default plugin cache is used, you can turn it of by setting this flag to `false`
-
+ATLANTIS_USE_TF_PLUGIN_CACHE=false
 ### `--var-file-allowlist`
   ```bash
   atlantis server --var-file-allowlist='/path/to/tfvars/dir'
