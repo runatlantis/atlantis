@@ -992,6 +992,8 @@ This flag is useful when having multiple projects that need to run a plan and ap
 - [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
 - [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
 
+The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient managment of the PRs.
+
 ### `--var-file-allowlist`
   ```bash
   atlantis server --var-file-allowlist='/path/to/tfvars/dir'
