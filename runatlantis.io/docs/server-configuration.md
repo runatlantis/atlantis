@@ -985,7 +985,12 @@ atlantis server --use-tf-plugin-cache=false
 # or
 ATLANTIS_USE_TF_PLUGIN_CACHE=false
 ```
-Set it to false if you want to disable terraform plugin cache
+Set to false if you want to disable terraform plugin cache.
+
+This flag is useful when having multiple projects that need to run a plan and apply in the same PR to avoid the race condition of `plugin_cache_dir` concurrently, this is a terraform known issue, more info:
+
+- [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
+- [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
 
 ### `--var-file-allowlist`
   ```bash
