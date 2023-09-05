@@ -9,7 +9,7 @@ jobs:
         # that flag starts the download asynchronously so we'd have a race
         # condition.
         # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-        TERRAFORM_VERSION: 1.5.5
+        TERRAFORM_VERSION: 1.5.6
     steps:
     - checkout
     - run: make build-service
