@@ -14,8 +14,6 @@ on:
       - '.github/workflows/atlantis-image.yml'
       - '**.go'
       - 'go.*'
-      - 'yarn.lock'
-      - 'package.json'
   workflow_dispatch:
 
 concurrency:
@@ -35,7 +33,7 @@ jobs:
       PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     # Lint the Dockerfile first before setting anything up
     - name: Lint Dockerfile

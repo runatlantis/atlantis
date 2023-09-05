@@ -55,6 +55,8 @@ const (
 	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutomergeFlag                    = "automerge"
+	ParallelPlanFlag                 = "parallel-plan"
+	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
 	AutoplanModulesFromProjects      = "autoplan-modules-from-projects"
 	AutoplanFileListFlag             = "autoplan-file-list"
@@ -78,6 +80,7 @@ const (
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	ExecutableName                   = "executable-name"
+	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
@@ -455,6 +458,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
 		defaultValue: false,
 	},
+	FailOnPreWorkflowHookError: {
+		description:  "Fail and do not run the requested Atlantis command if any of the pre workflow hooks error.",
+		defaultValue: false,
+	},
 	GHAllowMergeableBypassApply: {
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
 		defaultValue: false,
@@ -466,6 +473,14 @@ var boolFlags = map[string]boolFlag{
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
+	ParallelPlanFlag: {
+		description:  "Run plan operations in parallel.",
+		defaultValue: false,
+	},
+	ParallelApplyFlag: {
+		description:  "Run apply operations in parallel.",
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {
@@ -1086,8 +1101,8 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	}
 	if userConfig.AllowRepoConfig {
 		deprecatedFlags = append(deprecatedFlags, AllowRepoConfigFlag)
-		yamlCfg += "\n  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow]\n  allow_custom_workflows: true"
-		jsonCfg += `, "allowed_overrides":["plan_requirements","apply_requirements","import_requirements","workflow"], "allow_custom_workflows":true`
+		yamlCfg += "\n  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, policy_check]\n  allow_custom_workflows: true"
+		jsonCfg += `, "allowed_overrides":["plan_requirements","apply_requirements","import_requirements","workflow", "policy_check"], "allow_custom_workflows":true`
 	}
 	jsonCfg += "}]}"
 

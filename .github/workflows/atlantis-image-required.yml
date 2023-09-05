@@ -11,8 +11,6 @@ on:
       - '.github/workflows/atlantis-image.yml'
       - '**.go'
       - 'go.*'
-      - 'yarn.lock'
-      - 'package.json'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}

@@ -238,7 +238,7 @@ tbody {
 /* Styles for the lock index */
 .lock-grid{
   display: grid;
-  grid-template-columns: auto auto auto auto auto;
+  grid-template-columns: auto auto auto auto auto auto;
   border: 1px solid #dbeaf4;
   width: 100%;
   font-size: 12px;
@@ -279,6 +279,10 @@ tbody {
 }
 
 .lock-reponame {
+  word-break: break-all;
+}
+
+.lock-username {
   word-break: break-all;
 }
 
@@ -356,6 +360,10 @@ tbody {
 }
 
 .js-discard-success {
+  font-family: monospace, monospace; font-size: 1.1em; text-align: center; display: none;
+}
+
+.github-app-msg {
   font-family: monospace, monospace; font-size: 1.1em; text-align: center;
 }
 

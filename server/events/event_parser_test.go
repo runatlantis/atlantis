@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
@@ -492,7 +492,15 @@ func TestParseGitlabMergeEvent_Update_ActionType(t *testing.T) {
 		},
 		{
 			filename: "gitlab-merge-request-event-update-target-branch.json",
-			exp:      models.UpdatedPullEvent,
+			exp:      models.OtherPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-update-reviewer.json",
+			exp:      models.OtherPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-update-milestone.json",
+			exp:      models.OtherPullEvent,
 		},
 		{
 			filename: "gitlab-merge-request-event-mark-as-ready.json",
@@ -990,6 +998,42 @@ func TestParseBitbucketCloudPullEvent_States(t *testing.T) {
 	}
 }
 
+func TestBitBucketNonCodeChangesAreIgnored(t *testing.T) {
+	// lets say a user opens a PR
+	act := parser.GetBitbucketCloudPullEventType("pullrequest:created", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OpenedPullEvent, act)
+	// Another update with same SHA should be ignored
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OtherPullEvent, act)
+	// Only if SHA changes do we act
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha2", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.UpdatedPullEvent, act)
+
+	// If sha changes in seperate PR,
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "otherPRSha", "https://github.com/fakeorg/fakerepo/pull/2")
+	Equals(t, models.UpdatedPullEvent, act)
+	// We will still ignore same shas in first PR
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha2", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OtherPullEvent, act)
+}
+
+func TestBitbucketShaCacheExpires(t *testing.T) {
+	// lets say a user opens a PR
+	act := parser.GetBitbucketCloudPullEventType("pullrequest:created", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OpenedPullEvent, act)
+	// Another update with same SHA should be ignored
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OtherPullEvent, act)
+	// But after 300 times, the cache should expire
+	// this is so we don't have ever increasing memory usage
+	for i := 0; i < 302; i++ {
+		parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", fmt.Sprintf("https://github.com/fakeorg/fakerepo/pull/%d", i))
+	}
+	// and now SHA will seen as a change again
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.UpdatedPullEvent, act)
+}
+
 func TestGetBitbucketCloudEventType(t *testing.T) {
 	cases := []struct {
 		header string
@@ -1018,7 +1062,9 @@ func TestGetBitbucketCloudEventType(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.header, func(t *testing.T) {
-			act := parser.GetBitbucketCloudPullEventType(c.header)
+			// we pass in the header as the SHA so the SHA changes each time
+			// the code will ignore duplicate SHAS to avoid extra TF plans
+			act := parser.GetBitbucketCloudPullEventType(c.header, c.header, "https://github.com/fakeorg/fakerepo/pull/1")
 			Equals(t, c.exp, act)
 		})
 	}

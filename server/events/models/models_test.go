@@ -369,6 +369,10 @@ func TestPlanSuccess_Summary(t *testing.T) {
 			"Plan: 100 to add, 111 to change, 222 to destroy.",
 		},
 		{
+			"dummy\nPlan: 42 to import, 53 to add, 64 to change, 75 to destroy.",
+			"Plan: 42 to import, 53 to add, 64 to change, 75 to destroy.",
+		},
+		{
 			"Note: Objects have changed outside of Terraform\ndummy\nNo changes. Infrastructure is up-to-date.",
 			"\n**Note: Objects have changed outside of Terraform**\nNo changes. Infrastructure is up-to-date.",
 		},
@@ -629,6 +633,7 @@ func TestPlanSuccessStats(t *testing.T) {
 					Plan: 1 to add, 3 to change, 2 to destroy.`,
 			models.PlanSuccessStats{
 				Changes: true,
+
 				Add:     1,
 				Change:  3,
 				Destroy: 2,
@@ -649,6 +654,25 @@ func TestPlanSuccessStats(t *testing.T) {
 					No changes. Your infrastructure matches the configuration.`,
 			models.PlanSuccessStats{
 				ChangesOutside: true,
+			},
+		},
+		{
+			"with imports",
+			`Terraform used the selected providers to generate the following execution
+			plan. Resource actions are indicated with the following symbols:	
+			  + create
+			  ~ update in-place
+			  - destroy
+			Terraform will perform the following actions:
+			  - null_resource.hi[1]
+			Plan: 42 to import, 31 to add, 20 to change, 1 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  42,
+				Add:     31,
+				Change:  20,
+				Destroy: 1,
 			},
 		},
 		{

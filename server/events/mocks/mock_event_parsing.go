@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	github "github.com/google/go-github/v53/github"
+	github "github.com/google/go-github/v54/github"
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
@@ -28,11 +28,11 @@ func NewMockEventParsing(options ...pegomock.Option) *MockEventParsing {
 func (mock *MockEventParsing) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockEventParsing) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockEventParsing) GetBitbucketCloudPullEventType(eventTypeHeader string) models.PullRequestEventType {
+func (mock *MockEventParsing) GetBitbucketCloudPullEventType(eventTypeHeader string, sha string, pr string) models.PullRequestEventType {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockEventParsing().")
 	}
-	params := []pegomock.Param{eventTypeHeader}
+	params := []pegomock.Param{eventTypeHeader, sha, pr}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetBitbucketCloudPullEventType", params, []reflect.Type{reflect.TypeOf((*models.PullRequestEventType)(nil)).Elem()})
 	var ret0 models.PullRequestEventType
 	if len(result) != 0 {

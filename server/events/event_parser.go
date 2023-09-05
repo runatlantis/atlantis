@@ -21,7 +21,8 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v54/github"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -33,6 +34,8 @@ import (
 
 const gitlabPullOpened = "opened"
 const usagesCols = 90
+
+var lastBitbucketSha, _ = lru.New[string, string](300)
 
 // PullCommand is a command to run on a pull request.
 type PullCommand interface {
@@ -267,7 +270,7 @@ type EventParsing interface {
 
 	// GetBitbucketCloudPullEventType returns the type of the pull request
 	// event given the Bitbucket Cloud header.
-	GetBitbucketCloudPullEventType(eventTypeHeader string) models.PullRequestEventType
+	GetBitbucketCloudPullEventType(eventTypeHeader string, sha string, pr string) models.PullRequestEventType
 
 	// ParseBitbucketServerPullEvent parses a pull request event from Bitbucket
 	// Server.
@@ -343,11 +346,18 @@ func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFu
 
 // GetBitbucketCloudPullEventType returns the type of the pull request
 // event given the Bitbucket Cloud header.
-func (e *EventParser) GetBitbucketCloudPullEventType(eventTypeHeader string) models.PullRequestEventType {
+func (e *EventParser) GetBitbucketCloudPullEventType(eventTypeHeader string, sha string, pr string) models.PullRequestEventType {
 	switch eventTypeHeader {
 	case bitbucketcloud.PullCreatedHeader:
+		lastBitbucketSha.Add(pr, sha)
 		return models.OpenedPullEvent
 	case bitbucketcloud.PullUpdatedHeader:
+		lastSha, _ := lastBitbucketSha.Get(pr)
+		if sha == lastSha {
+			// No change, ignore
+			return models.OtherPullEvent
+		}
+		lastBitbucketSha.Add(pr, sha)
 		return models.UpdatedPullEvent
 	case bitbucketcloud.PullFulfilledHeader, bitbucketcloud.PullRejectedHeader:
 		return models.ClosedPullEvent
@@ -589,29 +599,9 @@ func (e *EventParser) ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent
 		// Check for MR that has been marked as ready
 		(strings.HasPrefix(event.Changes.Title.Previous, "Draft:") && !strings.HasPrefix(event.Changes.Title.Current, "Draft:")) {
 		return models.UpdatedPullEvent
-	}
-
-	// Update Assignee
-	if len(event.Changes.Assignees.Previous) > 0 || len(event.Changes.Assignees.Current) > 0 {
+	} else {
 		return models.OtherPullEvent
 	}
-
-	// Update Description
-	if len(event.Changes.Description.Previous) > 0 || len(event.Changes.Description.Current) > 0 {
-		return models.OtherPullEvent
-	}
-
-	// Update Labels
-	if len(event.Changes.Labels.Previous) > 0 || len(event.Changes.Labels.Current) > 0 {
-		return models.OtherPullEvent
-	}
-
-	//Update Title
-	if len(event.Changes.Title.Previous) > 0 || len(event.Changes.Title.Current) > 0 {
-		return models.OtherPullEvent
-	}
-
-	return models.UpdatedPullEvent
 }
 
 // ParseGitlabMergeRequestEvent parses GitLab merge request events.

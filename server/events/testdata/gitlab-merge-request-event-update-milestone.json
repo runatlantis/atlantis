@@ -1,0 +1,154 @@
+{
+    "object_kind": "merge_request",
+    "event_type": "merge_request",
+    "user": {
+      "id": 2,
+      "name": "Simon Heather",
+      "username": "sheather",
+      "avatar_url": "https://secure.gravatar.com/avatar/000b3c2c6b410f2f327d6450faab4d88?s=80&d=identicon",
+      "email": "[REDACTED]"
+    },
+    "project": {
+      "id": 2,
+      "name": "test",
+      "description": null,
+      "web_url": "https://gitlab.lan/sheather/test",
+      "avatar_url": null,
+      "git_ssh_url": "git@gitlab.lan:sheather/test.git",
+      "git_http_url": "https://gitlab.lan/sheather/test.git",
+      "namespace": "Simon Heather",
+      "visibility_level": 0,
+      "path_with_namespace": "sheather/test",
+      "default_branch": "main",
+      "ci_config_path": null,
+      "homepage": "https://gitlab.lan/sheather/test",
+      "url": "git@gitlab.lan:sheather/test.git",
+      "ssh_url": "git@gitlab.lan:sheather/test.git",
+      "http_url": "https://gitlab.lan/sheather/test.git"
+    },
+    "object_attributes": {
+      "assignee_id": null,
+      "author_id": 2,
+      "created_at": "2023-07-02 15:59:31 UTC",
+      "description": "",
+      "head_pipeline_id": 8,
+      "id": 3,
+      "iid": 3,
+      "last_edited_at": null,
+      "last_edited_by_id": null,
+      "merge_commit_sha": null,
+      "merge_error": null,
+      "merge_params": {
+        "force_remove_source_branch": "1"
+      },
+      "merge_status": "can_be_merged",
+      "merge_user_id": null,
+      "merge_when_pipeline_succeeds": false,
+      "milestone_id": 1,
+      "source_branch": "sheather-cloudfront-patch-92417",
+      "source_project_id": 2,
+      "state_id": 1,
+      "target_branch": "cloudfront",
+      "target_project_id": 2,
+      "time_estimate": 0,
+      "title": "Update live/aws/123456789012/develop/eu-west-2/cloudfront/main.tf",
+      "updated_at": "2023-07-02 16:50:42 UTC",
+      "updated_by_id": 2,
+      "url": "https://gitlab.lan/sheather/test/-/merge_requests/3",
+      "source": {
+        "id": 2,
+        "name": "test",
+        "description": null,
+        "web_url": "https://gitlab.lan/sheather/test",
+        "avatar_url": null,
+        "git_ssh_url": "git@gitlab.lan:sheather/test.git",
+        "git_http_url": "https://gitlab.lan/sheather/test.git",
+        "namespace": "Simon Heather",
+        "visibility_level": 0,
+        "path_with_namespace": "sheather/test",
+        "default_branch": "main",
+        "ci_config_path": null,
+        "homepage": "https://gitlab.lan/sheather/test",
+        "url": "git@gitlab.lan:sheather/test.git",
+        "ssh_url": "git@gitlab.lan:sheather/test.git",
+        "http_url": "https://gitlab.lan/sheather/test.git"
+      },
+      "target": {
+        "id": 2,
+        "name": "test",
+        "description": null,
+        "web_url": "https://gitlab.lan/sheather/test",
+        "avatar_url": null,
+        "git_ssh_url": "git@gitlab.lan:sheather/test.git",
+        "git_http_url": "https://gitlab.lan/sheather/test.git",
+        "namespace": "Simon Heather",
+        "visibility_level": 0,
+        "path_with_namespace": "sheather/test",
+        "default_branch": "main",
+        "ci_config_path": null,
+        "homepage": "https://gitlab.lan/sheather/test",
+        "url": "git@gitlab.lan:sheather/test.git",
+        "ssh_url": "git@gitlab.lan:sheather/test.git",
+        "http_url": "https://gitlab.lan/sheather/test.git"
+      },
+      "last_commit": {
+        "id": "386f281f2c9b1a3b659fc7a244ca6781174e1836",
+        "message": "Update main.tf",
+        "title": "Update main.tf",
+        "timestamp": "2023-07-02T16:33:22+00:00",
+        "url": "https://gitlab.lan/sheather/test/-/commit/386f281f2c9b1a3b659fc7a244ca6781174e1836",
+        "author": {
+          "name": "Simon Heather",
+          "email": "[REDACTED]"
+        }
+      },
+      "work_in_progress": false,
+      "total_time_spent": 0,
+      "time_change": 0,
+      "human_total_time_spent": null,
+      "human_time_change": null,
+      "human_time_estimate": null,
+      "assignee_ids": [
+  
+      ],
+      "reviewer_ids": [
+        2
+      ],
+      "labels": [
+  
+      ],
+      "state": "opened",
+      "blocking_discussions_resolved": true,
+      "first_contribution": false,
+      "detailed_merge_status": "ci_must_pass",
+      "action": "update"
+    },
+    "labels": [
+  
+    ],
+    "changes": {
+      "milestone_id": {
+        "previous": null,
+        "current": 1
+      },
+      "updated_at": {
+        "previous": "2023-07-02 16:49:20 UTC",
+        "current": "2023-07-02 16:50:42 UTC"
+      }
+    },
+    "repository": {
+      "name": "test",
+      "url": "git@gitlab.lan:sheather/test.git",
+      "description": null,
+      "homepage": "https://gitlab.lan/sheather/test"
+    },
+    "reviewers": [
+      {
+        "id": 2,
+        "name": "Simon Heather",
+        "username": "sheather",
+        "avatar_url": "https://secure.gravatar.com/avatar/000b3c2c6b410f2f327d6450faab4d88?s=80&d=identicon",
+        "email": "[REDACTED]"
+      }
+    ]
+  }
