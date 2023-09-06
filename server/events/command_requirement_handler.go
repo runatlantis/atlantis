@@ -22,7 +22,7 @@ func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, c
 		switch req {
 		case raw.ApprovedRequirement:
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
-				return "Pull request must be approved by at least one person other than the author before running plan.", nil
+				return "Pull request must be approved according to the project's approval rules before running plan.", nil
 			}
 		case raw.MergeableRequirement:
 			if !ctx.PullReqStatus.Mergeable {
