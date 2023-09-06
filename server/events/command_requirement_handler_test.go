@@ -249,7 +249,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
 				},
 			},
-			wantFailure: "Pull request must be approved according to the project's approval rules before running plan.",
+			wantFailure: "Pull request must be approved according to the project's approval rules before running apply.",
 			wantErr:     assert.NoError,
 		},
 		{

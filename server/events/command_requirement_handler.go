@@ -43,7 +43,7 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 		switch req {
 		case raw.ApprovedRequirement:
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
-				return "Pull request must be approved by at least one person other than the author before running apply.", nil
+				return "Pull request must be approved according to the project's approval rules before running apply.", nil
 			}
 		// this should come before mergeability check since mergeability is a superset of this check.
 		case valid.PoliciesPassedCommandReq:
