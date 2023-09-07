@@ -5,7 +5,7 @@ ARG DEBIAN_TAG=12.1-slim
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.21.0-alpine AS builder
+FROM golang:1.21.1-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -60,7 +60,7 @@ WORKDIR /tmp/build
 
 # install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV DEFAULT_CONFTEST_VERSION=0.44.1
+ENV DEFAULT_CONFTEST_VERSION=0.45.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
     case ${TARGETPLATFORM} in \
