@@ -517,11 +517,12 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 		ProjectContexts        []command.ProjectContext
 		ProjectResults         []command.ProjectResult
 		PrevPlanStored         bool // stores a previous "No changes" plan in the backend
+		DoNotUpdateApply       bool // certain circumtances we want to skip the call to update apply
 		ExpVCSApplyStatusTotal int
 		ExpVCSApplyStatusSucc  int
 	}{
 		{
-			Description: "When planning with changes, set the 0/1 apply status",
+			Description: "When planning with changes, do not change the apply status",
 			ProjectContexts: []command.ProjectContext{
 				{
 					CommandName: command.Plan,
@@ -537,6 +538,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					},
 				},
 			},
+			DoNotUpdateApply:       true,
 			ExpVCSApplyStatusTotal: 1,
 			ExpVCSApplyStatusSucc:  0,
 		},
@@ -561,7 +563,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			ExpVCSApplyStatusSucc:  1,
 		},
 		{
-			Description: "When planning with no changes and previous plan with no changes, set the 1/2 apply status",
+			Description: "When planning with no changes and previous plan with no changes do not set the apply status",
 			ProjectContexts: []command.ProjectContext{
 				{
 					CommandName: command.Plan,
@@ -603,7 +605,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			ExpVCSApplyStatusSucc:  2,
 		},
 		{
-			Description: "When planning again with changes following a previous 'No changes' plan, set the 0/1 apply status",
+			Description: "When planning again with changes following a previous 'No changes' plan do not set the apply status",
 			ProjectContexts: []command.ProjectContext{
 				{
 					CommandName: command.Plan,
@@ -626,7 +628,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			ExpVCSApplyStatusSucc:  0,
 		},
 		{
-			Description: "When planning again with changes following a previous 'No changes' plan, while another plan with 'No changes', set the 1/2 apply status.",
+			Description: "When planning again with changes following a previous 'No changes' plan, while another plan with 'No changes' do not set the apply status.",
 			ProjectContexts: []command.ProjectContext{
 				{
 					CommandName: command.Plan,
@@ -748,15 +750,25 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			if c.ExpVCSApplyStatusSucc != c.ExpVCSApplyStatusTotal {
 				ExpCommitStatus = models.PendingCommitStatus
 			}
-
-			commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-				Any[models.Repo](),
-				Any[models.PullRequest](),
-				Eq[models.CommitStatus](ExpCommitStatus),
-				Eq[command.Name](command.Apply),
-				Eq(c.ExpVCSApplyStatusSucc),
-				Eq(c.ExpVCSApplyStatusTotal),
-			)
+			if c.DoNotUpdateApply {
+				commitUpdater.VerifyWasCalled(Times(0)).UpdateCombinedCount(
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Eq[models.CommitStatus](ExpCommitStatus),
+					Eq[command.Name](command.Apply),
+					AnyInt(),
+					AnyInt(),
+				)
+			} else {
+				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Eq[models.CommitStatus](ExpCommitStatus),
+					Eq[command.Name](command.Apply),
+					Eq(c.ExpVCSApplyStatusSucc),
+					Eq(c.ExpVCSApplyStatusTotal),
+				)
+			}
 		})
 	}
 }
