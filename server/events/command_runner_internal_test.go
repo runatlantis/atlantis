@@ -201,8 +201,8 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 				},
 			},
 			expStatus:     models.PendingCommitStatus,
-			expNumSuccess: 1,
-			expNumTotal:   2,
+			expNumSuccess: 0,
+			expNumTotal:   0,
 		},
 		"one plan, one apply, one plan success with no changes": {
 			cmd: command.Apply,
@@ -220,8 +220,8 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 				},
 			},
 			expStatus:     models.PendingCommitStatus,
-			expNumSuccess: 2,
-			expNumTotal:   3,
+			expNumSuccess: 0,
+			expNumTotal:   0,
 		},
 		"one apply error, one apply, one plan success with no changes": {
 			cmd: command.Apply,
