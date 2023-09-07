@@ -347,15 +347,17 @@ func TestPost_GithubCommentResponse(t *testing.T) {
 
 func TestPost_GitlabCommentSuccess(t *testing.T) {
 	t.Log("when the event is a gitlab comment with a valid command we call the command handler")
-	e, _, gl, _, _, cr, _, _, _ := setup(t)
+	e, _, gl, _, _, cr, _, _, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
+	cmd := events.CommentCommand{}
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
+	When(cp.Parse(Any[string](), Eq(models.Gitlab))).ThenReturn(events.CommentParseResult{Command: &cmd})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
 
-	cr.VerifyWasCalledOnce().RunCommentCommand(models.Repo{}, &models.Repo{}, nil, models.User{}, 0, nil)
+	cr.VerifyWasCalledOnce().RunCommentCommand(models.Repo{}, &models.Repo{}, nil, models.User{}, 0, &cmd)
 }
 
 func TestPost_GithubCommentSuccess(t *testing.T) {
@@ -398,10 +400,12 @@ func TestPost_GithubCommentReaction(t *testing.T) {
 
 func TestPost_GilabCommentReaction(t *testing.T) {
 	t.Log("when the event is a gitlab comment with a valid command we call the ReactToComment handler")
-	e, _, gl, _, _, _, _, vcsClient, _ := setup(t)
+	e, _, gl, _, _, _, _, vcsClient, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
+	cmd := events.CommentCommand{}
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
+	When(cp.Parse(Any[string](), Eq(models.Gitlab))).ThenReturn(events.CommentParseResult{Command: &cmd})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
