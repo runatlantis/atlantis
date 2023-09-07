@@ -1,4 +1,4 @@
-FROM golang:1.21.0
+FROM golang:1.21.1
 
 RUN apt-get update && apt-get --no-install-recommends -y install unzip \
     && apt-get clean \
@@ -16,7 +16,7 @@ RUN case $(uname -m) in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH
 
 # Install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV CONFTEST_VERSION=0.44.1
+ENV CONFTEST_VERSION=0.45.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN case $(uname -m) in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
     curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
