@@ -166,11 +166,12 @@ func TestPlanUpdatePlanCommitStatus(t *testing.T) {
 
 func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 	cases := map[string]struct {
-		cmd           command.Name
-		pullStatus    models.PullStatus
-		expStatus     models.CommitStatus
-		expNumSuccess int
-		expNumTotal   int
+		cmd                  command.Name
+		pullStatus           models.PullStatus
+		expStatus            models.CommitStatus
+		doNotCallUpdateApply bool // In certain situations, we don't expect updateCommitStatus to call the underlying commitStatusUpdater code at all
+		expNumSuccess        int
+		expNumTotal          int
 	}{
 		"all plans success with no changes": {
 			cmd: command.Apply,
@@ -200,9 +201,7 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 					},
 				},
 			},
-			expStatus:     models.PendingCommitStatus,
-			expNumSuccess: 0,
-			expNumTotal:   0,
+			doNotCallUpdateApply: true,
 		},
 		"one plan, one apply, one plan success with no changes": {
 			cmd: command.Apply,
@@ -219,9 +218,8 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 					},
 				},
 			},
-			expStatus:     models.PendingCommitStatus,
-			expNumSuccess: 0,
-			expNumTotal:   0,
+			expStatus:            models.PendingCommitStatus,
+			doNotCallUpdateApply: true,
 		},
 		"one apply error, one apply, one plan success with no changes": {
 			cmd: command.Apply,
@@ -251,12 +249,17 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 				commitStatusUpdater: csu,
 			}
 			cr.updateCommitStatus(&command.Context{}, c.pullStatus, command.Apply)
-			Equals(t, models.Repo{}, csu.CalledRepo)
-			Equals(t, models.PullRequest{}, csu.CalledPull)
-			Equals(t, c.expStatus, csu.CalledStatus)
-			Equals(t, c.cmd, csu.CalledCommand)
-			Equals(t, c.expNumSuccess, csu.CalledNumSuccess)
-			Equals(t, c.expNumTotal, csu.CalledNumTotal)
+			if c.doNotCallUpdateApply {
+				Equals(t, csu.Called, false)
+			} else {
+				Equals(t, csu.Called, true)
+				Equals(t, models.Repo{}, csu.CalledRepo)
+				Equals(t, models.PullRequest{}, csu.CalledPull)
+				Equals(t, c.expStatus, csu.CalledStatus)
+				Equals(t, c.cmd, csu.CalledCommand)
+				Equals(t, c.expNumSuccess, csu.CalledNumSuccess)
+				Equals(t, c.expNumTotal, csu.CalledNumTotal)
+			}
 		})
 	}
 }
@@ -268,9 +271,11 @@ type MockCSU struct {
 	CalledCommand    command.Name
 	CalledNumSuccess int
 	CalledNumTotal   int
+	Called           bool
 }
 
 func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command command.Name, numSuccess int, numTotal int) error {
+	m.Called = true
 	m.CalledRepo = repo
 	m.CalledPull = pull
 	m.CalledStatus = status
