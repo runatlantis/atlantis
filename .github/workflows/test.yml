@@ -32,6 +32,6 @@ jobs:
     runs-on: ubuntu-22.04
     container: ghcr.io/runatlantis/testing-env:latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: make test-all
       - run: make check-fmt
