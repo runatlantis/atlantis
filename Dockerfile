@@ -5,7 +5,7 @@ ARG DEBIAN_TAG=12.1-slim
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.21.0-alpine AS builder
+FROM golang:1.21.1-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -121,7 +121,7 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.5.6
+ENV DEFAULT_TERRAFORM_VERSION=1.5.7
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 # Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
