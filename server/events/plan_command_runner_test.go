@@ -746,7 +746,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				ExpCommitStatus = models.PendingCommitStatus
 			}
 			if c.DoNotUpdateApply {
-				commitUpdater.VerifyWasCalled(Times(1)).UpdateCombinedCount(
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
 					Any[models.Repo](),
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
