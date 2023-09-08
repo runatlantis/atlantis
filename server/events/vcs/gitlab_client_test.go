@@ -368,6 +368,27 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			true,
 		},
 		{
+			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			true,
+		},
+		{
+			fmt.Sprintf("%s/apply", vcsStatusName),
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			true,
+		},
+		{
+			fmt.Sprintf("%s/plan: resource/default", vcsStatusName),
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			false,
+		},
+		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.PendingCommitStatus,
 			gitlabServerVersions,
@@ -380,6 +401,13 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			noHeadPipelineMR,
 			false,
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			true,
 		},
 	}
 	for _, serverVersion := range gitlabServerVersions {

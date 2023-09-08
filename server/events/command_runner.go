@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -96,12 +96,15 @@ type DefaultCommandRunner struct {
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
-	DisableAutoplan          bool
-	EventParser              EventParsing
-	Logger                   logging.SimpleLogging
-	GlobalCfg                valid.GlobalCfg
-	StatsScope               tally.Scope
-	// AllowForkPRs controls whether we operate on pull requests from forks.
+	// User config option: Disables autoplan when a pull request is opened or updated.
+	DisableAutoplan bool
+	EventParser     EventParsing
+	// User config option: Fail and do not run the Atlantis command request if any of the pre workflow hooks error
+	FailOnPreWorkflowHookError bool
+	Logger                     logging.SimpleLogging
+	GlobalCfg                  valid.GlobalCfg
+	StatsScope                 tally.Scope
+	// User config option: controls whether to operate on pull requests from forks.
 	AllowForkPRs bool
 	// ParallelPoolSize controls the size of the wait group used to run
 	// parallel plans and applies (if enabled).
@@ -110,7 +113,7 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
 	AllowForkPRsFlag string
-	// SilenceForkPRErrors controls whether to comment on Fork PRs when AllowForkPRs = False
+	// User config option: controls whether to comment on Fork PRs when AllowForkPRs = False
 	SilenceForkPRErrors bool
 	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
@@ -169,7 +172,14 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
+		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
+
+		if c.FailOnPreWorkflowHookError {
+			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
+			return
+		}
+
+		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", command.Plan)
 	}
 
 	autoPlanRunner := buildCommentCommandRunner(c, command.Plan)
@@ -293,7 +303,14 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, cmd.Name.String())
+		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
+
+		if c.FailOnPreWorkflowHookError {
+			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
+			return
+		}
+
+		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", cmd.Name.String())
 	}
 
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())

@@ -550,7 +550,7 @@ If you set a workflow with the key `default`, it will override this.
 | Key                    | Type                      | Default | Required  | Description                              |
 |------------------------|---------------------------|---------|-----------|------------------------------------------|
 | statsd                 | [Statsd](#statsd)         | none    | no        | Statsd metrics provider                  |
-| prometheus             | [Prometheus](#prometheus) | none    | no        | Statsd metrics provider                  |
+| prometheus             | [Prometheus](#prometheus) | none    | no        | Prometheus metrics provider              |
 
 ### Statsd
 

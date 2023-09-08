@@ -272,7 +272,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
 	res := runner.Apply(ctx)
-	Equals(t, "Pull request must be approved by at least one person other than the author before running apply.", res.Failure)
+	Equals(t, "Pull request must be approved according to the project's approval rules before running apply.", res.Failure)
 }
 
 // Test that if mergeable is required and the PR isn't mergeable we give an error.
@@ -676,7 +676,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 					IsApproved: false,
 				},
 			},
-			expFailure: "Pull request must be approved by at least one person other than the author before running import.",
+			expFailure: "Pull request must be approved according to the project's approval rules before running import.",
 		},
 	}
 
