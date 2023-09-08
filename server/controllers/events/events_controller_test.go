@@ -31,6 +31,7 @@ import (
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	emocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -380,17 +381,18 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 }
 
 func TestPost_GithubCommentReaction(t *testing.T) {
-	t.Log("when the event is a github comment with a valid command we call the command handler")
+	t.Log("when the event is a github comment with a valid command we call the ReactToComment handler")
 	e, v, _, _, p, _, _, vcsClient, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "issue_comment")
-	event := `{"action": "created", "comment": {"body": "@atlantis-bot help", "id": 1}}`
+	testComment := "atlantis plan"
+	event := fmt.Sprintf(`{"action": "created", "comment": {"body": "%v", "id": 1}}`, testComment)
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	baseRepo := models.Repo{}
 	user := models.User{}
-	cmd := events.CommentCommand{}
+	cmd := events.CommentCommand{Name: command.Plan}
 	When(p.ParseGithubIssueCommentEvent(Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
-	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
+	When(cp.Parse(testComment, models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
@@ -689,12 +691,14 @@ func TestPost_AzureDevopsPullRequestWebhookTestIgnoreEvent(t *testing.T) {
 
 func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
 	t.Log("when the event should not be ignored it should pass through all ignore statements without error")
-	e, _, _, ado, _, _, _, _, _ := setup(t)
+	e, _, _, ado, _, _, _, _, cp := setup(t)
 
+	testComment := "atlantis plan"
 	repo := models.Repo{}
+	cmd := events.CommentCommand{Name: command.Plan}
 	When(e.Parser.ParseAzureDevopsRepo(Any[*azuredevops.GitRepository]())).ThenReturn(repo, nil)
-
-	payload := `{
+	When(cp.Parse(testComment, models.AzureDevops)).ThenReturn(events.CommentParseResult{Command: &cmd})
+	payload := fmt.Sprintf(`{
 		"subscriptionId": "11111111-1111-1111-1111-111111111111",
 		"notificationId": 1,
 		"id": "22222222-2222-2222-2222-222222222222",
@@ -707,14 +711,14 @@ func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
 			"comment": {
 				"id": 1,
 				"commentType": "text",
-				"content": "test"
+				"content": "%v"
 			},
 			"pullRequest": {
 				"pullRequestId": 1,
 				"repository": {}
 			}
 		}
-	}`
+	}`, testComment)
 
 	t.Run("Testing to see if comment passes ignore conditions", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "", strings.NewReader(payload))
