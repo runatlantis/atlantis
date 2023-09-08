@@ -89,6 +89,7 @@ atlantis plan -d dir -- -destroy
 ```
 ::: warning NOTE 
 The `-destroy` flag initiates resource destruction, which can result in data loss or service disruptions. Ensure that you have thoroughly reviewed your Terraform configuration and intend to remove the specified resources before using this flag.
+:::
 
 ---
 ## atlantis apply
