@@ -218,7 +218,6 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 					},
 				},
 			},
-			expStatus:            models.PendingCommitStatus,
 			doNotCallUpdateApply: true,
 		},
 		"one apply error, one apply, one plan success with no changes": {

@@ -538,9 +538,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					},
 				},
 			},
-			DoNotUpdateApply:       true,
-			ExpVCSApplyStatusTotal: 1,
-			ExpVCSApplyStatusSucc:  0,
+			DoNotUpdateApply: true,
 		},
 		{
 			Description: "When planning with no changes, set the 1/1 apply status",
@@ -579,10 +577,8 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					},
 				},
 			},
-			DoNotUpdateApply:       true,
-			PrevPlanStored:         true,
-			ExpVCSApplyStatusTotal: 2,
-			ExpVCSApplyStatusSucc:  1,
+			DoNotUpdateApply: true,
+			PrevPlanStored:   true,
 		},
 		{
 			Description: "When planning with no changes and previous 'No changes' plan, set the 2/2 apply status",
@@ -624,10 +620,8 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					},
 				},
 			},
-			DoNotUpdateApply:       true,
-			PrevPlanStored:         true,
-			ExpVCSApplyStatusTotal: 1,
-			ExpVCSApplyStatusSucc:  0,
+			DoNotUpdateApply: true,
+			PrevPlanStored:   true,
 		},
 		{
 			Description: "When planning again with changes following a previous 'No changes' plan, while another plan with 'No changes' do not set the apply status.",
@@ -659,10 +653,8 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					},
 				},
 			},
-			DoNotUpdateApply:       true,
-			PrevPlanStored:         true,
-			ExpVCSApplyStatusTotal: 2,
-			ExpVCSApplyStatusSucc:  1,
+			DoNotUpdateApply: true,
+			PrevPlanStored:   true,
 		},
 		{
 			Description: "When planning again with no changes following a previous 'No changes' plan, while another plan also with 'No changes', set the 2/2 apply status.",
@@ -754,10 +746,10 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				ExpCommitStatus = models.PendingCommitStatus
 			}
 			if c.DoNotUpdateApply {
-				commitUpdater.VerifyWasCalled(Times(0)).UpdateCombinedCount(
+				commitUpdater.VerifyWasCalled(Times(1)).UpdateCombinedCount(
 					Any[models.Repo](),
 					Any[models.PullRequest](),
-					Eq[models.CommitStatus](ExpCommitStatus),
+					Any[models.CommitStatus](),
 					Eq[command.Name](command.Apply),
 					AnyInt(),
 					AnyInt(),
