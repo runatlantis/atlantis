@@ -16,7 +16,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func commandNotFoundErrorFormat(shell, shellArgs string) string {
+func commandNotFoundErrorFormat(shell string) string {
 	// TODO: Add more GOOSs. Also I haven't done too much testing
 	// maybe the output here depends on other factors as well
 	if goruntime.GOOS == "darwin" {
@@ -39,7 +39,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 
 	defaultShell := "sh"
 	defaultShellArgs := "-c"
-	defautShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell, defaultShellArgs)
+	defautShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell)
 	defaultUnterminatedStringError := unterminatedStringError(defaultShell, defaultShellArgs)
 
 	cases := []struct {

@@ -19,7 +19,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 
 	defaultShell := "sh"
 	defaultShellArgs := "-c"
-	defautShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell, defaultShellArgs)
+	defautShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell)
 	defaultUnterminatedStringError := unterminatedStringError(defaultShell, defaultShellArgs)
 
 	cases := []struct {
