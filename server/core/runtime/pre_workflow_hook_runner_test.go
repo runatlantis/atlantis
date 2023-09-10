@@ -1,6 +1,8 @@
 package runtime_test
 
 import (
+	"fmt"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
@@ -14,10 +16,31 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+func commandNotFoundErrorFormat(shell, shellArgs string) string {
+	// TODO: Add more GOOSs. Also I haven't done too much testing
+	// maybe the output here depends on other factors as well
+	if goruntime.GOOS == "darwin" {
+		return fmt.Sprintf("%s: %%s: command not found\r\n", shell)
+	}
+	return fmt.Sprintf("%s: 1: %%s: not found\r\n", shell)
+
+}
+
+func unterminatedStringError(shell, shellArgs string) string {
+	// TODO: Add more GOOSs. Also I haven't done too much testing
+	// maybe the output here depends on other factors as well
+	if goruntime.GOOS == "darwin" {
+		return fmt.Sprintf("%s: %s: line 0: unexpected EOF while looking for matching `''\r\n%s: %s: line 1: syntax error: unexpected end of file\r\n", shell, shellArgs, shell, shellArgs)
+	}
+	return fmt.Sprintf("%s: 1: Syntax error: Unterminated quoted string\r\n", shell)
+}
+
 func TestPreWorkflowHookRunner_Run(t *testing.T) {
 
 	defaultShell := "sh"
 	defaultShellArgs := "-c"
+	defautShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell, defaultShellArgs)
+	defaultUnterminatedStringError := unterminatedStringError(defaultShell, defaultShellArgs)
 
 	cases := []struct {
 		Command        string
@@ -63,7 +86,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 			Command:        "echo 'a",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
-			ExpOut:         "sh: 1: Syntax error: Unterminated quoted string\r\n",
+			ExpOut:         defaultUnterminatedStringError,
 			ExpErr:         "exit status 2: running \"sh -c echo 'a\" in",
 			ExpDescription: "",
 		},
@@ -79,7 +102,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 			Command:        "lkjlkj",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
-			ExpOut:         "sh: 1: lkjlkj: not found\r\n",
+			ExpOut:         fmt.Sprintf(defautShellCommandNotFoundErrorFormat, "lkjlkj"),
 			ExpErr:         "exit status 127: running \"sh -c lkjlkj\" in",
 			ExpDescription: "",
 		},

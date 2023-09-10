@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -18,6 +19,8 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 
 	defaultShell := "sh"
 	defaultShellArgs := "-c"
+	defautShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell, defaultShellArgs)
+	defaultUnterminatedStringError := unterminatedStringError(defaultShell, defaultShellArgs)
 
 	cases := []struct {
 		Command        string
@@ -63,7 +66,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Command:        "echo 'a",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
-			ExpOut:         "sh: 1: Syntax error: Unterminated quoted string\r\n",
+			ExpOut:         defaultUnterminatedStringError,
 			ExpErr:         "exit status 2: running \"sh -c echo 'a\" in",
 			ExpDescription: "",
 		},
@@ -79,7 +82,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Command:        "lkjlkj",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
-			ExpOut:         "sh: 1: lkjlkj: not found\r\n",
+			ExpOut:         fmt.Sprintf(defautShellCommandNotFoundErrorFormat, "lkjlkj"),
 			ExpErr:         "exit status 127: running \"sh -c lkjlkj\" in",
 			ExpDescription: "",
 		},
