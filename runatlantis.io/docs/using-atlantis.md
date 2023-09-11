@@ -85,6 +85,7 @@ If you always need to append a certain flag, see [Custom Workflow Use Cases](cus
 To perform a destructive plan that will destroy resources you can use the `-destroy` flag like this:
 
 ```bash
+atlantis plan -- -destroy
 atlantis plan -d dir -- -destroy
 ```
 ::: warning NOTE 
