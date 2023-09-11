@@ -82,7 +82,7 @@ If you always need to append a certain flag, see [Custom Workflow Use Cases](cus
 ### Using the -destroy Flag
 
 #### Example
-To perform a destructive plan that will destroy resources in the specified directory, you can use the `-destroy` flag like this:
+To perform a destructive plan that will destroy resources you can use the `-destroy` flag like this:
 
 ```bash
 atlantis plan -d dir -- -destroy
