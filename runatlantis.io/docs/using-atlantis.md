@@ -88,7 +88,7 @@ To perform a destructive plan that will destroy resources you can use the `-dest
 atlantis plan -d dir -- -destroy
 ```
 ::: warning NOTE 
-The `-destroy` flag initiates resource destruction, which can result in data loss or service disruptions. Ensure that you have thoroughly reviewed your Terraform configuration and intend to remove the specified resources before using this flag.
+The `-destroy` flag generates a destroy plan, If this plan is applied it can result in data loss or service disruptions. Ensure that you have thoroughly reviewed your Terraform configuration and intend to remove the specified resources before using this flag.
 :::
 
 ---
