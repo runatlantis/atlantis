@@ -60,6 +60,7 @@ type UserConfig struct {
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
+	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
 	LockingDBType                   string `mapstructure:"locking-db-type"`
