@@ -626,6 +626,16 @@ This is useful when you have many projects and want to keep the pull request cle
   Hide previous plan comments to declutter PRs. This is only supported in
   GitHub and GitLab currently. This is not enabled by default.
 
+### `--include-git-untracked-files`
+  ```bash
+  atlantis server --include-git-untracked-files
+  # or
+  ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
+  ```
+  Include git untracked files in the Atlantis modified file list.
+  Used for example with CDKTF pre-workflow hooks that dynamically generate
+  Terraform files.
+
 ### `--locking-db-type`
   ```bash
   atlantis server --locking-db-type="<boltdb|redis>"
