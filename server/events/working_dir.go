@@ -32,8 +32,8 @@ const workingDirPrefix = "repos"
 
 var cloneLocks sync.Map
 
-//go:generate pegomock generate --package mocks -o mocks/mock_working_dir.go WorkingDir
-//go:generate pegomock generate --package events WorkingDir
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
 
 // WorkingDir handles the workspace on disk for running commands.
 type WorkingDir interface {
@@ -56,6 +56,8 @@ type WorkingDir interface {
 	SetCheckForUpstreamChanges()
 	// DeletePlan deletes the plan for this repo, pull, workspace path and project name
 	DeletePlan(r models.Repo, p models.PullRequest, workspace string, path string, projectName string) error
+	// GetGitUntrackedFiles returns a list of Git untracked files in the working dir.
+	GetGitUntrackedFiles(r models.Repo, p models.PullRequest, workspace string) ([]string, error)
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -415,4 +417,25 @@ func (w *FileWorkspace) DeletePlan(r models.Repo, p models.PullRequest, workspac
 	planPath := filepath.Join(w.cloneDir(r, p, workspace), projectPath, runtime.GetPlanFilename(workspace, projectName))
 	w.Logger.Info("Deleting plan: " + planPath)
 	return os.Remove(planPath)
+}
+
+// getGitUntrackedFiles returns a list of Git untracked files in the working dir.
+func (w *FileWorkspace) GetGitUntrackedFiles(r models.Repo, p models.PullRequest, workspace string) ([]string, error) {
+	workingDir, err := w.GetWorkingDir(r, p, workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	w.Logger.Debug("Checking for Git untracked files in directory: '%s'", workingDir)
+	cmd := exec.Command("git", "ls-files", "--others", "--exclude-standard")
+	cmd.Dir = workingDir
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	untrackedFiles := strings.Split(string(output), "\n")[:]
+	w.Logger.Debug("Untracked files: '%s'", strings.Join(untrackedFiles, ","))
+	return untrackedFiles, nil
 }

@@ -93,6 +93,25 @@ func (mock *MockWorkingDir) DeletePlan(r models.Repo, p models.PullRequest, work
 	return ret0
 }
 
+func (mock *MockWorkingDir) GetGitUntrackedFiles(r models.Repo, p models.PullRequest, workspace string) ([]string, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+	}
+	params := []pegomock.Param{r, p, workspace}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetGitUntrackedFiles", params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 []string
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].([]string)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockWorkingDir) GetPullDir(r models.Repo, p models.PullRequest) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
@@ -330,6 +349,41 @@ func (c *MockWorkingDir_DeletePlan_OngoingVerification) GetAllCapturedArguments(
 		_param4 = make([]string, len(c.methodInvocations))
 		for u, param := range params[4] {
 			_param4[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWorkingDir) GetGitUntrackedFiles(r models.Repo, p models.PullRequest, workspace string) *MockWorkingDir_GetGitUntrackedFiles_OngoingVerification {
+	params := []pegomock.Param{r, p, workspace}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetGitUntrackedFiles", params, verifier.timeout)
+	return &MockWorkingDir_GetGitUntrackedFiles_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDir_GetGitUntrackedFiles_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDir_GetGitUntrackedFiles_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string) {
+	r, p, workspace := c.GetAllCapturedArguments()
+	return r[len(r)-1], p[len(p)-1], workspace[len(workspace)-1]
+}
+
+func (c *MockWorkingDir_GetGitUntrackedFiles_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.Repo, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.Repo)
+		}
+		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.PullRequest)
+		}
+		_param2 = make([]string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
 		}
 	}
 	return
