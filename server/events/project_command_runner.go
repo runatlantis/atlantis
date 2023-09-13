@@ -491,11 +491,18 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	var policySetResults []models.PolicySetResult
 	for i, output := range outputs {
 		index = i
-		err = json.Unmarshal([]byte(strings.Join([]string{output}, "\n")), &policySetResults)
-		if err == nil {
-			break
+		if !ctx.CustomPolicyCheck {
+			err = json.Unmarshal([]byte(strings.Join([]string{output}, "\n")), &policySetResults)
+			if err == nil {
+				break
+			}
+			preConftestOutput = append(preConftestOutput, output)
+		} else {
+			// Using a policy tool other than Conftest, manually building result struct
+			passed := !strings.Contains(strings.ToLower(output), "fail")
+			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: "Custom", ConftestOutput: output, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
+			preConftestOutput = append(preConftestOutput, "")
 		}
-		preConftestOutput = append(preConftestOutput, output)
 	}
 	if policySetResults == nil {
 		return nil, "", errors.New("unable to unmarshal conftest output")
