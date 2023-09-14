@@ -344,6 +344,9 @@ unless you've created your own server-side workflow with that key (overriding it
 See [Custom Workflows](custom-workflows.html) for more details on writing
 custom workflows.
 
+### Allow Using Custom Policy Tools
+Conftest is the standard policy check application integrated with Atlantis, but custom tools can still be run in custom workflows when the `custom_policy_check` option is set.  See the [Custom Policy Checks page](custom-policy-checks.md) for detailed examples.
+
 ### Allow Repos To Define Their Own Workflows
 If you want repos to be able to define their own workflows you need to
 allow them to override the `workflow` key and set `allow_custom_workflows` to `true`.
