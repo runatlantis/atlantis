@@ -978,7 +978,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        false,
-				CustomPolicyCheck:  true,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"last server-side match wins": {
@@ -1429,7 +1429,7 @@ repos:
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
 				PolicyCheck:        true, // Project will have policy check as true but since it is globally disable it wont actually run
-				CustomPolicyCheck:  true,
+				CustomPolicyCheck:  false,
 			},
 		},
 	}

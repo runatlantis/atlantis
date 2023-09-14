@@ -194,7 +194,7 @@ func (r Repo) Validate() error {
 		overrides := value.([]string)
 		for _, o := range overrides {
 			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey && o != valid.PolicyCheckKey && o != valid.CustomPolicyCheckKey {
-				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q, %q, %q, %q and %q are supported", o, valid.PlanRequirementsKey, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey, valid.PolicyCheckKey, valid.CustomPolicyCheckKey)
+				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q, %q, %q, %q, and %q are supported", o, valid.PlanRequirementsKey, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey, valid.PolicyCheckKey, valid.CustomPolicyCheckKey)
 			}
 		}
 		return nil
