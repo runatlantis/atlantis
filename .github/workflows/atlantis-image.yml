@@ -94,7 +94,7 @@ jobs:
           # Suffix is not used here since there's no way to disable it above
 
     - name: Login to Packages Container registry
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
