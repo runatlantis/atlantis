@@ -425,7 +425,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
 	}
-	ctx.Log.Debug("acquired lock for project")
+	ctx.Log.Debug("acquired lock for project.")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
@@ -489,6 +489,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	var preConftestOutput []string
 	var postConftestOutput []string
 	var policySetResults []models.PolicySetResult
+
 	for i, output := range outputs {
 		index = i
 		if !ctx.CustomPolicyCheck {
@@ -504,6 +505,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			preConftestOutput = append(preConftestOutput, "")
 		}
 	}
+
 	if policySetResults == nil {
 		return nil, "", errors.New("unable to unmarshal conftest output")
 	}
