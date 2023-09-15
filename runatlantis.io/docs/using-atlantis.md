@@ -79,6 +79,19 @@ atlantis plan -d dir -- -var foo='bar'
 ```
 If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
 
+### Using the -destroy Flag
+
+#### Example
+To perform a destructive plan that will destroy resources you can use the `-destroy` flag like this:
+
+```bash
+atlantis plan -- -destroy
+atlantis plan -d dir -- -destroy
+```
+::: warning NOTE 
+The `-destroy` flag generates a destroy plan, If this plan is applied it can result in data loss or service disruptions. Ensure that you have thoroughly reviewed your Terraform configuration and intend to remove the specified resources before using this flag.
+:::
+
 ---
 ## atlantis apply
 ```bash
