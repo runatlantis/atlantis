@@ -62,7 +62,7 @@ jobs:
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@v4
+      uses: docker/metadata-action@v5
       env:
         SUFFIX: ${{ format('-{0}', matrix.image_type) }}
       with:
