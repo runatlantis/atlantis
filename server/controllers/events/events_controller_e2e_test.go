@@ -1323,6 +1323,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		false,
 		false,
+		false,
 		statsScope,
 		logger,
 		terraformClient,

@@ -60,6 +60,7 @@ type UserConfig struct {
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
+	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
 	LockingDBType                   string `mapstructure:"locking-db-type"`
@@ -125,6 +126,7 @@ type UserConfig struct {
 	WebPassword            string          `mapstructure:"web-password"`
 	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin   bool            `mapstructure:"websocket-check-origin"`
+	UseTFPluginCache         bool            `mapstructure:"use-tf-plugin-cache"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName

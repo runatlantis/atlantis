@@ -626,6 +626,16 @@ This is useful when you have many projects and want to keep the pull request cle
   Hide previous plan comments to declutter PRs. This is only supported in
   GitHub and GitLab currently. This is not enabled by default.
 
+### `--include-git-untracked-files`
+  ```bash
+  atlantis server --include-git-untracked-files
+  # or
+  ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
+  ```
+  Include git untracked files in the Atlantis modified file list.
+  Used for example with CDKTF pre-workflow hooks that dynamically generate
+  Terraform files.
+
 ### `--locking-db-type`
   ```bash
   atlantis server --locking-db-type="<boltdb|redis>"
@@ -986,6 +996,21 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy'
   ```
   A token for Terraform Cloud/Terraform Enterprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
+
+### `--use-tf-plugin-cache`
+```bash
+atlantis server --use-tf-plugin-cache=false
+# or
+ATLANTIS_USE_TF_PLUGIN_CACHE=false
+```
+Set to false if you want to disable terraform plugin cache.
+
+This flag is useful when having multiple projects that need to run a plan and apply in the same PR to avoid the race condition of `plugin_cache_dir` concurrently, this is a terraform known issue, more info:
+
+- [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
+- [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
+
+The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient managment of the PRs.
 
 ### `--var-file-allowlist`
   ```bash

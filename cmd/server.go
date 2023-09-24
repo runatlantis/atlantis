@@ -97,6 +97,7 @@ const (
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
@@ -134,6 +135,7 @@ const (
 	RestrictFileList           = "restrict-file-list"
 	TFDownloadFlag             = "tf-download"
 	TFDownloadURLFlag          = "tf-download-url"
+	UseTFPluginCache             = "use-tf-plugin-cache"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
@@ -477,6 +479,10 @@ var boolFlags = map[string]boolFlag{
 			"VCS support is limited to: GitHub.",
 		defaultValue: false,
 	},
+	IncludeGitUntrackedFiles: {
+		description:  "Include git untracked files in the Atlantis modified file scope.",
+		defaultValue: false,
+	},
 	ParallelPlanFlag: {
 		description:  "Run plan operations in parallel.",
 		defaultValue: false,
@@ -568,6 +574,10 @@ var boolFlags = map[string]boolFlag{
 	HideUnchangedPlanComments: {
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
+	},
+	UseTFPluginCache: {
+		description:  "Enable the use of the Terraform plugin cache",
+		defaultValue: true,
 	},
 }
 var intFlags = map[string]intFlag{
