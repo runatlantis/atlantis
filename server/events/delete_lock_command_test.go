@@ -137,7 +137,7 @@ func TestDeleteLocksByPull_SingleSuccess(t *testing.T) {
 				RepoFullName: pull.BaseRepo.FullName,
 			},
 		},
-	}, nil,
+	}, nil, nil,
 	)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:     l,
@@ -182,7 +182,7 @@ func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
 				RepoFullName: pull.BaseRepo.FullName,
 			},
 		},
-	}, nil,
+	}, nil, nil,
 	)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:     l,
