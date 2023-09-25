@@ -279,9 +279,11 @@ workflows:
           name: TF_IN_AUTOMATION
           value: 'true'
       - run:
-          command: terragrunt plan -input=false -out=$PLANFILE
-          output: strip_refreshing
-      - run: terragrunt show -json $PLANFILE > $SHOWFILE
+          # Allow for targetted plans/applies as not supported for Terraform wrappers by default
+          command: terragrunt plan -input=false $(printf '%s' $COMMENT_ARGS | sed 's/,/ /g' | tr -d '\\') -no-color -out $PLANFILE
+          output: hide
+      - run: |
+          terragrunt show $PLANFILE
     apply:
       steps:
       - env:
@@ -292,6 +294,23 @@ workflows:
           name: TF_IN_AUTOMATION
           value: 'true'
       - run: terragrunt apply -input=false $PLANFILE
+    import:
+      steps:
+      - env:
+          name: TERRAGRUNT_TFPATH
+          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+      - env:
+          name: TF_VAR_author
+          command: 'git show -s --format="%ae" $HEAD_COMMIT'
+      # Allow for imports as not supported for Terraform wrappers by default
+      - run: terragrunt import -input=false $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
+    state_rm:
+      steps:
+      - env:
+          name: TERRAGRUNT_TFPATH
+          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+      # Allow for state removals as not supported for Terraform wrappers by default
+      - run: terragrunt state rm $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
 ```
 
 If using the repo's `atlantis.yaml` file you would use the following config:
