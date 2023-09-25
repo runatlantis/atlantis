@@ -355,6 +355,16 @@ and set `--autoplan-modules` to `false`.
   ```
   Disable atlantis auto planning.
 
+### `--disable-autoplan-label`
+  ```bash
+  atlantis server --disable-autoplan-label="no-autoplan"
+  # or
+  ATLANTIS_DISABLE_AUTOPLAN_LABEL="no-autoplan"
+  ```
+  Disable atlantis auto planning only on pull requests with the specified label.
+
+  If `disable-autoplan` property is `true`, this flag has no effect.
+
 ### `--disable-markdown-folding`
   ```bash
   atlantis server --disable-markdown-folding
