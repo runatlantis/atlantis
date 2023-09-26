@@ -72,6 +72,7 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableApplyFlag                 = "disable-apply"
 	DisableAutoplanFlag              = "disable-autoplan"
+	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
@@ -80,6 +81,7 @@ const (
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	ExecutableName                   = "executable-name"
+	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
@@ -96,6 +98,7 @@ const (
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
@@ -132,6 +135,7 @@ const (
 	RestrictFileList           = "restrict-file-list"
 	TFDownloadFlag             = "tf-download"
 	TFDownloadURLFlag          = "tf-download-url"
+	UseTFPluginCache             = "use-tf-plugin-cache"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
@@ -253,6 +257,10 @@ var stringFlags = map[string]stringFlag{
 	DataDirFlag: {
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	DisableAutoplanLabelFlag: {
+		description:  "Pull request label to disable atlantis auto planning feature only if present.",
+		defaultValue: "",
 	},
 	EmojiReaction: {
 		description:  "Emoji Reaction to use to react to comments",
@@ -457,6 +465,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
 		defaultValue: false,
 	},
+	FailOnPreWorkflowHookError: {
+		description:  "Fail and do not run the requested Atlantis command if any of the pre workflow hooks error.",
+		defaultValue: false,
+	},
 	GHAllowMergeableBypassApply: {
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
 		defaultValue: false,
@@ -468,6 +480,10 @@ var boolFlags = map[string]boolFlag{
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
+	IncludeGitUntrackedFiles: {
+		description:  "Include git untracked files in the Atlantis modified file scope.",
 		defaultValue: false,
 	},
 	ParallelPlanFlag: {
@@ -557,6 +573,10 @@ var boolFlags = map[string]boolFlag{
 	HideUnchangedPlanComments: {
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
+	},
+	UseTFPluginCache: {
+		description:  "Enable the use of the Terraform plugin cache",
+		defaultValue: true,
 	},
 }
 var intFlags = map[string]intFlag{
