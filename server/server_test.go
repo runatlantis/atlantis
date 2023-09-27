@@ -31,6 +31,7 @@ import (
 	tMocks "github.com/runatlantis/atlantis/server/controllers/templates/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -100,13 +101,14 @@ func TestIndex_Success(t *testing.T) {
 	u, err := url.Parse("https://example.com")
 	Ok(t, err)
 	s := server.Server{
-		Locker:          l,
-		ApplyLocker:     al,
-		IndexTemplate:   it,
-		Router:          r,
-		AtlantisVersion: atlantisVersion,
-		AtlantisURL:     u,
-		Logger:          logging.NewNoopLogger(t),
+		Locker:                  l,
+		ApplyLocker:             al,
+		IndexTemplate:           it,
+		Router:                  r,
+		AtlantisVersion:         atlantisVersion,
+		AtlantisURL:             u,
+		Logger:                  logging.NewNoopLogger(t),
+		ProjectCmdOutputHandler: &jobs.NoopProjectOutputHandler{},
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
@@ -126,7 +128,8 @@ func TestIndex_Success(t *testing.T) {
 				TimeFormatted: now.Format("02-01-2006 15:04:05"),
 			},
 		},
-		AtlantisVersion: atlantisVersion,
+		PullToJobMapping: []jobs.PullInfoWithJobIDs{},
+		AtlantisVersion:  atlantisVersion,
 	})
 	ResponseContains(t, w, http.StatusOK, "")
 }
