@@ -587,7 +587,8 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		}
 	}
 
-	logger.Debug("executing command")
+	logger.Info("Running comment command '%v' on repo '%v', pull request: %v for user '%v'.",
+		parseResult.Command.Name, baseRepo.FullName, pullNum, user.Username)
 	if !e.TestingMode {
 		// Respond with success and then actually execute the command asynchronously.
 		// We use a goroutine so that this function returns and the connection is
