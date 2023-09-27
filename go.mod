@@ -21,7 +21,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.6
-	github.com/hashicorp/terraform-config-inspect v0.0.0-20230825013512-b800820f61b8
+	github.com/hashicorp/terraform-config-inspect v0.0.0-20230925220900-5a6f8d18746d
 	github.com/kr/pretty v0.3.1
 	github.com/mcdafydd/go-azuredevops v0.12.1
 	github.com/microcosm-cc/bluemonday v1.0.25
@@ -31,7 +31,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/petergtz/pegomock/v4 v4.0.0
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.1.0
+	github.com/redis/go-redis/v9 v9.2.0
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20230704064427-599ae7bbf278
 	github.com/slack-go/slack v0.12.3
@@ -42,9 +42,9 @@ require (
 	github.com/uber-go/tally/v4 v4.1.7
 	github.com/urfave/negroni/v3 v3.0.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
-	github.com/xanzy/go-gitlab v0.91.1
+	github.com/xanzy/go-gitlab v0.92.1
 	go.etcd.io/bbolt v1.3.7
-	go.uber.org/zap v1.25.0
+	go.uber.org/zap v1.26.0
 	golang.org/x/term v0.12.0
 	golang.org/x/text v0.13.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -72,7 +72,6 @@ require (
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
-	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
