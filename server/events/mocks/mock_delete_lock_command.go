@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
@@ -25,11 +25,11 @@ func NewMockDeleteLockCommand(options ...pegomock.Option) *MockDeleteLockCommand
 func (mock *MockDeleteLockCommand) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockDeleteLockCommand) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockDeleteLockCommand) DeleteLock(_param0 string) (*models.ProjectLock, error) {
+func (mock *MockDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDeleteLockCommand().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{id}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLock", params, []reflect.Type{reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *models.ProjectLock
 	var ret1 error
@@ -44,11 +44,11 @@ func (mock *MockDeleteLockCommand) DeleteLock(_param0 string) (*models.ProjectLo
 	return ret0, ret1
 }
 
-func (mock *MockDeleteLockCommand) DeleteLocksByPull(_param0 string, _param1 int) (int, error) {
+func (mock *MockDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) (int, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDeleteLockCommand().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{repoFullName, pullNum}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLocksByPull", params, []reflect.Type{reflect.TypeOf((*int)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 int
 	var ret1 error
@@ -100,8 +100,8 @@ type VerifierMockDeleteLockCommand struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockDeleteLockCommand) DeleteLock(_param0 string) *MockDeleteLockCommand_DeleteLock_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockDeleteLockCommand) DeleteLock(id string) *MockDeleteLockCommand_DeleteLock_OngoingVerification {
+	params := []pegomock.Param{id}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeleteLock", params, verifier.timeout)
 	return &MockDeleteLockCommand_DeleteLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -112,8 +112,8 @@ type MockDeleteLockCommand_DeleteLock_OngoingVerification struct {
 }
 
 func (c *MockDeleteLockCommand_DeleteLock_OngoingVerification) GetCapturedArguments() string {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	id := c.GetAllCapturedArguments()
+	return id[len(id)-1]
 }
 
 func (c *MockDeleteLockCommand_DeleteLock_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
@@ -127,8 +127,8 @@ func (c *MockDeleteLockCommand_DeleteLock_OngoingVerification) GetAllCapturedArg
 	return
 }
 
-func (verifier *VerifierMockDeleteLockCommand) DeleteLocksByPull(_param0 string, _param1 int) *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification {
+	params := []pegomock.Param{repoFullName, pullNum}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeleteLocksByPull", params, verifier.timeout)
 	return &MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -139,8 +139,8 @@ type MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification struct {
 }
 
 func (c *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification) GetCapturedArguments() (string, int) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	repoFullName, pullNum := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1]
 }
 
 func (c *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {

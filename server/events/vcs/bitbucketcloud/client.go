@@ -101,7 +101,7 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, co
 }
 
 // UpdateComment updates the body of a comment on the merge request.
-func (b *Client) ReactToComment(repo models.Repo, commentID int64, reaction string) error { // nolint revive
+func (b *Client) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { // nolint revive
 	// TODO: Bitbucket support for reactions
 	return nil
 }
@@ -280,4 +280,8 @@ func (b *Client) GetFileContent(pull models.PullRequest, fileName string) (bool,
 
 func (b *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
 	return "", fmt.Errorf("not yet implemented")
+}
+
+func (b *Client) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+	return nil, fmt.Errorf("not yet implemented")
 }

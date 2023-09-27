@@ -60,7 +60,7 @@ projects:
   delete_source_branch_on_merge: true
   repo_locking: true
   autoplan:
-    when_modified: ["*.tf", "../modules/**/*.tf"]
+    when_modified: ["*.tf", "../modules/**/*.tf", ".terraform.lock.hcl"]
     enabled: true
   plan_requirements: [mergeable, approved, undiverged]
   apply_requirements: [mergeable, approved, undiverged]
@@ -72,6 +72,9 @@ workflows:
     plan:
       steps:
       - run: my-custom-command arg1 arg2
+      - run:
+          command: my-custom-command arg1 arg2
+          output: hide
       - init
       - plan:
           extra_args: ["-lock", "false"]
@@ -98,6 +101,7 @@ projects:
       when_modified:
         - "./terraform/modules/**/*.tf"
         - "**/*.tf"
+        - ".terraform.lock.hcl"
 
   - <<: *template
     name: ue1-prod-titan
@@ -184,7 +188,7 @@ version: 3
 projects:
 - dir: project1
   autoplan:
-    when_modified: ["../modules/**/*.tf", "*.tf*"]
+    when_modified: ["../modules/**/*.tf", "*.tf*", ".terraform.lock.hcl"]
 ```
 
 Note:
@@ -340,7 +344,7 @@ Atlantis supports this but requires the `name` key to be specified. See [Custom 
 ### Autoplan
 ```yaml
 enabled: true
-when_modified: ["*.tf", "terragrunt.hcl"]
+when_modified: ["*.tf", "terragrunt.hcl", ".terraform.lock.hcl"]
 ```
 | Key                   | Type          | Default        | Required | Description                                                                                                                                                                                                                                                       |
 |-----------------------|---------------|----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

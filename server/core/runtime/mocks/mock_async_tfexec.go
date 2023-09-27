@@ -5,7 +5,7 @@ package mocks
 
 import (
 	go_version "github.com/hashicorp/go-version"
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	"reflect"
@@ -27,11 +27,11 @@ func NewMockAsyncTFExec(options ...pegomock.Option) *MockAsyncTFExec {
 func (mock *MockAsyncTFExec) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockAsyncTFExec) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockAsyncTFExec) RunCommandAsync(_param0 command.ProjectContext, _param1 string, _param2 []string, _param3 map[string]string, _param4 *go_version.Version, _param5 string) (chan<- string, <-chan models.Line) {
+func (mock *MockAsyncTFExec) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) (chan<- string, <-chan models.Line) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockAsyncTFExec().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5}
+	params := []pegomock.Param{ctx, path, args, envs, v, workspace}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("RunCommandAsync", params, []reflect.Type{reflect.TypeOf((*chan<- string)(nil)).Elem(), reflect.TypeOf((*<-chan models.Line)(nil)).Elem()})
 	var ret0 chan<- string
 	var ret1 <-chan models.Line
@@ -91,8 +91,8 @@ type VerifierMockAsyncTFExec struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockAsyncTFExec) RunCommandAsync(_param0 command.ProjectContext, _param1 string, _param2 []string, _param3 map[string]string, _param4 *go_version.Version, _param5 string) *MockAsyncTFExec_RunCommandAsync_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2, _param3, _param4, _param5}
+func (verifier *VerifierMockAsyncTFExec) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) *MockAsyncTFExec_RunCommandAsync_OngoingVerification {
+	params := []pegomock.Param{ctx, path, args, envs, v, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunCommandAsync", params, verifier.timeout)
 	return &MockAsyncTFExec_RunCommandAsync_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -103,8 +103,8 @@ type MockAsyncTFExec_RunCommandAsync_OngoingVerification struct {
 }
 
 func (c *MockAsyncTFExec_RunCommandAsync_OngoingVerification) GetCapturedArguments() (command.ProjectContext, string, []string, map[string]string, *go_version.Version, string) {
-	_param0, _param1, _param2, _param3, _param4, _param5 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1], _param3[len(_param3)-1], _param4[len(_param4)-1], _param5[len(_param5)-1]
+	ctx, path, args, envs, v, workspace := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], path[len(path)-1], args[len(args)-1], envs[len(envs)-1], v[len(v)-1], workspace[len(workspace)-1]
 }
 
 func (c *MockAsyncTFExec_RunCommandAsync_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 [][]string, _param3 []map[string]string, _param4 []*go_version.Version, _param5 []string) {

@@ -23,7 +23,7 @@ Any failures need to either be addressed in a successive commit, or approved by 
 
 Policy approvals may be cleared either by re-planing, or by issuing the following command:
 ```
-atlantis approve_policies --clear-policy-approvals
+atlantis approve_policies --clear-policy-approval
 ```
 
 ::: warning
@@ -37,6 +37,10 @@ This section will provide a guide on how to get set up with a simple policy that
 ### Step 1: Enable the workflow
 
 Enable the workflow using the following server configuration flag `--enable-policy-checks`
+
+::: warning
+All repositories will have policy checking enabled.
+:::
 
 ### Step 2: Define the policy configuration
 
@@ -190,4 +194,34 @@ When the policy check workflow runs, a file is created in the working directory 
   }
 ]
 
+```
+
+## Running policy check only on some repositories
+
+When policy checking is enabled it will be enforced on all repositories, in order to disable policy checking on some repositories first [enable policy checks](https://www.runatlantis.io/docs/policy-checking.html#getting-started) and then disable it explicitly on each repository with the `policy_check` flag.
+
+For server side config:
+```yml
+# repos.yaml
+repos:
+- id: /.*/
+  plan_requirements: [approved]
+  apply_requirements: [approved]
+  import_requirements: [approved]
+- id: /special-repo/
+  plan_requirements: [approved]
+  apply_requirements: [approved]
+  import_requirements: [approved]
+  policy_check: false
+```
+
+For repo level `atlantis.yaml` config:
+```yml
+version: 3
+projects:
+- dir: project1
+  workspace: staging
+- dir: project1
+  workspace: production
+  policy_check: false
 ```

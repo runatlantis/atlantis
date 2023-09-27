@@ -130,7 +130,7 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	return nil
 }
 
-func (g *AzureDevopsClient) ReactToComment(repo models.Repo, commentID int64, reaction string) error { //nolint: revive
+func (g *AzureDevopsClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { //nolint: revive
 	return nil
 }
 
@@ -423,4 +423,8 @@ func GitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
 
 func (g *AzureDevopsClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
 	return "", fmt.Errorf("not yet implemented")
+}
+
+func (g *AzureDevopsClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+	return nil, fmt.Errorf("not yet implemented")
 }

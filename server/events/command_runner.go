@@ -15,9 +15,10 @@ package events
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/utils"
 	"strconv"
 
-	"github.com/google/go-github/v52/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -27,7 +28,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
@@ -35,7 +36,7 @@ const (
 	ShutdownComment = "Atlantis server is shutting down, please try again later."
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_command_runner.go CommandRunner
+//go:generate pegomock generate --package mocks -o mocks/mock_command_runner.go CommandRunner
 
 // CommandRunner is the first step after a command request has been parsed.
 type CommandRunner interface {
@@ -46,7 +47,7 @@ type CommandRunner interface {
 	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
+//go:generate pegomock generate --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
 
 // GithubPullGetter makes API calls to get pull requests.
 type GithubPullGetter interface {
@@ -54,7 +55,7 @@ type GithubPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
+//go:generate pegomock generate --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
 
 // AzureDevopsPullGetter makes API calls to get pull requests.
 type AzureDevopsPullGetter interface {
@@ -62,7 +63,7 @@ type AzureDevopsPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
+//go:generate pegomock generate --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
 // GitlabMergeRequestGetter makes API calls to get merge requests.
 type GitlabMergeRequestGetter interface {
@@ -96,12 +97,16 @@ type DefaultCommandRunner struct {
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
-	DisableAutoplan          bool
-	EventParser              EventParsing
-	Logger                   logging.SimpleLogging
-	GlobalCfg                valid.GlobalCfg
-	StatsScope               tally.Scope
-	// AllowForkPRs controls whether we operate on pull requests from forks.
+	// User config option: Disables autoplan when a pull request is opened or updated.
+	DisableAutoplan bool
+	DisableAutoplanLabel     string
+	EventParser     EventParsing
+	// User config option: Fail and do not run the Atlantis command request if any of the pre workflow hooks error
+	FailOnPreWorkflowHookError bool
+	Logger                     logging.SimpleLogging
+	GlobalCfg                  valid.GlobalCfg
+	StatsScope                 tally.Scope
+	// User config option: controls whether to operate on pull requests from forks.
 	AllowForkPRs bool
 	// ParallelPoolSize controls the size of the wait group used to run
 	// parallel plans and applies (if enabled).
@@ -110,7 +115,7 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
 	AllowForkPRsFlag string
-	// SilenceForkPRErrors controls whether to comment on Fork PRs when AllowForkPRs = False
+	// User config option: controls whether to comment on Fork PRs when AllowForkPRs = False
 	SilenceForkPRErrors bool
 	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
@@ -162,18 +167,36 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	if c.DisableAutoplan {
 		return
 	}
+	if len(c.DisableAutoplanLabel) > 0 {
+		labels, err := c.VCSClient.GetPullLabels(baseRepo, pull)
+		if err != nil {
+			ctx.Log.Err("Unable to get pull labels. Proceeding with %s command.", err, command.Plan)
+		} else if utils.SlicesContains(labels, c.DisableAutoplanLabel) {
+			return
+		}
+	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, nil)
+	cmd := &CommentCommand{
+		Name: command.Autoplan,
+	}
+	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
+		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
+
+		if c.FailOnPreWorkflowHookError {
+			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
+			return
+		}
+
+		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", command.Plan)
 	}
 
 	autoPlanRunner := buildCommentCommandRunner(c, command.Plan)
 
 	autoPlanRunner.Run(ctx, nil)
 
-	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, nil)
+	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd)
 
 	if err != nil {
 		ctx.Log.Err("Error running post-workflow hooks %s.", err)
@@ -290,7 +313,14 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, cmd.Name.String())
+		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
+
+		if c.FailOnPreWorkflowHookError {
+			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
+			return
+		}
+
+		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", cmd.Name.String())
 	}
 
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())

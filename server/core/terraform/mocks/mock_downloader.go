@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 	"time"
 )
@@ -24,11 +24,11 @@ func NewMockDownloader(options ...pegomock.Option) *MockDownloader {
 func (mock *MockDownloader) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockDownloader) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockDownloader) GetAny(_param0 string, _param1 string) error {
+func (mock *MockDownloader) GetAny(dst string, src string) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDownloader().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{dst, src}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetAny", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -39,11 +39,11 @@ func (mock *MockDownloader) GetAny(_param0 string, _param1 string) error {
 	return ret0
 }
 
-func (mock *MockDownloader) GetFile(_param0 string, _param1 string) error {
+func (mock *MockDownloader) GetFile(dst string, src string) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDownloader().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{dst, src}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetFile", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -91,8 +91,8 @@ type VerifierMockDownloader struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockDownloader) GetAny(_param0 string, _param1 string) *MockDownloader_GetAny_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockDownloader) GetAny(dst string, src string) *MockDownloader_GetAny_OngoingVerification {
+	params := []pegomock.Param{dst, src}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetAny", params, verifier.timeout)
 	return &MockDownloader_GetAny_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -103,8 +103,8 @@ type MockDownloader_GetAny_OngoingVerification struct {
 }
 
 func (c *MockDownloader_GetAny_OngoingVerification) GetCapturedArguments() (string, string) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	dst, src := c.GetAllCapturedArguments()
+	return dst[len(dst)-1], src[len(src)-1]
 }
 
 func (c *MockDownloader_GetAny_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string) {
@@ -122,8 +122,8 @@ func (c *MockDownloader_GetAny_OngoingVerification) GetAllCapturedArguments() (_
 	return
 }
 
-func (verifier *VerifierMockDownloader) GetFile(_param0 string, _param1 string) *MockDownloader_GetFile_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockDownloader) GetFile(dst string, src string) *MockDownloader_GetFile_OngoingVerification {
+	params := []pegomock.Param{dst, src}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetFile", params, verifier.timeout)
 	return &MockDownloader_GetFile_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -134,8 +134,8 @@ type MockDownloader_GetFile_OngoingVerification struct {
 }
 
 func (c *MockDownloader_GetFile_OngoingVerification) GetCapturedArguments() (string, string) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	dst, src := c.GetAllCapturedArguments()
+	return dst[len(dst)-1], src[len(src)-1]
 }
 
 func (c *MockDownloader_GetFile_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string) {

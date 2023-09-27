@@ -265,8 +265,8 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 			exp: valid.RepoCfg{
 				Version:                    2,
-				Automerge:                  false,
-				ParallelApply:              false,
+				Automerge:                  nil,
+				ParallelApply:              nil,
 				AbortOnExcecutionOrderFail: false,
 				Workflows:                  map[string]valid.Workflow{},
 			},
@@ -281,8 +281,8 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 			exp: valid.RepoCfg{
 				Version:                    2,
-				Automerge:                  true,
-				ParallelApply:              true,
+				Automerge:                  Bool(true),
+				ParallelApply:              Bool(true),
 				AbortOnExcecutionOrderFail: true,
 				Workflows:                  map[string]valid.Workflow{},
 			},
@@ -297,8 +297,8 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 			exp: valid.RepoCfg{
 				Version:                    2,
-				Automerge:                  false,
-				ParallelApply:              false,
+				Automerge:                  Bool(false),
+				ParallelApply:              Bool(false),
 				AbortOnExcecutionOrderFail: false,
 				Workflows:                  map[string]valid.Workflow{},
 			},
@@ -319,8 +319,8 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 			exp: valid.RepoCfg{
 				Version:       2,
-				Automerge:     false,
-				ParallelApply: false,
+				Automerge:     nil,
+				ParallelApply: nil,
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
 						Name:        "myworkflow",
@@ -386,8 +386,8 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 			exp: valid.RepoCfg{
 				Version:       2,
-				Automerge:     true,
-				ParallelApply: true,
+				Automerge:     Bool(true),
+				ParallelApply: Bool(true),
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
 						Name: "myworkflow",
@@ -433,7 +433,7 @@ func TestConfig_ToValid(t *testing.T) {
 						Dir:       "mydir",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},

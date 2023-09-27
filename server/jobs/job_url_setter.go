@@ -5,14 +5,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_project_job_url_generator.go ProjectJobURLGenerator
+//go:generate pegomock generate --package mocks -o mocks/mock_project_job_url_generator.go ProjectJobURLGenerator
 
 // ProjectJobURLGenerator generates urls to view project's progress.
 type ProjectJobURLGenerator interface {
 	GenerateProjectJobURL(p command.ProjectContext) (string, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_project_status_updater.go ProjectStatusUpdater
+//go:generate pegomock generate --package mocks -o mocks/mock_project_status_updater.go ProjectStatusUpdater
 
 type ProjectStatusUpdater interface {
 	// UpdateProject sets the commit status for the project represented by

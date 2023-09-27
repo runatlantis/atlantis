@@ -18,6 +18,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"embed"
 	"flag"
 	"fmt"
 	"io"
@@ -33,8 +34,8 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/uber-go/tally"
-	"github.com/uber-go/tally/prometheus"
+	tally "github.com/uber-go/tally/v4"
+	prometheus "github.com/uber-go/tally/v4/prometheus"
 	"github.com/urfave/negroni/v3"
 
 	cfg "github.com/runatlantis/atlantis/server/core/config"
@@ -45,7 +46,6 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
 
-	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
@@ -64,7 +64,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/static"
 )
 
 const (
@@ -142,12 +141,19 @@ type WebhookConfig struct {
 	// that is being modified for this event. If the regex matches, we'll
 	// send the webhook, ex. "production.*".
 	WorkspaceRegex string `mapstructure:"workspace-regex"`
+	// BranchRegex is a regex that is used to match against the base branch
+	// that is being modified for this event. If the regex matches, we'll
+	// send the webhook, ex. "main.*".
+	BranchRegex string `mapstructure:"branch-regex"`
 	// Kind is the type of webhook we should send, ex. slack.
 	Kind string `mapstructure:"kind"`
 	// Channel is the channel to send this webhook to. It only applies to
 	// slack webhooks. Should be without '#'.
 	Channel string `mapstructure:"channel"`
 }
+
+//go:embed static
+var staticAssets embed.FS
 
 // NewServer returns a new server. If there are issues starting the server or
 // its dependencies an error will be returned. This is like the main() function
@@ -342,6 +348,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	for _, c := range userConfig.Webhooks {
 		config := webhooks.Config{
 			Channel:        c.Channel,
+			BranchRegex:    c.BranchRegex,
 			Event:          c.Event,
 			Kind:           c.Kind,
 			WorkspaceRegex: c.WorkspaceRegex,
@@ -406,7 +413,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.TFDownloadURL,
 		&terraform.DefaultDownloader{},
 		userConfig.TFDownload,
-		true,
+		userConfig.UseTFPluginCache,
 		projectCmdOutputHandler)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
@@ -461,6 +468,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:    userConfig.CheckoutDepth,
 		GithubAppEnabled: githubAppEnabled,
+		Logger:           logger,
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(
@@ -581,10 +589,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commentParser,
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
+		userConfig.Automerge,
+		userConfig.ParallelPlan,
+		userConfig.ParallelApply,
 		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
 		statsScope,
 		logger,
 		terraformClient,
@@ -778,11 +790,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
+		VCSClient:                      vcsClient,
 		GithubPullGetter:               githubClient,
 		GitlabMergeRequestGetter:       gitlabClient,
 		AzureDevopsPullGetter:          azuredevopsClient,
 		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
 		EventParser:                    eventParser,
+		FailOnPreWorkflowHookError:     userConfig.FailOnPreWorkflowHookError,
 		Logger:                         logger,
 		GlobalCfg:                      globalCfg,
 		StatsScope:                     statsScope.SubScope("cmd"),
@@ -791,6 +805,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SilenceForkPRErrors:            userConfig.SilenceForkPRErrors,
 		SilenceForkPRErrorsFlag:        config.SilenceForkPRErrorsFlag,
 		DisableAutoplan:                userConfig.DisableAutoplan,
+		DisableAutoplanLabel:           userConfig.DisableAutoplanLabel,
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
@@ -920,7 +935,7 @@ func (s *Server) Start() error {
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
-	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
+	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
@@ -1030,6 +1045,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			// query params as part of the lock URL.
 			LockPath:      lockURL.String(),
 			RepoFullName:  v.Project.RepoFullName,
+			LockedBy:      v.Pull.Author,
 			PullNum:       v.Pull.Num,
 			Path:          v.Project.Path,
 			Workspace:     v.Workspace,

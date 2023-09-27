@@ -5,7 +5,7 @@ package mocks
 
 import (
 	go_version "github.com/hashicorp/go-version"
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 	"time"
 )
@@ -25,11 +25,11 @@ func NewMockKeySerializer(options ...pegomock.Option) *MockKeySerializer {
 func (mock *MockKeySerializer) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockKeySerializer) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockKeySerializer) Serialize(_param0 *go_version.Version) (string, error) {
+func (mock *MockKeySerializer) Serialize(key *go_version.Version) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockKeySerializer().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{key}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Serialize", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -81,8 +81,8 @@ type VerifierMockKeySerializer struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockKeySerializer) Serialize(_param0 *go_version.Version) *MockKeySerializer_Serialize_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockKeySerializer) Serialize(key *go_version.Version) *MockKeySerializer_Serialize_OngoingVerification {
+	params := []pegomock.Param{key}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Serialize", params, verifier.timeout)
 	return &MockKeySerializer_Serialize_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -93,8 +93,8 @@ type MockKeySerializer_Serialize_OngoingVerification struct {
 }
 
 func (c *MockKeySerializer_Serialize_OngoingVerification) GetCapturedArguments() *go_version.Version {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	key := c.GetAllCapturedArguments()
+	return key[len(key)-1]
 }
 
 func (c *MockKeySerializer_Serialize_OngoingVerification) GetAllCapturedArguments() (_param0 []*go_version.Version) {

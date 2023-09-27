@@ -21,7 +21,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/webhooks/mocks"
 
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -163,8 +163,9 @@ func setup(t *testing.T) {
 			FullName: "runatlantis/atlantis",
 		},
 		Pull: models.PullRequest{
-			Num: 1,
-			URL: "url",
+			Num:        1,
+			URL:        "url",
+			BaseBranch: "main",
 		},
 		User: models.User{
 			Username: "lkysow",

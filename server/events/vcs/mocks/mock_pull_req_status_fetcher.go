@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
@@ -25,11 +25,11 @@ func NewMockPullReqStatusFetcher(options ...pegomock.Option) *MockPullReqStatusF
 func (mock *MockPullReqStatusFetcher) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPullReqStatusFetcher) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPullReqStatusFetcher) FetchPullStatus(_param0 models.PullRequest) (models.PullReqStatus, error) {
+func (mock *MockPullReqStatusFetcher) FetchPullStatus(pull models.PullRequest) (models.PullReqStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPullReqStatusFetcher().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{pull}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("FetchPullStatus", params, []reflect.Type{reflect.TypeOf((*models.PullReqStatus)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.PullReqStatus
 	var ret1 error
@@ -81,8 +81,8 @@ type VerifierMockPullReqStatusFetcher struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockPullReqStatusFetcher) FetchPullStatus(_param0 models.PullRequest) *MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockPullReqStatusFetcher) FetchPullStatus(pull models.PullRequest) *MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification {
+	params := []pegomock.Param{pull}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "FetchPullStatus", params, verifier.timeout)
 	return &MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -93,8 +93,8 @@ type MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification struct {
 }
 
 func (c *MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification) GetCapturedArguments() models.PullRequest {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	pull := c.GetAllCapturedArguments()
+	return pull[len(pull)-1]
 }
 
 func (c *MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest) {

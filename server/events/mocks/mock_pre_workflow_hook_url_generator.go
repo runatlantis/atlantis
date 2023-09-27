@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 	"time"
 )
@@ -24,11 +24,11 @@ func NewMockPreWorkflowHookURLGenerator(options ...pegomock.Option) *MockPreWork
 func (mock *MockPreWorkflowHookURLGenerator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPreWorkflowHookURLGenerator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPreWorkflowHookURLGenerator) GenerateProjectWorkflowHookURL(_param0 string) (string, error) {
+func (mock *MockPreWorkflowHookURLGenerator) GenerateProjectWorkflowHookURL(hookID string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPreWorkflowHookURLGenerator().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{hookID}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GenerateProjectWorkflowHookURL", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -80,8 +80,8 @@ type VerifierMockPreWorkflowHookURLGenerator struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockPreWorkflowHookURLGenerator) GenerateProjectWorkflowHookURL(_param0 string) *MockPreWorkflowHookURLGenerator_GenerateProjectWorkflowHookURL_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockPreWorkflowHookURLGenerator) GenerateProjectWorkflowHookURL(hookID string) *MockPreWorkflowHookURLGenerator_GenerateProjectWorkflowHookURL_OngoingVerification {
+	params := []pegomock.Param{hookID}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GenerateProjectWorkflowHookURL", params, verifier.timeout)
 	return &MockPreWorkflowHookURLGenerator_GenerateProjectWorkflowHookURL_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -92,8 +92,8 @@ type MockPreWorkflowHookURLGenerator_GenerateProjectWorkflowHookURL_OngoingVerif
 }
 
 func (c *MockPreWorkflowHookURLGenerator_GenerateProjectWorkflowHookURL_OngoingVerification) GetCapturedArguments() string {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	hookID := c.GetAllCapturedArguments()
+	return hookID[len(hookID)-1]
 }
 
 func (c *MockPreWorkflowHookURLGenerator_GenerateProjectWorkflowHookURL_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {

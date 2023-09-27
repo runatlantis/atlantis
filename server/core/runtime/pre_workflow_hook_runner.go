@@ -11,19 +11,20 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
+//go:generate pegomock generate --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
 type PreWorkflowHookRunner interface {
-	Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error)
+	Run(ctx models.WorkflowHookCommandContext, command string, shell string, shellArgs string, path string) (string, string, error)
 }
 
 type DefaultPreWorkflowHookRunner struct {
 	OutputHandler jobs.ProjectCommandOutputHandler
 }
 
-func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, string, error) {
+func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, shell string, shellArgs string, path string) (string, string, error) {
 	outputFilePath := filepath.Join(path, "OUTPUT_STATUS_FILE")
 
-	cmd := exec.Command("sh", "-c", command) // #nosec
+	shellArgsSlice := append(strings.Split(shellArgs, " "), command)
+	cmd := exec.Command(shell, shellArgsSlice...) // #nosec
 	cmd.Dir = path
 
 	baseEnvVars := os.Environ()
@@ -42,6 +43,7 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		"PULL_URL":           ctx.Pull.URL,
 		"USER_NAME":          ctx.User.Username,
 		"OUTPUT_STATUS_FILE": outputFilePath,
+		"COMMAND_NAME":       ctx.CommandName,
 	}
 
 	finalEnvVars := baseEnvVars
@@ -52,11 +54,12 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 	cmd.Env = finalEnvVars
 	out, err := cmd.CombinedOutput()
 
-	wh.OutputHandler.SendWorkflowHook(ctx, string(out), false)
+	outString := strings.ReplaceAll(string(out), "\n", "\r\n")
+	wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
 	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
+		err = fmt.Errorf("%s: running %q in %q: \n%s", err, shell+" "+shellArgs+" "+command, path, out)
 		ctx.Log.Debug("error: %s", err)
 		return string(out), "", err
 	}
@@ -68,12 +71,12 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		var customStatusErr error
 		customStatusOut, customStatusErr = os.ReadFile(outputFilePath)
 		if customStatusErr != nil {
-			err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
+			err = fmt.Errorf("%s: running %q in %q: \n%s", err, shell+" "+shellArgs+" "+command, path, out)
 			ctx.Log.Debug("error: %s", err)
 			return string(out), "", err
 		}
 	}
 
-	ctx.Log.Info("successfully ran %q in %q", command, path)
+	ctx.Log.Info("successfully ran %q in %q", shell+" "+shellArgs+" "+command, path)
 	return string(out), strings.Trim(string(customStatusOut), "\n"), nil
 }

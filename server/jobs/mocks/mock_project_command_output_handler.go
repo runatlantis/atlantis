@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	jobs "github.com/runatlantis/atlantis/server/jobs"
@@ -27,19 +27,19 @@ func NewMockProjectCommandOutputHandler(options ...pegomock.Option) *MockProject
 func (mock *MockProjectCommandOutputHandler) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockProjectCommandOutputHandler) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockProjectCommandOutputHandler) CleanUp(_param0 jobs.PullInfo) {
+func (mock *MockProjectCommandOutputHandler) CleanUp(pullInfo jobs.PullInfo) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{pullInfo}
 	pegomock.GetGenericMockFrom(mock).Invoke("CleanUp", params, []reflect.Type{})
 }
 
-func (mock *MockProjectCommandOutputHandler) Deregister(_param0 string, _param1 chan string) {
+func (mock *MockProjectCommandOutputHandler) Deregister(jobID string, receiver chan string) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{jobID, receiver}
 	pegomock.GetGenericMockFrom(mock).Invoke("Deregister", params, []reflect.Type{})
 }
 
@@ -51,11 +51,11 @@ func (mock *MockProjectCommandOutputHandler) Handle() {
 	pegomock.GetGenericMockFrom(mock).Invoke("Handle", params, []reflect.Type{})
 }
 
-func (mock *MockProjectCommandOutputHandler) IsKeyExists(_param0 string) bool {
+func (mock *MockProjectCommandOutputHandler) IsKeyExists(key string) bool {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{key}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("IsKeyExists", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
 	var ret0 bool
 	if len(result) != 0 {
@@ -66,27 +66,27 @@ func (mock *MockProjectCommandOutputHandler) IsKeyExists(_param0 string) bool {
 	return ret0
 }
 
-func (mock *MockProjectCommandOutputHandler) Register(_param0 string, _param1 chan string) {
+func (mock *MockProjectCommandOutputHandler) Register(jobID string, receiver chan string) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{jobID, receiver}
 	pegomock.GetGenericMockFrom(mock).Invoke("Register", params, []reflect.Type{})
 }
 
-func (mock *MockProjectCommandOutputHandler) Send(_param0 command.ProjectContext, _param1 string, _param2 bool) {
+func (mock *MockProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg string, operationComplete bool) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2}
+	params := []pegomock.Param{ctx, msg, operationComplete}
 	pegomock.GetGenericMockFrom(mock).Invoke("Send", params, []reflect.Type{})
 }
 
-func (mock *MockProjectCommandOutputHandler) SendWorkflowHook(_param0 models.WorkflowHookCommandContext, _param1 string, _param2 bool) {
+func (mock *MockProjectCommandOutputHandler) SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
 	}
-	params := []pegomock.Param{_param0, _param1, _param2}
+	params := []pegomock.Param{ctx, msg, operationComplete}
 	pegomock.GetGenericMockFrom(mock).Invoke("SendWorkflowHook", params, []reflect.Type{})
 }
 
@@ -127,8 +127,8 @@ type VerifierMockProjectCommandOutputHandler struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockProjectCommandOutputHandler) CleanUp(_param0 jobs.PullInfo) *MockProjectCommandOutputHandler_CleanUp_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockProjectCommandOutputHandler) CleanUp(pullInfo jobs.PullInfo) *MockProjectCommandOutputHandler_CleanUp_OngoingVerification {
+	params := []pegomock.Param{pullInfo}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CleanUp", params, verifier.timeout)
 	return &MockProjectCommandOutputHandler_CleanUp_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -139,8 +139,8 @@ type MockProjectCommandOutputHandler_CleanUp_OngoingVerification struct {
 }
 
 func (c *MockProjectCommandOutputHandler_CleanUp_OngoingVerification) GetCapturedArguments() jobs.PullInfo {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	pullInfo := c.GetAllCapturedArguments()
+	return pullInfo[len(pullInfo)-1]
 }
 
 func (c *MockProjectCommandOutputHandler_CleanUp_OngoingVerification) GetAllCapturedArguments() (_param0 []jobs.PullInfo) {
@@ -154,8 +154,8 @@ func (c *MockProjectCommandOutputHandler_CleanUp_OngoingVerification) GetAllCapt
 	return
 }
 
-func (verifier *VerifierMockProjectCommandOutputHandler) Deregister(_param0 string, _param1 chan string) *MockProjectCommandOutputHandler_Deregister_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockProjectCommandOutputHandler) Deregister(jobID string, receiver chan string) *MockProjectCommandOutputHandler_Deregister_OngoingVerification {
+	params := []pegomock.Param{jobID, receiver}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Deregister", params, verifier.timeout)
 	return &MockProjectCommandOutputHandler_Deregister_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -166,8 +166,8 @@ type MockProjectCommandOutputHandler_Deregister_OngoingVerification struct {
 }
 
 func (c *MockProjectCommandOutputHandler_Deregister_OngoingVerification) GetCapturedArguments() (string, chan string) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	jobID, receiver := c.GetAllCapturedArguments()
+	return jobID[len(jobID)-1], receiver[len(receiver)-1]
 }
 
 func (c *MockProjectCommandOutputHandler_Deregister_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []chan string) {
@@ -202,8 +202,8 @@ func (c *MockProjectCommandOutputHandler_Handle_OngoingVerification) GetCaptured
 func (c *MockProjectCommandOutputHandler_Handle_OngoingVerification) GetAllCapturedArguments() {
 }
 
-func (verifier *VerifierMockProjectCommandOutputHandler) IsKeyExists(_param0 string) *MockProjectCommandOutputHandler_IsKeyExists_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockProjectCommandOutputHandler) IsKeyExists(key string) *MockProjectCommandOutputHandler_IsKeyExists_OngoingVerification {
+	params := []pegomock.Param{key}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "IsKeyExists", params, verifier.timeout)
 	return &MockProjectCommandOutputHandler_IsKeyExists_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -214,8 +214,8 @@ type MockProjectCommandOutputHandler_IsKeyExists_OngoingVerification struct {
 }
 
 func (c *MockProjectCommandOutputHandler_IsKeyExists_OngoingVerification) GetCapturedArguments() string {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	key := c.GetAllCapturedArguments()
+	return key[len(key)-1]
 }
 
 func (c *MockProjectCommandOutputHandler_IsKeyExists_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
@@ -229,8 +229,8 @@ func (c *MockProjectCommandOutputHandler_IsKeyExists_OngoingVerification) GetAll
 	return
 }
 
-func (verifier *VerifierMockProjectCommandOutputHandler) Register(_param0 string, _param1 chan string) *MockProjectCommandOutputHandler_Register_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockProjectCommandOutputHandler) Register(jobID string, receiver chan string) *MockProjectCommandOutputHandler_Register_OngoingVerification {
+	params := []pegomock.Param{jobID, receiver}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Register", params, verifier.timeout)
 	return &MockProjectCommandOutputHandler_Register_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -241,8 +241,8 @@ type MockProjectCommandOutputHandler_Register_OngoingVerification struct {
 }
 
 func (c *MockProjectCommandOutputHandler_Register_OngoingVerification) GetCapturedArguments() (string, chan string) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	jobID, receiver := c.GetAllCapturedArguments()
+	return jobID[len(jobID)-1], receiver[len(receiver)-1]
 }
 
 func (c *MockProjectCommandOutputHandler_Register_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []chan string) {
@@ -260,8 +260,8 @@ func (c *MockProjectCommandOutputHandler_Register_OngoingVerification) GetAllCap
 	return
 }
 
-func (verifier *VerifierMockProjectCommandOutputHandler) Send(_param0 command.ProjectContext, _param1 string, _param2 bool) *MockProjectCommandOutputHandler_Send_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2}
+func (verifier *VerifierMockProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg string, operationComplete bool) *MockProjectCommandOutputHandler_Send_OngoingVerification {
+	params := []pegomock.Param{ctx, msg, operationComplete}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Send", params, verifier.timeout)
 	return &MockProjectCommandOutputHandler_Send_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -272,8 +272,8 @@ type MockProjectCommandOutputHandler_Send_OngoingVerification struct {
 }
 
 func (c *MockProjectCommandOutputHandler_Send_OngoingVerification) GetCapturedArguments() (command.ProjectContext, string, bool) {
-	_param0, _param1, _param2 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
+	ctx, msg, operationComplete := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], msg[len(msg)-1], operationComplete[len(operationComplete)-1]
 }
 
 func (c *MockProjectCommandOutputHandler_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 []bool) {
@@ -295,8 +295,8 @@ func (c *MockProjectCommandOutputHandler_Send_OngoingVerification) GetAllCapture
 	return
 }
 
-func (verifier *VerifierMockProjectCommandOutputHandler) SendWorkflowHook(_param0 models.WorkflowHookCommandContext, _param1 string, _param2 bool) *MockProjectCommandOutputHandler_SendWorkflowHook_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1, _param2}
+func (verifier *VerifierMockProjectCommandOutputHandler) SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool) *MockProjectCommandOutputHandler_SendWorkflowHook_OngoingVerification {
+	params := []pegomock.Param{ctx, msg, operationComplete}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "SendWorkflowHook", params, verifier.timeout)
 	return &MockProjectCommandOutputHandler_SendWorkflowHook_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -307,8 +307,8 @@ type MockProjectCommandOutputHandler_SendWorkflowHook_OngoingVerification struct
 }
 
 func (c *MockProjectCommandOutputHandler_SendWorkflowHook_OngoingVerification) GetCapturedArguments() (models.WorkflowHookCommandContext, string, bool) {
-	_param0, _param1, _param2 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
+	ctx, msg, operationComplete := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], msg[len(msg)-1], operationComplete[len(operationComplete)-1]
 }
 
 func (c *MockProjectCommandOutputHandler_SendWorkflowHook_OngoingVerification) GetAllCapturedArguments() (_param0 []models.WorkflowHookCommandContext, _param1 []string, _param2 []bool) {
