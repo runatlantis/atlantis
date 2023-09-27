@@ -2,7 +2,7 @@ changelog:
   exclude:
     labels:
       - ignore-for-release
-      - docs
+      - github-actions
     authors:
       - octocat
   categories:

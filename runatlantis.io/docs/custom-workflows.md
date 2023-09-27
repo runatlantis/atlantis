@@ -142,7 +142,11 @@ workflows:
   myworkflow:
     plan:
       steps:
-      - run: terraform init -input=false
+      # If you want to hide command output from Atlantis's PR comment, use
+      # the output option on the run step's expanded form.
+      - run:
+          command: terraform init -input=false
+          output: hide
       
       # If you're using workspaces you need to select the workspace using the
       # $WORKSPACE environment variable.
@@ -157,16 +161,17 @@ workflows:
       - run: terraform apply $PLANFILE
 ```
 
-### cdktf
-Here are the requirements to enable [cdktf](https://developer.hashicorp.com/terraform/cdktf)
+### CDKTF
+Here are the requirements to enable [CDKTF](https://developer.hashicorp.com/terraform/cdktf)
 
-- A custom image with `cdktf` installed
-- The autoplan file updated to trigger off of `**/cdk.tf.json`
-- The output of `cdktf synth` has to be committed to the pull request
-- Optional: Use `pre_workflow_hooks` to run `cdktf synth` as a double check
+- A custom image with `CDKTF` installed
+- Add `**/cdk.tf.json` to the list of Atlantis autoplan files.
+- Set the `atlantis-include-git-untracked-files` flag so that the Terraform files dynamically generated
+by CDKTF will be add to the Atlantis modified file list.
+- Use `pre_workflow_hooks` to run `cdktf synth`
 - Optional: There isn't a requirement to use a repo `atlantis.yaml` but one can be leveraged if needed.
 
-#### custom image
+#### Custom Image
 
 ```dockerfile
 # Dockerfile
@@ -175,11 +180,12 @@ FROM ghcr.io/runatlantis/atlantis:v0.19.7
 RUN apk add npm && npm i -g cdktf-cli
 ```
 
-#### server config
+#### Server Config
 
 ```bash
 # env variables
 ATLANTIS_AUTOPLAN_FILE_LIST="**/*.tf,**/*.tfvars,**/*.tfvars.json,**/cdk.tf.json"
+ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
 ```
 
 OR
@@ -188,9 +194,10 @@ OR
 ```yaml
 # config.yaml
 autoplan-file-list: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/cdk.tf.json"
+include-git-untracked-files: true
 ```
 
-#### server repo config
+#### Server Repo Config
 
 Use `pre_workflow_hooks`
 
@@ -200,32 +207,39 @@ Use `pre_workflow_hooks`
 repos:
   - id: /.*cdktf.*/
     pre_workflow_hooks:
-      - run: npm i && cdktf get && cdktf synth
+      - run: npm i && cdktf get && cdktf synth --output ci-cdktf.out
 ```
 
-#### repo structure
+**Note:** don't use the default `cdktf.out` directory that CDKTF uses, as this should be in the `.gitignore` list of the
+repo, so that locally generated files are not checked in.
 
-This is the git repo structure after running `cdktf synth`. The `cdk.tf.json` files contain the HCL that atlantis can run.
+#### Repo Structure
+
+This is the git repo structure after running `cdktf synth`. The `cdk.tf.json` files contain the Terraform configuration
+that atlantis can run.
 
 ```bash
 $ tree --gitignore
 .
 ├── cdktf.json
-├── cdktf.out
+├── ci-cdktf.out
 │   ├── manifest.json
 │   └── stacks
 │       └── eks
 │           └── cdk.tf.json
 ```
 
-#### workflow
+#### Workflow
 
-1. Container orchestrator (k8s/fargate/ecs/etc) uses the custom docker image of atlantis with `cdktf` installed with the `--autoplan-file-list` to trigger on json files
-1. PR branch is pushed up containing `cdktf` changes and generated hcl json
-1. Atlantis checks out the branch in the repo
-1. Atlantis runs the `npm i && cdktf get && cdktf synth` command in the repo root as a step in `pre_workflow_hooks` (as a double check described above)
-1. Atlantis detects the change to the generated hcl json files in a number of `dir`s
-1. Atlantis then runs `terraform` workflows in the respective `dir`s as usual
+1. Container orchestrator (k8s/fargate/ecs/etc) uses the custom docker image of atlantis with `cdktf` installed with
+the `--autoplan-file-list` to trigger on `cdk.tf.json` files and `--include-git-untracked-files` set to include the
+CDKTF dynamically generated Terraform files in the Atlantis plan. 
+1. PR branch is pushed up containing `cdktf` code changes.
+1. Atlantis checks out the branch in the repo.
+1. Atlantis runs the `npm i && cdktf get && cdktf synth` command in the repo root as a step in `pre_workflow_hooks`,
+generating the `cdk.tf.json` Terraform files.
+1. Atlantis detects the `cdk.tf.json` untracked files in a number of directories.
+1. Atlantis then runs `terraform` workflows in the respective directories as usual.
 
 ### Terragrunt
 Atlantis supports running custom commands in place of the default Atlantis
@@ -264,8 +278,12 @@ workflows:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
           value: 'true'
-      - run: terragrunt plan -input=false -out=$PLANFILE
-      - run: terragrunt show -json $PLANFILE > $SHOWFILE
+      - run:
+          # Allow for targetted plans/applies as not supported for Terraform wrappers by default
+          command: terragrunt plan -input=false $(printf '%s' $COMMENT_ARGS | sed 's/,/ /g' | tr -d '\\') -no-color -out $PLANFILE
+          output: hide
+      - run: |
+          terragrunt show $PLANFILE
     apply:
       steps:
       - env:
@@ -276,6 +294,23 @@ workflows:
           name: TF_IN_AUTOMATION
           value: 'true'
       - run: terragrunt apply -input=false $PLANFILE
+    import:
+      steps:
+      - env:
+          name: TERRAGRUNT_TFPATH
+          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+      - env:
+          name: TF_VAR_author
+          command: 'git show -s --format="%ae" $HEAD_COMMIT'
+      # Allow for imports as not supported for Terraform wrappers by default
+      - run: terragrunt import -input=false $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
+    state_rm:
+      steps:
+      - env:
+          name: TERRAGRUNT_TFPATH
+          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+      # Allow for state removals as not supported for Terraform wrappers by default
+      - run: terragrunt state rm $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
 ```
 
 If using the repo's `atlantis.yaml` file you would use the following config:
@@ -297,7 +332,9 @@ workflows:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
           value: 'true'
-      - run: terragrunt plan -out $PLANFILE
+      - run:
+          command: terragrunt plan -input=false -out=$PLANFILE
+          output: strip_refreshing
     apply:
       steps:
       - env:
@@ -451,13 +488,27 @@ A map from string to `extra_args` for a built-in command with extra arguments.
 | init/plan/apply/import/state_rm | map[`extra_args` -> array[string]] | none    | no       | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
 
 #### Custom `run` Command
-Or a custom command
+A custom command can be written in 2 ways
+
+Compact:
 ```yaml
-- run: custom-command
+- run: custom-command arg1 arg2
 ```
 | Key | Type   | Default | Required | Description          |
 |-----|--------|---------|----------|----------------------|
 | run | string | none    | no       | Run a custom command |
+
+Full
+```yaml
+- run: 
+    command: custom-command arg1 arg2
+    output: show
+```
+| Key | Type                                                         | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                             |
+|-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| run | map[string -> string] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
+| run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
+| run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>* `show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
 
 ::: tip Notes
 * `run` steps in the main `workflow` are executed with the following environment variables:  
@@ -513,9 +564,12 @@ as the environment variable value.
     name: ENV_NAME_2
     command: 'echo "dynamic-value-$(date)"'
 ```
-| Key             | Type                               | Default | Required | Description                                                                                                                                         |
-|-----------------|------------------------------------|---------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
-| env | map[`name` -> string, `value` -> string, `command` -> string] | none    | no       | Set environment variables for subsequent steps |
+| Key             | Type                  | Default | Required | Description                                                                                                     |
+|-----------------|-----------------------|---------|----------|-----------------------------------------------------------------------------------------------------------------|
+| env | map[string -> string] | none    | no       | Set environment variables for subsequent steps                                                                  |
+| env.name | string | none | yes | Name of the environment variable                                                                                |
+| env.value | string | none | no | Set the value of the environment variable to a hard-coded string. Cannot be set at the same time as `command`   |
+| env.command | string | none | no | Set the value of the environment variable to the output of a command. Cannot be set at the same time as `value` |
 
 ::: tip Notes
 * `env` `command`'s can use any of the built-in environment variables available

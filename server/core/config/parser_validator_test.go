@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -217,7 +218,7 @@ projects:
 						WorkflowName:     nil,
 						TerraformVersion: nil,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 						ApplyRequirements: nil,
@@ -240,7 +241,7 @@ projects:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},
@@ -286,7 +287,7 @@ projects:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},
@@ -309,7 +310,7 @@ workflows: ~
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},
@@ -337,7 +338,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},
@@ -368,7 +369,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -402,7 +403,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -436,7 +437,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"mergeable"},
@@ -470,7 +471,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged"},
@@ -504,7 +505,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"mergeable", "approved"},
@@ -538,7 +539,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "approved"},
@@ -572,7 +573,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "mergeable"},
@@ -606,7 +607,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "mergeable", "approved"},
@@ -716,7 +717,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},
@@ -725,7 +726,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},
@@ -767,7 +768,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},
@@ -866,7 +867,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},
@@ -957,7 +958,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},
@@ -1050,7 +1051,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      true,
 						},
 					},
@@ -1308,7 +1309,7 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   allowed_overrides: [invalid]`,
-			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"plan_requirements\", \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\" and \"repo_locking\" are supported.).).",
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"plan_requirements\", \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\", \"repo_locking\" and \"policy_check\" are supported.).).",
 		},
 		"invalid plan_requirement": {
 			input: `repos:
@@ -1402,12 +1403,14 @@ repos:
     - run: custom workflow command
   allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, delete_source_branch_on_merge]
   allow_custom_workflows: true
+  policy_check: true
 - id: /.*/
   branch: /(master|main)/
   pre_workflow_hooks:
     - run: custom workflow command
   post_workflow_hooks:
     - run: custom workflow command
+  policy_check: false
 workflows:
   custom1:
     plan:
@@ -1453,12 +1456,14 @@ policies:
 						PostWorkflowHooks:    postWorkflowHooks,
 						AllowedOverrides:     []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
+						PolicyCheck:          Bool(true),
 					},
 					{
 						IDRegex:           regexp.MustCompile(".*"),
 						BranchRegex:       regexp.MustCompile("(master|main)"),
 						PreWorkflowHooks:  preWorkflowHooks,
 						PostWorkflowHooks: postWorkflowHooks,
+						PolicyCheck:       Bool(false),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1567,6 +1572,7 @@ workflows:
 						AllowCustomWorkflows:      Bool(false),
 						DeleteSourceBranchOnMerge: Bool(false),
 						RepoLocking:               Bool(true),
+						PolicyCheck:               Bool(false),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1597,10 +1603,11 @@ workflows:
 			Ok(t, os.WriteFile(path, []byte(c.input), 0600))
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowRepoCfg:       false,
+				MergeableReq:       false,
+				ApprovedReq:        false,
+				UnDivergedReq:      false,
+				PolicyCheckEnabled: false,
 			}
 
 			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))

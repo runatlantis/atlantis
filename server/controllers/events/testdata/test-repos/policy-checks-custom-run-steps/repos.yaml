@@ -1,0 +1,19 @@
+policies:
+  owners:
+    users:
+      - runatlantis
+  policy_sets:
+    - name: test_policy
+      path: policies/policy.rego
+      source: local
+        
+workflows:
+  default:
+    policy_check:
+      steps:
+        - show
+        - run: "echo 'pre-conftest output'"
+        - policy_check:
+            extra_args:
+              - --no-fail
+        - run: "echo 'post-conftest output'"

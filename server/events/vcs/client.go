@@ -17,7 +17,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_client.go Client
+//go:generate pegomock generate --package mocks -o mocks/mock_client.go Client
 
 // Client is used to make API calls to a VCS host like GitHub or GitLab.
 type Client interface {
@@ -49,4 +49,7 @@ type Client interface {
 	GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error)
 	SupportsSingleFileDownload(repo models.Repo) bool
 	GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error)
+
+	// GetPullLabels returns the labels of a pull request
+	GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error)
 }

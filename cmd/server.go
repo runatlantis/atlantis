@@ -33,6 +33,12 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
+// checkout strategies
+const (
+	CheckoutStrategyBranch = "branch"
+	CheckoutStrategyMerge  = "merge"
+)
+
 // To add a new flag you must:
 // 1. Add a const with the flag name (in alphabetic order).
 // 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
@@ -49,6 +55,8 @@ const (
 	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutomergeFlag                    = "automerge"
+	ParallelPlanFlag                 = "parallel-plan"
+	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
 	AutoplanModulesFromProjects      = "autoplan-modules-from-projects"
 	AutoplanFileListFlag             = "autoplan-file-list"
@@ -64,6 +72,7 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableApplyFlag                 = "disable-apply"
 	DisableAutoplanFlag              = "disable-autoplan"
+	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
@@ -72,6 +81,7 @@ const (
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	ExecutableName                   = "executable-name"
+	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
@@ -88,6 +98,7 @@ const (
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
@@ -124,6 +135,7 @@ const (
 	RestrictFileList           = "restrict-file-list"
 	TFDownloadFlag             = "tf-download"
 	TFDownloadURLFlag          = "tf-download-url"
+	UseTFPluginCache             = "use-tf-plugin-cache"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
@@ -141,7 +153,7 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
-	DefaultCheckoutStrategy             = "branch"
+	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
@@ -245,6 +257,10 @@ var stringFlags = map[string]stringFlag{
 	DataDirFlag: {
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	DisableAutoplanLabelFlag: {
+		description:  "Pull request label to disable atlantis auto planning feature only if present.",
+		defaultValue: "",
 	},
 	EmojiReaction: {
 		description:  "Emoji Reaction to use to react to comments",
@@ -449,6 +465,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
 		defaultValue: false,
 	},
+	FailOnPreWorkflowHookError: {
+		description:  "Fail and do not run the requested Atlantis command if any of the pre workflow hooks error.",
+		defaultValue: false,
+	},
 	GHAllowMergeableBypassApply: {
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
 		defaultValue: false,
@@ -460,6 +480,18 @@ var boolFlags = map[string]boolFlag{
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
+	IncludeGitUntrackedFiles: {
+		description:  "Include git untracked files in the Atlantis modified file scope.",
+		defaultValue: false,
+	},
+	ParallelPlanFlag: {
+		description:  "Run plan operations in parallel.",
+		defaultValue: false,
+	},
+	ParallelApplyFlag: {
+		description:  "Run apply operations in parallel.",
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {
@@ -542,10 +574,14 @@ var boolFlags = map[string]boolFlag{
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
 	},
+	UseTFPluginCache: {
+		description:  "Enable the use of the Terraform plugin cache",
+		defaultValue: true,
+	},
 }
 var intFlags = map[string]intFlag{
 	CheckoutDepthFlag: {
-		description: fmt.Sprintf("Used only if --%s=merge.", CheckoutStrategyFlag) +
+		description: fmt.Sprintf("Used only if --%s=%s.", CheckoutStrategyFlag, CheckoutStrategyMerge) +
 			" How many commits to include in each of base and feature branches when cloning repository." +
 			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
 		defaultValue: DefaultCheckoutDepth,
@@ -852,8 +888,9 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 
 	checkoutStrategy := userConfig.CheckoutStrategy
-	if checkoutStrategy != "branch" && checkoutStrategy != "merge" {
-		return errors.New("invalid checkout strategy: not one of branch or merge")
+	if checkoutStrategy != CheckoutStrategyBranch && checkoutStrategy != CheckoutStrategyMerge {
+		return fmt.Errorf("invalid checkout strategy: not one of %s or %s",
+			CheckoutStrategyBranch, CheckoutStrategyMerge)
 	}
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
@@ -1079,8 +1116,8 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	}
 	if userConfig.AllowRepoConfig {
 		deprecatedFlags = append(deprecatedFlags, AllowRepoConfigFlag)
-		yamlCfg += "\n  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow]\n  allow_custom_workflows: true"
-		jsonCfg += `, "allowed_overrides":["plan_requirements","apply_requirements","import_requirements","workflow"], "allow_custom_workflows":true`
+		yamlCfg += "\n  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, policy_check]\n  allow_custom_workflows: true"
+		jsonCfg += `, "allowed_overrides":["plan_requirements","apply_requirements","import_requirements","workflow", "policy_check"], "allow_custom_workflows":true`
 	}
 	jsonCfg += "}]}"
 

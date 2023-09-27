@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - "main"
-    paths:
-      - '**.go'
-      - 'go.*'
-      - '.github/workflows/test.yml'
   pull_request:
     types:
       - opened
@@ -16,60 +12,42 @@ on:
       - ready_for_review
     branches:
       - "main"
-    paths:
-      - '**.go'
-      - 'go.*'
-      - '.github/workflows/test.yml'
- 
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  test:
+  changes:
+    outputs:
+      should-run-tests: ${{ steps.changes.outputs.go == 'true' }}
     if: github.event.pull_request.draft == false
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            go:
+              - '**.go'
+              - 'go.*'
+              - '.github/workflows/test.yml'
+  test:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-tests == 'true'
     name: runner / gotest
     runs-on: ubuntu-22.04
     container: ghcr.io/runatlantis/testing-env:latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: make test-all
       - run: make check-fmt
 
-  # Check that there's no missing links for the website.
-  # This job builds the website, starts a server to serve it, and then uses
-  # muffet (https://github.com/raviqqe/muffet) to perform the link check.
-  website_link_check:
-    if: github.event.pull_request.draft == false
+  skip-test:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-tests == 'false'
+    name: runner / gotest
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-node@v3
-        with:
-          node-version-file: .node-version
-
-      - name: run http-server
-        env:
-          # renovate: datasource=github-releases depName=raviqqe/muffet
-          MUFFET_VERSION: 2.6.3
-        run: |
-          npm install -g yarn
-          # http-server is used to serve the website locally as muffet checks it.
-          yarn global add http-server
-          # install raviqqe/muffet to check for broken links.
-          curl -L https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_${MUFFET_VERSION}_Linux_x86_64.tar.gz | tar -xz
-          yarn install
-          yarn website:build
-          http-server runatlantis.io/.vuepress/dist &
-
-      - name: wait until server listened
-        run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
-
-      - run: |
-          ./muffet \
-            -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
-            -e 'https://github.com/runatlantis/helm-charts#customization' \
-            --header 'Accept-Encoding:deflate, gzip' \
-            --buffer-size 8192 \
-            http://localhost:8080/
+      - run: 'echo "No build required"'

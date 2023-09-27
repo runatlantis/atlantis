@@ -238,7 +238,7 @@ tbody {
 /* Styles for the lock index */
 .lock-grid{
   display: grid;
-  grid-template-columns: auto auto auto auto auto;
+  grid-template-columns: auto auto auto auto auto auto;
   border: 1px solid #dbeaf4;
   width: 100%;
   font-size: 12px;
@@ -282,6 +282,10 @@ tbody {
   word-break: break-all;
 }
 
+.lock-username {
+  word-break: break-all;
+}
+
 .lock-path {
   padding: .2rem .5rem;
   margin: 0 .2rem;
@@ -309,6 +313,14 @@ tbody {
     overflow: auto; /* Enable scroll if needed */
     background-color: rgb(0,0,0); /* Fallback color */
     background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+.lock-detail-grid {
+  display: grid;
+  grid-template-columns: 130px auto;
+  border: 1px solid #dbeaf4;
+  width: 100%;
+  font-size: 14px;
 }
 
 /* Modal Header */
@@ -348,6 +360,10 @@ tbody {
 }
 
 .js-discard-success {
+  font-family: monospace, monospace; font-size: 1.1em; text-align: center; display: none;
+}
+
+.github-app-msg {
   font-family: monospace, monospace; font-size: 1.1em; text-align: center;
 }
 

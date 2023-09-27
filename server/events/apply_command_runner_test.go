@@ -4,13 +4,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v53/github"
-	. "github.com/petergtz/pegomock/v3"
+	"github.com/google/go-github/v54/github"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -192,24 +191,24 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				timesComment = 0
 			}
 
-			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
+			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 			if c.ExpVCSStatusSet {
 				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-					matchers.AnyModelsRepo(),
-					matchers.AnyModelsPullRequest(),
-					matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-					matchers.EqCommandName(command.Apply),
-					EqInt(c.ExpVCSStatusSucc),
-					EqInt(c.ExpVCSStatusTotal),
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Eq[models.CommitStatus](models.SuccessCommitStatus),
+					Eq[command.Name](command.Apply),
+					Eq(c.ExpVCSStatusSucc),
+					Eq(c.ExpVCSStatusTotal),
 				)
 			} else {
 				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-					matchers.AnyModelsRepo(),
-					matchers.AnyModelsPullRequest(),
-					matchers.AnyModelsCommitStatus(),
-					matchers.EqCommandName(command.Apply),
-					AnyInt(),
-					AnyInt(),
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Any[models.CommitStatus](),
+					Eq[command.Name](command.Apply),
+					Any[int](),
+					Any[int](),
 				)
 			}
 		})
