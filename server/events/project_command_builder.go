@@ -53,6 +53,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoplanFileList string,
 	RestrictFileList bool,
 	SilenceNoProjects bool,
+	IncludeGitUntrackedFiles bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 	terraformClient terraform.Client,
@@ -83,6 +84,7 @@ func NewInstrumentedProjectCommandBuilder(
 			AutoplanFileList,
 			RestrictFileList,
 			SilenceNoProjects,
+			IncludeGitUntrackedFiles,
 			scope,
 			logger,
 			terraformClient,
@@ -111,27 +113,29 @@ func NewProjectCommandBuilder(
 	AutoplanFileList string,
 	RestrictFileList bool,
 	SilenceNoProjects bool,
+	IncludeGitUntrackedFiles bool,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 	terraformClient terraform.Client,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
-		ParserValidator:       parserValidator,
-		ProjectFinder:         projectFinder,
-		VCSClient:             vcsClient,
-		WorkingDir:            workingDir,
-		WorkingDirLocker:      workingDirLocker,
-		GlobalCfg:             globalCfg,
-		PendingPlanFinder:     pendingPlanFinder,
-		SkipCloneNoChanges:    skipCloneNoChanges,
-		EnableRegExpCmd:       EnableRegExpCmd,
-		EnableAutoMerge:       EnableAutoMerge,
-		EnableParallelPlan:    EnableParallelPlan,
-		EnableParallelApply:   EnableParallelApply,
-		AutoDetectModuleFiles: AutoDetectModuleFiles,
-		AutoplanFileList:      AutoplanFileList,
-		RestrictFileList:      RestrictFileList,
-		SilenceNoProjects:     SilenceNoProjects,
+		ParserValidator:          parserValidator,
+		ProjectFinder:            projectFinder,
+		VCSClient:                vcsClient,
+		WorkingDir:               workingDir,
+		WorkingDirLocker:         workingDirLocker,
+		GlobalCfg:                globalCfg,
+		PendingPlanFinder:        pendingPlanFinder,
+		SkipCloneNoChanges:       skipCloneNoChanges,
+		EnableRegExpCmd:          EnableRegExpCmd,
+		EnableAutoMerge:          EnableAutoMerge,
+		EnableParallelPlan:       EnableParallelPlan,
+		EnableParallelApply:      EnableParallelApply,
+		AutoDetectModuleFiles:    AutoDetectModuleFiles,
+		AutoplanFileList:         AutoplanFileList,
+		RestrictFileList:         RestrictFileList,
+		SilenceNoProjects:        SilenceNoProjects,
+		IncludeGitUntrackedFiles: IncludeGitUntrackedFiles,
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
@@ -184,7 +188,7 @@ type ProjectStateCommandBuilder interface {
 	BuildStateRmCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
@@ -200,25 +204,46 @@ type ProjectCommandBuilder interface {
 // This class combines the data from the comment and any atlantis.yaml file or
 // Atlantis server config and then generates a set of contexts.
 type DefaultProjectCommandBuilder struct {
-	ParserValidator              *config.ParserValidator
-	ProjectFinder                ProjectFinder
-	VCSClient                    vcs.Client
-	WorkingDir                   WorkingDir
-	WorkingDirLocker             WorkingDirLocker
-	GlobalCfg                    valid.GlobalCfg
-	PendingPlanFinder            *DefaultPendingPlanFinder
+	// Parses and validates server-side repo config files and repo-level atlantis.yaml files.
+	ParserValidator *config.ParserValidator
+	// Determines which projects were modified in a given pull request.
+	ProjectFinder ProjectFinder
+	// Used to make API calls to a VCS host like GitHub or GitLab.
+	VCSClient vcs.Client
+	// Handles the workspace on disk for running commands.
+	WorkingDir WorkingDir
+	// Used to prevent multiple commands from executing at the same time for a single repo, pull, and workspace.
+	WorkingDirLocker WorkingDirLocker
+	// The final parsed version of the server-side repo config.
+	GlobalCfg valid.GlobalCfg
+	// Finds unapplied plans.
+	PendingPlanFinder *DefaultPendingPlanFinder
+	// Builds project command contexts for Atlantis commands.
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
-	SkipCloneNoChanges           bool
-	EnableRegExpCmd              bool
-	EnableAutoMerge              bool
-	EnableParallelPlan           bool
-	EnableParallelApply          bool
-	AutoDetectModuleFiles        string
-	AutoplanFileList             string
-	EnableDiffMarkdownFormat     bool
-	RestrictFileList             bool
-	SilenceNoProjects            bool
-	TerraformExecutor            terraform.Client
+	// User config option: Skip cloning the repo during autoplan if there are no changes to Terraform projects.
+	SkipCloneNoChanges bool
+	// User config option: Enable the use of regular expressions to run plan/apply commands against defined project names.
+	EnableRegExpCmd bool
+	// User config option: Automatically merge pull requests after all plans have been successfully applied.
+	EnableAutoMerge bool
+	// User config option: Whether to run plan operations in parallel.
+	EnableParallelPlan bool
+	// User config option: Whether to run apply operations in parallel.
+	EnableParallelApply bool
+	// User config option: Enables auto-planning of projects when a module dependency in the same repository has changed.
+	AutoDetectModuleFiles string
+	// User config option: List of file patterns to to to check if a directory contains modified files.
+	AutoplanFileList string
+	// User config option: Format Terraform plan output into a markdown-diff friendy format for color-coding purposes.
+	EnableDiffMarkdownFormat bool
+	// User config option: Block plan requests from projects outside the files modified in the pull request.
+	RestrictFileList bool
+	// User config option: Ignore PR if none of the modified files are part of a project.
+	SilenceNoProjects bool
+	// User config option: Include git untracked files in the modified file list.
+	IncludeGitUntrackedFiles bool
+	// Handles the actual running of Terraform commands.
+	TerraformExecutor terraform.Client
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -241,8 +266,11 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 // See ProjectCommandBuilder.BuildPlanCommands.
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
+		ctx.Log.Debug("Building plan command for all affected projects")
 		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
 	}
+	ctx.Log.Debug("Building plan command for specific project with directory: '%v', workspace: '%v', project: '%v'",
+		cmd.RepoRelDir, cmd.Workspace, cmd.ProjectName)
 	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
 	return pcc, err
 }
@@ -296,7 +324,17 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	if err != nil {
 		return nil, err
 	}
-	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
+
+	if p.IncludeGitUntrackedFiles {
+		ctx.Log.Debug(("'include-git-untracked-files' option is set, getting untracked files"))
+		untrackedFiles, err := p.WorkingDir.GetGitUntrackedFiles(ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+		if err != nil {
+			return nil, err
+		}
+		modifiedFiles = append(modifiedFiles, untrackedFiles...)
+	}
+
+	ctx.Log.Debug("%d files were modified in this pull request. Modified files: %v", len(modifiedFiles), modifiedFiles)
 
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
 		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
@@ -341,7 +379,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	repoDir, _, err := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -479,12 +517,25 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	}
 
 	if p.RestrictFileList {
+		ctx.Log.Debug("'restrict-file-list' option is set, checking modified files")
 		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
 		if err != nil {
 			return nil, err
 		}
 
+		if p.IncludeGitUntrackedFiles {
+			ctx.Log.Debug(("'include-git-untracked-files' option is set, getting untracked files"))
+			untrackedFiles, err := p.WorkingDir.GetGitUntrackedFiles(ctx.HeadRepo, ctx.Pull, workspace)
+			if err != nil {
+				return nil, err
+			}
+			modifiedFiles = append(modifiedFiles, untrackedFiles...)
+		}
+
+		ctx.Log.Debug("%d files were modified in this pull request. Modified files: %v", len(modifiedFiles), modifiedFiles)
+
 		if cmd.RepoRelDir != "" {
+			ctx.Log.Debug("Command directory specified: %s", cmd.RepoRelDir)
 			foundDir := false
 
 			for _, f := range modifiedFiles {
@@ -499,6 +550,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		}
 
 		if cmd.ProjectName != "" {
+			ctx.Log.Debug("Command project name specified: %s", cmd.ProjectName)
 			var notFoundFiles = []string{}
 			var repoConfig valid.RepoCfg
 
@@ -536,7 +588,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	defer unlockFn()
 
 	ctx.Log.Debug("cloning repository")
-	_, _, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return pcc, err
 	}
@@ -734,7 +786,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		if repoCfgPtr.ParallelPlan != nil {
 			parallelPlan = *repoCfgPtr.ParallelPlan
 		}
-		abortOnExcecutionOrderFail = *&repoCfgPtr.AbortOnExcecutionOrderFail
+		abortOnExcecutionOrderFail = repoCfgPtr.AbortOnExcecutionOrderFail
 	}
 
 	if len(matchingProjects) > 0 {

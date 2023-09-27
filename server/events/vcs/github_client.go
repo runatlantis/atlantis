@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -397,7 +397,7 @@ func isRequiredCheck(check string, required []string) bool {
 // GetCombinedStatusMinusApply checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
 func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest, vcstatusname string) (bool, error) {
 	//check combined status api
-	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, *pull.Head.Ref, nil)
+	status, _, err := g.client.Repositories.GetCombinedStatus(g.ctx, *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
 	if err != nil {
 		return false, errors.Wrap(err, "getting combined status")
 	}
@@ -418,8 +418,12 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 		return false, errors.Wrap(err, "getting required status checks")
 	}
 
+	if required.RequiredStatusChecks == nil {
+		return true, nil
+	}
+
 	//check check suite/check run api
-	checksuites, _, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), repo.Owner, repo.Name, *pull.Head.Ref, nil)
+	checksuites, _, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
 	if err != nil {
 		return false, errors.Wrap(err, "getting check suites for ref")
 	}
@@ -428,7 +432,7 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 	for _, c := range checksuites.CheckSuites {
 		if *c.Status == "completed" {
 			//iterate over the runs inside the suite
-			suite, _, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), repo.Owner, repo.Name, *c.ID, nil)
+			suite, _, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *c.ID, nil)
 			if err != nil {
 				return false, errors.Wrap(err, "getting check runs for check suite")
 			}
@@ -719,4 +723,19 @@ func (g *GithubClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) 
 		return "", err
 	}
 	return repository.GetCloneURL(), nil
+}
+
+func (g *GithubClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+	pullDetails, _, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, pull.Num)
+	if err != nil {
+		return nil, err
+	}
+
+	var labels []string
+
+	for _, label := range pullDetails.Labels {
+		labels = append(labels, *label.Name)
+	}
+
+	return labels, nil
 }

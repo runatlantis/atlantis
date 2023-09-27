@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 
@@ -1238,6 +1238,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		TestingOverrideHeadCloneURL: "override-me",
+		Logger:                      logger,
 	}
 
 	defaultTFVersion := terraformClient.DefaultVersion()
@@ -1320,6 +1321,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		false,
 		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		false,
 		false,
 		false,
 		statsScope,
