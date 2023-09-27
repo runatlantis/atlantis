@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -723,4 +723,19 @@ func (g *GithubClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) 
 		return "", err
 	}
 	return repository.GetCloneURL(), nil
+}
+
+func (g *GithubClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+	pullDetails, _, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, pull.Num)
+	if err != nil {
+		return nil, err
+	}
+
+	var labels []string
+
+	for _, label := range pullDetails.Labels {
+		labels = append(labels, *label.Name)
+	}
+
+	return labels, nil
 }

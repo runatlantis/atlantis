@@ -283,7 +283,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	// Prevent nil pointer error when mr.HeadPipeline is empty
 	// See: https://github.com/runatlantis/atlantis/issues/1852
 	commit := pull.HeadCommit
-	isPipelineSkipped := true
+	isPipelineSkipped := false
 	if mr.HeadPipeline != nil {
 		commit = mr.HeadPipeline.SHA
 		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
@@ -514,4 +514,14 @@ func (g *GitlabClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) 
 		return "", err
 	}
 	return project.HTTPURLToRepo, nil
+}
+
+func (g *GitlabClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mr.Labels, nil
 }
