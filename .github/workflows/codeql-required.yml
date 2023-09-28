@@ -6,8 +6,9 @@ name: "CodeQL"
 on:
   push:
     branches: [ "main" ]
-    paths:
-      - '.github/**'
+    paths-ignore:
+      - '**.go'
+      - '**.js'
   pull_request:
     # The branches below must be a subset of the branches above
     types:
@@ -16,8 +17,9 @@ on:
       - synchronize
       - ready_for_review
     branches: [ "main" ]
-    paths:
-      - '.github/**'
+    paths-ignore:
+      - '**.go'
+      - '**.js'
 
 jobs:
   analyze:

@@ -102,6 +102,10 @@ Values are chosen in this order:
   and in links from pull request comments. Defaults to `http://$(hostname):$port`
   where `$port` is from the [`--port`](#port) flag. Supports a basepath if you're hosting Atlantis under a path.
 
+  Notes:
+  * If a load balancer with a non http/https port (not the one defined in the `--port` flag) is used, update the URL to include the port like in the example above.
+   * This URL is used as the `details` link next to each atlantis job to view the job's logs.
+
 ### `--automerge`
   ```bash
   atlantis server --automerge
@@ -139,7 +143,7 @@ Values are chosen in this order:
 
 
 ::: warning NOTE
-By default, changes to modules will not trigger autoplanning. See the flags below. 
+By default, changes to modules will not trigger autoplanning. See the flags below.
 :::
 
 ::: warning NOTE
@@ -155,7 +159,7 @@ ATLANTIS_AUTOPLAN_MODULES=true
 ```
 
 Defaults to `false`. When set to `true`, Atlantis will trace the local modules of included projects.
-Included project are projects with files included by `--autoplan-file-list`. 
+Included project are projects with files included by `--autoplan-file-list`.
 After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
 `--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
 
@@ -171,8 +175,8 @@ atlantis server --autoplan-modules-from-projects='**/init.tf'
 ATLANTIS_AUTOPLAN_MODULES_FROM_PROJECTS='**/init.tf'
 ```
 
-Enables auto-planing of projects when a module dependency in the same repository has changed. 
-This is a list of file patterns like `autoplan-file-list`. 
+Enables auto-planing of projects when a module dependency in the same repository has changed.
+This is a list of file patterns like `autoplan-file-list`.
 
 These patterns select **projects** to index based on the files matched. The index maps modules to the projects that depends on them,
 including projects that include the module via other modules. When a module file matching `autoplan-file-list` changes,
@@ -212,7 +216,7 @@ and set `--autoplan-modules` to `false`.
   ```
   Azure DevOps basic authentication password for inbound webhooks (see
   [docs](https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)).
-  
+
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure DevOps org. This means that an
@@ -322,7 +326,7 @@ and set `--autoplan-modules` to `false`.
   Terraform binaries here. If Atlantis loses this directory, [locks](locking.html)
   will be lost and unapplied plans will be lost.
 
-  Note that the atlantis user is restricted to `~/.atlantis`. 
+  Note that the atlantis user is restricted to `~/.atlantis`.
   If you set the `--data-dir` flag to a path outside of Atlantis its home directory, ensure that you grant the atlantis user the correct permissions.
 
 ### `--default-tf-version`
@@ -351,6 +355,16 @@ and set `--autoplan-modules` to `false`.
   ```
   Disable atlantis auto planning.
 
+### `--disable-autoplan-label`
+  ```bash
+  atlantis server --disable-autoplan-label="no-autoplan"
+  # or
+  ATLANTIS_DISABLE_AUTOPLAN_LABEL="no-autoplan"
+  ```
+  Disable atlantis auto planning only on pull requests with the specified label.
+
+  If `disable-autoplan` property is `true`, this flag has no effect.
+
 ### `--disable-markdown-folding`
   ```bash
   atlantis server --disable-markdown-folding
@@ -367,6 +381,15 @@ and set `--autoplan-modules` to `false`.
   ```
   Stops atlantis from locking projects and or workspaces when running terraform.
 
+### `--emoji-reaction`
+  ```bash
+  atlantis server --emoji-reaction thumbsup
+  # or
+  ATLANTIS_EMOJI_REACTION=thumbsup
+  ```
+  The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab.
+  Defaults to `eyes`.
+
 ### `--enable-policy-checks`
   ```bash
   atlantis server --enable-policy-checks
@@ -382,9 +405,9 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_ENABLE_REGEXP_CMD=true
   ```
   Enable Atlantis to use regular expressions to run plan/apply commands against defined project names when `-p` flag is passed with it.
-  
+
   This can be used to run all defined projects (with the `name` key) in `atlantis.yaml` using `atlantis plan -p .*`.
-  
+
   The flag will only allow the regexes listed in the [`allowed_regexp_prefixes`](https://www.runatlantis.io/docs/repo-level-atlantis-yaml.html#reference) key defined in the repo `atlantis.yaml` file. If the key is undefined, its value defaults to `[]` which will allow any regex.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
@@ -416,13 +439,22 @@ and set `--autoplan-modules` to `false`.
 
   This is useful when running multiple Atlantis servers against a single repository.
 
+### `--fail-on-pre-workflow-hook-error`
+  ```bash
+  atlantis server --fail-on-pre-workflow-hook-error
+  # or
+  ATLANTIS_FAIL_ON_PRE_WORKFLOW_HOOK_ERROR=true 
+  ```
+
+  Fail and do not run the requested Atlantis command if any of the pre workflow hooks error.
+
 ### `--hide-unchanged-plan-comments`
   ```bash
   atlantis server --hide-unchanged-plan-comments
   # or
   ATLANTIS_HIDE_UNCHANGED_PLAN_COMMENTS=true
   ```
-Remove no-changes plan comments from the pull request. 
+Remove no-changes plan comments from the pull request.
 
 This is useful when you have many projects and want to keep the pull request clean from useless comments.
 
@@ -502,7 +534,7 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_GH_APP_SLUG="myappslug"
   ```
-  A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`.
+  A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`. You need to obtain this value from your GitHub app, one way is to go to your App settings and open "Public page" from the left sidebar. Your `--gh-app-slug` value will be the last part of the URL, e.g `https://github.com/apps/<slug>`.
 
 ### `--gh-app-key-file`
   ```bash
@@ -531,13 +563,13 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
   ```
   In versions v0.21.0 and later, the GitHub team name can be a name or a slug.
-  
+
   In versions v0.20.1 and below, the Github team name required the case sensitive team name.
-  
+
   Comma-separated list of GitHub teams and permission pairs.
-  
+
   By default, any team can plan and apply.
-  
+
   ::: warning NOTE
   You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
   i.e., "Engineering Team:plan, Infrastructure Team:apply"
@@ -550,11 +582,6 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY=true
   ```
   Feature flag to enable ability to use `mergeable` mode with required apply status check.
-
-  ::: warning NOTE
-  If there aren't any required checks set in the Github branch protection settings then this will cause atlantis to fail.
-  See issue https://github.com/runatlantis/atlantis/issues/2663.
-  :::
 
 ### `--gitlab-hostname`
   ```bash
@@ -607,7 +634,17 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
   ```
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub currently. This is not enabled by default.
+  GitHub and GitLab currently. This is not enabled by default.
+
+### `--include-git-untracked-files`
+  ```bash
+  atlantis server --include-git-untracked-files
+  # or
+  ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
+  ```
+  Include git untracked files in the Atlantis modified file list.
+  Used for example with CDKTF pre-workflow hooks that dynamically generate
+  Terraform files.
 
 ### `--locking-db-type`
   ```bash
@@ -655,6 +692,22 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_PARALLEL_POOL_SIZE=100
   ```
   Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
+
+### `--parallel-plan`
+  ```bash
+  atlantis server --parallel-plan
+  # or
+  ATLANTIS_PARALLEL_PLAN=true
+  ```
+  Whether to run plan operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precedence.
+
+### `--parallel-apply`
+  ```bash
+  atlantis server --parallel-apply
+  # or
+  ATLANTIS_PARALLEL_APPLY=true
+  ```
+  Whether to run apply operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precedence.
 
 ### `--port`
   ```bash
@@ -781,6 +834,7 @@ This is useful when you have many projects and want to keep the pull request cle
   * Accepts a comma separated list, ex. `definition1,definition2`
   * Format is `{hostname}/{owner}/{repo}`, ex. `github.com/runatlantis/atlantis`
   * `*` matches any characters, ex. `github.com/runatlantis/*` will match all repos in the runatlantis organization
+  * An entry beginning with `!` negates it, ex. `github.com/foo/*,!github.com/foo/bar` will match all github repos in the `foo` owner *except* `bar`.
   * For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
     * User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
   * For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
@@ -791,6 +845,8 @@ This is useful when you have many projects and want to keep the pull request cle
     * `--repo-allowlist=github.com/myorg/repo1,github.com/myorg/repo2`
   * Allowlist all repos under `myorg` on `github.com`
     * `--repo-allowlist='github.com/myorg/*'`
+  * Allowlist all repos under `myorg` on `github.com`, excluding `myorg/untrusted-repo`
+    * `--repo-allowlist='github.com/myorg/*,!github.com/myorg/untrusted-repo'`
   * Allowlist all repos in my GitHub Enterprise installation
     * `--repo-allowlist='github.yourcompany.com/*'`
   * Allowlist all repos under `myorg` project `myproject` on Azure DevOps
@@ -913,7 +969,7 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   An alternative URL to download Terraform versions if they are missing. Useful in an airgapped
   environment where releases.hashicorp.com is not available. Directory structure of the custom
   endpoint should match that of releases.hashicorp.com.
-  
+
   This has no impact if `--tf-download` is set to `false`.
 
 ### `--tfe-hostname`
@@ -942,6 +998,21 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy'
   ```
   A token for Terraform Cloud/Terraform Enterprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
+
+### `--use-tf-plugin-cache`
+```bash
+atlantis server --use-tf-plugin-cache=false
+# or
+ATLANTIS_USE_TF_PLUGIN_CACHE=false
+```
+Set to false if you want to disable terraform plugin cache.
+
+This flag is useful when having multiple projects that need to run a plan and apply in the same PR to avoid the race condition of `plugin_cache_dir` concurrently, this is a terraform known issue, more info:
+
+- [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
+- [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
+
+The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient managment of the PRs.
 
 ### `--var-file-allowlist`
   ```bash
@@ -972,9 +1043,9 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   ```
   Write out a .git-credentials file with the provider user and token to allow
   cloning private modules over HTTPS or SSH. See [here](https://git-scm.com/docs/git-credential-store) for more information.
-  
+
   Follow the `git::ssh` syntax to avoid using a custom `.gitconfig` with an `insteadOf`.
-  
+
   ```hcl
   module "private_submodule" {
     source = "git::ssh://git@github.com/<org>/<repo>//modules/<some-module-name>?ref=v1.2.3"
@@ -982,7 +1053,7 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
     # ...
   }
   ```
-  
+
   ::: warning SECURITY WARNING
   This does write secrets to disk and should only be enabled in a secure environment.
   :::

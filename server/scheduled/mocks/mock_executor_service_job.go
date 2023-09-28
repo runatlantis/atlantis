@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 	"time"
 )

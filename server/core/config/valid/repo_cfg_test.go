@@ -5,6 +5,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -29,7 +30,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -52,7 +53,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+						WhenModified: raw.DefaultAutoPlanWhenModified,
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},
@@ -71,7 +72,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -82,7 +83,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -112,7 +113,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -123,7 +124,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -146,7 +147,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+						WhenModified: raw.DefaultAutoPlanWhenModified,
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},
@@ -157,7 +158,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+						WhenModified: raw.DefaultAutoPlanWhenModified,
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},
@@ -176,7 +177,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: raw.DefaultAutoPlanWhenModified,
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -199,7 +200,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+						WhenModified: raw.DefaultAutoPlanWhenModified,
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},

@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/templates/mocks"
@@ -266,4 +266,13 @@ func TestParseAtlantisURL(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCommandRunnerVCSClientInitialized(t *testing.T) {
+	s, _ := server.NewServer(server.UserConfig{
+		AtlantisURL: "http://example.com",
+	},
+		server.Config{},
+	)
+	Assert(t, s.CommandRunner.VCSClient != nil, "VCSClient must not be nil.")
 }

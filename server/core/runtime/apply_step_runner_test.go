@@ -9,15 +9,13 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 
@@ -66,7 +64,7 @@ func TestRun_Success(t *testing.T) {
 		TerraformExecutor: terraform,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
@@ -98,7 +96,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 		TerraformExecutor: terraform,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
@@ -130,7 +128,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 		TerraformExecutor: terraform,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)

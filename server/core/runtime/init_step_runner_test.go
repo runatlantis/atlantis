@@ -8,14 +8,12 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -60,7 +58,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
 				ThenReturn("output", nil)
 
 			output, err := iso.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
@@ -83,7 +81,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 	RegisterMockTestingT(t)
 	tfClient := mocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	When(tfClient.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(tfClient.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", errors.New("error"))
 
 	tfVersion, _ := version.NewVersion("0.11.0")
@@ -127,7 +125,7 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 
 	output, err := iso.Run(ctx, []string{"extra", "args"}, repoDir, map[string]string(nil))
@@ -156,7 +154,7 @@ func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 
 	output, err := iso.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
@@ -189,7 +187,7 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 
 	output, err := iso.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
@@ -256,7 +254,7 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
 				ThenReturn("output", nil)
 
 			output, err := iso.Run(ctx, c.extraArgs, "/path", map[string]string(nil))
@@ -288,7 +286,7 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(matchers.AnyCommandProjectContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 
 	ctx := command.ProjectContext{

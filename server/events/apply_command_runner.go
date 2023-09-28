@@ -161,7 +161,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	var result command.Result
 	if a.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running applies in parallel")
-		result = runProjectCmdsParallelGroups(projectCmds, a.prjCmdRunner.Apply, a.parallelPoolSize)
+		result = runProjectCmdsParallelGroups(ctx, projectCmds, a.prjCmdRunner.Apply, a.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, a.prjCmdRunner.Apply)
 	}
@@ -199,7 +199,7 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 	var numErrored int
 	status := models.SuccessCommitStatus
 
-	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus)
+	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
 	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
 	if numErrored > 0 {

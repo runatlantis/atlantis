@@ -81,6 +81,9 @@ repos:
   post_workflow_hooks: 
     - run: my-post-workflow-hook-command arg1
 
+  # policy_check defines if policy checking should be enable on this repository.
+  policy_check: false
+
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
 
@@ -483,7 +486,8 @@ If you set a workflow with the key `default`, it will override this.
 | allowed_workflows             | []string | none    | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                                                                                           |
 | allow_custom_workflows        | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                                                                                        |
 | delete_source_branch_on_merge | bool     | false   | no       | Whether or not to delete the source branch on merge.                                                                                                                                                                                                                                                      |
-| repo_locking                  | bool     | false   | no       | Whether or not to get a lock                                                                                                                                                                                                                                                                              |
+| repo_locking                  | bool     | false   | no       | Whether or not to get a lock.                                                                                                                                                                                                                                                                             |
+| policy_check                  | bool     | false   | no       | Whether or not to run policy checks on this repository.                                                                                                                                                                                                                                                   |
 
 
 :::tip Notes
@@ -519,11 +523,12 @@ If you set a workflow with the key `default`, it will override this.
 
 ### Policies
 
-| Key                    | Type            | Default | Required  | Description                              |
-|------------------------|-----------------|---------|-----------|------------------------------------------|
-| conftest_version       | string          | none    | no        | conftest version to run all policy sets  |
-| owners                 | Owners(#Owners) | none    | yes       | owners that can approve failing policies |
-| policy_sets            | []PolicySet     | none    | yes       | set of policies to run on a plan output  |
+| Key                    | Type            | Default | Required  | Description                                              |
+|------------------------|-----------------|---------|-----------|----------------------------------------------------------|
+| conftest_version       | string          | none    | no        | conftest version to run all policy sets                  |
+| owners                 | Owners(#Owners) | none    | yes       | owners that can approve failing policies                 |
+| approve_count          | int             | 1       | no        | number of approvals required to bypass failing policies. |
+| policy_sets            | []PolicySet     | none    | yes       | set of policies to run on a plan output                  |
 
 ### Owners
 | Key         | Type              | Default | Required   | Description                                             |
@@ -545,7 +550,7 @@ If you set a workflow with the key `default`, it will override this.
 | Key                    | Type                      | Default | Required  | Description                              |
 |------------------------|---------------------------|---------|-----------|------------------------------------------|
 | statsd                 | [Statsd](#statsd)         | none    | no        | Statsd metrics provider                  |
-| prometheus             | [Prometheus](#prometheus) | none    | no        | Statsd metrics provider                  |
+| prometheus             | [Prometheus](#prometheus) | none    | no        | Prometheus metrics provider              |
 
 ### Statsd
 

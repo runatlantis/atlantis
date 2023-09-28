@@ -6,7 +6,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_delete_lock_command.go DeleteLockCommand
+//go:generate pegomock generate --package mocks -o mocks/mock_delete_lock_command.go DeleteLockCommand
 
 // DeleteLockCommand is the first step after a command request has been parsed.
 type DeleteLockCommand interface {
@@ -33,7 +33,15 @@ func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, e
 		return nil, nil
 	}
 
-	l.deleteWorkingDir(*lock)
+	// The locks controller currently has no implementation of Atlantis project names, so this is hardcoded to an empty string.
+	projectName := ""
+
+	removeErr := l.WorkingDir.DeletePlan(lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, projectName)
+	if removeErr != nil {
+		l.Logger.Warn("Failed to delete plan: %s", removeErr)
+		return nil, removeErr
+	}
+
 	return lock, nil
 }
 
@@ -45,37 +53,22 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNu
 		return numLocks, err
 	}
 	if numLocks == 0 {
-		l.Logger.Debug("No locks found for pull")
+		l.Logger.Debug("No locks found for repo '%v', pull request: %v", repoFullName, pullNum)
 		return numLocks, nil
 	}
 
+	// The locks controller currently has no implementation of Atlantis project names, so this is hardcoded to an empty string.
+	projectName := ""
+
 	for i := 0; i < numLocks; i++ {
 		lock := locks[i]
-		l.deleteWorkingDir(lock)
+
+		err := l.WorkingDir.DeletePlan(lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, projectName)
+		if err != nil {
+			l.Logger.Warn("Failed to delete plan: %s", err)
+			return numLocks, err
+		}
 	}
 
 	return numLocks, nil
-}
-
-func (l *DefaultDeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
-	// NOTE: Because BaseRepo was added to the PullRequest model later, previous
-	// installations of Atlantis will have locks in their DB that do not have
-	// this field on PullRequest. We skip deleting the working dir in this case.
-	if lock.Pull.BaseRepo == (models.Repo{}) {
-		l.Logger.Debug("Not deleting the working dir.")
-		return
-	}
-	unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace, lock.Project.Path)
-	if err != nil {
-		l.Logger.Err("unable to obtain working dir lock when trying to delete old plans: %s", err)
-	} else {
-		defer unlock()
-		// nolint: vetshadow
-		if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
-			l.Logger.Err("unable to delete workspace: %s", err)
-		}
-	}
-	if err := l.Backend.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
-		l.Logger.Err("unable to delete project status: %s", err)
-	}
 }

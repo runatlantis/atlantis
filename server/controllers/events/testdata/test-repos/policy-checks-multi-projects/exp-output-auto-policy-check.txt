@@ -4,12 +4,13 @@ Ran Policy Check for 2 projects:
 1. dir: `dir2` workspace: `default`
 
 ### 1. dir: `dir1` workspace: `default`
+#### Policy Set: `test_policy`
 ```diff
-Checking plan against the following policies: 
-  test_policy
 
 1 test, 1 passed, 0 warnings, 0 failures, 0 exceptions
+
 ```
+
 
 * :arrow_forward: To **apply** this plan, comment:
     * `atlantis apply -d dir1`
@@ -19,22 +20,30 @@ Checking plan against the following policies:
 
 ---
 ### 2. dir: `dir2` workspace: `default`
-**Policy Check Error**
-```
-exit status 1
-Checking plan against the following policies: 
-  test_policy
+**Policy Check Failed**: Some policy sets did not pass.
+#### Policy Set: `test_policy`
+```diff
 FAIL - <redacted plan file> - main - WARNING: Forbidden Resource creation is prohibited.
 
 1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions
 
 ```
-* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:
-    * `atlantis approve_policies`
-* :repeat: Or, address the policy failure by modifying the codebase and re-planning.
+
+
+#### Policy Approval Status:
+```
+policy set: test_policy: requires: 1 approval(s), have: 0.
+```
+* :heavy_check_mark: To **approve** this project, comment:
+    * `atlantis approve_policies -d dir2`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * `atlantis plan -d dir2`
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * `atlantis apply`
+* :heavy_check_mark: To **approve** all unapplied plans from this pull request, comment:
+    * `atlantis approve_policies`
 * :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
     * `atlantis unlock`
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * `atlantis plan`

@@ -49,7 +49,7 @@ type AsyncProjectCommandOutputHandler struct {
 	pullToJobMapping sync.Map
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_project_command_output_handler.go ProjectCommandOutputHandler
+//go:generate pegomock generate --package mocks -o mocks/mock_project_command_output_handler.go ProjectCommandOutputHandler
 
 type ProjectCommandOutputHandler interface {
 	// Send will enqueue the msg and wait for Handle() to receive the message.

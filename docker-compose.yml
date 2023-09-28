@@ -15,12 +15,12 @@ services:
         depends_on:
         - atlantis
     redis:
-        image: redis:7.0-alpine
+        image: redis:7.2-alpine
         restart: always
         ports:
         - '6379:6379'
         command: redis-server --save 20 1 --loglevel warning --requirepass test123
-        volumes: 
+        volumes:
         - redis:/data
     atlantis:
         depends_on:

@@ -22,7 +22,7 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 		},
 		"policy_check success": {
 			command.ProjectResult{
-				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+				PolicyCheckResults: &models.PolicyCheckResults{},
 			},
 			true,
 		},
@@ -81,6 +81,15 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 		},
 		{
 			p: command.ProjectResult{
+				Command: command.Plan,
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "No changes. Infrastructure is up-to-date.",
+				},
+			},
+			expStatus: models.PlannedNoChangesPlanStatus,
+		},
+		{
+			p: command.ProjectResult{
 				Command: command.Apply,
 				Error:   errors.New("err"),
 			},
@@ -103,7 +112,7 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 		{
 			p: command.ProjectResult{
 				Command:            command.PolicyCheck,
-				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+				PolicyCheckResults: &models.PolicyCheckResults{},
 			},
 			expStatus: models.PassedPolicyCheckStatus,
 		},
@@ -117,7 +126,7 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 		{
 			p: command.ProjectResult{
 				Command:            command.ApprovePolicies,
-				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+				PolicyCheckResults: &models.PolicyCheckResults{},
 			},
 			expStatus: models.PassedPolicyCheckStatus,
 		},

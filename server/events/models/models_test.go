@@ -369,6 +369,10 @@ func TestPlanSuccess_Summary(t *testing.T) {
 			"Plan: 100 to add, 111 to change, 222 to destroy.",
 		},
 		{
+			"dummy\nPlan: 42 to import, 53 to add, 64 to change, 75 to destroy.",
+			"Plan: 42 to import, 53 to add, 64 to change, 75 to destroy.",
+		},
+		{
 			"Note: Objects have changed outside of Terraform\ndummy\nNo changes. Infrastructure is up-to-date.",
 			"\n**Note: Objects have changed outside of Terraform**\nNo changes. Infrastructure is up-to-date.",
 		},
@@ -419,18 +423,160 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 	}
 }
 
-func TestPolicyCheckSuccess_Summary(t *testing.T) {
-	cases := []string{
-		"20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
-		"3 tests, 0 passed, 1 warning, 1 failure, 0 exceptions, 1 skipped",
-		"1 test, 0 passed, 1 warning, 1 failure, 1 exception",
+func TestPolicyCheckResults_Summary(t *testing.T) {
+	cases := []struct {
+		description      string
+		policysetResults []models.PolicySetResult
+		exp              string
+	}{
+		{
+			description: "test single format with single policy set",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName:  "policy1",
+					ConftestOutput: "20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
+				},
+			},
+			exp: "policy set: policy1: 20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
+		},
+		{
+			description: "test multiple formats with multiple policy sets",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName:  "policy1",
+					ConftestOutput: "20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions",
+				},
+				{
+					PolicySetName:  "policy2",
+					ConftestOutput: "3 tests, 0 passed, 1 warning, 1 failure, 0 exceptions, 1 skipped",
+				},
+				{
+					PolicySetName:  "policy3",
+					ConftestOutput: "1 test, 0 passed, 1 warning, 1 failure, 1 exception",
+				},
+			},
+			exp: `policy set: policy1: 20 tests, 19 passed, 2 warnings, 0 failures, 0 exceptions
+policy set: policy2: 3 tests, 0 passed, 1 warning, 1 failure, 0 exceptions, 1 skipped
+policy set: policy3: 1 test, 0 passed, 1 warning, 1 failure, 1 exception`,
+		},
 	}
-	for i, summary := range cases {
-		t.Run(fmt.Sprintf("summary %d", i), func(t *testing.T) {
-			pcs := models.PolicyCheckSuccess{
-				PolicyCheckOutput: `WARN - <redacted plan file> - main - example main package\n` + summary,
+	for _, summary := range cases {
+		t.Run(summary.description, func(t *testing.T) {
+			pcs := models.PolicyCheckResults{
+				PolicySetResults: summary.policysetResults,
 			}
-			Equals(t, summary, pcs.Summary())
+			Equals(t, summary.exp, pcs.Summary())
+		})
+	}
+}
+
+// Test PolicyCleared and PolicySummary
+func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
+	cases := []struct {
+		description      string
+		policysetResults []models.PolicySetResult
+		policyClearedExp bool
+		policySummaryExp string
+	}{
+		{
+			description: "single policy set, not passed",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					Passed:        false,
+					ReqApprovals:  1,
+				},
+			},
+			policyClearedExp: false,
+			policySummaryExp: "policy set: policy1: requires: 1 approval(s), have: 0.",
+		},
+		{
+			description: "single policy set, passed",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					Passed:        true,
+					ReqApprovals:  1,
+				},
+			},
+			policyClearedExp: true,
+			policySummaryExp: "policy set: policy1: passed.",
+		},
+		{
+			description: "single policy set, fully approved",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					Passed:        false,
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+			},
+			policyClearedExp: true,
+			policySummaryExp: "policy set: policy1: approved.",
+		},
+		{
+			description: "multiple policy sets, different states.",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					Passed:        false,
+					ReqApprovals:  2,
+					CurApprovals:  0,
+				},
+				{
+					PolicySetName: "policy2",
+					Passed:        false,
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy3",
+					Passed:        true,
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+			},
+			policyClearedExp: false,
+			policySummaryExp: `policy set: policy1: requires: 2 approval(s), have: 0.
+policy set: policy2: approved.
+policy set: policy3: passed.`,
+		},
+		{
+			description: "multiple policy sets, all cleared.",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					Passed:        false,
+					ReqApprovals:  2,
+					CurApprovals:  2,
+				},
+				{
+					PolicySetName: "policy2",
+					Passed:        false,
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy3",
+					Passed:        true,
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+			},
+			policyClearedExp: true,
+			policySummaryExp: `policy set: policy1: approved.
+policy set: policy2: approved.
+policy set: policy3: passed.`,
+		},
+	}
+	for _, summary := range cases {
+		t.Run(summary.description, func(t *testing.T) {
+			pcs := models.PolicyCheckResults{
+				PolicySetResults: summary.policysetResults,
+			}
+			Equals(t, summary.policyClearedExp, pcs.PolicyCleared())
+			Equals(t, summary.policySummaryExp, pcs.PolicySummary())
 		})
 	}
 }
@@ -469,4 +615,94 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 1, ps.StatusCount(models.DiscardedPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.ErroredPolicyCheckStatus))
 	Equals(t, 1, ps.StatusCount(models.PassedPolicyCheckStatus))
+}
+
+func TestPlanSuccessStats(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		exp    models.PlanSuccessStats
+	}{
+		{
+			"has changes",
+			`An execution plan has been generated and is shown below.
+					Resource actions are indicated with the following symbols:
+					  - destroy
+					Terraform will perform the following actions:
+					  - null_resource.hi[1]
+					Plan: 1 to add, 3 to change, 2 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     1,
+				Change:  3,
+				Destroy: 2,
+			},
+		},
+		{
+			"no changes",
+			`An execution plan has been generated and is shown below.
+					Resource actions are indicated with the following symbols:
+					No changes. Infrastructure is up-to-date.`,
+			models.PlanSuccessStats{},
+		},
+		{
+			"changes outside",
+			`Note: Objects have changed outside of Terraform
+					Terraform detected the following changes made outside of Terraform since the
+					last "terraform apply":
+					No changes. Your infrastructure matches the configuration.`,
+			models.PlanSuccessStats{
+				ChangesOutside: true,
+			},
+		},
+		{
+			"with imports",
+			`Terraform used the selected providers to generate the following execution
+			plan. Resource actions are indicated with the following symbols:	
+			  + create
+			  ~ update in-place
+			  - destroy
+			Terraform will perform the following actions:
+			  - null_resource.hi[1]
+			Plan: 42 to import, 31 to add, 20 to change, 1 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  42,
+				Add:     31,
+				Change:  20,
+				Destroy: 1,
+			},
+		},
+		{
+			"changes and changes outside",
+			`Note: Objects have changed outside of Terraform
+					Terraform detected the following changes made outside of Terraform since the
+					last "terraform apply":
+					An execution plan has been generated and is shown below.
+					Resource actions are indicated with the following symbols:
+					  - destroy
+					Terraform will perform the following actions:
+					  - null_resource.hi[1]
+					Plan: 3 to add, 0 to change, 1 to destroy.`,
+			models.PlanSuccessStats{
+				Changes:        true,
+				ChangesOutside: true,
+
+				Add:     3,
+				Change:  0,
+				Destroy: 1,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := models.NewPlanSuccessStats(tt.output)
+			if s != tt.exp {
+				t.Errorf("\nexp: %#v\ngot: %#v", tt.exp, s)
+			}
+		})
+	}
 }

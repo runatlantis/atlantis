@@ -692,19 +692,19 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
-					case "/api/v3/repos/owner/repo/pulls/1":
+					case "/api/v3/repos/octocat/repo/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
 						return
-					case "/api/v3/repos/owner/repo/pulls/1/reviews?per_page=300":
+					case "/api/v3/repos/octocat/repo/pulls/1/reviews?per_page=300":
 						w.Write([]byte("[]")) // nolint: errcheck
 						return
-					case "/api/v3/repos/owner/repo/commits/new-topic/status":
+					case "/api/v3/repos/octocat/repo/commits/new-topic/status":
 						w.Write([]byte(commitJSON)) // nolint: errcheck
 					case "/api/graphql":
 						w.Write([]byte(reviewDecision)) // nolint: errcheck
-					case "/api/v3/repos/owner/repo/branches/main/protection":
+					case "/api/v3/repos/octocat/repo/branches/main/protection":
 						w.Write([]byte(branchProtectionJSON)) // nolint: errcheck
-					case "/api/v3/repos/owner/repo/commits/new-topic/check-suites":
+					case "/api/v3/repos/octocat/repo/commits/new-topic/check-suites":
 						w.Write([]byte(checkSuites)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -719,9 +719,117 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			defer disableSSLVerification()()
 
 			actMergeable, err := client.PullIsMergeable(models.Repo{
-				FullName:          "owner/repo",
-				Owner:             "owner",
+				FullName:          "octocat/repo",
+				Owner:             "octocat",
 				Name:              "repo",
+				CloneURL:          "",
+				SanitizedCloneURL: "",
+				VCSHost: models.VCSHost{
+					Type:     models.Github,
+					Hostname: "github.com",
+				},
+			}, models.PullRequest{
+				Num: 1,
+			}, vcsStatusName)
+			Ok(t, err)
+			Equals(t, c.expMergeable, actMergeable)
+		})
+	}
+}
+
+func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApplyButWithNoBranchProtectionChecks(t *testing.T) {
+	vcsStatusName := "atlantis"
+	cases := []struct {
+		state          string
+		reviewDecision string
+		expMergeable   bool
+	}{
+		{
+			"blocked",
+			`"REVIEW_REQUIRED"`,
+			false,
+		},
+	}
+
+	// Use a real GitHub json response and edit the mergeable_state field.
+	jsBytes, err := os.ReadFile("testdata/github-pull-request.json")
+	Ok(t, err)
+	prJSON := string(jsBytes)
+
+	// Status Check Response
+	jsBytes, err = os.ReadFile("testdata/github-commit-status-full.json")
+	Ok(t, err)
+	commitJSON := string(jsBytes)
+
+	// Branch protection Response
+	jsBytes, err = os.ReadFile("testdata/github-branch-protection-no-required-checks.json")
+	Ok(t, err)
+	branchProtectionJSON := string(jsBytes)
+
+	// List check suites Response
+	jsBytes, err = os.ReadFile("testdata/github-commit-check-suites-completed.json")
+	Ok(t, err)
+	checkSuites := string(jsBytes)
+
+	// List check runs in a check suite
+	jsBytes, err = os.ReadFile("testdata/github-commit-check-suites-check-runs-completed.json")
+	Ok(t, err)
+	checkRuns := string(jsBytes)
+
+	for _, c := range cases {
+		t.Run(c.state, func(t *testing.T) {
+			response := strings.Replace(prJSON,
+				`"mergeable_state": "clean"`,
+				fmt.Sprintf(`"mergeable_state": "%s"`, c.state),
+				1,
+			)
+
+			// reviewDecision Response
+			reviewDecision := fmt.Sprintf(`{
+				"data": {
+					"repository": {
+						"pullRequest": {
+							"reviewDecision": %s
+						}
+					}
+				}
+			}`, c.reviewDecision)
+
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v3/repos/octocat/Hello-World/pulls/1":
+						w.Write([]byte(response)) // nolint: errcheck
+						return
+					case "/api/v3/repos/octocat/Hello-World/pulls/1/reviews?per_page=300":
+						w.Write([]byte("[]")) // nolint: errcheck
+						return
+					case "/api/v3/repos/octocat/Hello-World/commits/new-topic/status":
+						w.Write([]byte(commitJSON)) // nolint: errcheck
+					case "/api/graphql":
+						w.Write([]byte(reviewDecision)) // nolint: errcheck
+					case "/api/v3/repos/octocat/Hello-World/branches/main/protection":
+						w.Write([]byte(branchProtectionJSON)) // nolint: errcheck
+					case "/api/v3/repos/octocat/Hello-World/commits/new-topic/check-suites":
+						w.Write([]byte(checkSuites)) // nolint: errcheck
+					case "/api/v3/repos/octocat/Hello-World/check-suites/1234567890/check-runs":
+						w.Write([]byte(checkRuns)) // nolint: errcheck
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{AllowMergeableBypassApply: true}, logging.NewNoopLogger(t))
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			actMergeable, err := client.PullIsMergeable(models.Repo{
+				FullName:          "octocat/Hello-World",
+				Owner:             "octocat",
+				Name:              "Hello-World",
 				CloneURL:          "",
 				SanitizedCloneURL: "",
 				VCSHost: models.VCSHost{
@@ -787,10 +895,6 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 						defer r.Body.Close() // nolint: errcheck
 						w.WriteHeader(c.code)
 						w.Write([]byte(resp)) // nolint: errcheck
-					case "/api/v3/repos/runatlantis/atlantis/branches/master/protection":
-						w.WriteHeader(404)
-						w.Write([]byte("{\"message\":\"Branch not protected\"}")) // nolint: errcheck
-						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
@@ -817,8 +921,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 							Hostname: "github.com",
 						},
 					},
-					Num:        1,
-					BaseBranch: "master",
+					Num: 1,
 				}, models.PullRequestOptions{
 					DeleteSourceBranchOnMerge: false,
 				})
@@ -836,184 +939,40 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 // use that method
 func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 	cases := map[string]struct {
-		allowMerge           bool
-		allowRebase          bool
-		allowSquash          bool
-		requireLinearHistory bool
-		protectedBranch      bool
-		protectionAvailable  bool
-		expMethod            string
+		allowMerge  bool
+		allowRebase bool
+		allowSquash bool
+		expMethod   string
 	}{
 		"all true": {
-			allowMerge:           true,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  true,
-			expMethod:            "merge",
+			allowMerge:  true,
+			allowRebase: true,
+			allowSquash: true,
+			expMethod:   "merge",
 		},
 		"all false (edge case)": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          false,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  true,
-			expMethod:            "merge",
+			allowMerge:  false,
+			allowRebase: false,
+			allowSquash: false,
+			expMethod:   "merge",
 		},
 		"merge: false rebase: true squash: true": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
+			allowMerge:  false,
+			allowRebase: true,
+			allowSquash: true,
+			expMethod:   "rebase",
 		},
 		"merge: false rebase: false squash: true": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  true,
-			expMethod:            "squash",
+			allowMerge:  false,
+			allowRebase: false,
+			allowSquash: true,
+			expMethod:   "squash",
 		},
 		"merge: false rebase: true squash: false": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          false,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protected, all true, rlh: false": {
-			allowMerge:           true,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "merge",
-		},
-		"protected, all false (edge case), rlh: false": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          false,
-			requireLinearHistory: false,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "merge",
-		},
-		"protected, merge: false rebase: true squash: true, rlh: false": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protected, merge: false rebase: false squash: true, rlh: false": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "squash",
-		},
-		"protected, merge: false rebase: true squash: false, rlh: false": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          false,
-			requireLinearHistory: false,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protected, all true, rlh: true": {
-			allowMerge:           true,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: true,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protected, all false (edge case), rlh: true": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          false,
-			requireLinearHistory: true,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "merge",
-		},
-		"protected, merge: false rebase: true squash: true, rlh: true": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: true,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protected, merge: false rebase: false squash: true, rlh: true": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          true,
-			requireLinearHistory: true,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "squash",
-		},
-		"protected, merge: false rebase: true squash: false, rlh: true": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          false,
-			requireLinearHistory: true,
-			protectedBranch:      true,
-			protectionAvailable:  true,
-			expMethod:            "rebase",
-		},
-		"protection not supported, all true": {
-			allowMerge:           true,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  false,
-			expMethod:            "merge",
-		},
-		"protection not supported, merge: false, rebase: true, squash: true": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  false,
-			expMethod:            "rebase",
-		},
-		"protection not supported, merge: false, rebase: false, squash: true": {
-			allowMerge:           false,
-			allowRebase:          false,
-			allowSquash:          true,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  false,
-			expMethod:            "squash",
-		},
-		"protection not supported, merge: false, rebase: true, squash: false": {
-			allowMerge:           false,
-			allowRebase:          true,
-			allowSquash:          false,
-			requireLinearHistory: false,
-			protectedBranch:      false,
-			protectionAvailable:  false,
-			expMethod:            "rebase",
+			allowMerge:  false,
+			allowRebase: true,
+			allowSquash: false,
+			expMethod:   "rebase",
 		},
 	}
 
@@ -1023,10 +982,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			// Modify response.
 			jsBytes, err := os.ReadFile("testdata/github-repo.json")
 			Ok(t, err)
-			rlhBytes, err := os.ReadFile("testdata/github-branch-protection-require-linear-history.json")
-			Ok(t, err)
 			resp := string(jsBytes)
-			protected := string(rlhBytes)
 			resp = strings.Replace(resp,
 				`"allow_squash_merge": true`,
 				fmt.Sprintf(`"allow_squash_merge": %t`, c.allowSquash),
@@ -1039,27 +995,12 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 				`"allow_rebase_merge": true`,
 				fmt.Sprintf(`"allow_rebase_merge": %t`, c.allowRebase),
 				-1)
-			protected = strings.Replace(protected,
-				`"enabled": true`,
-				fmt.Sprintf(`"enabled": %t`, c.requireLinearHistory),
-				-1)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					case "/api/v3/repos/runatlantis/atlantis":
 						w.Write([]byte(resp)) // nolint: errcheck
-						return
-					case "/api/v3/repos/runatlantis/atlantis/branches/master/protection":
-						if c.protectedBranch && c.protectionAvailable {
-							w.Write([]byte(protected)) // nolint: errcheck
-						} else if !c.protectedBranch && c.protectionAvailable {
-							w.WriteHeader(404)
-							w.Write([]byte("{\"message\":\"Branch not protected\"}")) // nolint: errcheck
-						} else if !c.protectionAvailable {
-							w.WriteHeader(403)
-							w.Write([]byte("{\"message\":\"Upgrade to GitHub Pro or make this repository public to enable this feature.\"}")) // nolint: errcheck
-						}
 						return
 					case "/api/v3/repos/runatlantis/atlantis/pulls/1/merge":
 						body, err := io.ReadAll(r.Body)
@@ -1103,8 +1044,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 							Hostname: "github.com",
 						},
 					},
-					Num:        1,
-					BaseBranch: "master",
+					Num: 1,
 				}, models.PullRequestOptions{
 					DeleteSourceBranchOnMerge: false,
 				})
@@ -1533,4 +1473,111 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 			Equals(t, responseLength, responseIndex) // check if all defined requests have been used
 		})
 	}
+}
+
+func TestGithubClient_GetPullLabels(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	resp := `{
+	  "url": "https://api.github.com/repos/runatlantis/atlantis/pulls/1",
+	  "id": 167530667,
+	  "merge_commit_sha": "3fe6aa34bc25ac3720e639fcad41b428e83bdb37",
+	  "labels": [
+		{
+		  "id": 1303230720,
+		  "node_id": "MDU6TGFiZWwxMzAzMjMwNzIw",
+		  "url": "https://api.github.com/repos/runatlantis/atlantis/labels/docs",
+		  "name": "docs",
+		  "color": "d87165",
+		  "default": false,
+		  "description": "Documentation"
+		},
+		{
+		  "id": 2552271640,
+		  "node_id": "MDU6TGFiZWwyNTUyMjcxNjQw",
+		  "url": "https://api.github.com/repos/runatlantis/atlantis/labels/go",
+		  "name": "go",
+		  "color": "16e2e2",
+		  "default": false,
+		  "description": "Pull requests that update Go code"
+		},
+		{
+		  "id": 2696098981,
+		  "node_id": "MDU6TGFiZWwyNjk2MDk4OTgx",
+		  "url": "https://api.github.com/repos/runatlantis/atlantis/labels/needs%20tests",
+		  "name": "needs tests",
+		  "color": "FBB1DE",
+		  "default": false,
+		  "description": "Change requires tests"
+		},
+		{
+		  "id": 4439792681,
+		  "node_id": "LA_kwDOBy76Zc8AAAABCKHcKQ",
+		  "url": "https://api.github.com/repos/runatlantis/atlantis/labels/work-in-progress",
+		  "name": "work-in-progress",
+		  "color": "B1E20A",
+		  "default": false,
+		  "description": ""
+		}
+	  ]
+	}`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/runatlantis/atlantis/pulls/1":
+				w.Write([]byte(resp)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{}, logger)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	labels, err := client.GetPullLabels(models.Repo{
+		Owner: "runatlantis",
+		Name:  "atlantis",
+	}, models.PullRequest{
+		Num: 1,
+	})
+	Ok(t, err)
+	Equals(t, []string{"docs", "go", "needs tests", "work-in-progress"}, labels)
+}
+
+func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	resp := `{
+	  "url": "https://api.github.com/repos/runatlantis/atlantis/pulls/1",
+	  "id": 167530667,
+	  "merge_commit_sha": "3fe6aa34bc25ac3720e639fcad41b428e83bdb37",
+	  "labels": []
+	}`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/runatlantis/atlantis/pulls/1":
+				w.Write([]byte(resp)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{}, logger)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	labels, err := client.GetPullLabels(models.Repo{
+		Owner: "runatlantis",
+		Name:  "atlantis",
+	}, models.PullRequest{
+		Num: 1,
+	})
+	Ok(t, err)
+	Equals(t, 0, len(labels))
 }

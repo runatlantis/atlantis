@@ -5,7 +5,7 @@ package mocks
 
 import (
 	go_version "github.com/hashicorp/go-version"
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 	"time"
 )
@@ -25,11 +25,11 @@ func NewMockExecutionVersionCache(options ...pegomock.Option) *MockExecutionVers
 func (mock *MockExecutionVersionCache) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockExecutionVersionCache) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockExecutionVersionCache) Get(_param0 *go_version.Version) (string, error) {
+func (mock *MockExecutionVersionCache) Get(key *go_version.Version) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockExecutionVersionCache().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{key}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Get", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -81,8 +81,8 @@ type VerifierMockExecutionVersionCache struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockExecutionVersionCache) Get(_param0 *go_version.Version) *MockExecutionVersionCache_Get_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockExecutionVersionCache) Get(key *go_version.Version) *MockExecutionVersionCache_Get_OngoingVerification {
+	params := []pegomock.Param{key}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Get", params, verifier.timeout)
 	return &MockExecutionVersionCache_Get_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -93,8 +93,8 @@ type MockExecutionVersionCache_Get_OngoingVerification struct {
 }
 
 func (c *MockExecutionVersionCache_Get_OngoingVerification) GetCapturedArguments() *go_version.Version {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	key := c.GetAllCapturedArguments()
+	return key[len(key)-1]
 }
 
 func (c *MockExecutionVersionCache_Get_OngoingVerification) GetAllCapturedArguments() (_param0 []*go_version.Version) {

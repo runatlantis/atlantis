@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/go-github/v50/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
@@ -29,7 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
@@ -49,13 +49,15 @@ const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/
 // VCSEventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
 type VCSEventsController struct {
-	CommandRunner events.CommandRunner
-	PullCleaner   events.PullCleaner
-	Logger        logging.SimpleLogging
-	Scope         tally.Scope
-	Parser        events.EventParsing
-	CommentParser events.CommentParsing
-	ApplyDisabled bool
+	CommandRunner  events.CommandRunner
+	PullCleaner    events.PullCleaner
+	Logger         logging.SimpleLogging
+	Scope          tally.Scope
+	Parser         events.EventParsing
+	CommentParser  events.CommentParsing
+	ApplyDisabled  bool
+	EmojiReaction  string
+	ExecutableName string
 	// GithubWebhookSecret is the secret added to this webhook via the GitHub
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
@@ -309,9 +311,11 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 		}
 	}
 
+	comment := event.GetComment()
+
 	// We pass in nil for maybeHeadRepo because the head repo data isn't
 	// available in the GithubIssueComment event.
-	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, pullNum, event.Comment.GetBody(), models.Github)
+	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, pullNum, comment.GetBody(), comment.GetID(), models.Github)
 }
 
 // HandleBitbucketCloudCommentEvent handles comment events from Bitbucket.
@@ -321,7 +325,7 @@ func (e *VCSEventsController) HandleBitbucketCloudCommentEvent(w http.ResponseWr
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud)
+	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, pull.Num, comment, -1, models.BitbucketCloud)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -342,7 +346,7 @@ func (e *VCSEventsController) HandleBitbucketServerCommentEvent(w http.ResponseW
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud)
+	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, pull.Num, comment, -1, models.BitbucketCloud)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -362,7 +366,8 @@ func (e *VCSEventsController) handleBitbucketCloudPullRequestEvent(w http.Respon
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType)
+	e.Logger.Debug("SHA is %q", pull.HeadCommit)
+	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType, pull.HeadCommit, pull.URL)
 	e.Logger.Info("identified event as type %q", pullEventType.String())
 	resp := e.handlePullRequestEvent(e.Logger, baseRepo, headRepo, pull, user, pullEventType)
 
@@ -511,12 +516,12 @@ func (e *VCSEventsController) handleGitlabPost(w http.ResponseWriter, r *http.Re
 // commands can come from. It's exported to make testing easier.
 func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event gitlab.MergeCommentEvent) {
 	// todo: can gitlab return the pull request here too?
-	baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeRequestCommentEvent(event)
+	baseRepo, headRepo, commentID, user, err := e.Parser.ParseGitlabMergeRequestCommentEvent(event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, nil, user, event.MergeRequest.IID, event.ObjectAttributes.Note, models.Gitlab)
+	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, nil, user, event.MergeRequest.IID, event.ObjectAttributes.Note, int64(commentID), models.Gitlab)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -530,7 +535,7 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 	e.respond(w, lvl, code, msg)
 }
 
-func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, vcsHost models.VCSHostType) HTTPResponse {
+func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, commentID int64, vcsHost models.VCSHostType) HTTPResponse {
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -561,6 +566,14 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		}
 	}
 
+	// It's a comment we're gonna react to, so add a reaction.
+	if e.EmojiReaction != "" {
+		err := e.VCSClient.ReactToComment(baseRepo, pullNum, commentID, e.EmojiReaction)
+		if err != nil {
+			logger.Warn("Failed to react to comment: %s", err)
+		}
+	}
+
 	// If the command isn't valid or doesn't require processing, ex.
 	// "atlantis help" then we just comment back immediately.
 	// We do this here rather than earlier because we need access to the pull
@@ -574,7 +587,8 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		}
 	}
 
-	logger.Debug("executing command")
+	logger.Info("Running comment command '%v' on repo '%v', pull request: %v for user '%v'.",
+		parseResult.Command.Name, baseRepo.FullName, pullNum, user.Username)
 	if !e.TestingMode {
 		// Respond with success and then actually execute the command asynchronously.
 		// We use a goroutine so that this function returns and the connection is
@@ -654,7 +668,7 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull request repository field: %s; %s", err, azuredevopsReqID)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, nil, nil, user, resource.PullRequest.GetPullRequestID(), string(strippedComment), models.AzureDevops)
+	resp := e.handleCommentEvent(e.Logger, baseRepo, nil, nil, user, resource.PullRequest.GetPullRequestID(), string(strippedComment), -1, models.AzureDevops)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug

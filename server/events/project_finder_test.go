@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -486,6 +487,22 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 			expProjPaths: []string{"project2"},
 		},
 		{
+			description: ".terraform.lock.hcl file modified",
+			config: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir: "project2",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: raw.DefaultAutoPlanWhenModified,
+						},
+					},
+				},
+			},
+			modified:     []string{"project2/.terraform.lock.hcl"},
+			expProjPaths: []string{"project2"},
+		},
+		{
 			description: "file excluded",
 			config: valid.RepoCfg{
 				Projects: []valid.Project{
@@ -538,7 +555,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			pf := events.DefaultProjectFinder{}
-			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(t), c.modified, c.config, tmpDir)
+			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(t), c.modified, c.config, tmpDir, nil)
 			Ok(t, err)
 			Equals(t, len(c.expProjPaths), len(projects))
 			for i, proj := range projects {

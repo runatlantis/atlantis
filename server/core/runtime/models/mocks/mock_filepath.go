@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"reflect"
 	"time"
@@ -25,12 +25,12 @@ func NewMockFilePath(options ...pegomock.Option) *MockFilePath {
 func (mock *MockFilePath) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockFilePath) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockFilePath) Join(_param0 ...string) models.FilePath {
+func (mock *MockFilePath) Join(elem ...string) models.FilePath {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockFilePath().")
 	}
 	params := []pegomock.Param{}
-	for _, param := range _param0 {
+	for _, param := range elem {
 		params = append(params, param)
 	}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Join", params, []reflect.Type{reflect.TypeOf((*models.FilePath)(nil)).Elem()})
@@ -73,11 +73,11 @@ func (mock *MockFilePath) Resolve() string {
 	return ret0
 }
 
-func (mock *MockFilePath) Symlink(_param0 string) (models.FilePath, error) {
+func (mock *MockFilePath) Symlink(newname string) (models.FilePath, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockFilePath().")
 	}
-	params := []pegomock.Param{_param0}
+	params := []pegomock.Param{newname}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Symlink", params, []reflect.Type{reflect.TypeOf((*models.FilePath)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.FilePath
 	var ret1 error
@@ -129,9 +129,9 @@ type VerifierMockFilePath struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockFilePath) Join(_param0 ...string) *MockFilePath_Join_OngoingVerification {
+func (verifier *VerifierMockFilePath) Join(elem ...string) *MockFilePath_Join_OngoingVerification {
 	params := []pegomock.Param{}
-	for _, param := range _param0 {
+	for _, param := range elem {
 		params = append(params, param)
 	}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Join", params, verifier.timeout)
@@ -144,8 +144,8 @@ type MockFilePath_Join_OngoingVerification struct {
 }
 
 func (c *MockFilePath_Join_OngoingVerification) GetCapturedArguments() []string {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	elem := c.GetAllCapturedArguments()
+	return elem[len(elem)-1]
 }
 
 func (c *MockFilePath_Join_OngoingVerification) GetAllCapturedArguments() (_param0 [][]string) {
@@ -198,8 +198,8 @@ func (c *MockFilePath_Resolve_OngoingVerification) GetCapturedArguments() {
 func (c *MockFilePath_Resolve_OngoingVerification) GetAllCapturedArguments() {
 }
 
-func (verifier *VerifierMockFilePath) Symlink(_param0 string) *MockFilePath_Symlink_OngoingVerification {
-	params := []pegomock.Param{_param0}
+func (verifier *VerifierMockFilePath) Symlink(newname string) *MockFilePath_Symlink_OngoingVerification {
+	params := []pegomock.Param{newname}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Symlink", params, verifier.timeout)
 	return &MockFilePath_Symlink_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -210,8 +210,8 @@ type MockFilePath_Symlink_OngoingVerification struct {
 }
 
 func (c *MockFilePath_Symlink_OngoingVerification) GetCapturedArguments() string {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+	newname := c.GetAllCapturedArguments()
+	return newname[len(newname)-1]
 }
 
 func (c *MockFilePath_Symlink_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {

@@ -357,6 +357,20 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 						res.ProjectName == proj.ProjectName {
 
 						proj.Status = res.PlanStatus()
+
+						// Updating only policy sets which are included in results; keeping the rest.
+						if len(proj.PolicyStatus) > 0 {
+							for i, oldPolicySet := range proj.PolicyStatus {
+								for _, newPolicySet := range res.PolicyStatus() {
+									if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
+										proj.PolicyStatus[i] = newPolicySet
+									}
+								}
+							}
+						} else {
+							proj.PolicyStatus = res.PolicyStatus()
+						}
+
 						updatedExisting = true
 						break
 					}
@@ -483,9 +497,10 @@ func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.
 
 func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
 	return models.ProjectStatus{
-		Workspace:   p.Workspace,
-		RepoRelDir:  p.RepoRelDir,
-		ProjectName: p.ProjectName,
-		Status:      p.PlanStatus(),
+		Workspace:    p.Workspace,
+		RepoRelDir:   p.RepoRelDir,
+		ProjectName:  p.ProjectName,
+		PolicyStatus: p.PolicyStatus(),
+		Status:       p.PlanStatus(),
 	}
 }

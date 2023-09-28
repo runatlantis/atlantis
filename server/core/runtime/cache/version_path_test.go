@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	cache_mocks "github.com/runatlantis/atlantis/server/core/runtime/cache/mocks"
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	models_mocks "github.com/runatlantis/atlantis/server/core/runtime/models/mocks"
@@ -50,10 +50,10 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 
 		Assert(t, err != nil, "err is expected")
 
-		mockFilePath.VerifyWasCalled(Never()).Join(AnyString())
+		mockFilePath.VerifyWasCalled(Never()).Join(Any[string]())
 		mockFilePath.VerifyWasCalled(Never()).NotExists()
 		mockFilePath.VerifyWasCalled(Never()).Resolve()
-		mockExec.VerifyWasCalled(Never()).LookPath(AnyString())
+		mockExec.VerifyWasCalled(Never()).LookPath(Any[string]())
 	})
 
 	t.Run("finds in path", func(t *testing.T) {
@@ -77,7 +77,7 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 
 		Assert(t, resultPath == expectedPath, "path is expected")
 
-		mockFilePath.VerifyWasCalled(Never()).Join(AnyString())
+		mockFilePath.VerifyWasCalled(Never()).Join(Any[string]())
 		mockFilePath.VerifyWasCalled(Never()).Resolve()
 		mockFilePath.VerifyWasCalled(Never()).NotExists()
 	})

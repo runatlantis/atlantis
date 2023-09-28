@@ -7,7 +7,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_apply_lock_checker.go ApplyLockChecker
+//go:generate pegomock generate --package mocks -o mocks/mock_apply_lock_checker.go ApplyLockChecker
 
 // ApplyLockChecker is an implementation of the global apply lock retrieval.
 // It returns an object that contains information about apply locks status.
@@ -15,7 +15,7 @@ type ApplyLockChecker interface {
 	CheckApplyLock() (ApplyCommandLock, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_apply_locker.go ApplyLocker
+//go:generate pegomock generate --package mocks -o mocks/mock_apply_locker.go ApplyLocker
 
 // ApplyLocker interface that manages locks for apply command runner
 type ApplyLocker interface {
