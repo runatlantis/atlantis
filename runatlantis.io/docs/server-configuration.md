@@ -387,7 +387,7 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_DISABLE_UNLOCK_LABEL="do-not-unlock"
   ```
-  Stops atlantis from unlocking a pull request with this label.
+  Stops atlantis from unlocking a pull request with this label. Defaults to "" (feature disabled).
 
 ### `--emoji-reaction`
   ```bash
