@@ -77,6 +77,7 @@ type TestConfig struct {
 	StatusName                 string
 	discardApprovalOnPlan      bool
 	backend                    locking.Backend
+	disableUnlockLabel         string
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -93,6 +94,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		StatusName:            "atlantis-test",
 		discardApprovalOnPlan: false,
 		backend:               defaultBoltDB,
+		disableUnlockLabel:    "do-not-unlock",
 	}
 
 	for _, op := range options {
@@ -195,6 +197,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		deleteLockCommand,
 		vcsClient,
 		testConfig.SilenceNoProjects,
+		testConfig.disableUnlockLabel,
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(

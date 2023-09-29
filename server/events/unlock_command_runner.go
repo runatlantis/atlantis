@@ -51,7 +51,7 @@ func (u *UnlockCommandRunner) Run(
 	}
 
 	var numLocks int
-	if err != nil {
+	if err == nil {
 		numLocks, err = u.deleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
 		if err != nil {
 			vcsMessage = "Failed to delete PR locks"
