@@ -381,6 +381,14 @@ and set `--autoplan-modules` to `false`.
   ```
   Stops atlantis from locking projects and or workspaces when running terraform.
 
+### `--disable-unlock-label`
+  ```bash
+  atlantis server --disable-unlock-label do-not-unlock
+  # or
+  ATLANTIS_DISABLE_UNLOCK_LABEL="do-not-unlock"
+  ```
+  Stops atlantis from unlocking a pull request with this label.
+
 ### `--emoji-reaction`
   ```bash
   atlantis server --emoji-reaction thumbsup
