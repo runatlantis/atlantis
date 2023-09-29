@@ -10,13 +10,13 @@ func NewUnlockCommandRunner(
 	deleteLockCommand DeleteLockCommand,
 	vcsClient vcs.Client,
 	SilenceNoProjects bool,
-	disableUnlockLabel string,
+	DisableUnlockLabel string,
 ) *UnlockCommandRunner {
 	return &UnlockCommandRunner{
 		deleteLockCommand:  deleteLockCommand,
 		vcsClient:          vcsClient,
 		SilenceNoProjects:  SilenceNoProjects,
-		disableUnlockLabel: disableUnlockLabel,
+		DisableUnlockLabel: DisableUnlockLabel,
 	}
 }
 
@@ -26,7 +26,7 @@ type UnlockCommandRunner struct {
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects  bool
-	disableUnlockLabel string
+	DisableUnlockLabel string
 }
 
 func (u *UnlockCommandRunner) Run(
@@ -35,23 +35,29 @@ func (u *UnlockCommandRunner) Run(
 ) {
 	baseRepo := ctx.Pull.BaseRepo
 	pullNum := ctx.Pull.Num
-	disableUnlockLabel := u.disableUnlockLabel
+	disableUnlockLabel := u.DisableUnlockLabel
 
 	ctx.Log.Info("Unlocking all locks")
 	vcsMessage := "All Atlantis locks for this PR have been unlocked and plans discarded"
 
-	labels, err := u.vcsClient.GetPullLabels(baseRepo, ctx.Pull)
-	if err != nil {
-		vcsMessage = "Failed to retrieve PR labels"
-		ctx.Log.Err("faield to retrieve PR labels for pull %s", err.Error())
-	}
-	if slices.Contains(labels, disableUnlockLabel) {
-		vcsMessage = "Not allowed to unlock PR with " + disableUnlockLabel + " label"
-		ctx.Log.Info("Not allowed to unlock PR with %v label", disableUnlockLabel)
+	var hasLabel bool
+	var err error
+	if disableUnlockLabel != "" {
+		var labels []string
+		labels, err = u.vcsClient.GetPullLabels(baseRepo, ctx.Pull)
+		if err != nil {
+			vcsMessage = "Failed to retrieve PR labels... Not unlocking"
+			ctx.Log.Err("Failed to retrieve PR labels for pull %s", err.Error())
+		}
+		hasLabel = slices.Contains(labels, disableUnlockLabel)
+		if hasLabel {
+			vcsMessage = "Not allowed to unlock PR with " + disableUnlockLabel + " label"
+			ctx.Log.Info("Not allowed to unlock PR with %v label", disableUnlockLabel)
+		}
 	}
 
 	var numLocks int
-	if err == nil {
+	if err == nil && !hasLabel {
 		numLocks, err = u.deleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
 		if err != nil {
 			vcsMessage = "Failed to delete PR locks"
