@@ -51,6 +51,7 @@ const (
 	ADHostnameFlag                   = "azuredevops-hostname"
 	AllowCommandsFlag                = "allow-commands"
 	AllowForkPRsFlag                 = "allow-fork-prs"
+	ApplyErrorLabelFlag              = "apply-error-label"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
@@ -202,6 +203,10 @@ var stringFlags = map[string]stringFlag{
 	AllowCommandsFlag: {
 		description:  "Comma separated list of acceptable atlantis commands.",
 		defaultValue: DefaultAllowCommands,
+	},
+	ApplyErrorLabelFlag: {
+		description:  "Pull request label to add if an apply error occurs.",
+		defaultValue: "",
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",

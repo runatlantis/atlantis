@@ -747,3 +747,8 @@ func (g *GithubClient) GetPullLabels(repo models.Repo, pull models.PullRequest) 
 
 	return labels, nil
 }
+
+func (g *GithubClient) AddPullLabel(repo models.Repo, pull models.PullRequest, label string) error {
+	_, _, err := g.client.Issues.AddLabelsToIssue(g.ctx, repo.Owner, repo.Name, pull.Num, []string{label})
+	return err
+}
