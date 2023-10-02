@@ -14,6 +14,7 @@ type UserConfig struct {
 	AllowForkPRs                bool   `mapstructure:"allow-fork-prs"`
 	AllowCommands               string `mapstructure:"allow-commands"`
 	AtlantisURL                 string `mapstructure:"atlantis-url"`
+	ApplyErrorLabel             string `mapstructure:"apply-error-label"`
 	AutoDiscoverModeFlag        string `mapstructure:"autodiscover-mode"`
 	Automerge                   bool   `mapstructure:"automerge"`
 	AutoplanFileList            string `mapstructure:"autoplan-file-list"`

@@ -52,4 +52,7 @@ type Client interface {
 
 	// GetPullLabels returns the labels of a pull request
 	GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error)
+
+	// AddPullLabel adds a label to a pull request
+	AddPullLabel(repo models.Repo, pull models.PullRequest, label string) error
 }
