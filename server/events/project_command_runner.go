@@ -501,7 +501,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		} else {
 			// Using a policy tool other than Conftest, manually building result struct
 			passed := !strings.Contains(strings.ToLower(output), "fail")
-			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: "Custom", ConftestOutput: output, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
+			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: "Custom", PolicyOutput: output, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
 			preConftestOutput = append(preConftestOutput, "")
 		}
 	}
