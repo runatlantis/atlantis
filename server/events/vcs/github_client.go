@@ -451,6 +451,8 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 				}
 
 			}
+		} else {
+			return false, nil
 		}
 	}
 
