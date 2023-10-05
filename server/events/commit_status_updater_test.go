@@ -67,7 +67,7 @@ func TestUpdateCombined(t *testing.T) {
 		t.Run(c.expDescrip, func(t *testing.T) {
 			RegisterMockTestingT(t)
 			client := mocks.NewMockClient()
-			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
+			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis", WorkflowNameDelimiter: ":"}
 			err := s.UpdateCombined(models.Repo{}, models.PullRequest{}, c.status, c.command)
 			Ok(t, err)
 
@@ -133,7 +133,7 @@ func TestUpdateCombinedCount(t *testing.T) {
 		t.Run(c.expDescrip, func(t *testing.T) {
 			RegisterMockTestingT(t)
 			client := mocks.NewMockClient()
-			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis-test"}
+			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis-test", WorkflowNameDelimiter: ":"}
 			err := s.UpdateCombinedCount(models.Repo{}, models.PullRequest{}, c.status, c.command, c.numSuccess, c.numTotal)
 			Ok(t, err)
 
@@ -170,7 +170,7 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.expSrc, func(t *testing.T) {
 			client := mocks.NewMockClient()
-			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
+			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis", WorkflowNameDelimiter: ":"}
 			err := s.UpdateProject(command.ProjectContext{
 				ProjectName: c.projectName,
 				RepoRelDir:  c.repoRelDir,
@@ -234,7 +234,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.expDescrip, func(t *testing.T) {
 			client := mocks.NewMockClient()
-			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
+			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis", WorkflowNameDelimiter: ":"}
 			err := s.UpdateProject(command.ProjectContext{
 				RepoRelDir: ".",
 				Workspace:  "default",
@@ -249,7 +249,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) {
 	RegisterMockTestingT(t)
 	client := mocks.NewMockClient()
-	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "custom"}
+	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "custom", WorkflowNameDelimiter: ":"}
 	err := s.UpdateProject(command.ProjectContext{
 		RepoRelDir: ".",
 		Workspace:  "default",

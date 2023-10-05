@@ -45,6 +45,8 @@ type DefaultCommitStatusUpdater struct {
 	Client vcs.Client
 	// StatusName is the name used to identify Atlantis when creating PR statuses.
 	StatusName string
+	// WorkflowNameDelimiter is a delimiter used in generation of workflow name.
+	WorkflowNameDelimiter string
 }
 
 // ensure DefaultCommitStatusUpdater implements runtime.StatusUpdater interface
@@ -116,7 +118,7 @@ func (d *DefaultCommitStatusUpdater) UpdatePostWorkflowHook(pull models.PullRequ
 }
 
 func (d *DefaultCommitStatusUpdater) updateWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, workflowType string, url string) error {
-	src := fmt.Sprintf("%s/%s: %s", d.StatusName, workflowType, hookDescription)
+	src := fmt.Sprintf("%s/%s%s %s", d.StatusName, workflowType, d.WorkflowNameDelimiter, hookDescription)
 
 	var descripWords string
 	if runtimeDescription != "" {

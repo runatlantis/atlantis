@@ -126,7 +126,8 @@ type UserConfig struct {
 	WebPassword            string          `mapstructure:"web-password"`
 	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin   bool            `mapstructure:"websocket-check-origin"`
-	UseTFPluginCache         bool            `mapstructure:"use-tf-plugin-cache"`
+	WorkflowNameDelimiter  string          `mapstructure:"workflow-name-delimiter"`
+	UseTFPluginCache       bool            `mapstructure:"use-tf-plugin-cache"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName

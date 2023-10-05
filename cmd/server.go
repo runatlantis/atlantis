@@ -135,7 +135,7 @@ const (
 	RestrictFileList           = "restrict-file-list"
 	TFDownloadFlag             = "tf-download"
 	TFDownloadURLFlag          = "tf-download-url"
-	UseTFPluginCache             = "use-tf-plugin-cache"
+	UseTFPluginCache           = "use-tf-plugin-cache"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
@@ -146,6 +146,7 @@ const (
 	WebUsernameFlag            = "web-username"
 	WebPasswordFlag            = "web-password"
 	WebsocketCheckOrigin       = "websocket-check-origin"
+	WorkflowNameDelimiterFlag  = "workflow-name-delimiter"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser                  = ""
@@ -178,6 +179,7 @@ const (
 	DefaultWebBasicAuth                 = false
 	DefaultWebUsername                  = "atlantis"
 	DefaultWebPassword                  = "atlantis"
+	DefaultWorkflowNameDelimiter        = ":"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -411,6 +413,10 @@ var stringFlags = map[string]stringFlag{
 	WebPasswordFlag: {
 		description:  "Password used for Web Basic Authentication on Atlantis HTTP Middleware",
 		defaultValue: DefaultWebPassword,
+	},
+	WorkflowNameDelimiterFlag: {
+		description:  "delimiter to be used when workflow name generated",
+		defaultValue: DefaultWorkflowNameDelimiter,
 	},
 }
 
@@ -878,6 +884,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.WebPassword == "" {
 		c.WebPassword = DefaultWebPassword
+	}
+	if c.WorkflowNameDelimiter == "" {
+		c.WorkflowNameDelimiter = DefaultWorkflowNameDelimiter
 	}
 }
 
