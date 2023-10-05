@@ -165,12 +165,12 @@ func (mock *MockWorkingDir) HasDiverged(cloneDir string) bool {
 	return ret0
 }
 
-func (mock *MockWorkingDir) SetSafeToReClone() {
+func (mock *MockWorkingDir) SetCheckForUpstreamChanges() {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
 	}
 	params := []pegomock.Param{}
-	pegomock.GetGenericMockFrom(mock).Invoke("SetSafeToReClone", params, []reflect.Type{})
+	pegomock.GetGenericMockFrom(mock).Invoke("SetCheckForUpstreamChanges", params, []reflect.Type{})
 }
 
 func (mock *MockWorkingDir) VerifyWasCalledOnce() *VerifierMockWorkingDir {
@@ -482,19 +482,19 @@ func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetAllCapturedArguments
 	return
 }
 
-func (verifier *VerifierMockWorkingDir) SetSafeToReClone() *MockWorkingDir_SetSafeToReClone_OngoingVerification {
+func (verifier *VerifierMockWorkingDir) SetCheckForUpstreamChanges() *MockWorkingDir_SetCheckForUpstreamChanges_OngoingVerification {
 	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "SetSafeToReClone", params, verifier.timeout)
-	return &MockWorkingDir_SetSafeToReClone_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "SetCheckForUpstreamChanges", params, verifier.timeout)
+	return &MockWorkingDir_SetCheckForUpstreamChanges_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type MockWorkingDir_SetSafeToReClone_OngoingVerification struct {
+type MockWorkingDir_SetCheckForUpstreamChanges_OngoingVerification struct {
 	mock              *MockWorkingDir
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockWorkingDir_SetSafeToReClone_OngoingVerification) GetCapturedArguments() {
+func (c *MockWorkingDir_SetCheckForUpstreamChanges_OngoingVerification) GetCapturedArguments() {
 }
 
-func (c *MockWorkingDir_SetSafeToReClone_OngoingVerification) GetAllCapturedArguments() {
+func (c *MockWorkingDir_SetCheckForUpstreamChanges_OngoingVerification) GetAllCapturedArguments() {
 }

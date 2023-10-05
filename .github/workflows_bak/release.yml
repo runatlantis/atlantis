@@ -22,7 +22,7 @@ jobs:
         go-version-file: go.mod
 
     - name: Run GoReleaser for stable release
-      uses: goreleaser/goreleaser-action@v4
+      uses: goreleaser/goreleaser-action@v5
       if: (!contains(github.ref, 'pre'))
       with:
         version: v1.16.2
@@ -45,7 +45,7 @@ jobs:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
     - name: Run GoReleaser for pre-release
-      uses: goreleaser/goreleaser-action@v4
+      uses: goreleaser/goreleaser-action@v5
       if: contains(github.ref, 'pre')
       with:
         version: v1.16.2

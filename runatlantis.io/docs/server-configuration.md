@@ -355,6 +355,16 @@ and set `--autoplan-modules` to `false`.
   ```
   Disable atlantis auto planning.
 
+### `--disable-autoplan-label`
+  ```bash
+  atlantis server --disable-autoplan-label="no-autoplan"
+  # or
+  ATLANTIS_DISABLE_AUTOPLAN_LABEL="no-autoplan"
+  ```
+  Disable atlantis auto planning only on pull requests with the specified label.
+
+  If `disable-autoplan` property is `true`, this flag has no effect.
+
 ### `--disable-markdown-folding`
   ```bash
   atlantis server --disable-markdown-folding
@@ -988,6 +998,21 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy'
   ```
   A token for Terraform Cloud/Terraform Enterprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
+
+### `--use-tf-plugin-cache`
+```bash
+atlantis server --use-tf-plugin-cache=false
+# or
+ATLANTIS_USE_TF_PLUGIN_CACHE=false
+```
+Set to false if you want to disable terraform plugin cache.
+
+This flag is useful when having multiple projects that need to run a plan and apply in the same PR to avoid the race condition of `plugin_cache_dir` concurrently, this is a terraform known issue, more info:
+
+- [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
+- [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
+
+The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient managment of the PRs.
 
 ### `--var-file-allowlist`
   ```bash

@@ -34,6 +34,7 @@ type UserConfig struct {
 	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
 	DisableApply                bool   `mapstructure:"disable-apply"`
 	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
+	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`
 	DisableMarkdownFolding      bool   `mapstructure:"disable-markdown-folding"`
 	DisableRepoLocking          bool   `mapstructure:"disable-repo-locking"`
 	DiscardApprovalOnPlanFlag   bool   `mapstructure:"discard-approval-on-plan"`
@@ -125,6 +126,7 @@ type UserConfig struct {
 	WebPassword            string          `mapstructure:"web-password"`
 	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin   bool            `mapstructure:"websocket-check-origin"`
+	UseTFPluginCache         bool            `mapstructure:"use-tf-plugin-cache"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName

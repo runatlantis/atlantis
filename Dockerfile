@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
-ARG ALPINE_TAG=3.18.3
+ARG ALPINE_TAG=3.18.4
 ARG DEBIAN_TAG=12.1-slim
 
 # Stage 1: build artifact and download deps
@@ -176,7 +176,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
         ca-certificates~=20230506 \
-        curl~=8.2 \
+        curl~=8.3 \
         git~=2.40 \
         unzip~=6.0 \
         bash~=5.2 \
