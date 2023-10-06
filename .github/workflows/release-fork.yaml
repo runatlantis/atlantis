@@ -27,7 +27,7 @@ jobs:
         with:
           release-type: simple
           default-branch: release-fork
-          release-as: 0.25.1-pre.2
+          release-as: 0.25.1-pre.3
           changelog-types: ${{ steps.configure-changelog.outputs.result }}
           # https://github.com/google-github-actions/release-please-action#github-credentials
           token: ${{ secrets.VINCENT_PAT }}
