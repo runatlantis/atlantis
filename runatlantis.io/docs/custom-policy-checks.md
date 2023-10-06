@@ -42,4 +42,3 @@ projects:
     custom_policy_check: true
     autoplan:
       when_modified: ["*.tf"]
-```
