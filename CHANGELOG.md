@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.1-pre.3](https://github.com/vincentgna/atlantis/compare/v0.25.1-pre.2...v0.25.1-pre.3) (2023-10-06)
+
+
+### Misc
+
+* bump pre-release version ([cacca21](https://github.com/vincentgna/atlantis/commit/cacca21e202932077ed49e1725f14e5009bc1a3b))
+
 ## [0.25.1-pre.2](https://github.com/vincentgna/atlantis/compare/v0.25.1-pre...v0.25.1-pre.2) (2023-10-06)
 
 
