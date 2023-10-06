@@ -425,7 +425,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
 	}
-	ctx.Log.Debug("acquired lock for project")
+	ctx.Log.Debug("acquired lock for project.")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
@@ -489,14 +489,23 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	var preConftestOutput []string
 	var postConftestOutput []string
 	var policySetResults []models.PolicySetResult
+
 	for i, output := range outputs {
 		index = i
-		err = json.Unmarshal([]byte(strings.Join([]string{output}, "\n")), &policySetResults)
-		if err == nil {
-			break
+		if !ctx.CustomPolicyCheck {
+			err = json.Unmarshal([]byte(strings.Join([]string{output}, "\n")), &policySetResults)
+			if err == nil {
+				break
+			}
+			preConftestOutput = append(preConftestOutput, output)
+		} else {
+			// Using a policy tool other than Conftest, manually building result struct
+			passed := !strings.Contains(strings.ToLower(output), "fail")
+			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: "Custom", PolicyOutput: output, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
+			preConftestOutput = append(preConftestOutput, "")
 		}
-		preConftestOutput = append(preConftestOutput, output)
 	}
+
 	if policySetResults == nil {
 		return nil, "", errors.New("unable to unmarshal conftest output")
 	}
