@@ -111,6 +111,7 @@ type WorkflowHook struct {
 	StepDescription string
 	Shell           string
 	ShellArgs       string
+	Commands        string
 }
 
 // DefaultApplyStage is the Atlantis default apply stage.
