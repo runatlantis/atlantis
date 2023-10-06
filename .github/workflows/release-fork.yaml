@@ -1,0 +1,57 @@
+on:
+  push:
+    branches:
+      - release-fork
+
+name: release-please
+jobs:
+  release-please:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/github-script@v6
+        id: configure-changelog
+        with:
+          result-encoding: string
+          script: |
+            const changelogTypes = [
+              {type: "feat", section: "Features", hidden: false},
+              {type: "chore", section: "Misc", hidden: false},
+              {type: "fix", section: "BugFixes", hidden: false},
+            ]
+
+            return JSON.stringify(changelogTypes)
+
+      - name: release please
+        uses: google-github-actions/release-please-action@v3.7.12
+        id: release
+        with:
+          release-type: simple
+          default-branch: release-fork
+          release-as: 0.25.1-pre
+          changelog-types: ${{ steps.configure-changelog.outputs.result }}
+          # https://github.com/google-github-actions/release-please-action#github-credentials
+          token: ${{ secrets.VINCENT_PAT }}
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          # we need to fetch all history and tags
+          # so we build the proper version
+          fetch-depth: 0
+        if: ${{ steps.release.outputs.release_created }}
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+        if: ${{ steps.release.outputs.release_created }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          version: latest
+          # You can pass flags to goreleaser via GORELEASER_ARGS
+          # --clean will save you deleting the dist dir
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.VINCENT_PAT }}
+        if: ${{ steps.release.outputs.release_created }}
