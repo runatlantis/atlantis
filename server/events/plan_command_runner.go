@@ -315,9 +315,8 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
 		} else if numSuccess < len(pullStatus.Projects) {
-			// If there are plans that haven't been applied yet, we'll use a pending
-			// status.
-			status = models.PendingCommitStatus
+			// If there are plans that haven't been applied yet, no need to update the status
+			return
 		}
 	}
 

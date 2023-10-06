@@ -191,7 +191,7 @@ $$$
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						HasDiverged:     true,
+						MergedAgain:     true,
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -210,7 +210,7 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
-:warning: The branch we're merging into is ahead, it is recommended to pull new commits first.
+:twisted_rightwards_arrows: Upstream was modified, a new merge was performed.
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
@@ -1974,7 +1974,7 @@ $$$
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						HasDiverged:     true,
+						MergedAgain:     true,
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -1992,7 +1992,7 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
-:warning: The branch we're merging into is ahead, it is recommended to pull new commits first.
+:twisted_rightwards_arrows: Upstream was modified, a new merge was performed.
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
