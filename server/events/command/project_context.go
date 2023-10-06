@@ -57,13 +57,13 @@ type ProjectContext struct {
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.
 	HeadRepo models.Repo
-	// Dependencies are a list of project that this project relies on
+	// DependsOn are a list of project that this project relies on
 	// their apply status. These projects must be applied first.
 	//
 	// Atlantis uses this information to valid the apply
 	// orders and to warn the user if they're applying a project that
 	// depends on other projects.
-	Dependencies []string
+	DependsOn []string
 	// Log is a logger that's been set up for this context.
 	Log logging.SimpleLogging
 	// Scope is the scope for reporting stats setup for this context
@@ -74,7 +74,7 @@ type ProjectContext struct {
 	ProjectPlanStatus models.ProjectPlanStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
 	ProjectPolicyStatus []models.PolicySetStatus
-
+	// PullStatus is the current status of a pull request that is in progress.
 	PullStatus *models.PullStatus
 	// Pull is the pull request we're responding to.
 	Pull models.PullRequest

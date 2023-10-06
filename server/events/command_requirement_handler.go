@@ -70,7 +70,7 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 }
 
 func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) (failure string, err error) {
-	for _, dependOnProject := range ctx.Dependencies {
+	for _, dependOnProject := range ctx.DependsOn {
 
 		for _, project := range ctx.PullStatus.Projects {
 

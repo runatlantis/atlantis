@@ -132,7 +132,7 @@ type Project struct {
 	PlanRequirements          []string
 	ApplyRequirements         []string
 	ImportRequirements        []string
-	Dependencies              []string
+	DependsOn                 []string
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
 	ExecutionOrderGroup       int

@@ -89,7 +89,7 @@ type MergedProjectCfg struct {
 	ImportRequirements        []string
 	Workflow                  Workflow
 	AllowedWorkflows          []string
-	Dependencies              []string
+	DependsOn                 []string
 	RepoRelDir                string
 	Workspace                 string
 	Name                      string
@@ -388,7 +388,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		Workflow:                  workflow,
 		RepoRelDir:                proj.Dir,
 		Workspace:                 proj.Workspace,
-		Dependencies:              proj.Dependencies,
+		DependsOn:                 proj.DependsOn,
 		Name:                      proj.GetName(),
 		AutoplanEnabled:           proj.Autoplan.Enabled,
 		TerraformVersion:          proj.TerraformVersion,
