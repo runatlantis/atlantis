@@ -531,8 +531,8 @@ type VerifierMockEventParsing struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockEventParsing) GetBitbucketCloudPullEventType(eventTypeHeader string) *MockEventParsing_GetBitbucketCloudPullEventType_OngoingVerification {
-	params := []pegomock.Param{eventTypeHeader}
+func (verifier *VerifierMockEventParsing) GetBitbucketCloudPullEventType(eventTypeHeader string, sha string, pr string) *MockEventParsing_GetBitbucketCloudPullEventType_OngoingVerification {
+	params := []pegomock.Param{eventTypeHeader, sha, pr}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetBitbucketCloudPullEventType", params, verifier.timeout)
 	return &MockEventParsing_GetBitbucketCloudPullEventType_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -542,17 +542,25 @@ type MockEventParsing_GetBitbucketCloudPullEventType_OngoingVerification struct 
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockEventParsing_GetBitbucketCloudPullEventType_OngoingVerification) GetCapturedArguments() string {
-	eventTypeHeader := c.GetAllCapturedArguments()
-	return eventTypeHeader[len(eventTypeHeader)-1]
+func (c *MockEventParsing_GetBitbucketCloudPullEventType_OngoingVerification) GetCapturedArguments() (string, string, string) {
+	eventTypeHeader, sha, pr := c.GetAllCapturedArguments()
+	return eventTypeHeader[len(eventTypeHeader)-1], sha[len(sha)-1], pr[len(pr)-1]
 }
 
-func (c *MockEventParsing_GetBitbucketCloudPullEventType_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+func (c *MockEventParsing_GetBitbucketCloudPullEventType_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
+		}
+		_param1 = make([]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(string)
+		}
+		_param2 = make([]string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
 		}
 	}
 	return
