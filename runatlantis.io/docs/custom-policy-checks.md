@@ -43,4 +43,3 @@ projects:
     autoplan:
       when_modified: ["*.tf"]
 ```
-
