@@ -2,9 +2,11 @@ package events
 
 import (
 	"fmt"
+
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_command_requirement_handler.go CommandRequirementHandler
@@ -68,7 +70,7 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 }
 
 func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) (failure string, err error) {
-	for _, dependOnProject := range ctx.Dependencies {
+	for _, dependOnProject := range ctx.DependsOn {
 
 		for _, project := range ctx.PullStatus.Projects {
 
