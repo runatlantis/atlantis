@@ -669,6 +669,95 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 	}
 }
 
+func TestGitlabClient_PullIsApproved(t *testing.T) {
+	gitlabClientUnderTest = true
+
+	unapprovedMergeRequest, err := os.ReadFile("testdata/gitlab-unapproved-merge-request.json")
+	Ok(t, err)
+
+	approvedMergeRequest, err := os.ReadFile("testdata/gitlab-approved-merge-request.json")
+	Ok(t, err)
+
+	unapprovedMR := 1
+	approvedMR := 2
+	cases := []struct {
+		name     string
+		mrID     int
+		author   string
+		expState models.ApprovalStatus
+	}{
+		{
+			"Unapproved",
+			unapprovedMR,
+			"lmassa",
+			models.ApprovalStatus{},
+		},
+		{
+			"Approved by author",
+			approvedMR,
+			"lmassa",
+			models.ApprovalStatus{},
+		},
+		{
+			"Approved by someone other than author",
+			approvedMR,
+			"someone-else",
+			models.ApprovalStatus{
+				IsApproved: true,
+				ApprovedBy: "lmassa",
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/":
+						// Rate limiter requests.
+						w.WriteHeader(http.StatusOK)
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1/approvals":
+						w.WriteHeader(http.StatusOK)
+						w.Write(unapprovedMergeRequest) // nolint: errcheck
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/2/approvals":
+						w.WriteHeader(http.StatusOK)
+						w.Write(approvedMergeRequest) // nolint: errcheck
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &GitlabClient{
+				Client:  internalClient,
+				Version: nil,
+			}
+
+			repo := models.Repo{
+				FullName: "runatlantis/atlantis",
+				Owner:    "runatlantis",
+				Name:     "atlantis",
+				VCSHost: models.VCSHost{
+					Type:     models.Gitlab,
+					Hostname: "gitlab.com",
+				},
+			}
+
+			approved, err := client.PullIsApproved(logging.NewNoopLogger(t), repo, models.PullRequest{
+				Num:        c.mrID,
+				BaseRepo:   repo,
+				Author:     c.author,
+				HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
+			})
+
+			Ok(t, err)
+			Equals(t, c.expState, approved)
+		})
+	}
+}
+
 func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	gitlabClientUnderTest = true

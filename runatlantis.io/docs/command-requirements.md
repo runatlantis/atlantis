@@ -53,18 +53,10 @@ The `approved` requirement by:
     ```
 
 #### Meaning
-
-Each VCS provider has different rules around who can approve:
-
-* **GitHub** – **Any user with read permissions** to the repo can approve a pull request
-* **GitLab** – The user who can approve can be set in the [repo settings](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* **Bitbucket Cloud (bitbucket.org)** – A user can approve their own pull request but
-  Atlantis does not count that as an approval and requires an approval from at least one user that
-  is not the author of the pull request
-* **Azure DevOps** – **All builtin groups include the "Contribute to pull requests"** permission and can approve a pull request
+Each VCS provider has different rules around what constitutes an "Approved" request. However, Atlantis `approved` is implemented in the same way for each VCS: at least one user other than the author who has the ability in the VCS to approve the request has done so. If you're using a VCS that has more complicated rules for determining approval, you can assert they are satisfied with the [mergeable](#mergeable) requirement.
 
 :::tip Tip
-To require **certain people** to approve the pull request, look at the
+To require **certain people** or a **certain number of people** to approve the pull request, look at the
 [mergeable](#mergeable) requirement.
 :::
 
@@ -106,8 +98,7 @@ Set the `mergeable` requirement by:
     ```
 
 #### Meaning
-
-Each VCS provider has a different concept of "mergeability":
+Each VCS provider has a different concept of "mergeability". For some this includes satisfying "approval requirements", which differs from the more narrow [approved](#approved) requirement above.
 
 ::: warning
 Some VCS providers have a feature for branch protection to control "mergeability". To use it,
@@ -141,8 +132,7 @@ If you set `atlantis/apply` to the mergeable requirement, use the `--gh-allow-me
 :::
 
 #### GitLab
-
-For GitLab, a merge request will be merged if there are no conflicts, no unresolved discussions if it is a project requirement and if all necessary approvers have approved the pull request.
+For GitLab, a merge request will be merged if there are no conflicts, no unresolved discussions if it is a project requirement and if all necessary approvers have approved the pull request. The number or list of users that are required for approval can be set in the [repo settings](https://docs.gitlab.com/user/project/merge_requests/merge_request_approvals.html).
 
 For pipelines, if the project requires that pipelines must succeed, all builds except the apply command status will be checked.
 
