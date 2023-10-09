@@ -72,6 +72,7 @@ type ProjectContext struct {
 	PullReqStatus models.PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
+	PullStatus *models.PullStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
 	ProjectPolicyStatus []models.PolicySetStatus
 
@@ -122,6 +123,8 @@ type ProjectContext struct {
 	ExecutionOrderGroup int
 	// If plans/applies should be aborted if any prior plan/apply fails
 	AbortOnExcecutionOrderFail bool
+	// Allows custom policy check tools outside of Conftest to run in checks
+	CustomPolicyCheck bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

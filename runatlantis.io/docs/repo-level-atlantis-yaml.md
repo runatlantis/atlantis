@@ -59,6 +59,7 @@ projects:
   terraform_version: v0.11.0
   delete_source_branch_on_merge: true
   repo_locking: true
+  custom_policy_check: false
   autoplan:
     when_modified: ["*.tf", "../modules/**/*.tf", ".terraform.lock.hcl"]
     enabled: true
@@ -311,6 +312,7 @@ workspace: myworkspace
 execution_order_group: 0
 delete_source_branch_on_merge: false
 repo_locking: true
+custom_policy_check: false
 autoplan:
 terraform_version: 0.11.0
 plan_requirements: ["approved"]
@@ -327,7 +329,9 @@ workflow: myworkflow
 | workspace                                | string                | `"default"` | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                    |
 | execution_order_group                    | int                   | `0`         | no       | Index of execution order group. Projects will be sort by this field before planning/applying.                                                                                                                                             |
 | delete_source_branch_on_merge            | bool                  | `false`     | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                         |
-| repo_locking                             | bool                  | `true`      | no       | Get a repository lock in this project when plan.                                                                                                                                                                                          |
+| repo_locking                             | bool                  | `true`      | no       | Get a repository lock in this project when plan.                                                                         
+
+| custom_policy_check                             | bool                  | `false`      | no       | Enable using policy check tools other than Conftest                                                                                                                                                           |
 | autoplan                                 | [Autoplan](#autoplan) | none        | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.html).                                                                                                                   |
 | terraform_version                        | string                | none        | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                                              |
 | plan_requirements<br />*(restricted)*   | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.  |

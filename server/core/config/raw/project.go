@@ -36,6 +36,7 @@ type Project struct {
 	RepoLocking               *bool     `yaml:"repo_locking,omitempty"`
 	ExecutionOrderGroup       *int      `yaml:"execution_order_group,omitempty"`
 	PolicyCheck               *bool     `yaml:"policy_check,omitempty"`
+	CustomPolicyCheck         *bool     `yaml:"custom_policy_check,omitempty"`
 }
 
 func (p Project) Validate() error {
@@ -144,6 +145,10 @@ func (p Project) ToValid() valid.Project {
 
 	if p.PolicyCheck != nil {
 		v.PolicyCheck = p.PolicyCheck
+	}
+
+	if p.CustomPolicyCheck != nil {
+		v.CustomPolicyCheck = p.CustomPolicyCheck
 	}
 
 	return v

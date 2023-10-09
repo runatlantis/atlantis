@@ -187,7 +187,7 @@ When the policy check workflow runs, a file is created in the working directory 
 [
   {
     "PolicySetName":  "policy1",
-    "ConftestOutput": "",
+    "PolicyOutput": "",
     "Passed":         false,
     "ReqApprovals":   1,
     "CurApprovals":   0
