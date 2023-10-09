@@ -50,6 +50,7 @@ automerge: true
 delete_source_branch_on_merge: true
 parallel_plan: true
 parallel_apply: true
+abort_on_execution_order_fail: true
 projects:
 - name: my-project-name
   branch: /main/
@@ -58,18 +59,23 @@ projects:
   terraform_version: v0.11.0
   delete_source_branch_on_merge: true
   repo_locking: true
+  custom_policy_check: false
   autoplan:
-    when_modified: ["*.tf", "../modules/**/*.tf"]
+    when_modified: ["*.tf", "../modules/**/*.tf", ".terraform.lock.hcl"]
     enabled: true
   plan_requirements: [mergeable, approved, undiverged]
   apply_requirements: [mergeable, approved, undiverged]
   import_requirements: [mergeable, approved, undiverged]
+  execution_order_group: 1
   workflow: myworkflow
 workflows:
   myworkflow:
     plan:
       steps:
       - run: my-custom-command arg1 arg2
+      - run:
+          command: my-custom-command arg1 arg2
+          output: hide
       - init
       - plan:
           extra_args: ["-lock", "false"]
@@ -96,6 +102,7 @@ projects:
       when_modified:
         - "./terraform/modules/**/*.tf"
         - "**/*.tf"
+        - ".terraform.lock.hcl"
 
   - <<: *template
     name: ue1-prod-titan
@@ -182,7 +189,7 @@ version: 3
 projects:
 - dir: project1
   autoplan:
-    when_modified: ["../modules/**/*.tf", "*.tf*"]
+    when_modified: ["../modules/**/*.tf", "*.tf*", ".terraform.lock.hcl"]
 ```
 
 Note:
@@ -259,6 +266,7 @@ to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-si
 ### Order of planning/applying
 ```yaml
 version: 3
+abort_on_execution_order_fail: true
 projects:
 - dir: project1
   execution_order_group: 2
@@ -268,7 +276,10 @@ projects:
 With this config above, Atlantis runs planning/applying for project2 first, then for project1.
 Several projects can have same `execution_order_group`. Any order in one group isn't guaranteed.
 `parallel_plan` and `parallel_apply` respect these order groups, so parallel planning/applying works
-in each group one by one.
+in each group one by one. 
+
+If any plan/apply fails and `abort_on_execution_order_fail` is set to true on a repo level, all the 
+following groups will be aborted. For this example, if project2 fails then project1 will not run.
 
 ### Custom Backend Config
 See [Custom Workflow Use Cases: Custom Backend Config](custom-workflows.html#custom-backend-config)
@@ -301,6 +312,7 @@ workspace: myworkspace
 execution_order_group: 0
 delete_source_branch_on_merge: false
 repo_locking: true
+custom_policy_check: false
 autoplan:
 terraform_version: 0.11.0
 plan_requirements: ["approved"]
@@ -317,7 +329,9 @@ workflow: myworkflow
 | workspace                                | string                | `"default"` | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                    |
 | execution_order_group                    | int                   | `0`         | no       | Index of execution order group. Projects will be sort by this field before planning/applying.                                                                                                                                             |
 | delete_source_branch_on_merge            | bool                  | `false`     | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                         |
-| repo_locking                             | bool                  | `true`      | no       | Get a repository lock in this project when plan.                                                                                                                                                                                          |
+| repo_locking                             | bool                  | `true`      | no       | Get a repository lock in this project when plan.                                                                         
+
+| custom_policy_check                             | bool                  | `false`      | no       | Enable using policy check tools other than Conftest                                                                                                                                                           |
 | autoplan                                 | [Autoplan](#autoplan) | none        | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.html).                                                                                                                   |
 | terraform_version                        | string                | none        | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                                              |
 | plan_requirements<br />*(restricted)*   | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.  |
@@ -334,7 +348,7 @@ Atlantis supports this but requires the `name` key to be specified. See [Custom 
 ### Autoplan
 ```yaml
 enabled: true
-when_modified: ["*.tf", "terragrunt.hcl"]
+when_modified: ["*.tf", "terragrunt.hcl", ".terraform.lock.hcl"]
 ```
 | Key                   | Type          | Default        | Required | Description                                                                                                                                                                                                                                                       |
 |-----------------------|---------------|----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

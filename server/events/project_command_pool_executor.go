@@ -72,6 +72,7 @@ func splitByExecutionOrderGroup(cmds []command.ProjectContext) [][]command.Proje
 }
 
 func runProjectCmdsParallelGroups(
+	ctx *command.Context,
 	cmds []command.ProjectContext,
 	runnerFunc prjCmdRunnerFunc,
 	poolSize int,
@@ -81,6 +82,10 @@ func runProjectCmdsParallelGroups(
 	for _, group := range groups {
 		res := runProjectCmdsParallel(group, runnerFunc, poolSize)
 		results = append(results, res.ProjectResults...)
+		if res.HasErrors() && group[0].AbortOnExcecutionOrderFail {
+			ctx.Log.Info("abort on execution order when failed")
+			break
+		}
 	}
 
 	return command.Result{ProjectResults: results}

@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -11,14 +12,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
+//go:generate pegomock generate --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
 
 // PreWorkflowHookURLGenerator generates urls to view the pre workflow progress.
 type PreWorkflowHookURLGenerator interface {
 	GenerateProjectWorkflowHookURL(hookID string) (string, error)
 }
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
+//go:generate pegomock generate --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
 
 type PreWorkflowHooksCommandRunner interface {
 	RunPreHooks(ctx *command.Context, cmd *CommentCommand) error
@@ -64,7 +65,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 	log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := w.WorkingDir.Clone(log, headRepo, pull, DefaultWorkspace)
+	repoDir, _, err := w.WorkingDir.Clone(headRepo, pull, DefaultWorkspace)
 	if err != nil {
 		return err
 	}
@@ -83,7 +84,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 			User:               user,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
-			HookID:             uuid.NewString(),
+			CommandName:        cmd.Name.String(),
 		},
 		preWorkflowHooks, repoDir)
 
@@ -105,6 +106,26 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			hookDescription = fmt.Sprintf("Pre workflow hook #%d", i)
 		}
 
+		ctx.Log.Debug("Processing pre workflow hook '%s', Command '%s', Target commands [%s]",
+			hookDescription, ctx.CommandName, hook.Commands)
+		if hook.Commands != "" && !strings.Contains(hook.Commands, ctx.CommandName) {
+			ctx.Log.Debug("Skipping pre workflow hook '%s' as command '%s' is not in Commands [%s]",
+				hookDescription, ctx.CommandName, hook.Commands)
+			continue
+		}
+
+		ctx.Log.Debug("Running pre workflow hook: '%s'", hookDescription)
+		ctx.HookID = uuid.NewString()
+		shell := hook.Shell
+		if shell == "" {
+			ctx.Log.Debug("Setting shell to default: %q", shell)
+			shell = "sh"
+		}
+		shellArgs := hook.ShellArgs
+		if shellArgs == "" {
+			ctx.Log.Debug("Setting shellArgs to default: %q", shellArgs)
+			shellArgs = "-c"
+		}
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
 		if err != nil {
 			return err
@@ -115,7 +136,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			return err
 		}
 
-		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, repoDir)
+		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
 
 		if err != nil {
 			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.FailedCommitStatus, hookDescription, runtimeDesc, url); err != nil {

@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	events "github.com/runatlantis/atlantis/server/events"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
@@ -26,11 +26,11 @@ func NewMockCommentParsing(options ...pegomock.Option) *MockCommentParsing {
 func (mock *MockCommentParsing) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockCommentParsing) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockCommentParsing) Parse(_param0 string, _param1 models.VCSHostType) events.CommentParseResult {
+func (mock *MockCommentParsing) Parse(comment string, vcsHost models.VCSHostType) events.CommentParseResult {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommentParsing().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{comment, vcsHost}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Parse", params, []reflect.Type{reflect.TypeOf((*events.CommentParseResult)(nil)).Elem()})
 	var ret0 events.CommentParseResult
 	if len(result) != 0 {
@@ -78,8 +78,8 @@ type VerifierMockCommentParsing struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockCommentParsing) Parse(_param0 string, _param1 models.VCSHostType) *MockCommentParsing_Parse_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockCommentParsing) Parse(comment string, vcsHost models.VCSHostType) *MockCommentParsing_Parse_OngoingVerification {
+	params := []pegomock.Param{comment, vcsHost}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Parse", params, verifier.timeout)
 	return &MockCommentParsing_Parse_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -90,8 +90,8 @@ type MockCommentParsing_Parse_OngoingVerification struct {
 }
 
 func (c *MockCommentParsing_Parse_OngoingVerification) GetCapturedArguments() (string, models.VCSHostType) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	comment, vcsHost := c.GetAllCapturedArguments()
+	return comment[len(comment)-1], vcsHost[len(vcsHost)-1]
 }
 
 func (c *MockCommentParsing_Parse_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.VCSHostType) {

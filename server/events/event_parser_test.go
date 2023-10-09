@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v50/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
@@ -492,6 +492,18 @@ func TestParseGitlabMergeEvent_Update_ActionType(t *testing.T) {
 		},
 		{
 			filename: "gitlab-merge-request-event-update-target-branch.json",
+			exp:      models.OtherPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-update-reviewer.json",
+			exp:      models.OtherPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-update-milestone.json",
+			exp:      models.OtherPullEvent,
+		},
+		{
+			filename: "gitlab-merge-request-event-mark-as-ready.json",
 			exp:      models.UpdatedPullEvent,
 		},
 	}
@@ -636,7 +648,7 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	var event *gitlab.MergeCommentEvent
 	err = json.Unmarshal(bytes, &event)
 	Ok(t, err)
-	baseRepo, headRepo, user, err := parser.ParseGitlabMergeRequestCommentEvent(*event)
+	baseRepo, headRepo, commentID, user, err := parser.ParseGitlabMergeRequestCommentEvent(*event)
 	Ok(t, err)
 	Equals(t, models.Repo{
 		FullName:          "gitlabhq/gitlab-test",
@@ -660,6 +672,7 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 			Type:     models.Gitlab,
 		},
 	}, headRepo)
+	Equals(t, 1244, commentID)
 	Equals(t, models.User{
 		Username: "root",
 	}, user)
@@ -673,7 +686,7 @@ func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 	var event *gitlab.MergeCommentEvent
 	err = json.Unmarshal(bytes, &event)
 	Ok(t, err)
-	baseRepo, headRepo, user, err := parser.ParseGitlabMergeRequestCommentEvent(*event)
+	baseRepo, headRepo, commentID, user, err := parser.ParseGitlabMergeRequestCommentEvent(*event)
 	Ok(t, err)
 
 	Equals(t, models.Repo{
@@ -698,6 +711,7 @@ func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 			Type:     models.Gitlab,
 		},
 	}, headRepo)
+	Equals(t, 96056916, commentID)
 	Equals(t, models.User{
 		Username: "lkysow",
 	}, user)
@@ -729,14 +743,14 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.RepoRelDir, func(t *testing.T) {
-			cmd := events.NewCommentCommand(c.RepoRelDir, nil, command.Plan, "", false, false, "workspace", "")
+			cmd := events.NewCommentCommand(c.RepoRelDir, nil, command.Plan, "", false, false, "workspace", "", "", false)
 			Equals(t, c.ExpDir, cmd.RepoRelDir)
 		})
 	}
 }
 
 func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
-	cmd := events.NewCommentCommand("", nil, command.Plan, "", false, false, "", "")
+	cmd := events.NewCommentCommand("", nil, command.Plan, "", false, false, "", "", "", false)
 	Equals(t, events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
@@ -748,7 +762,7 @@ func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
-	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, command.Plan, "", true, false, "workspace", "project")
+	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, command.Plan, "", true, false, "workspace", "project", "policyset", false)
 	Equals(t, events.CommentCommand{
 		Workspace:   "workspace",
 		RepoRelDir:  "dir",
@@ -756,6 +770,7 @@ func TestNewCommand_AllFieldsSet(t *testing.T) {
 		Flags:       []string{"a", "b"},
 		Name:        command.Plan,
 		ProjectName: "project",
+		PolicySet:   "policyset",
 	}, *cmd)
 }
 
@@ -794,7 +809,7 @@ func TestCommentCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_String(t *testing.T) {
-	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" flags="flag1,flag2"`
+	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" policyset="", clear-policy-approval=false, flags="flag1,flag2"`
 	Equals(t, exp, (events.CommentCommand{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},
@@ -983,6 +998,42 @@ func TestParseBitbucketCloudPullEvent_States(t *testing.T) {
 	}
 }
 
+func TestBitBucketNonCodeChangesAreIgnored(t *testing.T) {
+	// lets say a user opens a PR
+	act := parser.GetBitbucketCloudPullEventType("pullrequest:created", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OpenedPullEvent, act)
+	// Another update with same SHA should be ignored
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OtherPullEvent, act)
+	// Only if SHA changes do we act
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha2", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.UpdatedPullEvent, act)
+
+	// If sha changes in seperate PR,
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "otherPRSha", "https://github.com/fakeorg/fakerepo/pull/2")
+	Equals(t, models.UpdatedPullEvent, act)
+	// We will still ignore same shas in first PR
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha2", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OtherPullEvent, act)
+}
+
+func TestBitbucketShaCacheExpires(t *testing.T) {
+	// lets say a user opens a PR
+	act := parser.GetBitbucketCloudPullEventType("pullrequest:created", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OpenedPullEvent, act)
+	// Another update with same SHA should be ignored
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.OtherPullEvent, act)
+	// But after 300 times, the cache should expire
+	// this is so we don't have ever increasing memory usage
+	for i := 0; i < 302; i++ {
+		parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", fmt.Sprintf("https://github.com/fakeorg/fakerepo/pull/%d", i))
+	}
+	// and now SHA will seen as a change again
+	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", "https://github.com/fakeorg/fakerepo/pull/1")
+	Equals(t, models.UpdatedPullEvent, act)
+}
+
 func TestGetBitbucketCloudEventType(t *testing.T) {
 	cases := []struct {
 		header string
@@ -1011,7 +1062,9 @@ func TestGetBitbucketCloudEventType(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.header, func(t *testing.T) {
-			act := parser.GetBitbucketCloudPullEventType(c.header)
+			// we pass in the header as the SHA so the SHA changes each time
+			// the code will ignore duplicate SHAS to avoid extra TF plans
+			act := parser.GetBitbucketCloudPullEventType(c.header, c.header, "https://github.com/fakeorg/fakerepo/pull/1")
 			Equals(t, c.exp, act)
 		})
 	}

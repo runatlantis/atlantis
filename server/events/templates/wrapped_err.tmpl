@@ -5,5 +5,8 @@
 ```
 {{ .Error }}
 ```
+{{- if ne .RenderedContext "" }}
+{{ .RenderedContext }}
+{{- end }}
 </details>
 {{ end -}}

@@ -116,6 +116,8 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 `, flagHelpOutput)
 }
 
+// to80CharCols takes a string s as input and returns a new string that is split
+// into multiple lines with each line having a maximum of 80 characters
 func to80CharCols(s string) string {
 	var splitAt80 string
 	splitSpaces := strings.Split(s, " ")

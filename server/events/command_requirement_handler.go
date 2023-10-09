@@ -5,10 +5,9 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_command_requirement_handler.go CommandRequirementHandler
+//go:generate pegomock generate --package mocks -o mocks/mock_command_requirement_handler.go CommandRequirementHandler
 type CommandRequirementHandler interface {
 	ValidateProjectDependencies(ctx command.ProjectContext) (string, error)
 	ValidatePlanProject(repoDir string, ctx command.ProjectContext) (string, error)
@@ -25,14 +24,14 @@ func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, c
 		switch req {
 		case raw.ApprovedRequirement:
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
-				return "Pull request must be approved by at least one person other than the author before running plan.", nil
+				return "Pull request must be approved according to the project's approval rules before running plan.", nil
 			}
 		case raw.MergeableRequirement:
 			if !ctx.PullReqStatus.Mergeable {
 				return "Pull request must be mergeable before running plan.", nil
 			}
 		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
+			if a.WorkingDir.HasDiverged(repoDir) {
 				return "Default branch must be rebased onto pull request before running plan.", nil
 			}
 		}
@@ -46,11 +45,12 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 		switch req {
 		case raw.ApprovedRequirement:
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
-				return "Pull request must be approved by at least one person other than the author before running apply.", nil
+				return "Pull request must be approved according to the project's approval rules before running apply.", nil
 			}
 		// this should come before mergeability check since mergeability is a superset of this check.
 		case valid.PoliciesPassedCommandReq:
-			if ctx.ProjectPlanStatus == models.ErroredPolicyCheckStatus {
+			// We should rely on this function instead of plan status, since plan status after a failed apply will not carry the policy error over.
+			if !ctx.PolicyCleared() {
 				return "All policies must pass for project before running apply.", nil
 			}
 		case raw.MergeableRequirement:
@@ -58,7 +58,7 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 				return "Pull request must be mergeable before running apply.", nil
 			}
 		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
+			if a.WorkingDir.HasDiverged(repoDir) {
 				return "Default branch must be rebased onto pull request before running apply.", nil
 			}
 		}
@@ -86,14 +86,14 @@ func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string,
 		switch req {
 		case raw.ApprovedRequirement:
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
-				return "Pull request must be approved by at least one person other than the author before running import.", nil
+				return "Pull request must be approved according to the project's approval rules before running import.", nil
 			}
 		case raw.MergeableRequirement:
 			if !ctx.PullReqStatus.Mergeable {
 				return "Pull request must be mergeable before running import.", nil
 			}
 		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
+			if a.WorkingDir.HasDiverged(repoDir) {
 				return "Default branch must be rebased onto pull request before running import.", nil
 			}
 		}

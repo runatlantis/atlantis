@@ -1,0 +1,26 @@
+# For required checks when path filtering doesn't trigger the other job
+# https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks
+
+name: atlantis-image
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'Dockerfile'
+      - 'docker-entrypoint.sh'
+      - '.github/workflows/atlantis-image.yml'
+      - '**.go'
+      - 'go.*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        image_type: [alpine, debian]
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "No build required"'

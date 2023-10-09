@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -21,7 +22,7 @@ type RunStepRunner struct {
 	ProjectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
 
-func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, streamOutput bool) (string, error) {
+func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -49,9 +50,11 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		"PATH":                       fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
 		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
 		"SHOWFILE":                   filepath.Join(path, ctx.GetShowResultFileName()),
+		"POLICYCHECKFILE":            filepath.Join(path, ctx.GetPolicyCheckResultFileName()),
 		"PROJECT_NAME":               ctx.ProjectName,
 		"PULL_AUTHOR":                ctx.Pull.Author,
 		"PULL_NUM":                   fmt.Sprintf("%d", ctx.Pull.Num),
+		"PULL_URL":                   ctx.Pull.URL,
 		"REPO_REL_DIR":               ctx.RepoRelDir,
 		"USER_NAME":                  ctx.User.Username,
 		"WORKSPACE":                  ctx.Workspace,
@@ -70,8 +73,22 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output)
-		ctx.Log.Debug("error: %s", err)
-		return "", err
+		if !ctx.CustomPolicyCheck {
+			ctx.Log.Debug("error: %s", err)
+			return "", err
+		} else {
+			ctx.Log.Debug("Treating custom policy tool error exit code as a policy failure.  Error output: %s", err)
+		}
 	}
-	return output, nil
+
+	switch postProcessOutput {
+	case valid.PostProcessRunOutputHide:
+		return "", nil
+	case valid.PostProcessRunOutputStripRefreshing:
+		return StripRefreshingFromPlanOutput(output, tfVersion), nil
+	case valid.PostProcessRunOutputShow:
+		return output, nil
+	default:
+		return output, nil
+	}
 }

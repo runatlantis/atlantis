@@ -35,6 +35,9 @@ func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, co
 func (a *NotConfiguredVCSClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	return nil
 }
+func (a *NotConfiguredVCSClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { // nolint: revive
+	return nil
+}
 func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	return models.ApprovalStatus{}, a.err()
 }
@@ -69,4 +72,8 @@ func (a *NotConfiguredVCSClient) GetFileContent(pull models.PullRequest, fileNam
 }
 func (a *NotConfiguredVCSClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
 	return "", a.err()
+}
+
+func (a *NotConfiguredVCSClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+	return nil, a.err()
 }

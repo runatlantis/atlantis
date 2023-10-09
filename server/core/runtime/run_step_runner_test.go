@@ -6,13 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	version "github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	"github.com/hashicorp/go-version"
+	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -71,8 +70,8 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ExpOut:      "workspace=myworkspace version=0.11.0 dir=$DIR planfile=$DIR/my::project::name-myworkspace.tfplan showfile=$DIR/my::project::name-myworkspace.json project=my/project/name\n",
 		},
 		{
-			Command: "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME head_commit=$HEAD_COMMIT base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_author=$PULL_AUTHOR repo_rel_dir=$REPO_REL_DIR",
-			ExpOut:  "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=main pull_num=2 pull_author=acme repo_rel_dir=mydir\n",
+			Command: "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME head_commit=$HEAD_COMMIT base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_url=$PULL_URL pull_author=$PULL_AUTHOR repo_rel_dir=$REPO_REL_DIR",
+			ExpOut:  "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=main pull_num=2 pull_url=https://github.com/runatlantis/atlantis/pull/2 pull_author=acme repo_rel_dir=mydir\n",
 		},
 		{
 			Command: "echo user_name=$USER_NAME",
@@ -105,7 +104,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 
 		RegisterMockTestingT(t)
 		terraform := mocks.NewMockClient()
-		When(terraform.EnsureVersion(matchers.AnyLoggingSimpleLogging(), matchers2.AnyPtrToGoVersionVersion())).
+		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[*version.Version]())).
 			ThenReturn(nil)
 
 		logger := logging.NewNoopLogger(t)
@@ -130,6 +129,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				},
 				Pull: models.PullRequest{
 					Num:        2,
+					URL:        "https://github.com/runatlantis/atlantis/pull/2",
 					HeadBranch: "add-feat",
 					HeadCommit: "12345abcdef",
 					BaseBranch: "main",
@@ -145,7 +145,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				ProjectName:        c.ProjectName,
 				EscapedCommentArgs: []string{"-target=resource1", "-target=resource2"},
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"}, true)
+			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

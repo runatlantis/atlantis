@@ -6,16 +6,14 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -64,6 +62,7 @@ workflows:
 			repoCfg: "",
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   false,
@@ -120,6 +119,7 @@ projects:
   `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -180,6 +180,7 @@ projects:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -248,6 +249,7 @@ projects:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -403,6 +405,7 @@ workflows:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -465,6 +468,7 @@ projects:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -530,6 +534,7 @@ workflows:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -581,6 +586,7 @@ projects:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   false,
@@ -624,9 +630,9 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
@@ -659,8 +665,12 @@ projects:
 				&CommentParser{ExecutableName: "atlantis"},
 				false,
 				false,
+				false,
+				false,
+				false,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				false,
 				false,
 				statsScope,
@@ -793,6 +803,7 @@ projects:
   `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -p myproject_1",
+				ApprovePoliciesCmd: "atlantis approve_policies -p myproject_1",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -837,9 +848,9 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(logging_matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
@@ -869,8 +880,12 @@ projects:
 				&CommentParser{ExecutableName: "atlantis"},
 				false,
 				true,
+				false,
+				false,
+				false,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				false,
 				false,
 				statsScope,
@@ -969,6 +984,7 @@ repos:
 			repoCfg: "",
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   false,
@@ -981,9 +997,9 @@ repos:
 				},
 				Pull:               pull,
 				ProjectName:        "",
-				PlanRequirements:   []string{},
-				ApplyRequirements:  []string{},
-				ImportRequirements: []string{},
+				PlanRequirements:   []string{"policies_passed"},
+				ApplyRequirements:  []string{"policies_passed"},
+				ImportRequirements: []string{"policies_passed"},
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
 				User:               models.User{},
@@ -1030,6 +1046,7 @@ workflows:
 `,
 			expCtx: command.ProjectContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
@@ -1042,18 +1059,19 @@ workflows:
 				},
 				Pull:               pull,
 				ProjectName:        "",
-				PlanRequirements:   []string{},
+				PlanRequirements:   []string{"policies_passed"},
 				ApplyRequirements:  []string{},
-				ImportRequirements: []string{},
+				ImportRequirements: []string{"policies_passed"},
 				RepoConfigVersion:  3,
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
-				TerraformVersion:   mustVersion("10.0"),
+				TerraformVersion:   mustVersion("v10.0"),
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				PolicySetTarget:    "",
 			},
 			expPolicyCheckSteps: []string{"policy_check"},
 		},
@@ -1073,19 +1091,20 @@ workflows:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowRepoCfg:       false,
+				MergeableReq:       false,
+				ApprovedReq:        false,
+				UnDivergedReq:      false,
+				PolicyCheckEnabled: true,
 			}
 
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
@@ -1110,8 +1129,12 @@ workflows:
 				&CommentParser{ExecutableName: "atlantis"},
 				false,
 				false,
+				false,
+				false,
+				false,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
 				false,
 				false,
 				statsScope,
@@ -1225,9 +1248,9 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyLoggingSimpleLogging(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
@@ -1262,10 +1285,14 @@ projects:
 				&CommentParser{ExecutableName: "atlantis"},
 				false,
 				false,
+				false,
+				false,
+				false,
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
 				true,
+				false,
 				statsScope,
 				logger,
 				terraformClient,

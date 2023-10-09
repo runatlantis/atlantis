@@ -8,7 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 )
 
 func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope tally.Scope) ProjectCommandContextBuilder {
@@ -38,7 +38,7 @@ type ProjectCommandContextBuilder interface {
 		prjCfg valid.MergedProjectCfg,
 		commentFlags []string,
 		repoDir string,
-		automerge, parallelApply, parallelPlan, verbose bool, terraformClient terraform.Client,
+		automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool, terraformClient terraform.Client,
 	) []command.ProjectContext
 }
 
@@ -58,12 +58,13 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose bool, terraformClient terraform.Client,
+	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
+	terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
 	cb.ProjectCounter.Inc(1)
 
 	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
-		ctx, cmdName, subCmdName, prjCfg, commentFlags, repoDir, automerge, parallelApply, parallelPlan, verbose, terraformClient,
+		ctx, cmdName, subCmdName, prjCfg, commentFlags, repoDir, automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail, terraformClient,
 	)
 
 	projectCmds = []command.ProjectContext{}
@@ -91,7 +92,8 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose bool, terraformClient terraform.Client,
+	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
+	terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
 
@@ -129,6 +131,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		ctx,
 		cmdName,
 		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+		cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 		prjCfg,
 		steps,
@@ -138,6 +141,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		parallelApply,
 		parallelPlan,
 		verbose,
+		abortOnExcecutionOrderFail,
 		ctx.Scope,
 		ctx.PullRequestStatus,
 		ctx.PullStatus,
@@ -160,9 +164,15 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose bool, terraformClient terraform.Client,
+	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
+	terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
-	ctx.Log.Debug("PolicyChecks are enabled")
+	if prjCfg.PolicyCheck {
+		ctx.Log.Debug("PolicyChecks are enabled")
+	} else {
+		// PolicyCheck is disabled at repository level
+		ctx.Log.Debug("PolicyChecks are disabled on this repository")
+	}
 
 	// If TerraformVersion not defined in config file look for a
 	// terraform.require_version block.
@@ -181,10 +191,11 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		parallelApply,
 		parallelPlan,
 		verbose,
+		abortOnExcecutionOrderFail,
 		terraformClient,
 	)
 
-	if cmdName == command.Plan {
+	if cmdName == command.Plan && prjCfg.PolicyCheck {
 		ctx.Log.Debug("Building project command context for %s", command.PolicyCheck)
 		steps := prjCfg.Workflow.PolicyCheck.Steps
 
@@ -192,6 +203,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			ctx,
 			command.PolicyCheck,
 			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+			cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 			prjCfg,
 			steps,
@@ -201,6 +213,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			parallelApply,
 			parallelPlan,
 			verbose,
+			abortOnExcecutionOrderFail,
 			ctx.Scope,
 			ctx.PullRequestStatus,
 			ctx.PullStatus,
@@ -215,6 +228,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 func newProjectCommandContext(ctx *command.Context,
 	cmd command.Name,
 	applyCmd string,
+	approvePoliciesCmd string,
 	planCmd string,
 	projCfg valid.MergedProjectCfg,
 	steps []valid.Step,
@@ -224,12 +238,14 @@ func newProjectCommandContext(ctx *command.Context,
 	parallelApplyEnabled bool,
 	parallelPlanEnabled bool,
 	verbose bool,
+	abortOnExcecutionOrderFail bool,
 	scope tally.Scope,
 	pullReqStatus models.PullReqStatus,
 	pullStatus *models.PullStatus,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
+	var projectPolicyStatus []models.PolicySetStatus
 
 	if ctx.PullStatus != nil {
 		for _, project := range ctx.PullStatus.Projects {
@@ -237,11 +253,13 @@ func newProjectCommandContext(ctx *command.Context,
 			// if name is not used, let's match the directory
 			if projCfg.Name == "" && project.RepoRelDir == projCfg.RepoRelDir {
 				projectPlanStatus = project.Status
+				projectPolicyStatus = project.PolicyStatus
 				break
 			}
 
 			if projCfg.Name != "" && project.ProjectName == projCfg.Name {
 				projectPlanStatus = project.Status
+				projectPolicyStatus = project.PolicyStatus
 				break
 			}
 		}
@@ -250,11 +268,13 @@ func newProjectCommandContext(ctx *command.Context,
 	return command.ProjectContext{
 		CommandName:                cmd,
 		ApplyCmd:                   applyCmd,
+		ApprovePoliciesCmd:         approvePoliciesCmd,
 		BaseRepo:                   ctx.Pull.BaseRepo,
 		EscapedCommentArgs:         escapedCommentArgs,
 		AutomergeEnabled:           automergeEnabled,
 		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
 		RepoLocking:                projCfg.RepoLocking,
+		CustomPolicyCheck:          projCfg.CustomPolicyCheck,
 		ParallelApplyEnabled:       parallelApplyEnabled,
 		ParallelPlanEnabled:        parallelPlanEnabled,
 		ParallelPolicyCheckEnabled: parallelPlanEnabled,
@@ -265,6 +285,7 @@ func newProjectCommandContext(ctx *command.Context,
 		Log:                        ctx.Log,
 		Scope:                      scope,
 		ProjectPlanStatus:          projectPlanStatus,
+		ProjectPolicyStatus:        projectPolicyStatus,
 		Pull:                       ctx.Pull,
 		ProjectName:                projCfg.Name,
 		PlanRequirements:           projCfg.PlanRequirements,
@@ -280,8 +301,11 @@ func newProjectCommandContext(ctx *command.Context,
 		PolicySets:                 policySets,
 		PullReqStatus:              pullReqStatus,
 		PullStatus:                 pullStatus,
+		PolicySetTarget:            ctx.PolicySet,
+		ClearPolicyApproval:        ctx.ClearPolicyApproval,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
+		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
 	}
 }
 

@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
+	pegomock "github.com/petergtz/pegomock/v4"
 	http "net/http"
 	"reflect"
 	"time"
@@ -25,11 +25,11 @@ func NewMockGithubRequestValidator(options ...pegomock.Option) *MockGithubReques
 func (mock *MockGithubRequestValidator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockGithubRequestValidator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockGithubRequestValidator) Validate(_param0 *http.Request, _param1 []byte) ([]byte, error) {
+func (mock *MockGithubRequestValidator) Validate(r *http.Request, secret []byte) ([]byte, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGithubRequestValidator().")
 	}
-	params := []pegomock.Param{_param0, _param1}
+	params := []pegomock.Param{r, secret}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Validate", params, []reflect.Type{reflect.TypeOf((*[]byte)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 []byte
 	var ret1 error
@@ -81,8 +81,8 @@ type VerifierMockGithubRequestValidator struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockGithubRequestValidator) Validate(_param0 *http.Request, _param1 []byte) *MockGithubRequestValidator_Validate_OngoingVerification {
-	params := []pegomock.Param{_param0, _param1}
+func (verifier *VerifierMockGithubRequestValidator) Validate(r *http.Request, secret []byte) *MockGithubRequestValidator_Validate_OngoingVerification {
+	params := []pegomock.Param{r, secret}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Validate", params, verifier.timeout)
 	return &MockGithubRequestValidator_Validate_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -93,8 +93,8 @@ type MockGithubRequestValidator_Validate_OngoingVerification struct {
 }
 
 func (c *MockGithubRequestValidator_Validate_OngoingVerification) GetCapturedArguments() (*http.Request, []byte) {
-	_param0, _param1 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1], _param1[len(_param1)-1]
+	r, secret := c.GetAllCapturedArguments()
+	return r[len(r)-1], secret[len(secret)-1]
 }
 
 func (c *MockGithubRequestValidator_Validate_OngoingVerification) GetAllCapturedArguments() (_param0 []*http.Request, _param1 [][]byte) {

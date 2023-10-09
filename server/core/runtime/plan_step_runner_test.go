@@ -8,15 +8,13 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock"
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
-	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 
@@ -181,12 +179,12 @@ Terraform will perform the following actions:
 	tfVersion, _ := version.NewVersion("0.10.0")
 	s := runtime.NewPlanStepRunner(terraform, tfVersion, commitStatusUpdater, asyncTfExec)
 	When(terraform.RunCommandWithVersion(
-		matchers.AnyCommandProjectContext(),
-		AnyString(),
-		AnyStringSlice(),
-		matchers2.AnyMapOfStringToString(),
-		matchers2.AnyPtrToGoVersionVersion(),
-		AnyString())).
+		Any[command.ProjectContext](),
+		Any[string](),
+		Any[[]string](),
+		Any[map[string]string](),
+		Any[*version.Version](),
+		Any[string]())).
 		Then(func(params []Param) ReturnValues {
 			// This code allows us to return different values depending on the
 			// tf command being run while still using the wildcard matchers above.
@@ -234,12 +232,12 @@ func TestRun_OutputOnErr(t *testing.T) {
 	expOutput := "expected output"
 	expErrMsg := "error!"
 	When(terraform.RunCommandWithVersion(
-		matchers.AnyCommandProjectContext(),
-		AnyString(),
-		AnyStringSlice(),
-		matchers2.AnyMapOfStringToString(),
-		matchers2.AnyPtrToGoVersionVersion(),
-		AnyString())).
+		Any[command.ProjectContext](),
+		Any[string](),
+		Any[[]string](),
+		Any[map[string]string](),
+		Any[*version.Version](),
+		Any[string]())).
 		Then(func(params []Param) ReturnValues {
 			// This code allows us to return different values depending on the
 			// tf command being run while still using the wildcard matchers above.
@@ -295,12 +293,12 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 			asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 			When(terraform.RunCommandWithVersion(
-				matchers.AnyCommandProjectContext(),
-				AnyString(),
-				AnyStringSlice(),
-				matchers2.AnyMapOfStringToString(),
-				matchers2.AnyPtrToGoVersionVersion(),
-				AnyString())).ThenReturn("output", nil)
+				Any[command.ProjectContext](),
+				Any[string](),
+				Any[[]string](),
+				Any[map[string]string](),
+				Any[*version.Version](),
+				Any[string]())).ThenReturn("output", nil)
 
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			s := runtime.NewPlanStepRunner(terraform, tfVersion, commitStatusUpdater, asyncTfExec)

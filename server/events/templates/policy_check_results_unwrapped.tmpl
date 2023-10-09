@@ -1,0 +1,29 @@
+{{ define "policyCheckResultsUnwrapped" -}}
+{{- if eq .Command "Policy Check" }}
+{{- if ne .PreConftestOutput "" }}
+```diff
+{{ .PreConftestOutput }}
+```
+{{- end -}}
+{{ template "policyCheck" .PolicySetResults }}
+{{- if ne .PostConftestOutput "" }}
+```diff
+{{ .PostConftestOutput }}
+```
+{{ end -}}
+{{- end }}
+{{- if .PolicyCleared }}
+* :arrow_forward: To **apply** this plan, comment:
+    * `{{ .ApplyCmd }}`
+{{- else }}
+#### Policy Approval Status:
+```
+{{ .PolicyApprovalSummary }}
+```
+* :heavy_check_mark: To **approve** this project, comment:
+    * `{{ .ApprovePoliciesCmd }}`
+{{- end }}
+* :put_litter_in_its_place: To **delete** this plan click [here]({{ .LockURL }})
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * `{{ .RePlanCmd }}`
+{{ end -}}

@@ -1,0 +1,13 @@
+repos:
+  - id: /.*/
+    policy_check: false
+
+policies:
+  owners:
+    users:
+      - runatlantis
+  policy_sets:
+    - name: test_policy
+      path: policies/policy.rego
+      source: local
+        

@@ -3,7 +3,7 @@ package command
 import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/uber-go/tally"
+	tally "github.com/uber-go/tally/v4"
 )
 
 // Trigger represents the how the command was triggered
@@ -35,6 +35,12 @@ type Context struct {
 	PullRequestStatus models.PullReqStatus
 
 	PullStatus *models.PullStatus
+
+	// PolicySet is the policy set to target (if specified) for the approve_policies command.
+	PolicySet string
+
+	// ClearPolicyApproval is true if approval should be cleared on specified policies.
+	ClearPolicyApproval bool
 
 	Trigger Trigger
 }

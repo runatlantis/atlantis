@@ -199,14 +199,16 @@ func TestPolicySets_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.PolicySets{
-				Version: version,
+				Version:      version,
+				ApproveCount: 1,
 				Owners: valid.PolicyOwners{
 					Users: []string{"test"},
 					Teams: []string{"testteam"},
 				},
 				PolicySets: []valid.PolicySet{
 					{
-						Name: "good-policy",
+						Name:         "good-policy",
+						ApproveCount: 1,
 						Owners: valid.PolicyOwners{
 							Users: []string{
 								"john-doe",
@@ -238,7 +240,8 @@ func TestPolicySets_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.PolicySets{
-				Version: version,
+				Version:      version,
+				ApproveCount: 1,
 				PolicySets: []valid.PolicySet{
 					{
 						Name: "good-policy",
@@ -248,8 +251,9 @@ func TestPolicySets_ToValid(t *testing.T) {
 								"jane-doe",
 							},
 						},
-						Path:   "rel/path/to/source",
-						Source: "local",
+						Path:         "rel/path/to/source",
+						Source:       "local",
+						ApproveCount: 1,
 					},
 				},
 			},
