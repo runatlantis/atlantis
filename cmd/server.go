@@ -109,6 +109,7 @@ const (
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
 	PortFlag                         = "port"
+	QueueEnabled                     = "queue-enabled"
 	RedisDB                          = "redis-db"
 	RedisHost                        = "redis-host"
 	RedisPassword                    = "redis-password"
@@ -170,6 +171,7 @@ const (
 	DefaultRedisDB                      = 0
 	DefaultRedisPort                    = 6379
 	DefaultRedisTLSEnabled              = false
+	DefaultQueueEnabled                 = false
 	DefaultRedisInsecureSkipVerify      = false
 	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
 	DefaultTFDownload                   = true
@@ -497,6 +499,10 @@ var boolFlags = map[string]boolFlag{
 	QuietPolicyChecks: {
 		description:  "Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings.",
 		defaultValue: false,
+	},
+	QueueEnabled: {
+		description:  "Enable lock queue.",
+		defaultValue: DefaultQueueEnabled,
 	},
 	RedisTLSEnabled: {
 		description:  "Enable TLS on the connection to Redis with a min TLS version of 1.2",

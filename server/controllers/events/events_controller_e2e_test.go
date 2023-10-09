@@ -1224,7 +1224,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	}
 	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, true, false, projectCmdOutputHandler)
 	Ok(t, err)
-	boltdb, err := db.New(dataDir)
+	boltdb, err := db.New(dataDir, false)
 	Ok(t, err)
 	backend := boltdb
 	lockingClient := locking.NewClient(boltdb)

@@ -45,6 +45,25 @@ func (mock *MockLocker) GetLock(key string) (*models.ProjectLock, error) {
 	return ret0, ret1
 }
 
+func (mock *MockLocker) GetQueueByLock(project models.Project, workspace string) (models.ProjectLockQueue, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockLocker().")
+	}
+	params := []pegomock.Param{project, workspace}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetQueueByLock", params, []reflect.Type{reflect.TypeOf((*models.ProjectLockQueue)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.ProjectLockQueue
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.ProjectLockQueue)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockLocker) List() (map[string]models.ProjectLock, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockLocker().")
@@ -83,42 +102,50 @@ func (mock *MockLocker) TryLock(p models.Project, workspace string, pull models.
 	return ret0, ret1
 }
 
-func (mock *MockLocker) Unlock(key string) (*models.ProjectLock, error) {
+func (mock *MockLocker) Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockLocker().")
 	}
 	params := []pegomock.Param{key}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Unlock", params, []reflect.Type{reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Unlock", params, []reflect.Type{reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *models.ProjectLock
-	var ret1 error
+	var ret1 *models.ProjectLock
+	var ret2 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(*models.ProjectLock)
 		}
 		if result[1] != nil {
-			ret1 = result[1].(error)
+			ret1 = result[1].(*models.ProjectLock)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(error)
 		}
 	}
-	return ret0, ret1
+	return ret0, ret1, ret2
 }
 
-func (mock *MockLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+func (mock *MockLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, *models.DequeueStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockLocker().")
 	}
 	params := []pegomock.Param{repoFullName, pullNum}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("UnlockByPull", params, []reflect.Type{reflect.TypeOf((*[]models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("UnlockByPull", params, []reflect.Type{reflect.TypeOf((*[]models.ProjectLock)(nil)).Elem(), reflect.TypeOf((**models.DequeueStatus)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 []models.ProjectLock
-	var ret1 error
+	var ret1 *models.DequeueStatus
+	var ret2 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].([]models.ProjectLock)
 		}
 		if result[1] != nil {
-			ret1 = result[1].(error)
+			ret1 = result[1].(*models.DequeueStatus)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(error)
 		}
 	}
-	return ret0, ret1
+	return ret0, ret1, ret2
 }
 
 func (mock *MockLocker) VerifyWasCalledOnce() *VerifierMockLocker {
@@ -180,6 +207,37 @@ func (c *MockLocker_GetLock_OngoingVerification) GetAllCapturedArguments() (_par
 		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockLocker) GetQueueByLock(project models.Project, workspace string) *MockLocker_GetQueueByLock_OngoingVerification {
+	params := []pegomock.Param{project, workspace}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetQueueByLock", params, verifier.timeout)
+	return &MockLocker_GetQueueByLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockLocker_GetQueueByLock_OngoingVerification struct {
+	mock              *MockLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockLocker_GetQueueByLock_OngoingVerification) GetCapturedArguments() (models.Project, string) {
+	project, workspace := c.GetAllCapturedArguments()
+	return project[len(project)-1], workspace[len(workspace)-1]
+}
+
+func (c *MockLocker_GetQueueByLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.Project, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.Project)
+		}
+		_param1 = make([]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(string)
 		}
 	}
 	return

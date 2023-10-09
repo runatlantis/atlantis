@@ -238,7 +238,7 @@ tbody {
 /* Styles for the lock index */
 .lock-grid{
   display: grid;
-  grid-template-columns: auto auto auto auto auto auto;
+  grid-template-columns: auto auto auto auto auto auto auto;
   border: 1px solid #dbeaf4;
   width: 100%;
   font-size: 12px;
@@ -350,7 +350,7 @@ tbody {
 
 /* Add Animation */
 @-webkit-keyframes animatetop {
-    from {top: -300px; opacity: 0} 
+    from {top: -300px; opacity: 0}
     to {top: 0; opacity: 1}
 }
 
@@ -369,7 +369,7 @@ tbody {
 
 .title-heading {
   font-family: monospace, monospace; font-size: 1.1em; text-align: center;
- } 
+ }
 
 .small {
   font-size: 1.0em;

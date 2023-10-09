@@ -25,42 +25,50 @@ func NewMockDeleteLockCommand(options ...pegomock.Option) *MockDeleteLockCommand
 func (mock *MockDeleteLockCommand) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockDeleteLockCommand) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, error) {
+func (mock *MockDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, *models.ProjectLock, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDeleteLockCommand().")
 	}
 	params := []pegomock.Param{id}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLock", params, []reflect.Type{reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLock", params, []reflect.Type{reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *models.ProjectLock
-	var ret1 error
+	var ret1 *models.ProjectLock
+	var ret2 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(*models.ProjectLock)
 		}
 		if result[1] != nil {
-			ret1 = result[1].(error)
+			ret1 = result[1].(*models.ProjectLock)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(error)
 		}
 	}
-	return ret0, ret1
+	return ret0, ret1, ret2
 }
 
-func (mock *MockDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) (int, error) {
+func (mock *MockDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) (int, *models.DequeueStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDeleteLockCommand().")
 	}
 	params := []pegomock.Param{repoFullName, pullNum}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLocksByPull", params, []reflect.Type{reflect.TypeOf((*int)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLocksByPull", params, []reflect.Type{reflect.TypeOf((*int)(nil)).Elem(), reflect.TypeOf((**models.DequeueStatus)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 int
-	var ret1 error
+	var ret1 *models.DequeueStatus
+	var ret2 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(int)
 		}
 		if result[1] != nil {
-			ret1 = result[1].(error)
+			ret1 = result[1].(*models.DequeueStatus)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(error)
 		}
 	}
-	return ret0, ret1
+	return ret0, ret1, ret2
 }
 
 func (mock *MockDeleteLockCommand) VerifyWasCalledOnce() *VerifierMockDeleteLockCommand {
