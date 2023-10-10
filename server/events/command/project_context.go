@@ -113,6 +113,8 @@ type ProjectContext struct {
 	ExecutionOrderGroup int
 	// If plans/applies should be aborted if any prior plan/apply fails
 	AbortOnExcecutionOrderFail bool
+	// Allows custom policy check tools outside of Conftest to run in checks
+	CustomPolicyCheck bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

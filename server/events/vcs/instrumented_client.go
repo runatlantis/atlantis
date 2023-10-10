@@ -250,6 +250,7 @@ func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions mode
 	if err := c.Client.MergePull(pull, pullOptions); err != nil {
 		executionError.Inc(1)
 		logger.Err("Unable to merge pull, error: %s", err.Error())
+		return err
 	}
 
 	executionSuccess.Inc(1)
