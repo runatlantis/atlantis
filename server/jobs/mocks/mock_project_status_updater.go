@@ -26,16 +26,16 @@ func NewMockProjectStatusUpdater(options ...pegomock.Option) *MockProjectStatusU
 func (mock *MockProjectStatusUpdater) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockProjectStatusUpdater) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockProjectStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectResult) error {
+func (mock *MockProjectStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, res *command.ProjectResult) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectStatusUpdater().")
 	}
-	params := []pegomock.Param{ctx, cmdName, status, url, result}
-	pegomockResult := pegomock.GetGenericMockFrom(mock).Invoke("UpdateProject", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	params := []pegomock.Param{ctx, cmdName, status, url, res}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdateProject", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
-	if len(pegomockResult) != 0 {
-		if pegomockResult[0] != nil {
-			ret0 = pegomockResult[0].(error)
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
 		}
 	}
 	return ret0
@@ -78,8 +78,8 @@ type VerifierMockProjectStatusUpdater struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockProjectStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectResult) *MockProjectStatusUpdater_UpdateProject_OngoingVerification {
-	params := []pegomock.Param{ctx, cmdName, status, url, result}
+func (verifier *VerifierMockProjectStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, res *command.ProjectResult) *MockProjectStatusUpdater_UpdateProject_OngoingVerification {
+	params := []pegomock.Param{ctx, cmdName, status, url, res}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateProject", params, verifier.timeout)
 	return &MockProjectStatusUpdater_UpdateProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -90,8 +90,8 @@ type MockProjectStatusUpdater_UpdateProject_OngoingVerification struct {
 }
 
 func (c *MockProjectStatusUpdater_UpdateProject_OngoingVerification) GetCapturedArguments() (command.ProjectContext, command.Name, models.CommitStatus, string, *command.ProjectResult) {
-	ctx, cmdName, status, url, result := c.GetAllCapturedArguments()
-	return ctx[len(ctx)-1], cmdName[len(cmdName)-1], status[len(status)-1], url[len(url)-1], result[len(result)-1]
+	ctx, cmdName, status, url, res := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], cmdName[len(cmdName)-1], status[len(status)-1], url[len(url)-1], res[len(res)-1]
 }
 
 func (c *MockProjectStatusUpdater_UpdateProject_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []command.Name, _param2 []models.CommitStatus, _param3 []string, _param4 []*command.ProjectResult) {

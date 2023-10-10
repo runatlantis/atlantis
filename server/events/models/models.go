@@ -368,11 +368,11 @@ type PlanSuccess struct {
 }
 
 type PolicySetResult struct {
-	PolicySetName  string
-	ConftestOutput string
-	Passed         bool
-	ReqApprovals   int
-	CurApprovals   int
+	PolicySetName string
+	PolicyOutput  string
+	Passed        bool
+	ReqApprovals  int
+	CurApprovals  int
 }
 
 // PolicySetApproval tracks the number of approvals a given policy set has.
@@ -472,7 +472,7 @@ func (p *PolicyCheckResults) CombinedOutput() string {
 	combinedOutput := ""
 	for _, psResult := range p.PolicySetResults {
 		// accounting for json output from conftest.
-		for _, psResultLine := range strings.Split(psResult.ConftestOutput, "\\n") {
+		for _, psResultLine := range strings.Split(psResult.PolicyOutput, "\\n") {
 			combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
 		}
 	}
@@ -484,7 +484,7 @@ func (p *PolicyCheckResults) Summary() string {
 	note := ""
 	for _, policySetResult := range p.PolicySetResults {
 		r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
-		if match := r.FindString(policySetResult.ConftestOutput); match != "" {
+		if match := r.FindString(policySetResult.PolicyOutput); match != "" {
 			note = fmt.Sprintf("%s\npolicy set: %s: %s", note, policySetResult.PolicySetName, match)
 		}
 	}
