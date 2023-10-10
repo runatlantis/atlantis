@@ -1,11 +1,14 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
-ARG ALPINE_TAG=3.18.3
+ARG ALPINE_TAG=3.18.4
 ARG DEBIAN_TAG=12.1-slim
+
+ARG DEFAULT_TERRAFORM_VERSION=1.5.7
+ARG DEFAULT_CONFTEST_VERSION=0.46.0
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.21.1-alpine AS builder
+FROM golang:1.21.2-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -13,6 +16,11 @@ ARG ATLANTIS_COMMIT=none
 ENV ATLANTIS_COMMIT=${ATLANTIS_COMMIT}
 ARG ATLANTIS_DATE=unknown
 ENV ATLANTIS_DATE=${ATLANTIS_DATE}
+
+ARG DEFAULT_TERRAFORM_VERSION
+ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
 WORKDIR /app
 
@@ -60,7 +68,8 @@ WORKDIR /tmp/build
 
 # install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ENV DEFAULT_CONFTEST_VERSION=0.45.0
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
     case ${TARGETPLATFORM} in \
@@ -121,7 +130,8 @@ RUN case ${TARGETPLATFORM} in \
 
 # install terraform binaries
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV DEFAULT_TERRAFORM_VERSION=1.5.7
+ARG DEFAULT_TERRAFORM_VERSION
+ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 # Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
