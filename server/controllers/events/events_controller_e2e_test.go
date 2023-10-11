@@ -1275,6 +1275,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	parallelPoolSize := 1
 	silenceNoProjects := false
 
+	disableUnlockLabel := "do-not-unlock"
+
 	statusUpdater := runtimemocks.NewMockStatusUpdater()
 	commitStatusUpdater := mocks.NewMockCommitStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
@@ -1460,6 +1462,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		mocks.NewMockDeleteLockCommand(),
 		e2eVCSClient,
 		silenceNoProjects,
+		disableUnlockLabel,
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(

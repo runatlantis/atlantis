@@ -98,9 +98,9 @@ type DefaultCommandRunner struct {
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	// User config option: Disables autoplan when a pull request is opened or updated.
-	DisableAutoplan bool
-	DisableAutoplanLabel     string
-	EventParser     EventParsing
+	DisableAutoplan      bool
+	DisableAutoplanLabel string
+	EventParser          EventParsing
 	// User config option: Fail and do not run the Atlantis command request if any of the pre workflow hooks error
 	FailOnPreWorkflowHookError bool
 	Logger                     logging.SimpleLogging
