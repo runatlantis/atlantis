@@ -223,7 +223,7 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 		{
 			name: "pass all dependencies applied",
 			ctx: command.ProjectContext{
-				Dependencies: []string{"project1"},
+				DependsOn: []string{"project1"},
 				PullStatus: &models.PullStatus{
 					Projects: []models.ProjectStatus{
 						{
@@ -238,7 +238,7 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 		{
 			name: "Fail all dependencies are not applied",
 			ctx: command.ProjectContext{
-				Dependencies: []string{"project1", "project2"},
+				DependsOn: []string{"project1", "project2"},
 				PullStatus: &models.PullStatus{
 					Projects: []models.ProjectStatus{
 						{
@@ -258,7 +258,7 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 		{
 			name: "Fail one of dependencies is not applied",
 			ctx: command.ProjectContext{
-				Dependencies: []string{"project1", "project2"},
+				DependsOn: []string{"project1", "project2"},
 				PullStatus: &models.PullStatus{
 					Projects: []models.ProjectStatus{
 						{
@@ -268,6 +268,49 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 						{
 							ProjectName: "project2",
 							Status:      models.ErroredApplyStatus,
+						},
+					},
+				},
+			},
+			wantFailure: "Can't apply your project unless you apply its dependencies: [project2]",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "Should not fail if one of dependencies is not applied but it has no changes to apply",
+			ctx: command.ProjectContext{
+				DependsOn: []string{"project1", "project2"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.AppliedPlanStatus,
+						},
+						{
+							ProjectName: "project2",
+							Status:      models.PlannedNoChangesPlanStatus,
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "In the case of more than one dependency, should not continue to check dependencies if one of them is not in applied status",
+			ctx: command.ProjectContext{
+				DependsOn: []string{"project1", "project2"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.AppliedPlanStatus,
+						},
+						{
+							ProjectName: "project2",
+							Status:      models.ErroredApplyStatus,
+						},
+						{
+							ProjectName: "project3",
+							Status:      models.PlannedPlanStatus,
 						},
 					},
 				},

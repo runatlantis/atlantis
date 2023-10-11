@@ -63,7 +63,7 @@ type ProjectContext struct {
 	// Atlantis uses this information to valid the apply
 	// orders and to warn the user if they're applying a project that
 	// depends on other projects.
-	Dependencies []string
+	DependsOn []string
 	// Log is a logger that's been set up for this context.
 	Log logging.SimpleLogging
 	// Scope is the scope for reporting stats setup for this context
@@ -72,11 +72,10 @@ type ProjectContext struct {
 	PullReqStatus models.PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
-	PullStatus *models.PullStatus
+	PullStatus        *models.PullStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
 	ProjectPolicyStatus []models.PolicySetStatus
 
-	PullStatus *models.PullStatus
 	// Pull is the pull request we're responding to.
 	Pull models.PullRequest
 	// ProjectName is the name of the project set in atlantis.yaml. If there was

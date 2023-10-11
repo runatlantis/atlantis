@@ -70,11 +70,11 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 }
 
 func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) (failure string, err error) {
-	for _, dependOnProject := range ctx.Dependencies {
+	for _, dependOnProject := range ctx.DependsOn {
 
 		for _, project := range ctx.PullStatus.Projects {
 
-			if project.ProjectName == dependOnProject && project.Status != models.AppliedPlanStatus {
+			if project.ProjectName == dependOnProject && project.Status != models.AppliedPlanStatus && project.Status != models.PlannedNoChangesPlanStatus {
 				return fmt.Sprintf("Can't apply your project unless you apply its dependencies: [%s]", project.ProjectName), nil
 			}
 		}
