@@ -72,7 +72,8 @@ type ProjectContext struct {
 	PullReqStatus models.PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
-	PullStatus        *models.PullStatus
+	//PullStatus is the status of the current pull request prior to this command.
+	PullStatus *models.PullStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
 	ProjectPolicyStatus []models.PolicySetStatus
 
