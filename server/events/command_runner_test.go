@@ -77,6 +77,7 @@ type TestConfig struct {
 	StatusName                 string
 	discardApprovalOnPlan      bool
 	backend                    locking.Backend
+	DisableUnlockLabel         string
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -93,6 +94,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		StatusName:            "atlantis-test",
 		discardApprovalOnPlan: false,
 		backend:               defaultBoltDB,
+		DisableUnlockLabel:    "do-not-unlock",
 	}
 
 	for _, op := range options {
@@ -195,6 +197,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		deleteLockCommand,
 		vcsClient,
 		testConfig.SilenceNoProjects,
+		testConfig.DisableUnlockLabel,
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
@@ -668,6 +671,65 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Unlock})
 
 	vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, testdata.Pull.Num, "Failed to delete PR locks", "unlock")
+}
+
+func TestRunUnlockCommandFail_DisableUnlockLabel(t *testing.T) {
+	t.Log("if PR has label equal to disable-unlock-label unlock should fail")
+
+	doNotUnlock := "do-not-unlock"
+
+	vcsClient := setup(t)
+	pull := &github.PullRequest{
+		State: github.String("open"),
+	}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(deleteLockCommand.DeleteLocksByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(0, errors.New("err"))
+	When(ch.VCSClient.GetPullLabels(testdata.GithubRepo, modelPull)).ThenReturn([]string{doNotUnlock, "need-help"}, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Unlock})
+
+	vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, testdata.Pull.Num, "Not allowed to unlock PR with "+doNotUnlock+" label", "unlock")
+}
+
+func TestRunUnlockCommandFail_GetLabelsFail(t *testing.T) {
+	t.Log("if GetPullLabels fails do not unlock PR")
+
+	vcsClient := setup(t)
+	pull := &github.PullRequest{
+		State: github.String("open"),
+	}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(deleteLockCommand.DeleteLocksByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(0, errors.New("err"))
+	When(ch.VCSClient.GetPullLabels(testdata.GithubRepo, modelPull)).ThenReturn(nil, errors.New("err"))
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Unlock})
+
+	vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, testdata.Pull.Num, "Failed to retrieve PR labels... Not unlocking", "unlock")
+}
+
+func TestRunUnlockCommandDoesntRetrieveLabelsIfDisableUnlockLabelNotSet(t *testing.T) {
+	t.Log("if disable-unlock-label is not set do not call GetPullLabels")
+
+	doNotUnlock := "do-not-unlock"
+
+	vcsClient := setup(t)
+	pull := &github.PullRequest{
+		State: github.String("open"),
+	}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(deleteLockCommand.DeleteLocksByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(0, errors.New("err"))
+	When(ch.VCSClient.GetPullLabels(testdata.GithubRepo, modelPull)).ThenReturn([]string{doNotUnlock, "need-help"}, nil)
+	unlockCommandRunner.DisableUnlockLabel = ""
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Unlock})
+
+	vcsClient.VerifyWasNotCalled().GetPullLabels(testdata.GithubRepo, modelPull)
 }
 
 func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
