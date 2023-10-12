@@ -320,9 +320,10 @@ the `depends_on` feature will make sure that `production` is not applied before 
 ::: tip
 What Happens if one or more project's dependencies are not applied?
 
-If there's one or more projects in the dependency list which is not in applied status, users will see an error
-if they try to run `atlantis apply`.
+If there's one or more projects in the dependency list which is not in applied status, users will see an error message like this:
+`Can't apply your project unless you apply its dependencies`
 :::
+
 ### Custom Backend Config
 See [Custom Workflow Use Cases: Custom Backend Config](custom-workflows.html#custom-backend-config)
 
