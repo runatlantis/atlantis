@@ -285,7 +285,7 @@ following groups will be aborted. For this example, if project2 fails then proje
 
 Execution order groups are useful when you have dependencies between projects. However, they are only applicable in the case where
 you initiate a global apply for all of your projects, i.e `atlantis apply`. If you initiate an apply on a single project, then the execution order groups are ignored.
-Thus, the depond_on key is more useful in this case. and can be used in conjunction with execution order groups.
+Thus, the `depends_on` key is more useful in this case. and can be used in conjunction with execution order groups.
 
 The following configuration is an example of how to use execution order groups and depends_on together to enforce dependencies between projects.
 ```yaml
