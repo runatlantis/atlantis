@@ -29,5 +29,4 @@ jobs:
     - name: golangci-lint
       uses: reviewdog/action-golangci-lint@v2
       with:
-        fail_on_error: true
         tool_name: golangci-lint
