@@ -1275,6 +1275,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	parallelPoolSize := 1
 	silenceNoProjects := false
 
+	disableUnlockLabel := "do-not-unlock"
+
 	statusUpdater := runtimemocks.NewMockStatusUpdater()
 	commitStatusUpdater := mocks.NewMockCommitStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
@@ -1321,6 +1323,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		false,
 		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		false,
 		false,
 		false,
 		statsScope,
@@ -1459,6 +1462,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		mocks.NewMockDeleteLockCommand(),
 		e2eVCSClient,
 		silenceNoProjects,
+		disableUnlockLabel,
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
@@ -1738,7 +1742,7 @@ func ensureRunningConftest(t *testing.T) {
 	_, err := exec.LookPath(conftestCommand)
 	if err != nil {
 		t.Logf(`%s must be installed to run this test
-- on local, please install contest command or run 'make docker/test-all'
+- on local, please install conftest command or run 'make docker/test-all'
 - on CI, please check testing-env docker image contains conftest command. see testing/Dockerfile
 `, conftestCommand)
 		t.FailNow()

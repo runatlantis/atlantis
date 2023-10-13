@@ -361,18 +361,18 @@ type PlanSuccess struct {
 	RePlanCmd string
 	// ApplyCmd is the command that users should run to apply this plan.
 	ApplyCmd string
-	// HasDiverged is true if we're using the checkout merge strategy and the
-	// branch we're merging into has been updated since we cloned and merged
-	// it.
-	HasDiverged bool
+	// MergedAgain is true if we're using the checkout merge strategy and the
+	// branch we're merging into had been updated, and we had to merge again
+	// before planning
+	MergedAgain bool
 }
 
 type PolicySetResult struct {
-	PolicySetName  string
-	ConftestOutput string
-	Passed         bool
-	ReqApprovals   int
-	CurApprovals   int
+	PolicySetName string
+	PolicyOutput  string
+	Passed        bool
+	ReqApprovals  int
+	CurApprovals  int
 }
 
 // PolicySetApproval tracks the number of approvals a given policy set has.
@@ -472,7 +472,7 @@ func (p *PolicyCheckResults) CombinedOutput() string {
 	combinedOutput := ""
 	for _, psResult := range p.PolicySetResults {
 		// accounting for json output from conftest.
-		for _, psResultLine := range strings.Split(psResult.ConftestOutput, "\\n") {
+		for _, psResultLine := range strings.Split(psResult.PolicyOutput, "\\n") {
 			combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
 		}
 	}
@@ -484,7 +484,7 @@ func (p *PolicyCheckResults) Summary() string {
 	note := ""
 	for _, policySetResult := range p.PolicySetResults {
 		r := regexp.MustCompile(`\d+ tests?, \d+ passed, \d+ warnings?, \d+ failures?, \d+ exceptions?(, \d skipped)?`)
-		if match := r.FindString(policySetResult.ConftestOutput); match != "" {
+		if match := r.FindString(policySetResult.PolicyOutput); match != "" {
 			note = fmt.Sprintf("%s\npolicy set: %s: %s", note, policySetResult.PolicySetName, match)
 		}
 	}

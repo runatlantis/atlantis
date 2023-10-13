@@ -721,3 +721,18 @@ func (g *GithubClient) GetCloneURL(_ models.VCSHostType, repo string) (string, e
 	}
 	return repository.GetCloneURL(), nil
 }
+
+func (g *GithubClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+	pullDetails, _, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, pull.Num)
+	if err != nil {
+		return nil, err
+	}
+
+	var labels []string
+
+	for _, label := range pullDetails.Labels {
+		labels = append(labels, *label.Name)
+	}
+
+	return labels, nil
+}

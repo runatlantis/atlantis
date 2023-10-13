@@ -73,3 +73,7 @@ func (a *NotConfiguredVCSClient) GetFileContent(_ models.PullRequest, _ string) 
 func (a *NotConfiguredVCSClient) GetCloneURL(_ models.VCSHostType, _ string) (string, error) {
 	return "", a.err()
 }
+
+func (a *NotConfiguredVCSClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+	return nil, a.err()
+}

@@ -115,6 +115,8 @@ var testFlags = map[string]interface{}{
 	VCSStatusName:                    "my-status",
 	WriteGitCredsFlag:                true,
 	DisableAutoplanFlag:              true,
+	DisableAutoplanLabelFlag:         "no-auto-plan",
+	DisableUnlockLabelFlag:           "do-not-unlock",
 	EnablePolicyChecksFlag:           false,
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,

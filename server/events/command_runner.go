@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/utils"
 	"strconv"
 
 	"github.com/google/go-github/v54/github"
@@ -97,8 +98,9 @@ type DefaultCommandRunner struct {
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	// User config option: Disables autoplan when a pull request is opened or updated.
-	DisableAutoplan bool
-	EventParser     EventParsing
+	DisableAutoplan      bool
+	DisableAutoplanLabel string
+	EventParser          EventParsing
 	// User config option: Fail and do not run the Atlantis command request if any of the pre workflow hooks error
 	FailOnPreWorkflowHookError bool
 	Logger                     logging.SimpleLogging
@@ -164,6 +166,14 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 	if c.DisableAutoplan {
 		return
+	}
+	if len(c.DisableAutoplanLabel) > 0 {
+		labels, err := c.VCSClient.GetPullLabels(baseRepo, pull)
+		if err != nil {
+			ctx.Log.Err("Unable to get pull labels. Proceeding with %s command.", err, command.Plan)
+		} else if utils.SlicesContains(labels, c.DisableAutoplanLabel) {
+			return
+		}
 	}
 
 	cmd := &CommentCommand{

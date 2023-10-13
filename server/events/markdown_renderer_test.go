@@ -191,7 +191,7 @@ $$$
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						HasDiverged:     true,
+						MergedAgain:     true,
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -210,7 +210,7 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
-:warning: The branch we're merging into is ahead, it is recommended to pull new commits first.
+:twisted_rightwards_arrows: Upstream was modified, a new merge was performed.
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
@@ -267,7 +267,7 @@ $$$
 							{
 								PolicySetName: "policy1",
 								// strings.Repeat require to get wrapped result
-								ConftestOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+								PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
 								Passed:       false,
@@ -276,9 +276,9 @@ $$$
 							{
 								PolicySetName: "policy2",
 								// strings.Repeat require to get wrapped result
-								ConftestOutput: "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
-								Passed:         true,
-								ReqApprovals:   1,
+								PolicyOutput: "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+								Passed:       true,
+								ReqApprovals: 1,
 							},
 						},
 						LockURL:   "lock-url",
@@ -335,7 +335,7 @@ $$$
 							{
 								PolicySetName: "policy1",
 								// strings.Repeat require to get wrapped result
-								ConftestOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+								PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
 								Passed:       false,
@@ -564,10 +564,10 @@ $$$
 					RepoRelDir: "path",
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName:  "policy1",
-								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:         true,
+							models.PolicySetResult{
+								PolicySetName: "policy1",
+								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
 							},
 						},
 						LockURL:   "lock-url",
@@ -581,10 +581,10 @@ $$$
 					ProjectName: "projectname",
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName:  "policy1",
-								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:         true,
+							models.PolicySetResult{
+								PolicySetName: "policy1",
+								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
 							},
 						}, LockURL: "lock-url2",
 						ApplyCmd:  "atlantis apply -d path2 -w workspace",
@@ -777,10 +777,10 @@ $$$
 					RepoRelDir: "path",
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName:  "policy1",
-								ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:         true,
+							models.PolicySetResult{
+								PolicySetName: "policy1",
+								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
 							},
 						}, LockURL: "lock-url",
 						ApplyCmd:  "atlantis apply -d path -w workspace",
@@ -793,11 +793,11 @@ $$$
 					Failure:    "failure",
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName:  "policy1",
-								ConftestOutput: "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
-								Passed:         false,
-								ReqApprovals:   1,
+							models.PolicySetResult{
+								PolicySetName: "policy1",
+								PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+								Passed:        false,
+								ReqApprovals:  1,
 							},
 						}, LockURL: "lock-url",
 						ApplyCmd:  "atlantis apply -d path -w workspace",
@@ -1316,10 +1316,10 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 				RepoRelDir: "path",
 				PolicyCheckResults: &models.PolicyCheckResults{
 					PolicySetResults: []models.PolicySetResult{
-						{
-							PolicySetName:  "policy1",
-							ConftestOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-							Passed:         true,
+						models.PolicySetResult{
+							PolicySetName: "policy1",
+							PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+							Passed:        true,
 						},
 					}, LockURL: "lock-url",
 					ApplyCmd:  "atlantis apply -d path -w workspace",
@@ -1974,7 +1974,7 @@ $$$
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						HasDiverged:     true,
+						MergedAgain:     true,
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -1992,7 +1992,7 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
-:warning: The branch we're merging into is ahead, it is recommended to pull new commits first.
+:twisted_rightwards_arrows: Upstream was modified, a new merge was performed.
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:

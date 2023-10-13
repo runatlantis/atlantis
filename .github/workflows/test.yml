@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - "main"
-    paths:
-      - '**.go'
-      - 'go.*'
-      - '.github/workflows/test.yml'
   pull_request:
     types:
       - opened
@@ -16,18 +12,30 @@ on:
       - ready_for_review
     branches:
       - "main"
-    paths:
-      - '**.go'
-      - 'go.*'
-      - '.github/workflows/test.yml'
- 
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  test:
+  changes:
+    outputs:
+      should-run-tests: ${{ steps.changes.outputs.go == 'true' }}
     if: github.event.pull_request.draft == false
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            go:
+              - '**.go'
+              - 'go.*'
+              - '.github/workflows/test.yml'
+  test:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-tests == 'true'
     name: runner / gotest
     runs-on: ubuntu-22.04
     container: ghcr.io/runatlantis/testing-env:latest
@@ -35,3 +43,11 @@ jobs:
       - uses: actions/checkout@v4
       - run: make test-all
       - run: make check-fmt
+
+  skip-test:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-tests == 'false'
+    name: runner / gotest
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No build required"'

@@ -72,8 +72,10 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableApplyFlag                 = "disable-apply"
 	DisableAutoplanFlag              = "disable-autoplan"
+	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
+	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
@@ -97,6 +99,7 @@ const (
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
@@ -133,6 +136,7 @@ const (
 	RestrictFileList           = "restrict-file-list"
 	TFDownloadFlag             = "tf-download"
 	TFDownloadURLFlag          = "tf-download-url"
+	UseTFPluginCache           = "use-tf-plugin-cache"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
@@ -254,6 +258,14 @@ var stringFlags = map[string]stringFlag{
 	DataDirFlag: {
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	DisableAutoplanLabelFlag: {
+		description:  "Pull request label to disable atlantis auto planning feature only if present.",
+		defaultValue: "",
+	},
+	DisableUnlockLabelFlag: {
+		description:  "Pull request label to disable atlantis unlock feature only if present.",
+		defaultValue: "",
 	},
 	EmojiReaction: {
 		description:  "Emoji Reaction to use to react to comments",
@@ -475,6 +487,10 @@ var boolFlags = map[string]boolFlag{
 			"VCS support is limited to: GitHub.",
 		defaultValue: false,
 	},
+	IncludeGitUntrackedFiles: {
+		description:  "Include git untracked files in the Atlantis modified file scope.",
+		defaultValue: false,
+	},
 	ParallelPlanFlag: {
 		description:  "Run plan operations in parallel.",
 		defaultValue: false,
@@ -562,6 +578,10 @@ var boolFlags = map[string]boolFlag{
 	HideUnchangedPlanComments: {
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
+	},
+	UseTFPluginCache: {
+		description:  "Enable the use of the Terraform plugin cache",
+		defaultValue: true,
 	},
 }
 var intFlags = map[string]intFlag{
