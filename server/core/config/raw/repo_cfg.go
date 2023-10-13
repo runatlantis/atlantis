@@ -20,6 +20,7 @@ type RepoCfg struct {
 	Workflows                  map[string]Workflow `yaml:"workflows,omitempty"`
 	PolicySets                 PolicySets          `yaml:"policies,omitempty"`
 	Automerge                  *bool               `yaml:"automerge,omitempty"`
+	Autodiscover               *Autodiscover       `yaml:"autodiscover,omitempty"`
 	ParallelApply              *bool               `yaml:"parallel_apply,omitempty"`
 	ParallelPlan               *bool               `yaml:"parallel_plan,omitempty"`
 	DeleteSourceBranchOnMerge  *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
@@ -57,6 +58,15 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		validProjects = append(validProjects, p.ToValid())
 	}
 
+	var autodiscover *valid.Autodiscover
+	if r.Autodiscover == nil {
+		defaultAutoDiscover := DefaultAutoDiscover()
+		autodiscover = &defaultAutoDiscover
+	} else {
+		validAutoDiscover := r.Autodiscover.ToValid()
+		autodiscover = &validAutoDiscover
+	}
+
 	automerge := r.Automerge
 	parallelApply := r.ParallelApply
 	parallelPlan := r.ParallelPlan
@@ -76,6 +86,7 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		Projects:                   validProjects,
 		Workflows:                  validWorkflows,
 		Automerge:                  automerge,
+		Autodiscover:               autodiscover,
 		ParallelApply:              parallelApply,
 		ParallelPlan:               parallelPlan,
 		ParallelPolicyCheck:        parallelPlan,

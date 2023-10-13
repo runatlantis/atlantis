@@ -19,6 +19,7 @@ type RepoCfg struct {
 	Workflows                  map[string]Workflow
 	PolicySets                 PolicySets
 	Automerge                  *bool
+	Autodiscover               *Autodiscover
 	ParallelApply              *bool
 	ParallelPlan               *bool
 	ParallelPolicyCheck        *bool
@@ -129,6 +130,7 @@ type Project struct {
 	WorkflowName              *string
 	TerraformVersion          *version.Version
 	Autoplan                  Autoplan
+	Autodiscover              Autodiscover
 	PlanRequirements          []string
 	ApplyRequirements         []string
 	ImportRequirements        []string
@@ -146,6 +148,10 @@ func (p Project) GetName() string {
 		return *p.Name
 	}
 	return ""
+}
+
+type Autodiscover struct {
+	Enabled bool
 }
 
 type Autoplan struct {

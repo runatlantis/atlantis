@@ -3,3 +3,4 @@
 package valid
 
 const DefaultAutoPlanEnabled = true
+const DefaultAutoDiscoverEnabled = true

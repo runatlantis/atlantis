@@ -38,7 +38,7 @@ type ProjectCommandContextBuilder interface {
 		prjCfg valid.MergedProjectCfg,
 		commentFlags []string,
 		repoDir string,
-		automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool, terraformClient terraform.Client,
+		automerge bool, autodiscover valid.Autodiscover, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool, terraformClient terraform.Client,
 	) []command.ProjectContext
 }
 
@@ -58,13 +58,12 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
-	terraformClient terraform.Client,
+	automerge bool, autodiscover valid.Autodiscover, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool, terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
 	cb.ProjectCounter.Inc(1)
 
 	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
-		ctx, cmdName, subCmdName, prjCfg, commentFlags, repoDir, automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail, terraformClient,
+		ctx, cmdName, subCmdName, prjCfg, commentFlags, repoDir, automerge, autodiscover, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail, terraformClient,
 	)
 
 	projectCmds = []command.ProjectContext{}
@@ -92,8 +91,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
-	terraformClient terraform.Client,
+	automerge bool, autodiscover valid.Autodiscover, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool, terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
 
@@ -138,6 +136,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		prjCfg.PolicySets,
 		escapeArgs(commentFlags),
 		automerge,
+		autodiscover,
 		parallelApply,
 		parallelPlan,
 		verbose,
@@ -163,8 +162,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
-	terraformClient terraform.Client,
+	automerge bool, autodiscover valid.Autodiscover, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool, terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
 	if prjCfg.PolicyCheck {
 		ctx.Log.Debug("PolicyChecks are enabled")
@@ -187,6 +185,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		commentFlags,
 		repoDir,
 		automerge,
+		autodiscover,
 		parallelApply,
 		parallelPlan,
 		verbose,
@@ -209,6 +208,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			prjCfg.PolicySets,
 			escapeArgs(commentFlags),
 			automerge,
+			autodiscover,
 			parallelApply,
 			parallelPlan,
 			verbose,
@@ -233,6 +233,7 @@ func newProjectCommandContext(ctx *command.Context,
 	policySets valid.PolicySets,
 	escapedCommentArgs []string,
 	automergeEnabled bool,
+	autodiscoverEnabled valid.Autodiscover,
 	parallelApplyEnabled bool,
 	parallelPlanEnabled bool,
 	verbose bool,
@@ -269,6 +270,7 @@ func newProjectCommandContext(ctx *command.Context,
 		BaseRepo:                   ctx.Pull.BaseRepo,
 		EscapedCommentArgs:         escapedCommentArgs,
 		AutomergeEnabled:           automergeEnabled,
+		AutodiscoverEnabled:        autodiscoverEnabled,
 		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
 		RepoLocking:                projCfg.RepoLocking,
 		CustomPolicyCheck:          projCfg.CustomPolicyCheck,

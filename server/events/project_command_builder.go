@@ -28,6 +28,14 @@ const (
 	// DefaultWorkspace is the default Terraform workspace we run commands in.
 	// This is also Terraform's default workspace.
 	DefaultWorkspace = "default"
+	// DefaultAutomergeEnabled is the default for the automerge setting.
+	DefaultAutomergeEnabled = false
+	// DefaultAutoDiscoverEnabled is the default for the auto discover setting.
+	DefaultAutoDiscoverEnabled = true
+	// DefaultParallelApplyEnabled is the default for the parallel apply setting.
+	DefaultParallelApplyEnabled = false
+	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
+	DefaultParallelPlanEnabled = false
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
 	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
@@ -47,6 +55,7 @@ func NewInstrumentedProjectCommandBuilder(
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	EnableAutoMerge bool,
+	EnableAutoDiscover valid.Autodiscover,
 	EnableParallelPlan bool,
 	EnableParallelApply bool,
 	AutoDetectModuleFiles string,
@@ -78,6 +87,7 @@ func NewInstrumentedProjectCommandBuilder(
 			skipCloneNoChanges,
 			EnableRegExpCmd,
 			EnableAutoMerge,
+			EnableAutoDiscover,
 			EnableParallelPlan,
 			EnableParallelApply,
 			AutoDetectModuleFiles,
@@ -107,6 +117,7 @@ func NewProjectCommandBuilder(
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	EnableAutoMerge bool,
+	EnableAutoDiscover valid.Autodiscover,
 	EnableParallelPlan bool,
 	EnableParallelApply bool,
 	AutoDetectModuleFiles string,
@@ -129,6 +140,7 @@ func NewProjectCommandBuilder(
 		SkipCloneNoChanges:       skipCloneNoChanges,
 		EnableRegExpCmd:          EnableRegExpCmd,
 		EnableAutoMerge:          EnableAutoMerge,
+		EnableAutoDiscover:       EnableAutoDiscover,
 		EnableParallelPlan:       EnableParallelPlan,
 		EnableParallelApply:      EnableParallelApply,
 		AutoDetectModuleFiles:    AutoDetectModuleFiles,
@@ -226,6 +238,8 @@ type DefaultProjectCommandBuilder struct {
 	EnableRegExpCmd bool
 	// User config option: Automatically merge pull requests after all plans have been successfully applied.
 	EnableAutoMerge bool
+	// User config option: Enables auto-discovery of projects in a repository.
+	EnableAutoDiscover valid.Autodiscover
 	// User config option: Whether to run plan operations in parallel.
 	EnableParallelPlan bool
 	// User config option: Whether to run apply operations in parallel.
@@ -360,7 +374,11 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					return []command.ProjectContext{}, nil
 				}
 			} else {
-				ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", repoCfgFile)
+				if !repoCfg.Autodiscover.Enabled {
+					ctx.Log.Info("No projects are defined in %s. Auto discovery is disabled. Will skip automatic detection", repoCfgFile)
+					return []command.ProjectContext{}, nil
+				}
+				ctx.Log.Info("No projects are defined in %s. Auto discovery is enabled, will resume automatic detection", repoCfgFile)
 			}
 			// NOTE: We discard this work here and end up doing it again after
 			// cloning to ensure all the return values are set properly with
@@ -411,12 +429,18 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	ctx.Log.Debug("moduleInfo for %s (matching %q) = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
 
 	automerge := p.EnableAutoMerge
+	autodiscover := p.EnableAutoDiscover
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
 	if hasRepoCfg {
 		if repoCfg.Automerge != nil {
 			automerge = *repoCfg.Automerge
+		}
+		if repoCfg.Autodiscover != nil {
+			autodiscover = *repoCfg.Autodiscover
+		} else {
+			autodiscover = valid.Autodiscover{Enabled: DefaultAutoDiscoverEnabled}
 		}
 		if repoCfg.ParallelApply != nil {
 			parallelApply = *repoCfg.ParallelApply
@@ -447,10 +471,11 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					commentFlags,
 					repoDir,
 					automerge,
+					autodiscover,
 					parallelApply,
 					parallelPlan,
 					verbose,
-					repoCfg.AbortOnExcecutionOrderFail,
+					abortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -458,7 +483,11 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		// If there is no config file or it specified no projects, then we'll plan each project that
 		// our algorithm determines was modified.
 		if hasRepoCfg {
-			ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", repoCfgFile)
+			if !repoCfg.Autodiscover.Enabled {
+				ctx.Log.Info("No projects are defined in %s. Auto discovery is disabled. Will skip automatic detection", repoCfgFile)
+				return []command.ProjectContext{}, nil
+			}
+			ctx.Log.Info("No projects are defined in %s. Auto discovery is enabled, will resume automatic detection", repoCfgFile)
 		} else {
 			ctx.Log.Info("found no %s file", repoCfgFile)
 		}
@@ -483,6 +512,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					commentFlags,
 					repoDir,
 					automerge,
+					autodiscover,
 					parallelApply,
 					parallelPlan,
 					verbose,
@@ -772,13 +802,20 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	}
 	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
+
 	automerge := p.EnableAutoMerge
+	autodiscover := p.EnableAutoDiscover
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
 	if repoCfgPtr != nil {
 		if repoCfgPtr.Automerge != nil {
 			automerge = *repoCfgPtr.Automerge
+		}
+		if repoCfgPtr.Autodiscover != nil {
+			autodiscover = *repoCfgPtr.Autodiscover
+		} else {
+			autodiscover = valid.Autodiscover{Enabled: true}
 		}
 		if repoCfgPtr.ParallelApply != nil {
 			parallelApply = *repoCfgPtr.ParallelApply
@@ -808,6 +845,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					commentFlags,
 					repoDir,
 					automerge,
+					autodiscover,
 					parallelApply,
 					parallelPlan,
 					verbose,
@@ -832,6 +870,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				commentFlags,
 				repoDir,
 				automerge,
+				autodiscover,
 				parallelApply,
 				parallelPlan,
 				verbose,

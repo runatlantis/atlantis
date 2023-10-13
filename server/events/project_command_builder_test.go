@@ -26,6 +26,7 @@ var defaultUserConfig = struct {
 	SkipCloneNoChanges       bool
 	EnableRegExpCmd          bool
 	EnableAutoMerge          bool
+	EnableAutoDiscover       valid.Autodiscover
 	EnableParallelPlan       bool
 	EnableParallelApply      bool
 	AutoDetectModuleFiles    string
@@ -187,6 +188,7 @@ projects:
 				userConfig.SkipCloneNoChanges,
 				userConfig.EnableRegExpCmd,
 				userConfig.EnableAutoMerge,
+				userConfig.EnableAutoDiscover,
 				userConfig.EnableParallelPlan,
 				userConfig.EnableParallelApply,
 				userConfig.AutoDetectModuleFiles,
@@ -232,6 +234,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 		ExpErr                     string
 		ExpApplyReqs               []string
 		EnableAutoMergeUserCfg     bool
+		EnableAutoDiscoverUserCfg  valid.Autodiscover
 		EnableParallelPlanUserCfg  bool
 		EnableParallelApplyUserCfg bool
 		ExpAutoMerge               bool
@@ -543,6 +546,7 @@ projects:
 					userConfig.SkipCloneNoChanges,
 					userConfig.EnableRegExpCmd,
 					c.EnableAutoMergeUserCfg,
+					c.EnableAutoDiscoverUserCfg,
 					c.EnableParallelPlanUserCfg,
 					c.EnableParallelApplyUserCfg,
 					userConfig.AutoDetectModuleFiles,
@@ -732,6 +736,7 @@ projects:
 				userConfig.SkipCloneNoChanges,
 				userConfig.EnableRegExpCmd,
 				userConfig.EnableAutoMerge,
+				userConfig.EnableAutoDiscover,
 				userConfig.EnableParallelPlan,
 				userConfig.EnableParallelApply,
 				userConfig.AutoDetectModuleFiles,
@@ -770,6 +775,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 		RepoRelDir       string
 		Workspace        string
 		Automerge        bool
+		Autodiscover     valid.Autodiscover
 		ExpParallelPlan  bool
 		ExpParallelApply bool
 	}
@@ -913,6 +919,60 @@ parallel_apply: false
 				},
 			},
 		},
+		"no projects and autodiscover is true in atlantis.yaml": {
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `
+version: 3
+automerge: true
+autodiscover: 
+  enabled: true
+parallel_plan: true
+parallel_apply: true
+`,
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			Exp: []expCtxFields{
+				{
+					ProjectName:      "",
+					RepoRelDir:       "project1",
+					Workspace:        "default",
+					Automerge:        true,
+					Autodiscover:     valid.Autodiscover{Enabled: true},
+					ExpParallelApply: true,
+					ExpParallelPlan:  true,
+				},
+				{
+					ProjectName:      "",
+					RepoRelDir:       "project2",
+					Workspace:        "default",
+					Automerge:        true,
+					Autodiscover:     valid.Autodiscover{Enabled: true},
+					ExpParallelApply: true,
+					ExpParallelPlan:  true,
+				},
+			},
+		},
+		"no projects and the autodiscover is false atlantis.yaml": {
+			DirStructure: map[string]interface{}{
+				"main.tf": nil,
+			},
+			AtlantisYAML: `
+version: 3
+automerge: true
+autodiscover: 
+  enabled: false
+parallel_plan: true
+parallel_apply: true
+`,
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			Exp:           []expCtxFields{},
+		},
 		"no modified files": {
 			DirStructure: map[string]interface{}{
 				"main.tf": nil,
@@ -1000,6 +1060,7 @@ projects:
 				userConfig.SkipCloneNoChanges,
 				userConfig.EnableRegExpCmd,
 				userConfig.EnableAutoMerge,
+				userConfig.EnableAutoDiscover,
 				c.ParallelPlanEnabledUserCfg,
 				c.ParallelApplyEnabledUserCfg,
 				userConfig.AutoDetectModuleFiles,
@@ -1021,7 +1082,7 @@ projects:
 					RepoRelDir:  "",
 					Flags:       nil,
 					Name:        command.Plan,
-					Verbose:     false,
+					Verbose:     true,
 					Workspace:   "",
 					ProjectName: "",
 				})
@@ -1104,6 +1165,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
 		userConfig.EnableAutoMerge,
+		userConfig.EnableAutoDiscover,
 		userConfig.EnableParallelPlan,
 		userConfig.EnableParallelApply,
 		userConfig.AutoDetectModuleFiles,
@@ -1199,6 +1261,7 @@ projects:
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
 		userConfig.EnableAutoMerge,
+		userConfig.EnableAutoDiscover,
 		userConfig.EnableParallelPlan,
 		userConfig.EnableParallelApply,
 		userConfig.AutoDetectModuleFiles,
@@ -1289,6 +1352,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				userConfig.SkipCloneNoChanges,
 				userConfig.EnableRegExpCmd,
 				userConfig.EnableAutoMerge,
+				userConfig.EnableAutoDiscover,
 				userConfig.EnableParallelPlan,
 				userConfig.EnableParallelApply,
 				userConfig.AutoDetectModuleFiles,
@@ -1460,6 +1524,7 @@ projects:
 				userConfig.SkipCloneNoChanges,
 				userConfig.EnableRegExpCmd,
 				userConfig.EnableAutoMerge,
+				userConfig.EnableAutoDiscover,
 				userConfig.EnableParallelPlan,
 				userConfig.EnableParallelApply,
 				userConfig.AutoDetectModuleFiles,
@@ -1561,6 +1626,7 @@ parallel_plan: true`,
 			userConfig.SkipCloneNoChanges,
 			userConfig.EnableRegExpCmd,
 			userConfig.EnableAutoMerge,
+			userConfig.EnableAutoDiscover,
 			userConfig.EnableParallelPlan,
 			userConfig.EnableParallelApply,
 			userConfig.AutoDetectModuleFiles,
@@ -1631,6 +1697,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
 		userConfig.EnableAutoMerge,
+		userConfig.EnableAutoDiscover,
 		userConfig.EnableParallelPlan,
 		userConfig.EnableParallelApply,
 		userConfig.AutoDetectModuleFiles,
@@ -1723,6 +1790,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
 		userConfig.EnableAutoMerge,
+		userConfig.EnableAutoDiscover,
 		userConfig.EnableParallelPlan,
 		userConfig.EnableParallelApply,
 		userConfig.AutoDetectModuleFiles,
@@ -1854,6 +1922,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				userConfig.SkipCloneNoChanges,
 				userConfig.EnableRegExpCmd,
 				userConfig.EnableAutoMerge,
+				userConfig.EnableAutoDiscover,
 				userConfig.EnableParallelPlan,
 				userConfig.EnableParallelApply,
 				userConfig.AutoDetectModuleFiles,
@@ -1965,6 +2034,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				userConfig.SkipCloneNoChanges,
 				userConfig.EnableRegExpCmd,
 				userConfig.EnableAutoMerge,
+				userConfig.EnableAutoDiscover,
 				userConfig.EnableParallelPlan,
 				userConfig.EnableParallelApply,
 				userConfig.AutoDetectModuleFiles,

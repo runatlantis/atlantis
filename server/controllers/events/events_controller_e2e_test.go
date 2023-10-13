@@ -1319,6 +1319,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		false,
 		false,
 		false,
+		valid.Autodiscover{Enabled: true},
 		false,
 		false,
 		"",

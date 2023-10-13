@@ -180,6 +180,7 @@ workflows:
 						StateRm: valid.DefaultStateRmStage,
 					},
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 
@@ -190,9 +191,10 @@ workflows:
 version: 3
 projects:`,
 			exp: valid.RepoCfg{
-				Version:   3,
-				Projects:  nil,
-				Workflows: map[string]valid.Workflow{},
+				Version:      3,
+				Projects:     nil,
+				Workflows:    map[string]valid.Workflow{},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -224,7 +226,8 @@ projects:
 						ApplyRequirements: nil,
 					},
 				},
-				Workflows: map[string]valid.Workflow{},
+				Workflows:    map[string]valid.Workflow{},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -246,7 +249,8 @@ projects:
 						},
 					},
 				},
-				Workflows: make(map[string]valid.Workflow),
+				Workflows:    make(map[string]valid.Workflow),
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -270,7 +274,32 @@ projects:
 						},
 					},
 				},
-				Workflows: make(map[string]valid.Workflow),
+				Workflows:    make(map[string]valid.Workflow),
+				Autodiscover: &valid.Autodiscover{Enabled: true},
+			},
+		},
+		{
+			description: "autodiscover should be enabled by default",
+			input: `
+version: 3
+`,
+			exp: valid.RepoCfg{
+				Version:      3,
+				Autodiscover: &valid.Autodiscover{Enabled: true},
+				Workflows:    make(map[string]valid.Workflow),
+			},
+		},
+		{
+			description: "disable autodiscover",
+			input: `
+version: 3
+autodiscover:
+  enabled: false
+`,
+			exp: valid.RepoCfg{
+				Version:      3,
+				Autodiscover: &valid.Autodiscover{Enabled: false},
+				Workflows:    make(map[string]valid.Workflow),
 			},
 		},
 		{
@@ -292,7 +321,8 @@ projects:
 						},
 					},
 				},
-				Workflows: make(map[string]valid.Workflow),
+				Workflows:    make(map[string]valid.Workflow),
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -315,7 +345,8 @@ workflows: ~
 						},
 					},
 				},
-				Workflows: make(map[string]valid.Workflow),
+				Workflows:    make(map[string]valid.Workflow),
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -346,6 +377,7 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"default": defaultWorkflow("default"),
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -378,6 +410,7 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": defaultWorkflow("myworkflow"),
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -412,6 +445,7 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": defaultWorkflow("myworkflow"),
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -446,6 +480,7 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": defaultWorkflow("myworkflow"),
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -480,6 +515,7 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": defaultWorkflow("myworkflow"),
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -514,6 +550,7 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": defaultWorkflow("myworkflow"),
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -548,6 +585,7 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": defaultWorkflow("myworkflow"),
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -582,6 +620,7 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": defaultWorkflow("myworkflow"),
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -616,6 +655,7 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": defaultWorkflow("myworkflow"),
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -731,7 +771,8 @@ projects:
 						},
 					},
 				},
-				Workflows: map[string]valid.Workflow{},
+				Workflows:    map[string]valid.Workflow{},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -822,6 +863,7 @@ workflows:
 						},
 					},
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -925,6 +967,7 @@ workflows:
 						},
 					},
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -1008,6 +1051,7 @@ workflows:
 						},
 					},
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 		{
@@ -1106,6 +1150,7 @@ workflows:
 						},
 					},
 				},
+				Autodiscover: &valid.Autodiscover{Enabled: true},
 			},
 		},
 	}
