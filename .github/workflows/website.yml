@@ -14,7 +14,7 @@ on:
     branches:
       - 'main'
       - 'release-**'
- 
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
@@ -55,7 +55,7 @@ jobs:
       - name: run http-server
         env:
           # renovate: datasource=github-releases depName=raviqqe/muffet
-          MUFFET_VERSION: 2.6.3
+          MUFFET_VERSION: 2.9.3
         run: |
           npm install -g yarn
           # http-server is used to serve the website locally as muffet checks it.
@@ -86,4 +86,4 @@ jobs:
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
-      - run: 'echo "No build required"' 
+      - run: 'echo "No build required"'
