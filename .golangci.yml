@@ -1,3 +1,7 @@
+linters-settings:
+  misspell:
+    locale: US
+
 linters:
   enable:
   - errcheck
