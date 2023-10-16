@@ -46,7 +46,7 @@ type ProjectCommandContextBuilder interface {
 // object relevant to the command it applies to.
 type CommandScopedStatsProjectCommandContextBuilder struct {
 	ProjectCommandContextBuilder
-	// Consciously making this global since it gets flushed periodically anyways
+	// Conciously making this global since it gets flushed periodically anyways
 	ProjectCounter tally.Counter
 }
 

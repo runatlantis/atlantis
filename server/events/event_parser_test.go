@@ -1009,7 +1009,7 @@ func TestBitBucketNonCodeChangesAreIgnored(t *testing.T) {
 	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha2", "https://github.com/fakeorg/fakerepo/pull/1")
 	Equals(t, models.UpdatedPullEvent, act)
 
-	// If sha changes in separate PR,
+	// If sha changes in seperate PR,
 	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "otherPRSha", "https://github.com/fakeorg/fakerepo/pull/2")
 	Equals(t, models.UpdatedPullEvent, act)
 	// We will still ignore same shas in first PR

@@ -43,7 +43,7 @@ type IGithubClient interface {
 }
 
 // InstrumentedGithubClient should delegate to the underlying InstrumentedClient for vcs provider-agnostic
-// methods and implement solely any github specific interfaces.
+// methods and implement soley any github specific interfaces.
 type InstrumentedGithubClient struct {
 	*InstrumentedClient
 	PullRequestGetter GithubPullRequestGetter

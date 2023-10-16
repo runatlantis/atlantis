@@ -84,7 +84,7 @@ func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, 
 		// comment on a merge request or a commit.
 		var subset struct {
 			ObjectAttributes struct {
-				NotableType string `json:"notable_type"`
+				NoteableType string `json:"noteable_type"`
 			} `json:"object_attributes"`
 		}
 		if err := json.Unmarshal(bytes, &subset); err != nil {
@@ -92,7 +92,7 @@ func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, 
 		}
 
 		// We then parse into the correct comment event type.
-		switch subset.ObjectAttributes.NotableType {
+		switch subset.ObjectAttributes.NoteableType {
 		case "Commit":
 			var e gitlab.CommitCommentEvent
 			err := json.Unmarshal(bytes, &e)
