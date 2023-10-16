@@ -2,13 +2,12 @@ linters:
   enable:
   - errcheck
   - gochecknoinits
-# We don't use goconst because it gives false positives in the tests.
-#  - goconst
   - gofmt
-  - revive
   - gosec
   - gosimple
   - ineffassign
+  - misspell
+  - revive
   - staticcheck
   - typecheck
   - unconvert
