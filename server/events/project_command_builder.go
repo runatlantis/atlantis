@@ -506,6 +506,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
+
 	var pcc []command.ProjectContext
 
 	ctx.Log.Debug("cloning repository")
