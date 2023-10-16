@@ -1,6 +1,12 @@
 linters-settings:
   misspell:
-    locale: US
+    # Correct spellings using locale preferences for US or UK.
+    # Default is to use a neutral variety of English.
+    # Setting locale to US will correct the British spelling of 'colour' to 'color'.
+    # locale: US
+    ignore-words:
+      # for gitlab notes api
+      - noteable
 
 linters:
   enable:
