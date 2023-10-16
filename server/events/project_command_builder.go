@@ -506,8 +506,13 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
-
 	var pcc []command.ProjectContext
+
+	ctx.Log.Debug("cloning repository")
+	_, _, err := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
+	if err != nil {
+		return pcc, err
+	}
 
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
@@ -586,12 +591,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		return pcc, err
 	}
 	defer unlockFn()
-
-	ctx.Log.Debug("cloning repository")
-	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
-	if err != nil {
-		return pcc, err
-	}
 
 	repoRelDir := DefaultRepoRelDir
 	if cmd.RepoRelDir != "" {
