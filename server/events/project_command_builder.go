@@ -509,8 +509,15 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 
 	var pcc []command.ProjectContext
 
+	ctx.Log.Debug("building plan command")
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
+	if err != nil {
+		return pcc, err
+	}
+	defer unlockFn()
+
 	ctx.Log.Debug("cloning repository")
-	_, _, err := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
+	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return pcc, err
 	}
@@ -585,13 +592,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 			}
 		}
 	}
-
-	ctx.Log.Debug("building plan command")
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
-	if err != nil {
-		return pcc, err
-	}
-	defer unlockFn()
 
 	repoRelDir := DefaultRepoRelDir
 	if cmd.RepoRelDir != "" {
