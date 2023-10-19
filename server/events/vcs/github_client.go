@@ -139,7 +139,7 @@ listloop:
 			// First don't sleep, then sleep 1, 3, 7, etc.
 			time.Sleep(attemptDelay)
 			attemptDelay = 2*attemptDelay + 1*time.Second
-			
+
 			pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
 			g.logger.Debug("[attempt %d] GET /repos/%v/%v/pulls/%d/files returned: %v", i+1, repo.Owner, repo.Name, pull.Num, resp.StatusCode)
 			if err != nil {
