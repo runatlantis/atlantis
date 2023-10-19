@@ -43,6 +43,45 @@ jobs:
       - uses: actions/checkout@v4
       - run: make test-all
       - run: make check-fmt
+      ###########################################################
+      # Notifying #contributors about test failure on main branch
+      ###########################################################
+      - name: Slack failure notification
+        if: ${{ github.ref == 'refs/heads/main' && failure() }}
+        uses: slackapi/slack-github-action@e28cf165c92ffef168d23c5c9000cffc8a25e117 # v1.24.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":x: Failed GitHub Action:"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Job:*\n${{ github.job }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repo:*\n${{ github.repository }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
   skip-test:
     needs: [changes]
