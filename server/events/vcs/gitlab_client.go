@@ -358,14 +358,12 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	if err != nil {
 		return err
 	}
-	// refTarget is set to current branch if no pipeline is assigned to the commit,
-	// otherwise it is set to the pipeline created by the merge_request_event rule
+	// refTarget is set to the current branch if no pipeline is assigned to the commit,
+	// otherwise it is set to the ref of the Head Pipeline
 	refTarget := pull.HeadBranch
-	if mr.Pipeline != nil {
-		switch mr.Pipeline.Source {
-		case "merge_request_event":
-			refTarget = fmt.Sprintf("refs/merge-requests/%d/head", pull.Num)
-		}
+	if mr.HeadPipeline != nil {
+		refTarget = mr.HeadPipeline.Ref
+		g.logger.Debug("Head pipeline found for merge request %d, source '%s'. refTarget '%s'", pull.Num, mr.HeadPipeline.Source, refTarget)
 	}
 	_, _, err = g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
 		State:       gitlabState,
