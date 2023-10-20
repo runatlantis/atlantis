@@ -24,6 +24,7 @@ type RepoCfg struct {
 	ParallelPolicyCheck        *bool
 	DeleteSourceBranchOnMerge  *bool
 	RepoLocking                *bool
+	LockRepoOnApply            *bool
 	CustomPolicyCheck          *bool
 	EmojiReaction              string
 	AllowedRegexpPrefixes      []string
@@ -134,6 +135,7 @@ type Project struct {
 	ImportRequirements        []string
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
+	LockRepoOnApply           *bool
 	ExecutionOrderGroup       int
 	PolicyCheck               *bool
 	CustomPolicyCheck         *bool

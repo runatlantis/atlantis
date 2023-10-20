@@ -26,6 +26,7 @@ const AllowCustomWorkflowsKey = "allow_custom_workflows"
 const DefaultWorkflowName = "default"
 const DeleteSourceBranchOnMergeKey = "delete_source_branch_on_merge"
 const RepoLockingKey = "repo_locking"
+const LockRepoOnApplyKey = "lock_repo_on_apply"
 const PolicyCheckKey = "policy_check"
 const CustomPolicyCheckKey = "custom_policy_check"
 
@@ -82,6 +83,7 @@ type Repo struct {
 	AllowCustomWorkflows      *bool
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
+	LockRepoOnApply           *bool
 	PolicyCheck               *bool
 	CustomPolicyCheck         *bool
 }
@@ -103,6 +105,7 @@ type MergedProjectCfg struct {
 	DeleteSourceBranchOnMerge bool
 	ExecutionOrderGroup       int
 	RepoLocking               bool
+	LockRepoOnApply           bool
 	PolicyCheck               bool
 	CustomPolicyCheck         bool
 }
@@ -243,10 +246,11 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 
 	allowCustomWorkflows := false
 	deleteSourceBranchOnMerge := false
-	repoLockingKey := true
+	repoLocking := true
+	lockRepoOnApply := false
 	customPolicyCheck := false
 	if args.AllowRepoCfg {
-		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, PolicyCheckKey}
+		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, LockRepoOnApplyKey, PolicyCheckKey}
 		allowCustomWorkflows = true
 	}
 
@@ -266,7 +270,8 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 				AllowedOverrides:          allowedOverrides,
 				AllowCustomWorkflows:      &allowCustomWorkflows,
 				DeleteSourceBranchOnMerge: &deleteSourceBranchOnMerge,
-				RepoLocking:               &repoLockingKey,
+				RepoLocking:               &repoLocking,
+				LockRepoOnApply:           &lockRepoOnApply,
 				PolicyCheck:               &policyCheck,
 				CustomPolicyCheck:         &customPolicyCheck,
 			},
@@ -305,7 +310,7 @@ func (r Repo) IDString() string {
 // final config. It assumes that all configs have been validated.
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
 	log.Debug("MergeProjectCfg started")
-	planReqs, applyReqs, importReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge, repoLocking, policyCheck, customPolicyCheck := g.getMatchingCfg(log, repoID)
+	planReqs, applyReqs, importReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge, repoLocking, lockRepoOnApply, policyCheck, customPolicyCheck := g.getMatchingCfg(log, repoID)
 
 	// If repos are allowed to override certain keys then override them.
 	for _, key := range allowedOverrides {
@@ -366,6 +371,11 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				log.Debug("overriding server-defined %s with repo settings: [%t]", RepoLockingKey, *proj.RepoLocking)
 				repoLocking = *proj.RepoLocking
 			}
+		case LockRepoOnApplyKey:
+			if proj.LockRepoOnApply != nil {
+				log.Debug("overriding server-defined %s with repo settings: [%t]", LockRepoOnApplyKey, *proj.LockRepoOnApply)
+				lockRepoOnApply = *proj.LockRepoOnApply
+			}
 		case PolicyCheckKey:
 			if proj.PolicyCheck != nil {
 				log.Debug("overriding server-defined %s with repo settings: [%t]", PolicyCheckKey, *proj.PolicyCheck)
@@ -398,6 +408,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
 		ExecutionOrderGroup:       proj.ExecutionOrderGroup,
 		RepoLocking:               repoLocking,
+		LockRepoOnApply:           lockRepoOnApply,
 		PolicyCheck:               policyCheck,
 		CustomPolicyCheck:         customPolicyCheck,
 	}
@@ -407,7 +418,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 // repo with id repoID. It is used when there is no repo config.
 func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
 	log.Debug("building config based on server-side config")
-	planReqs, applyReqs, importReqs, workflow, _, _, deleteSourceBranchOnMerge, repoLocking, policyCheck, customPolicyCheck := g.getMatchingCfg(log, repoID)
+	planReqs, applyReqs, importReqs, workflow, _, _, deleteSourceBranchOnMerge, repoLocking, lockRepoOnApply, policyCheck, customPolicyCheck := g.getMatchingCfg(log, repoID)
 	return MergedProjectCfg{
 		PlanRequirements:          planReqs,
 		ApplyRequirements:         applyReqs,
@@ -421,6 +432,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
 		RepoLocking:               repoLocking,
+		LockRepoOnApply:           lockRepoOnApply,
 		PolicyCheck:               policyCheck,
 		CustomPolicyCheck:         customPolicyCheck,
 	}
@@ -466,6 +478,9 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		}
 		if p.RepoLocking != nil && !utils.SlicesContains(allowedOverrides, RepoLockingKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", RepoLockingKey, AllowedOverridesKey, RepoLockingKey)
+		}
+		if p.LockRepoOnApply != nil && !utils.SlicesContains(allowedOverrides, LockRepoOnApplyKey) {
+			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", LockRepoOnApplyKey, AllowedOverridesKey, LockRepoOnApplyKey)
 		}
 		if p.CustomPolicyCheck != nil && !utils.SlicesContains(allowedOverrides, CustomPolicyCheckKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", CustomPolicyCheckKey, AllowedOverridesKey, CustomPolicyCheckKey)
@@ -528,7 +543,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 }
 
 // getMatchingCfg returns the key settings for repoID.
-func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (planReqs []string, applyReqs []string, importReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocking bool, policyCheck bool, customPolicyCheck bool) {
+func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (planReqs []string, applyReqs []string, importReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocking bool, lockRepoOnApply bool, policyCheck bool, customPolicyCheck bool) {
 	toLog := make(map[string]string)
 	traceF := func(repoIdx int, repoID string, key string, val interface{}) string {
 		from := "default server config"
@@ -550,7 +565,7 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (pla
 		return fmt.Sprintf("setting %s: %s from %s", key, valStr, from)
 	}
 
-	for _, key := range []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, PolicyCheckKey, CustomPolicyCheckKey} {
+	for _, key := range []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, LockRepoOnApplyKey, PolicyCheckKey, CustomPolicyCheckKey} {
 		for i, repo := range g.Repos {
 			if repo.IDMatches(repoID) {
 				switch key {
@@ -593,6 +608,11 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (pla
 					if repo.RepoLocking != nil {
 						toLog[RepoLockingKey] = traceF(i, repo.IDString(), RepoLockingKey, *repo.RepoLocking)
 						repoLocking = *repo.RepoLocking
+					}
+				case LockRepoOnApplyKey:
+					if repo.LockRepoOnApply != nil {
+						toLog[LockRepoOnApplyKey] = traceF(i, repo.IDString(), LockRepoOnApplyKey, *repo.LockRepoOnApply)
+						lockRepoOnApply = *repo.LockRepoOnApply
 					}
 				case PolicyCheckKey:
 					if repo.PolicyCheck != nil {

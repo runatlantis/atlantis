@@ -80,6 +80,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				AllowCustomWorkflows:      Bool(false),
 				DeleteSourceBranchOnMerge: Bool(false),
 				RepoLocking:               Bool(true),
+				LockRepoOnApply:           Bool(false),
 				PolicyCheck:               Bool(false),
 				CustomPolicyCheck:         Bool(false),
 			},
@@ -209,7 +210,7 @@ func TestNewGlobalCfg(t *testing.T) {
 
 			if c.allowRepoCfg {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
-				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "policy_check"}
+				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "lock_repo_on_apply", "policy_check"}
 			}
 			if c.mergeableReq {
 				exp.Repos[0].PlanRequirements = append(exp.Repos[0].PlanRequirements, "mergeable")
@@ -713,6 +714,7 @@ policies:
 				Name:              "",
 				AutoplanEnabled:   false,
 				RepoLocking:       true,
+				LockRepoOnApply:   false,
 				CustomPolicyCheck: false,
 			},
 		},
@@ -762,6 +764,7 @@ policies:
 				Name:              "",
 				AutoplanEnabled:   false,
 				RepoLocking:       true,
+				LockRepoOnApply:   false,
 				CustomPolicyCheck: false,
 			},
 		},
@@ -857,6 +860,7 @@ workflows:
 				AutoplanEnabled:   false,
 				PolicySets:        emptyPolicySets,
 				RepoLocking:       true,
+				LockRepoOnApply:   false,
 				CustomPolicyCheck: false,
 			},
 		},
@@ -887,6 +891,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				LockRepoOnApply:    false,
 				CustomPolicyCheck:  false,
 			},
 		},
@@ -917,6 +922,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				LockRepoOnApply:    false,
 				CustomPolicyCheck:  false,
 			},
 		},
@@ -947,6 +953,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				LockRepoOnApply:    false,
 				CustomPolicyCheck:  false,
 			},
 		},
@@ -978,6 +985,39 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        false,
+				LockRepoOnApply:    false,
+				CustomPolicyCheck:  false,
+			},
+		},
+		"repo-side lock_repo_on_apply win out if allowed": {
+			gCfg: `
+repos:
+- id: /.*/
+  lock_repo_on_apply: true
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:                ".",
+				Workspace:          "default",
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
+				LockRepoOnApply:    Bool(false),
+				CustomPolicyCheck:  Bool(false),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+				LockRepoOnApply:    true,
 				CustomPolicyCheck:  false,
 			},
 		},
@@ -1015,6 +1055,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				LockRepoOnApply:    false,
 				CustomPolicyCheck:  false,
 			},
 		},
@@ -1042,6 +1083,7 @@ repos:
 				AutoplanEnabled:    true,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				LockRepoOnApply:    false,
 				CustomPolicyCheck:  false,
 			},
 		},
@@ -1071,6 +1113,7 @@ repos:
 				PolicySets:          emptyPolicySets,
 				ExecutionOrderGroup: 10,
 				RepoLocking:         true,
+				LockRepoOnApply:     false,
 				CustomPolicyCheck:   false,
 			},
 		},
@@ -1265,6 +1308,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				LockRepoOnApply:    false,
 				PolicyCheck:        false,
 				CustomPolicyCheck:  false,
 			},
@@ -1305,6 +1349,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				LockRepoOnApply:    false,
 				PolicyCheck:        true,
 				CustomPolicyCheck:  false,
 			},
@@ -1346,6 +1391,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				LockRepoOnApply:    false,
 				PolicyCheck:        false,
 				CustomPolicyCheck:  false,
 			},
@@ -1387,6 +1433,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				LockRepoOnApply:    false,
 				PolicyCheck:        false,
 				CustomPolicyCheck:  false,
 			},
@@ -1428,6 +1475,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				LockRepoOnApply:    false,
 				PolicyCheck:        true, // Project will have policy check as true but since it is globally disable it wont actually run
 				CustomPolicyCheck:  false,
 			},

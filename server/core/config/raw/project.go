@@ -33,6 +33,7 @@ type Project struct {
 	ImportRequirements        []string  `yaml:"import_requirements,omitempty"`
 	DeleteSourceBranchOnMerge *bool     `yaml:"delete_source_branch_on_merge,omitempty"`
 	RepoLocking               *bool     `yaml:"repo_locking,omitempty"`
+	LockRepoOnApply           *bool     `yaml:"lock_repo_on_apply,omitempty"`
 	ExecutionOrderGroup       *int      `yaml:"execution_order_group,omitempty"`
 	PolicyCheck               *bool     `yaml:"policy_check,omitempty"`
 	CustomPolicyCheck         *bool     `yaml:"custom_policy_check,omitempty"`
@@ -129,6 +130,10 @@ func (p Project) ToValid() valid.Project {
 
 	if p.RepoLocking != nil {
 		v.RepoLocking = p.RepoLocking
+	}
+
+	if p.LockRepoOnApply != nil {
+		v.LockRepoOnApply = p.LockRepoOnApply
 	}
 
 	if p.ExecutionOrderGroup != nil {

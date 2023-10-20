@@ -436,6 +436,17 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
 
 			ctx := command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
@@ -507,6 +518,17 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		Any[models.PullRequest](),
 		Any[string](),
 	)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+	}, nil)
 
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),

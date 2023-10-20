@@ -105,6 +105,8 @@ type ProjectContext struct {
 	DeleteSourceBranchOnMerge bool
 	// RepoLocking will get a lock when plan
 	RepoLocking bool
+	// Lock repo on apply instead of plan
+	LockRepoOnApply bool
 	// RepoConfigFile
 	RepoConfigFile string
 	// UUID for atlantis logs
