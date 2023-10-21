@@ -517,7 +517,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	defer unlockFn()
 
 	ctx.Log.Debug("cloning repository")
-	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
+	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 	if err != nil {
 		return pcc, err
 	}
@@ -590,6 +590,14 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 			if len(notFoundFiles) > 0 {
 				return pcc, fmt.Errorf("the following directories are present in the pull request but not in the requested project:\n%s", strings.Join(notFoundFiles, "\n"))
 			}
+		}
+	}
+
+	if DefaultWorkspace != workspace {
+		ctx.Log.Debug("cloning repository with workspace %s", workspace)
+		_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
+		if err != nil {
+			return pcc, err
 		}
 	}
 
