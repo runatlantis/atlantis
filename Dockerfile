@@ -147,10 +147,6 @@ RUN addgroup atlantis && \
     chmod u+rwx /home/atlantis/ && \
     chmod u+rw /etc/passwd
 
-# Removing setuid and setgid permissions prevents container privilege escalation
-RUN chmod s-u file && \
-    chmod g-u file
-
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
@@ -193,10 +189,6 @@ RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/ && \
     chmod u+rw /etc/passwd
-
-# Removing setuid and setgid permissions prevents container privilege escalation
-RUN chmod s-u file && \
-    chmod g-u file
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
