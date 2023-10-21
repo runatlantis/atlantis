@@ -135,12 +135,12 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="1.2.9 1.3.10 1.4.6 ${DEFAULT_TERRAFORM_VERSION
 # Creating the individual distro builds using targets
 FROM alpine:${ALPINE_TAG} AS alpine
 
-# atlantis user for OpenShift compatibility
+# Create the atlantis user
 RUN addgroup atlantis && \
     adduser -S -G atlantis atlantis && \
     chown atlantis:root /home/atlantis/ && \
-    chmod g=u /home/atlantis/ && \
-    chmod g=u /etc/passwd
+    chmod u+rwx /home/atlantis/ && \
+    chmod u+rw /etc/passwd
 
 # copy binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
@@ -174,11 +174,11 @@ CMD ["server"]
 # Stage 2 - Debian
 FROM debian-base AS debian
 
-# Add atlantis user to Debian as well
+# Create the atlantis user
 RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
     chown atlantis:root /home/atlantis/ && \
-    chmod g=u /home/atlantis/ && \
-    chmod g=u /etc/passwd
+    chmod u+rwx /home/atlantis/ && \
+    chmod u+rw /etc/passwd
 
 # copy binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
