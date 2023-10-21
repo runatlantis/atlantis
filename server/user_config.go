@@ -39,6 +39,7 @@ type UserConfig struct {
 	DisableRepoLocking          bool   `mapstructure:"disable-repo-locking"`
 	DisableUnlockLabel          string `mapstructure:"disable-unlock-label"`
 	DiscardApprovalOnPlanFlag   bool   `mapstructure:"discard-approval-on-plan"`
+	DisableEmojiReactions       bool   `mapstructure:"disable-emoji-reactions"`
 	EmojiReaction               string `mapstructure:"emoji-reaction"`
 	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
