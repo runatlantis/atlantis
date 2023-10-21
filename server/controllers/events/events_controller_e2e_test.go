@@ -95,7 +95,7 @@ func TestGitHubWorkflow(t *testing.T) {
 		AllowCommands []command.Name
 		// DisableAutoplan flag disable auto plans when any pull request is opened.
 		DisableAutoplan bool
-		// DisablePreWorkflowHooks if set to false, pre-workflow hooks will be disabled
+		// DisablePreWorkflowHooks if set to true, pre-workflow hooks will be disabled
 		DisablePreWorkflowHooks bool
 		// ExpAutomerge is true if we expect Atlantis to automerge.
 		ExpAutomerge bool
