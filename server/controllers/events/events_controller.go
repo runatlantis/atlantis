@@ -567,7 +567,7 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		}
 	}
 
-	// It's a comment we're gonna react to (as long as emoji reactions aren't disabled), so add a reaction.
+	// It's a comment we're going to react to (as long as emoji reactions aren't disabled), so add a reaction.
 	if e.EmojiReaction != "" && !e.DisableEmojiReactions {
 		err := e.VCSClient.ReactToComment(baseRepo, pullNum, commentID, e.EmojiReaction)
 		if err != nil {
