@@ -89,30 +89,6 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
         rm checksums.txt; \
     done
 
-# install gosu
-# We use gosu to step down from root and run as the atlantis user
-# renovate: datasource=github-releases depName=tianon/gosu
-ENV GOSU_VERSION=1.16
-
-RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") GOSU_ARCH=amd64 ;; \
-        "linux/arm64") GOSU_ARCH=arm64 ;; \
-        "linux/arm/v7") GOSU_ARCH=armhf ;; \
-    esac && \
-    curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" && \
-    curl -L -s --output gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" && \
-    for server in $(shuf -e ipv4.pool.sks-keyservers.net \
-                            hkp://p80.pool.sks-keyservers.net:80 \
-                            keyserver.ubuntu.com \
-                            hkp://keyserver.ubuntu.com:80 \
-                            pgp.mit.edu) ; do \
-        gpg --keyserver "$server" --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 && break || : ; \
-    done && \
-    gpg --batch --verify gosu.asc gosu && \
-    chmod +x gosu && \
-    cp gosu /bin && \
-    gosu --version
-
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
 ENV GIT_LFS_VERSION=3.4.0
@@ -159,10 +135,9 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="1.2.9 1.3.10 1.4.6 ${DEFAULT_TERRAFORM_VERSION
 # Creating the individual distro builds using targets
 FROM alpine:${ALPINE_TAG} AS alpine
 
-# atlantis user for gosu and OpenShift compatibility
+# atlantis user for OpenShift compatibility
 RUN addgroup atlantis && \
     adduser -S -G atlantis atlantis && \
-    adduser atlantis root && \
     chown atlantis:root /home/atlantis/ && \
     chmod g=u /home/atlantis/ && \
     chmod g=u /etc/passwd
@@ -173,7 +148,6 @@ COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
 # copy deps
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
-COPY --from=deps /bin/gosu /bin/gosu
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -191,6 +165,9 @@ RUN apk add --no-cache \
         dumb-init~=1.2 \
         gcompat~=1.1
 
+
+# Set the entry point to the atlantis user and run the atlantis command
+USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
 
@@ -199,7 +176,6 @@ FROM debian-base AS debian
 
 # Add atlantis user to Debian as well
 RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
-    adduser atlantis root && \
     chown atlantis:root /home/atlantis/ && \
     chmod g=u /home/atlantis/ && \
     chmod g=u /etc/passwd
@@ -210,10 +186,11 @@ COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
 # copy deps
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
-COPY --from=deps /bin/gosu /bin/gosu
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+# Set the entry point to the atlantis user and run the atlantis command
+USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
