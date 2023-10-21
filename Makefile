@@ -77,6 +77,7 @@ test-coverage-html: ## Show test coverage and output html
 .PHONY: docker/dev
 docker/dev: ## Build dev Dockerfile as atlantis-dev
 	GOOS=linux GOARCH=amd64 go build -o atlantis .
+	export DOCKER_CONTENT_TRUST=1 
 	docker build -f Dockerfile.dev -t atlantis-dev .
 
 .PHONY: release
