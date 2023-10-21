@@ -140,24 +140,28 @@ EXPOSE ${ATLANTIS_PORT:-4141}
 HEALTHCHECK --interval=5m --timeout=3s \
   CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
-# Create the atlantis user
+# Set up the 'atlantis' user and adjust permissions
 RUN addgroup atlantis && \
     adduser -S -G atlantis atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/ && \
     chmod u+rw /etc/passwd
 
-# copy binary
+# Removing setuid and setgid permissions prevents container privilege escalation
+RUN chmod s-u file && \
+    chmod g-u file
+
+# copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform
+# copy terraform binaries
 COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-# copy deps
+# copy dependencies (conftest, git-lfs)
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
-# copy docker entrypoint
+# copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Install packages needed for running Atlantis.
+# Install packages needed to running Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
         ca-certificates~=20230506 \
@@ -184,20 +188,24 @@ EXPOSE ${ATLANTIS_PORT:-4141}
 HEALTHCHECK --interval=5m --timeout=3s \
   CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
-# Create the atlantis user
+# Set up the 'atlantis' user and adjust permissions
 RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/ && \
     chmod u+rw /etc/passwd
 
-# copy binary
+# Removing setuid and setgid permissions prevents container privilege escalation
+RUN chmod s-u file && \
+    chmod g-u file
+
+# copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform
+# copy terraform binaries
 COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-# copy deps
+# copy dependencies (conftest, git-lfs)
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
-# copy docker entrypoint
+# copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Set the entry point to the atlantis user and run the atlantis command
