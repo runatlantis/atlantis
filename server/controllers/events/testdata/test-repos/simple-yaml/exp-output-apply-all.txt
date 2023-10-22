@@ -39,3 +39,6 @@ postapply
 </details>
 
 ---
+### Apply Summary
+
+2 projects, 2 successful, 0 failed, 0 errored
