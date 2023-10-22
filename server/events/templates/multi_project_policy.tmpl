@@ -1,4 +1,4 @@
-{{ define "multiProjectPlan" -}}
+{{ define "multiProjectPolicy" -}}
 {{ template "multiProjectHeader" . }}
 {{ $disableApplyAll := .DisableApplyAll -}}
 {{ $hideUnchangedPlans := .HideUnchangedPlanComments -}}
@@ -7,8 +7,17 @@
 ### {{ add $i 1 }}. {{ if $result.ProjectName }}project: `{{ $result.ProjectName }}` {{ end }}dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
 {{ $result.Rendered }}
 
+{{ if ne $disableApplyAll true -}}
 ---
 {{ end -}}
-{{ template "multiProjectPlanFooter" . }}
-{{- template "log" . -}}
+{{ end -}}
+{{ if ne .DisableApplyAll true -}}
+{{ if and (gt (len .Results) 0) (not .PlansDeleted) -}}
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * `{{ .ExecutableName }} apply`
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * `{{ .ExecutableName }} unlock`
+{{ end -}}
+{{ end -}}
+{{ template "log" . -}}
 {{ end -}}
