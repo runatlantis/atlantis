@@ -41,7 +41,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM debian:${DEBIAN_TAG} as debian-base
 
-# Install packages needed for running Atlantis.
+# Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 # hadolint ignore explanation
 # DL3008 (pin versions using "=") - Ignored to avoid failing the build
@@ -157,7 +157,7 @@ COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Install packages needed to running Atlantis.
+# Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
         ca-certificates~=20230506 \
