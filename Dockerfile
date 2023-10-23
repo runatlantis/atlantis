@@ -151,7 +151,7 @@ RUN addgroup atlantis && \
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
 COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-# copy dependencies (conftest, git-lfs)
+# copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
@@ -194,7 +194,7 @@ RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
 COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-# copy dependencies (conftest, git-lfs)
+# copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
