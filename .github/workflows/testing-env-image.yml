@@ -29,9 +29,6 @@ jobs:
         image: tonistiigi/binfmt:latest
         platforms: arm64,arm
 
-    - name: Set DOCKER_CONTENT_TRUST
-      run: export DOCKER_CONTENT_TRUST=1
-
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
