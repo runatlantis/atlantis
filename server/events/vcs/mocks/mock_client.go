@@ -75,11 +75,11 @@ func (mock *MockClient) GetCloneURL(logger logging.SimpleLogging, VCSHostType mo
 	return ret0, ret1
 }
 
-func (mock *MockClient) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {
+func (mock *MockClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{logger, pull, fileName}
+	params := []pegomock.Param{logger, repo, branch, fileName}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetFileContent", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*[]byte)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 bool
 	var ret1 []byte
@@ -433,8 +433,8 @@ func (c *MockClient_GetCloneURL_OngoingVerification) GetAllCapturedArguments() (
 	return
 }
 
-func (verifier *VerifierMockClient) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) *MockClient_GetFileContent_OngoingVerification {
-	params := []pegomock.Param{logger, pull, fileName}
+func (verifier *VerifierMockClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) *MockClient_GetFileContent_OngoingVerification {
+	params := []pegomock.Param{logger, repo, branch, fileName}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetFileContent", params, verifier.timeout)
 	return &MockClient_GetFileContent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }

@@ -1668,7 +1668,7 @@ projects:
 			Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 		When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(true)
 		When(vcsClient.GetFileContent(
-			Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
+			Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
 		workingDir := mocks.NewMockWorkingDir()
 
 		logger := logging.NewNoopLogger(t)
