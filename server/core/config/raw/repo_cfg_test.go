@@ -11,6 +11,7 @@ import (
 )
 
 func TestConfig_UnmarshalYAML(t *testing.T) {
+	auto_discover_enabled := valid.AutoDiscoverEnabledMode
 	cases := []struct {
 		description string
 		input       string
@@ -128,6 +129,8 @@ version: 3
 automerge: true
 parallel_apply: true
 parallel_plan: false
+autodiscover:
+  mode: enabled
 projects:
 - dir: mydir
   workspace: myworkspace
@@ -150,6 +153,7 @@ allowed_regexp_prefixes:
 - staging/`,
 			exp: raw.RepoCfg{
 				Version:       Int(3),
+				AutoDiscover:  &raw.AutoDiscover{Mode: &auto_discover_enabled},
 				Automerge:     Bool(true),
 				ParallelApply: Bool(true),
 				ParallelPlan:  Bool(false),
@@ -232,6 +236,7 @@ func TestConfig_Validate(t *testing.T) {
 }
 
 func TestConfig_ToValid(t *testing.T) {
+	auto_discover_enabled := valid.AutoDiscoverEnabledMode
 	cases := []struct {
 		description string
 		input       raw.RepoCfg
@@ -241,25 +246,28 @@ func TestConfig_ToValid(t *testing.T) {
 			description: "nothing set",
 			input:       raw.RepoCfg{Version: Int(2)},
 			exp: valid.RepoCfg{
-				Version:   2,
-				Workflows: make(map[string]valid.Workflow),
+				Version:      2,
+				AutoDiscover: raw.DefaultAutoDiscover(),
+				Workflows:    make(map[string]valid.Workflow),
 			},
 		},
 		{
 			description: "set to empty",
 			input: raw.RepoCfg{
-				Version:   Int(2),
-				Workflows: map[string]raw.Workflow{},
-				Projects:  []raw.Project{},
+				Version:      Int(2),
+				AutoDiscover: &raw.AutoDiscover{},
+				Workflows:    map[string]raw.Workflow{},
+				Projects:     []raw.Project{},
 			},
 			exp: valid.RepoCfg{
-				Version:   2,
-				Workflows: map[string]valid.Workflow{},
-				Projects:  nil,
+				Version:      2,
+				AutoDiscover: raw.DefaultAutoDiscover(),
+				Workflows:    map[string]valid.Workflow{},
+				Projects:     nil,
 			},
 		},
 		{
-			description: "automerge, parallel_apply and abort_on_execution_order_fail omitted",
+			description: "automerge, parallel_apply, abort_on_execution_order_fail omitted",
 			input: raw.RepoCfg{
 				Version: Int(2),
 			},
@@ -268,11 +276,12 @@ func TestConfig_ToValid(t *testing.T) {
 				Automerge:                  nil,
 				ParallelApply:              nil,
 				AbortOnExcecutionOrderFail: false,
+				AutoDiscover:               raw.DefaultAutoDiscover(),
 				Workflows:                  map[string]valid.Workflow{},
 			},
 		},
 		{
-			description: "automerge, parallel_apply and abort_on_execution_order_fail true",
+			description: "automerge, parallel_apply, abort_on_execution_order_fail true",
 			input: raw.RepoCfg{
 				Version:                    Int(2),
 				Automerge:                  Bool(true),
@@ -284,11 +293,12 @@ func TestConfig_ToValid(t *testing.T) {
 				Automerge:                  Bool(true),
 				ParallelApply:              Bool(true),
 				AbortOnExcecutionOrderFail: true,
+				AutoDiscover:               raw.DefaultAutoDiscover(),
 				Workflows:                  map[string]valid.Workflow{},
 			},
 		},
 		{
-			description: "automerge, parallel_apply and abort_on_execution_order_fail false",
+			description: "automerge, parallel_apply, abort_on_execution_order_fail false",
 			input: raw.RepoCfg{
 				Version:                    Int(2),
 				Automerge:                  Bool(false),
@@ -300,7 +310,36 @@ func TestConfig_ToValid(t *testing.T) {
 				Automerge:                  Bool(false),
 				ParallelApply:              Bool(false),
 				AbortOnExcecutionOrderFail: false,
+				AutoDiscover:               raw.DefaultAutoDiscover(),
 				Workflows:                  map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "autodiscovery omitted",
+			input: raw.RepoCfg{
+				Version:      Int(2),
+				AutoDiscover: nil,
+			},
+			exp: valid.RepoCfg{
+				Version: 2,
+				AutoDiscover: &valid.AutoDiscover{
+					Mode: valid.AutoDiscoverAutoMode,
+				},
+				Workflows: map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "autodiscovery included",
+			input: raw.RepoCfg{
+				Version:      Int(2),
+				AutoDiscover: &raw.AutoDiscover{Mode: &auto_discover_enabled},
+			},
+			exp: valid.RepoCfg{
+				Version: 2,
+				AutoDiscover: &valid.AutoDiscover{
+					Mode: valid.AutoDiscoverEnabledMode,
+				},
+				Workflows: map[string]valid.Workflow{},
 			},
 		},
 		{
@@ -331,6 +370,7 @@ func TestConfig_ToValid(t *testing.T) {
 						StateRm:     valid.DefaultStateRmStage,
 					},
 				},
+				AutoDiscover: raw.DefaultAutoDiscover(),
 			},
 		},
 		{
@@ -339,6 +379,9 @@ func TestConfig_ToValid(t *testing.T) {
 				Version:       Int(2),
 				Automerge:     Bool(true),
 				ParallelApply: Bool(true),
+				AutoDiscover: &raw.AutoDiscover{
+					Mode: &auto_discover_enabled,
+				},
 				Workflows: map[string]raw.Workflow{
 					"myworkflow": {
 						Apply: &raw.Stage{
@@ -388,6 +431,9 @@ func TestConfig_ToValid(t *testing.T) {
 				Version:       2,
 				Automerge:     Bool(true),
 				ParallelApply: Bool(true),
+				AutoDiscover: &valid.AutoDiscover{
+					Mode: valid.AutoDiscoverEnabledMode,
+				},
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
 						Name: "myworkflow",

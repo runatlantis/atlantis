@@ -19,6 +19,7 @@ type RepoCfg struct {
 	Projects                   []Project           `yaml:"projects,omitempty"`
 	Workflows                  map[string]Workflow `yaml:"workflows,omitempty"`
 	PolicySets                 PolicySets          `yaml:"policies,omitempty"`
+	AutoDiscover               *AutoDiscover       `yaml:"autodiscover,omitempty"`
 	Automerge                  *bool               `yaml:"automerge,omitempty"`
 	ParallelApply              *bool               `yaml:"parallel_apply,omitempty"`
 	ParallelPlan               *bool               `yaml:"parallel_plan,omitempty"`
@@ -71,10 +72,16 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		abortOnExcecutionOrderFail = *r.AbortOnExcecutionOrderFail
 	}
 
+	autoDiscover := DefaultAutoDiscover()
+	if r.AutoDiscover != nil {
+		autoDiscover = r.AutoDiscover.ToValid()
+	}
+
 	return valid.RepoCfg{
 		Version:                    *r.Version,
 		Projects:                   validProjects,
 		Workflows:                  validWorkflows,
+		AutoDiscover:               autoDiscover,
 		Automerge:                  automerge,
 		ParallelApply:              parallelApply,
 		ParallelPlan:               parallelPlan,

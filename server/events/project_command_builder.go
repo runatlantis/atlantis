@@ -18,6 +18,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
@@ -349,18 +350,23 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 				return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 			}
 			ctx.Log.Info("successfully parsed remote %s file", repoCfgFile)
-			if len(repoCfg.Projects) > 0 {
-				matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
-				if err != nil {
-					return nil, err
-				}
-				ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
-				if len(matchingProjects) == 0 {
-					ctx.Log.Info("skipping repo clone since no project was modified")
-					return []command.ProjectContext{}, nil
+			// If auto_discovery is enabled, we never want to skip cloning
+			if !repoCfg.AutoDiscoverEnabled() {
+				if len(repoCfg.Projects) > 0 {
+					matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
+					if err != nil {
+						return nil, err
+					}
+					ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
+					if len(matchingProjects) == 0 {
+						ctx.Log.Info("skipping repo clone since no project was modified")
+						return []command.ProjectContext{}, nil
+					}
+				} else {
+					ctx.Log.Info("no projects are defined in %s. Will resume automatic detection", repoCfgFile)
 				}
 			} else {
-				ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", repoCfgFile)
+				ctx.Log.Info("automatic project discovery enabled. Will resume automatic detection")
 			}
 			// NOTE: We discard this work here and end up doing it again after
 			// cloning to ensure all the return values are set properly with
@@ -454,17 +460,39 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					p.TerraformExecutor,
 				)...)
 		}
-	} else {
+	}
+
+	if repoCfg.AutoDiscoverEnabled() {
 		// If there is no config file or it specified no projects, then we'll plan each project that
 		// our algorithm determines was modified.
 		if hasRepoCfg {
-			ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", repoCfgFile)
+			if len(repoCfg.Projects) == 0 {
+				ctx.Log.Info("no projects are defined in %s. Will resume automatic detection", repoCfgFile)
+			} else {
+				ctx.Log.Info("automatic project discovery enabled. Will resume automatic detection")
+			}
 		} else {
 			ctx.Log.Info("found no %s file", repoCfgFile)
 		}
 		// build a module index for projects that are explicitly included
-		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
-		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
+		allModifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
+		// If a project is already manually configured with the same dir as a discovered project, the manually configured project should take precedence
+		modifiedProjects := make([]models.Project, 0)
+		configuredProjDirs := make(map[string]bool)
+		// We compare against all configured projects instead of projects which match the modified files in case a
+		// project is being specifically excluded (ex: when_modified doesn't match). We don't want to accidentally
+		// "discover" it again.
+		for _, configProj := range repoCfg.Projects {
+			// Clean the path to make sure ./rel_path is equivalent to rel_path, etc
+			configuredProjDirs[filepath.Clean(configProj.Dir)] = true
+		}
+		for _, mp := range allModifiedProjects {
+			_, dirExists := configuredProjDirs[filepath.Clean(mp.Path)]
+			if !dirExists {
+				modifiedProjects = append(modifiedProjects, mp)
+			}
+		}
+		ctx.Log.Info("automatically determined that there were %d additional projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, repoDir)
