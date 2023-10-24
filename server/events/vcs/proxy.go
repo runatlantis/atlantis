@@ -96,8 +96,8 @@ func (d *ClientProxy) GetTeamNamesForUser(repo models.Repo, user models.User) ([
 	return d.clients[repo.VCSHost.Type].GetTeamNamesForUser(repo, user)
 }
 
-func (d *ClientProxy) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
-	return d.clients[pull.BaseRepo.VCSHost.Type].GetFileContent(pull, fileName)
+func (d *ClientProxy) GetFileContent(repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+	return d.clients[repo.VCSHost.Type].GetFileContent(repo, branch, fileName)
 }
 
 func (d *ClientProxy) SupportsSingleFileDownload(repo models.Repo) bool {

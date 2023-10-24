@@ -67,7 +67,7 @@ func (a *NotConfiguredVCSClient) SupportsSingleFileDownload(_ models.Repo) bool 
 	return false
 }
 
-func (a *NotConfiguredVCSClient) GetFileContent(_ models.PullRequest, _ string) (bool, []byte, error) {
+func (a *NotConfiguredVCSClient) GetFileContent(_ models.Repo, _ string, _ string) (bool, []byte, error) {
 	return true, []byte{}, a.err()
 }
 func (a *NotConfiguredVCSClient) GetCloneURL(_ models.VCSHostType, _ string) (string, error) {

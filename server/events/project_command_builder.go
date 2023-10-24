@@ -352,7 +352,17 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
 		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Pull, repoCfgFile)
+
+		var hasRepoCfg bool
+		var repoCfgData []byte
+		var err error
+		if ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
+			hasRepoCfg, repoCfgData, err = p.VCSClient.GetFileContent(ctx.HeadRepo, ctx.Pull.HeadBranch, repoCfgFile)
+
+		} else {
+			hasRepoCfg, repoCfgData, err = p.VCSClient.GetFileContent(ctx.Pull.BaseRepo, ctx.Pull.HeadBranch, repoCfgFile)
+		}
+
 		if err != nil {
 			return nil, errors.Wrapf(err, "downloading %s", repoCfgFile)
 		}
