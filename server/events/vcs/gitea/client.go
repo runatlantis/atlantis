@@ -421,13 +421,11 @@ func (c *GiteaClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (c *GiteaClient) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {
-	logger.Debug("Getting file content for %s in Gitea pull request %d", fileName, pull.Num)
-
-	content, resp, err := c.giteaClient.GetContents(pull.BaseRepo.Owner, pull.BaseRepo.Name, pull.HeadCommit, fileName)
+func (c *GiteaClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+	content, resp, err := c.giteaClient.GetContents(repo.Owner, repo.Name, branch, fileName)
 
 	if err != nil {
-		logger.Debug("GET /repos/%v/%v/contents/%s?ref=%v returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, fileName, pull.HeadCommit, resp.StatusCode)
+		logger.Debug("GET /repos/%v/%v/contents/%s?ref=%v returned: %v", repo.Owner, repo.Name, fileName, branch, resp.StatusCode)
 		return false, nil, err
 	}
 
