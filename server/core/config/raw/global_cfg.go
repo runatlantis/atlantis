@@ -20,22 +20,23 @@ type GlobalCfg struct {
 
 // Repo is the raw schema for repos in the server-side repo config.
 type Repo struct {
-	ID                        string         `yaml:"id" json:"id"`
-	Branch                    string         `yaml:"branch" json:"branch"`
-	RepoConfigFile            string         `yaml:"repo_config_file" json:"repo_config_file"`
-	PlanRequirements          []string       `yaml:"plan_requirements" json:"plan_requirements"`
-	ApplyRequirements         []string       `yaml:"apply_requirements" json:"apply_requirements"`
-	ImportRequirements        []string       `yaml:"import_requirements" json:"import_requirements"`
-	PreWorkflowHooks          []WorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
-	Workflow                  *string        `yaml:"workflow,omitempty" json:"workflow,omitempty"`
-	PostWorkflowHooks         []WorkflowHook `yaml:"post_workflow_hooks" json:"post_workflow_hooks"`
-	AllowedWorkflows          []string       `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
-	AllowedOverrides          []string       `yaml:"allowed_overrides" json:"allowed_overrides"`
-	AllowCustomWorkflows      *bool          `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
-	DeleteSourceBranchOnMerge *bool          `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
-	RepoLocking               *bool          `yaml:"repo_locking,omitempty" json:"repo_locking,omitempty"`
-	PolicyCheck               *bool          `yaml:"policy_check,omitempty" json:"policy_check,omitempty"`
-	CustomPolicyCheck         *bool          `yaml:"custom_policy_check,omitempty" json:"custom_policy_check,omitempty"`
+	ID                        string              `yaml:"id" json:"id"`
+	Branch                    string              `yaml:"branch" json:"branch"`
+	RepoConfigFile            string              `yaml:"repo_config_file" json:"repo_config_file"`
+	PlanRequirements          []string            `yaml:"plan_requirements" json:"plan_requirements"`
+	ApplyRequirements         []string            `yaml:"apply_requirements" json:"apply_requirements"`
+	ImportRequirements        []string            `yaml:"import_requirements" json:"import_requirements"`
+	PreWorkflowHooks          []WorkflowHook      `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
+	Workflow                  *string             `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	PostWorkflowHooks         []WorkflowHook      `yaml:"post_workflow_hooks" json:"post_workflow_hooks"`
+	AllowedWorkflows          []string            `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
+	AllowedOverrides          []string            `yaml:"allowed_overrides" json:"allowed_overrides"`
+	AllowCustomWorkflows      *bool               `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
+	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
+	RepoLocking               *bool               `yaml:"repo_locking,omitempty" json:"repo_locking,omitempty"`
+	PolicyCheck               *bool               `yaml:"policy_check,omitempty" json:"policy_check,omitempty"`
+	CustomPolicyCheck         *bool               `yaml:"custom_policy_check,omitempty" json:"custom_policy_check,omitempty"`
+	Autodiscover              *valid.Autodiscover `yaml:"autodiscover,omitempty" json:"autodiscover,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -193,8 +194,8 @@ func (r Repo) Validate() error {
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey && o != valid.PolicyCheckKey && o != valid.CustomPolicyCheckKey {
-				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q, %q, %q, %q, and %q are supported", o, valid.PlanRequirementsKey, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey, valid.PolicyCheckKey, valid.CustomPolicyCheckKey)
+			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey && o != valid.PolicyCheckKey && o != valid.CustomPolicyCheckKey && o != valid.AutoDiscoverKey {
+				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q, %q, %q, %q, %q, and %q are supported", o, valid.PlanRequirementsKey, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey, valid.PolicyCheckKey, valid.CustomPolicyCheckKey, valid.AutoDiscoverKey)
 			}
 		}
 		return nil
@@ -211,6 +212,16 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
+	autoDiscoverValid := func(value interface{}) error {
+		// var autoDiscover interface{} = value
+		// if autoDiscover != nil {
+		// 	if _, ok := autoDiscover.(Autodiscover); !ok {
+		// 		return fmt.Errorf("autodiscover must be a map like : autodiscover: \\n enabled: true")
+		// 	}
+		// }
+		return nil
+	}
+
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.ID, validation.Required, validation.By(idValid)),
 		validation.Field(&r.Branch, validation.By(branchValid)),
@@ -221,6 +232,7 @@ func (r Repo) Validate() error {
 		validation.Field(&r.ImportRequirements, validation.By(validImportReq)),
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
 		validation.Field(&r.DeleteSourceBranchOnMerge, validation.By(deleteSourceBranchOnMergeValid)),
+		validation.Field(&r.Autodiscover, validation.By(autoDiscoverValid)),
 	)
 }
 
@@ -333,5 +345,6 @@ OuterGlobalImportReqs:
 		RepoLocking:               r.RepoLocking,
 		PolicyCheck:               r.PolicyCheck,
 		CustomPolicyCheck:         r.CustomPolicyCheck,
+		AutoDiscover:              r.Autodiscover,
 	}
 }

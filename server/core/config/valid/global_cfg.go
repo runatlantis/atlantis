@@ -28,6 +28,7 @@ const DeleteSourceBranchOnMergeKey = "delete_source_branch_on_merge"
 const RepoLockingKey = "repo_locking"
 const PolicyCheckKey = "policy_check"
 const CustomPolicyCheckKey = "custom_policy_check"
+const AutoDiscoverKey = "auto_discover"
 
 // DefaultAtlantisFile is the default name of the config file for each repo.
 const DefaultAtlantisFile = "atlantis.yaml"
@@ -84,6 +85,7 @@ type Repo struct {
 	RepoLocking               *bool
 	PolicyCheck               *bool
 	CustomPolicyCheck         *bool
+	AutoDiscover              *Autodiscover
 }
 
 type MergedProjectCfg struct {
@@ -105,6 +107,7 @@ type MergedProjectCfg struct {
 	RepoLocking               bool
 	PolicyCheck               bool
 	CustomPolicyCheck         bool
+	AutoDiscover              Autodiscover
 }
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.
@@ -210,6 +213,7 @@ type GlobalCfgArgs struct {
 	PolicyCheckEnabled bool
 	PreWorkflowHooks   []*WorkflowHook
 	PostWorkflowHooks  []*WorkflowHook
+	AutoDiscover       *Autodiscover
 }
 
 func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
@@ -245,8 +249,9 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	deleteSourceBranchOnMerge := false
 	repoLockingKey := true
 	customPolicyCheck := false
+	autoDiscover := Autodiscover{Enabled: true}
 	if args.AllowRepoCfg {
-		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, PolicyCheckKey}
+		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, PolicyCheckKey, AutoDiscoverKey}
 		allowCustomWorkflows = true
 	}
 
@@ -269,6 +274,7 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 				RepoLocking:               &repoLockingKey,
 				PolicyCheck:               &policyCheck,
 				CustomPolicyCheck:         &customPolicyCheck,
+				AutoDiscover:              &autoDiscover,
 			},
 		},
 		Workflows: map[string]Workflow{
@@ -305,7 +311,7 @@ func (r Repo) IDString() string {
 // final config. It assumes that all configs have been validated.
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
 	log.Debug("MergeProjectCfg started")
-	planReqs, applyReqs, importReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge, repoLocking, policyCheck, customPolicyCheck := g.getMatchingCfg(log, repoID)
+	planReqs, applyReqs, importReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge, repoLocking, policyCheck, customPolicyCheck, autoDiscover := g.getMatchingCfg(log, repoID)
 
 	// If repos are allowed to override certain keys then override them.
 	for _, key := range allowedOverrides {
@@ -376,6 +382,11 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				log.Debug("overriding server-defined %s with repo settings: [%t]", CustomPolicyCheckKey, *proj.CustomPolicyCheck)
 				customPolicyCheck = *proj.CustomPolicyCheck
 			}
+		case AutoDiscoverKey:
+			if proj.Autodiscover != nil {
+				log.Debug("overriding server-defined %s with repo settings: [%t]", AutoDiscoverKey, *proj.Autodiscover)
+				autoDiscover = *proj.Autodiscover
+			}
 		}
 		log.Debug("MergeProjectCfg completed")
 	}
@@ -400,6 +411,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		RepoLocking:               repoLocking,
 		PolicyCheck:               policyCheck,
 		CustomPolicyCheck:         customPolicyCheck,
+		AutoDiscover:              autoDiscover,
 	}
 }
 
@@ -407,7 +419,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 // repo with id repoID. It is used when there is no repo config.
 func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
 	log.Debug("building config based on server-side config")
-	planReqs, applyReqs, importReqs, workflow, _, _, deleteSourceBranchOnMerge, repoLocking, policyCheck, customPolicyCheck := g.getMatchingCfg(log, repoID)
+	planReqs, applyReqs, importReqs, workflow, _, _, deleteSourceBranchOnMerge, repoLocking, policyCheck, customPolicyCheck, autoDiscoverCheck := g.getMatchingCfg(log, repoID)
 	return MergedProjectCfg{
 		PlanRequirements:          planReqs,
 		ApplyRequirements:         applyReqs,
@@ -423,6 +435,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		RepoLocking:               repoLocking,
 		PolicyCheck:               policyCheck,
 		CustomPolicyCheck:         customPolicyCheck,
+		AutoDiscover:              autoDiscoverCheck,
 	}
 }
 
@@ -528,7 +541,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 }
 
 // getMatchingCfg returns the key settings for repoID.
-func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (planReqs []string, applyReqs []string, importReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocking bool, policyCheck bool, customPolicyCheck bool) {
+func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (planReqs []string, applyReqs []string, importReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocking bool, policyCheck bool, customPolicyCheck bool, autoDiscover Autodiscover) {
 	toLog := make(map[string]string)
 	traceF := func(repoIdx int, repoID string, key string, val interface{}) string {
 		from := "default server config"
@@ -603,6 +616,11 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (pla
 					if repo.CustomPolicyCheck != nil {
 						toLog[CustomPolicyCheckKey] = traceF(i, repo.IDString(), CustomPolicyCheckKey, *repo.CustomPolicyCheck)
 						customPolicyCheck = *repo.CustomPolicyCheck
+					}
+				case AutoDiscoverKey:
+					if repo.AutoDiscover != nil {
+						toLog[AutoDiscoverKey] = traceF(i, repo.IDString(), AutoDiscoverKey, *repo.AutoDiscover)
+						autoDiscover = *repo.AutoDiscover
 					}
 				}
 			}

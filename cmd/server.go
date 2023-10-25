@@ -54,6 +54,7 @@ const (
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
+	AutoDiscover                     = "autodiscover"
 	AutomergeFlag                    = "automerge"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"

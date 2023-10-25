@@ -54,7 +54,7 @@ repos:
 
   # allowed_overrides specifies which keys can be overridden by this repo in
   # its atlantis.yaml file.
-  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge, repo_locking, custom_policy_check]
+  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge, repo_locking, custom_policy_check, autodiscover]
 
   # allowed_workflows specifies which workflows the repos that match 
   # are allowed to select.
@@ -87,6 +87,10 @@ repos:
 
   # policy_check defines if policy checking should be enable on this repository.
   policy_check: false
+
+  # autodiscover defines if atlantis should automatically discover projects in this repository.
+  autodiscover:
+    enabled: true
 
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
@@ -496,6 +500,7 @@ If you set a workflow with the key `default`, it will override this.
 | repo_locking                  | bool     | false   | no       | Whether or not to get a lock.                                                                                                                                                                                                                                                                             |
 | policy_check                  | bool     | false   | no       | Whether or not to run policy checks on this repository.                                                                                                                                                                                                                                                   |
 | custom_policy_check                  | bool     | false   | no       | Whether or not to enable custom policy check tools outside of Conftest on this repository.                                                                                                                                                                                                       |
+| autodiscover                  | Autodiscover     | true   | no       | Whether or not to enable autodiscover on this repository.                                                                                                                                                                                                                                                   |
 
 
 :::tip Notes

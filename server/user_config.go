@@ -16,8 +16,8 @@ type UserConfig struct {
 	AllowRepoConfig             bool               `mapstructure:"allow-repo-config"`
 	AllowCommands               string             `mapstructure:"allow-commands"`
 	AtlantisURL                 string             `mapstructure:"atlantis-url"`
-	Automerge                   bool               `mapstructure:"automerge"`
 	Autodiscover                valid.Autodiscover `mapstructure:"autodiscover"`
+	Automerge                   bool               `mapstructure:"automerge"`
 	AutoplanFileList            string             `mapstructure:"autoplan-file-list"`
 	AutoplanModules             bool               `mapstructure:"autoplan-modules"`
 	AutoplanModulesFromProjects string             `mapstructure:"autoplan-modules-from-projects"`

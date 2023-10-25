@@ -130,7 +130,7 @@ type Project struct {
 	WorkflowName              *string
 	TerraformVersion          *version.Version
 	Autoplan                  Autoplan
-	Autodiscover              Autodiscover
+	Autodiscover              *Autodiscover
 	PlanRequirements          []string
 	ApplyRequirements         []string
 	ImportRequirements        []string

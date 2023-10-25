@@ -47,6 +47,8 @@ need to be defined.
 ```yaml
 version: 3
 automerge: true
+autodiscover:
+  enabled: true
 delete_source_branch_on_merge: true
 parallel_plan: true
 parallel_apply: true
@@ -147,6 +149,15 @@ projects:
 ```
 This will stop Atlantis automatically running plan when `project1/` is updated
 in a pull request.
+
+### Disabling Autodiscover
+```
+version: 3
+autodiscover:
+  enabled: false
+```
+
+This will stop Atlantis automatically discovering projects in a repo.
 
 ### Run plans and applies in parallel
 

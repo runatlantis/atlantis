@@ -82,6 +82,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				RepoLocking:               Bool(true),
 				PolicyCheck:               Bool(false),
 				CustomPolicyCheck:         Bool(false),
+				AutoDiscover:              &valid.Autodiscover{Enabled: true},
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -95,6 +96,7 @@ func TestNewGlobalCfg(t *testing.T) {
 		mergeableReq       bool
 		unDivergedReq      bool
 		policyCheckEnabled bool
+		autoDiscover       *valid.Autodiscover
 	}{
 		{
 			allowRepoCfg:       false,
@@ -102,6 +104,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       false,
 			unDivergedReq:      false,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       true,
@@ -109,6 +112,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       false,
 			unDivergedReq:      false,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       false,
@@ -116,6 +120,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       false,
 			unDivergedReq:      false,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       false,
@@ -123,6 +128,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       true,
 			unDivergedReq:      false,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       false,
@@ -130,6 +136,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       true,
 			unDivergedReq:      false,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       true,
@@ -137,6 +144,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       true,
 			unDivergedReq:      false,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       false,
@@ -144,6 +152,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       false,
 			unDivergedReq:      true,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       true,
@@ -151,6 +160,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       false,
 			unDivergedReq:      true,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: true},
 		},
 		{
 			allowRepoCfg:       false,
@@ -158,6 +168,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       false,
 			unDivergedReq:      true,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       false,
@@ -165,6 +176,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       true,
 			unDivergedReq:      true,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       false,
@@ -172,6 +184,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       true,
 			unDivergedReq:      true,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       true,
@@ -179,6 +192,15 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       true,
 			unDivergedReq:      true,
 			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: true},
+		},
+		{
+			allowRepoCfg:       true,
+			approvedReq:        true,
+			mergeableReq:       true,
+			unDivergedReq:      true,
+			policyCheckEnabled: false,
+			autoDiscover:       &valid.Autodiscover{Enabled: false},
 		},
 		{
 			allowRepoCfg:       true,
@@ -186,12 +208,13 @@ func TestNewGlobalCfg(t *testing.T) {
 			mergeableReq:       true,
 			unDivergedReq:      true,
 			policyCheckEnabled: true,
+			autoDiscover:       &valid.Autodiscover{Enabled: true},
 		},
 	}
 
 	for _, c := range cases {
-		caseName := fmt.Sprintf("allow_repo: %t, approved: %t, mergeable: %t, undiverged: %t, policy_check: %t",
-			c.allowRepoCfg, c.approvedReq, c.mergeableReq, c.unDivergedReq, c.policyCheckEnabled)
+		caseName := fmt.Sprintf("allow_repo: %t, approved: %t, mergeable: %t, undiverged: %t, policy_check: %t, auto_discover: %t",
+			c.allowRepoCfg, c.approvedReq, c.mergeableReq, c.unDivergedReq, c.policyCheckEnabled, c.autoDiscover)
 		t.Run(caseName, func(t *testing.T) {
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:       c.allowRepoCfg,
@@ -199,6 +222,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				ApprovedReq:        c.approvedReq,
 				UnDivergedReq:      c.unDivergedReq,
 				PolicyCheckEnabled: c.policyCheckEnabled,
+				AutoDiscover:       c.autoDiscover,
 			}
 			act := valid.NewGlobalCfgFromArgs(globalCfgArgs)
 
@@ -209,7 +233,7 @@ func TestNewGlobalCfg(t *testing.T) {
 
 			if c.allowRepoCfg {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
-				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "policy_check"}
+				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "policy_check", "auto_discover"}
 			}
 			if c.mergeableReq {
 				exp.Repos[0].PlanRequirements = append(exp.Repos[0].PlanRequirements, "mergeable")
@@ -677,6 +701,7 @@ policies:
     - name: good-policy
       source: local
       path: rel/path/to/source
+
 `,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{

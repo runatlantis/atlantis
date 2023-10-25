@@ -1354,7 +1354,7 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   allowed_overrides: [invalid]`,
-			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"plan_requirements\", \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\", \"repo_locking\", \"policy_check\", and \"custom_policy_check\" are supported.).).",
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"plan_requirements\", \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\", \"repo_locking\", \"policy_check\", \"custom_policy_check\", and \"auto_discover\" are supported.).).",
 		},
 		"invalid plan_requirement": {
 			input: `repos:
@@ -1373,6 +1373,22 @@ func TestParseGlobalCfg(t *testing.T) {
 - id: /.*/
   import_requirements: [invalid]`,
 			expErr: "repos: (0: (import_requirements: \"invalid\" is not a valid import_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
+		},
+		"disable autodiscover": {
+			input: `repos: 
+- id: /.*/
+  autodiscover:
+    enabled: false`,
+			exp: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					defaultCfg.Repos[0],
+					{
+						IDRegex:      regexp.MustCompile(".*"),
+						AutoDiscover: &valid.Autodiscover{Enabled: false},
+					},
+				},
+				Workflows: defaultCfg.Workflows,
+			},
 		},
 		"no workflows key": {
 			input: `repos: []`,
@@ -1449,6 +1465,8 @@ repos:
   allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, delete_source_branch_on_merge]
   allow_custom_workflows: true
   policy_check: true
+  autodiscover:
+    enabled: true
 - id: /.*/
   branch: /(master|main)/
   pre_workflow_hooks:
@@ -1456,6 +1474,8 @@ repos:
   post_workflow_hooks:
     - run: custom workflow command
   policy_check: false
+  autodiscover:
+    enabled: false
 workflows:
   custom1:
     plan:
@@ -1502,6 +1522,7 @@ policies:
 						AllowedOverrides:     []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
 						PolicyCheck:          Bool(true),
+						AutoDiscover:         &valid.Autodiscover{Enabled: true},
 					},
 					{
 						IDRegex:           regexp.MustCompile(".*"),
@@ -1509,6 +1530,7 @@ policies:
 						PreWorkflowHooks:  preWorkflowHooks,
 						PostWorkflowHooks: postWorkflowHooks,
 						PolicyCheck:       Bool(false),
+						AutoDiscover:      &valid.Autodiscover{Enabled: false},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1619,6 +1641,7 @@ workflows:
 						RepoLocking:               Bool(true),
 						PolicyCheck:               Bool(false),
 						CustomPolicyCheck:         Bool(false),
+						AutoDiscover:              &valid.Autodiscover{Enabled: true},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
