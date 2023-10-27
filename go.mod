@@ -14,7 +14,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/go-github/v54 v54.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/google/uuid v1.3.1
+	github.com/google/uuid v1.4.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-getter/v2 v2.2.1
@@ -42,8 +42,8 @@ require (
 	github.com/uber-go/tally/v4 v4.1.10
 	github.com/urfave/negroni/v3 v3.0.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20221027055942-201c8e92e997
-	github.com/xanzy/go-gitlab v0.93.1
-	go.etcd.io/bbolt v1.3.7
+	github.com/xanzy/go-gitlab v0.93.2
+	go.etcd.io/bbolt v1.3.8
 	go.uber.org/zap v1.26.0
 	golang.org/x/term v0.13.0
 	golang.org/x/text v0.13.0
