@@ -370,12 +370,12 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	// Try to get the MR details a couple of times in case the pipeline is not yet assigned to the MR
 	refTarget := pull.HeadBranch
 
-	retries := 2
+	retries := 1
 	delay := 2 * time.Second
 	var mr *gitlab.MergeRequest
 	var err error
 
-	for i := 1; i <= retries; i++ {
+	for i := 0; i <= retries; i++ {
 		mr, err = g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
 		if err != nil {
 			return err
