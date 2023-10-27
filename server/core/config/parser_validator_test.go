@@ -162,8 +162,7 @@ workflows:
       - run: old 'shell parsing'
 `,
 			exp: valid.RepoCfg{
-				Version:      2,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 2,
 				Workflows: map[string]valid.Workflow{
 					"custom": {
 						Name:        "custom",
@@ -191,10 +190,9 @@ workflows:
 version: 3
 projects:`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
-				Projects:     nil,
-				Workflows:    map[string]valid.Workflow{},
+				Version:   3,
+				Projects:  nil,
+				Workflows: map[string]valid.Workflow{},
 			},
 		},
 		{
@@ -212,8 +210,7 @@ version: 3
 projects:
 - dir: .`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -238,8 +235,7 @@ projects:
 - dir: "."
 `,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -263,8 +259,7 @@ projects:
     when_modified: ["**/*.tf*"]
 `,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -286,8 +281,7 @@ projects:
 - dir: "."
 `,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -310,8 +304,7 @@ projects:
 workflows: ~
 `,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -339,8 +332,7 @@ workflows:
       steps:
 `,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -369,8 +361,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -404,8 +395,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -439,8 +429,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -474,8 +463,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -509,8 +497,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -544,8 +531,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -579,8 +565,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -614,8 +599,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -726,8 +710,7 @@ projects:
   dir: .
   workspace: workspace`,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Name:      String("myname"),
@@ -779,8 +762,7 @@ workflows:
       - state_rm
 `,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -879,8 +861,7 @@ workflows:
           extra_args: ["a", "b"]
 `,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -971,8 +952,7 @@ workflows:
       - run: echo apply "arg 4"
 `,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -1065,8 +1045,7 @@ workflows:
           value: env_value
 `,
 			exp: valid.RepoCfg{
-				Version:      3,
-				AutoDiscover: raw.DefaultAutoDiscover(),
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -1350,6 +1329,22 @@ func TestParseGlobalCfg(t *testing.T) {
   import_requirements: [invalid]`,
 			expErr: "repos: (0: (import_requirements: \"invalid\" is not a valid import_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
 		},
+		"disable autodiscover": {
+			input: `repos: 
+- id: /.*/
+  autodiscover:
+    mode: disabled`,
+			exp: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					defaultCfg.Repos[0],
+					{
+						IDRegex:      regexp.MustCompile(".*"),
+						AutoDiscover: &valid.AutoDiscover{Mode: valid.AutoDiscoverDisabledMode},
+					},
+				},
+				Workflows: defaultCfg.Workflows,
+			},
+		},
 		"no workflows key": {
 			input: `repos: []`,
 			exp:   defaultCfg,
@@ -1425,6 +1420,8 @@ repos:
   allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, delete_source_branch_on_merge]
   allow_custom_workflows: true
   policy_check: true
+  autodiscover:
+    mode: enabled
 - id: /.*/
   branch: /(master|main)/
   pre_workflow_hooks:
@@ -1432,6 +1429,8 @@ repos:
   post_workflow_hooks:
     - run: custom workflow command
   policy_check: false
+  autodiscover:
+    mode: disabled
 workflows:
   custom1:
     plan:
@@ -1478,6 +1477,7 @@ policies:
 						AllowedOverrides:     []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
 						PolicyCheck:          Bool(true),
+						AutoDiscover:         &valid.AutoDiscover{Mode: valid.AutoDiscoverEnabledMode},
 					},
 					{
 						IDRegex:           regexp.MustCompile(".*"),
@@ -1485,6 +1485,7 @@ policies:
 						PreWorkflowHooks:  preWorkflowHooks,
 						PostWorkflowHooks: postWorkflowHooks,
 						PolicyCheck:       Bool(false),
+						AutoDiscover:      &valid.AutoDiscover{Mode: valid.AutoDiscoverDisabledMode},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1595,6 +1596,7 @@ workflows:
 						RepoLocking:               Bool(true),
 						PolicyCheck:               Bool(false),
 						CustomPolicyCheck:         Bool(false),
+						AutoDiscover:              raw.DefaultAutoDiscover(),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1748,7 +1750,10 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
       "allowed_workflows": ["custom"],
       "apply_requirements": ["mergeable", "approved"],
       "allowed_overrides": ["workflow", "apply_requirements"],
-      "allow_custom_workflows": true
+      "allow_custom_workflows": true,
+	  "autodiscover": {
+		"mode": "enabled"
+	  }
     },
     {
       "id": "github.com/owner/repo"
@@ -1813,6 +1818,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 						AllowedWorkflows:     []string{"custom"},
 						AllowedOverrides:     []string{"workflow", "apply_requirements"},
 						AllowCustomWorkflows: Bool(true),
+						AutoDiscover:         &valid.AutoDiscover{Mode: valid.AutoDiscoverEnabledMode},
 					},
 					{
 						ID:                   "github.com/owner/repo",
@@ -1820,6 +1826,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 						ApplyRequirements:    nil,
 						AllowedOverrides:     nil,
 						AllowCustomWorkflows: nil,
+						AutoDiscover:         nil,
 					},
 				},
 				Workflows: map[string]valid.Workflow{

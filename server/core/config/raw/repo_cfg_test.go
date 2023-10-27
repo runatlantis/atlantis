@@ -127,10 +127,10 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 			input: `
 version: 3
 automerge: true
-parallel_apply: true
-parallel_plan: false
 autodiscover:
   mode: enabled
+parallel_apply: true
+parallel_plan: false
 projects:
 - dir: mydir
   workspace: myworkspace
@@ -246,9 +246,8 @@ func TestConfig_ToValid(t *testing.T) {
 			description: "nothing set",
 			input:       raw.RepoCfg{Version: Int(2)},
 			exp: valid.RepoCfg{
-				Version:      2,
-				AutoDiscover: raw.DefaultAutoDiscover(),
-				Workflows:    make(map[string]valid.Workflow),
+				Version:   2,
+				Workflows: make(map[string]valid.Workflow),
 			},
 		},
 		{
@@ -276,7 +275,6 @@ func TestConfig_ToValid(t *testing.T) {
 				Automerge:                  nil,
 				ParallelApply:              nil,
 				AbortOnExcecutionOrderFail: false,
-				AutoDiscover:               raw.DefaultAutoDiscover(),
 				Workflows:                  map[string]valid.Workflow{},
 			},
 		},
@@ -293,7 +291,6 @@ func TestConfig_ToValid(t *testing.T) {
 				Automerge:                  Bool(true),
 				ParallelApply:              Bool(true),
 				AbortOnExcecutionOrderFail: true,
-				AutoDiscover:               raw.DefaultAutoDiscover(),
 				Workflows:                  map[string]valid.Workflow{},
 			},
 		},
@@ -310,26 +307,21 @@ func TestConfig_ToValid(t *testing.T) {
 				Automerge:                  Bool(false),
 				ParallelApply:              Bool(false),
 				AbortOnExcecutionOrderFail: false,
-				AutoDiscover:               raw.DefaultAutoDiscover(),
 				Workflows:                  map[string]valid.Workflow{},
 			},
 		},
 		{
-			description: "autodiscovery omitted",
+			description: "autodiscover omitted",
 			input: raw.RepoCfg{
-				Version:      Int(2),
-				AutoDiscover: nil,
+				Version: Int(2),
 			},
 			exp: valid.RepoCfg{
-				Version: 2,
-				AutoDiscover: &valid.AutoDiscover{
-					Mode: valid.AutoDiscoverAutoMode,
-				},
+				Version:   2,
 				Workflows: map[string]valid.Workflow{},
 			},
 		},
 		{
-			description: "autodiscovery included",
+			description: "autodiscover included",
 			input: raw.RepoCfg{
 				Version:      Int(2),
 				AutoDiscover: &raw.AutoDiscover{Mode: &auto_discover_enabled},
@@ -370,7 +362,6 @@ func TestConfig_ToValid(t *testing.T) {
 						StateRm:     valid.DefaultStateRmStage,
 					},
 				},
-				AutoDiscover: raw.DefaultAutoDiscover(),
 			},
 		},
 		{

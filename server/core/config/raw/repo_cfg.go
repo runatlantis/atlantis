@@ -72,7 +72,7 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		abortOnExcecutionOrderFail = *r.AbortOnExcecutionOrderFail
 	}
 
-	autoDiscover := DefaultAutoDiscover()
+	var autoDiscover *valid.AutoDiscover = nil
 	if r.AutoDiscover != nil {
 		autoDiscover = r.AutoDiscover.ToValid()
 	}

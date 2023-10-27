@@ -29,6 +29,14 @@ const (
 	// DefaultWorkspace is the default Terraform workspace we run commands in.
 	// This is also Terraform's default workspace.
 	DefaultWorkspace = "default"
+	// DefaultAutomergeEnabled is the default for the automerge setting.
+	DefaultAutomergeEnabled = false
+	// DefaultAutoDiscoverEnabled is the default for the auto discover setting.
+	DefaultAutoDiscoverEnabled = true
+	// DefaultParallelApplyEnabled is the default for the parallel apply setting.
+	DefaultParallelApplyEnabled = false
+	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
+	DefaultParallelPlanEnabled = false
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
 	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
@@ -55,6 +63,7 @@ func NewInstrumentedProjectCommandBuilder(
 	RestrictFileList bool,
 	SilenceNoProjects bool,
 	IncludeGitUntrackedFiles bool,
+	AutoDiscoverMode string,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 	terraformClient terraform.Client,
@@ -86,6 +95,7 @@ func NewInstrumentedProjectCommandBuilder(
 			RestrictFileList,
 			SilenceNoProjects,
 			IncludeGitUntrackedFiles,
+			AutoDiscoverMode,
 			scope,
 			logger,
 			terraformClient,
@@ -115,6 +125,7 @@ func NewProjectCommandBuilder(
 	RestrictFileList bool,
 	SilenceNoProjects bool,
 	IncludeGitUntrackedFiles bool,
+	AutoDiscoverMode string,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 	terraformClient terraform.Client,
@@ -137,6 +148,7 @@ func NewProjectCommandBuilder(
 		RestrictFileList:         RestrictFileList,
 		SilenceNoProjects:        SilenceNoProjects,
 		IncludeGitUntrackedFiles: IncludeGitUntrackedFiles,
+		AutoDiscoverMode:         AutoDiscoverMode,
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
@@ -243,6 +255,8 @@ type DefaultProjectCommandBuilder struct {
 	SilenceNoProjects bool
 	// User config option: Include git untracked files in the modified file list.
 	IncludeGitUntrackedFiles bool
+	// User config option: Controls auto-discovery of projects in a repository.
+	AutoDiscoverMode string
 	// Handles the actual running of Terraform commands.
 	TerraformExecutor terraform.Client
 }
@@ -337,6 +351,13 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 
 	ctx.Log.Debug("%d files were modified in this pull request. Modified files: %v", len(modifiedFiles), modifiedFiles)
 
+	// Get default AutoDiscoverMode from userConfig/globalConfig
+	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
+	globalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
+	if globalAutoDiscover != nil {
+		defaultAutoDiscoverMode = globalAutoDiscover.Mode
+	}
+
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
 		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
 		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Pull, repoCfgFile)
@@ -350,8 +371,12 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 				return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 			}
 			ctx.Log.Info("successfully parsed remote %s file", repoCfgFile)
+
+			if repoCfg.AutoDiscover != nil {
+				defaultAutoDiscoverMode = repoCfg.AutoDiscover.Mode
+			}
 			// If auto_discovery is enabled, we never want to skip cloning
-			if !repoCfg.AutoDiscoverEnabled() {
+			if !repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode) {
 				if len(repoCfg.Projects) > 0 {
 					matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
 					if err != nil {
@@ -408,6 +433,10 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 		}
 		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+		// This above condition to set this may not have been reached
+		if repoCfg.AutoDiscover != nil {
+			defaultAutoDiscoverMode = repoCfg.AutoDiscover.Mode
+		}
 	}
 
 	moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
@@ -456,13 +485,13 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
-					repoCfg.AbortOnExcecutionOrderFail,
+					abortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
 	}
 
-	if repoCfg.AutoDiscoverEnabled() {
+	if repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode) {
 		// If there is no config file or it specified no projects, then we'll plan each project that
 		// our algorithm determines was modified.
 		if hasRepoCfg {
@@ -800,6 +829,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	}
 	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
+
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan

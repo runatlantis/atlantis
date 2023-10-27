@@ -53,9 +53,9 @@ manually configured project, the manually configured project will take precedenc
 ```yaml
 version: 3
 automerge: true
-delete_source_branch_on_merge: true
-autoplan:
+autodiscover:
   mode: auto
+delete_source_branch_on_merge: true
 parallel_plan: true
 parallel_apply: true
 abort_on_execution_order_fail: true

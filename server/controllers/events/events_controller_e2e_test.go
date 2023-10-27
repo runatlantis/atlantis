@@ -1326,6 +1326,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		false,
 		false,
 		false,
+		"auto",
 		statsScope,
 		logger,
 		terraformClient,

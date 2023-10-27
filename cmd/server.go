@@ -54,6 +54,7 @@ const (
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
+	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
@@ -152,6 +153,7 @@ const (
 	DefaultADBasicUser                  = ""
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
+	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
@@ -210,6 +212,12 @@ var stringFlags = map[string]stringFlag{
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
+	},
+	AutoDiscoverModeFlag: {
+		description: "Auto discover mode controls whether projects in a repo are discovered by Atlantis. Defaults to \"auto\" which " +
+			"means projects will be discovered when no explicit projects are defined in repo config. Also supports \"enabled\" (always " +
+			"discover projects) and \"disabled\" (never discover projects).",
+		defaultValue: DefaultAutoDiscoverMode,
 	},
 	AutoplanModulesFromProjects: {
 		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
@@ -883,6 +891,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.WebPassword == "" {
 		c.WebPassword = DefaultWebPassword
+	}
+	if c.AutoDiscoverModeFlag == "" {
+		c.AutoDiscoverModeFlag = DefaultAutoDiscoverMode
 	}
 }
 
