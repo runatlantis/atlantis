@@ -18,9 +18,9 @@ The default mode of AutoDiscover is "auto". This is equivalent to the below sett
       mode: auto
     ```
 1. Server Flags
-```
-atlantis server --autodiscover-mode=auto
-```
+    ```
+    atlantis server --autodiscover-mode=auto
+    ```
 
 ### Disabling auto discover unconditionally 
 1. In the server repo config file:
@@ -36,9 +36,9 @@ atlantis server --autodiscover-mode=auto
       mode: disabled
     ```
 1. Server Flags
-```
-atlantis server --autodiscover-mode=disabled
-```
+    ```
+    atlantis server --autodiscover-mode=disabled
+    ```
 
 ### Enabling auto discover unconditionally 
 1. In the server repo config file:
@@ -52,8 +52,8 @@ atlantis server --autodiscover-mode=disabled
     version: 3
     autodiscover:
       mode: enabled
-
+    ```
 1. Server Flags
-```
-atlantis server --autodiscover-mode=enabled
-```
+    ```
+    atlantis server --autodiscover-mode=enabled
+    ```
