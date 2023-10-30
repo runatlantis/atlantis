@@ -200,7 +200,7 @@ func (w *FileWorkspace) HasDiverged(cloneDir string) bool {
 		return false
 	}
 
-	statusFetchCmd := exec.Command("git", "remote", "update")
+	statusFetchCmd := exec.Command("git", "fetch")
 	statusFetchCmd.Dir = cloneDir
 	outputStatusFetch, err := statusFetchCmd.CombinedOutput()
 	if err != nil {
