@@ -19,7 +19,7 @@ func Test_githubAppTokenRotator_GenerateJob(t *testing.T) {
 	Ok(t, err)
 
 	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, logging.NewNoopLogger(t))
+	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode("good-code")
 	Ok(t, err)

@@ -106,6 +106,7 @@ const (
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
+	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
@@ -590,6 +591,10 @@ var intFlags = map[string]intFlag{
 			" How many commits to include in each of base and feature branches when cloning repository." +
 			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
 		defaultValue: DefaultCheckoutDepth,
+	},
+	MaxCommentsPerCommand: {
+		description:  "If non-zero, the maximum number of comments to split command output into before truncating.",
+		defaultValue: 0,
 	},
 	ParallelPoolSize: {
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",

@@ -693,6 +693,18 @@ This is useful when you have many projects and want to keep the pull request cle
 
   Defaults to the atlantis home directory `/home/atlantis/.markdown_templates/` in `/$HOME/.markdown_templates`.
 
+### `--max-comments-per-command`
+  ```bash
+  atlantis server --max-comments-per-command=10
+  # or
+  ATLANTIS_MAX_COMMENTS_PER_COMMAND=10
+  ```
+  When a command's output is large, Atlantis automatically splits it into multiple comments with a maximum size based
+  on the specific VCS. By default, Atlantis will post enough comments to include the full command output. If your
+  command has a huge amount of output (eg, from setting `TF_LOG=debug`), the amount of comments may be enough to make
+  it challenging to read your PR, or it may even cause your VCS to rate limit Atlantis. Set this option to a non-zero
+  number to make Atlantis truncate output after this many comments.
+
 ### `--parallel-apply`
   ```bash
   atlantis server --parallel-apply

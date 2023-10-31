@@ -136,7 +136,7 @@ func (b *Client) GetProjectKey(repoName string, cloneURL string) (string, error)
 func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
 	sepEnd := "\n```\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n```diff\n"
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, 0, "")
 	for _, c := range comments {
 		if err := b.postComment(repo, pullNum, c); err != nil {
 			return err

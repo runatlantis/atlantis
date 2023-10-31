@@ -41,12 +41,13 @@ var (
 
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
-	user     string
-	client   *github.Client
-	v4Client *githubv4.Client
-	ctx      context.Context
-	logger   logging.SimpleLogging
-	config   GithubConfig
+	user                  string
+	client                *github.Client
+	v4Client              *githubv4.Client
+	ctx                   context.Context
+	logger                logging.SimpleLogging
+	config                GithubConfig
+	maxCommentsPerCommand int
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -77,7 +78,7 @@ type GithubPRReviewSummary struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, logger logging.SimpleLogging) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, maxCommentsPerCommand int, logger logging.SimpleLogging) (*GithubClient, error) {
 	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
@@ -107,12 +108,13 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		return nil, errors.Wrap(err, "getting user")
 	}
 	return &GithubClient{
-		user:     user,
-		client:   client,
-		v4Client: v4Client,
-		ctx:      context.Background(),
-		logger:   logger,
-		config:   config,
+		user:                  user,
+		client:                client,
+		v4Client:              v4Client,
+		ctx:                   context.Background(),
+		logger:                logger,
+		config:                config,
+		maxCommentsPerCommand: maxCommentsPerCommand,
 	}, nil
 }
 
@@ -187,7 +189,10 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 			"```diff\n"
 	}
 
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	truncationFooter := "\n```\n</details>" +
+		"\n<br>\n\n**Warning**: Command output is larger than the maximum number of comments per command. Output truncated."
+
+	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, g.maxCommentsPerCommand, truncationFooter)
 	for i := range comments {
 		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
 		g.logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
