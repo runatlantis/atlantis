@@ -645,7 +645,7 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			// If there are locks to delete at the end, that will take a comment
 			if !c.ExpNoLocksToDelete {
-				expNumReplies += 1
+				expNumReplies++
 			}
 
 			if c.ExpAutoplan {
