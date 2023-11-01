@@ -28,7 +28,6 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -70,7 +69,6 @@ const (
 	DataDirFlag                      = "data-dir"
 	DefaultTFVersionFlag             = "default-tf-version"
 	DisableApplyAllFlag              = "disable-apply-all"
-	DisableApplyFlag                 = "disable-apply"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
@@ -441,10 +439,6 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableApplyAllFlag: {
 		description:  "Disable \"atlantis apply\" command without any flags (i.e. apply all). A specific project/workspace/directory has to be specified for applies.",
-		defaultValue: false,
-	},
-	DisableApplyFlag: {
-		description:  "Disable all \"atlantis apply\" command regardless of which flags are passed with it.",
 		defaultValue: false,
 	},
 	DisableAutoplanFlag: {
@@ -1095,16 +1089,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	if userConfig.RequireMergeable {
 		deprecatedFlags = append(deprecatedFlags, RequireMergeableFlag)
 		commandReqs = append(commandReqs, valid.MergeableCommandReq)
-	}
-	if userConfig.DisableApply {
-		deprecatedFlags = append(deprecatedFlags, DisableApplyFlag)
-		var filtered []string
-		for _, allowCommand := range strings.Split(userConfig.AllowCommands, ",") {
-			if allowCommand != command.Apply.String() {
-				filtered = append(filtered, allowCommand)
-			}
-		}
-		userConfig.AllowCommands = strings.Join(filtered, ",")
 	}
 
 	// Build up strings with what the recommended yaml and json config should

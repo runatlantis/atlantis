@@ -32,7 +32,6 @@ type UserConfig struct {
 	CheckoutStrategy            string `mapstructure:"checkout-strategy"`
 	DataDir                     string `mapstructure:"data-dir"`
 	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
-	DisableApply                bool   `mapstructure:"disable-apply"`
 	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
 	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`
 	DisableMarkdownFolding      bool   `mapstructure:"disable-markdown-folding"`

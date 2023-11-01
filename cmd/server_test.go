@@ -57,7 +57,7 @@ var testFlags = map[string]interface{}{
 	ADWebhookPasswordFlag:            "ad-wh-pass",
 	ADWebhookUserFlag:                "ad-wh-user",
 	AtlantisURLFlag:                  "url",
-	AllowCommandsFlag:                "version,plan,unlock,import,approve_policies", // apply is disabled by DisableApply
+	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
 	AllowForkPRsFlag:                 true,
 	AllowRepoConfigFlag:              true,
 	AutomergeFlag:                    true,
@@ -70,7 +70,6 @@ var testFlags = map[string]interface{}{
 	DataDirFlag:                      "/path",
 	DefaultTFVersionFlag:             "v0.11.0",
 	DisableApplyAllFlag:              true,
-	DisableApplyFlag:                 true,
 	DisableMarkdownFoldingFlag:       true,
 	DisableRepoLockingFlag:           true,
 	DiscardApprovalOnPlanFlag:        true,
@@ -785,16 +784,6 @@ func TestExecute_BothSilenceAllowAndWhitelistErrors(t *testing.T) {
 	}, t)
 	err := c.Execute()
 	ErrEquals(t, "both --silence-allowlist-errors and --silence-whitelist-errors cannot be set–use --silence-allowlist-errors", err)
-}
-
-func TestExecute_DisableApplyDeprecation(t *testing.T) {
-	c := setupWithDefaults(map[string]interface{}{
-		DisableApplyFlag:  true,
-		AllowCommandsFlag: "plan,apply,unlock",
-	}, t)
-	err := c.Execute()
-	Ok(t, err)
-	Equals(t, "plan,unlock", passedConfig.AllowCommands)
 }
 
 // Test that we set the corresponding allow list values on the userConfig
