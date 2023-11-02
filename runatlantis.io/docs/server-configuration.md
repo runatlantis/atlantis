@@ -112,15 +112,15 @@ Values are chosen in this order:
   # or
   ATLANTIS_AUTODISCOVER_MODE="<auto|enabled|disabled>"
   ```
-  Sets auto discover mode, default is "auto". When set to "auto", projects in a repo will be discovered by
+  Sets auto discover mode, default is `auto`. When set to `auto`, projects in a repo will be discovered by
   Atlantis when there are no projects configured in the repo config. If one or more projects are defined
   in the repo config then auto discovery will be completely disabled.
 
-  When set to "enabled" projects will be discovered unconditionally. If an auto discovered project is already
+  When set to `enabled` projects will be discovered unconditionally. If an auto discovered project is already
   defined in the projects section of the repo config, the project from the repo config will take precedence over
   the auto discovered project.
 
-  When set to "disabled" projects will never be discovered, even if there are no projects configured in the repo config.
+  When set to `disabled` projects will never be discovered, even if there are no projects configured in the repo config.
 
 ### `--automerge`
   ```bash

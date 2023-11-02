@@ -214,9 +214,9 @@ var stringFlags = map[string]stringFlag{
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
 	},
 	AutoDiscoverModeFlag: {
-		description: "Auto discover mode controls whether projects in a repo are discovered by Atlantis. Defaults to \"auto\" which " +
-			"means projects will be discovered when no explicit projects are defined in repo config. Also supports \"enabled\" (always " +
-			"discover projects) and \"disabled\" (never discover projects).",
+		description: "Auto discover mode controls whether projects in a repo are discovered by Atlantis. Defaults to 'auto' which " +
+			"means projects will be discovered when no explicit projects are defined in repo config. Also supports 'enabled' (always " +
+			"discover projects) and 'disabled' (never discover projects).",
 		defaultValue: DefaultAutoDiscoverMode,
 	},
 	AutoplanModulesFromProjects: {

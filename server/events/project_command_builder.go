@@ -29,14 +29,6 @@ const (
 	// DefaultWorkspace is the default Terraform workspace we run commands in.
 	// This is also Terraform's default workspace.
 	DefaultWorkspace = "default"
-	// DefaultAutomergeEnabled is the default for the automerge setting.
-	DefaultAutomergeEnabled = false
-	// DefaultAutoDiscoverEnabled is the default for the auto discover setting.
-	DefaultAutoDiscoverEnabled = true
-	// DefaultParallelApplyEnabled is the default for the parallel apply setting.
-	DefaultParallelApplyEnabled = false
-	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
-	DefaultParallelPlanEnabled = false
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
 	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
@@ -433,7 +425,12 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 		}
 		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
-		// This above condition to set this may not have been reached
+		// It's possible we've already set defaultAutoDiscoverMode
+		// from the config file while checking whether we can skip
+		// cloning. We still need to set it here in the case that
+		// we were not able to check whether we can skip cloning
+		// and thus were not able to previously fetch the repo
+		// config.
 		if repoCfg.AutoDiscover != nil {
 			defaultAutoDiscoverMode = repoCfg.AutoDiscover.Mode
 		}
@@ -504,8 +501,10 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			ctx.Log.Info("found no %s file", repoCfgFile)
 		}
 		// build a module index for projects that are explicitly included
-		allModifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
-		// If a project is already manually configured with the same dir as a discovered project, the manually configured project should take precedence
+		allModifiedProjects := p.ProjectFinder.DetermineProjects(
+			ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
+		// If a project is already manually configured with the same dir as a discovered project, the manually configured
+		// project should take precedence
 		modifiedProjects := make([]models.Project, 0)
 		configuredProjDirs := make(map[string]bool)
 		// We compare against all configured projects instead of projects which match the modified files in case a
@@ -521,7 +520,8 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 				modifiedProjects = append(modifiedProjects, mp)
 			}
 		}
-		ctx.Log.Info("automatically determined that there were %d additional projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
+		ctx.Log.Info("automatically determined that there were %d additional projects modified in this pull request: %s",
+			len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, repoDir)

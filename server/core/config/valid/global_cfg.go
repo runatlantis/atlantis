@@ -430,6 +430,9 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 	}
 }
 
+// RepoAutoDiscoverCfg returns the AutoDiscover config from the global config
+// for the repo with id repoID. If no matching repo is found or there is no
+// AutoDiscover config then this function returns nil.
 func (g GlobalCfg) RepoAutoDiscoverCfg(repoID string) *AutoDiscover {
 	repo := g.MatchingRepo(repoID)
 	if repo != nil {
