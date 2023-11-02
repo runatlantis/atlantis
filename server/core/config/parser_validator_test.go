@@ -1751,9 +1751,9 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
       "apply_requirements": ["mergeable", "approved"],
       "allowed_overrides": ["workflow", "apply_requirements"],
       "allow_custom_workflows": true,
-	  "autodiscover": {
-		"mode": "enabled"
-	  }
+      "autodiscover": {
+        "mode": "enabled"
+      }
     },
     {
       "id": "github.com/owner/repo"

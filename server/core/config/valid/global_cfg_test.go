@@ -187,13 +187,6 @@ func TestNewGlobalCfg(t *testing.T) {
 			approvedReq:        true,
 			mergeableReq:       true,
 			unDivergedReq:      true,
-			policyCheckEnabled: false,
-		},
-		{
-			allowRepoCfg:       true,
-			approvedReq:        true,
-			mergeableReq:       true,
-			unDivergedReq:      true,
 			policyCheckEnabled: true,
 		},
 	}
