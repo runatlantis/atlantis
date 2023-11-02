@@ -75,6 +75,7 @@ const (
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
+	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
@@ -135,7 +136,7 @@ const (
 	RestrictFileList           = "restrict-file-list"
 	TFDownloadFlag             = "tf-download"
 	TFDownloadURLFlag          = "tf-download-url"
-	UseTFPluginCache             = "use-tf-plugin-cache"
+	UseTFPluginCache           = "use-tf-plugin-cache"
 	VarFileAllowlistFlag       = "var-file-allowlist"
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
@@ -260,6 +261,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	DisableAutoplanLabelFlag: {
 		description:  "Pull request label to disable atlantis auto planning feature only if present.",
+		defaultValue: "",
+	},
+	DisableUnlockLabelFlag: {
+		description:  "Pull request label to disable atlantis unlock feature only if present.",
 		defaultValue: "",
 	},
 	EmojiReaction: {
