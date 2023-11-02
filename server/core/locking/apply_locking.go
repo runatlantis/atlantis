@@ -31,7 +31,7 @@ type ApplyLocker interface {
 // ApplyCommandLock contains information about apply command lock status.
 type ApplyCommandLock struct {
 	// Locked is true is when apply commands are locked
-	// Either by using omitting apply from `--allow-commands` or creating a global ApplyCommandLock
+	// Either by using omitting apply from AllowCommands or creating a global ApplyCommandLock
 	// DisableApply lock take precedence when set
 	Locked  bool
 	Time    time.Time
