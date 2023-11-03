@@ -3,7 +3,7 @@
 ARG ALPINE_TAG=3.18.4
 ARG DEBIAN_TAG=12.2-slim
 
-ARG DEFAULT_TERRAFORM_VERSION=1.5.7
+ARG DEFAULT_TERRAFORM_VERSION=1.6.3
 ARG DEFAULT_CONFTEST_VERSION=0.46.0
 
 # Stage 1: build artifact and download deps
@@ -135,7 +135,7 @@ ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 # Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
-RUN AVAILABLE_TERRAFORM_VERSIONS="1.2.9 1.3.10 1.4.6 ${DEFAULT_TERRAFORM_VERSION}" && \
+RUN AVAILABLE_TERRAFORM_VERSIONS="1.3.10 1.4.6 1.5.7 ${DEFAULT_TERRAFORM_VERSION}" && \
     case "${TARGETPLATFORM}" in \
         "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
         "linux/arm64") TERRAFORM_ARCH=arm64 ;; \
