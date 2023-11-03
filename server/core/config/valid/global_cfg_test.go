@@ -679,7 +679,6 @@ policies:
     - name: good-policy
       source: local
       path: rel/path/to/source
-
 `,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{

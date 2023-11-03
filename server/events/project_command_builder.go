@@ -829,7 +829,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	}
 	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
-
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan

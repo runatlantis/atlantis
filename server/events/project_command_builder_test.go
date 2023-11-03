@@ -982,6 +982,7 @@ projects:
 - name: project1-custom-name
   dir: project1`,
 			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			// project2 is autodiscovered, whereas project1 is not
 			Exp: []expCtxFields{
 				{
 					ProjectName: "project1-custom-name",
