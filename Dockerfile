@@ -94,25 +94,24 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 # install gosu
 # We use gosu to step down from root and run as the atlantis user
 # renovate: datasource=github-releases depName=tianon/gosu
-#ENV GOSU_VERSION=1.16
-ENV GOSU_VERSION=1.16-8
+ENV GOSU_VERSION=1.17
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GOSU_ARCH=amd64 ;; \
         #"linux/arm64") GOSU_ARCH=arm64 ;; \
         #"linux/arm/v7") GOSU_ARCH=armhf ;; \
     esac && \
-    #curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" && \
-    curl -L -s --output gosu "https://github.com/checkout-anywhere/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" && \
-    #curl -L -s --output gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" && \
-    # for server in $(shuf -e ipv4.pool.sks-keyservers.net \
-    #                         hkp://p80.pool.sks-keyservers.net:80 \
-    #                         keyserver.ubuntu.com \
-    #                         hkp://keyserver.ubuntu.com:80 \
-    #                         pgp.mit.edu) ; do \
-    #     gpg --keyserver "$server" --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 && break || : ; \
-    # done && \
-    # gpg --batch --verify gosu.asc gosu && \
+    curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" && \
+    #curl -L -s --output gosu "https://github.com/checkout-anywhere/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" && \
+    curl -L -s --output gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" && \
+    for server in $(shuf -e ipv4.pool.sks-keyservers.net \
+                             hkp://p80.pool.sks-keyservers.net:80 \
+                             keyserver.ubuntu.com \
+                             hkp://keyserver.ubuntu.com:80 \
+                             pgp.mit.edu) ; do \
+         gpg --keyserver "$server" --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 && break || : ; \
+    done && \
+    gpg --batch --verify gosu.asc gosu && \
     chmod +x gosu && \
     cp gosu /bin && \
     gosu --version
