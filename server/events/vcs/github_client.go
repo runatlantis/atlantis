@@ -403,16 +403,6 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 		return false, errors.Wrap(err, "getting combined status")
 	}
 
-	//iterate over statuses - return false if we find one that isn't "apply" and doesn't have state = "success"
-	for _, r := range status.Statuses {
-		if strings.HasPrefix(*r.Context, fmt.Sprintf("%s/%s", vcstatusname, command.Apply.String())) {
-			continue
-		}
-		if *r.State != "success" {
-			return false, nil
-		}
-	}
-
 	//get required status checks
 	required, resp, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner, repo.Name, *pull.Base.Ref)
 	g.logger.Debug("GET /repos/%v/%v/branches/%s/protection returned: %v", repo.Owner, repo.Name, *pull.Base.Ref, resp.StatusCode)
@@ -422,6 +412,16 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 
 	if required.RequiredStatusChecks == nil {
 		return true, nil
+	}
+
+	//iterate over statuses - return false if we find one that isn't "apply", is a required status and doesn't have state = "success"
+	for _, r := range status.Statuses {
+		if strings.HasPrefix(*r.Context, fmt.Sprintf("%s/%s", vcstatusname, command.Apply.String())) {
+			continue
+		}
+		if isRequiredCheck(*r.Context, required.RequiredStatusChecks.Contexts) && *r.State != "success" {
+			return false, nil
+		}
 	}
 
 	//check check suite/check run api
