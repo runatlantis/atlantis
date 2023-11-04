@@ -278,7 +278,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
-						exp := fmt.Sprintf(`{"state":"%s","ref":"test","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
+						exp := fmt.Sprintf(`{"state":"%s","ref":"patch-1-merger","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
 						Equals(t, exp, string(body))
 						defer r.Body.Close()  // nolint: errcheck
 						w.Write([]byte("{}")) // nolint: errcheck
