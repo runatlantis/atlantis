@@ -12,7 +12,6 @@ import (
 // the config is parsed from a YAML file.
 type UserConfig struct {
 	AllowForkPRs                bool   `mapstructure:"allow-fork-prs"`
-	AllowRepoConfig             bool   `mapstructure:"allow-repo-config"`
 	AllowCommands               string `mapstructure:"allow-commands"`
 	AtlantisURL                 string `mapstructure:"atlantis-url"`
 	Automerge                   bool   `mapstructure:"automerge"`

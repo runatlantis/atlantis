@@ -52,7 +52,6 @@ const (
 	ADHostnameFlag                   = "azuredevops-hostname"
 	AllowCommandsFlag                = "allow-commands"
 	AllowForkPRsFlag                 = "allow-fork-prs"
-	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutomergeFlag                    = "automerge"
 	ParallelPlanFlag                 = "parallel-plan"
@@ -423,13 +422,6 @@ var boolFlags = map[string]boolFlag{
 	AllowForkPRsFlag: {
 		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
 		defaultValue: false,
-	},
-	AllowRepoConfigFlag: {
-		description: "Allow repositories to use atlantis.yaml files to customize the commands Atlantis runs." +
-			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
-			" on the Atlantis server.",
-		defaultValue: false,
-		hidden:       true,
 	},
 	AutoplanModules: {
 		description:  "Automatically plan projects that have a changed module from the local repository.",
@@ -1118,11 +1110,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		jsonCfg += fmt.Sprintf(`, "plan_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
 		jsonCfg += fmt.Sprintf(`, "apply_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
 		jsonCfg += fmt.Sprintf(`, "import_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
-	}
-	if userConfig.AllowRepoConfig {
-		deprecatedFlags = append(deprecatedFlags, AllowRepoConfigFlag)
-		yamlCfg += "\n  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, policy_check]\n  allow_custom_workflows: true"
-		jsonCfg += `, "allowed_overrides":["plan_requirements","apply_requirements","import_requirements","workflow", "policy_check"], "allow_custom_workflows":true`
 	}
 	jsonCfg += "}]}"
 

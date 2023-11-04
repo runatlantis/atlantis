@@ -168,7 +168,6 @@ projects:
 			}
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
 				MergeableReq:  false,
 				ApprovedReq:   false,
 				UnDivergedReq: false,
@@ -521,10 +520,10 @@ projects:
 				}
 
 				globalCfgArgs := valid.GlobalCfgArgs{
-					AllowRepoCfg:  true,
-					MergeableReq:  false,
-					ApprovedReq:   false,
-					UnDivergedReq: false,
+					AllowAllRepoSettings: true,
+					MergeableReq:         false,
+					ApprovedReq:          false,
+					UnDivergedReq:        false,
 				}
 
 				terraformClient := terraform_mocks.NewMockClient()
@@ -710,10 +709,10 @@ projects:
 			}
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
@@ -978,10 +977,10 @@ projects:
 			}
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
@@ -1081,7 +1080,6 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	userConfig := defaultUserConfig
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  false,
 		MergeableReq:  false,
 		ApprovedReq:   false,
 		UnDivergedReq: false,
@@ -1174,10 +1172,10 @@ projects:
 		Any[string]())).ThenReturn(repoDir, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  true,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
+		AllowAllRepoSettings: true,
+		MergeableReq:         false,
+		ApprovedReq:          false,
+		UnDivergedReq:        false,
 	}
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
@@ -1267,10 +1265,10 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
@@ -1430,10 +1428,10 @@ projects:
 				Any[string]())).ThenReturn(tmpDir, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
@@ -1539,10 +1537,10 @@ parallel_plan: true`,
 		logger := logging.NewNoopLogger(t)
 
 		globalCfgArgs := valid.GlobalCfgArgs{
-			AllowRepoCfg:  true,
-			MergeableReq:  false,
-			ApprovedReq:   false,
-			UnDivergedReq: false,
+			AllowAllRepoSettings: true,
+			MergeableReq:         false,
+			ApprovedReq:          false,
+			UnDivergedReq:        false,
 		}
 		scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 		terraformClient := terraform_mocks.NewMockClient()
@@ -1607,11 +1605,11 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:       false,
-		MergeableReq:       false,
-		ApprovedReq:        false,
-		UnDivergedReq:      false,
-		PolicyCheckEnabled: true,
+		AllowAllRepoSettings: false,
+		MergeableReq:         false,
+		ApprovedReq:          false,
+		UnDivergedReq:        false,
+		PolicyCheckEnabled:   true,
 	}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
@@ -1702,10 +1700,10 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	userConfig := defaultUserConfig
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  false,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
+		AllowAllRepoSettings: false,
+		MergeableReq:         false,
+		ApprovedReq:          false,
+		UnDivergedReq:        false,
 	}
 	terraformClient := terraform_mocks.NewMockClient()
 	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
@@ -1810,10 +1808,10 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 	}
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  true,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
+		AllowAllRepoSettings: true,
+		MergeableReq:         false,
+		ApprovedReq:          false,
+		UnDivergedReq:        false,
 	}
 
 	logger := logging.NewNoopLogger(t)
@@ -1921,10 +1919,10 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 	}
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  true,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
+		AllowAllRepoSettings: true,
+		MergeableReq:         false,
+		ApprovedReq:          false,
+		UnDivergedReq:        false,
 	}
 
 	logger := logging.NewNoopLogger(t)

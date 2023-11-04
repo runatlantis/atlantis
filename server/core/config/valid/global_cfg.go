@@ -174,42 +174,18 @@ var DefaultStateRmStage = Stage{
 	},
 }
 
-// Deprecated: use NewGlobalCfgFromArgs
-func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq bool, unDivergedReq bool, preWorkflowHooks []*WorkflowHook, postWorkflowHooks []*WorkflowHook) GlobalCfg {
-	return NewGlobalCfgFromArgs(GlobalCfgArgs{
-		AllowRepoCfg:      allowRepoCfg,
-		MergeableReq:      mergeableReq,
-		ApprovedReq:       approvedReq,
-		UnDivergedReq:     unDivergedReq,
-		PreWorkflowHooks:  preWorkflowHooks,
-		PostWorkflowHooks: postWorkflowHooks,
-	})
-}
-
-// NewGlobalCfg returns a global config that respects the parameters.
-// allowRepoCfg is true if users want to allow repos full config functionality.
-// mergeableReq is true if users want to set the mergeable apply requirement
-// for all repos.
-// approvedReq is true if users want to set the approved apply requirement
-// for all repos.
-// Deprecated: use NewGlobalCfgFromArgs
-func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
-	return NewGlobalCfgFromArgs(GlobalCfgArgs{
-		AllowRepoCfg: allowRepoCfg,
-		MergeableReq: mergeableReq,
-		ApprovedReq:  approvedReq,
-	})
-}
-
 type GlobalCfgArgs struct {
-	RepoConfigFile     string
-	AllowRepoCfg       bool
-	MergeableReq       bool
-	ApprovedReq        bool
-	UnDivergedReq      bool
-	PolicyCheckEnabled bool
-	PreWorkflowHooks   []*WorkflowHook
-	PostWorkflowHooks  []*WorkflowHook
+	RepoConfigFile string
+	// No longer a user option as of https://github.com/runatlantis/atlantis/pull/3911,
+	// but useful for tests to set to true to not require enumeration of allowed settings
+	// on the repo side
+	AllowAllRepoSettings bool
+	MergeableReq         bool
+	ApprovedReq          bool
+	UnDivergedReq        bool
+	PolicyCheckEnabled   bool
+	PreWorkflowHooks     []*WorkflowHook
+	PostWorkflowHooks    []*WorkflowHook
 }
 
 func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
@@ -245,7 +221,7 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	deleteSourceBranchOnMerge := false
 	repoLockingKey := true
 	customPolicyCheck := false
-	if args.AllowRepoCfg {
+	if args.AllowAllRepoSettings {
 		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, PolicyCheckKey}
 		allowCustomWorkflows = true
 	}
