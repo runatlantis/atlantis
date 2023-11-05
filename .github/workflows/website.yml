@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
 
@@ -64,6 +64,7 @@ jobs:
             -e 'https://medium.com/runatlantis' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
+            -e 'https://confluence.atlassian.com/*' \
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
             http://localhost:8080/

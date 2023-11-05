@@ -46,7 +46,7 @@ type ProjectCommandContextBuilder interface {
 // object relevant to the command it applies to.
 type CommandScopedStatsProjectCommandContextBuilder struct {
 	ProjectCommandContextBuilder
-	// Conciously making this global since it gets flushed periodically anyways
+	// Consciously making this global since it gets flushed periodically anyways
 	ProjectCounter tally.Counter
 }
 
@@ -271,6 +271,7 @@ func newProjectCommandContext(ctx *command.Context,
 		AutomergeEnabled:           automergeEnabled,
 		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
 		RepoLocking:                projCfg.RepoLocking,
+		CustomPolicyCheck:          projCfg.CustomPolicyCheck,
 		ParallelApplyEnabled:       parallelApplyEnabled,
 		ParallelPlanEnabled:        parallelPlanEnabled,
 		ParallelPolicyCheckEnabled: parallelPlanEnabled,

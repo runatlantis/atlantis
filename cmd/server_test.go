@@ -116,6 +116,7 @@ var testFlags = map[string]interface{}{
 	WriteGitCredsFlag:                true,
 	DisableAutoplanFlag:              true,
 	DisableAutoplanLabelFlag:         "no-auto-plan",
+	DisableUnlockLabelFlag:           "do-not-unlock",
 	EnablePolicyChecksFlag:           false,
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,
