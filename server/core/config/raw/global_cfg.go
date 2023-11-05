@@ -213,7 +213,7 @@ func (r Repo) Validate() error {
 	}
 
 	autoDiscoverValid := func(value interface{}) error {
-		var autoDiscover *AutoDiscover = value.(*AutoDiscover)
+		autoDiscover := value.(*AutoDiscover)
 		if autoDiscover != nil {
 			return autoDiscover.Validate()
 		}
@@ -325,7 +325,7 @@ OuterGlobalImportReqs:
 		mergedImportReqs = append(mergedImportReqs, globalReq)
 	}
 
-	var autoDiscover *valid.AutoDiscover = nil
+	var autoDiscover *valid.AutoDiscover
 	if r.AutoDiscover != nil {
 		autoDiscover = r.AutoDiscover.ToValid()
 	}

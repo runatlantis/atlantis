@@ -11,7 +11,7 @@ import (
 )
 
 func TestConfig_UnmarshalYAML(t *testing.T) {
-	auto_discover_enabled := valid.AutoDiscoverEnabledMode
+	autoDiscoverEnabled := valid.AutoDiscoverEnabledMode
 	cases := []struct {
 		description string
 		input       string
@@ -153,7 +153,7 @@ allowed_regexp_prefixes:
 - staging/`,
 			exp: raw.RepoCfg{
 				Version:       Int(3),
-				AutoDiscover:  &raw.AutoDiscover{Mode: &auto_discover_enabled},
+				AutoDiscover:  &raw.AutoDiscover{Mode: &autoDiscoverEnabled},
 				Automerge:     Bool(true),
 				ParallelApply: Bool(true),
 				ParallelPlan:  Bool(false),
@@ -236,7 +236,7 @@ func TestConfig_Validate(t *testing.T) {
 }
 
 func TestConfig_ToValid(t *testing.T) {
-	auto_discover_enabled := valid.AutoDiscoverEnabledMode
+	autoDiscoverEnabled := valid.AutoDiscoverEnabledMode
 	cases := []struct {
 		description string
 		input       raw.RepoCfg
@@ -324,7 +324,7 @@ func TestConfig_ToValid(t *testing.T) {
 			description: "autodiscover included",
 			input: raw.RepoCfg{
 				Version:      Int(2),
-				AutoDiscover: &raw.AutoDiscover{Mode: &auto_discover_enabled},
+				AutoDiscover: &raw.AutoDiscover{Mode: &autoDiscoverEnabled},
 			},
 			exp: valid.RepoCfg{
 				Version: 2,
@@ -371,7 +371,7 @@ func TestConfig_ToValid(t *testing.T) {
 				Automerge:     Bool(true),
 				ParallelApply: Bool(true),
 				AutoDiscover: &raw.AutoDiscover{
-					Mode: &auto_discover_enabled,
+					Mode: &autoDiscoverEnabled,
 				},
 				Workflows: map[string]raw.Workflow{
 					"myworkflow": {

@@ -10,7 +10,7 @@ import (
 )
 
 func TestAutoDiscover_UnmarshalYAML(t *testing.T) {
-	auto_discover_enabled := valid.AutoDiscoverEnabledMode
+	autoDiscoverEnabled := valid.AutoDiscoverEnabledMode
 	cases := []struct {
 		description string
 		input       string
@@ -29,7 +29,7 @@ func TestAutoDiscover_UnmarshalYAML(t *testing.T) {
 mode: enabled
 `,
 			exp: raw.AutoDiscover{
-				Mode: &auto_discover_enabled,
+				Mode: &autoDiscoverEnabled,
 			},
 		},
 	}
@@ -45,10 +45,10 @@ mode: enabled
 }
 
 func TestAutoDiscover_Validate(t *testing.T) {
-	auto_discover_auto := valid.AutoDiscoverAutoMode
-	auto_discover_enabled := valid.AutoDiscoverEnabledMode
-	auto_discover_disabled := valid.AutoDiscoverDisabledMode
-	random_string := valid.AutoDiscoverMode("random_string")
+	autoDiscoverAuto := valid.AutoDiscoverAutoMode
+	autoDiscoverEnabled := valid.AutoDiscoverEnabledMode
+	autoDiscoverDisabled := valid.AutoDiscoverDisabledMode
+	randomString := valid.AutoDiscoverMode("random_string")
 	cases := []struct {
 		description string
 		input       raw.AutoDiscover
@@ -62,28 +62,28 @@ func TestAutoDiscover_Validate(t *testing.T) {
 		{
 			description: "mode set to auto",
 			input: raw.AutoDiscover{
-				Mode: &auto_discover_auto,
+				Mode: &autoDiscoverAuto,
 			},
 			errContains: nil,
 		},
 		{
 			description: "mode set to disabled",
 			input: raw.AutoDiscover{
-				Mode: &auto_discover_disabled,
+				Mode: &autoDiscoverDisabled,
 			},
 			errContains: nil,
 		},
 		{
 			description: "mode set to enabled",
 			input: raw.AutoDiscover{
-				Mode: &auto_discover_enabled,
+				Mode: &autoDiscoverEnabled,
 			},
 			errContains: nil,
 		},
 		{
 			description: "mode set to random string",
 			input: raw.AutoDiscover{
-				Mode: &random_string,
+				Mode: &randomString,
 			},
 			errContains: String("valid value"),
 		},
@@ -100,7 +100,7 @@ func TestAutoDiscover_Validate(t *testing.T) {
 }
 
 func TestAutoDiscover_ToValid(t *testing.T) {
-	auto_discover_enabled := valid.AutoDiscoverEnabledMode
+	autoDiscoverEnabled := valid.AutoDiscoverEnabledMode
 	cases := []struct {
 		description string
 		input       raw.AutoDiscover
@@ -116,7 +116,7 @@ func TestAutoDiscover_ToValid(t *testing.T) {
 		{
 			description: "value set",
 			input: raw.AutoDiscover{
-				Mode: &auto_discover_enabled,
+				Mode: &autoDiscoverEnabled,
 			},
 			exp: &valid.AutoDiscover{
 				Mode: valid.AutoDiscoverEnabledMode,

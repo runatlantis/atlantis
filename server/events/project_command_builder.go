@@ -367,7 +367,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			if repoCfg.AutoDiscover != nil {
 				defaultAutoDiscoverMode = repoCfg.AutoDiscover.Mode
 			}
-			// If auto_discovery is enabled, we never want to skip cloning
+			// If auto discover is enabled, we never want to skip cloning
 			if !repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode) {
 				if len(repoCfg.Projects) > 0 {
 					matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
