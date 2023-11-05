@@ -404,7 +404,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
 	}
 
-	moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
+	moduleInfo, err := FindModuleProjects(ctx.Log, repoDir, p.AutoDetectModuleFiles)
 	if err != nil {
 		ctx.Log.Warn("error(s) loading project module dependencies: %s", err)
 	}

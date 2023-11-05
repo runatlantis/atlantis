@@ -7,6 +7,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,6 +15,8 @@ import (
 var repos embed.FS
 
 func Test_findModuleDependants(t *testing.T) {
+	log, err := logging.NewStructuredLogger()
+	assert.NoError(t, err)
 
 	type args struct {
 		files                    fs.FS
@@ -57,7 +60,7 @@ func Test_findModuleDependants(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := findModuleDependants(tt.args.files, tt.args.autoplanModuleDependants)
+			got, err := findModuleDependants(log, tt.args.files, tt.args.autoplanModuleDependants)
 			if !tt.wantErr(t, err, fmt.Sprintf("findModuleDependants(%v, %v)", tt.args.files, tt.args.autoplanModuleDependants)) {
 				return
 			}

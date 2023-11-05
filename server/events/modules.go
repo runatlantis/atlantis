@@ -119,25 +119,20 @@ func (m moduleInfo) load(files fs.FS, dir string, projects ...string) (_ *module
 }
 
 // FindModuleProjects returns a mapping of modules to projects that depend on them.
-func FindModuleProjects(absRepoDir string, autoplanModuleDependants string) (ModuleProjects, error) {
-	return findModuleDependants(os.DirFS(absRepoDir), autoplanModuleDependants)
+func FindModuleProjects(Log logging.SimpleLogging, absRepoDir string, autoplanModuleDependants string) (ModuleProjects, error) {
+	return findModuleDependants(Log, os.DirFS(absRepoDir), autoplanModuleDependants)
 }
 
-func findModuleDependants(files fs.FS, autoplanModuleDependants string) (ModuleProjects, error) {
-	log, err := logging.NewStructuredLogger()
-	if err != nil {
-		return nil, err
-	}
-
+func findModuleDependants(Log logging.SimpleLogging, files fs.FS, autoplanModuleDependants string) (ModuleProjects, error) {
 	if autoplanModuleDependants == "" {
 		return moduleInfo{}, nil
 	}
 	// find all the projects matching autoplanModuleDependants
 	filter, _ := patternmatcher.New(strings.Split(autoplanModuleDependants, ","))
 	var projects []string
-	err = fs.WalkDir(files, ".", func(rel string, info fs.DirEntry, err error) error {
+	err := fs.WalkDir(files, ".", func(rel string, info fs.DirEntry, err error) error {
 		if match, _ := filter.MatchesOrParentMatches(rel); match {
-			if projectDir := getProjectDirFromFs(log, files, rel); projectDir != "" {
+			if projectDir := getProjectDirFromFs(Log, files, rel); projectDir != "" {
 				projects = append(projects, projectDir)
 			}
 		}
