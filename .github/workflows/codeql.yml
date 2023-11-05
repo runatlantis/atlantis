@@ -13,7 +13,9 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - 'main'
+      - 'releases-**'
     paths:
       - '**.go'
       - '**.js'
@@ -24,7 +26,9 @@ on:
       - reopened
       - synchronize
       - ready_for_review
-    branches: [ "main" ]
+    branches:
+      - 'main'
+      - 'releases-**'
     paths:
       - '**.go'
       - '**.js'
@@ -33,10 +37,26 @@ on:
     - cron: '17 9 * * 5'
 
 jobs:
-  analyze:
-    name: Analyze
+  changes:
+    outputs:
+      should-run-analyze: ${{ steps.changes.outputs.src == 'true' }}
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - '**.go'
+              - '**.js4'
+
+  analyze:
+    needs: [changes]
+    name: Analyze
+    if: github.event.pull_request.draft == false && needs.changes.outputs.src == 'true'
+    runs-on: ubuntu-22.04
     permissions:
       actions: read
       contents: read
@@ -87,3 +107,11 @@ jobs:
       uses: github/codeql-action/analyze@v2
       with:
         category: "/language:${{matrix.language}}"
+
+  skip-analyze:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-analyze == 'false'
+    name: Analyze
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No build required"'  
