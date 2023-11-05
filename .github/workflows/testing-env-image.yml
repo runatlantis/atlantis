@@ -2,16 +2,13 @@ name: testing-env-image
 
 on:
   push:
-    paths:
-      - "testing/**"
-      - ".github/workflows/testing-env-image.yml"
     branches:
       - 'main'
       - 'release-**'
   pull_request:
-    paths:
-      - 'testing/**'
-      - '.github/workflows/testing-env-image.yml'
+    branches:
+      - 'main'
+      - 'release-**'
   workflow_dispatch:
 
 concurrency:

@@ -16,9 +16,6 @@ on:
     branches:
       - 'main'
       - 'releases-**'
-    paths:
-      - '**.go'
-      - '**.js'
   pull_request:
     # The branches below must be a subset of the branches above
     types:
@@ -29,9 +26,6 @@ on:
     branches:
       - 'main'
       - 'releases-**'
-    paths:
-      - '**.go'
-      - '**.js'
 
   schedule:
     - cron: '17 9 * * 5'

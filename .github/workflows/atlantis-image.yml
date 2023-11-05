@@ -9,12 +9,9 @@ on:
       - v*.*.* # stable release like, v0.19.2
       - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
   pull_request:
-    paths:
-      - 'Dockerfile'
-      - 'docker-entrypoint.sh'
-      - '.github/workflows/atlantis-image.yml'
-      - '**.go'
-      - 'go.*'
+    branches:
+      - 'main'
+      - 'releases-**'
   workflow_dispatch:
 
 concurrency:
