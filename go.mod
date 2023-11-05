@@ -9,13 +9,13 @@ require (
 	github.com/briandowns/spinner v1.23.0
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
-	github.com/go-playground/validator/v10 v10.15.5
+	github.com/go-playground/validator/v10 v10.16.0
 	github.com/go-test/deep v1.1.0
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/go-github/v54 v54.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.4.0
-	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-getter/v2 v2.2.1
 	github.com/hashicorp/go-multierror v1.1.1
