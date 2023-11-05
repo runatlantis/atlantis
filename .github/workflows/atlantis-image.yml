@@ -150,6 +150,9 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'false'
     name: Build Image
+    strategy:
+      matrix:
+        image_type: [alpine, debian]
     runs-on: ubuntu-22.04
     steps:
       - run: 'echo "No build required"'

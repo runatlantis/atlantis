@@ -23,7 +23,7 @@ concurrency:
 jobs:
   changes:
     outputs:
-      should-run-tests: ${{ steps.changes.outputs.go == 'true' }}
+      should-run-linting: ${{ steps.changes.outputs.go == 'true' }}
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
@@ -40,7 +40,7 @@ jobs:
 
   golangci-lint:
     needs: [changes]
-    if: github.event.pull_request.draft == false && needs.changes.outputs.go == 'true'
+    if: github.event.pull_request.draft == false && needs.changes.outputs.should-run-linting == 'true'
     name: Linting
     runs-on: ubuntu-22.04
     steps:

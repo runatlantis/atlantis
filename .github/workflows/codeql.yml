@@ -55,7 +55,7 @@ jobs:
   analyze:
     needs: [changes]
     name: Analyze
-    if: github.event.pull_request.draft == false && needs.changes.outputs.src == 'true'
+    if: github.event.pull_request.draft == false && needs.changes.outputs.should-run-analyze == 'true'
     runs-on: ubuntu-22.04
     permissions:
       actions: read
@@ -112,6 +112,9 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-analyze == 'false'
     name: Analyze
+    strategy:
+      matrix:
+        language: [ 'go', 'javascript' ]
     runs-on: ubuntu-22.04
     steps:
       - run: 'echo "No build required"'  
