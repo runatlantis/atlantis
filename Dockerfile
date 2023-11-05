@@ -141,8 +141,8 @@ HEALTHCHECK --interval=5m --timeout=3s \
   CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # Set up the 'atlantis' user and adjust permissions
-RUN addgroup -g 1000 atlantis && \
-    adduser -S -u 100 -G atlantis atlantis && \
+RUN addgroup atlantis && \
+    adduser -S -G atlantis atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/
 
@@ -183,7 +183,7 @@ HEALTHCHECK --interval=5m --timeout=3s \
   CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # Set up the 'atlantis' user and adjust permissions
-RUN useradd --create-home --user-group --shell /bin/bash --uid 100 -g 1000 atlantis && \
+RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/
 
