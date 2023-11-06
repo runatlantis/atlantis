@@ -94,8 +94,8 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 # install gosu
 # We use gosu to step down from root and run as the atlantis user
 # renovate: datasource=github-releases depName=tianon/gosu
-#ENV GOSU_VERSION=1.16
-ENV GOSU_VERSION=1.17
+#ENV GOSU_VERSION=1.17
+ENV GOSU_VERSION=1.17-1
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GOSU_ARCH=amd64 ;; \
