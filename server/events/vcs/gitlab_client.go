@@ -393,6 +393,7 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 		TargetURL:   &url,
 		Ref:         gitlab.String(refTarget),
 	})
+	g.logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
 	return err
 }
 
