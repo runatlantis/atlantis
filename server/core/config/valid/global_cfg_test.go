@@ -908,7 +908,7 @@ repos:
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
 				PlanRequirements:   []string{},
-				ApplyRequirements:  []string{"mergeable"},
+				ApplyRequirements:  []string{"policies_passed", "mergeable"},
 				ImportRequirements: []string{},
 				Workflow:           defaultWorkflow,
 				RepoRelDir:         ".",
