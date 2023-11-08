@@ -6,7 +6,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func TestMetrics_Unmarshal(t *testing.T) {

@@ -24,7 +24,7 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
