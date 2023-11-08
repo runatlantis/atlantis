@@ -1060,7 +1060,7 @@ workflows:
 				Pull:               pull,
 				ProjectName:        "",
 				PlanRequirements:   []string{"policies_passed"},
-				ApplyRequirements:  []string{},
+				ApplyRequirements:  []string{"policies_passed"},
 				ImportRequirements: []string{"policies_passed"},
 				RepoConfigVersion:  3,
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
