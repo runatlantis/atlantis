@@ -920,7 +920,7 @@ repos:
 				CustomPolicyCheck:  false,
 			},
 		},
-		"repo-side apply reqs should include non-overrideable 'policies_passed' req when overriden and policies enabled": {
+		"repo-side apply reqs should include non-overrideable 'policies_passed' req when overridden and policies enabled": {
 			gCfg: `
 repos:
 - id: /.*/
@@ -952,7 +952,7 @@ repos:
 				PolicyCheck:        true,
 			},
 		},
-		"repo-side apply reqs should not include non-overrideable 'policies_passed' req when overriden and policies disabled": {
+		"repo-side apply reqs should not include non-overrideable 'policies_passed' req when overridden and policies disabled": {
 			gCfg: `
 repos:
 - id: /.*/
