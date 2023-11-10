@@ -128,8 +128,6 @@ const (
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
 	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
-	// SilenceWhitelistErrorsFlag is deprecated for SilenceAllowlistErrorsFlag.
-	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
 	SkipCloneNoChanges         = "skip-clone-no-changes"
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
@@ -538,11 +536,6 @@ var boolFlags = map[string]boolFlag{
 		description:  "Silences the posting of allowlist error comments.",
 		defaultValue: false,
 	},
-	SilenceWhitelistErrorsFlag: {
-		description:  "[Deprecated for --silence-allowlist-errors].",
-		defaultValue: false,
-		hidden:       true,
-	},
 	DisableMarkdownFoldingFlag: {
 		description:  "Toggle off folding in markdown output.",
 		defaultValue: false,
@@ -943,9 +936,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if strings.Contains(userConfig.RepoAllowlist, "://") {
 		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoAllowlistFlag)
 	}
-	if userConfig.SilenceAllowlistErrors && userConfig.SilenceWhitelistErrors {
-		return fmt.Errorf("both --%s and --%s cannot be set–use --%s", SilenceAllowlistErrorsFlag, SilenceWhitelistErrorsFlag, SilenceAllowlistErrorsFlag)
-	}
 
 	if userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret != "" {
 		return fmt.Errorf("--%s cannot be specified for Bitbucket Cloud because it is not supported by Bitbucket", BitbucketWebhookSecretFlag)
@@ -1148,9 +1138,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	}
 
 	// Handle repo whitelist deprecation.
-	if userConfig.SilenceWhitelistErrors {
-		userConfig.SilenceAllowlistErrors = true
-	}
 	if userConfig.RepoWhitelist != "" {
 		userConfig.RepoAllowlist = userConfig.RepoWhitelist
 	}
