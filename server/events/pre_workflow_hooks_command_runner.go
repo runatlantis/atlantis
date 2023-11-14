@@ -75,6 +75,18 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 		escapedArgs = escapeArgs(cmd.Flags)
 	}
 
+	// Update the plan or apply commit status to pending whilst the pre workflow hook is running
+	switch cmd.Name {
+	case command.Plan:
+		if err := w.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+			ctx.Log.Warn("unable to update plan commit status: %s", err)
+		}
+	case command.Apply:
+		if err := w.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+			ctx.Log.Warn("unable to update apply commit status: %s", err)
+		}
+	}
+
 	err = w.runHooks(
 		models.WorkflowHookCommandContext{
 			BaseRepo:           baseRepo,
@@ -132,7 +144,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 		}
 
 		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.PendingCommitStatus, hookDescription, "", url); err != nil {
-			ctx.Log.Warn("unable to pre workflow hook status: %s", err)
+			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 			return err
 		}
 
@@ -140,13 +152,13 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 
 		if err != nil {
 			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.FailedCommitStatus, hookDescription, runtimeDesc, url); err != nil {
-				ctx.Log.Warn("unable to pre workflow hook status: %s", err)
+				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 			}
 			return err
 		}
 
 		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.SuccessCommitStatus, hookDescription, runtimeDesc, url); err != nil {
-			ctx.Log.Warn("unable to pre workflow hook status: %s", err)
+			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 			return err
 		}
 	}
