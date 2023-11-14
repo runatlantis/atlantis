@@ -84,8 +84,6 @@ type UserConfig struct {
 	RepoConfig                      string `mapstructure:"repo-config"`
 	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
 	RepoAllowlist                   string `mapstructure:"repo-allowlist"`
-	// RepoWhitelist is deprecated in favour of RepoAllowlist.
-	RepoWhitelist string `mapstructure:"repo-whitelist"`
 
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
