@@ -6,6 +6,7 @@ on:
       - '.github/renovate.json5'
     branches:
       - main
+      - 'releases-**'
   pull_request:
     paths:
       - '.github/renovate.json5'
@@ -13,8 +14,8 @@ on:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
       - run: npx --package renovate -c 'renovate-config-validator'

@@ -146,6 +146,7 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 				Version:         nil,
 				PollingInterval: time.Second * 0,
 				PollingTimeout:  time.Second * 10,
+				logger:          logging.NewNoopLogger(t),
 			}
 
 			filenames, err := client.GetModifiedFiles(
@@ -225,6 +226,7 @@ func TestGitlabClient_MergePull(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
+				logger:  logging.NewNoopLogger(t),
 			}
 
 			err = client.MergePull(models.PullRequest{
@@ -276,7 +278,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
-						exp := fmt.Sprintf(`{"state":"%s","ref":"test","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
+						exp := fmt.Sprintf(`{"state":"%s","ref":"patch-1-merger","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
 						Equals(t, exp, string(body))
 						defer r.Body.Close()  // nolint: errcheck
 						w.Write([]byte("{}")) // nolint: errcheck
@@ -297,6 +299,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
+				logger:  logging.NewNoopLogger(t),
 			}
 
 			repo := models.Repo{
@@ -451,6 +454,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				client := &GitlabClient{
 					Client:  internalClient,
 					Version: nil,
+					logger:  logging.NewNoopLogger(t),
 				}
 
 				repo := models.Repo{
@@ -623,6 +627,7 @@ func TestGithubClient_GetPullLabels(t *testing.T) {
 	client := &GitlabClient{
 		Client:  internalClient,
 		Version: nil,
+		logger:  logging.NewNoopLogger(t),
 	}
 
 	labels, err := client.GetPullLabels(models.Repo{
@@ -652,6 +657,7 @@ func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
 	client := &GitlabClient{
 		Client:  internalClient,
 		Version: nil,
+		logger:  logging.NewNoopLogger(t),
 	}
 
 	labels, err := client.GetPullLabels(models.Repo{
