@@ -767,22 +767,22 @@
     markdown-it "^13.0.1"
     markdown-it-container "^3.0.0"
 
-"@vuepress/plugin-docsearch@2.0.0-beta.67":
-  version "2.0.0-beta.67"
-  resolved "https://registry.yarnpkg.com/@vuepress/plugin-docsearch/-/plugin-docsearch-2.0.0-beta.67.tgz#dd7c17641c9541cafb982f13001e47b663189a9e"
-  integrity sha512-s1lvIfEN5U7wzNpCLjIUIkHMdrBp4GzogJ+KM0LDNB56NE3DJf2brTB+UbGbcHCe8ispkTqCOXgHAbVFMPKv/Q==
+"@vuepress/plugin-docsearch@2.0.0-beta.68":
+  version "2.0.0-beta.68"
+  resolved "https://registry.yarnpkg.com/@vuepress/plugin-docsearch/-/plugin-docsearch-2.0.0-beta.68.tgz#9f4e05ffdfcdb4bd4eadd0765650009f89b78324"
+  integrity sha512-UmG2zNCmELFG7aX6OkkEQ6MG9ye7lOIvZM2qVQCJuqMk1cyejIFw2jgsugcFdPSwbExXJ5fqSHAPPoXgFhYuZg==
   dependencies:
     "@docsearch/css" "^3.5.2"
     "@docsearch/js" "^3.5.2"
     "@docsearch/react" "^3.5.2"
-    "@vuepress/client" "2.0.0-beta.67"
-    "@vuepress/core" "2.0.0-beta.67"
-    "@vuepress/shared" "2.0.0-beta.67"
-    "@vuepress/utils" "2.0.0-beta.67"
-    "@vueuse/core" "^10.4.1"
+    "@vuepress/client" "2.0.0-beta.68"
+    "@vuepress/core" "2.0.0-beta.68"
+    "@vuepress/shared" "2.0.0-beta.68"
+    "@vuepress/utils" "2.0.0-beta.68"
+    "@vueuse/core" "^10.6.0"
     ts-debounce "^4.0.0"
-    vue "^3.3.4"
-    vue-router "^4.2.4"
+    vue "^3.3.8"
+    vue-router "^4.2.5"
 
 "@vuepress/plugin-external-link-icon@2.0.0-beta.67":
   version "2.0.0-beta.67"
