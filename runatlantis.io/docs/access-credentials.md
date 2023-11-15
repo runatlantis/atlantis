@@ -34,6 +34,7 @@ Your Atlantis user must also have "Write permissions" (for repos in an organizat
 
 ### GitHub app
 
+#### Create the GitHub App Using Atlantis
 ::: warning
 Available in Atlantis versions **newer** than 0.13.0.
 :::
@@ -53,6 +54,32 @@ Only a single installation per GitHub App is supported at the moment.
 
 ::: tip NOTE
 GitHub App handles the webhook calls by itself, hence there is no need to create wehbooks separately. If webhooks were created manually, those should be removed when using GitHub App. Otherwise, there would be 2 calls to Atlantis resulting in locking errors on path/workspace.
+:::
+
+#### Manually Creating the GitHub app
+
+- Create the GitHub app as an Administrator
+  - Ensure the app is registered / installed with the organization / user
+  - See the GitHub app [documentation](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/about-creating-github-apps)
+- Create a file with the contents of the GitHub App Key, e.g. `atlantis-app-key.pem`
+- Start Atlantis with the following flags: `atlantis server --gh-app-id <your id> --gh-installation-id <installation id> --gh-app-key-file atlantis-app-key.pem --gh-webhook-secret <your secret> --write-git-creds --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`.
+
+  NOTE: Instead of using a file for the GitHub App Key you can also pass the key value directly using `--gh-app-key`. You can also create a config file instead of using flags. See [Server Configuration](/docs/server-configuration.html#config-file).
+
+::: tip NOTE
+Manually installing the GitHub app means that the credentials can be shared by many Atlantis installations. This has the benefit of centralizing repository access for shared modules / code.
+:::
+
+::: tip NOTE
+Repositories must be manually registered with the created GitHub app to allow Atlantis to interact with Pull Requests.
+:::
+
+::: tip NOTE
+Webhooks must be created manually for repositories that trigger Atlantis.
+:::
+
+::: tip NOTE
+Passing the additional flag `--gh-app-slug` will modify the name of the App when posting comments on a Pull Request.
 :::
 
 #### Permissions
