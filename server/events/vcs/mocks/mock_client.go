@@ -135,6 +135,21 @@ func (mock *MockClient) GetPullLabels(repo models.Repo, pull models.PullRequest)
 	return ret0, ret1
 }
 
+func (mock *MockClient) AddPullLabel(repo models.Repo, pull models.PullRequest, label string) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockClient().")
+	}
+	params := []pegomock.Param{repo, pull, label}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("AddPullLabel", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
@@ -512,6 +527,41 @@ func (c *MockClient_GetPullLabels_OngoingVerification) GetAllCapturedArguments()
 		_param1 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockClient) AddPullLabel(repo models.Repo, pull models.PullRequest, label string) *MockClient_AddPullLabel_OngoingVerification {
+	params := []pegomock.Param{repo, pull, label}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "AddPullLabel", params, verifier.timeout)
+	return &MockClient_AddPullLabel_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockClient_AddPullLabel_OngoingVerification struct {
+	mock              *MockClient
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockClient_AddPullLabel_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string) {
+	repo, pull, label := c.GetAllCapturedArguments()
+	return repo[len(repo)-1], pull[len(pull)-1], label[len(label)-1]
+}
+
+func (c *MockClient_AddPullLabel_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.Repo, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.Repo)
+		}
+		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.PullRequest)
+		}
+		_param2 = make([]string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
 		}
 	}
 	return

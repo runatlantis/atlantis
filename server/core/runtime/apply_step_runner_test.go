@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"fmt"
+	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,6 +73,69 @@ func TestRun_Success(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}
+func TestRun_Success_WithApplyErrorLabel(t *testing.T) {
+	tmpDir := t.TempDir()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	err := os.WriteFile(planPath, nil, 0600)
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		EscapedCommentArgs: []string{"comment", "args"},
+	}
+	Ok(t, err)
+
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+	applyErrorLabel := "some-label"
+	vcsClient := vcsmocks.NewMockClient()
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor: terraform,
+		ApplyErrorLabel:   applyErrorLabel,
+		VcsClient:         vcsClient,
+	}
+
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+		ThenReturn("output", nil)
+	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	Ok(t, err)
+	Equals(t, "output", output)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
+	vcsClient.VerifyWasNotCalled().AddPullLabel(ctx.Pull.BaseRepo, ctx.Pull, applyErrorLabel)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}
+
+func TestRun_Fail_WithApplyErrorLabel(t *testing.T) {
+	tmpDir := t.TempDir()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	err := os.WriteFile(planPath, nil, 0600)
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		EscapedCommentArgs: []string{"comment", "args"},
+	}
+	Ok(t, err)
+
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+	applyErrorLabel := "some-label"
+	vcsClient := vcsmocks.NewMockClient()
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor: terraform,
+		ApplyErrorLabel:   applyErrorLabel,
+		VcsClient:         vcsClient,
+	}
+	errString := "some-error"
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+		ThenReturn("", errors.New(errString))
+	_, err = o.Run(ctx, nil, tmpDir, map[string]string(nil))
+	ErrEquals(t, errString, err)
+	vcsClient.VerifyWasCalledOnce().AddPullLabel(ctx.Pull.BaseRepo, ctx.Pull, applyErrorLabel)
 }
 
 func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
