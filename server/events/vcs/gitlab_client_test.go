@@ -146,6 +146,7 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 				Version:         nil,
 				PollingInterval: time.Second * 0,
 				PollingTimeout:  time.Second * 10,
+				logger:          logging.NewNoopLogger(t),
 			}
 
 			filenames, err := client.GetModifiedFiles(
@@ -225,6 +226,7 @@ func TestGitlabClient_MergePull(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
+				logger:  logging.NewNoopLogger(t),
 			}
 
 			err = client.MergePull(models.PullRequest{
@@ -276,7 +278,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
-						exp := fmt.Sprintf(`{"state":"%s","ref":"test","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
+						exp := fmt.Sprintf(`{"state":"%s","ref":"patch-1-merger","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
 						Equals(t, exp, string(body))
 						defer r.Body.Close()  // nolint: errcheck
 						w.Write([]byte("{}")) // nolint: errcheck
@@ -297,6 +299,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
+				logger:  logging.NewNoopLogger(t),
 			}
 
 			repo := models.Repo{
@@ -368,6 +371,27 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			true,
 		},
 		{
+			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			true,
+		},
+		{
+			fmt.Sprintf("%s/apply", vcsStatusName),
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			true,
+		},
+		{
+			fmt.Sprintf("%s/plan: resource/default", vcsStatusName),
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			false,
+		},
+		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.PendingCommitStatus,
 			gitlabServerVersions,
@@ -380,6 +404,13 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			noHeadPipelineMR,
 			false,
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			true,
 		},
 	}
 	for _, serverVersion := range gitlabServerVersions {
@@ -423,6 +454,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				client := &GitlabClient{
 					Client:  internalClient,
 					Version: nil,
+					logger:  logging.NewNoopLogger(t),
 				}
 
 				repo := models.Repo{
@@ -574,6 +606,67 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 	Equals(t, summaryHeader, gotNotePutCalls[1].comment[0])
 	Equals(t, planComments[1], gotNotePutCalls[1].comment[1])
 	Equals(t, summaryFooter, gotNotePutCalls[1].comment[2])
+}
+
+func TestGithubClient_GetPullLabels(t *testing.T) {
+	var mergeSuccessWithLabel = strings.ReplaceAll(mergeSuccess, `"labels":[]`, `"labels":["work in progress"]`)
+	testServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(mergeSuccessWithLabel)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		}))
+
+	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+	Ok(t, err)
+	client := &GitlabClient{
+		Client:  internalClient,
+		Version: nil,
+		logger:  logging.NewNoopLogger(t),
+	}
+
+	labels, err := client.GetPullLabels(models.Repo{
+		FullName: "runatlantis/atlantis",
+	}, models.PullRequest{
+		Num: 1,
+	})
+	Ok(t, err)
+	Equals(t, []string{"work in progress"}, labels)
+}
+
+func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
+	testServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(pipelineSuccess)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		}))
+
+	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+	Ok(t, err)
+	client := &GitlabClient{
+		Client:  internalClient,
+		Version: nil,
+		logger:  logging.NewNoopLogger(t),
+	}
+
+	labels, err := client.GetPullLabels(models.Repo{
+		FullName: "runatlantis/atlantis",
+	}, models.PullRequest{
+		Num: 1,
+	})
+	Ok(t, err)
+	Equals(t, 0, len(labels))
 }
 
 var mergeSuccess = `{"id":22461274,"iid":13,"project_id":4580910,"title":"Update main.tf","description":"","state":"merged","created_at":"2019-01-15T18:27:29.375Z","updated_at":"2019-01-25T17:28:01.437Z","merged_by":{"id":1755902,"name":"Luke Kysow","username":"lkysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80\u0026d=identicon","web_url":"https://gitlab.com/lkysow"},"merged_at":"2019-01-25T17:28:01.459Z","closed_by":null,"closed_at":null,"target_branch":"patch-1","source_branch":"patch-1-merger","upvotes":0,"downvotes":0,"author":{"id":1755902,"name":"Luke Kysow","username":"lkysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80\u0026d=identicon","web_url":"https://gitlab.com/lkysow"},"assignee":null,"source_project_id":4580910,"target_project_id":4580910,"labels":[],"work_in_progress":false,"milestone":null,"merge_when_pipeline_succeeds":false,"merge_status":"can_be_merged","detailed_merge_status":"mergeable","sha":"cb86d70f464632bdfbe1bb9bc0f2f9d847a774a0","merge_commit_sha":"c9b336f1c71d3e64810b8cfa2abcfab232d6bff6","user_notes_count":0,"discussion_locked":null,"should_remove_source_branch":null,"force_remove_source_branch":false,"web_url":"https://gitlab.com/lkysow/atlantis-example/merge_requests/13","time_stats":{"time_estimate":0,"total_time_spent":0,"human_time_estimate":null,"human_total_time_spent":null},"squash":false,"subscribed":true,"changes_count":"1","latest_build_started_at":null,"latest_build_finished_at":null,"first_deployed_to_production_at":null,"pipeline":null,"diff_refs":{"base_sha":"67cb91d3f6198189f433c045154a885784ba6977","head_sha":"cb86d70f464632bdfbe1bb9bc0f2f9d847a774a0","start_sha":"67cb91d3f6198189f433c045154a885784ba6977"},"merge_error":null,"approvals_before_merge":null}`

@@ -52,6 +52,7 @@ type MultiWebhookSender struct {
 type Config struct {
 	Event          string
 	WorkspaceRegex string
+	BranchRegex    string
 	Kind           string
 	Channel        string
 }
@@ -59,7 +60,11 @@ type Config struct {
 func NewMultiWebhookSender(configs []Config, client SlackClient) (*MultiWebhookSender, error) {
 	var webhooks []Sender
 	for _, c := range configs {
-		r, err := regexp.Compile(c.WorkspaceRegex)
+		wr, err := regexp.Compile(c.WorkspaceRegex)
+		if err != nil {
+			return nil, err
+		}
+		br, err := regexp.Compile(c.BranchRegex)
 		if err != nil {
 			return nil, err
 		}
@@ -77,7 +82,7 @@ func NewMultiWebhookSender(configs []Config, client SlackClient) (*MultiWebhookS
 			if c.Channel == "" {
 				return nil, errors.New("must specify \"channel\" if using a webhook of \"kind: slack\"")
 			}
-			slack, err := NewSlack(r, c.Channel, client)
+			slack, err := NewSlack(wr, br, c.Channel, client)
 			if err != nil {
 				return nil, err
 			}

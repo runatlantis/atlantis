@@ -49,4 +49,7 @@ type Client interface {
 	GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error)
 	SupportsSingleFileDownload(repo models.Repo) bool
 	GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error)
+
+	// GetPullLabels returns the labels of a pull request
+	GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error)
 }

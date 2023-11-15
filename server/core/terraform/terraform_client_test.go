@@ -392,7 +392,7 @@ terraform {
 		"<= 1.0": "1.0.0",
 		// cannot use ~> 1.3 or ~> 1.0 since that is a moving target since it will always
 		// resolve to the latest terraform 1.x
-		"~> 1.3.0": "1.3.9",
+		"~> 1.3.0": "1.3.10",
 	}
 
 	type testCase struct {

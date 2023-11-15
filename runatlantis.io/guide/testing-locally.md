@@ -173,11 +173,12 @@ TOKEN="{YOUR_TOKEN}"
 
 ### Bitbucket Server (aka Stash) Access Token
 - Click on your avatar in the top right and select **Manage account**
-- Click **Personal access tokens** in the sidebar
-- Click **Create a token**
+- Click **HTTP access tokens** in the sidebar
+- Click **Create token**
 - Name the token **atlantis**
 - Give the token **Read** Project permissions and **Write** Pull request permissions
-- Click **create** and set the token as an environment variable
+- Choose an Expiry option **Do not expire** or **Expire automatically** 
+- Click **Create** and set the token as an environment variable
 ```
 TOKEN="{YOUR_TOKEN}"
 ```

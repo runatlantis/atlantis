@@ -144,7 +144,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 	if len(modifiedTerraformFiles) == 0 {
 		return projects
 	}
-	log.Info("filtered modified files to %d .tf or terragrunt.hcl files: %v",
+	log.Info("filtered modified files to %d file(s) in the autoplan file list: %v",
 		len(modifiedTerraformFiles), modifiedTerraformFiles)
 
 	var dirs []string

@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/webhooks/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -35,10 +36,14 @@ func TestSend_PostMessage(t *testing.T) {
 	hook := webhooks.SlackWebhook{
 		Client:         client,
 		WorkspaceRegex: regex,
+		BranchRegex:    regex,
 		Channel:        channel,
 	}
 	result := webhooks.ApplyResult{
 		Workspace: "production",
+		Pull: models.PullRequest{
+			BaseBranch: "main",
+		},
 	}
 
 	t.Log("PostMessage should be called, doesn't matter if it errors or not")
@@ -57,10 +62,14 @@ func TestSend_NoopSuccess(t *testing.T) {
 	hook := webhooks.SlackWebhook{
 		Client:         client,
 		WorkspaceRegex: regex,
+		BranchRegex:    regex,
 		Channel:        channel,
 	}
 	result := webhooks.ApplyResult{
 		Workspace: "production",
+		Pull: models.PullRequest{
+			BaseBranch: "main",
+		},
 	}
 	err = hook.Send(logging.NewNoopLogger(t), result)
 	Ok(t, err)

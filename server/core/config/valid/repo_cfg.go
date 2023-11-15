@@ -24,6 +24,7 @@ type RepoCfg struct {
 	ParallelPolicyCheck        *bool
 	DeleteSourceBranchOnMerge  *bool
 	RepoLocking                *bool
+	CustomPolicyCheck          *bool
 	EmojiReaction              string
 	AllowedRegexpPrefixes      []string
 	AbortOnExcecutionOrderFail bool
@@ -135,6 +136,7 @@ type Project struct {
 	RepoLocking               *bool
 	ExecutionOrderGroup       int
 	PolicyCheck               *bool
+	CustomPolicyCheck         *bool
 }
 
 // GetName returns the name of the project or an empty string if there is no

@@ -51,7 +51,7 @@ type AsyncTFExec interface {
 //
 //go:generate pegomock generate --package mocks -o mocks/mock_status_updater.go StatusUpdater
 type StatusUpdater interface {
-	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectResult) error
+	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, res *command.ProjectResult) error
 }
 
 // Runner mirrors events.StepRunner as a way to bring it into this package

@@ -15,10 +15,34 @@ workflows](custom-workflows.html#custom-run-command) in several ways.
 
 Pre workflow hooks can only be specified in the Server-Side Repo Config under the
 `repos` key.
+
 ::: tip Note
-`pre-workflow-hooks` do not prevent Atlantis from executing its
-workflows(`plan`, `apply`) even if a `run` command exits with an error.
+By default, `pre-workflow-hooks` do not prevent Atlantis from executing its
+workflows(`plan`, `apply`) even if a `run` command exits with an error. This
+behavior can be changed by setting the [fail-on-pre-workflow-hook-error](server-configuration.html#fail-on-pre-workflow-hook-error)
+flag in the Atlantis server configuration.
 ::: 
+
+## Atlantis Command Targetting
+
+By default, the workflow hook will run when any command is processed by Atlantis.
+This can be modified by specifying the `commands` key in the workflow hook containing a comma delimited list
+of Atlantis commands that the hook should be run for. Detail of the Atlantis commands
+can be found in [Using Atlantis](using-atlantis.md).
+
+### Example
+
+```yaml
+repos:
+    - id: /.*/
+      pre_workflow_hooks:
+        - run: ./plan-hook.sh
+          description: Plan Hook
+          commands: plan
+        - run: ./plan-apply-hook.sh
+          description: Plan & Apply Hook
+          commands: plan, apply
+```
 
 ## Use Cases
 

@@ -2,7 +2,6 @@ changelog:
   exclude:
     labels:
       - ignore-for-release
-      - docs
       - github-actions
     authors:
       - octocat
@@ -22,9 +21,3 @@ changelog:
     - title: Other Changes
       labels:
         - "*"
-    - title: Dependencies
-      labels:
-        - dependencies
-    - title: Build
-      labels:
-        - build

@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -74,6 +75,18 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 		escapedArgs = escapeArgs(cmd.Flags)
 	}
 
+	// Update the plan or apply commit status to pending whilst the pre workflow hook is running
+	switch cmd.Name {
+	case command.Plan:
+		if err := w.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+			ctx.Log.Warn("unable to update plan commit status: %s", err)
+		}
+	case command.Apply:
+		if err := w.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+			ctx.Log.Warn("unable to update apply commit status: %s", err)
+		}
+	}
+
 	err = w.runHooks(
 		models.WorkflowHookCommandContext{
 			BaseRepo:           baseRepo,
@@ -105,6 +118,15 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			hookDescription = fmt.Sprintf("Pre workflow hook #%d", i)
 		}
 
+		ctx.Log.Debug("Processing pre workflow hook '%s', Command '%s', Target commands [%s]",
+			hookDescription, ctx.CommandName, hook.Commands)
+		if hook.Commands != "" && !strings.Contains(hook.Commands, ctx.CommandName) {
+			ctx.Log.Debug("Skipping pre workflow hook '%s' as command '%s' is not in Commands [%s]",
+				hookDescription, ctx.CommandName, hook.Commands)
+			continue
+		}
+
+		ctx.Log.Debug("Running pre workflow hook: '%s'", hookDescription)
 		ctx.HookID = uuid.NewString()
 		shell := hook.Shell
 		if shell == "" {
@@ -122,7 +144,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 		}
 
 		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.PendingCommitStatus, hookDescription, "", url); err != nil {
-			ctx.Log.Warn("unable to pre workflow hook status: %s", err)
+			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 			return err
 		}
 
@@ -130,13 +152,13 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 
 		if err != nil {
 			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.FailedCommitStatus, hookDescription, runtimeDesc, url); err != nil {
-				ctx.Log.Warn("unable to pre workflow hook status: %s", err)
+				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 			}
 			return err
 		}
 
 		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.SuccessCommitStatus, hookDescription, runtimeDesc, url); err != nil {
-			ctx.Log.Warn("unable to pre workflow hook status: %s", err)
+			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 			return err
 		}
 	}

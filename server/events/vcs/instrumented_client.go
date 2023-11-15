@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -43,7 +43,7 @@ type IGithubClient interface {
 }
 
 // InstrumentedGithubClient should delegate to the underlying InstrumentedClient for vcs provider-agnostic
-// methods and implement soley any github specific interfaces.
+// methods and implement solely any github specific interfaces.
 type InstrumentedGithubClient struct {
 	*InstrumentedClient
 	PullRequestGetter GithubPullRequestGetter
@@ -250,6 +250,7 @@ func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions mode
 	if err := c.Client.MergePull(pull, pullOptions); err != nil {
 		executionError.Inc(1)
 		logger.Err("Unable to merge pull, error: %s", err.Error())
+		return err
 	}
 
 	executionSuccess.Inc(1)

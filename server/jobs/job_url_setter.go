@@ -17,7 +17,7 @@ type ProjectJobURLGenerator interface {
 type ProjectStatusUpdater interface {
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
-	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectResult) error
+	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, res *command.ProjectResult) error
 }
 
 type JobURLSetter struct {

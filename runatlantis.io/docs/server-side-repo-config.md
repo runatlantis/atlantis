@@ -54,7 +54,7 @@ repos:
 
   # allowed_overrides specifies which keys can be overridden by this repo in
   # its atlantis.yaml file.
-  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge, repo_locking]
+  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge, repo_locking, custom_policy_check]
 
   # allowed_workflows specifies which workflows the repos that match 
   # are allowed to select.
@@ -72,6 +72,10 @@ repos:
   # repo_locking defines whether lock repository when planning.
   # If true (default), atlantis try to get a lock.
   repo_locking: true
+
+  # custom_policy_check defines whether policy checking tools besides Conftest are enabled in checks
+  # If false (default), only Conftest JSON output is allowed
+  custom_policy_check: false
 
   # pre_workflow_hooks defines arbitrary list of scripts to execute before workflow execution.
   pre_workflow_hooks: 
@@ -340,6 +344,9 @@ unless you've created your own server-side workflow with that key (overriding it
 See [Custom Workflows](custom-workflows.html) for more details on writing
 custom workflows.
 
+### Allow Using Custom Policy Tools
+Conftest is the standard policy check application integrated with Atlantis, but custom tools can still be run in custom workflows when the `custom_policy_check` option is set.  See the [Custom Policy Checks page](custom-policy-checks.md) for detailed examples.
+
 ### Allow Repos To Define Their Own Workflows
 If you want repos to be able to define their own workflows you need to
 allow them to override the `workflow` key and set `allow_custom_workflows` to `true`.
@@ -482,12 +489,13 @@ If you set a workflow with the key `default`, it will override this.
 | plan_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.                                                                  |                                                                                           |
 | apply_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.                                                                  |
 | import_requirements           | []string | none    | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.                                                                 |
-| allowed_overrides             | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge` and `repo_locking`                                                                                                                       |
+| allowed_overrides             | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge`,`repo_locking`, and `custom_policy_check`                                                                                                                          |
 | allowed_workflows             | []string | none    | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                                                                                           |
 | allow_custom_workflows        | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                                                                                        |
 | delete_source_branch_on_merge | bool     | false   | no       | Whether or not to delete the source branch on merge.                                                                                                                                                                                                                                                      |
 | repo_locking                  | bool     | false   | no       | Whether or not to get a lock.                                                                                                                                                                                                                                                                             |
 | policy_check                  | bool     | false   | no       | Whether or not to run policy checks on this repository.                                                                                                                                                                                                                                                   |
+| custom_policy_check                  | bool     | false   | no       | Whether or not to enable custom policy check tools outside of Conftest on this repository.                                                                                                                                                                                                       |
 
 
 :::tip Notes
@@ -550,7 +558,7 @@ If you set a workflow with the key `default`, it will override this.
 | Key                    | Type                      | Default | Required  | Description                              |
 |------------------------|---------------------------|---------|-----------|------------------------------------------|
 | statsd                 | [Statsd](#statsd)         | none    | no        | Statsd metrics provider                  |
-| prometheus             | [Prometheus](#prometheus) | none    | no        | Statsd metrics provider                  |
+| prometheus             | [Prometheus](#prometheus) | none    | no        | Prometheus metrics provider              |
 
 ### Statsd
 
