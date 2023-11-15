@@ -4,16 +4,14 @@ on:
   push:
     branches:
       - 'main'
+      - 'release-**'
     tags:
       - v*.*.* # stable release like, v0.19.2
       - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
   pull_request:
-    paths:
-      - 'Dockerfile'
-      - 'docker-entrypoint.sh'
-      - '.github/workflows/atlantis-image.yml'
-      - '**.go'
-      - 'go.*'
+    branches:
+      - 'main'
+      - 'release-**'
   workflow_dispatch:
 
 concurrency:
@@ -21,7 +19,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    outputs:
+      should-run-build: ${{ steps.changes.outputs.src == 'true' }}
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'Dockerfile'
+              - 'docker-entrypoint.sh'
+              - '.github/workflows/atlantis-image.yml'
+              - '**.go'
+              - 'go.*'
+
   build:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-build == 'true'
+    name: Build Image
     strategy:
       matrix:
         image_type: [alpine, debian]
@@ -123,3 +142,14 @@ jobs:
         target: ${{ matrix.image_type }}
         labels: ${{ steps.meta.outputs.labels }}
         outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}
+
+  skip-build:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-build == 'false'
+    name: Build Image
+    strategy:
+      matrix:
+        image_type: [alpine, debian]
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No build required"'
