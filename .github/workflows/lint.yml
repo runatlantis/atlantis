@@ -9,20 +9,34 @@ on:
       - ready_for_review
     branches:
       - "main"
-    paths:
-      - '**.go'
-      - 'go.*'
-      - '.github/workflows/lint.yml'
-      - '.golangci.yml'
+      - 'release-**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  golangci-lint:
+  changes:
+    outputs:
+      should-run-linting: ${{ steps.changes.outputs.go == 'true' }}
     if: github.event.pull_request.draft == false
-    name: runner / golangci-lint
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            go:
+              - '**.go'
+              - 'go.*'
+              - '.github/workflows/lint.yml'
+              - '.golangci.yml'
+
+  golangci-lint:
+    needs: [changes]
+    if: github.event.pull_request.draft == false && needs.changes.outputs.should-run-linting == 'true'
+    name: Linting
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
@@ -30,3 +44,11 @@ jobs:
       uses: reviewdog/action-golangci-lint@v2
       with:
         tool_name: golangci-lint
+  
+  skip-lint:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-linting == 'false'
+    name: Linting
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No build required"'
