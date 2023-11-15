@@ -111,7 +111,28 @@ func TestGitHubWorkflow(t *testing.T) {
 		ExpAllowResponseCommentBack bool
 		// ExpParseFailedCount represents how many times test sends invalid commands
 		ExpParseFailedCount int
+		// ExpNoLocksToDelete whether we expect that there are no locks at the end to delete
+		ExpNoLocksToDelete bool
 	}{
+		{
+			Description:        "no comment or change",
+			RepoDir:            "simple",
+			ModifiedFiles:      []string{},
+			Comments:           []string{},
+			ExpReplies:         [][]string{},
+			ExpNoLocksToDelete: true,
+		},
+		{
+			Description:   "no comment",
+			RepoDir:       "simple",
+			ModifiedFiles: []string{"main.tf"},
+			Comments:      []string{},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-merge.txt"},
+			},
+			ExpAutoplan: true,
+		},
 		{
 			Description:   "simple",
 			RepoDir:       "simple",
@@ -208,6 +229,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpAllowResponseCommentBack: true,
 			ExpParseFailedCount:         1,
+			ExpNoLocksToDelete:          true,
 		},
 		{
 			Description:   "simple with atlantis.yaml",
@@ -618,9 +640,13 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
-			// and apply have 1 for each comment plus one for the locks deleted at the
-			// end.
-			expNumReplies := len(c.Comments) + 1 - c.ExpParseFailedCount
+			// and apply have 1 for each comment
+			expNumReplies := len(c.Comments)
+
+			// If there are locks to delete at the end, that will take a comment
+			if !c.ExpNoLocksToDelete {
+				expNumReplies++
+			}
 
 			if c.ExpAutoplan {
 				expNumReplies++
@@ -1275,6 +1301,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	parallelPoolSize := 1
 	silenceNoProjects := false
 
+	disableUnlockLabel := "do-not-unlock"
+
 	statusUpdater := runtimemocks.NewMockStatusUpdater()
 	commitStatusUpdater := mocks.NewMockCommitStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
@@ -1460,6 +1488,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		mocks.NewMockDeleteLockCommand(),
 		e2eVCSClient,
 		silenceNoProjects,
+		disableUnlockLabel,
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
@@ -1739,7 +1768,7 @@ func ensureRunningConftest(t *testing.T) {
 	_, err := exec.LookPath(conftestCommand)
 	if err != nil {
 		t.Logf(`%s must be installed to run this test
-- on local, please install contest command or run 'make docker/test-all'
+- on local, please install conftest command or run 'make docker/test-all'
 - on CI, please check testing-env docker image contains conftest command. see testing/Dockerfile
 `, conftestCommand)
 		t.FailNow()

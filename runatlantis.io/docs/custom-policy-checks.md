@@ -4,7 +4,7 @@ If you want to run custom policy tools or scripts instead of the built-in Confte
 This option can be configured either at the server-level in a [repos.yaml config file](server-configuration.md) or at the repo-level in an [atlantis.yaml file.](repo-level-atlantis-yaml.md). 
 
 ## Server-side config example
-Set the `policy_check` and `custom_policy_check` options to true, and run the custom tool in the policy check steps as seen below.  No
+Set the `policy_check` and `custom_policy_check` options to true, and run the custom tool in the policy check steps as seen below.
 
 ```yaml
 repos:
