@@ -53,7 +53,6 @@ RUN apt-get update && \
         git \
         unzip \
         openssh-server \
-        libcap2 \
         dumb-init \
         gnupg \
         openssl && \
@@ -164,7 +163,6 @@ RUN apk add --no-cache \
         unzip~=6.0 \
         bash~=5.2 \
         openssh~=9.3_p2 \
-        libcap~=2.69 \
         dumb-init~=1.2 \
         gcompat~=1.1
 
