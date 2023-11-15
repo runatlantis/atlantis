@@ -3,12 +3,8 @@ name: website
 on:
   push:
     branches:
-      - "main"
-    paths:
-      - '**.js'
-      - 'yarn.lock'
-      - 'package.json'
-      - '.github/workflows/website.yml'
+      - 'main'
+      - 'release-**'
   pull_request:
     types:
       - opened
@@ -16,28 +12,43 @@ on:
       - synchronize
       - ready_for_review
     branches:
-      - "main"
-    paths:
-      - '**.js'
-      - 'yarn.lock'
-      - 'package.json'
-      - '.github/workflows/website.yml'
+      - 'main'
+      - 'release-**'
  
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  # Check that the website builds and there's no missing links.
-  # This job builds the website, starts a server to serve it, and then uses
-  # muffet (https://github.com/raviqqe/muffet) to perform the link check.
-  link_check:
+  changes:
+    outputs:
+      should-run-link-check: ${{ steps.changes.outputs.src == 'true' }}
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - '**.js'
+              - 'yarn.lock'
+              - 'package.json'
+              - '.github/workflows/website.yml'
 
-      - uses: actions/setup-node@v3
+  # Check that the website builds and there's no missing links.
+  # This job builds the website, starts a server to serve it, and then uses
+  # muffet (https://github.com/raviqqe/muffet) to perform the link check.
+  link-check:
+    needs: [changes]
+    if: github.event.pull_request.draft == false && needs.changes.outputs.should-run-link-check == 'true'
+    name: Website Link Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
 
@@ -68,3 +79,11 @@ jobs:
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
             http://localhost:8080/
+
+  skip-link-check:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-link-check == 'false'
+    name: Website Link Check
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "No build required"' 

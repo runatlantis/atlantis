@@ -2,15 +2,13 @@ name: testing-env-image
 
 on:
   push:
-    paths:
-      - "testing/**"
-      - ".github/workflows/testing-env-image.yml"
     branches:
-      - "main"
+      - 'main'
+      - 'release-**'
   pull_request:
-    paths:
-      - 'testing/**'
-      - '.github/workflows/testing-env-image.yml'
+    branches:
+      - 'main'
+      - 'release-**'
   workflow_dispatch:
 
 concurrency:
@@ -18,7 +16,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    outputs:
+      should-run-build: ${{ steps.changes.outputs.src == 'true' }}
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'testing/**'
+              - '.github/workflows/testing-env-image.yml'
+
   build:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-build == 'true'
+    name: Build Testing Env Image
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
@@ -51,3 +67,11 @@ jobs:
         tags: |
            ghcr.io/runatlantis/testing-env:${{env.TODAY}}
            ghcr.io/runatlantis/testing-env:latest
+
+  skip-build:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-build == 'false'
+    name: Build Testing Env Image
+    runs-on: ubuntu-22.04
+    steps:
+      - run: 'echo "No build required"'
