@@ -36,6 +36,8 @@ type APIRequest struct {
 	Repository string `validate:"required"`
 	Ref        string `validate:"required"`
 	Type       string `validate:"required"`
+	Commit     string
+	BaseBranch string
 	PR         int
 	Projects   []string
 	Paths      []struct {
@@ -155,6 +157,13 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	return &command.Result{ProjectResults: projectResults}, nil
 }
 
+func GetOrElse(val, def string) string {
+	if val != "" {
+		return val
+	}
+	return def
+}
+
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
 	cmds, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildApplyCommands)
 	if err != nil {
@@ -212,13 +221,16 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusForbidden, fmt.Errorf("repo not allowlisted")
 	}
 
+	baseBranch := GetOrElse(request.BaseBranch, request.Ref)
+	headCommit := GetOrElse(request.Commit, request.Ref)
+
 	return &request, &command.Context{
 		HeadRepo: baseRepo,
 		Pull: models.PullRequest{
 			Num:        request.PR,
-			BaseBranch: request.Ref,
+			BaseBranch: baseBranch,
 			HeadBranch: request.Ref,
-			HeadCommit: request.Ref,
+			HeadCommit: headCommit,
 			BaseRepo:   baseRepo,
 		},
 		Scope: a.Scope,
