@@ -413,7 +413,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.TFDownloadURL,
 		&terraform.DefaultDownloader{},
 		userConfig.TFDownload,
-		true,
+		userConfig.UseTFPluginCache,
 		projectCmdOutputHandler)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
@@ -596,6 +596,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
 		statsScope,
 		logger,
 		terraformClient,
@@ -745,6 +746,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		deleteLockCommand,
 		vcsClient,
 		userConfig.SilenceNoProjects,
+		userConfig.DisableUnlockLabel,
 	)
 
 	versionCommandRunner := events.NewVersionCommandRunner(
@@ -795,6 +797,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsPullGetter:          azuredevopsClient,
 		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
 		EventParser:                    eventParser,
+		FailOnPreWorkflowHookError:     userConfig.FailOnPreWorkflowHookError,
 		Logger:                         logger,
 		GlobalCfg:                      globalCfg,
 		StatsScope:                     statsScope.SubScope("cmd"),
@@ -803,12 +806,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SilenceForkPRErrors:            userConfig.SilenceForkPRErrors,
 		SilenceForkPRErrorsFlag:        config.SilenceForkPRErrorsFlag,
 		DisableAutoplan:                userConfig.DisableAutoplan,
+		DisableAutoplanLabel:           userConfig.DisableAutoplanLabel,
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              backend,
 		TeamAllowlistChecker:           githubTeamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
+		CommitStatusUpdater:            commitStatusUpdater,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {

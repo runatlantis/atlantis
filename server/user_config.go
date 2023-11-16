@@ -11,37 +11,41 @@ import (
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type UserConfig struct {
-	AllowForkPRs                    bool   `mapstructure:"allow-fork-prs"`
-	AllowRepoConfig                 bool   `mapstructure:"allow-repo-config"`
-	AllowCommands                   string `mapstructure:"allow-commands"`
-	AtlantisURL                     string `mapstructure:"atlantis-url"`
-	Automerge                       bool   `mapstructure:"automerge"`
-	AutoplanFileList                string `mapstructure:"autoplan-file-list"`
-	AutoplanModules                 bool   `mapstructure:"autoplan-modules"`
-	AutoplanModulesFromProjects     string `mapstructure:"autoplan-modules-from-projects"`
-	AzureDevopsToken                string `mapstructure:"azuredevops-token"`
-	AzureDevopsUser                 string `mapstructure:"azuredevops-user"`
-	AzureDevopsWebhookPassword      string `mapstructure:"azuredevops-webhook-password"`
-	AzureDevopsWebhookUser          string `mapstructure:"azuredevops-webhook-user"`
-	AzureDevOpsHostname             string `mapstructure:"azuredevops-hostname"`
-	BitbucketBaseURL                string `mapstructure:"bitbucket-base-url"`
-	BitbucketToken                  string `mapstructure:"bitbucket-token"`
-	BitbucketUser                   string `mapstructure:"bitbucket-user"`
-	BitbucketWebhookSecret          string `mapstructure:"bitbucket-webhook-secret"`
-	CheckoutDepth                   int    `mapstructure:"checkout-depth"`
-	CheckoutStrategy                string `mapstructure:"checkout-strategy"`
-	DataDir                         string `mapstructure:"data-dir"`
-	DisableApplyAll                 bool   `mapstructure:"disable-apply-all"`
-	DisableApply                    bool   `mapstructure:"disable-apply"`
-	DisableAutoplan                 bool   `mapstructure:"disable-autoplan"`
-	DisableMarkdownFolding          bool   `mapstructure:"disable-markdown-folding"`
-	DisableRepoLocking              bool   `mapstructure:"disable-repo-locking"`
-	DiscardApprovalOnPlanFlag       bool   `mapstructure:"discard-approval-on-plan"`
-	EmojiReaction                   string `mapstructure:"emoji-reaction"`
-	EnablePolicyChecksFlag          bool   `mapstructure:"enable-policy-checks"`
-	EnableRegExpCmd                 bool   `mapstructure:"enable-regexp-cmd"`
-	EnableDiffMarkdownFormat        bool   `mapstructure:"enable-diff-markdown-format"`
-	ExecutableName                  string `mapstructure:"executable-name"`
+	AllowForkPRs                bool   `mapstructure:"allow-fork-prs"`
+	AllowRepoConfig             bool   `mapstructure:"allow-repo-config"`
+	AllowCommands               string `mapstructure:"allow-commands"`
+	AtlantisURL                 string `mapstructure:"atlantis-url"`
+	Automerge                   bool   `mapstructure:"automerge"`
+	AutoplanFileList            string `mapstructure:"autoplan-file-list"`
+	AutoplanModules             bool   `mapstructure:"autoplan-modules"`
+	AutoplanModulesFromProjects string `mapstructure:"autoplan-modules-from-projects"`
+	AzureDevopsToken            string `mapstructure:"azuredevops-token"`
+	AzureDevopsUser             string `mapstructure:"azuredevops-user"`
+	AzureDevopsWebhookPassword  string `mapstructure:"azuredevops-webhook-password"`
+	AzureDevopsWebhookUser      string `mapstructure:"azuredevops-webhook-user"`
+	AzureDevOpsHostname         string `mapstructure:"azuredevops-hostname"`
+	BitbucketBaseURL            string `mapstructure:"bitbucket-base-url"`
+	BitbucketToken              string `mapstructure:"bitbucket-token"`
+	BitbucketUser               string `mapstructure:"bitbucket-user"`
+	BitbucketWebhookSecret      string `mapstructure:"bitbucket-webhook-secret"`
+	CheckoutDepth               int    `mapstructure:"checkout-depth"`
+	CheckoutStrategy            string `mapstructure:"checkout-strategy"`
+	DataDir                     string `mapstructure:"data-dir"`
+	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
+	DisableApply                bool   `mapstructure:"disable-apply"`
+	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
+	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`
+	DisableMarkdownFolding      bool   `mapstructure:"disable-markdown-folding"`
+	DisableRepoLocking          bool   `mapstructure:"disable-repo-locking"`
+	DisableUnlockLabel          string `mapstructure:"disable-unlock-label"`
+	DiscardApprovalOnPlanFlag   bool   `mapstructure:"discard-approval-on-plan"`
+	EmojiReaction               string `mapstructure:"emoji-reaction"`
+	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
+	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
+	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
+	ExecutableName              string `mapstructure:"executable-name"`
+	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
+	FailOnPreWorkflowHookError      bool   `mapstructure:"fail-on-pre-workflow-hook-error"`
 	HideUnchangedPlanComments       bool   `mapstructure:"hide-unchanged-plan-comments"`
 	GithubAllowMergeableBypassApply bool   `mapstructure:"gh-allow-mergeable-bypass-apply"`
 	GithubHostname                  string `mapstructure:"gh-hostname"`
@@ -58,6 +62,7 @@ type UserConfig struct {
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
+	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
 	LockingDBType                   string `mapstructure:"locking-db-type"`
@@ -79,8 +84,6 @@ type UserConfig struct {
 	RepoConfig                      string `mapstructure:"repo-config"`
 	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
 	RepoAllowlist                   string `mapstructure:"repo-allowlist"`
-	// RepoWhitelist is deprecated in favour of RepoAllowlist.
-	RepoWhitelist string `mapstructure:"repo-whitelist"`
 
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
@@ -99,29 +102,28 @@ type UserConfig struct {
 	SilenceVCSStatusNoPlans bool `mapstructure:"silence-vcs-status-no-plans"`
 	// SilenceVCSStatusNoProjects is whether autoplan should set commit status if no projects
 	// are found.
-	SilenceVCSStatusNoProjects bool `mapstructure:"silence-vcs-status-no-projects"`
-	SilenceAllowlistErrors     bool `mapstructure:"silence-allowlist-errors"`
-	// SilenceWhitelistErrors is deprecated in favour of SilenceAllowlistErrors
-	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
-	SkipCloneNoChanges     bool            `mapstructure:"skip-clone-no-changes"`
-	SlackToken             string          `mapstructure:"slack-token"`
-	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
-	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
-	RestrictFileList       bool            `mapstructure:"restrict-file-list"`
-	TFDownload             bool            `mapstructure:"tf-download"`
-	TFDownloadURL          string          `mapstructure:"tf-download-url"`
-	TFEHostname            string          `mapstructure:"tfe-hostname"`
-	TFELocalExecutionMode  bool            `mapstructure:"tfe-local-execution-mode"`
-	TFEToken               string          `mapstructure:"tfe-token"`
-	VarFileAllowlist       string          `mapstructure:"var-file-allowlist"`
-	VCSStatusName          string          `mapstructure:"vcs-status-name"`
-	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
-	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
-	WebBasicAuth           bool            `mapstructure:"web-basic-auth"`
-	WebUsername            string          `mapstructure:"web-username"`
-	WebPassword            string          `mapstructure:"web-password"`
-	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
-	WebsocketCheckOrigin   bool            `mapstructure:"websocket-check-origin"`
+	SilenceVCSStatusNoProjects bool            `mapstructure:"silence-vcs-status-no-projects"`
+	SilenceAllowlistErrors     bool            `mapstructure:"silence-allowlist-errors"`
+	SkipCloneNoChanges         bool            `mapstructure:"skip-clone-no-changes"`
+	SlackToken                 string          `mapstructure:"slack-token"`
+	SSLCertFile                string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile                 string          `mapstructure:"ssl-key-file"`
+	RestrictFileList           bool            `mapstructure:"restrict-file-list"`
+	TFDownload                 bool            `mapstructure:"tf-download"`
+	TFDownloadURL              string          `mapstructure:"tf-download-url"`
+	TFEHostname                string          `mapstructure:"tfe-hostname"`
+	TFELocalExecutionMode      bool            `mapstructure:"tfe-local-execution-mode"`
+	TFEToken                   string          `mapstructure:"tfe-token"`
+	VarFileAllowlist           string          `mapstructure:"var-file-allowlist"`
+	VCSStatusName              string          `mapstructure:"vcs-status-name"`
+	DefaultTFVersion           string          `mapstructure:"default-tf-version"`
+	Webhooks                   []WebhookConfig `mapstructure:"webhooks"`
+	WebBasicAuth               bool            `mapstructure:"web-basic-auth"`
+	WebUsername                string          `mapstructure:"web-username"`
+	WebPassword                string          `mapstructure:"web-password"`
+	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
+	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
+	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName

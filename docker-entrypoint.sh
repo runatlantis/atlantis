@@ -29,20 +29,6 @@ if ! whoami > /dev/null 2>&1; then
   fi
 fi
 
-# If we're running as root and we're trying to execute atlantis then we use
-# gosu to step down from root and run as the atlantis user.
-# In OpenShift, containers are run as a random users so we don't need to use gosu.
-if [ "$(id -u)" = 0 ] && [ "$1" = 'atlantis' ]; then
-    # If requested, set the capability to bind to privileged ports before
-    # we drop to the non-root user. Note that this doesn't work with all
-    # storage drivers (it won't work with AUFS).
-    if [ -n "${ATLANTIS_ALLOW_PRIVILEGED_PORTS+x}" ]; then
-        setcap "cap_net_bind_service=+ep" /bin/atlantis
-    fi
-
-    set -- gosu atlantis "$@"
-fi
-
 # If we need to install some tools at entrypoint level, we can add shell scripts
 # in folder /docker-entrypoint.d/ with extension .sh and this scripts will be executed
 # at entrypount level.

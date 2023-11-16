@@ -81,6 +81,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				DeleteSourceBranchOnMerge: Bool(false),
 				RepoLocking:               Bool(true),
 				PolicyCheck:               Bool(false),
+				CustomPolicyCheck:         Bool(false),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -707,11 +708,12 @@ policies:
 						},
 					},
 				},
-				RepoRelDir:      ".",
-				Workspace:       "default",
-				Name:            "",
-				AutoplanEnabled: false,
-				RepoLocking:     true,
+				RepoRelDir:        ".",
+				Workspace:         "default",
+				Name:              "",
+				AutoplanEnabled:   false,
+				RepoLocking:       true,
+				CustomPolicyCheck: false,
 			},
 		},
 		"policies set correct version if specified": {
@@ -755,11 +757,12 @@ policies:
 						},
 					},
 				},
-				RepoRelDir:      ".",
-				Workspace:       "default",
-				Name:            "",
-				AutoplanEnabled: false,
-				RepoLocking:     true,
+				RepoRelDir:        ".",
+				Workspace:         "default",
+				Name:              "",
+				AutoplanEnabled:   false,
+				RepoLocking:       true,
+				CustomPolicyCheck: false,
 			},
 		},
 	}
@@ -848,12 +851,13 @@ workflows:
 					Import:  valid.DefaultImportStage,
 					StateRm: valid.DefaultStateRmStage,
 				},
-				RepoRelDir:      ".",
-				Workspace:       "default",
-				Name:            "",
-				AutoplanEnabled: false,
-				PolicySets:      emptyPolicySets,
-				RepoLocking:     true,
+				RepoRelDir:        ".",
+				Workspace:         "default",
+				Name:              "",
+				AutoplanEnabled:   false,
+				PolicySets:        emptyPolicySets,
+				RepoLocking:       true,
+				CustomPolicyCheck: false,
 			},
 		},
 		"repo-side plan reqs win out if allowed": {
@@ -883,6 +887,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"repo-side apply reqs win out if allowed": {
@@ -912,6 +917,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"repo-side import reqs win out if allowed": {
@@ -941,6 +947,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"repo-side repo_locking win out if allowed": {
@@ -957,6 +964,7 @@ repos:
 				ApplyRequirements:  []string{},
 				ImportRequirements: []string{},
 				RepoLocking:        Bool(true),
+				CustomPolicyCheck:  Bool(false),
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
@@ -970,6 +978,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        false,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"last server-side match wins": {
@@ -1006,6 +1015,7 @@ repos:
 				AutoplanEnabled:    false,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"autoplan is set properly": {
@@ -1032,6 +1042,7 @@ repos:
 				AutoplanEnabled:    true,
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"execution order group is set": {
@@ -1060,6 +1071,7 @@ repos:
 				PolicySets:          emptyPolicySets,
 				ExecutionOrderGroup: 10,
 				RepoLocking:         true,
+				CustomPolicyCheck:   false,
 			},
 		},
 	}
@@ -1254,6 +1266,7 @@ repos:
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
 				PolicyCheck:        false,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"global policy check enabled": {
@@ -1293,6 +1306,7 @@ repos:
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
 				PolicyCheck:        true,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"global policy check enabled except current repo": {
@@ -1333,6 +1347,7 @@ repos:
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
 				PolicyCheck:        false,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"global policy check disabled and disabled on current repo": {
@@ -1373,6 +1388,7 @@ repos:
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
 				PolicyCheck:        false,
+				CustomPolicyCheck:  false,
 			},
 		},
 		"global policy check disabled and enabled on current repo": {
@@ -1413,6 +1429,7 @@ repos:
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
 				PolicyCheck:        true, // Project will have policy check as true but since it is globally disable it wont actually run
+				CustomPolicyCheck:  false,
 			},
 		},
 	}

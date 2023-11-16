@@ -27,6 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
+	"github.com/runatlantis/atlantis/server/utils"
 	tally "github.com/uber-go/tally/v4"
 	gitlab "github.com/xanzy/go-gitlab"
 )
@@ -96,12 +97,16 @@ type DefaultCommandRunner struct {
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
-	DisableAutoplan          bool
-	EventParser              EventParsing
-	Logger                   logging.SimpleLogging
-	GlobalCfg                valid.GlobalCfg
-	StatsScope               tally.Scope
-	// AllowForkPRs controls whether we operate on pull requests from forks.
+	// User config option: Disables autoplan when a pull request is opened or updated.
+	DisableAutoplan      bool
+	DisableAutoplanLabel string
+	EventParser          EventParsing
+	// User config option: Fail and do not run the Atlantis command request if any of the pre workflow hooks error
+	FailOnPreWorkflowHookError bool
+	Logger                     logging.SimpleLogging
+	GlobalCfg                  valid.GlobalCfg
+	StatsScope                 tally.Scope
+	// User config option: controls whether to operate on pull requests from forks.
 	AllowForkPRs bool
 	// ParallelPoolSize controls the size of the wait group used to run
 	// parallel plans and applies (if enabled).
@@ -110,7 +115,7 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
 	AllowForkPRsFlag string
-	// SilenceForkPRErrors controls whether to comment on Fork PRs when AllowForkPRs = False
+	// User config option: controls whether to comment on Fork PRs when AllowForkPRs = False
 	SilenceForkPRErrors bool
 	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
@@ -123,6 +128,7 @@ type DefaultCommandRunner struct {
 	PullStatusFetcher              PullStatusFetcher
 	TeamAllowlistChecker           *TeamAllowlistChecker
 	VarFileAllowlistChecker        *VarFileAllowlistChecker
+	CommitStatusUpdater            CommitStatusUpdater
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -147,6 +153,16 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
+	// Check if the user who triggered the autoplan has permissions to run 'plan'.
+	ok, err := c.checkUserPermissions(baseRepo, user, "plan")
+	if err != nil {
+		c.Logger.Err("Unable to check user permissions: %s", err)
+		return
+	}
+	if !ok {
+		return
+	}
+
 	ctx := &command.Context{
 		User:       user,
 		Log:        log,
@@ -162,6 +178,14 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	if c.DisableAutoplan {
 		return
 	}
+	if len(c.DisableAutoplanLabel) > 0 {
+		labels, err := c.VCSClient.GetPullLabels(baseRepo, pull)
+		if err != nil {
+			ctx.Log.Err("Unable to get pull labels. Proceeding with %s command.", err, command.Plan)
+		} else if utils.SlicesContains(labels, c.DisableAutoplanLabel) {
+			return
+		}
+	}
 
 	cmd := &CommentCommand{
 		Name: command.Autoplan,
@@ -169,7 +193,27 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, command.Plan)
+		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
+
+		if c.FailOnPreWorkflowHookError {
+			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
+
+			// Update the plan or apply commit status to pending whilst the pre workflow hook is running so that the PR can't be merged.
+			switch cmd.Name {
+			case command.Plan:
+				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
+					ctx.Log.Warn("unable to update plan commit status: %s", err)
+				}
+			case command.Apply:
+				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
+					ctx.Log.Warn("unable to update apply commit status: %s", err)
+				}
+			}
+
+			return
+		}
+
+		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", command.Plan)
 	}
 
 	autoPlanRunner := buildCommentCommandRunner(c, command.Plan)
@@ -193,7 +237,7 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 }
 
 // checkUserPermissions checks if the user has permissions to execute the command
-func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmd *CommentCommand) (bool, error) {
+func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmdName string) (bool, error) {
 	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
 		// allowlist restriction is not enabled
 		return true, nil
@@ -202,7 +246,7 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 	if err != nil {
 		return false, err
 	}
-	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmd.Name.String())
+	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmdName)
 	if !ok {
 		return false, nil
 	}
@@ -244,7 +288,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	defer timer.Stop()
 
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
-	ok, err := c.checkUserPermissions(baseRepo, user, cmd)
+	ok, err := c.checkUserPermissions(baseRepo, user, cmd.Name.String())
 	if err != nil {
 		c.Logger.Err("Unable to check user permissions: %s", err)
 		return
@@ -293,7 +337,27 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, cmd.Name.String())
+		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
+
+		if c.FailOnPreWorkflowHookError {
+			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
+
+			// Update the plan or apply commit status to pending whilst the pre workflow hook is running so that the PR can't be merged.
+			switch cmd.Name {
+			case command.Plan:
+				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
+					ctx.Log.Warn("unable to update plan commit status: %s", err)
+				}
+			case command.Apply:
+				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
+					ctx.Log.Warn("unable to update apply commit status: %s", err)
+				}
+			}
+
+			return
+		}
+
+		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", cmd.Name.String())
 	}
 
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
