@@ -216,9 +216,9 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		HeadRepo: baseRepo,
 		Pull: models.PullRequest{
 			Num:        request.PR,
-			BaseBranch: request.Ref,
+			BaseBranch: "main",
 			HeadBranch: request.Ref,
-			HeadCommit: request.Ref,
+			HeadCommit: "HEAD",
 			BaseRepo:   baseRepo,
 		},
 		Scope: a.Scope,
