@@ -654,14 +654,14 @@
     vue "^3.3.4"
     vue-router "^4.2.4"
 
-"@vuepress/client@2.0.0-beta.68":
-  version "2.0.0-beta.68"
-  resolved "https://registry.yarnpkg.com/@vuepress/client/-/client-2.0.0-beta.68.tgz#9dd56575326b6f4344a0b14a38035250f28aab01"
-  integrity sha512-Y6amMnkPxpmn51vcgy5yzm3gpIaqZo4Pa8ItPFd7MW6GQy6HVZRNaV9ufzWRPOAedLHgpT4aVXomidvTMEKHVw==
+"@vuepress/client@2.0.0-rc.0":
+  version "2.0.0-rc.0"
+  resolved "https://registry.yarnpkg.com/@vuepress/client/-/client-2.0.0-rc.0.tgz#851677f81d90ad4fb5d5fd4c5693c499b3dd0ad2"
+  integrity sha512-TwQx8hJgYONYxX+QltZ2aw9O5Ym6SKelfiUduuIRb555B1gece/jSVap3H/ZwyBhpgJMtG4+/Mrmf8nlDSHjvw==
   dependencies:
     "@vue/devtools-api" "^6.5.1"
-    "@vuepress/shared" "2.0.0-beta.68"
-    "@vueuse/core" "^10.6.0"
+    "@vuepress/shared" "2.0.0-rc.0"
+    "@vueuse/core" "^10.6.1"
     vue "^3.3.8"
     vue-router "^4.2.5"
 
@@ -676,15 +676,15 @@
     "@vuepress/utils" "2.0.0-beta.67"
     vue "^3.3.4"
 
-"@vuepress/core@2.0.0-beta.68":
-  version "2.0.0-beta.68"
-  resolved "https://registry.yarnpkg.com/@vuepress/core/-/core-2.0.0-beta.68.tgz#d796b7802ab5a5f8876ee151a7bc3db98cf5ef90"
-  integrity sha512-/c+3gdduDyiyeGARzui6Z5ZeZurRGcbVSmqcUfb8SjB7sHojDt+bq/7gYeXKXrJ4R0zPpmqshlZdNGOSY4+uGQ==
+"@vuepress/core@2.0.0-rc.0":
+  version "2.0.0-rc.0"
+  resolved "https://registry.yarnpkg.com/@vuepress/core/-/core-2.0.0-rc.0.tgz#b4a8f68a58e755ecc23d330c7d7769270ce792e4"
+  integrity sha512-uoOaZP1MdxZYJIAJcRcmYKKeCIVnxZeOuLMOOB9CPuAKSalT1RvJ1lztw6RX3q9SPnlqtSZPQXDncPAZivw4pA==
   dependencies:
-    "@vuepress/client" "2.0.0-beta.68"
-    "@vuepress/markdown" "2.0.0-beta.68"
-    "@vuepress/shared" "2.0.0-beta.68"
-    "@vuepress/utils" "2.0.0-beta.68"
+    "@vuepress/client" "2.0.0-rc.0"
+    "@vuepress/markdown" "2.0.0-rc.0"
+    "@vuepress/shared" "2.0.0-rc.0"
+    "@vuepress/utils" "2.0.0-rc.0"
     vue "^3.3.8"
 
 "@vuepress/markdown@2.0.0-beta.67":
@@ -709,10 +709,10 @@
     markdown-it-emoji "^2.0.2"
     mdurl "^1.0.1"
 
-"@vuepress/markdown@2.0.0-beta.68":
-  version "2.0.0-beta.68"
-  resolved "https://registry.yarnpkg.com/@vuepress/markdown/-/markdown-2.0.0-beta.68.tgz#30df752af338cfb208ab8a1d008efca1d7bb9ae3"
-  integrity sha512-wQOVw1QQSnkdKClTnv3dHw1A7Y+XF2eu2hJmhTf9XOnEMxQ9taacIq5iRuQdcfR+Y8rjWmrzrqWZL+MiJbxKMQ==
+"@vuepress/markdown@2.0.0-rc.0":
+  version "2.0.0-rc.0"
+  resolved "https://registry.yarnpkg.com/@vuepress/markdown/-/markdown-2.0.0-rc.0.tgz#513de09b470306e3a647ce2901995d0e63efbc0e"
+  integrity sha512-USmqdKKMT6ZFHYRztTjKUlO8qgGfnEygMAAq4AzC/uYXiEfrbMBLAWJhteyGS56P3rGLj0OPAhksE681bX/wOg==
   dependencies:
     "@mdit-vue/plugin-component" "^1.0.0"
     "@mdit-vue/plugin-frontmatter" "^1.0.0"
@@ -724,8 +724,8 @@
     "@mdit-vue/types" "^1.0.0"
     "@types/markdown-it" "^13.0.6"
     "@types/markdown-it-emoji" "^2.0.4"
-    "@vuepress/shared" "2.0.0-beta.68"
-    "@vuepress/utils" "2.0.0-beta.68"
+    "@vuepress/shared" "2.0.0-rc.0"
+    "@vuepress/utils" "2.0.0-rc.0"
     markdown-it "^13.0.2"
     markdown-it-anchor "^8.6.7"
     markdown-it-emoji "^2.0.2"
@@ -805,14 +805,14 @@
     "@vuepress/utils" "2.0.0-beta.67"
     execa "^8.0.1"
 
-"@vuepress/plugin-google-analytics@2.0.0-beta.68":
-  version "2.0.0-beta.68"
-  resolved "https://registry.yarnpkg.com/@vuepress/plugin-google-analytics/-/plugin-google-analytics-2.0.0-beta.68.tgz#38e41837fdc4e4cfdaeca5528442cd68a74269e1"
-  integrity sha512-O8qqSp3Zo9GwwB7d4FnCxMwBpc4QxSro7wqHRYRwd0nHxPtnEQFZfYFqn8vO4qEBjrx0sevQeS8njN2O5b7xuA==
+"@vuepress/plugin-google-analytics@2.0.0-rc.0":
+  version "2.0.0-rc.0"
+  resolved "https://registry.yarnpkg.com/@vuepress/plugin-google-analytics/-/plugin-google-analytics-2.0.0-rc.0.tgz#1ddc27e8f76dcd6e3fc278adaf943f13f4eac5c1"
+  integrity sha512-rkYW2LGkLAfRFtaFWVPr1V2mS6hwgYhn2hLeJAF5xHlC3PcjCiSV0cqH7ooeCo+FBJUlCtMQ9N8iSNl63vd7VQ==
   dependencies:
-    "@vuepress/client" "2.0.0-beta.68"
-    "@vuepress/core" "2.0.0-beta.68"
-    "@vuepress/utils" "2.0.0-beta.68"
+    "@vuepress/client" "2.0.0-rc.0"
+    "@vuepress/core" "2.0.0-rc.0"
+    "@vuepress/utils" "2.0.0-rc.0"
 
 "@vuepress/plugin-medium-zoom@2.0.0-beta.67":
   version "2.0.0-beta.67"
@@ -873,10 +873,10 @@
     "@mdit-vue/types" "^0.12.0"
     "@vue/shared" "^3.3.4"
 
-"@vuepress/shared@2.0.0-beta.68":
-  version "2.0.0-beta.68"
-  resolved "https://registry.yarnpkg.com/@vuepress/shared/-/shared-2.0.0-beta.68.tgz#ea413dde17e3e8663d0b82749747246c6981319f"
-  integrity sha512-vnlOOchZ7ZHeTQuFDKcTC1AKF5zl4+XKwZZdpX9cUkIl3rYbM4y80yoWvfG5SQnPjjoYG57g4Qz21Fa8u/CnCQ==
+"@vuepress/shared@2.0.0-rc.0":
+  version "2.0.0-rc.0"
+  resolved "https://registry.yarnpkg.com/@vuepress/shared/-/shared-2.0.0-rc.0.tgz#0d6ef42940dd030d575c877160fb0583791a9d6c"
+  integrity sha512-ikdSfjRv5LGM1iv4HHwF9P6gqTjaFCXKPK+hzlkHFHNZO1GLqk7/BPc4F51tAG1s8TcLhUZc+54LrfgS7PkXXA==
   dependencies:
     "@mdit-vue/types" "^1.0.0"
     "@vue/shared" "^3.3.8"
@@ -923,15 +923,15 @@
     picocolors "^1.0.0"
     upath "^2.0.1"
 
-"@vuepress/utils@2.0.0-beta.68":
-  version "2.0.0-beta.68"
-  resolved "https://registry.yarnpkg.com/@vuepress/utils/-/utils-2.0.0-beta.68.tgz#9dbdf1cc5afd4c08a3a58924dfbf535fc13862a5"
-  integrity sha512-asRN+c8JCIVJWusP/V0FY8rgArGwuKXarEIKwFHcaR7x9IeB3Iww4p8raQHb1xYJADM7QFXx1gs2oM6Fx4XsUw==
+"@vuepress/utils@2.0.0-rc.0":
+  version "2.0.0-rc.0"
+  resolved "https://registry.yarnpkg.com/@vuepress/utils/-/utils-2.0.0-rc.0.tgz#34331cea9d4f843cc0c5641aaa395ab49ee66041"
+  integrity sha512-Q1ay/woClDHcW0Qe91KsnHoupdNN0tp/vhjvVLuAYxlv/1Obii7hz9WFcajyyGEhmsYxdvG2sGmcxFA02tuKkw==
   dependencies:
     "@types/debug" "^4.1.12"
     "@types/fs-extra" "^11.0.4"
     "@types/hash-sum" "^1.0.2"
-    "@vuepress/shared" "2.0.0-beta.68"
+    "@vuepress/shared" "2.0.0-rc.0"
     debug "^4.3.4"
     fs-extra "^11.1.1"
     globby "^14.0.0"
@@ -940,7 +940,7 @@
     picocolors "^1.0.0"
     upath "^2.0.1"
 
-"@vueuse/core@^10.4.1", "@vueuse/core@^10.6.0":
+"@vueuse/core@^10.4.1", "@vueuse/core@^10.6.1":
   version "10.6.1"
   resolved "https://registry.yarnpkg.com/@vueuse/core/-/core-10.6.1.tgz#5b16d8238054c6983b6cb7cd77a78035f098dd89"
   integrity sha512-Pc26IJbqgC9VG1u6VY/xrXXfxD33hnvxBnKrLlA2LJlyHII+BSrRoTPJgGYq7qZOu61itITFUnm6QbacwZ4H8Q==
