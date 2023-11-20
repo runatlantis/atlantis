@@ -391,8 +391,8 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 				pull.Num, delay)
 			time.Sleep(delay)
 		} else {
-			g.logger.Debug("Head pipeline not found for merge request %d, source '%s'.",
-				pull.Num, mr.HeadPipeline.Source)
+			g.logger.Debug("Head pipeline not found for merge request %d.",
+				pull.Num)
 		}
 	}
 
