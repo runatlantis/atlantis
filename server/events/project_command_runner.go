@@ -343,7 +343,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	// Only query the users team membership if any teams have been configured as owners on any policy set(s).
 	if policySetCfg.HasTeamOwners() {
 		// A convenient way to access vcsClient. Not sure if best way.
-		userTeams, err := p.VcsClient.GetTeamNamesForUser(ctx.Pull.BaseRepo, ctx.User)
+		userTeams, err := p.VcsClient.GetTeamNamesForUser(ctx.Pull.BaseRepo, ctx.User, policySetCfg.AllTeams())
 		if err != nil {
 			ctx.Log.Err("unable to get team membership for user: %s", err)
 			return nil, "", err

@@ -390,7 +390,7 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *AzureDevopsClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) { //nolint: revive
+func (g *AzureDevopsClient) GetTeamNamesForUser(repo models.Repo, user models.User, configuredTeams []string) ([]string, error) { //nolint: revive
 	return nil, nil
 }
 
