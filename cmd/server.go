@@ -99,6 +99,7 @@ const (
 	GiteaUserFlag                    = "gitea-user"
 	GiteaWebhookSecretFlag           = "gitea-webhook-secret" // nolint: gosec
 	GiteaPageSizeFlag                = "gitea-page-size"
+	GitlabGroupAllowlistFlag         = "gitlab-group-allowlist"
 	GitlabHostnameFlag               = "gitlab-hostname"
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
@@ -343,6 +344,17 @@ var stringFlags = map[string]stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from Gitea. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GITEA_WEBHOOK_SECRET environment variable.",
+	},
+	GitlabGroupAllowlistFlag: {
+		description: "Comma separated list of key-value pairs representing the GitLab groups and the operations that " +
+			"the members of a particular group are allowed to perform. " +
+			"The format is {group}:{command},{group}:{command}. " +
+			"Valid values for 'command' are 'plan', 'apply' and '*', e.g. 'myorg/dev:plan,myorg/ops:apply,myorg/devops:*'" +
+			"This example gives the users from the 'myorg/dev' GitLab group the permissions to execute the 'plan' command, " +
+			"the 'myorg/ops' group the permissions to execute the 'apply' command, " +
+			"and allows the 'myorg/devops' group to perform any operation. If this argument is not provided, the default value (*:*) " +
+			"will be used and the default behavior will be to not check permissions " +
+			"and to allow users from any group to perform any operation.",
 	},
 	GitlabHostnameFlag: {
 		description:  "Hostname of your GitLab Enterprise installation. If using gitlab.com, no need to set.",
