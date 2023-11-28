@@ -100,6 +100,7 @@ var testFlags = map[string]interface{}{
 	GiteaUserFlag:                    "gitea-user",
 	GiteaWebhookSecretFlag:           "gitea-secret",
 	GiteaPageSizeFlag:                30,
+	GitlabGroupAllowlistFlag:         "",
 	GitlabHostnameFlag:               "gitlab-hostname",
 	GitlabTokenFlag:                  "gitlab-token",
 	GitlabUserFlag:                   "gitlab-user",

@@ -66,6 +66,7 @@ type UserConfig struct {
 	GiteaWebhookSecret              string `mapstructure:"gitea-webhook-secret"`
 	GiteaPageSize                   int    `mapstructure:"gitea-page-size"`
 	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
+	GitlabGroupAllowlist            string `mapstructure:"gitlab-group-allowlist"`
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
