@@ -18,7 +18,7 @@ import (
 	"github.com/runatlantis/atlantis/server/utils"
 	"strconv"
 
-	"github.com/google/go-github/v56/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -98,9 +98,9 @@ type DefaultCommandRunner struct {
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	// User config option: Disables autoplan when a pull request is opened or updated.
-	DisableAutoplan      bool
-	DisableAutoplanLabel string
-	EventParser          EventParsing
+	DisableAutoplan bool
+	DisableAutoplanLabel     string
+	EventParser     EventParsing
 	// User config option: Fail and do not run the Atlantis command request if any of the pre workflow hooks error
 	FailOnPreWorkflowHookError bool
 	Logger                     logging.SimpleLogging
