@@ -103,7 +103,10 @@ Runs `terraform apply` for the plan that matches the directory/project/workspace
 ::: tip
 If no directory/project/workspace is specified, ex. `atlantis apply`, this command will apply **all unapplied plans from this pull request**.
 This includes all projects that have been planned manually with `atlantis plan` `-p`/`-d`/`-w` since the last autoplan or `atlantis plan` command.
+For the `atlantis apply` to work note that atlantis needs to know the location of the path where the tfstate is for that you can use this ENV $PLANFILE like `terraform plan -out $PLANFILE`
+in the plan step, and `terraform apply $PLANFILE` in the apply step.
 :::
+
 
 ### Examples
 ```bash
