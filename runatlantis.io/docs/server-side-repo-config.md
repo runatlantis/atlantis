@@ -88,6 +88,10 @@ repos:
   # policy_check defines if policy checking should be enable on this repository.
   policy_check: false
 
+  # autodiscover defines how atlantis should automatically discover projects in this repository.
+  autodiscover:
+    mode: auto
+
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
 
@@ -496,6 +500,7 @@ If you set a workflow with the key `default`, it will override this.
 | repo_locking                  | bool     | false   | no       | Whether or not to get a lock.                                                                                                                                                                                                                                                                             |
 | policy_check                  | bool     | false   | no       | Whether or not to run policy checks on this repository.                                                                                                                                                                                                                                                   |
 | custom_policy_check                  | bool     | false   | no       | Whether or not to enable custom policy check tools outside of Conftest on this repository.                                                                                                                                                                                                       |
+| autodiscover                  | AutoDiscover     | none   | no       | Auto discover settings for this repo
 
 
 :::tip Notes
