@@ -33,6 +33,7 @@ var defaultUserConfig = struct {
 	RestrictFileList         bool
 	SilenceNoProjects        bool
 	IncludeGitUntrackedFiles bool
+	AutoDiscoverMode         string
 }{
 	SkipCloneNoChanges:       false,
 	EnableRegExpCmd:          false,
@@ -44,6 +45,7 @@ var defaultUserConfig = struct {
 	RestrictFileList:         false,
 	SilenceNoProjects:        false,
 	IncludeGitUntrackedFiles: true,
+	AutoDiscoverMode:         "auto",
 }
 
 func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
@@ -194,6 +196,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -232,6 +235,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 		ExpErr                     string
 		ExpApplyReqs               []string
 		EnableAutoMergeUserCfg     bool
+		AutoDiscoverModeUserCfg    string
 		EnableParallelPlanUserCfg  bool
 		EnableParallelApplyUserCfg bool
 		ExpAutoMerge               bool
@@ -550,6 +554,7 @@ projects:
 					userConfig.RestrictFileList,
 					c.Silenced,
 					userConfig.IncludeGitUntrackedFiles,
+					c.AutoDiscoverModeUserCfg,
 					scope,
 					logger,
 					terraformClient,
@@ -739,6 +744,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -770,6 +776,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 		RepoRelDir       string
 		Workspace        string
 		Automerge        bool
+		AutoDiscover     valid.AutoDiscover
 		ExpParallelPlan  bool
 		ExpParallelApply bool
 	}
@@ -956,6 +963,67 @@ projects:
 				},
 			},
 		},
+		"follow autodiscover enabled config": {
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project3": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `version: 3
+autodiscover:
+  mode: enabled
+projects:
+- name: project1-custom-name
+  dir: project1`,
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			// project2 is autodiscovered, whereas project1 is not
+			Exp: []expCtxFields{
+				{
+					ProjectName: "project1-custom-name",
+					RepoRelDir:  "project1",
+					Workspace:   "default",
+				},
+				{
+					ProjectName: "",
+					RepoRelDir:  "project2",
+					Workspace:   "default",
+				},
+			},
+		},
+		"autodiscover enabled but project excluded by empty when_modified": {
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project3": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `version: 3
+autodiscover:
+  mode: enabled
+projects:
+- dir: project1
+  autoplan:
+    when_modified: []`,
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			Exp: []expCtxFields{
+				{
+					ProjectName: "",
+					RepoRelDir:  "project2",
+					Workspace:   "default",
+				},
+			},
+		},
 	}
 
 	logger := logging.NewNoopLogger(t)
@@ -1007,6 +1075,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -1021,7 +1090,7 @@ projects:
 					RepoRelDir:  "",
 					Flags:       nil,
 					Name:        command.Plan,
-					Verbose:     false,
+					Verbose:     true,
 					Workspace:   "",
 					ProjectName: "",
 				})
@@ -1111,6 +1180,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
 		scope,
 		logger,
 		terraformClient,
@@ -1206,6 +1276,7 @@ projects:
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
 		scope,
 		logger,
 		terraformClient,
@@ -1296,6 +1367,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -1467,6 +1539,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -1523,6 +1596,17 @@ parallel_plan: true`,
 			ExpectedClones: Once(),
 			ModifiedFiles:  []string{"README.md"},
 		},
+		{
+			AtlantisYAML: `
+version: 3
+autodiscover:
+  mode: enabled
+projects:
+- dir: dir1`,
+			ExpectedCtxs:   0,
+			ExpectedClones: Once(),
+			ModifiedFiles:  []string{"dir2/main.tf"},
+		},
 	}
 
 	userConfig := defaultUserConfig
@@ -1568,6 +1652,7 @@ parallel_plan: true`,
 			userConfig.RestrictFileList,
 			userConfig.SilenceNoProjects,
 			userConfig.IncludeGitUntrackedFiles,
+			userConfig.AutoDiscoverMode,
 			scope,
 			logger,
 			terraformClient,
@@ -1638,6 +1723,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
 		scope,
 		logger,
 		terraformClient,
@@ -1730,6 +1816,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
 		scope,
 		logger,
 		terraformClient,
@@ -1861,6 +1948,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -1972,6 +2060,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,

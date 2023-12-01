@@ -6,6 +6,7 @@
   commitMessageSuffix: " in {{packageFile}}",
   dependencyDashboardAutoclose: true,
   automerge: true,
+  baseBranches: ["main", "/^release\-.*/"],
   platformAutomerge: true,
   labels: ["dependencies"],
   postUpdateOptions: [

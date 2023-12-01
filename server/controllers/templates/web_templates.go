@@ -400,32 +400,41 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <style>
       #terminal {
         position: fixed;
-        top: 200px;
+        top: 0px;
         left: 0px;
         bottom: 0px;
         right: 0px;
         border: 5px solid white;
+        z-index: 10;
         }
 
       .terminal.xterm {
         padding: 10px;
       }
+      #watermark {
+        opacity: 0.5;
+        color: BLACK;
+        position: absolute;
+        bottom: 0;
+        padding-right: 30px;
+        padding-bottom: 15px;
+        right: 0;
+        z-index: 15;
+      }
     </style>
   </head>
 
   <body>
-    <section class="header">
+    <section id="watermark">
     <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
-    <p class="title-heading">atlantis</p>
+    <p class="terminal-heading-white">atlantis</p>
     <p class="title-heading"><strong></strong></p>
     </section>
-    <div class="spacer"></div>
-    <br>
     <section>
       <div id="terminal"></div>
     </section>
   </div>
-  <footer>Initializing...
+  <footer class="footer-white">Initializing...
   </footer>
 
     <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
@@ -524,7 +533,7 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
     <script>
       var term = new Terminal();
       var socket = new WebSocket(
-        (document.location.protocol === "http:" ? "ws://" : "wss://") + 
+        (document.location.protocol === "http:" ? "ws://" : "wss://") +
         document.location.host +
         document.location.pathname +
         "/ws");
