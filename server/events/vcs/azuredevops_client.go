@@ -107,6 +107,7 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	const maxCommentLength = 150000
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	common.ReverseComments(comments)
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	for i := range comments {

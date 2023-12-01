@@ -188,6 +188,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	}
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	common.ReverseComments(comments)
 	for i := range comments {
 		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
 		g.logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
