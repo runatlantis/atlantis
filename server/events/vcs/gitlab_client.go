@@ -333,7 +333,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 			mr.DetailedMergeStatus == "ci_still_running" ||
 			mr.DetailedMergeStatus == "ci_must_pass")) ||
 		(!supportsDetailedMergeStatus &&
-			mr.MergeStatus == "can_be_merged")) &&
+			mr.MergeStatus == "can_be_merged")) && //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
 		!mr.WorkInProgress &&
