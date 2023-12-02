@@ -20,7 +20,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var projectId = 4580910
+var projectID = 4580910
 
 // Test that the base url gets set properly.
 func TestNewGitlabClient_BaseURL(t *testing.T) {
@@ -452,10 +452,10 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", ciMustPassFailureMR):
 							w.WriteHeader(http.StatusOK)
 							w.Write([]byte(detailedMergeStatusCiMustPass)) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/%v", projectId):
+						case fmt.Sprintf("/api/v4/projects/%v", projectID):
 							w.WriteHeader(http.StatusOK)
 							w.Write([]byte(projectSuccess)) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectId):
+						case fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
 							w.WriteHeader(http.StatusOK)
 							response := fmt.Sprintf(`[{"id":133702594,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"ApplySuccess","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}]`, c.status, c.statusName)
 							w.Write([]byte(response)) // nolint: errcheck
