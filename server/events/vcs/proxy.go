@@ -60,8 +60,8 @@ func (d *ClientProxy) CreateComment(repo models.Repo, pullNum int, comment strin
 	return d.clients[repo.VCSHost.Type].CreateComment(repo, pullNum, comment, command)
 }
 
-func (d *ClientProxy) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
-	return d.clients[repo.VCSHost.Type].HidePrevCommandComments(repo, pullNum, command)
+func (d *ClientProxy) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error {
+	return d.clients[repo.VCSHost.Type].HidePrevCommandComments(repo, pullNum, command, dir)
 }
 
 func (d *ClientProxy) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {

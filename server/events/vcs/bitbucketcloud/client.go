@@ -106,7 +106,7 @@ func (b *Client) ReactToComment(repo models.Repo, pullNum int, commentID int64, 
 	return nil
 }
 
-func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error {
 	return nil
 }
 

@@ -591,7 +591,7 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 		},
 	}
 
-	err = client.HidePrevCommandComments(repo, pullNum, command.Plan.TitleString())
+	err = client.HidePrevCommandComments(repo, pullNum, command.Plan.TitleString(),"")
 	Ok(t, err)
 
 	// Check the correct number of plan comments have been processed

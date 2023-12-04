@@ -230,6 +230,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 		},
 		123,
 		command.Plan.TitleString(),
+		"",
 	)
 	Ok(t, err)
 	Equals(t, 2, len(gotMinimizeCalls))
@@ -314,6 +315,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 		},
 		123,
 		command.Plan.TitleString(),
+		"",
 	)
 	Ok(t, err)
 	Equals(t, 3, len(gotMinimizeCalls))
