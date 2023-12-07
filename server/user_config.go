@@ -14,6 +14,7 @@ type UserConfig struct {
 	AllowForkPRs                bool   `mapstructure:"allow-fork-prs"`
 	AllowCommands               string `mapstructure:"allow-commands"`
 	AtlantisURL                 string `mapstructure:"atlantis-url"`
+	AutoDiscoverModeFlag        string `mapstructure:"autodiscover-mode"`
 	Automerge                   bool   `mapstructure:"automerge"`
 	AutoplanFileList            string `mapstructure:"autoplan-file-list"`
 	AutoplanModules             bool   `mapstructure:"autoplan-modules"`
@@ -83,8 +84,6 @@ type UserConfig struct {
 	RepoConfig                      string `mapstructure:"repo-config"`
 	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
 	RepoAllowlist                   string `mapstructure:"repo-allowlist"`
-	// RepoWhitelist is deprecated in favour of RepoAllowlist.
-	RepoWhitelist string `mapstructure:"repo-whitelist"`
 
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
@@ -103,30 +102,28 @@ type UserConfig struct {
 	SilenceVCSStatusNoPlans bool `mapstructure:"silence-vcs-status-no-plans"`
 	// SilenceVCSStatusNoProjects is whether autoplan should set commit status if no projects
 	// are found.
-	SilenceVCSStatusNoProjects bool `mapstructure:"silence-vcs-status-no-projects"`
-	SilenceAllowlistErrors     bool `mapstructure:"silence-allowlist-errors"`
-	// SilenceWhitelistErrors is deprecated in favour of SilenceAllowlistErrors
-	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
-	SkipCloneNoChanges     bool            `mapstructure:"skip-clone-no-changes"`
-	SlackToken             string          `mapstructure:"slack-token"`
-	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
-	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
-	RestrictFileList       bool            `mapstructure:"restrict-file-list"`
-	TFDownload             bool            `mapstructure:"tf-download"`
-	TFDownloadURL          string          `mapstructure:"tf-download-url"`
-	TFEHostname            string          `mapstructure:"tfe-hostname"`
-	TFELocalExecutionMode  bool            `mapstructure:"tfe-local-execution-mode"`
-	TFEToken               string          `mapstructure:"tfe-token"`
-	VarFileAllowlist       string          `mapstructure:"var-file-allowlist"`
-	VCSStatusName          string          `mapstructure:"vcs-status-name"`
-	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
-	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
-	WebBasicAuth           bool            `mapstructure:"web-basic-auth"`
-	WebUsername            string          `mapstructure:"web-username"`
-	WebPassword            string          `mapstructure:"web-password"`
-	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
-	WebsocketCheckOrigin   bool            `mapstructure:"websocket-check-origin"`
-	UseTFPluginCache       bool            `mapstructure:"use-tf-plugin-cache"`
+	SilenceVCSStatusNoProjects bool            `mapstructure:"silence-vcs-status-no-projects"`
+	SilenceAllowlistErrors     bool            `mapstructure:"silence-allowlist-errors"`
+	SkipCloneNoChanges         bool            `mapstructure:"skip-clone-no-changes"`
+	SlackToken                 string          `mapstructure:"slack-token"`
+	SSLCertFile                string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile                 string          `mapstructure:"ssl-key-file"`
+	RestrictFileList           bool            `mapstructure:"restrict-file-list"`
+	TFDownload                 bool            `mapstructure:"tf-download"`
+	TFDownloadURL              string          `mapstructure:"tf-download-url"`
+	TFEHostname                string          `mapstructure:"tfe-hostname"`
+	TFELocalExecutionMode      bool            `mapstructure:"tfe-local-execution-mode"`
+	TFEToken                   string          `mapstructure:"tfe-token"`
+	VarFileAllowlist           string          `mapstructure:"var-file-allowlist"`
+	VCSStatusName              string          `mapstructure:"vcs-status-name"`
+	DefaultTFVersion           string          `mapstructure:"default-tf-version"`
+	Webhooks                   []WebhookConfig `mapstructure:"webhooks"`
+	WebBasicAuth               bool            `mapstructure:"web-basic-auth"`
+	WebUsername                string          `mapstructure:"web-username"`
+	WebPassword                string          `mapstructure:"web-password"`
+	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
+	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
+	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName

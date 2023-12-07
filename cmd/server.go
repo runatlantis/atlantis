@@ -53,6 +53,7 @@ const (
 	AllowCommandsFlag                = "allow-commands"
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AtlantisURLFlag                  = "atlantis-url"
+	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
@@ -117,40 +118,37 @@ const (
 	RedisInsecureSkipVerify          = "redis-insecure-skip-verify"
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
-	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
-	RepoWhitelistFlag          = "repo-whitelist"
-	RepoAllowlistFlag          = "repo-allowlist"
-	RequireApprovalFlag        = "require-approval"
-	RequireMergeableFlag       = "require-mergeable"
-	SilenceNoProjectsFlag      = "silence-no-projects"
-	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
-	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
-	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
-	// SilenceWhitelistErrorsFlag is deprecated for SilenceAllowlistErrorsFlag.
-	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
-	SkipCloneNoChanges         = "skip-clone-no-changes"
-	SlackTokenFlag             = "slack-token"
-	SSLCertFileFlag            = "ssl-cert-file"
-	SSLKeyFileFlag             = "ssl-key-file"
-	RestrictFileList           = "restrict-file-list"
-	TFDownloadFlag             = "tf-download"
-	TFDownloadURLFlag          = "tf-download-url"
-	UseTFPluginCache           = "use-tf-plugin-cache"
-	VarFileAllowlistFlag       = "var-file-allowlist"
-	VCSStatusName              = "vcs-status-name"
-	TFEHostnameFlag            = "tfe-hostname"
-	TFELocalExecutionModeFlag  = "tfe-local-execution-mode"
-	TFETokenFlag               = "tfe-token"
-	WriteGitCredsFlag          = "write-git-creds" // nolint: gosec
-	WebBasicAuthFlag           = "web-basic-auth"
-	WebUsernameFlag            = "web-username"
-	WebPasswordFlag            = "web-password"
-	WebsocketCheckOrigin       = "websocket-check-origin"
+	RepoAllowlistFlag                = "repo-allowlist"
+	RequireApprovalFlag              = "require-approval"
+	RequireMergeableFlag             = "require-mergeable"
+	SilenceNoProjectsFlag            = "silence-no-projects"
+	SilenceForkPRErrorsFlag          = "silence-fork-pr-errors"
+	SilenceVCSStatusNoPlans          = "silence-vcs-status-no-plans"
+	SilenceAllowlistErrorsFlag       = "silence-allowlist-errors"
+	SkipCloneNoChanges               = "skip-clone-no-changes"
+	SlackTokenFlag                   = "slack-token"
+	SSLCertFileFlag                  = "ssl-cert-file"
+	SSLKeyFileFlag                   = "ssl-key-file"
+	RestrictFileList                 = "restrict-file-list"
+	TFDownloadFlag                   = "tf-download"
+	TFDownloadURLFlag                = "tf-download-url"
+	UseTFPluginCache                 = "use-tf-plugin-cache"
+	VarFileAllowlistFlag             = "var-file-allowlist"
+	VCSStatusName                    = "vcs-status-name"
+	TFEHostnameFlag                  = "tfe-hostname"
+	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
+	TFETokenFlag                     = "tfe-token"
+	WriteGitCredsFlag                = "write-git-creds" // nolint: gosec
+	WebBasicAuthFlag                 = "web-basic-auth"
+	WebUsernameFlag                  = "web-username"
+	WebPasswordFlag                  = "web-password"
+	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser                  = ""
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
+	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
@@ -209,6 +207,12 @@ var stringFlags = map[string]stringFlag{
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
+	},
+	AutoDiscoverModeFlag: {
+		description: "Auto discover mode controls whether projects in a repo are discovered by Atlantis. Defaults to 'auto' which " +
+			"means projects will be discovered when no explicit projects are defined in repo config. Also supports 'enabled' (always " +
+			"discover projects) and 'disabled' (never discover projects).",
+		defaultValue: DefaultAutoDiscoverMode,
 	},
 	AutoplanModulesFromProjects: {
 		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
@@ -370,10 +374,6 @@ var stringFlags = map[string]stringFlag{
 			"all repos: '*' (not secure), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'." +
 			" For Bitbucket Server, {owner} is the name of the project (not the key).",
 	},
-	RepoWhitelistFlag: {
-		description: "[Deprecated for --repo-allowlist].",
-		hidden:      true,
-	},
 	SlackTokenFlag: {
 		description: "API token for Slack notifications.",
 	},
@@ -528,11 +528,6 @@ var boolFlags = map[string]boolFlag{
 	SilenceAllowlistErrorsFlag: {
 		description:  "Silences the posting of allowlist error comments.",
 		defaultValue: false,
-	},
-	SilenceWhitelistErrorsFlag: {
-		description:  "[Deprecated for --silence-allowlist-errors].",
-		defaultValue: false,
-		hidden:       true,
 	},
 	DisableMarkdownFoldingFlag: {
 		description:  "Toggle off folding in markdown output.",
@@ -876,6 +871,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.WebPassword == "" {
 		c.WebPassword = DefaultWebPassword
 	}
+	if c.AutoDiscoverModeFlag == "" {
+		c.AutoDiscoverModeFlag = DefaultAutoDiscoverMode
+	}
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
@@ -917,21 +915,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return vcsErr
 	}
 
-	// Handle deprecation of repo whitelist.
-	if userConfig.RepoWhitelist == "" && userConfig.RepoAllowlist == "" {
+	if userConfig.RepoAllowlist == "" {
 		return fmt.Errorf("--%s must be set for security purposes", RepoAllowlistFlag)
-	}
-	if userConfig.RepoAllowlist != "" && userConfig.RepoWhitelist != "" {
-		return fmt.Errorf("both --%s and --%s cannot be set–use --%s", RepoAllowlistFlag, RepoWhitelistFlag, RepoAllowlistFlag)
-	}
-	if strings.Contains(userConfig.RepoWhitelist, "://") {
-		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoWhitelistFlag)
 	}
 	if strings.Contains(userConfig.RepoAllowlist, "://") {
 		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoAllowlistFlag)
-	}
-	if userConfig.SilenceAllowlistErrors && userConfig.SilenceWhitelistErrors {
-		return fmt.Errorf("both --%s and --%s cannot be set–use --%s", SilenceAllowlistErrorsFlag, SilenceWhitelistErrorsFlag, SilenceAllowlistErrorsFlag)
 	}
 
 	if userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret != "" {
@@ -1127,14 +1115,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 			jsonCfg,
 		)
 		fmt.Println(warning)
-	}
-
-	// Handle repo whitelist deprecation.
-	if userConfig.SilenceWhitelistErrors {
-		userConfig.SilenceAllowlistErrors = true
-	}
-	if userConfig.RepoWhitelist != "" {
-		userConfig.RepoAllowlist = userConfig.RepoWhitelist
 	}
 
 	return nil

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
-ARG ALPINE_TAG=3.18.4
+ARG ALPINE_TAG=3.18.5
 ARG DEBIAN_TAG=12.2-slim
 
 ARG DEFAULT_TERRAFORM_VERSION=1.6.3
@@ -8,7 +8,7 @@ ARG DEFAULT_CONFTEST_VERSION=0.46.0
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.21.3-alpine AS builder
+FROM golang:1.21.5-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -41,7 +41,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM debian:${DEBIAN_TAG} as debian-base
 
-# Install packages needed for running Atlantis.
+# Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 # hadolint ignore explanation
 # DL3008 (pin versions using "=") - Ignored to avoid failing the build
@@ -53,7 +53,6 @@ RUN apt-get update && \
         git \
         unzip \
         openssh-server \
-        libcap2 \
         dumb-init \
         gnupg \
         openssl && \
@@ -88,30 +87,6 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
         rm "conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
         rm checksums.txt; \
     done
-
-# install gosu
-# We use gosu to step down from root and run as the atlantis user
-# renovate: datasource=github-releases depName=tianon/gosu
-ENV GOSU_VERSION=1.16
-
-RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") GOSU_ARCH=amd64 ;; \
-        "linux/arm64") GOSU_ARCH=arm64 ;; \
-        "linux/arm/v7") GOSU_ARCH=armhf ;; \
-    esac && \
-    curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" && \
-    curl -L -s --output gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" && \
-    for server in $(shuf -e ipv4.pool.sks-keyservers.net \
-                            hkp://p80.pool.sks-keyservers.net:80 \
-                            keyserver.ubuntu.com \
-                            hkp://keyserver.ubuntu.com:80 \
-                            pgp.mit.edu) ; do \
-        gpg --keyserver "$server" --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 && break || : ; \
-    done && \
-    gpg --batch --verify gosu.asc gosu && \
-    chmod +x gosu && \
-    cp gosu /bin && \
-    gosu --version
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
@@ -159,26 +134,27 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="1.3.10 1.4.6 1.5.7 ${DEFAULT_TERRAFORM_VERSION
 # Creating the individual distro builds using targets
 FROM alpine:${ALPINE_TAG} AS alpine
 
-# atlantis user for gosu and OpenShift compatibility
+EXPOSE ${ATLANTIS_PORT:-4141}
+
+HEALTHCHECK --interval=5m --timeout=3s \
+  CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
+
+# Set up the 'atlantis' user and adjust permissions
 RUN addgroup atlantis && \
     adduser -S -G atlantis atlantis && \
-    adduser atlantis root && \
     chown atlantis:root /home/atlantis/ && \
-    chmod g=u /home/atlantis/ && \
-    chmod g=u /etc/passwd
+    chmod u+rwx /home/atlantis/
 
-# copy binary
+# copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform
+# copy terraform binaries
 COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-# copy deps
+# copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
-COPY --from=deps /bin/gosu /bin/gosu
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
-# copy docker entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Install packages needed for running Atlantis.
+# Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
         ca-certificates~=20230506 \
@@ -187,33 +163,39 @@ RUN apk add --no-cache \
         unzip~=6.0 \
         bash~=5.2 \
         openssh~=9.3_p2 \
-        libcap~=2.69 \
         dumb-init~=1.2 \
         gcompat~=1.1
 
+
+# Set the entry point to the atlantis user and run the atlantis command
+USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
 
 # Stage 2 - Debian
 FROM debian-base AS debian
 
-# Add atlantis user to Debian as well
-RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
-    adduser atlantis root && \
-    chown atlantis:root /home/atlantis/ && \
-    chmod g=u /home/atlantis/ && \
-    chmod g=u /etc/passwd
+EXPOSE ${ATLANTIS_PORT:-4141}
 
-# copy binary
+HEALTHCHECK --interval=5m --timeout=3s \
+  CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
+
+# Set up the 'atlantis' user and adjust permissions
+RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
+    chown atlantis:root /home/atlantis/ && \
+    chmod u+rwx /home/atlantis/
+
+# copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform
+# copy terraform binaries
 COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-# copy deps
+# copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
-COPY --from=deps /bin/gosu /bin/gosu
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
-# copy docker entrypoint
+# copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+# Set the entry point to the atlantis user and run the atlantis command
+USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]

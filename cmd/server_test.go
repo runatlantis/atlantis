@@ -59,6 +59,7 @@ var testFlags = map[string]interface{}{
 	AtlantisURLFlag:                  "url",
 	AllowCommandsFlag:                "version,plan,unlock,import,approve_policies", // apply is disabled by DisableApply
 	AllowForkPRsFlag:                 true,
+	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
 	AutoplanFileListFlag:             "**/*.tf,**/*.yml",
 	BitbucketBaseURLFlag:             "https://bitbucket-base-url.com",
@@ -751,18 +752,6 @@ func TestExecute_TFEHostnameOnly(t *testing.T) {
 	ErrEquals(t, "if setting --tfe-hostname, must set --tfe-token", err)
 }
 
-// Can't use both --repo-allowlist and --repo-whitelist
-func TestExecute_BothAllowAndWhitelist(t *testing.T) {
-	c := setup(map[string]interface{}{
-		GHUserFlag:        "user",
-		GHTokenFlag:       "token",
-		RepoAllowlistFlag: "github.com",
-		RepoWhitelistFlag: "github.com",
-	}, t)
-	err := c.Execute()
-	ErrEquals(t, "both --repo-allowlist and --repo-whitelist cannot be set–use --repo-allowlist", err)
-}
-
 // Must set allow or whitelist.
 func TestExecute_AllowAndWhitelist(t *testing.T) {
 	c := setup(map[string]interface{}{
@@ -773,19 +762,6 @@ func TestExecute_AllowAndWhitelist(t *testing.T) {
 	ErrEquals(t, "--repo-allowlist must be set for security purposes", err)
 }
 
-// Can't use both --silence-whitelist-errors and --silence-allowlist-errors
-func TestExecute_BothSilenceAllowAndWhitelistErrors(t *testing.T) {
-	c := setup(map[string]interface{}{
-		GHUserFlag:                 "user",
-		GHTokenFlag:                "token",
-		RepoAllowlistFlag:          "*",
-		SilenceWhitelistErrorsFlag: true,
-		SilenceAllowlistErrorsFlag: true,
-	}, t)
-	err := c.Execute()
-	ErrEquals(t, "both --silence-allowlist-errors and --silence-whitelist-errors cannot be set–use --silence-allowlist-errors", err)
-}
-
 func TestExecute_DisableApplyDeprecation(t *testing.T) {
 	c := setupWithDefaults(map[string]interface{}{
 		DisableApplyFlag:  true,
@@ -794,21 +770,6 @@ func TestExecute_DisableApplyDeprecation(t *testing.T) {
 	err := c.Execute()
 	Ok(t, err)
 	Equals(t, "plan,unlock", passedConfig.AllowCommands)
-}
-
-// Test that we set the corresponding allow list values on the userConfig
-// struct if the deprecated whitelist flags are used.
-func TestExecute_RepoWhitelistDeprecation(t *testing.T) {
-	c := setup(map[string]interface{}{
-		GHUserFlag:                 "user",
-		GHTokenFlag:                "token",
-		RepoWhitelistFlag:          "*",
-		SilenceWhitelistErrorsFlag: true,
-	}, t)
-	err := c.Execute()
-	Ok(t, err)
-	Equals(t, true, passedConfig.SilenceAllowlistErrors)
-	Equals(t, "*", passedConfig.RepoAllowlist)
 }
 
 func TestExecute_AutoDetectModulesFromProjects_Env(t *testing.T) {
