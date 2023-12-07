@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
-ARG ALPINE_TAG=3.18.4
+ARG ALPINE_TAG=3.18.5
 ARG DEBIAN_TAG=12.2-slim
 
 ARG DEFAULT_TERRAFORM_VERSION=1.6.3
@@ -8,7 +8,7 @@ ARG DEFAULT_CONFTEST_VERSION=0.46.0
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.21.4-alpine AS builder
+FROM golang:1.21.5-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
