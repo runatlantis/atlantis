@@ -158,7 +158,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
         ca-certificates~=20230506 \
-        curl~=8 \
+        curl~=8.5 \
         git~=2.40 \
         unzip~=6.0 \
         bash~=5.2 \
