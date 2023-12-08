@@ -223,7 +223,7 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	deleteSourceBranchOnMerge := false
 	repoLockingKey := true
 	customPolicyCheck := false
-  autoDiscover := AutoDiscover{Mode: AutoDiscoverAutoMode}
+    autoDiscover := AutoDiscover{Mode: AutoDiscoverAutoMode}
 	if args.AllowAllRepoSettings {
 		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, PolicyCheckKey}
 		allowCustomWorkflows = true
