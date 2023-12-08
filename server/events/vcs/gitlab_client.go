@@ -388,12 +388,12 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 			break
 		}
 		if i != retries {
-			g.logger.Debug("Head pipeline not found for merge request %d, source '%s'. Retrying in %s",
-				pull.Num, mr.HeadPipeline.Source, delay)
+			g.logger.Debug("Head pipeline not found for merge request %d. Retrying in %s",
+				pull.Num, delay)
 			time.Sleep(delay)
 		} else {
-			g.logger.Debug("Head pipeline not found for merge request %d, source '%s'.",
-				pull.Num, mr.HeadPipeline.Source)
+			g.logger.Debug("Head pipeline not found for merge request %d.",
+				pull.Num)
 		}
 	}
 
