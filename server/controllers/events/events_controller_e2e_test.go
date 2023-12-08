@@ -1358,6 +1358,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		false,
 		false,
 		false,
+		"auto",
 		statsScope,
 		logger,
 		terraformClient,
@@ -1369,7 +1370,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	conftextExec := policy.NewConfTestExecutorWorkflow(logger, binDir, &NoopTFDownloader{})
 
-	// swapping out version cache to something that always returns local contest
+	// swapping out version cache to something that always returns local conftest
 	// binary
 	conftextExec.VersionCache = &LocalConftestCache{}
 
@@ -1769,7 +1770,7 @@ func mkSubDirs(t *testing.T) (string, string, string) {
 
 // Will fail test if conftest isn't in path
 func ensureRunningConftest(t *testing.T) {
-	// use `conftest` command instead `contest$version`, so tests may fail on the environment cause the output logs may become change by version.
+	// use `conftest` command instead `conftest$version`, so tests may fail on the environment cause the output logs may become change by version.
 	t.Logf("conftest check may fail depends on conftest version. please use latest stable conftest.")
 	_, err := exec.LookPath(conftestCommand)
 	if err != nil {

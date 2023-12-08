@@ -364,19 +364,38 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 		gitlabState = gitlab.Success
 	}
 
-	mr, err := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
-	if err != nil {
-		return err
-	}
-	// refTarget is set to current branch if no pipeline is assigned to the commit,
-	// otherwise it is set to the pipeline created by the merge_request_event rule
+	// refTarget is set to the head pipeline of the MR if it exists, or else it is set to the head branch
+	// of the MR. This is needed because the commit status is only shown in the MR if the pipeline is
+	// assigned to an MR reference.
+	// Try to get the MR details a couple of times in case the pipeline is not yet assigned to the MR
 	refTarget := pull.HeadBranch
-	if mr.Pipeline != nil {
-		switch mr.Pipeline.Source {
-		case "merge_request_event":
-			refTarget = fmt.Sprintf("refs/merge-requests/%d/head", pull.Num)
+
+	retries := 1
+	delay := 2 * time.Second
+	var mr *gitlab.MergeRequest
+	var err error
+
+	for i := 0; i <= retries; i++ {
+		mr, err = g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
+		if err != nil {
+			return err
+		}
+		if mr.HeadPipeline != nil {
+			g.logger.Debug("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
+				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
+			refTarget = mr.HeadPipeline.Ref
+			break
+		}
+		if i != retries {
+			g.logger.Debug("Head pipeline not found for merge request %d. Retrying in %s",
+				pull.Num, delay)
+			time.Sleep(delay)
+		} else {
+			g.logger.Debug("Head pipeline not found for merge request %d.",
+				pull.Num)
 		}
 	}
+
 	_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
 		State:       gitlabState,
 		Context:     gitlab.String(src),

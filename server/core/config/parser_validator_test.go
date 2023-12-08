@@ -1329,6 +1329,22 @@ func TestParseGlobalCfg(t *testing.T) {
   import_requirements: [invalid]`,
 			expErr: "repos: (0: (import_requirements: \"invalid\" is not a valid import_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
 		},
+		"disable autodiscover": {
+			input: `repos: 
+- id: /.*/
+  autodiscover:
+    mode: disabled`,
+			exp: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					defaultCfg.Repos[0],
+					{
+						IDRegex:      regexp.MustCompile(".*"),
+						AutoDiscover: &valid.AutoDiscover{Mode: valid.AutoDiscoverDisabledMode},
+					},
+				},
+				Workflows: defaultCfg.Workflows,
+			},
+		},
 		"no workflows key": {
 			input: `repos: []`,
 			exp:   defaultCfg,
@@ -1404,6 +1420,8 @@ repos:
   allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, delete_source_branch_on_merge]
   allow_custom_workflows: true
   policy_check: true
+  autodiscover:
+    mode: enabled
 - id: /.*/
   branch: /(master|main)/
   pre_workflow_hooks:
@@ -1411,6 +1429,8 @@ repos:
   post_workflow_hooks:
     - run: custom workflow command
   policy_check: false
+  autodiscover:
+    mode: disabled
 workflows:
   custom1:
     plan:
@@ -1457,6 +1477,7 @@ policies:
 						AllowedOverrides:     []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
 						PolicyCheck:          Bool(true),
+						AutoDiscover:         &valid.AutoDiscover{Mode: valid.AutoDiscoverEnabledMode},
 					},
 					{
 						IDRegex:           regexp.MustCompile(".*"),
@@ -1464,6 +1485,7 @@ policies:
 						PreWorkflowHooks:  preWorkflowHooks,
 						PostWorkflowHooks: postWorkflowHooks,
 						PolicyCheck:       Bool(false),
+						AutoDiscover:      &valid.AutoDiscover{Mode: valid.AutoDiscoverDisabledMode},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1574,6 +1596,7 @@ workflows:
 						RepoLocking:               Bool(true),
 						PolicyCheck:               Bool(false),
 						CustomPolicyCheck:         Bool(false),
+						AutoDiscover:              raw.DefaultAutoDiscover(),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1727,7 +1750,10 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
       "allowed_workflows": ["custom"],
       "apply_requirements": ["mergeable", "approved"],
       "allowed_overrides": ["workflow", "apply_requirements"],
-      "allow_custom_workflows": true
+      "allow_custom_workflows": true,
+      "autodiscover": {
+        "mode": "enabled"
+      }
     },
     {
       "id": "github.com/owner/repo"
@@ -1792,6 +1818,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 						AllowedWorkflows:     []string{"custom"},
 						AllowedOverrides:     []string{"workflow", "apply_requirements"},
 						AllowCustomWorkflows: Bool(true),
+						AutoDiscover:         &valid.AutoDiscover{Mode: valid.AutoDiscoverEnabledMode},
 					},
 					{
 						ID:                   "github.com/owner/repo",
@@ -1799,6 +1826,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 						ApplyRequirements:    nil,
 						AllowedOverrides:     nil,
 						AllowCustomWorkflows: nil,
+						AutoDiscover:         nil,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
