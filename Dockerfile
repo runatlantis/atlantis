@@ -158,13 +158,13 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
         ca-certificates~=20230506 \
-        curl~=8.5 \
-        git~=2.40 \
-        unzip~=6.0 \
-        bash~=5.2 \
-        openssh~=9.3_p2 \
-        dumb-init~=1.2 \
-        gcompat~=1.1
+        curl~=8 \
+        git~=2 \
+        unzip~=6 \
+        bash~=5 \
+        openssh~=9 \
+        dumb-init~=1 \
+        gcompat~=1
 
 
 # Set the entry point to the atlantis user and run the atlantis command
