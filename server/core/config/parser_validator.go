@@ -78,7 +78,7 @@ func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.G
 	//
 	i := 0
 	for _, p := range validConfig.Projects {
-		if branch == "" || p.BranchRegex == nil || p.BranchRegex.Match([]byte(branch)) {
+		if branch == "" || p.BranchRegex == nil || p.BranchRegex.MatchString(branch) {
 			validConfig.Projects[i] = p
 			i++
 		}

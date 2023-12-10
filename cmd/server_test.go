@@ -60,6 +60,7 @@ var testFlags = map[string]interface{}{
 	AllowCommandsFlag:                "version,plan,unlock,import,approve_policies", // apply is disabled by DisableApply
 	AllowForkPRsFlag:                 true,
 	AllowRepoConfigFlag:              true,
+	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
 	AutoplanFileListFlag:             "**/*.tf,**/*.yml",
 	BitbucketBaseURLFlag:             "https://bitbucket-base-url.com",

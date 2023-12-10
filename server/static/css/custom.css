@@ -350,7 +350,7 @@ tbody {
 
 /* Add Animation */
 @-webkit-keyframes animatetop {
-    from {top: -300px; opacity: 0} 
+    from {top: -300px; opacity: 0}
     to {top: 0; opacity: 1}
 }
 
@@ -369,7 +369,11 @@ tbody {
 
 .title-heading {
   font-family: monospace, monospace; font-size: 1.1em; text-align: center;
- } 
+ }
+
+.terminal-heading-white {
+  font-family: monospace, monospace; font-size: 1.1em; text-align: center; color: white;
+ }
 
 .small {
   font-size: 1.0em;
@@ -383,4 +387,14 @@ footer {
   right: 0;
   color: grey;
   padding-right: 10px;
+}
+
+.footer-white {
+  font-family: monospace, monospace; font-size: 1.2rem;
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  color: grey;
+  padding-right: 10px;
+  color: white;
 }
