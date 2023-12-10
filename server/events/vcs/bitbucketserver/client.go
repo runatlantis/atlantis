@@ -366,6 +366,6 @@ func (b *Client) GetCloneURL(_ models.VCSHostType, _ string) (string, error) {
 	return "", fmt.Errorf("not yet implemented")
 }
 
-func (b *Client) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (b *Client) GetPullLabels(_ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }

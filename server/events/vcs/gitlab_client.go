@@ -178,7 +178,7 @@ func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment stri
 		"```diff\n"
 	comments := common.SplitComment(comment, gitlabMaxCommentLength, sepEnd, sepStart)
 	for _, c := range comments {
-		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.String(c)})
+		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(c)})
 		g.logger.Debug("POST /projects/%s/merge_requests/%d/notes returned: %d", repo.FullName, pullNum, resp.StatusCode)
 		if err != nil {
 			return err
@@ -202,8 +202,8 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 		g.logger.Debug("/projects/%v/merge_requests/%d/notes", repo.FullName, pullNum)
 		comments, resp, err := g.Client.Notes.ListMergeRequestNotes(repo.FullName, pullNum,
 			&gitlab.ListMergeRequestNotesOptions{
-				Sort:        gitlab.String("asc"),
-				OrderBy:     gitlab.String("created_at"),
+				Sort:        gitlab.Ptr("asc"),
+				OrderBy:     gitlab.Ptr("created_at"),
 				ListOptions: gitlab.ListOptions{Page: nextPage},
 			})
 		g.logger.Debug("GET /projects/%s/merge_requests/%d/notes returned: %d", repo.FullName, pullNum, resp.StatusCode)
@@ -399,10 +399,10 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 
 	_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
 		State:       gitlabState,
-		Context:     gitlab.String(src),
-		Description: gitlab.String(description),
+		Context:     gitlab.Ptr(src),
+		Description: gitlab.Ptr(description),
 		TargetURL:   &url,
-		Ref:         gitlab.String(refTarget),
+		Ref:         gitlab.Ptr(refTarget),
 	})
 	g.logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
 	return err
@@ -525,7 +525,7 @@ func (g *GitlabClient) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]stri
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
 func (g *GitlabClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
-	opt := gitlab.GetRawFileOptions{Ref: gitlab.String(pull.HeadBranch)}
+	opt := gitlab.GetRawFileOptions{Ref: gitlab.Ptr(pull.HeadBranch)}
 
 	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, fileName, &opt)
 	g.logger.Debug("GET /projects/%s/repository/files/%s/raw returned: %d", pull.BaseRepo.FullName, fileName, resp.StatusCode)

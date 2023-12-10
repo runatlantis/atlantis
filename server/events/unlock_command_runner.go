@@ -1,9 +1,10 @@
 package events
 
 import (
+	"slices"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"slices"
 )
 
 func NewUnlockCommandRunner(

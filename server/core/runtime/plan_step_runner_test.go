@@ -193,9 +193,8 @@ Terraform will perform the following actions:
 				return []ReturnValue{"default", nil}
 			} else if tfArgs[0] == "plan" {
 				return []ReturnValue{rawOutput, nil}
-			} else {
-				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 			}
+			return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 		})
 	actOutput, err := s.Run(command.ProjectContext{Workspace: "default"}, nil, "", map[string]string(nil))
 	Ok(t, err)
@@ -246,9 +245,8 @@ func TestRun_OutputOnErr(t *testing.T) {
 				return []ReturnValue{"default\n", nil}
 			} else if tfArgs[0] == "plan" {
 				return []ReturnValue{expOutput, errors.New(expErrMsg)}
-			} else {
-				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 			}
+			return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 		})
 	actOutput, actErr := s.Run(command.ProjectContext{Workspace: "default"}, nil, "", map[string]string(nil))
 	ErrEquals(t, expErrMsg, actErr)
