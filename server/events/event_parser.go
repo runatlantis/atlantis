@@ -599,9 +599,8 @@ func (e *EventParser) ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent
 		// Check for MR that has been marked as ready
 		(strings.HasPrefix(event.Changes.Title.Previous, "Draft:") && !strings.HasPrefix(event.Changes.Title.Current, "Draft:")) {
 		return models.UpdatedPullEvent
-	} else {
-		return models.OtherPullEvent
 	}
+	return models.OtherPullEvent
 }
 
 // ParseGitlabMergeRequestEvent parses GitLab merge request events.

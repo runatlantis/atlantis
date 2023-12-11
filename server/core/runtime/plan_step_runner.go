@@ -296,7 +296,7 @@ locally at this time.
 // using Terraform Cloud remote operations in TF 1.1.0 and above
 var remoteOpsErr110 = `╷
 │ Error: Saving a generated plan is currently not supported
-│ 
+│
 │ Terraform Cloud does not support saving the generated execution plan
 │ locally at this time.
 ╵

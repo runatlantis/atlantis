@@ -253,7 +253,8 @@ func TestParseGithubPullEvent_EventType(t *testing.T) {
 		t.Run(c.action, func(t *testing.T) {
 			// Test normal parsing
 			event := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-			event.Action = &c.action
+			action := c.action
+			event.Action = &action
 			_, actType, _, _, _, err := parser.ParseGithubPullEvent(&event)
 			Ok(t, err)
 			Equals(t, c.exp, actType)
@@ -1009,7 +1010,7 @@ func TestBitBucketNonCodeChangesAreIgnored(t *testing.T) {
 	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha2", "https://github.com/fakeorg/fakerepo/pull/1")
 	Equals(t, models.UpdatedPullEvent, act)
 
-	// If sha changes in seperate PR,
+	// If sha changes in separate PR,
 	act = parser.GetBitbucketCloudPullEventType("pullrequest:updated", "otherPRSha", "https://github.com/fakeorg/fakerepo/pull/2")
 	Equals(t, models.UpdatedPullEvent, act)
 	// We will still ignore same shas in first PR

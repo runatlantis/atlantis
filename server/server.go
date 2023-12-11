@@ -597,6 +597,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverModeFlag,
 		statsScope,
 		logger,
 		terraformClient,
@@ -813,6 +814,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PullStatusFetcher:              backend,
 		TeamAllowlistChecker:           githubTeamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
+		CommitStatusUpdater:            commitStatusUpdater,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -1003,7 +1005,8 @@ func (s *Server) Start() error {
 		s.Logger.Err(err.Error())
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		return fmt.Errorf("while shutting down: %s", err)
 	}

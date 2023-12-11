@@ -192,7 +192,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				},
 				{
 					Command: command.Plan,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 			},
 			RunnerInvokeMatch: []*EqMatcher{
@@ -221,7 +221,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:     command.Plan,
@@ -256,7 +256,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:     command.Plan,
@@ -306,7 +306,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				},
 				{
 					Command: command.Plan,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command: command.Plan,
@@ -372,7 +372,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				},
 				{
 					Command: command.Plan,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command: command.Plan,
@@ -407,7 +407,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command: command.Plan,
@@ -438,7 +438,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command: command.Plan,
