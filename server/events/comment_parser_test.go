@@ -1013,6 +1013,7 @@ var PlanUsage = `Usage of plan:
                            project configured in a repo config file. Cannot be used
                            at same time as workspace or dir flags.
       --verbose            Append Atlantis log to comment.
+  -k, --workflow string    Select projects from workflow.
   -w, --workspace string   Switch to this Terraform workspace before planning.
 `
 

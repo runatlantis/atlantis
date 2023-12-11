@@ -276,8 +276,8 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, c
 		ctx.Log.Debug("Building plan command for all affected projects")
 		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
 	}
-	ctx.Log.Debug("Building plan command for specific project with directory: '%v', workspace: '%v', project: '%v'",
-		cmd.RepoRelDir, cmd.Workspace, cmd.ProjectName)
+	ctx.Log.Debug("Building plan command for specific project with directory: '%v', workspace: '%v', project: '%v', workflow: '%v'",
+		cmd.RepoRelDir, cmd.Workspace, cmd.ProjectName, cmd.WorkflowName)
 	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
 	return pcc, err
 }
@@ -616,6 +616,36 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 				return pcc, err
 			}
 			repoCfgProjects := repoConfig.FindProjectsByName(cmd.ProjectName)
+
+			for _, f := range modifiedFiles {
+				foundDir := false
+
+				for _, p := range repoCfgProjects {
+					if filepath.Dir(f) == p.Dir {
+						foundDir = true
+					}
+				}
+
+				if !foundDir {
+					notFoundFiles = append(notFoundFiles, filepath.Dir(f))
+				}
+			}
+
+			if len(notFoundFiles) > 0 {
+				return pcc, fmt.Errorf("the following directories are present in the pull request but not in the requested project:\n%s", strings.Join(notFoundFiles, "\n"))
+			}
+		}
+
+		if cmd.WorkflowName != "" {
+			ctx.Log.Debug("Command workflow selector specified: %s", cmd.WorkflowName)
+			var notFoundFiles = []string{}
+			var repoConfig valid.RepoCfg
+
+			repoConfig, err = p.ParserValidator.ParseRepoCfg(defaultRepoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+			if err != nil {
+				return pcc, err
+			}
+			repoCfgProjects := repoConfig.FindProjectsByWorkflow(cmd.WorkflowName)
 
 			for _, f := range modifiedFiles {
 				foundDir := false
