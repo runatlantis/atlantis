@@ -32,7 +32,7 @@ type LocksController struct {
 
 // LockApply handles creating a global apply lock.
 // If Lock already exists it will be a no-op
-func (l *LocksController) LockApply(w http.ResponseWriter, r *http.Request) {
+func (l *LocksController) LockApply(w http.ResponseWriter, _ *http.Request) {
 	lock, err := l.ApplyLocker.LockApply()
 	if err != nil {
 		l.respond(w, logging.Error, http.StatusInternalServerError, "creating apply lock failed with: %s", err)
@@ -44,7 +44,7 @@ func (l *LocksController) LockApply(w http.ResponseWriter, r *http.Request) {
 
 // UnlockApply handles releasing a global apply lock.
 // If Lock doesn't exists it will be a no-op
-func (l *LocksController) UnlockApply(w http.ResponseWriter, r *http.Request) {
+func (l *LocksController) UnlockApply(w http.ResponseWriter, _ *http.Request) {
 	err := l.ApplyLocker.UnlockApply()
 	if err != nil {
 		l.respond(w, logging.Error, http.StatusInternalServerError, "deleting apply lock failed with: %s", err)

@@ -125,7 +125,7 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 					switch r.RequestURI {
 					case "/api/v4/projects/lkysow%2Fatlantis-example/merge_requests/8312/changes?page=1&per_page=100":
 						w.WriteHeader(200)
-						numAttempts += 1
+						numAttempts++
 						if numAttempts < c.attempts {
 							w.Write([]byte(changesPending)) // nolint: errcheck
 							t.Logf("returning changesPending for attempt %d", numAttempts)
@@ -332,7 +332,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 		statusName    string
 		status        models.CommitStatus
 		gitlabVersion []string
-		mrId          int
+		mrID          int
 		expState      bool
 	}{
 		{
@@ -442,7 +442,8 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 								Version string
 							}
 							v := version{Version: serverVersion}
-							json.NewEncoder(w).Encode(v)
+							err := json.NewEncoder(w).Encode(v)
+							Ok(t, err)
 						default:
 							t.Errorf("got unexpected request at %q", r.RequestURI)
 							http.Error(w, "not found", http.StatusNotFound)
@@ -468,7 +469,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				}
 
 				mergeable, err := client.PullIsMergeable(repo, models.PullRequest{
-					Num:        c.mrId,
+					Num:        c.mrID,
 					BaseRepo:   repo,
 					HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
 				}, vcsStatusName)
@@ -554,7 +555,8 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 				case strings.HasPrefix(r.RequestURI, fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%d/notes/", pullNum)):
 					w.WriteHeader(http.StatusOK)
 					var body jsonBody
-					json.NewDecoder(r.Body).Decode(&body)
+					err := json.NewDecoder(r.Body).Decode(&body)
+					Ok(t, err)
 					notePutCallDetail := notePutCallDetails{
 						noteID:  path.Base(r.RequestURI),
 						comment: strings.Split(body.Body, "\n"),

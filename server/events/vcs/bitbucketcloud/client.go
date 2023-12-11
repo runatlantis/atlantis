@@ -85,7 +85,7 @@ func (b *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]
 }
 
 // CreateComment creates a comment on the merge request.
-func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, _ string) error {
 	// NOTE: I tried to find the maximum size of a comment for bitbucket.org but
 	// I got up to 200k chars without issue so for now I'm not going to bother
 	// to detect this.
@@ -101,12 +101,12 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, co
 }
 
 // UpdateComment updates the body of a comment on the merge request.
-func (b *Client) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { // nolint revive
+func (b *Client) ReactToComment(_ models.Repo, _ int, _ int64, _ string) error {
 	// TODO: Bitbucket support for reactions
 	return nil
 }
 
-func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (b *Client) HidePrevCommandComments(_ models.Repo, _ int, _ string) error {
 	return nil
 }
 
@@ -138,7 +138,7 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (appr
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, _ string) (bool, error) {
 	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
 	// We'll only loop 1000 times as a safety measure.
 	maxLoops := 1000
@@ -207,7 +207,7 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 }
 
 // MergePull merges the pull request.
-func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+func (b *Client) MergePull(pull models.PullRequest, _ models.PullRequestOptions) error {
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/merge", b.BaseURL, pull.BaseRepo.FullName, pull.Num)
 	_, err := b.makeRequest("POST", path, nil)
 	return err
@@ -234,7 +234,7 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	return req, nil
 }
 
-func (b *Client) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (b *Client) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 	// TODO implement
 	return nil
 }
@@ -263,7 +263,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (b *Client) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (b *Client) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]string, error) {
 	return nil, nil
 }
 
@@ -274,14 +274,14 @@ func (b *Client) SupportsSingleFileDownload(models.Repo) bool {
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (b *Client) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
-	return false, []byte{}, fmt.Errorf("Not Implemented")
+func (b *Client) GetFileContent(_ models.PullRequest, _ string) (bool, []byte, error) {
+	return false, []byte{}, fmt.Errorf("not implemented")
 }
 
-func (b *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+func (b *Client) GetCloneURL(_ models.VCSHostType, _ string) (string, error) {
 	return "", fmt.Errorf("not yet implemented")
 }
 
-func (b *Client) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (b *Client) GetPullLabels(_ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }
