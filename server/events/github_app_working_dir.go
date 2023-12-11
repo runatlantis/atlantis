@@ -19,7 +19,7 @@ type GithubAppWorkingDir struct {
 }
 
 // Clone writes a fresh token for Github App authentication
-func (g *GithubAppWorkingDir) Clone(headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error) {
+func (g *GithubAppWorkingDir) Clone(headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
 	baseRepo := &p.BaseRepo
 
 	// Realistically, this is a super brittle way of supporting clones using gh app installation tokens

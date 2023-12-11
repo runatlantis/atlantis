@@ -31,6 +31,7 @@ import (
 const workingDirPrefix = "repos"
 
 var cloneLocks sync.Map
+var recheckRequiredMap sync.Map
 
 //go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
 //go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
@@ -38,10 +39,11 @@ var cloneLocks sync.Map
 // WorkingDir handles the workspace on disk for running commands.
 type WorkingDir interface {
 	// Clone git clones headRepo, checks out the branch and then returns the
-	// absolute path to the root of the cloned repo. It also returns
-	// a boolean indicating if we should warn users that the branch we're
-	// merging into has been updated since we cloned it.
-	Clone(headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
+	// absolute path to the root of the cloned repo.
+	Clone(headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
+	// MergeAgain merges again with upstream if upstream has been modified, returns
+	// whether it actually did a new merge
+	MergeAgain(headRepo models.Repo, p models.PullRequest, workspace string) (bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
@@ -50,10 +52,6 @@ type WorkingDir interface {
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
 	DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error
-	// Set a flag in the workingdir so Clone() can know that it is safe to re-clone the workingdir if
-	// the upstream branch has been modified. This is only safe after grabbing the project lock
-	// and before running any plans
-	SetCheckForUpstreamChanges()
 	// DeletePlan deletes the plan for this repo, pull, workspace path and project name
 	DeletePlan(r models.Repo, p models.PullRequest, workspace string, path string, projectName string) error
 	// GetGitUntrackedFiles returns a list of Git untracked files in the working dir.
@@ -90,17 +88,19 @@ type FileWorkspace struct {
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
-// path to the root of the cloned repo. It also returns
-// a boolean indicating whether we had to merge with upstream again.
+// path to the root of the cloned repo.
 // If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
-func (w *FileWorkspace) Clone(
-	headRepo models.Repo,
-	p models.PullRequest,
-	workspace string) (string, bool, error) {
+func (w *FileWorkspace) Clone(headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
 	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
-	defer func() { w.CheckForUpstreamChanges = false }()
+
+	// Unconditionally wait for the clone lock here, if anyone else is doing any clone
+	// operation in this directory, we wait for it to finish before we check anything.
+	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
+	mutex := value.(*sync.Mutex)
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	c := wrappedGitContext{cloneDir, headRepo, p}
 	// If the directory already exists, check if it's at the right commit.
@@ -122,28 +122,61 @@ func (w *FileWorkspace) Clone(
 		outputRevParseCmd, err := revParseCmd.CombinedOutput()
 		if err != nil {
 			w.Logger.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
-			return cloneDir, false, w.forceClone(c)
+			return cloneDir, w.forceClone(c)
 		}
 		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
 
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			if w.CheckForUpstreamChanges && w.CheckoutMerge && w.recheckDiverged(p, headRepo, cloneDir) {
-				w.Logger.Info("base branch has been updated, using merge strategy and will clone again")
-				return cloneDir, true, w.mergeAgain(c)
-			} else {
-				w.Logger.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
-				return cloneDir, false, nil
-			}
-		} else {
-			w.Logger.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
+			w.Logger.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
+			return cloneDir, nil
 		}
+		w.Logger.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
 		// We'll fall through to re-clone.
 	}
 
 	// Otherwise we clone the repo.
-	return cloneDir, false, w.forceClone(c)
+	return cloneDir, w.forceClone(c)
+}
+
+// MergeAgain merges again with upstream if we are using the merge checkout strategy,
+// and upstream has been modified since we last checked.
+// It returns a flag indicating whether we had to merge with upstream again.
+func (w *FileWorkspace) MergeAgain(
+	headRepo models.Repo,
+	p models.PullRequest,
+	workspace string) (bool, error) {
+
+	if !w.CheckoutMerge {
+		return false, nil
+	}
+
+	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
+	// We atomically set the recheckRequiredMap flag here before grabbing the clone lock.
+	// If the flag is cleared after we grab the lock, it means some other thread
+	// did the necessary work late enough that we do not have to do it again.
+	recheckRequiredMap.Store(cloneDir, struct{}{})
+
+	// Unconditionally wait for the clone lock here, if anyone else is doing any clone
+	// operation in this directory, we wait for it to finish before we check anything.
+	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
+	mutex := value.(*sync.Mutex)
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if _, exists := recheckRequiredMap.Load(cloneDir); !exists {
+		w.Logger.Debug("Skipping upstream check. Some other thread has done this for us")
+		return false, nil
+	}
+	recheckRequiredMap.Delete(cloneDir)
+
+	c := wrappedGitContext{cloneDir, headRepo, p}
+	if w.recheckDiverged(p, headRepo, cloneDir) {
+		w.Logger.Info("base branch has been updated, using merge strategy and will merge again")
+		return true, w.mergeAgain(c)
+	}
+	return false, nil
 }
 
 // recheckDiverged returns true if the branch we're merging into has diverged
@@ -213,15 +246,6 @@ func (w *FileWorkspace) HasDiverged(cloneDir string) bool {
 }
 
 func (w *FileWorkspace) forceClone(c wrappedGitContext) error {
-	value, _ := cloneLocks.LoadOrStore(c.dir, new(sync.Mutex))
-	mutex := value.(*sync.Mutex)
-
-	defer mutex.Unlock()
-	if locked := mutex.TryLock(); !locked {
-		mutex.Lock()
-		return nil
-	}
-
 	err := os.RemoveAll(c.dir)
 	if err != nil {
 		return errors.Wrapf(err, "deleting dir %q before cloning", c.dir)
@@ -276,15 +300,6 @@ func (w *FileWorkspace) forceClone(c wrappedGitContext) error {
 // There is a new upstream update that we need, and we want to update to it
 // without deleting any existing plans
 func (w *FileWorkspace) mergeAgain(c wrappedGitContext) error {
-	value, _ := cloneLocks.LoadOrStore(c.dir, new(sync.Mutex))
-	mutex := value.(*sync.Mutex)
-
-	defer mutex.Unlock()
-	if locked := mutex.TryLock(); !locked {
-		mutex.Lock()
-		return nil
-	}
-
 	// Reset branch as if it was cloned again
 	if err := w.wrappedGit(c, "reset", "--hard", fmt.Sprintf("refs/remotes/head/%s", c.pr.BaseBranch)); err != nil {
 		return err
