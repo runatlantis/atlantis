@@ -1344,12 +1344,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		AllowAllRepoSettings: true,
 		MergeableReq:         false,
 		ApprovedReq:          false,
-		PreWorkflowHooks: []*valid.WorkflowHook{
-			{
-				StepName:   "global_hook",
-				RunCommand: "some dummy command",
-			},
-		},
+		PreWorkflowHooks:     preWorkflowHooks,
 		PostWorkflowHooks: []*valid.WorkflowHook{
 			{
 				StepName:   "global_hook",
