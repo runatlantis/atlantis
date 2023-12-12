@@ -17,6 +17,8 @@ import (
 	"html/template"
 	"io"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/jobs"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_template_writer.go TemplateWriter
@@ -50,7 +52,9 @@ type ApplyLockData struct {
 
 // IndexData holds the data for rendering the index page
 type IndexData struct {
-	Locks           []LockIndexData
+	Locks            []LockIndexData
+	PullToJobMapping []jobs.PullInfoWithJobIDs
+
 	ApplyLock       ApplyLockData
 	AtlantisVersion string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
@@ -113,8 +117,8 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <br>
   <section>
     <p class="title-heading small"><strong>Locks</strong></p>
-    {{ if .Locks }}
     {{ $basePath := .CleanedBasePath }}
+    {{ if .Locks }}
     <div class="lock-grid">
     <div class="lock-header">
       <span>Repository</span>
@@ -149,6 +153,36 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     </div>
     {{ else }}
     <p class="placeholder">No locks found.</p>
+    {{ end }}
+  </section>
+  <br>
+  <br>
+  <br>
+  <section>
+    <p class="title-heading small"><strong>Jobs</strong></p>
+    {{ if .PullToJobMapping }}
+    <div class="pulls-grid">
+    <div class="lock-header">
+      <span>Repository</span>
+      <span>Project</span>
+      <span>Workspace</span>
+      <span>Jobs</span>
+    </div>
+    {{ range .PullToJobMapping }}
+      <div class="pulls-row">
+      <span class="pulls-element">{{.Pull.RepoFullName}} #{{.Pull.PullNum}}</span>
+      <span class="pulls-element"><code>{{.Pull.Path}}</code></span>
+      <span class="pulls-element"><code>{{.Pull.Workspace}}</code></span>
+      <span class="pulls-element">
+      {{ range .JobIDInfos }}
+        <div><a href="{{ $basePath }}{{ .JobIDUrl }}" target="_blank">{{ .TimeFormatted }}</a></div>
+      {{ end }}
+      </span>
+      </div>
+    {{ end }}
+    </div>
+    {{ else }}
+    <p class="placeholder">No jobs found.</p>
     {{ end }}
   </section>
   <div id="applyLockMessageModal" class="modal">

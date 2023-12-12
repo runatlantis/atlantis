@@ -218,7 +218,14 @@ func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullR
 func (c *InstrumentedClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	scope := c.StatsScope.SubScope("update_status")
 	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
+	logger := c.Logger.WithHistory([]interface{}{
+		"repository", fmt.Sprintf("%s/%s", repo.Owner, repo.Name),
+		"pull-num", strconv.Itoa(pull.Num),
+		"src", src,
+		"description", description,
+		"state", state,
+		"url", url,
+	}...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -226,6 +233,7 @@ func (c *InstrumentedClient) UpdateStatus(repo models.Repo, pull models.PullRequ
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
+	logger.Info("updating vcs status")
 	if err := c.Client.UpdateStatus(repo, pull, state, src, description, url); err != nil {
 		executionError.Inc(1)
 		logger.Err("Unable to update status at url: %s, error: %s", url, err.Error())
