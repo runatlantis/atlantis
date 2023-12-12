@@ -33,7 +33,7 @@ jobs:
           filters: |
             src:
               - '**.js'
-              - 'yarn.lock'
+              - 'pnpm-lock.yaml'
               - 'package.json'
               - '.github/workflows/website.yml'
 
@@ -57,13 +57,15 @@ jobs:
           # renovate: datasource=github-releases depName=raviqqe/muffet
           MUFFET_VERSION: 2.9.3
         run: |
-          npm install -g yarn
-
           # install raviqqe/muffet to check for broken links.
           curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
-          yarn install
+
+          # build site
+          pnpm install
           pnpm website:build
-          http-server runatlantis.io/.vuepress/dist &
+
+          # start http-server for integration testing
+          npx http-server runatlantis.io/.vuepress/dist &
 
       - name: wait until server listened
         run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
