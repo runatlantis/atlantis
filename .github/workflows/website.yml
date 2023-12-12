@@ -48,9 +48,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: wyvox/action-setup-pnpm@v3
         with:
-          node-version-file: .node-version
+          node-version: 20
 
       - name: run http-server
         env:
@@ -61,12 +61,9 @@ jobs:
 
           # install raviqqe/muffet to check for broken links.
           curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
-
-          # build the site
-          yarn && yarn website:build
-
-          # run http-server for muffet to check the links
-          npx http-server runatlantis.io/.vuepress/dist &
+          yarn install
+          pnpm website:build
+          http-server runatlantis.io/.vuepress/dist &
 
       - name: wait until server listened
         run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
