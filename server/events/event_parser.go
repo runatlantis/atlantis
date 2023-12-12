@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v54/github"
+	"github.com/google/go-github/v57/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
@@ -599,9 +599,8 @@ func (e *EventParser) ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent
 		// Check for MR that has been marked as ready
 		(strings.HasPrefix(event.Changes.Title.Previous, "Draft:") && !strings.HasPrefix(event.Changes.Title.Current, "Draft:")) {
 		return models.UpdatedPullEvent
-	} else {
-		return models.OtherPullEvent
 	}
+	return models.OtherPullEvent
 }
 
 // ParseGitlabMergeRequestEvent parses GitLab merge request events.

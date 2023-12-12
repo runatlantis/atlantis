@@ -562,13 +562,14 @@ projects:
 
 				var actCtxs []command.ProjectContext
 				var err error
+				cmd := c.Cmd
 				if cmdName == command.Plan {
 					actCtxs, err = builder.BuildPlanCommands(&command.Context{
 						Log:   logger,
 						Scope: scope,
-					}, &c.Cmd)
+					}, &cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope}, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope}, &cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -752,10 +753,11 @@ projects:
 
 			var actCtxs []command.ProjectContext
 			var err error
+			cmd := c.Cmd
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
 				Log:   logger,
 				Scope: scope,
-			}, &c.Cmd)
+			}, &cmd)
 
 			if c.ExpErr != "" {
 				ErrEquals(t, c.ExpErr, err)
@@ -1956,10 +1958,11 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 
 			var actCtxs []command.ProjectContext
 			var err error
+			cmd := c.Cmd
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
 				Log:   logger,
 				Scope: scope,
-			}, &c.Cmd)
+			}, &cmd)
 			if c.ExpErr != "" {
 				ErrEquals(t, c.ExpErr, err)
 				return
@@ -2068,10 +2071,11 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 
 			var actCtxs []command.ProjectContext
 			var err error
+			cmd := c.Cmd
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
 				Log:   logger,
 				Scope: scope,
-			}, &c.Cmd)
+			}, &cmd)
 			if c.ExpErr != "" {
 				ErrEquals(t, c.ExpErr, err)
 				return

@@ -229,6 +229,12 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 				if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
 					ctx.Log.Warn("unable to update commit status: %s", err)
 				}
+				if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+					ctx.Log.Warn("unable to update commit status: %s", err)
+				}
+				if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+					ctx.Log.Warn("unable to update commit status: %s", err)
+				}
 			}
 		}
 		return
@@ -282,6 +288,14 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		!(result.HasErrors() || result.PlansDeleted) {
 		ctx.Log.Info("Running policy check for %s", cmd.String())
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
+	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
+		// If there were no projects modified, we set successful commit statuses
+		// with 0/0 projects planned/policy_checked/applied successfully because some users require
+		// the Atlantis status to be passing for all pull requests.
+		ctx.Log.Debug("setting VCS status to success with no projects found")
+		if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			ctx.Log.Warn("unable to update commit status: %s", err)
+		}
 	}
 }
 

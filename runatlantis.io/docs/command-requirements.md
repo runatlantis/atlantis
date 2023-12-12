@@ -46,7 +46,7 @@ The `approved` requirement by:
 #### Meaning
 Each VCS provider has different rules around who can approve:
 * **GitHub** – **Any user with read permissions** to the repo can approve a pull request
-* **GitLab** – The user who can approve can be set in the [repo settings](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html)
+* **GitLab** – The user who can approve can be set in the [repo settings](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
 * **Bitbucket Cloud (bitbucket.org)** – A user can approve their own pull request but
   Atlantis does not count that as an approval and requires an approval from at least one user that
   is not the author of the pull request
@@ -260,6 +260,6 @@ request can run the actual `atlantis apply` command.
 
 ## Next Steps
 * For more information on GitHub pull request reviews and approvals see: [https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews)
-* For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: [https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html).
+* For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: [https://docs.gitlab.com/ee/user/project/merge_requests/approvals/](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/).
 * For more information on Bitbucket pull request reviews and approvals see: [https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html](https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html)
 * For more information on Azure DevOps pull request reviews and approvals see: [https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops&tabs=browser](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops&tabs=browser)

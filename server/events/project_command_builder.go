@@ -119,7 +119,7 @@ func NewProjectCommandBuilder(
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
 	scope tally.Scope,
-	logger logging.SimpleLogging,
+	_ logging.SimpleLogging,
 	terraformClient terraform.Client,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
@@ -566,6 +566,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 
 	var pcc []command.ProjectContext
 
+	ctx.Log.Debug("building plan command")
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
+	if err != nil {
+		return pcc, err
+	}
+	defer unlockFn()
+
+	ctx.Log.Debug("cloning repository")
+	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return pcc, err
+	}
+
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
@@ -637,17 +650,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		}
 	}
 
-	ctx.Log.Debug("building plan command")
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
-	if err != nil {
-		return pcc, err
-	}
-	defer unlockFn()
-
-	ctx.Log.Debug("cloning repository")
-	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
-	if err != nil {
-		return pcc, err
+	if DefaultWorkspace != workspace {
+		ctx.Log.Debug("cloning repository with workspace %s", workspace)
+		_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
+		if err != nil {
+			return pcc, err
+		}
 	}
 
 	repoRelDir := DefaultRepoRelDir
