@@ -23,7 +23,7 @@ type StatusResponse struct {
 }
 
 // Get is the GET /status route.
-func (d *StatusController) Get(w http.ResponseWriter, r *http.Request) {
+func (d *StatusController) Get(w http.ResponseWriter, _ *http.Request) {
 	status := d.Drainer.GetStatus()
 	data, err := json.MarshalIndent(&StatusResponse{
 		ShuttingDown:    status.ShuttingDown,

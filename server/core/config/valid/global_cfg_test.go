@@ -92,115 +92,115 @@ func TestNewGlobalCfg(t *testing.T) {
 	}
 
 	cases := []struct {
-		allowRepoCfg       bool
-		approvedReq        bool
-		mergeableReq       bool
-		unDivergedReq      bool
-		policyCheckEnabled bool
+		allowAllRepoSettings bool
+		approvedReq          bool
+		mergeableReq         bool
+		unDivergedReq        bool
+		policyCheckEnabled   bool
 	}{
 		{
-			allowRepoCfg:       false,
-			approvedReq:        false,
-			mergeableReq:       false,
-			unDivergedReq:      false,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: false,
+			approvedReq:          false,
+			mergeableReq:         false,
+			unDivergedReq:        false,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       true,
-			approvedReq:        false,
-			mergeableReq:       false,
-			unDivergedReq:      false,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: true,
+			approvedReq:          false,
+			mergeableReq:         false,
+			unDivergedReq:        false,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       false,
-			approvedReq:        true,
-			mergeableReq:       false,
-			unDivergedReq:      false,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: false,
+			approvedReq:          true,
+			mergeableReq:         false,
+			unDivergedReq:        false,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       false,
-			approvedReq:        false,
-			mergeableReq:       true,
-			unDivergedReq:      false,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: false,
+			approvedReq:          false,
+			mergeableReq:         true,
+			unDivergedReq:        false,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       false,
-			approvedReq:        true,
-			mergeableReq:       true,
-			unDivergedReq:      false,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: false,
+			approvedReq:          true,
+			mergeableReq:         true,
+			unDivergedReq:        false,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       true,
-			approvedReq:        true,
-			mergeableReq:       true,
-			unDivergedReq:      false,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: true,
+			approvedReq:          true,
+			mergeableReq:         true,
+			unDivergedReq:        false,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       false,
-			approvedReq:        false,
-			mergeableReq:       false,
-			unDivergedReq:      true,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: false,
+			approvedReq:          false,
+			mergeableReq:         false,
+			unDivergedReq:        true,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       true,
-			approvedReq:        false,
-			mergeableReq:       false,
-			unDivergedReq:      true,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: true,
+			approvedReq:          false,
+			mergeableReq:         false,
+			unDivergedReq:        true,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       false,
-			approvedReq:        true,
-			mergeableReq:       false,
-			unDivergedReq:      true,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: false,
+			approvedReq:          true,
+			mergeableReq:         false,
+			unDivergedReq:        true,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       false,
-			approvedReq:        false,
-			mergeableReq:       true,
-			unDivergedReq:      true,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: false,
+			approvedReq:          false,
+			mergeableReq:         true,
+			unDivergedReq:        true,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       false,
-			approvedReq:        true,
-			mergeableReq:       true,
-			unDivergedReq:      true,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: false,
+			approvedReq:          true,
+			mergeableReq:         true,
+			unDivergedReq:        true,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       true,
-			approvedReq:        true,
-			mergeableReq:       true,
-			unDivergedReq:      true,
-			policyCheckEnabled: false,
+			allowAllRepoSettings: true,
+			approvedReq:          true,
+			mergeableReq:         true,
+			unDivergedReq:        true,
+			policyCheckEnabled:   false,
 		},
 		{
-			allowRepoCfg:       true,
-			approvedReq:        true,
-			mergeableReq:       true,
-			unDivergedReq:      true,
-			policyCheckEnabled: true,
+			allowAllRepoSettings: true,
+			approvedReq:          true,
+			mergeableReq:         true,
+			unDivergedReq:        true,
+			policyCheckEnabled:   true,
 		},
 	}
 
 	for _, c := range cases {
 		caseName := fmt.Sprintf("allow_repo: %t, approved: %t, mergeable: %t, undiverged: %t, policy_check: %t",
-			c.allowRepoCfg, c.approvedReq, c.mergeableReq, c.unDivergedReq, c.policyCheckEnabled)
+			c.allowAllRepoSettings, c.approvedReq, c.mergeableReq, c.unDivergedReq, c.policyCheckEnabled)
 		t.Run(caseName, func(t *testing.T) {
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:       c.allowRepoCfg,
-				MergeableReq:       c.mergeableReq,
-				ApprovedReq:        c.approvedReq,
-				UnDivergedReq:      c.unDivergedReq,
-				PolicyCheckEnabled: c.policyCheckEnabled,
+				AllowAllRepoSettings: c.allowAllRepoSettings,
+				MergeableReq:         c.mergeableReq,
+				ApprovedReq:          c.approvedReq,
+				UnDivergedReq:        c.unDivergedReq,
+				PolicyCheckEnabled:   c.policyCheckEnabled,
 			}
 			act := valid.NewGlobalCfgFromArgs(globalCfgArgs)
 
@@ -209,7 +209,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			exp.Repos[0].IDRegex = regexp.MustCompile(".*") // deepcopy doesn't copy the regex.
 			exp.Repos[0].BranchRegex = regexp.MustCompile(".*")
 
-			if c.allowRepoCfg {
+			if c.allowAllRepoSettings {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
 				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "policy_check"}
 			}
@@ -264,10 +264,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						AllowRepoCfg:  true,
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
+						AllowAllRepoSettings: true,
+						MergeableReq:         false,
+						ApprovedReq:          false,
+						UnDivergedReq:        false,
 					}).Repos[0],
 					{
 						ID:                   "github.com/owner/repo",
@@ -297,10 +297,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						AllowRepoCfg:  true,
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
+						AllowAllRepoSettings: true,
+						MergeableReq:         false,
+						ApprovedReq:          false,
+						UnDivergedReq:        false,
 					}).Repos[0],
 					{
 						ID:                   "github.com/owner/repo",
@@ -330,10 +330,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						AllowRepoCfg:  true,
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
+						AllowAllRepoSettings: true,
+						MergeableReq:         false,
+						ApprovedReq:          false,
+						UnDivergedReq:        false,
 					}).Repos[0],
 					{
 						ID:                   "github.com/owner/repo",
@@ -365,10 +365,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						AllowRepoCfg:  true,
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
+						AllowAllRepoSettings: true,
+						MergeableReq:         false,
+						ApprovedReq:          false,
+						UnDivergedReq:        false,
 					}).Repos[0],
 					{
 						ID:                   "github.com/owner/repo",
@@ -400,10 +400,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						AllowRepoCfg:  true,
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
+						AllowAllRepoSettings: true,
+						MergeableReq:         false,
+						ApprovedReq:          false,
+						UnDivergedReq:        false,
 					}).Repos[0],
 					{
 						ID:                   "github.com/owner/repo",
@@ -433,10 +433,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						AllowRepoCfg:  true,
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
+						AllowAllRepoSettings: true,
+						MergeableReq:         false,
+						ApprovedReq:          false,
+						UnDivergedReq:        false,
 					}).Repos[0],
 					{
 						ID:                   "github.com/owner/repo",
@@ -464,10 +464,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"workflow not allowed": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: false,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}),
 			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
@@ -481,10 +481,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"custom workflows not allowed": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: false,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}),
 			rCfg: valid.RepoCfg{
 				Workflows: map[string]valid.Workflow{
@@ -496,10 +496,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"custom workflows allowed": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}),
 			rCfg: valid.RepoCfg{
 				Workflows: map[string]valid.Workflow{
@@ -511,10 +511,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"repo uses custom workflow defined on repo": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}),
 			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
@@ -535,10 +535,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						AllowRepoCfg:  false,
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
+						AllowAllRepoSettings: false,
+						MergeableReq:         false,
+						ApprovedReq:          false,
+						UnDivergedReq:        false,
 					}).Repos[0],
 					{
 						ID:                   "github.com/owner/repo",
@@ -556,10 +556,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"repo uses global workflow": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}),
 			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
@@ -575,10 +575,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"plan_reqs not allowed": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: false,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}),
 			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
@@ -594,10 +594,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"apply_reqs not allowed": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: false,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}),
 			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
@@ -613,10 +613,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"import_reqs not allowed": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: false,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}),
 			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
@@ -632,10 +632,10 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"repo workflow doesn't exist": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}),
 			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
@@ -777,19 +777,19 @@ policies:
 				Ok(t, os.WriteFile(path, []byte(c.gCfg), 0600))
 				var err error
 				globalCfgArgs := valid.GlobalCfgArgs{
-					AllowRepoCfg:  false,
-					MergeableReq:  false,
-					ApprovedReq:   false,
-					UnDivergedReq: false,
+					AllowAllRepoSettings: false,
+					MergeableReq:         false,
+					ApprovedReq:          false,
+					UnDivergedReq:        false,
 				}
 				global, err = (&config.ParserValidator{}).ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 				Ok(t, err)
 			} else {
 				globalCfgArgs := valid.GlobalCfgArgs{
-					AllowRepoCfg:  false,
-					MergeableReq:  false,
-					ApprovedReq:   false,
-					UnDivergedReq: false,
+					AllowAllRepoSettings: false,
+					MergeableReq:         false,
+					ApprovedReq:          false,
+					UnDivergedReq:        false,
 				}
 				global = valid.NewGlobalCfgFromArgs(globalCfgArgs)
 			}
@@ -920,6 +920,69 @@ repos:
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
 				CustomPolicyCheck:  false,
+			},
+		},
+		"repo-side apply reqs should include non-overrideable 'policies_passed' req when overridden and policies enabled": {
+			gCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [apply_requirements]
+  apply_requirements: [approved]
+  policy_check: true
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:                ".",
+				Workspace:          "default",
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{"mergeable"},
+				ImportRequirements: []string{},
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{"mergeable", "policies_passed"},
+				ImportRequirements: []string{},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+				CustomPolicyCheck:  false,
+				PolicyCheck:        true,
+			},
+		},
+		"repo-side apply reqs should not include non-overrideable 'policies_passed' req when overridden and policies disabled": {
+			gCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [apply_requirements]
+  apply_requirements: [approved]
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:                ".",
+				Workspace:          "default",
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{"mergeable"},
+				ImportRequirements: []string{},
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{"mergeable"},
+				ImportRequirements: []string{},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+				CustomPolicyCheck:  false,
+				PolicyCheck:        false,
 			},
 		},
 		"repo-side import reqs win out if allowed": {
@@ -1086,20 +1149,20 @@ repos:
 				Ok(t, os.WriteFile(path, []byte(c.gCfg), 0600))
 				var err error
 				globalCfgArgs := valid.GlobalCfgArgs{
-					AllowRepoCfg:  false,
-					MergeableReq:  false,
-					ApprovedReq:   false,
-					UnDivergedReq: false,
+					AllowAllRepoSettings: false,
+					MergeableReq:         false,
+					ApprovedReq:          false,
+					UnDivergedReq:        false,
 				}
 
 				global, err = (&config.ParserValidator{}).ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 				Ok(t, err)
 			} else {
 				globalCfgArgs := valid.GlobalCfgArgs{
-					AllowRepoCfg:  false,
-					MergeableReq:  false,
-					ApprovedReq:   false,
-					UnDivergedReq: false,
+					AllowAllRepoSettings: false,
+					MergeableReq:         false,
+					ApprovedReq:          false,
+					UnDivergedReq:        false,
 				}
 				global = valid.NewGlobalCfgFromArgs(globalCfgArgs)
 			}
@@ -1443,11 +1506,11 @@ repos:
 			Ok(t, os.WriteFile(path, []byte(c.gCfg), 0600))
 			var err error
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:       false,
-				MergeableReq:       false,
-				ApprovedReq:        false,
-				UnDivergedReq:      false,
-				PolicyCheckEnabled: c.gPolicyCheck,
+				AllowAllRepoSettings: false,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
+				PolicyCheckEnabled:   c.gPolicyCheck,
 			}
 
 			global, err = (&config.ParserValidator{}).ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))

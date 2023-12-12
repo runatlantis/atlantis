@@ -68,7 +68,6 @@ projects:
 	require.NoError(t, err)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  false,
 		MergeableReq:  false,
 		ApprovedReq:   false,
 		UnDivergedReq: false,

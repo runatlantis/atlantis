@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
-ARG ALPINE_TAG=3.18.5
+ARG ALPINE_TAG=3.19.0
 ARG DEBIAN_TAG=12.2-slim
 
 ARG DEFAULT_TERRAFORM_VERSION=1.6.3
@@ -158,13 +158,13 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
         ca-certificates~=20230506 \
-        curl~=8.4 \
-        git~=2.40 \
-        unzip~=6.0 \
-        bash~=5.2 \
-        openssh~=9.3_p2 \
-        dumb-init~=1.2 \
-        gcompat~=1.1
+        curl~=8 \
+        git~=2 \
+        unzip~=6 \
+        bash~=5 \
+        openssh~=9 \
+        dumb-init~=1 \
+        gcompat~=1
 
 
 # Set the entry point to the atlantis user and run the atlantis command

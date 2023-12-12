@@ -639,7 +639,6 @@ projects:
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
 				MergeableReq:  false,
 				ApprovedReq:   false,
 				UnDivergedReq: false,
@@ -857,7 +856,12 @@ projects:
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg(false, false, false))
+			globalCfgArgs := valid.GlobalCfgArgs{
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			Ok(t, err)
 
 			if c.repoCfg != "" {
@@ -1062,7 +1066,7 @@ workflows:
 				Pull:               pull,
 				ProjectName:        "",
 				PlanRequirements:   []string{"policies_passed"},
-				ApplyRequirements:  []string{},
+				ApplyRequirements:  []string{"policies_passed"},
 				ImportRequirements: []string{"policies_passed"},
 				RepoConfigVersion:  3,
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
@@ -1102,7 +1106,6 @@ workflows:
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:       false,
 				MergeableReq:       false,
 				ApprovedReq:        false,
 				UnDivergedReq:      false,
@@ -1260,7 +1263,6 @@ projects:
 			Ok(t, os.WriteFile(globalCfgPath, []byte(globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
 				MergeableReq:  false,
 				ApprovedReq:   false,
 				UnDivergedReq: false,
@@ -1404,10 +1406,10 @@ projects:
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: false,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
 			}
 
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))

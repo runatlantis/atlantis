@@ -12,7 +12,6 @@ import (
 // the config is parsed from a YAML file.
 type UserConfig struct {
 	AllowForkPRs                bool   `mapstructure:"allow-fork-prs"`
-	AllowRepoConfig             bool   `mapstructure:"allow-repo-config"`
 	AllowCommands               string `mapstructure:"allow-commands"`
 	AtlantisURL                 string `mapstructure:"atlantis-url"`
 	AutoDiscoverModeFlag        string `mapstructure:"autodiscover-mode"`
@@ -33,7 +32,6 @@ type UserConfig struct {
 	CheckoutStrategy            string `mapstructure:"checkout-strategy"`
 	DataDir                     string `mapstructure:"data-dir"`
 	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
-	DisableApply                bool   `mapstructure:"disable-apply"`
 	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
 	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`
 	DisableMarkdownFolding      bool   `mapstructure:"disable-markdown-folding"`

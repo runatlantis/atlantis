@@ -17,10 +17,7 @@ const PoliciesPassedCommandReq = "policies_passed"
 const PlanRequirementsKey = "plan_requirements"
 const ApplyRequirementsKey = "apply_requirements"
 const ImportRequirementsKey = "import_requirements"
-const PreWorkflowHooksKey = "pre_workflow_hooks"
 const WorkflowKey = "workflow"
-const PostWorkflowHooksKey = "post_workflow_hooks"
-const AllowedWorkflowsKey = "allowed_workflows"
 const AllowedOverridesKey = "allowed_overrides"
 const AllowCustomWorkflowsKey = "allow_custom_workflows"
 const DefaultWorkflowName = "default"
@@ -94,6 +91,7 @@ type MergedProjectCfg struct {
 	ImportRequirements        []string
 	Workflow                  Workflow
 	AllowedWorkflows          []string
+	DependsOn                 []string
 	RepoRelDir                string
 	Workspace                 string
 	Name                      string
@@ -176,42 +174,18 @@ var DefaultStateRmStage = Stage{
 	},
 }
 
-// Deprecated: use NewGlobalCfgFromArgs
-func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq bool, unDivergedReq bool, preWorkflowHooks []*WorkflowHook, postWorkflowHooks []*WorkflowHook) GlobalCfg {
-	return NewGlobalCfgFromArgs(GlobalCfgArgs{
-		AllowRepoCfg:      allowRepoCfg,
-		MergeableReq:      mergeableReq,
-		ApprovedReq:       approvedReq,
-		UnDivergedReq:     unDivergedReq,
-		PreWorkflowHooks:  preWorkflowHooks,
-		PostWorkflowHooks: postWorkflowHooks,
-	})
-}
-
-// NewGlobalCfg returns a global config that respects the parameters.
-// allowRepoCfg is true if users want to allow repos full config functionality.
-// mergeableReq is true if users want to set the mergeable apply requirement
-// for all repos.
-// approvedReq is true if users want to set the approved apply requirement
-// for all repos.
-// Deprecated: use NewGlobalCfgFromArgs
-func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
-	return NewGlobalCfgFromArgs(GlobalCfgArgs{
-		AllowRepoCfg: allowRepoCfg,
-		MergeableReq: mergeableReq,
-		ApprovedReq:  approvedReq,
-	})
-}
-
 type GlobalCfgArgs struct {
-	RepoConfigFile     string
-	AllowRepoCfg       bool
-	MergeableReq       bool
-	ApprovedReq        bool
-	UnDivergedReq      bool
-	PolicyCheckEnabled bool
-	PreWorkflowHooks   []*WorkflowHook
-	PostWorkflowHooks  []*WorkflowHook
+	RepoConfigFile string
+	// No longer a user option as of https://github.com/runatlantis/atlantis/pull/3911,
+	// but useful for tests to set to true to not require enumeration of allowed settings
+	// on the repo side
+	AllowAllRepoSettings bool
+	MergeableReq         bool
+	ApprovedReq          bool
+	UnDivergedReq        bool
+	PolicyCheckEnabled   bool
+	PreWorkflowHooks     []*WorkflowHook
+	PostWorkflowHooks    []*WorkflowHook
 }
 
 func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
@@ -248,7 +222,7 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	repoLockingKey := true
 	customPolicyCheck := false
 	autoDiscover := AutoDiscover{Mode: AutoDiscoverAutoMode}
-	if args.AllowRepoCfg {
+	if args.AllowAllRepoSettings {
 		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, PolicyCheckKey}
 		allowCustomWorkflows = true
 	}
@@ -323,6 +297,11 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 			if proj.ApplyRequirements != nil {
 				log.Debug("overriding server-defined %s with repo settings: [%s]", ApplyRequirementsKey, strings.Join(proj.ApplyRequirements, ","))
 				applyReqs = proj.ApplyRequirements
+
+				// Preserve policies_passed req if policy check is enabled
+				if policyCheck {
+					applyReqs = append(applyReqs, PoliciesPassedCommandReq)
+				}
 			}
 		case ImportRequirementsKey:
 			if proj.ImportRequirements != nil {
@@ -394,6 +373,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		Workflow:                  workflow,
 		RepoRelDir:                proj.Dir,
 		Workspace:                 proj.Workspace,
+		DependsOn:                 proj.DependsOn,
 		Name:                      proj.GetName(),
 		AutoplanEnabled:           proj.Autoplan.Enabled,
 		TerraformVersion:          proj.TerraformVersion,

@@ -286,13 +286,6 @@ func (mock *MockClient) UpdateStatus(repo models.Repo, pull models.PullRequest, 
 	return ret0
 }
 
-func (mock *MockClient) VerifyWasNotCalled() *VerifierMockClient {
-	return &VerifierMockClient{
-		mock:                   mock,
-		invocationCountMatcher: pegomock.Times(0),
-	}
-}
-
 func (mock *MockClient) VerifyWasCalledOnce() *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,

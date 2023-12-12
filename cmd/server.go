@@ -28,7 +28,6 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -52,7 +51,6 @@ const (
 	ADHostnameFlag                   = "azuredevops-hostname"
 	AllowCommandsFlag                = "allow-commands"
 	AllowForkPRsFlag                 = "allow-fork-prs"
-	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
@@ -71,7 +69,6 @@ const (
 	DataDirFlag                      = "data-dir"
 	DefaultTFVersionFlag             = "default-tf-version"
 	DisableApplyAllFlag              = "disable-apply-all"
-	DisableApplyFlag                 = "disable-apply"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
@@ -424,13 +421,6 @@ var boolFlags = map[string]boolFlag{
 		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
 		defaultValue: false,
 	},
-	AllowRepoConfigFlag: {
-		description: "Allow repositories to use atlantis.yaml files to customize the commands Atlantis runs." +
-			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
-			" on the Atlantis server.",
-		defaultValue: false,
-		hidden:       true,
-	},
 	AutoplanModules: {
 		description:  "Automatically plan projects that have a changed module from the local repository.",
 		defaultValue: false,
@@ -441,10 +431,6 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableApplyAllFlag: {
 		description:  "Disable \"atlantis apply\" command without any flags (i.e. apply all). A specific project/workspace/directory has to be specified for applies.",
-		defaultValue: false,
-	},
-	DisableApplyFlag: {
-		description:  "Disable all \"atlantis apply\" command regardless of which flags are passed with it.",
 		defaultValue: false,
 	},
 	DisableAutoplanFlag: {
@@ -1084,16 +1070,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		deprecatedFlags = append(deprecatedFlags, RequireMergeableFlag)
 		commandReqs = append(commandReqs, valid.MergeableCommandReq)
 	}
-	if userConfig.DisableApply {
-		deprecatedFlags = append(deprecatedFlags, DisableApplyFlag)
-		var filtered []string
-		for _, allowCommand := range strings.Split(userConfig.AllowCommands, ",") {
-			if allowCommand != command.Apply.String() {
-				filtered = append(filtered, allowCommand)
-			}
-		}
-		userConfig.AllowCommands = strings.Join(filtered, ",")
-	}
 
 	// Build up strings with what the recommended yaml and json config should
 	// be instead of using the deprecated flags.
@@ -1106,11 +1082,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		jsonCfg += fmt.Sprintf(`, "plan_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
 		jsonCfg += fmt.Sprintf(`, "apply_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
 		jsonCfg += fmt.Sprintf(`, "import_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
-	}
-	if userConfig.AllowRepoConfig {
-		deprecatedFlags = append(deprecatedFlags, AllowRepoConfigFlag)
-		yamlCfg += "\n  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, policy_check]\n  allow_custom_workflows: true"
-		jsonCfg += `, "allowed_overrides":["plan_requirements","apply_requirements","import_requirements","workflow", "policy_check"], "allow_custom_workflows":true`
 	}
 	jsonCfg += "}]}"
 
