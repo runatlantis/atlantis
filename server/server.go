@@ -520,6 +520,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			VCSClient:                vcsClient,
 		},
 	)
+
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
@@ -1074,14 +1075,49 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 
 	err = s.IndexTemplate.Execute(w, templates.IndexData{
-		Locks:           lockResults,
-		ApplyLock:       applyLockData,
-		AtlantisVersion: s.AtlantisVersion,
-		CleanedBasePath: s.AtlantisURL.Path,
+		Locks:            lockResults,
+		PullToJobMapping: preparePullToJobMappings(s),
+		ApplyLock:        applyLockData,
+		AtlantisVersion:  s.AtlantisVersion,
+		CleanedBasePath:  s.AtlantisURL.Path,
 	})
 	if err != nil {
 		s.Logger.Err(err.Error())
 	}
+}
+
+func preparePullToJobMappings(s *Server) []jobs.PullInfoWithJobIDs {
+
+	pullToJobMappings := s.ProjectCmdOutputHandler.GetPullToJobMapping()
+
+	for i := range pullToJobMappings {
+		for j := range pullToJobMappings[i].JobIDInfos {
+			jobUrl, _ := s.Router.Get(ProjectJobsViewRouteName).URL("job-id", pullToJobMappings[i].JobIDInfos[j].JobID)
+			pullToJobMappings[i].JobIDInfos[j].JobIDUrl = jobUrl.String()
+			pullToJobMappings[i].JobIDInfos[j].TimeFormatted = pullToJobMappings[i].JobIDInfos[j].Time.Format("02-01-2006 15:04:05")
+		}
+
+		//Sort by date - newest to oldest.
+		sort.SliceStable(pullToJobMappings[i].JobIDInfos, func(x, y int) bool {
+			return pullToJobMappings[i].JobIDInfos[x].Time.After(pullToJobMappings[i].JobIDInfos[y].Time)
+		})
+	}
+
+	//Sort by repository, project, path, workspace then date.
+	sort.SliceStable(pullToJobMappings, func(x, y int) bool {
+		if pullToJobMappings[x].Pull.RepoFullName != pullToJobMappings[y].Pull.RepoFullName {
+			return pullToJobMappings[x].Pull.RepoFullName < pullToJobMappings[y].Pull.RepoFullName
+		}
+		if pullToJobMappings[x].Pull.ProjectName != pullToJobMappings[y].Pull.ProjectName {
+			return pullToJobMappings[x].Pull.ProjectName < pullToJobMappings[y].Pull.ProjectName
+		}
+		if pullToJobMappings[x].Pull.Path != pullToJobMappings[y].Pull.Path {
+			return pullToJobMappings[x].Pull.Path < pullToJobMappings[y].Pull.Path
+		}
+		return pullToJobMappings[x].Pull.Workspace < pullToJobMappings[y].Pull.Workspace
+	})
+
+	return pullToJobMappings
 }
 
 func mkSubDir(parentDir string, subDir string) (string, error) {

@@ -161,10 +161,12 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		projectOutputHandler.Send(ctx, "Complete", false)
 
 		pullContext := jobs.PullInfo{
-			PullNum:     ctx.Pull.Num,
-			Repo:        ctx.BaseRepo.Name,
-			ProjectName: ctx.ProjectName,
-			Workspace:   ctx.Workspace,
+			PullNum:      ctx.Pull.Num,
+			Repo:         ctx.BaseRepo.Name,
+			RepoFullName: ctx.BaseRepo.FullName,
+			ProjectName:  ctx.ProjectName,
+			Path:         ctx.RepoRelDir,
+			Workspace:    ctx.Workspace,
 		}
 		wg.Wait() // Must finish reading messages before cleaning up
 		projectOutputHandler.CleanUp(pullContext)

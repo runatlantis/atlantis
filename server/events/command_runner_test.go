@@ -729,7 +729,7 @@ func TestRunUnlockCommandDoesntRetrieveLabelsIfDisableUnlockLabelNotSet(t *testi
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Unlock})
 
-	vcsClient.VerifyWasNotCalled().GetPullLabels(testdata.GithubRepo, modelPull)
+	vcsClient.VerifyWasCalled(Never()).GetPullLabels(testdata.GithubRepo, modelPull)
 }
 
 func TestRunAutoplanCommand_DeletePlans(t *testing.T) {

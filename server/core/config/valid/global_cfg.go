@@ -297,6 +297,11 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 			if proj.ApplyRequirements != nil {
 				log.Debug("overriding server-defined %s with repo settings: [%s]", ApplyRequirementsKey, strings.Join(proj.ApplyRequirements, ","))
 				applyReqs = proj.ApplyRequirements
+
+				// Preserve policies_passed req if policy check is enabled
+				if policyCheck {
+					applyReqs = append(applyReqs, PoliciesPassedCommandReq)
+				}
 			}
 		case ImportRequirementsKey:
 			if proj.ImportRequirements != nil {

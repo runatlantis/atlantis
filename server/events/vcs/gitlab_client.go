@@ -323,14 +323,17 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 	allowSkippedPipeline := project.AllowMergeOnSkippedPipeline && isPipelineSkipped
 
-	ok, err := g.SupportsDetailedMergeStatus()
+	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus()
 	if err != nil {
 		return false, err
 	}
 
-	if ((ok && (mr.DetailedMergeStatus == "mergeable" || mr.DetailedMergeStatus == "ci_still_running")) ||
-		//nolint:staticcheck // SA1019 this check ensures compatibility with older gitlab versions
-		(!ok && mr.MergeStatus == "can_be_merged")) &&
+	if ((supportsDetailedMergeStatus &&
+		(mr.DetailedMergeStatus == "mergeable" ||
+			mr.DetailedMergeStatus == "ci_still_running" ||
+			mr.DetailedMergeStatus == "ci_must_pass")) ||
+		(!supportsDetailedMergeStatus &&
+			mr.MergeStatus == "can_be_merged")) && //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
 		!mr.WorkInProgress &&
