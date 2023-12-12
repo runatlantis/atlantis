@@ -553,60 +553,6 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 			planCommentIDs[1], planComments[1], authorID, authorUserName, authorEmail, pullNum) +
 		"]"
 
-	gitlabClientUnderTest = true
-	defer func() { gitlabClientUnderTest = false }()
-	gotNotePutCalls := make([]notePutCallDetails, 0, 1)
-	testServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch r.Method {
-			case "GET":
-				switch r.RequestURI {
-				case "/api/v4/user":
-					w.WriteHeader(http.StatusOK)
-					w.Header().Set("Content-Type", "application/json")
-					response := fmt.Sprintf(`{"id": %d,"username": "%s", "email": "%s"}`, authorID, authorUserName, authorEmail)
-					w.Write([]byte(response)) // nolint: errcheck
-				case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%d/notes?order_by=created_at&sort=asc", pullNum):
-					w.WriteHeader(http.StatusOK)
-					response := issueResp
-					w.Write([]byte(response)) // nolint: errcheck
-				default:
-					t.Errorf("got unexpected request at %q", r.RequestURI)
-					http.Error(w, "not found", http.StatusNotFound)
-				}
-			case "PUT":
-				switch {
-				case strings.HasPrefix(r.RequestURI, fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%d/notes/", pullNum)):
-					w.WriteHeader(http.StatusOK)
-					var body jsonBody
-					err := json.NewDecoder(r.Body).Decode(&body)
-					Ok(t, err)
-					notePutCallDetail := notePutCallDetails{
-						noteID:  path.Base(r.RequestURI),
-						comment: strings.Split(body.Body, "\n"),
-					}
-					gotNotePutCalls = append(gotNotePutCalls, notePutCallDetail)
-					response := "{}"
-					w.Write([]byte(response)) // nolint: errcheck
-				default:
-					t.Errorf("got unexpected request at %q", r.RequestURI)
-					http.Error(w, "not found", http.StatusNotFound)
-				}
-			default:
-				t.Errorf("got unexpected method at %q", r.Method)
-				http.Error(w, "not found", http.StatusNotFound)
-			}
-		}),
-	)
-
-	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
-	Ok(t, err)
-	client := &GitlabClient{
-		Client:  internalClient,
-		Version: nil,
-		logger:  logging.NewNoopLogger(t),
-	}
-
 	repo := models.Repo{
 		FullName: "runatlantis/atlantis",
 		Owner:    "runatlantis",
