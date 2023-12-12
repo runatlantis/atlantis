@@ -87,8 +87,6 @@ func TestGitHubWorkflow(t *testing.T) {
 		ModifiedFiles []string
 		// Comments are what our mock user writes to the pull request.
 		Comments []string
-		// DisableApply flag used by userConfig object when initializing atlantis server.
-		DisableApply bool
 		// ApplyLock creates an apply lock that temporarily disables apply command
 		ApplyLock bool
 		// AllowCommands flag what kind of atlantis commands are available.
@@ -457,7 +455,6 @@ func TestGitHubWorkflow(t *testing.T) {
 			Description:   "global apply lock disables apply commands",
 			RepoDir:       "simple-yaml",
 			ModifiedFiles: []string{"main.tf"},
-			DisableApply:  false,
 			ApplyLock:     true,
 			ExpAutoplan:   true,
 			Comments: []string{
@@ -470,18 +467,22 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 		},
 		{
-			Description:   "disable apply flag always takes presedence",
+			Description:   "omitting apply from allow commands always takes presedence",
 			RepoDir:       "simple-yaml",
 			ModifiedFiles: []string{"main.tf"},
-			DisableApply:  true,
+			AllowCommands: []command.Name{command.Plan},
 			ApplyLock:     false,
 			ExpAutoplan:   true,
 			Comments: []string{
 				"atlantis apply",
 			},
+			ExpParseFailedCount:         1,
+			ExpAllowResponseCommentBack: true,
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-apply-locked.txt"},
+				// Disabling apply is implementing by omitting it from the apply list
+				// See: https://github.com/runatlantis/atlantis/pull/2877
+				{"exp-output-allow-command-unknown-apply.txt"},
 				{"exp-output-merge.txt"},
 			},
 		},
@@ -628,7 +629,6 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			// reset userConfig
 			userConfig = server.UserConfig{}
-			userConfig.DisableApply = c.DisableApply
 
 			opt := setupOption{
 				repoConfigFile:          c.RepoConfigFile,
@@ -799,7 +799,6 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 
 			// reset userConfig
 			userConfig = server.UserConfig{}
-			userConfig.DisableApply = true
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, setupOption{})
 			// Set the repo to be cloned through the testing backdoor.
@@ -1295,6 +1294,13 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	if opt.allowCommands != nil {
 		allowCommands = opt.allowCommands
 	}
+	disableApply := true
+	for _, allowCommand := range allowCommands {
+		if allowCommand == command.Apply {
+			disableApply = false
+			break
+		}
+	}
 	commentParser := &events.CommentParser{
 		GithubUser:     "github-user",
 		GitlabUser:     "gitlab-user",
@@ -1308,7 +1314,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	backend := boltdb
 	lockingClient := locking.NewClient(boltdb)
 	noOpLocker := locking.NewNoOpLocker()
-	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
+	applyLocker = locking.NewApplyClient(boltdb, disableApply)
 	projectLocker := &events.DefaultProjectLocker{
 		Locker:     lockingClient,
 		NoOpLocker: noOpLocker,
