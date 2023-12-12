@@ -60,7 +60,7 @@ jobs:
           npm install -g yarn
 
           # install raviqqe/muffet to check for broken links.
-          curl -L https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_${MUFFET_VERSION}_Linux_x86_64.tar.gz | tar -xz
+          curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
 
           # build the site
           yarn && yarn website:build
