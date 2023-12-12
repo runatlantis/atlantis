@@ -93,6 +93,10 @@ func TestGitHubWorkflow(t *testing.T) {
 		ApplyLock bool
 		// AllowCommands flag what kind of atlantis commands are available.
 		AllowCommands []command.Name
+		// DisableAutoplan flag disable auto plans when any pull request is opened.
+		DisableAutoplan bool
+		// DisablePreWorkflowHooks if set to true, pre-workflow hooks will be disabled
+		DisablePreWorkflowHooks bool
 		// ExpAutomerge is true if we expect Atlantis to automerge.
 		ExpAutomerge bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
@@ -248,6 +252,25 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 		},
 		{
+			Description:             "simple with atlantis.yaml - autoplan disabled",
+			RepoDir:                 "simple-yaml",
+			ModifiedFiles:           []string{"main.tf"},
+			DisableAutoplan:         true,
+			DisablePreWorkflowHooks: true,
+			ExpAutoplan:             false,
+			Comments: []string{
+				"atlantis plan -w staging",
+				"atlantis plan -w default",
+				"atlantis apply -w staging",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-plan-staging.txt"},
+				{"exp-output-plan-default.txt"},
+				{"exp-output-apply-staging.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
 			Description:   "simple with atlantis.yaml and apply all",
 			RepoDir:       "simple-yaml",
 			ModifiedFiles: []string{"main.tf"},
@@ -289,6 +312,23 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan-only-staging.txt"},
+				{"exp-output-apply-staging.txt"},
+				{"exp-output-merge-only-staging.txt"},
+			},
+		},
+		{
+			Description:             "modules staging only - autoplan disabled",
+			RepoDir:                 "modules",
+			ModifiedFiles:           []string{"staging/main.tf"},
+			DisableAutoplan:         true,
+			DisablePreWorkflowHooks: true,
+			ExpAutoplan:             false,
+			Comments: []string{
+				"atlantis plan -d staging",
+				"atlantis apply -d staging",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-plan-staging.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-merge-only-staging.txt"},
 			},
@@ -590,7 +630,12 @@ func TestGitHubWorkflow(t *testing.T) {
 			userConfig = server.UserConfig{}
 			userConfig.DisableApply = c.DisableApply
 
-			opt := setupOption{repoConfigFile: c.RepoConfigFile, allowCommands: c.AllowCommands}
+			opt := setupOption{
+				repoConfigFile:          c.RepoConfigFile,
+				allowCommands:           c.AllowCommands,
+				disableAutoplan:         c.DisableAutoplan,
+				disablePreWorkflowHooks: c.DisablePreWorkflowHooks,
+			}
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, opt)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
@@ -630,10 +675,16 @@ func TestGitHubWorkflow(t *testing.T) {
 			ctrl.Post(w, pullClosedReq)
 			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
-			expNumHooks := len(c.Comments) + 1 - c.ExpParseFailedCount
+			expNumHooks := len(c.Comments) - c.ExpParseFailedCount
+			// if auto plan is disabled, hooks will not be called on pull request opened event
+			if !c.DisableAutoplan {
+				expNumHooks++
+			}
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](),
-				Eq("some dummy command"), Any[string](), Any[string](), Any[string]())
+			if !c.DisablePreWorkflowHooks {
+				mockPreWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](),
+					Eq("some dummy command"), Any[string](), Any[string](), Any[string]())
+			}
 			// Let's verify the post-workflow hook was called for each comment including the pull request opened event
 			mockPostWorkflowHookRunner.VerifyWasCalled(Times(expNumHooks)).Run(Any[models.WorkflowHookCommandContext](),
 				Eq("some post dummy command"), Any[string](), Any[string](), Any[string]())
@@ -1212,8 +1263,10 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 }
 
 type setupOption struct {
-	repoConfigFile string
-	allowCommands  []command.Name
+	repoConfigFile          string
+	allowCommands           []command.Name
+	disableAutoplan         bool
+	disablePreWorkflowHooks bool
 }
 
 func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
@@ -1266,22 +1319,26 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		TestingOverrideHeadCloneURL: "override-me",
 		Logger:                      logger,
 	}
+	var preWorkflowHooks []*valid.WorkflowHook
+	if !opt.disablePreWorkflowHooks {
+		preWorkflowHooks = []*valid.WorkflowHook{
+			{
+				StepName:   "global_hook",
+				RunCommand: "some dummy command",
+			},
+		}
+	}
 
 	defaultTFVersion := terraformClient.DefaultVersion()
 	locker := events.NewDefaultWorkingDirLocker()
 	parser := &config.ParserValidator{}
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		RepoConfigFile: opt.repoConfigFile,
-		AllowRepoCfg:   true,
-		MergeableReq:   false,
-		ApprovedReq:    false,
-		PreWorkflowHooks: []*valid.WorkflowHook{
-			{
-				StepName:   "global_hook",
-				RunCommand: "some dummy command",
-			},
-		},
+		RepoConfigFile:   opt.repoConfigFile,
+		AllowRepoCfg:     true,
+		MergeableReq:     false,
+		ApprovedReq:      false,
+		PreWorkflowHooks: preWorkflowHooks,
 		PostWorkflowHooks: []*valid.WorkflowHook{
 			{
 				StepName:   "global_hook",
@@ -1539,6 +1596,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              backend,
+		DisableAutoplan:                opt.disableAutoplan,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
