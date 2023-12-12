@@ -28,7 +28,6 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -54,6 +53,7 @@ const (
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
+	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
@@ -70,7 +70,6 @@ const (
 	DataDirFlag                      = "data-dir"
 	DefaultTFVersionFlag             = "default-tf-version"
 	DisableApplyAllFlag              = "disable-apply-all"
-	DisableApplyFlag                 = "disable-apply"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
@@ -148,6 +147,7 @@ const (
 	DefaultADBasicUser                  = ""
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
+	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
@@ -206,6 +206,12 @@ var stringFlags = map[string]stringFlag{
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
+	},
+	AutoDiscoverModeFlag: {
+		description: "Auto discover mode controls whether projects in a repo are discovered by Atlantis. Defaults to 'auto' which " +
+			"means projects will be discovered when no explicit projects are defined in repo config. Also supports 'enabled' (always " +
+			"discover projects) and 'disabled' (never discover projects).",
+		defaultValue: DefaultAutoDiscoverMode,
 	},
 	AutoplanModulesFromProjects: {
 		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
@@ -433,10 +439,6 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableApplyAllFlag: {
 		description:  "Disable \"atlantis apply\" command without any flags (i.e. apply all). A specific project/workspace/directory has to be specified for applies.",
-		defaultValue: false,
-	},
-	DisableApplyFlag: {
-		description:  "Disable all \"atlantis apply\" command regardless of which flags are passed with it.",
 		defaultValue: false,
 	},
 	DisableAutoplanFlag: {
@@ -871,6 +873,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.WebPassword == "" {
 		c.WebPassword = DefaultWebPassword
 	}
+	if c.AutoDiscoverModeFlag == "" {
+		c.AutoDiscoverModeFlag = DefaultAutoDiscoverMode
+	}
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
@@ -1072,16 +1077,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	if userConfig.RequireMergeable {
 		deprecatedFlags = append(deprecatedFlags, RequireMergeableFlag)
 		commandReqs = append(commandReqs, valid.MergeableCommandReq)
-	}
-	if userConfig.DisableApply {
-		deprecatedFlags = append(deprecatedFlags, DisableApplyFlag)
-		var filtered []string
-		for _, allowCommand := range strings.Split(userConfig.AllowCommands, ",") {
-			if allowCommand != command.Apply.String() {
-				filtered = append(filtered, allowCommand)
-			}
-		}
-		userConfig.AllowCommands = strings.Join(filtered, ",")
 	}
 
 	// Build up strings with what the recommended yaml and json config should

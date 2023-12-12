@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -82,6 +83,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				RepoLocking:               Bool(true),
 				PolicyCheck:               Bool(false),
 				CustomPolicyCheck:         Bool(false),
+				AutoDiscover:              raw.DefaultAutoDiscover(),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -918,6 +920,69 @@ repos:
 				PolicySets:         emptyPolicySets,
 				RepoLocking:        true,
 				CustomPolicyCheck:  false,
+			},
+		},
+		"repo-side apply reqs should include non-overrideable 'policies_passed' req when overridden and policies enabled": {
+			gCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [apply_requirements]
+  apply_requirements: [approved]
+  policy_check: true
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:                ".",
+				Workspace:          "default",
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{"mergeable"},
+				ImportRequirements: []string{},
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{"mergeable", "policies_passed"},
+				ImportRequirements: []string{},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+				CustomPolicyCheck:  false,
+				PolicyCheck:        true,
+			},
+		},
+		"repo-side apply reqs should not include non-overrideable 'policies_passed' req when overridden and policies disabled": {
+			gCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [apply_requirements]
+  apply_requirements: [approved]
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:                ".",
+				Workspace:          "default",
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{"mergeable"},
+				ImportRequirements: []string{},
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{"mergeable"},
+				ImportRequirements: []string{},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocking:        true,
+				CustomPolicyCheck:  false,
+				PolicyCheck:        false,
 			},
 		},
 		"repo-side import reqs win out if allowed": {

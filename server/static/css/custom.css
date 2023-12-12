@@ -300,6 +300,25 @@ tbody {
 .lock-datetime {
   color: #999;
 }
+/* Style for the Pull To Job Mapping Table */
+.pulls-grid{
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  border: 1px solid #dbeaf4;
+  width: 100%;
+  font-size: 12px;
+}
+
+.pulls-row {
+  display: contents;
+  text-transform: uppercase;
+}
+
+.pulls-element {
+  border-bottom: 1px solid #dbeaf4;
+  padding: 5px;
+}
+
 /* The Modal (background) */
 .modal {
     display: none; /* Hidden by default */
