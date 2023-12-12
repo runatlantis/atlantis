@@ -639,7 +639,6 @@ projects:
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
 				MergeableReq:  false,
 				ApprovedReq:   false,
 				UnDivergedReq: false,
@@ -673,6 +672,7 @@ projects:
 				false,
 				false,
 				false,
+				"auto",
 				statsScope,
 				logger,
 				terraformClient,
@@ -856,7 +856,12 @@ projects:
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg(false, false, false))
+			globalCfgArgs := valid.GlobalCfgArgs{
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			Ok(t, err)
 
 			if c.repoCfg != "" {
@@ -888,6 +893,7 @@ projects:
 				false,
 				false,
 				false,
+				"auto",
 				statsScope,
 				logger,
 				terraformClient,
@@ -1060,7 +1066,7 @@ workflows:
 				Pull:               pull,
 				ProjectName:        "",
 				PlanRequirements:   []string{"policies_passed"},
-				ApplyRequirements:  []string{},
+				ApplyRequirements:  []string{"policies_passed"},
 				ImportRequirements: []string{"policies_passed"},
 				RepoConfigVersion:  3,
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
@@ -1100,7 +1106,6 @@ workflows:
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:       false,
 				MergeableReq:       false,
 				ApprovedReq:        false,
 				UnDivergedReq:      false,
@@ -1137,6 +1142,7 @@ workflows:
 				false,
 				false,
 				false,
+				"auto",
 				statsScope,
 				logger,
 				terraformClient,
@@ -1257,7 +1263,6 @@ projects:
 			Ok(t, os.WriteFile(globalCfgPath, []byte(globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
 				MergeableReq:  false,
 				ApprovedReq:   false,
 				UnDivergedReq: false,
@@ -1293,6 +1298,7 @@ projects:
 				false,
 				true,
 				false,
+				"auto",
 				statsScope,
 				logger,
 				terraformClient,
@@ -1314,6 +1320,149 @@ projects:
 					Ok(t, err)
 				})
 			}
+		})
+	}
+}
+
+func TestBuildProjectCmdCtx_AutoDiscoverRespectsRepoConfig(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := map[string]struct {
+		globalCfg     string
+		repoCfg       string
+		modifiedFiles []string
+		expLen        int
+	}{
+		"autodiscover disabled": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: disabled
+`,
+			repoCfg: `
+version: 3
+automerge: true
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        0,
+		},
+		"autodiscover auto": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: auto
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        1,
+		},
+		"autodiscover enabled": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        3,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmp := DirStructure(t, map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project3": map[string]interface{}{
+					"main.tf": nil,
+				},
+			})
+
+			workingDir := NewMockWorkingDir()
+			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.modifiedFiles, nil)
+
+			// Write and parse the global config file.
+			globalCfgPath := filepath.Join(tmp, "global.yaml")
+			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
+			parser := &config.ParserValidator{}
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowAllRepoSettings: false,
+				MergeableReq:         false,
+				ApprovedReq:          false,
+				UnDivergedReq:        false,
+			}
+
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			Ok(t, err)
+
+			if c.repoCfg != "" {
+				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+			}
+			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+
+			terraformClient := mocks.NewMockClient()
+
+			builder := NewProjectCommandBuilder(
+				false,
+				parser,
+				&DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				NewDefaultWorkingDirLocker(),
+				globalCfg,
+				&DefaultPendingPlanFinder{},
+				&CommentParser{ExecutableName: "atlantis"},
+				false,
+				false,
+				false,
+				false,
+				false,
+				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
+				true,
+				false,
+				"auto",
+				statsScope,
+				logger,
+				terraformClient,
+			)
+
+			ctxs, err := builder.BuildPlanCommands(
+				&command.Context{
+					Log:   logger,
+					Scope: statsScope,
+				},
+				&CommentCommand{
+					RepoRelDir: "",
+					Flags:      nil,
+					Name:       command.Plan,
+					Verbose:    false,
+				},
+			)
+			Equals(t, c.expLen, len(ctxs))
+			Ok(t, err)
+
 		})
 	}
 }

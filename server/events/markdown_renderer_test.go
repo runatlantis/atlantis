@@ -564,7 +564,7 @@ $$$
 					RepoRelDir: "path",
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
-							models.PolicySetResult{
+							{
 								PolicySetName: "policy1",
 								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 								Passed:        true,
@@ -581,7 +581,7 @@ $$$
 					ProjectName: "projectname",
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
-							models.PolicySetResult{
+							{
 								PolicySetName: "policy1",
 								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 								Passed:        true,
@@ -777,7 +777,7 @@ $$$
 					RepoRelDir: "path",
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
-							models.PolicySetResult{
+							{
 								PolicySetName: "policy1",
 								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 								Passed:        true,
@@ -793,7 +793,7 @@ $$$
 					Failure:    "failure",
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
-							models.PolicySetResult{
+							{
 								PolicySetName: "policy1",
 								PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
 								Passed:        false,
@@ -1316,7 +1316,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 				RepoRelDir: "path",
 				PolicyCheckResults: &models.PolicyCheckResults{
 					PolicySetResults: []models.PolicySetResult{
-						models.PolicySetResult{
+						{
 							PolicySetName: "policy1",
 							PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
 							Passed:        true,

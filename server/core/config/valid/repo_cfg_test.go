@@ -216,3 +216,110 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 		})
 	}
 }
+
+func TestConfig_AutoDiscoverEnabled(t *testing.T) {
+	cases := []struct {
+		description         string
+		repoAutoDiscover    valid.AutoDiscoverMode
+		defaultAutoDiscover valid.AutoDiscoverMode
+		projects            []valid.Project
+		expEnabled          bool
+	}{
+		{
+			description:         "repo disabled autodiscover default enabled",
+			repoAutoDiscover:    valid.AutoDiscoverDisabledMode,
+			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
+			expEnabled:          false,
+		},
+		{
+			description:         "repo disabled autodiscover default disabled",
+			repoAutoDiscover:    valid.AutoDiscoverDisabledMode,
+			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
+			expEnabled:          false,
+		},
+		{
+			description:         "repo enabled autodiscover default enabled",
+			repoAutoDiscover:    valid.AutoDiscoverEnabledMode,
+			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
+			expEnabled:          true,
+		},
+		{
+			description:         "repo enabled autodiscover default disabled",
+			repoAutoDiscover:    valid.AutoDiscoverEnabledMode,
+			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
+			expEnabled:          true,
+		},
+		{
+			description:         "repo set auto autodiscover with no projects default enabled",
+			repoAutoDiscover:    valid.AutoDiscoverAutoMode,
+			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
+			expEnabled:          true,
+		},
+		{
+			description:         "repo set auto autodiscover with no projects default disabled",
+			repoAutoDiscover:    valid.AutoDiscoverAutoMode,
+			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
+			expEnabled:          true,
+		},
+		{
+			description:         "repo set auto autodiscover with a project default enabled",
+			repoAutoDiscover:    valid.AutoDiscoverAutoMode,
+			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
+			projects:            []valid.Project{{}},
+			expEnabled:          false,
+		},
+		{
+			description:         "repo set auto autodiscover with a project default disabled",
+			repoAutoDiscover:    valid.AutoDiscoverAutoMode,
+			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
+			projects:            []valid.Project{{}},
+			expEnabled:          false,
+		},
+		{
+			description:         "repo unset autodiscover with no projects default enabled",
+			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
+			expEnabled:          true,
+		},
+		{
+			description:         "repo unset autodiscover with no projects default disabled",
+			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
+			expEnabled:          false,
+		},
+		{
+			description:         "repo unset autodiscover with no projects default auto",
+			defaultAutoDiscover: valid.AutoDiscoverAutoMode,
+			expEnabled:          true,
+		},
+		{
+			description:         "repo unset autodiscover with a project default enabled",
+			projects:            []valid.Project{{}},
+			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
+			expEnabled:          true,
+		},
+		{
+			description:         "repo unset autodiscover with a project default disabled",
+			projects:            []valid.Project{{}},
+			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
+			expEnabled:          false,
+		},
+		{
+			description:         "repo unset autodiscover with a project default auto",
+			projects:            []valid.Project{{}},
+			defaultAutoDiscover: valid.AutoDiscoverAutoMode,
+			expEnabled:          false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			r := valid.RepoCfg{
+				Projects:     c.projects,
+				AutoDiscover: nil,
+			}
+			if c.repoAutoDiscover != "" {
+				r.AutoDiscover = &valid.AutoDiscover{c.repoAutoDiscover}
+			}
+			enabled := r.AutoDiscoverEnabled(c.defaultAutoDiscover)
+			Equals(t, c.expEnabled, enabled)
+		})
+	}
+}

@@ -68,7 +68,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	pull := ctx.Pull
 
 	locked, err := a.IsLocked()
-	// CheckApplyLock falls back to DisableApply flag if fetching the lock
+	// CheckApplyLock falls back to AllowedCommand flag if fetching the lock
 	// raises an error
 	// We will log failure as warning
 	if err != nil {

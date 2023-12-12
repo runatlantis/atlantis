@@ -1,35 +1,45 @@
 build:
-  - 'Dockerfile*'
+- changed-files:
+  - any-glob-to-any-file: 'Dockerfile*'
 
 dependencies:
-  - 'yarn.lock'
-  - 'go.*'
+- changed-files:
+  - any-glob-to-any-file: 'yarn.lock'
+  - any-glob-to-any-file: 'go.*'
 
 docs:
-  - 'runatlantis.io/**/*.md'
-  - 'README.md'
+- changed-files:
+  - any-glob-to-any-file: 'runatlantis.io/**/*.md'
+  - any-glob-to-any-file: 'README.md'
 
 github-actions:
-  - '.github/**'
+- changed-files:
+  - any-glob-to-any-file: '.github/**'
 
 go:
-  - '**/*.go'
+- changed-files:
+  - any-glob-to-any-file: '**/*.go'
 
 provider/azuredevops:
-  - 'server/**/*azuredevops*.go'
+- changed-files:
+  - any-glob-to-any-file: 'server/**/*azuredevops*.go'
 
 provider/bitbucket:
-  - 'server/**/*bitbucket*.go'
-  - 'server/events/vcs/bitbucketcloud/*.go'
-  - 'server/events/vcs/bitbucketserver/*.go'
+- changed-files:
+  - any-glob-to-any-file: 'server/**/*bitbucket*.go'
+  - any-glob-to-any-file: 'server/events/vcs/bitbucketcloud/*.go'
+  - any-glob-to-any-file: 'server/events/vcs/bitbucketserver/*.go'
 
 provider/github:
-  - 'server/**/*github*.go'
+- changed-files:
+  - any-glob-to-any-file: 'server/**/*github*.go'
 
 provider/gitlab:
-  - 'server/**/*gitlab*.go'
+- changed-files:
+  - any-glob-to-any-file: 'server/**/*gitlab*.go'
 
 website:
-  - 'runatlantis.io/.vuepress/**/*'
-  - 'package.json'
-  - 'yarn.lock'
+- changed-files:
+  - any-glob-to-any-file: 'runatlantis.io/.vuepress/**/*'
+  - any-glob-to-any-file: 'package.json'
+  - any-glob-to-any-file: 'yarn.lock'

@@ -18,6 +18,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
@@ -54,6 +55,7 @@ func NewInstrumentedProjectCommandBuilder(
 	RestrictFileList bool,
 	SilenceNoProjects bool,
 	IncludeGitUntrackedFiles bool,
+	AutoDiscoverMode string,
 	scope tally.Scope,
 	logger logging.SimpleLogging,
 	terraformClient terraform.Client,
@@ -85,6 +87,7 @@ func NewInstrumentedProjectCommandBuilder(
 			RestrictFileList,
 			SilenceNoProjects,
 			IncludeGitUntrackedFiles,
+			AutoDiscoverMode,
 			scope,
 			logger,
 			terraformClient,
@@ -114,8 +117,9 @@ func NewProjectCommandBuilder(
 	RestrictFileList bool,
 	SilenceNoProjects bool,
 	IncludeGitUntrackedFiles bool,
+	AutoDiscoverMode string,
 	scope tally.Scope,
-	logger logging.SimpleLogging,
+	_ logging.SimpleLogging,
 	terraformClient terraform.Client,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
@@ -136,6 +140,7 @@ func NewProjectCommandBuilder(
 		RestrictFileList:         RestrictFileList,
 		SilenceNoProjects:        SilenceNoProjects,
 		IncludeGitUntrackedFiles: IncludeGitUntrackedFiles,
+		AutoDiscoverMode:         AutoDiscoverMode,
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
@@ -242,6 +247,8 @@ type DefaultProjectCommandBuilder struct {
 	SilenceNoProjects bool
 	// User config option: Include git untracked files in the modified file list.
 	IncludeGitUntrackedFiles bool
+	// User config option: Controls auto-discovery of projects in a repository.
+	AutoDiscoverMode string
 	// Handles the actual running of Terraform commands.
 	TerraformExecutor terraform.Client
 }
@@ -336,6 +343,13 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 
 	ctx.Log.Debug("%d files were modified in this pull request. Modified files: %v", len(modifiedFiles), modifiedFiles)
 
+	// Get default AutoDiscoverMode from userConfig/globalConfig
+	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
+	globalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
+	if globalAutoDiscover != nil {
+		defaultAutoDiscoverMode = globalAutoDiscover.Mode
+	}
+
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
 		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
 		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Pull, repoCfgFile)
@@ -349,18 +363,27 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 				return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 			}
 			ctx.Log.Info("successfully parsed remote %s file", repoCfgFile)
-			if len(repoCfg.Projects) > 0 {
-				matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
-				if err != nil {
-					return nil, err
-				}
-				ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
-				if len(matchingProjects) == 0 {
-					ctx.Log.Info("skipping repo clone since no project was modified")
-					return []command.ProjectContext{}, nil
+
+			if repoCfg.AutoDiscover != nil {
+				defaultAutoDiscoverMode = repoCfg.AutoDiscover.Mode
+			}
+			// If auto discover is enabled, we never want to skip cloning
+			if !repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode) {
+				if len(repoCfg.Projects) > 0 {
+					matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
+					if err != nil {
+						return nil, err
+					}
+					ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
+					if len(matchingProjects) == 0 {
+						ctx.Log.Info("skipping repo clone since no project was modified")
+						return []command.ProjectContext{}, nil
+					}
+				} else {
+					ctx.Log.Info("no projects are defined in %s. Will resume automatic detection", repoCfgFile)
 				}
 			} else {
-				ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", repoCfgFile)
+				ctx.Log.Info("automatic project discovery enabled. Will resume automatic detection")
 			}
 			// NOTE: We discard this work here and end up doing it again after
 			// cloning to ensure all the return values are set properly with
@@ -402,6 +425,15 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 		}
 		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+		// It's possible we've already set defaultAutoDiscoverMode
+		// from the config file while checking whether we can skip
+		// cloning. We still need to set it here in the case that
+		// we were not able to check whether we can skip cloning
+		// and thus were not able to previously fetch the repo
+		// config.
+		if repoCfg.AutoDiscover != nil {
+			defaultAutoDiscoverMode = repoCfg.AutoDiscover.Mode
+		}
 	}
 
 	moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
@@ -450,21 +482,46 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
-					repoCfg.AbortOnExcecutionOrderFail,
+					abortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
-	} else {
+	}
+
+	if repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode) {
 		// If there is no config file or it specified no projects, then we'll plan each project that
 		// our algorithm determines was modified.
 		if hasRepoCfg {
-			ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", repoCfgFile)
+			if len(repoCfg.Projects) == 0 {
+				ctx.Log.Info("no projects are defined in %s. Will resume automatic detection", repoCfgFile)
+			} else {
+				ctx.Log.Info("automatic project discovery enabled. Will resume automatic detection")
+			}
 		} else {
 			ctx.Log.Info("found no %s file", repoCfgFile)
 		}
 		// build a module index for projects that are explicitly included
-		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
-		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
+		allModifiedProjects := p.ProjectFinder.DetermineProjects(
+			ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
+		// If a project is already manually configured with the same dir as a discovered project, the manually configured
+		// project should take precedence
+		modifiedProjects := make([]models.Project, 0)
+		configuredProjDirs := make(map[string]bool)
+		// We compare against all configured projects instead of projects which match the modified files in case a
+		// project is being specifically excluded (ex: when_modified doesn't match). We don't want to accidentally
+		// "discover" it again.
+		for _, configProj := range repoCfg.Projects {
+			// Clean the path to make sure ./rel_path is equivalent to rel_path, etc
+			configuredProjDirs[filepath.Clean(configProj.Dir)] = true
+		}
+		for _, mp := range allModifiedProjects {
+			_, dirExists := configuredProjDirs[filepath.Clean(mp.Path)]
+			if !dirExists {
+				modifiedProjects = append(modifiedProjects, mp)
+			}
+		}
+		ctx.Log.Info("automatically determined that there were %d additional projects modified in this pull request: %s",
+			len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, repoDir)
@@ -508,6 +565,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	}
 
 	var pcc []command.ProjectContext
+
+	ctx.Log.Debug("building plan command")
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
+	if err != nil {
+		return pcc, err
+	}
+	defer unlockFn()
+
+	ctx.Log.Debug("cloning repository")
+	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return pcc, err
+	}
 
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
@@ -580,17 +650,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		}
 	}
 
-	ctx.Log.Debug("building plan command")
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
-	if err != nil {
-		return pcc, err
-	}
-	defer unlockFn()
-
-	ctx.Log.Debug("cloning repository")
-	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
-	if err != nil {
-		return pcc, err
+	if DefaultWorkspace != workspace {
+		ctx.Log.Debug("cloning repository with workspace %s", workspace)
+		_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
+		if err != nil {
+			return pcc, err
+		}
 	}
 
 	repoRelDir := DefaultRepoRelDir
