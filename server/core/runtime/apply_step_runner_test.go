@@ -103,7 +103,7 @@ func TestRun_Success_WithApplyErrorLabel(t *testing.T) {
 	Ok(t, err)
 	Equals(t, "output", output)
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
-	vcsClient.VerifyWasNotCalled().AddPullLabel(ctx.Pull.BaseRepo, ctx.Pull, applyErrorLabel)
+	vcsClient.VerifyWasCalled(Never()).AddPullLabel(ctx.Pull.BaseRepo, ctx.Pull, applyErrorLabel)
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
