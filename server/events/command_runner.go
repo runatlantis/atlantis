@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v54/github"
+	"github.com/google/go-github/v57/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -425,7 +425,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	baseRepo models.Repo,
 	maybeHeadRepo *models.Repo,
 	maybePull *models.PullRequest,
-	user models.User,
+	_ models.User,
 	pullNum int,
 	log logging.SimpleLogging,
 ) (headRepo models.Repo, pull models.PullRequest, err error) {

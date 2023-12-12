@@ -191,7 +191,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		// read from channel
 		go func() {
-			for range ch {
+			for range ch { //revive:disable-line:empty-block
 			}
 		}()
 
@@ -225,7 +225,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		// read from channel
 		go func() {
-			for range ch {
+			for range ch { //revive:disable-line:empty-block
 			}
 		}()
 
@@ -240,7 +240,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		// buffer channel will be closed immediately after logs are streamed
 		go func() {
-			for range ch2 {
+			for range ch2 { //revive:disable-line:empty-block
 			}
 			opComplete <- true
 		}()

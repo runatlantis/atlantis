@@ -75,6 +75,8 @@ projects:
   apply_requirements: [mergeable, approved, undiverged]
   import_requirements: [mergeable, approved, undiverged]
   execution_order_group: 1
+  depends_on:
+    - project-1
   workflow: myworkflow
 workflows:
   myworkflow:
@@ -289,6 +291,46 @@ in each group one by one.
 If any plan/apply fails and `abort_on_execution_order_fail` is set to true on a repo level, all the 
 following groups will be aborted. For this example, if project2 fails then project1 will not run.
 
+Execution order groups are useful when you have dependencies between projects. However, they are only applicable in the case where
+you initiate a global apply for all of your projects, i.e `atlantis apply`. If you initiate an apply on a single project, then the execution order groups are ignored.
+Thus, the `depends_on` key is more useful in this case. and can be used in conjunction with execution order groups.
+
+The following configuration is an example of how to use execution order groups and depends_on together to enforce dependencies between projects.
+```yaml
+version: 3
+projects:
+- name: development
+  dir: .
+  autoplan:
+    when_modified: ["*.tf", "vars/development.tfvars"]
+  execution_order_group: 1
+  workspace: development
+  workflow: infra
+- name: staging
+  dir: .
+  autoplan:
+    when_modified: ["*.tf", "vars/staging.tfvars"]
+  depends_on: ["development"]
+  execution_order_group: 2
+  workspace: staging
+  workflow: infra
+- name: production
+  dir: .
+  autoplan:
+    when_modified: ["*.tf", "vars/production.tfvars"]
+  depends_on: ["staging"]
+  execution_order_group: 3
+  workspace: production
+  workflow: infra
+```
+the `depends_on` feature will make sure that `production` is not applied before `staging` for example.
+
+::: tip
+What Happens if one or more project's dependencies are not applied?
+
+If there's one or more projects in the dependency list which is not in applied status, users will see an error message like this:
+`Can't apply your project unless you apply its dependencies`
+:::
 ### Autodiscovery Config
 ```yaml
 autodiscover:

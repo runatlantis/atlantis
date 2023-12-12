@@ -1004,7 +1004,8 @@ func (s *Server) Start() error {
 		s.Logger.Err(err.Error())
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		return fmt.Errorf("while shutting down: %s", err)
 	}

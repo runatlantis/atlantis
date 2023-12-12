@@ -171,14 +171,14 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 }
 
 // CreateComment creates a comment on the merge request.
-func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string, _ string) error {
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
 		"```diff\n"
 	comments := common.SplitComment(comment, gitlabMaxCommentLength, sepEnd, sepStart)
 	for _, c := range comments {
-		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.String(c)})
+		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(c)})
 		g.logger.Debug("POST /projects/%s/merge_requests/%d/notes returned: %d", repo.FullName, pullNum, resp.StatusCode)
 		if err != nil {
 			return err
@@ -202,8 +202,8 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 		g.logger.Debug("/projects/%v/merge_requests/%d/notes", repo.FullName, pullNum)
 		comments, resp, err := g.Client.Notes.ListMergeRequestNotes(repo.FullName, pullNum,
 			&gitlab.ListMergeRequestNotesOptions{
-				Sort:        gitlab.String("asc"),
-				OrderBy:     gitlab.String("created_at"),
+				Sort:        gitlab.Ptr("asc"),
+				OrderBy:     gitlab.Ptr("created_at"),
 				ListOptions: gitlab.ListOptions{Page: nextPage},
 			})
 		g.logger.Debug("GET /projects/%s/merge_requests/%d/notes returned: %d", repo.FullName, pullNum, resp.StatusCode)
@@ -329,6 +329,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	if ((ok && (mr.DetailedMergeStatus == "mergeable" || mr.DetailedMergeStatus == "ci_still_running")) ||
+		//nolint:staticcheck // SA1019 this check ensures compatibility with older gitlab versions
 		(!ok && mr.MergeStatus == "can_be_merged")) &&
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
@@ -398,10 +399,10 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 
 	_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
 		State:       gitlabState,
-		Context:     gitlab.String(src),
-		Description: gitlab.String(description),
+		Context:     gitlab.Ptr(src),
+		Description: gitlab.Ptr(description),
 		TargetURL:   &url,
-		Ref:         gitlab.String(refTarget),
+		Ref:         gitlab.Ptr(refTarget),
 	})
 	g.logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
 	return err
@@ -471,7 +472,7 @@ func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 	return fmt.Sprintf("!%d", pull.Num), nil
 }
 
-func (g *GitlabClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (g *GitlabClient) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 	// TODO implement
 	return nil
 }
@@ -516,7 +517,7 @@ func MustConstraint(constraint string) version.Constraints {
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *GitlabClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (g *GitlabClient) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]string, error) {
 	return nil, nil
 }
 
@@ -524,7 +525,7 @@ func (g *GitlabClient) GetTeamNamesForUser(repo models.Repo, user models.User) (
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
 func (g *GitlabClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
-	opt := gitlab.GetRawFileOptions{Ref: gitlab.String(pull.HeadBranch)}
+	opt := gitlab.GetRawFileOptions{Ref: gitlab.Ptr(pull.HeadBranch)}
 
 	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, fileName, &opt)
 	g.logger.Debug("GET /projects/%s/repository/files/%s/raw returned: %d", pull.BaseRepo.FullName, fileName, resp.StatusCode)
@@ -539,11 +540,11 @@ func (g *GitlabClient) GetFileContent(pull models.PullRequest, fileName string) 
 	return true, bytes, nil
 }
 
-func (g *GitlabClient) SupportsSingleFileDownload(repo models.Repo) bool {
+func (g *GitlabClient) SupportsSingleFileDownload(_ models.Repo) bool {
 	return true
 }
 
-func (g *GitlabClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+func (g *GitlabClient) GetCloneURL(_ models.VCSHostType, repo string) (string, error) {
 	project, resp, err := g.Client.Projects.GetProject(repo, nil)
 	g.logger.Debug("GET /projects/%s returned: %d", repo, resp.StatusCode)
 	if err != nil {

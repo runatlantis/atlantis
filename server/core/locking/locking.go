@@ -166,7 +166,7 @@ func NewNoOpLocker() *NoOpLocker {
 }
 
 // TryLock attempts to acquire a lock to a project and workspace.
-func (c *NoOpLocker) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error) {
+func (c *NoOpLocker) TryLock(p models.Project, workspace string, _ models.PullRequest, _ models.User) (TryLockResponse, error) {
 	return TryLockResponse{true, models.ProjectLock{}, c.key(p, workspace)}, nil
 }
 
@@ -174,7 +174,7 @@ func (c *NoOpLocker) TryLock(p models.Project, workspace string, pull models.Pul
 // a pointer to the now deleted lock will be returned. Else, that
 // pointer will be nil. An error will only be returned if there was
 // an error deleting the lock (i.e. not if there was no lock).
-func (c *NoOpLocker) Unlock(key string) (*models.ProjectLock, error) {
+func (c *NoOpLocker) Unlock(_ string) (*models.ProjectLock, error) {
 	return &models.ProjectLock{}, nil
 }
 
@@ -186,7 +186,7 @@ func (c *NoOpLocker) List() (map[string]models.ProjectLock, error) {
 }
 
 // UnlockByPull deletes all locks associated with that pull request.
-func (c *NoOpLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+func (c *NoOpLocker) UnlockByPull(_ string, _ int) ([]models.ProjectLock, error) {
 	return []models.ProjectLock{}, nil
 }
 
@@ -194,7 +194,7 @@ func (c *NoOpLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.Pr
 // a pointer to the lock will be returned. Else, the pointer will be nil.
 // An error will only be returned if there was an error getting the lock
 // (i.e. not if there was no lock).
-func (c *NoOpLocker) GetLock(key string) (*models.ProjectLock, error) {
+func (c *NoOpLocker) GetLock(_ string) (*models.ProjectLock, error) {
 	return nil, nil
 }
 

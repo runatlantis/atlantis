@@ -322,9 +322,9 @@ func TestUnlockingMultiple(t *testing.T) {
 	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
-	new := lock
-	new.Project.RepoFullName = "new/repo"
-	_, _, err = rdb.TryLock(new)
+	new1 := lock
+	new1.Project.RepoFullName = "new/repo"
+	_, _, err = rdb.TryLock(new1)
 	Ok(t, err)
 
 	new2 := lock
@@ -342,7 +342,7 @@ func TestUnlockingMultiple(t *testing.T) {
 	Ok(t, err)
 	_, err = rdb.Unlock(new2.Project, workspace)
 	Ok(t, err)
-	_, err = rdb.Unlock(new.Project, workspace)
+	_, err = rdb.Unlock(new1.Project, workspace)
 	Ok(t, err)
 	_, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
@@ -419,9 +419,9 @@ func TestUnlockByPullMatching(t *testing.T) {
 	Ok(t, err)
 
 	// add additional locks with the same repo and pull num but different paths/workspaces
-	new := lock
-	new.Project.Path = "dif/path"
-	_, _, err = rdb.TryLock(new)
+	new1 := lock
+	new1.Project.Path = "dif/path"
+	_, _, err = rdb.TryLock(new1)
 	Ok(t, err)
 	new2 := lock
 	new2.Workspace = "new-workspace"

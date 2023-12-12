@@ -267,21 +267,22 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 // NoopProjectOutputHandler is a mock that doesn't do anything
 type NoopProjectOutputHandler struct{}
 
-func (p *NoopProjectOutputHandler) Send(ctx command.ProjectContext, msg string, isOperationComplete bool) {
+func (p *NoopProjectOutputHandler) Send(_ command.ProjectContext, _ string, _ bool) {
 }
 
-func (p *NoopProjectOutputHandler) SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool) {
+func (p *NoopProjectOutputHandler) SendWorkflowHook(_ models.WorkflowHookCommandContext, _ string, _ bool) {
 }
 
-func (p *NoopProjectOutputHandler) Register(jobID string, receiver chan string)   {}
-func (p *NoopProjectOutputHandler) Deregister(jobID string, receiver chan string) {}
+func (p *NoopProjectOutputHandler) Register(_ string, _ chan string) {}
+
+func (p *NoopProjectOutputHandler) Deregister(_ string, _ chan string) {}
 
 func (p *NoopProjectOutputHandler) Handle() {
 }
 
-func (p *NoopProjectOutputHandler) CleanUp(pullInfo PullInfo) {
+func (p *NoopProjectOutputHandler) CleanUp(_ PullInfo) {
 }
 
-func (p *NoopProjectOutputHandler) IsKeyExists(key string) bool {
+func (p *NoopProjectOutputHandler) IsKeyExists(_ string) bool {
 	return false
 }
