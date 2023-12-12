@@ -199,6 +199,15 @@ func (w *FileWorkspace) HasDiverged(cloneDir string) bool {
 		// we assume false here for 'branch' strategy.
 		return false
 	}
+
+	statusFetchCmd := exec.Command("git", "fetch")
+	statusFetchCmd.Dir = cloneDir
+	outputStatusFetch, err := statusFetchCmd.CombinedOutput()
+	if err != nil {
+		w.Logger.Warn("fetching repo has failed: %s", string(outputStatusFetch))
+		return false
+	}
+
 	// Check if remote main branch has diverged.
 	statusUnoCmd := exec.Command("git", "status", "--untracked-files=no")
 	statusUnoCmd.Dir = cloneDir
