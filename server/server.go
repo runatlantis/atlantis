@@ -198,7 +198,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	globalCfg := valid.NewGlobalCfgFromArgs(
 		valid.GlobalCfgArgs{
-			AllowRepoCfg:       userConfig.AllowRepoConfig,
 			MergeableReq:       userConfig.RequireMergeable,
 			ApprovedReq:        userConfig.RequireApproval,
 			UnDivergedReq:      userConfig.RequireUnDiverged,

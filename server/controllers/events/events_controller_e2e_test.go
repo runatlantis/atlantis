@@ -1340,11 +1340,11 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	parser := &config.ParserValidator{}
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		RepoConfigFile:   opt.repoConfigFile,
-		AllowRepoCfg:     true,
-		MergeableReq:     false,
-		ApprovedReq:      false,
-		PreWorkflowHooks: preWorkflowHooks,
+		RepoConfigFile:       opt.repoConfigFile,
+		AllowAllRepoSettings: true,
+		MergeableReq:         false,
+		ApprovedReq:          false,
+		PreWorkflowHooks:     preWorkflowHooks,
 		PostWorkflowHooks: []*valid.WorkflowHook{
 			{
 				StepName:   "global_hook",

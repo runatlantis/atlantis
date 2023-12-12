@@ -59,7 +59,6 @@ var testFlags = map[string]interface{}{
 	AtlantisURLFlag:                  "url",
 	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
 	AllowForkPRsFlag:                 true,
-	AllowRepoConfigFlag:              true,
 	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
 	AutoplanFileListFlag:             "**/*.tf,**/*.yml",
