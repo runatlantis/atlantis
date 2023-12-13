@@ -617,7 +617,7 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 						case strings.HasPrefix(r.RequestURI, fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%d/notes/", pullNum)):
 							w.WriteHeader(http.StatusOK)
 							var body jsonBody
-							json.NewDecoder(r.Body).Decode(&body)
+							json.NewDecoder(r.Body).Decode(&body) // nolint: errcheck
 							notePutCallDetail := notePutCallDetails{
 								noteID:  path.Base(r.RequestURI),
 								comment: strings.Split(body.Body, "\n"),
