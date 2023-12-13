@@ -607,6 +607,11 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", failure, err
 	}
 
+	failure, err = p.CommandRequirementHandler.ValidateProjectDependencies(ctx)
+	if failure != "" || err != nil {
+		return "", failure, err
+	}
+
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir), ctx.RepoLocking && ctx.LockRepoOnApply)
 	if err != nil {

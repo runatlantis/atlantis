@@ -284,18 +284,18 @@ func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest,
 	return nil
 }
 
-func (m *MockCSU) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command command.Name) error {
+func (m *MockCSU) UpdateCombined(_ models.Repo, _ models.PullRequest, _ models.CommitStatus, _ command.Name) error {
 	return nil
 }
 
-func (m *MockCSU) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectResult) error {
+func (m *MockCSU) UpdateProject(_ command.ProjectContext, _ command.Name, _ models.CommitStatus, _ string, _ *command.ProjectResult) error {
 	return nil
 }
 
-func (m *MockCSU) UpdatePreWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
+func (m *MockCSU) UpdatePreWorkflowHook(_ models.PullRequest, _ models.CommitStatus, _ string, _ string, _ string) error {
 	return nil
 }
 
-func (m *MockCSU) UpdatePostWorkflowHook(pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
+func (m *MockCSU) UpdatePostWorkflowHook(_ models.PullRequest, _ models.CommitStatus, _ string, _ string, _ string) error {
 	return nil
 }

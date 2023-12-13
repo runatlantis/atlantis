@@ -132,10 +132,9 @@ func (w *FileWorkspace) Clone(
 			if w.CheckForUpstreamChanges && w.CheckoutMerge && w.recheckDiverged(p, headRepo, cloneDir) {
 				w.Logger.Info("base branch has been updated, using merge strategy and will clone again")
 				return cloneDir, true, w.mergeAgain(c)
-			} else {
-				w.Logger.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
-				return cloneDir, false, nil
 			}
+			w.Logger.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
+			return cloneDir, false, nil
 		} else {
 			w.Logger.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
 		}
@@ -200,6 +199,15 @@ func (w *FileWorkspace) HasDiverged(cloneDir string) bool {
 		// we assume false here for 'branch' strategy.
 		return false
 	}
+
+	statusFetchCmd := exec.Command("git", "fetch")
+	statusFetchCmd.Dir = cloneDir
+	outputStatusFetch, err := statusFetchCmd.CombinedOutput()
+	if err != nil {
+		w.Logger.Warn("fetching repo has failed: %s", string(outputStatusFetch))
+		return false
+	}
+
 	// Check if remote main branch has diverged.
 	statusUnoCmd := exec.Command("git", "status", "--untracked-files=no")
 	statusUnoCmd.Dir = cloneDir

@@ -34,12 +34,18 @@ By default, this is not allowed.
 :::
 
 ::: warning
-Once an `atlantis.yaml` file exists in a repo, Atlantis won't try to determine
-where to run plan automatically. Instead it will just follow the project configuration.
-This means that you'll need to define each project in your repo.
+Once an `atlantis.yaml` file exists in a repo and one or more `projects` are configured,
+Atlantis won't try to determine where to run plan automatically. Instead it will just
+follow the project configuration. This means that you'll need to define each project
+in your repo.
 
 If you have many directories with Terraform configuration, each directory will
 need to be defined.
+
+This behavior can be overriden by setting `autodiscover.mode` to
+`enabled` in which case Atlantis will still try to discover projects which were not
+explicitly configured. If the directory of any discovered project conflicts with a
+manually configured project, the manually configured project will take precedence.
 :::
 
 ## Example Using All Keys
@@ -47,6 +53,8 @@ need to be defined.
 ```yaml
 version: 3
 automerge: true
+autodiscover:
+  mode: auto
 delete_source_branch_on_merge: true
 parallel_plan: true
 parallel_apply: true
@@ -68,6 +76,8 @@ projects:
   apply_requirements: [mergeable, approved, undiverged]
   import_requirements: [mergeable, approved, undiverged]
   execution_order_group: 1
+  depends_on:
+    - project-1
   workflow: myworkflow
 workflows:
   myworkflow:
@@ -281,6 +291,74 @@ in each group one by one.
 
 If any plan/apply fails and `abort_on_execution_order_fail` is set to true on a repo level, all the 
 following groups will be aborted. For this example, if project2 fails then project1 will not run.
+
+Execution order groups are useful when you have dependencies between projects. However, they are only applicable in the case where
+you initiate a global apply for all of your projects, i.e `atlantis apply`. If you initiate an apply on a single project, then the execution order groups are ignored.
+Thus, the `depends_on` key is more useful in this case. and can be used in conjunction with execution order groups.
+
+The following configuration is an example of how to use execution order groups and depends_on together to enforce dependencies between projects.
+```yaml
+version: 3
+projects:
+- name: development
+  dir: .
+  autoplan:
+    when_modified: ["*.tf", "vars/development.tfvars"]
+  execution_order_group: 1
+  workspace: development
+  workflow: infra
+- name: staging
+  dir: .
+  autoplan:
+    when_modified: ["*.tf", "vars/staging.tfvars"]
+  depends_on: ["development"]
+  execution_order_group: 2
+  workspace: staging
+  workflow: infra
+- name: production
+  dir: .
+  autoplan:
+    when_modified: ["*.tf", "vars/production.tfvars"]
+  depends_on: ["staging"]
+  execution_order_group: 3
+  workspace: production
+  workflow: infra
+```
+the `depends_on` feature will make sure that `production` is not applied before `staging` for example.
+
+::: tip
+What Happens if one or more project's dependencies are not applied?
+
+If there's one or more projects in the dependency list which is not in applied status, users will see an error message like this:
+`Can't apply your project unless you apply its dependencies`
+:::
+### Autodiscovery Config
+```yaml
+autodiscover:
+  mode: "auto"
+```
+The above is the default configuration for `autodiscover.mode`. When `autodiscover.mode` is auto,
+projects will be discovered only if the repo has no `projects` configured.
+
+```yaml
+autodiscover:
+  mode: "disabled"
+```
+With the config above, Atlantis will never try to discover projects, even when there are no
+`projects` configured. This is useful if dynamically generating Atlantis config in pre_workflow hooks.
+See [Dynamic Repo Config Generation](pre-workflow-hooks.html#dynamic-repo-config-generation).
+
+```yaml
+autodiscover:
+  mode: "enabled"
+```
+With the config above, Atlantis will unconditionally try to discover projects based on modified_files,
+even when the directory of the project is missing from the configured `projects` in the repo configuration.
+If a discovered project has the same directory as a project which was manually configured in `projects`,
+the manual configuration will take precedence.
+
+Use this feature when some projects require specific configuration in a repo with many projects yet
+it's still desirable for Atlantis to plan/apply for projects not enumerated in the config.
 
 ### Custom Backend Config
 See [Custom Workflow Use Cases: Custom Backend Config](custom-workflows.html#custom-backend-config)

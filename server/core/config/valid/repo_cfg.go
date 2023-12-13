@@ -19,6 +19,7 @@ type RepoCfg struct {
 	Workflows                  map[string]Workflow
 	PolicySets                 PolicySets
 	Automerge                  *bool
+	AutoDiscover               *AutoDiscover
 	ParallelApply              *bool
 	ParallelPlan               *bool
 	ParallelPolicyCheck        *bool
@@ -92,6 +93,24 @@ func isRegexAllowed(name string, allowedRegexpPrefixes []string) bool {
 	return false
 }
 
+// This function returns a final true/false decision for whether AutoDiscover is enabled
+// for a repo. It takes into account the defaultAutoDiscoverMode when there is no explicit
+// repo config. The defaultAutoDiscoverMode param should be understood as the default
+// AutoDiscover mode as may be set via CLI params or server side repo config.
+func (r RepoCfg) AutoDiscoverEnabled(defaultAutoDiscoverMode AutoDiscoverMode) bool {
+	autoDiscoverMode := defaultAutoDiscoverMode
+	if r.AutoDiscover != nil {
+		autoDiscoverMode = r.AutoDiscover.Mode
+	}
+
+	if autoDiscoverMode == AutoDiscoverAutoMode {
+		// AutoDiscover is enabled by default when no projects are defined
+		return len(r.Projects) == 0
+	}
+
+	return autoDiscoverMode == AutoDiscoverEnabledMode
+}
+
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in
 // repoRelDir but none of them use workspace. We want this to be an error
 // because if users have gone to the trouble of defining projects in repoRelDir
@@ -133,6 +152,7 @@ type Project struct {
 	PlanRequirements          []string
 	ApplyRequirements         []string
 	ImportRequirements        []string
+	DependsOn                 []string
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
 	LockRepoOnApply           *bool

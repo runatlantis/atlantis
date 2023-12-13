@@ -37,6 +37,7 @@ type Repo struct {
 	LockRepoOnApply           *bool          `yaml:"lock_repo_on_apply,omitempty" json:"lock_repo_on_apply,omitempty"`
 	PolicyCheck               *bool          `yaml:"policy_check,omitempty" json:"policy_check,omitempty"`
 	CustomPolicyCheck         *bool          `yaml:"custom_policy_check,omitempty" json:"custom_policy_check,omitempty"`
+	AutoDiscover              *AutoDiscover  `yaml:"autodiscover,omitempty" json:"autodiscover,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -212,6 +213,14 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
+	autoDiscoverValid := func(value interface{}) error {
+		autoDiscover := value.(*AutoDiscover)
+		if autoDiscover != nil {
+			return autoDiscover.Validate()
+		}
+		return nil
+	}
+
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.ID, validation.Required, validation.By(idValid)),
 		validation.Field(&r.Branch, validation.By(branchValid)),
@@ -222,6 +231,7 @@ func (r Repo) Validate() error {
 		validation.Field(&r.ImportRequirements, validation.By(validImportReq)),
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
 		validation.Field(&r.DeleteSourceBranchOnMerge, validation.By(deleteSourceBranchOnMergeValid)),
+		validation.Field(&r.AutoDiscover, validation.By(autoDiscoverValid)),
 	)
 }
 
@@ -282,7 +292,7 @@ OuterGlobalPlanReqs:
 		}
 
 		// dont add policy_check step if repo have it explicitly disabled
-		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && *r.PolicyCheck == false {
+		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
 			continue
 		}
 		mergedPlanReqs = append(mergedPlanReqs, globalReq)
@@ -296,7 +306,7 @@ OuterGlobalApplyReqs:
 		}
 
 		// dont add policy_check step if repo have it explicitly disabled
-		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && *r.PolicyCheck == false {
+		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
 			continue
 		}
 		mergedApplyReqs = append(mergedApplyReqs, globalReq)
@@ -310,10 +320,15 @@ OuterGlobalImportReqs:
 		}
 
 		// dont add policy_check step if repo have it explicitly disabled
-		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && *r.PolicyCheck == false {
+		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
 			continue
 		}
 		mergedImportReqs = append(mergedImportReqs, globalReq)
+	}
+
+	var autoDiscover *valid.AutoDiscover
+	if r.AutoDiscover != nil {
+		autoDiscover = r.AutoDiscover.ToValid()
 	}
 
 	return valid.Repo{
@@ -335,5 +350,6 @@ OuterGlobalImportReqs:
 		LockRepoOnApply:           r.LockRepoOnApply,
 		PolicyCheck:               r.PolicyCheck,
 		CustomPolicyCheck:         r.CustomPolicyCheck,
+		AutoDiscover:              autoDiscover,
 	}
 }

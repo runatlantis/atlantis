@@ -38,7 +38,7 @@ var passedConfig server.UserConfig
 
 type ServerCreatorMock struct{}
 
-func (s *ServerCreatorMock) NewServer(userConfig server.UserConfig, config server.Config) (ServerStarter, error) {
+func (s *ServerCreatorMock) NewServer(userConfig server.UserConfig, _ server.Config) (ServerStarter, error) {
 	passedConfig = userConfig
 	return &ServerStarterMock{}, nil
 }
@@ -57,9 +57,9 @@ var testFlags = map[string]interface{}{
 	ADWebhookPasswordFlag:            "ad-wh-pass",
 	ADWebhookUserFlag:                "ad-wh-user",
 	AtlantisURLFlag:                  "url",
-	AllowCommandsFlag:                "version,plan,unlock,import,approve_policies", // apply is disabled by DisableApply
+	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
 	AllowForkPRsFlag:                 true,
-	AllowRepoConfigFlag:              true,
+	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
 	AutoplanFileListFlag:             "**/*.tf,**/*.yml",
 	BitbucketBaseURLFlag:             "https://bitbucket-base-url.com",
@@ -70,7 +70,6 @@ var testFlags = map[string]interface{}{
 	DataDirFlag:                      "/path",
 	DefaultTFVersionFlag:             "v0.11.0",
 	DisableApplyAllFlag:              true,
-	DisableApplyFlag:                 true,
 	DisableMarkdownFoldingFlag:       true,
 	DisableRepoLockingFlag:           true,
 	DiscardApprovalOnPlanFlag:        true,
@@ -760,16 +759,6 @@ func TestExecute_AllowAndWhitelist(t *testing.T) {
 	}, t)
 	err := c.Execute()
 	ErrEquals(t, "--repo-allowlist must be set for security purposes", err)
-}
-
-func TestExecute_DisableApplyDeprecation(t *testing.T) {
-	c := setupWithDefaults(map[string]interface{}{
-		DisableApplyFlag:  true,
-		AllowCommandsFlag: "plan,apply,unlock",
-	}, t)
-	err := c.Execute()
-	Ok(t, err)
-	Equals(t, "plan,unlock", passedConfig.AllowCommands)
 }
 
 func TestExecute_AutoDetectModulesFromProjects_Env(t *testing.T) {
