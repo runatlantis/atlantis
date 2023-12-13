@@ -20,7 +20,6 @@ by at least one person other than the author.
 
 #### Usage
 The `approved` requirement by:
-1. Passing the `--require-approval` flag to `atlantis server` or
 1. Creating a `repos.yaml` file with the `apply_requirements` key:
    ```yaml
    repos:
@@ -62,7 +61,6 @@ The `mergeable` requirement will prevent applies unless a pull request is able t
 
 #### Usage
 Set the `mergeable` requirement by:
-1. Passing the `--require-mergeable` flag to `atlantis server` or
 1. Creating a `repos.yaml` file with the `apply_requirements` key:
    ```yaml
    repos:
@@ -196,8 +194,6 @@ having that apply requirement set.
 
 ### Project-Specific Settings
 If you only want some projects/repos to have apply requirements, then you must
-1. Not set the `--require-approval` or `--require-mergeable` flags, since those
-   will override any `repos.yaml` or `atlantis.yaml` settings
 1. Specifying which repos have which requirements via the `repos.yaml` file.
    ```yaml
    repos:
