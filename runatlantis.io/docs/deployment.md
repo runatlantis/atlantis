@@ -557,13 +557,12 @@ If you need to modify the Docker image that we provide, for instance to add the 
     USER root
     COPY terragrunt /usr/local/bin/terragrunt
     ```
+
 Since version `0.26.0` the atlantis image now uses the `atlantis` user to run atlantis instead of the root user. Previous container definitions and script might need to be adjusted to use the `atlantis` user instead of `root`. If you need to include packages from other images you can switch to the `root` user using `USER root` in your docker file and once you are done installing packages you can switch back to the atlantis user to start atlantis.
 
 It is possible also to use the `/docker-entrypoint.d/` directory to add aditional scripts that you might want to run before the atlantis server starts. This is particulary useful if you want to customize the instance without building your own pipeline for it.
 
 **NOTE:** The atlantis data directory needs to be readable by the `atlantis` user instead of `root`, earlier versions used to use `root` instead, you might have to update permissions in your current deployment if you are upgrading to `>0.26.0`.
-
-  
 
 1. Build your Docker image
     ```bash
