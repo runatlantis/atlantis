@@ -294,7 +294,7 @@ func (w *FileWorkspace) mergeAgain(c wrappedGitContext) error {
 	}
 
 	// Reset branch as if it was cloned again
-	if err := w.wrappedGit(c, "reset", "--hard", fmt.Sprintf("refs/remotes/head/%s", c.pr.BaseBranch)); err != nil {
+	if err := w.wrappedGit(c, "reset", "--hard", fmt.Sprintf("refs/remotes/origin/%s", c.pr.BaseBranch)); err != nil {
 		return err
 	}
 
