@@ -1044,20 +1044,13 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 }
 
 // deprecationWarnings prints a warning if flags that are deprecated are
-// being used. Right now this only applies to flags that have been made obsolete
-// due to server-side config.
+// being used.
 func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	var deprecatedFlags []string
-
-	// Build up strings with what the recommended yaml and json config should
-	// be instead of using the deprecated flags.
-	yamlCfg := "---\nrepos:\n- id: /.*/"
-	jsonCfg := `{"repos":[{"id":"/.*/"}]}`
 
 	// Currently there are no deprecated flags; if flags become deprecated, add them here like so
 	//       if userConfig.SomeDeprecatedFlag {
 	//               deprecatedFlags = append(deprecatedFlags, SomeDeprecatedFlag)
-	//               // Update yamlCfg and jsonCfg to show how to replace them
 	//       }
 	//
 
@@ -1068,12 +1061,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		} else {
 			warning += fmt.Sprintf("Flags --%s and --%s have been deprecated.", strings.Join(deprecatedFlags[0:len(deprecatedFlags)-1], ", --"), deprecatedFlags[len(deprecatedFlags)-1:][0])
 		}
-		warning += fmt.Sprintf("\nCreate a --%s file with the following config instead:\n\n%s\n\nor use --%s='%s'\n",
-			RepoConfigFlag,
-			yamlCfg,
-			RepoConfigJSONFlag,
-			jsonCfg,
-		)
 		fmt.Println(warning)
 	}
 
