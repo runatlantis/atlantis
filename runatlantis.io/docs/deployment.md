@@ -561,6 +561,8 @@ Since version `0.26.0` the atlantis image now uses the `atlantis` user to run at
 
 It is possible also to use the `/docker-entrypoint.d/` directory to add aditional scripts that you might want to run before the atlantis server starts. This is particulary useful if you want to customize the instance without building your own pipeline for it.
 
+** NOTE: ** The atlantis data directory needs to be readable by the `atlantis` user instead of `root`, earlier versions used to use `root` instead, you might have to update permissions in your current deployment if you are upgrading to `>0.26.0`.
+
   
 
 1. Build your Docker image
