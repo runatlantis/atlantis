@@ -4,14 +4,14 @@ on:
   push:
     branches:
       - 'main'
-      - 'releases-**'
+      - 'release-**'
     tags:
       - v*.*.* # stable release like, v0.19.2
       - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
   pull_request:
     branches:
       - 'main'
-      - 'releases-**'
+      - 'release-**'
   workflow_dispatch:
 
 concurrency:
@@ -21,7 +21,7 @@ concurrency:
 jobs:
   changes:
     outputs:
-      should-run-build: ${{ steps.changes.outputs.src == 'true' }}
+      should-run-build: ${{ steps.changes.outputs.src == 'true' || startsWith(github.ref, 'refs/tags/') }}
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:

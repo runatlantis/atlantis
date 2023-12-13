@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v54/github"
+	"github.com/google/go-github/v57/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
@@ -253,7 +253,8 @@ func TestParseGithubPullEvent_EventType(t *testing.T) {
 		t.Run(c.action, func(t *testing.T) {
 			// Test normal parsing
 			event := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-			event.Action = &c.action
+			action := c.action
+			event.Action = &action
 			_, actType, _, _, _, err := parser.ParseGithubPullEvent(&event)
 			Ok(t, err)
 			Equals(t, c.exp, actType)
