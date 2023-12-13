@@ -13,5 +13,5 @@ Ran Policy Check for dir: `.` workspace: `default`
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * `atlantis apply`
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * `atlantis unlock`

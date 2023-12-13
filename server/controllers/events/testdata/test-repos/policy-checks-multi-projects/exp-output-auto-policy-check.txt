@@ -43,7 +43,7 @@ policy set: test_policy: requires: 1 approval(s), have: 0.
 ---
 * :heavy_check_mark: To **approve** all unapplied plans from this pull request, comment:
     * `atlantis approve_policies`
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * `atlantis unlock`
 * :repeat: To re-run policies **plan** this project again by commenting:
     * `atlantis plan`
