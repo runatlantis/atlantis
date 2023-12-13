@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -150,6 +151,13 @@ var testFlags = map[string]interface{}{
 	EnableDiffMarkdownFormat:         false,
 }
 
+// Settings used by userConfig that do not have flags
+var nonFlagSettings = []string{
+	"require-undiverged",
+	"silence-vcs-status-no-projects",
+	"webhooks",
+}
+
 func TestExecute_Defaults(t *testing.T) {
 	t.Log("Should set the defaults for all unspecified flags.")
 
@@ -211,6 +219,31 @@ func TestExecute_Flags(t *testing.T) {
 	for flag, exp := range testFlags {
 		Equals(t, exp, configVal(t, passedConfig, flag))
 	}
+}
+
+func TestUserConfigNoExtra(t *testing.T) {
+	t.Log("All settings in userConfig should be tested.")
+
+	u := reflect.TypeOf(server.UserConfig{})
+
+	for i := 0; i < u.NumField(); i++ {
+
+		userConfigKey := u.Field(i).Tag.Get("mapstructure")
+		t.Run(userConfigKey, func(t *testing.T) {
+			_, ok := testFlags[userConfigKey]
+			if ok {
+				return
+			}
+			if slices.Contains(nonFlagSettings, userConfigKey) {
+				return
+			}
+			if !ok {
+				t.Errorf("server.UserConfig has field with mapstructure %s that is either not tested, or not in use in server.go", userConfigKey)
+			}
+		})
+
+	}
+
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
