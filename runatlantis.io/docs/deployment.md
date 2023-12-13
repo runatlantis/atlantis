@@ -558,11 +558,9 @@ If you need to modify the Docker image that we provide, for instance to add the 
     COPY terragrunt /usr/local/bin/terragrunt
     ```
 
-Since version `0.26.0` the atlantis image now uses the `atlantis` user to run atlantis instead of the root user. Previous container definitions and script might need to be adjusted to use the `atlantis` user instead of `root`. If you need to include packages from other images you can switch to the `root` user using `USER root` in your docker file and once you are done installing packages you can switch back to the atlantis user to start atlantis.
-
-It is possible also to use the `/docker-entrypoint.d/` directory to add aditional scripts that you might want to run before the atlantis server starts. This is particulary useful if you want to customize the instance without building your own pipeline for it.
-
-**NOTE:** The atlantis data directory needs to be readable by the `atlantis` user instead of `root`, earlier versions used to use `root` instead, you might have to update permissions in your current deployment if you are upgrading to `>0.26.0`.
+Beginning with version 0.26.0, the Atlantis image has been updated to run under the atlantis user, replacing the previous root user configuration. This change necessitates adjustments in existing container definitions and scripts to accommodate the new user settings. In scenarios where additional packages from other images are required, users can temporarily switch to the root user by inserting USER root in the Dockerfile. Following the installation of necessary packages, it is advisable to revert to the atlantis user for initiating the Atlantis service.
+Additionally, the /docker-entrypoint.d/ directory offers a flexible option for introducing extra scripts to be executed prior to the launch of the Atlantis server. This feature is particularly beneficial for users seeking to customize their Atlantis instance without the need to develop a dedicated pipeline.
+**Important Notice**: There is a critical update regarding the data directory in Atlantis. In versions prior to 0.26.0, the directory was configured to be accessible by the root user. However, with the transition to the atlantis user in newer versions, it is imperative to update the directory permissions accordingly in your current deployment when upgrading to a version later than 0.26.0. This step ensures seamless access and functionality for the atlantis user.
 
 1. Build your Docker image
     ```bash
