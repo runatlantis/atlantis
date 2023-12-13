@@ -249,7 +249,7 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 		if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
 			continue
 		}
-		
+
 		var m struct {
 			MinimizeComment struct {
 				MinimizedComment struct {
