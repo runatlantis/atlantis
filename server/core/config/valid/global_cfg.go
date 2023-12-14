@@ -183,9 +183,6 @@ type GlobalCfgArgs struct {
 	// but useful for tests to set to true to not require enumeration of allowed settings
 	// on the repo side
 	AllowAllRepoSettings bool
-	MergeableReq         bool
-	ApprovedReq          bool
-	UnDivergedReq        bool
 	PolicyCheckEnabled   bool
 	PreWorkflowHooks     []*WorkflowHook
 	PostWorkflowHooks    []*WorkflowHook
@@ -206,15 +203,6 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	allowedOverrides := []string{}
 	allowedWorkflows := []string{}
 	policyCheck := false
-	if args.MergeableReq {
-		commandReqs = append(commandReqs, MergeableCommandReq)
-	}
-	if args.ApprovedReq {
-		commandReqs = append(commandReqs, ApprovedCommandReq)
-	}
-	if args.UnDivergedReq {
-		commandReqs = append(commandReqs, UnDivergedCommandReq)
-	}
 	if args.PolicyCheckEnabled {
 		commandReqs = append(commandReqs, PoliciesPassedCommandReq)
 		policyCheck = true

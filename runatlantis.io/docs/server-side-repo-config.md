@@ -455,6 +455,7 @@ Each servers handle different repository config files.
 | repos     | array[[Repo](#repo)]                                    | see below | no       | List of repos to apply settings to.                                                   |
 | workflows | map[string: [Workflow](custom-workflows.html#workflow)] | see below | no       | Map from workflow name to workflow. Workflows override the default Atlantis commands. |
 | policies  | Policies.                                               | none      | no       | List of policy sets to run and associated metadata                                      |
+| metrics   | Metrics.                                                | none      | no       | Map of metric configuration                                       |
 
 
 ::: tip A Note On Defaults

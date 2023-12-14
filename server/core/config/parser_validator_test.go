@@ -17,9 +17,6 @@ import (
 
 var globalCfgArgs = valid.GlobalCfgArgs{
 	AllowAllRepoSettings: true,
-	MergeableReq:         false,
-	ApprovedReq:          false,
-	UnDivergedReq:        false,
 }
 
 var globalCfg = valid.NewGlobalCfgFromArgs(globalCfgArgs)
@@ -104,11 +101,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 			r := config.ParserValidator{}
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "", "")
 			ErrContains(t, c.expErr, err)
-			globalCfgArgs := valid.GlobalCfgArgs{
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
+			globalCfgArgs := valid.GlobalCfgArgs{}
 			_, err = r.ParseGlobalCfg(confPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			ErrContains(t, c.expErr, err)
 		})
@@ -1144,11 +1137,7 @@ workflows:
 	Ok(t, err)
 
 	r := config.ParserValidator{}
-	globalCfgArgs := valid.GlobalCfgArgs{
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
-	}
+	globalCfgArgs := valid.GlobalCfgArgs{}
 
 	_, err = r.ParseRepoCfg(tmpDir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "repo_id", "branch")
 	ErrEquals(t, "repo config not allowed to set 'workflow' key: server-side config needs 'allowed_overrides: [workflow]'", err)
@@ -1156,21 +1145,13 @@ workflows:
 
 func TestParseGlobalCfg_NotExist(t *testing.T) {
 	r := config.ParserValidator{}
-	globalCfgArgs := valid.GlobalCfgArgs{
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
-	}
+	globalCfgArgs := valid.GlobalCfgArgs{}
 	_, err := r.ParseGlobalCfg("/not/exist", valid.NewGlobalCfgFromArgs(globalCfgArgs))
 	ErrEquals(t, "unable to read /not/exist file: open /not/exist: no such file or directory", err)
 }
 
 func TestParseGlobalCfg(t *testing.T) {
-	globalCfgArgs := valid.GlobalCfgArgs{
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
-	}
+	globalCfgArgs := valid.GlobalCfgArgs{}
 
 	defaultCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
 	preWorkflowHook := &valid.WorkflowHook{
@@ -1624,9 +1605,6 @@ workflows:
 			Ok(t, os.WriteFile(path, []byte(c.input), 0600))
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				MergeableReq:       false,
-				ApprovedReq:        false,
-				UnDivergedReq:      false,
 				PolicyCheckEnabled: false,
 			}
 
@@ -1729,11 +1707,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 		},
 		"empty object": {
 			json: "{}",
-			exp: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}),
+			exp:  valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
 		},
 		"setting all keys": {
 			json: `
@@ -1800,11 +1774,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 `,
 			exp: valid.GlobalCfg{
 				Repos: []valid.Repo{
-					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
-					}).Repos[0],
+					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}).Repos[0],
 					{
 						IDRegex:              regexp.MustCompile(".*"),
 						ApplyRequirements:    []string{"mergeable", "approved"},
@@ -1824,12 +1794,8 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					},
 				},
 				Workflows: map[string]valid.Workflow{
-					"default": valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
-					}).Workflows["default"],
-					"custom": customWorkflow,
+					"default": valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}).Workflows["default"],
+					"custom":  customWorkflow,
 				},
 				PolicySets: valid.PolicySets{
 					Version:      conftestVersion,
@@ -1849,11 +1815,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			pv := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
+			globalCfgArgs := valid.GlobalCfgArgs{}
 			cfg, err := pv.ParseGlobalCfgJSON(c.json, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
@@ -1915,9 +1877,6 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
 			p := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowAllRepoSettings: true,
-				MergeableReq:         false,
-				ApprovedReq:          false,
-				UnDivergedReq:        false,
 			}
 			v2Cfg, err := p.ParseRepoCfg(v2Dir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "", "")
 			if c.expV2Err != "" {
@@ -1929,9 +1888,6 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
 			}
 			globalCfgArgs = valid.GlobalCfgArgs{
 				AllowAllRepoSettings: true,
-				MergeableReq:         false,
-				ApprovedReq:          false,
-				UnDivergedReq:        false,
 			}
 			v3Cfg, err := p.ParseRepoCfg(v3Dir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "", "")
 			Ok(t, err)

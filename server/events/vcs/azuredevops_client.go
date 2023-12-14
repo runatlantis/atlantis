@@ -134,7 +134,7 @@ func (g *AzureDevopsClient) ReactToComment(repo models.Repo, pullNum int, commen
 	return nil
 }
 
-func (g *AzureDevopsClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error { //nolint: revive
+func (g *AzureDevopsClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error { //nolint: revive
 	return nil
 }
 
