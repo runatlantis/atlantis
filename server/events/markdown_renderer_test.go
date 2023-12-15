@@ -181,7 +181,7 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -220,7 +220,7 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -257,7 +257,7 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -325,7 +325,7 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -400,7 +400,7 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -562,7 +562,7 @@ $$$
 
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -640,7 +640,7 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -784,7 +784,7 @@ $$$
 
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -881,7 +881,7 @@ $$$
 ---
 * :heavy_check_mark: To **approve** all unapplied plans from this pull request, comment:
     * $atlantis approve_policies$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 * :repeat: To re-run policies **plan** this project again by commenting:
     * $atlantis plan$
@@ -1646,7 +1646,7 @@ No changes. Infrastructure is up-to-date.
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$`
 						} else {
 							exp = `Ran Plan for dir: $.$ workspace: $default$
@@ -1664,7 +1664,7 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$`
 						}
 					case command.Apply:
@@ -1832,7 +1832,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `
 	Equals(t, normalize(exp), normalize(rendered))
@@ -2004,7 +2004,7 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -2041,7 +2041,7 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -2076,7 +2076,7 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -2177,7 +2177,7 @@ $$$
 
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -2316,7 +2316,7 @@ $$$
 
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -3006,7 +3006,7 @@ $$$
 
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
@@ -3061,7 +3061,7 @@ $$$
 
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * $atlantis unlock$
 `,
 		},
