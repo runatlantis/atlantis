@@ -15,7 +15,7 @@
 {{ if and (gt (len .Results) 0) (not .PlansDeleted) -}}
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * `{{ .ExecutableName }} apply`
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * `{{ .ExecutableName }} unlock`
 {{ end -}}
 {{ end -}}

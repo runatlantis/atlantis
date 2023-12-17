@@ -177,6 +177,7 @@ by CDKTF will be add to the Atlantis modified file list.
 # Dockerfile
 FROM ghcr.io/runatlantis/atlantis:v0.19.7
 
+USER root
 RUN apk add npm && npm i -g cdktf-cli
 ```
 
