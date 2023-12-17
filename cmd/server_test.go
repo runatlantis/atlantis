@@ -221,7 +221,7 @@ func TestExecute_Flags(t *testing.T) {
 	}
 }
 
-func TestUserConfigNoExtra(t *testing.T) {
+func TestUserConfigAllTested(t *testing.T) {
 	t.Log("All settings in userConfig should be tested.")
 
 	u := reflect.TypeOf(server.UserConfig{})
@@ -238,7 +238,7 @@ func TestUserConfigNoExtra(t *testing.T) {
 				return
 			}
 			if !ok {
-				t.Errorf("server.UserConfig has field with mapstructure %s that is either not tested, or not in use in server.go", userConfigKey)
+				t.Errorf("server.UserConfig has field with mapstructure %s that is either not tested. Either add it to server_test.testFlags, or remove it from server.UserConfig", userConfigKey)
 			}
 		})
 
