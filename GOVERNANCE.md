@@ -88,7 +88,7 @@ status of the proposal:
 
 To maintain velocity in a project as busy as Atlantis, the concept of [Lazy
 Consensus](http://en.osswiki.info/concepts/lazy_consensus) is practiced. Ideas
-and / or proposals should be shared by maintainers via
+and/or proposals should be shared by maintainers via
 GitHub with the appropriate maintainer groups (e.g.,
 `@atlantis/all-maintainers`) tagged. Out of respect for other contributors,
 major changes should also be accompanied by a ping on Slack or a note on the
