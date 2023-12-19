@@ -52,7 +52,7 @@ abstained.
 ## Proposal Process
 
 One of the most important aspects in any open source community is the concept
-of proposals. Large changes to the codebase and / or new features should be
+of proposals. Large changes to the codebase and/or new features should be
 preceded by a proposal as an ADR or GH issue in the main Atlantis repo. This process allows for all
 members of the community to weigh in on the concept (including the technical
 details), share their comments and ideas, and offer to help. It also ensures
