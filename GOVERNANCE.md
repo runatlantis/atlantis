@@ -16,12 +16,12 @@ maintained under the `runatlantis` organization.
 
 * **[atlantis](https://github.com/runatlantis/atlantis):** Main Atlantis codebase.
 * **[atlantis-helm-charts](https://github.com/runatlantis/helm-charts):** Helm chart for easy deployment of Atlantis.
-* **[atlantis-tests](https://github.com/runatlantis/atlantis):** A set of terraform projects that atlantis e2e tests run on.
-* **[atlantis-example](https://github.com/runatlantis/atlantis):** A simple terraform project to use along with atlantis bootstrap mode.
+* **[atlantis-tests](https://github.com/runatlantis/atlantis-tests):** A set of terraform projects that atlantis e2e tests run on.
+* **[atlantis-example](https://github.com/runatlantis/atlantis-example):** A simple terraform project to use along with atlantis bootstrap mode.
 
 ## Community Roles
 
-* **Users:** Members that engage with the Atlantis community via any medium (Slack, WeChat, GitHub, mailing lists, etc.).
+* **Users:** Members that engage with the Atlantis community via any medium (Slack, GitHub, mailing lists, etc.).
 * **Contributors:** Regular contributions to projects (documentation, code reviews, responding to issues, participation in proposal discussions, contributing code, etc.). 
 * **Core Contributors:** Contributors who drive certain subprojects within Atlantis. They are responsible for the direction and work done within that subproject, providing enhancements and support for the Atlantis project as a whole. Core Contributors are expected to contribute code and documentation, review PRs including ensuring quality of code, triage issues, proactively fix bugs, and perform maintenance tasks for the subprojects they are responsible for.
 * **Maintainers:** The Atlantis project leaders. They are responsible for the overall health and direction of the project; final reviewers of PRs and responsible for releases. Some Maintainers are responsible for one or more components within a project, acting as technical leads for that component. Maintainers are expected to contribute code and documentation, review PRs including ensuring quality of code, triage issues, proactively fix bugs, and perform maintenance tasks for these components.
