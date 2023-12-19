@@ -91,7 +91,8 @@ Consensus](http://en.osswiki.info/concepts/lazy_consensus) is practiced. Ideas
 and/or proposals should be shared by maintainers via
 GitHub with the appropriate maintainer groups (e.g.,
 `@atlantis/all-maintainers`) tagged. Out of respect for other contributors,
-major changes should also be accompanied by a ping on Slack or a note on the
+major changes should also be accompanied by a ping on Slack in the 
+[#contributors](https://atlantis-community.slack.com/archives/C04ES70Q6E8) channel or a note on the
 Atlantis google mailing list as appropriate. Author(s) of proposal, Pull Requests,
 issues, etc.  will give a time period of no less than five (5) working days for
 comment and remain cognizant of popular observed world holidays.
