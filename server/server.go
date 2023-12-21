@@ -786,6 +786,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	gitlabGroupAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+	if err != nil {
+		return nil, err
+	}
 	varFileAllowlistChecker, err := events.NewVarFileAllowlistChecker(userConfig.VarFileAllowlist)
 	if err != nil {
 		return nil, err
@@ -812,7 +816,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              backend,
-		TeamAllowlistChecker:           githubTeamAllowlistChecker,
+		GitHubTeamAllowlistChecker:     githubTeamAllowlistChecker,
+		GitLabGroupAllowlistChecker:    gitlabGroupAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}

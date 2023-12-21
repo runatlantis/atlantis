@@ -1231,7 +1231,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			}
 
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-			When(runner.VcsClient.GetTeamNamesForUser(testdata.GithubRepo, testdata.User)).ThenReturn(c.userTeams, nil)
+			When(runner.VcsClient.GetTeamNamesForUser(testdata.GithubRepo, testdata.User, c.policySetCfg.AllTeams())).ThenReturn(c.userTeams, nil)
 			ctx := command.ProjectContext{
 				User:                testdata.User,
 				Log:                 logging.NewNoopLogger(t),

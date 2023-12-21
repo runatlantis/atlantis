@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock/v4"
-	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock/v4"
+	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
 type MockClient struct {
@@ -135,11 +136,11 @@ func (mock *MockClient) GetPullLabels(repo models.Repo, pull models.PullRequest)
 	return ret0, ret1
 }
 
-func (mock *MockClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (mock *MockClient) GetTeamNamesForUser(repo models.Repo, user models.User, configuredTeams []string) ([]string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{repo, user}
+	params := []pegomock.Param{repo, user, configuredTeams}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetTeamNamesForUser", params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 []string
 	var ret1 error
@@ -517,8 +518,8 @@ func (c *MockClient_GetPullLabels_OngoingVerification) GetAllCapturedArguments()
 	return
 }
 
-func (verifier *VerifierMockClient) GetTeamNamesForUser(repo models.Repo, user models.User) *MockClient_GetTeamNamesForUser_OngoingVerification {
-	params := []pegomock.Param{repo, user}
+func (verifier *VerifierMockClient) GetTeamNamesForUser(repo models.Repo, user models.User, configuredTeams []string) *MockClient_GetTeamNamesForUser_OngoingVerification {
+	params := []pegomock.Param{repo, user, configuredTeams}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetTeamNamesForUser", params, verifier.timeout)
 	return &MockClient_GetTeamNamesForUser_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }

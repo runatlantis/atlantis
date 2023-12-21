@@ -58,6 +58,7 @@ type UserConfig struct {
 	GithubAppSlug                   string `mapstructure:"gh-app-slug"`
 	GithubTeamAllowlist             string `mapstructure:"gh-team-allowlist"`
 	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
+	GitlabGroupAllowlist            string `mapstructure:"gitlab-group-allowlist"`
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`

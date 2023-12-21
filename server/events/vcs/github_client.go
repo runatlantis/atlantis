@@ -638,7 +638,7 @@ func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
 // https://docs.github.com/en/graphql/reference/objects#organization
-func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User, _ []string) ([]string, error) {
 	orgName := repo.Owner
 	variables := map[string]interface{}{
 		"orgName":    githubv4.String(orgName),
