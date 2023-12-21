@@ -120,6 +120,12 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 		{1}, {2}, {3},
 	}
 
+	changesPending, err := os.ReadFile("testdata/gitlab-changes-pending.json")
+	Ok(t, err)
+
+	changesAvailable, err := os.ReadFile("testdata/gitlab-changes-available.json")
+	Ok(t, err)
+
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("Gitlab returns MR changes after %d attempts", c.attempts), func(t *testing.T) {
 			numAttempts := 0
@@ -130,12 +136,12 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 						w.WriteHeader(200)
 						numAttempts++
 						if numAttempts < c.attempts {
-							w.Write([]byte(changesPending)) // nolint: errcheck
+							w.Write(changesPending) // nolint: errcheck
 							t.Logf("returning changesPending for attempt %d", numAttempts)
 							return
 						}
 						t.Logf("returning changesAvailable for attempt %d", numAttempts)
-						w.Write([]byte(changesAvailable)) // nolint: errcheck
+						w.Write(changesAvailable) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
@@ -174,9 +180,18 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 }
 
 func TestGitlabClient_MergePull(t *testing.T) {
+	mergeSuccess, err := os.ReadFile("testdata/github-pull-request.json")
+	Ok(t, err)
+
+	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
+	Ok(t, err)
+
+	projectSuccess, err := os.ReadFile("testdata/gitlab-project-success.json")
+	Ok(t, err)
+
 	cases := []struct {
 		description string
-		glResponse  string
+		glResponse  []byte
 		code        int
 		expErr      string
 	}{
@@ -188,13 +203,13 @@ func TestGitlabClient_MergePull(t *testing.T) {
 		},
 		{
 			"405",
-			`{"message":"405 Method Not Allowed"}`,
+			[]byte(`{"message":"405 Method Not Allowed"}`),
 			405,
 			"405 {message: 405 Method Not Allowed}",
 		},
 		{
 			"406",
-			`{"message":"406 Branch cannot be merged"}`,
+			[]byte(`{"message":"406 Branch cannot be merged"}`),
 			406,
 			"406 {message: 406 Branch cannot be merged}",
 		},
@@ -208,13 +223,13 @@ func TestGitlabClient_MergePull(t *testing.T) {
 					// The first request should hit this URL.
 					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1/merge":
 						w.WriteHeader(c.code)
-						w.Write([]byte(c.glResponse)) // nolint: errcheck
+						w.Write(c.glResponse) // nolint: errcheck
 					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
 						w.WriteHeader(http.StatusOK)
-						w.Write([]byte(pipelineSuccess)) // nolint: errcheck
+						w.Write(pipelineSuccess) // nolint: errcheck
 					case "/api/v4/projects/4580910":
 						w.WriteHeader(http.StatusOK)
-						w.Write([]byte(projectSuccess)) // nolint: errcheck
+						w.Write(projectSuccess) // nolint: errcheck
 					case "/api/v4/":
 						// Rate limiter requests.
 						w.WriteHeader(http.StatusOK)
@@ -253,6 +268,9 @@ func TestGitlabClient_MergePull(t *testing.T) {
 }
 
 func TestGitlabClient_UpdateStatus(t *testing.T) {
+	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
+	Ok(t, err)
+
 	cases := []struct {
 		status   models.CommitStatus
 		expState string
@@ -287,7 +305,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 						w.Write([]byte("{}")) // nolint: errcheck
 					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
 						w.WriteHeader(http.StatusOK)
-						w.Write([]byte(pipelineSuccess)) // nolint: errcheck
+						w.Write(pipelineSuccess) // nolint: errcheck
 					case "/api/v4/":
 						// Rate limiter requests.
 						w.WriteHeader(http.StatusOK)
@@ -333,6 +351,19 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	noHeadPipelineMR := 2
 	ciMustPassSuccessMR := 3
 	ciMustPassFailureMR := 4
+
+	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
+	Ok(t, err)
+
+	projectSuccess, err := os.ReadFile("testdata/gitlab-project-success.json")
+	Ok(t, err)
+
+	detailedMergeStatusCiMustPass, err := os.ReadFile("testdata/gitlab-detailed-merge-status-ci-must-pass.json")
+	Ok(t, err)
+
+	headPipelineNotAvailable, err := os.ReadFile("testdata/gitlab-head-pipeline-not-available.json")
+	Ok(t, err)
+
 	cases := []struct {
 		statusName    string
 		status        models.CommitStatus
@@ -443,19 +474,19 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 							w.WriteHeader(http.StatusOK)
 						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", defaultMr):
 							w.WriteHeader(http.StatusOK)
-							w.Write([]byte(pipelineSuccess)) // nolint: errcheck
+							w.Write(pipelineSuccess) // nolint: errcheck
 						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", noHeadPipelineMR):
 							w.WriteHeader(http.StatusOK)
-							w.Write([]byte(headPipelineNotAvailable)) // nolint: errcheck
+							w.Write(headPipelineNotAvailable) // nolint: errcheck
 						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", ciMustPassSuccessMR):
 							w.WriteHeader(http.StatusOK)
-							w.Write([]byte(detailedMergeStatusCiMustPass)) // nolint: errcheck
+							w.Write(detailedMergeStatusCiMustPass) // nolint: errcheck
 						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", ciMustPassFailureMR):
 							w.WriteHeader(http.StatusOK)
-							w.Write([]byte(detailedMergeStatusCiMustPass)) // nolint: errcheck
+							w.Write(detailedMergeStatusCiMustPass) // nolint: errcheck
 						case fmt.Sprintf("/api/v4/projects/%v", projectID):
 							w.WriteHeader(http.StatusOK)
-							w.Write([]byte(projectSuccess)) // nolint: errcheck
+							w.Write(projectSuccess) // nolint: errcheck
 						case fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
 							w.WriteHeader(http.StatusOK)
 							response := fmt.Sprintf(`[{"id":133702594,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"ApplySuccess","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}]`, c.status, c.statusName)
@@ -636,13 +667,15 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 }
 
 func TestGithubClient_GetPullLabels(t *testing.T) {
-	var mergeSuccessWithLabel = strings.ReplaceAll(mergeSuccess, `"labels": []`, `"labels":["work in progress"]`)
+	mergeSuccessWithLabel, err := os.ReadFile("testdata/gitlab-merge-success-with-label.json")
+	Ok(t, err)
+
 	testServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
 			case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(mergeSuccessWithLabel)) // nolint: errcheck
+				w.Write(mergeSuccessWithLabel) // nolint: errcheck
 			default:
 				t.Errorf("got unexpected request at %q", r.RequestURI)
 				http.Error(w, "not found", http.StatusNotFound)
@@ -667,12 +700,15 @@ func TestGithubClient_GetPullLabels(t *testing.T) {
 }
 
 func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
+	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
+	Ok(t, err)
+
 	testServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
 			case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(pipelineSuccess)) // nolint: errcheck
+				w.Write(pipelineSuccess) // nolint: errcheck
 			default:
 				t.Errorf("got unexpected request at %q", r.RequestURI)
 				http.Error(w, "not found", http.StatusNotFound)
@@ -694,29 +730,4 @@ func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
 	})
 	Ok(t, err)
 	Equals(t, 0, len(labels))
-}
-
-var mergeSuccess = ""
-var pipelineSuccess = ""
-var detailedMergeStatusCiMustPass = ""
-var projectSuccess = ""
-var changesPending = ""
-var changesAvailable = ""
-var headPipelineNotAvailable = ""
-
-func mustReadFileToString(filename string) string {
-	res, err := os.ReadFile(filename)
-	if err != nil {
-		panic(err)
-	}
-	return string(res)
-}
-func init() {
-	mergeSuccess = mustReadFileToString("testdata/gitlab-merge-success.json")
-	pipelineSuccess = mustReadFileToString("testdata/gitlab-pipeline-success.json")
-	detailedMergeStatusCiMustPass = mustReadFileToString("testdata/gitlab-detailed-merge-status-ci-must-pass.json")
-	projectSuccess = mustReadFileToString("testdata/gitlab-project-success.json")
-	changesPending = mustReadFileToString("testdata/gitlab-changes-pending.json")
-	changesAvailable = mustReadFileToString("testdata/gitlab-changes-available.json")
-	headPipelineNotAvailable = mustReadFileToString("testdata/gitlab-head-pipeline-not-available.json")
 }
