@@ -26,7 +26,6 @@ const (
 	DefaultConftestVersionEnvKey = "DEFAULT_CONFTEST_VERSION"
 	conftestBinaryName           = "conftest"
 	conftestDownloadURLPrefix    = "https://github.com/open-policy-agent/conftest/releases/download/v"
-	conftestArch                 = "x86_64"
 )
 
 type Arg struct {
