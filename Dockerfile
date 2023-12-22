@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
 ARG ALPINE_TAG=3.18.4
-ARG DEBIAN_TAG=12.2-slim
+ARG DEBIAN_TAG=12.4-slim
 
 ARG DEFAULT_TERRAFORM_VERSION=1.5.7
 ARG DEFAULT_CONFTEST_VERSION=0.46.0
