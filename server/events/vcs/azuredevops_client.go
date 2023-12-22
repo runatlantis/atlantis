@@ -398,7 +398,7 @@ func (g *AzureDevopsClient) SupportsSingleFileDownload(repo models.Repo) bool { 
 	return false
 }
 
-func (g *AzureDevopsClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) { //nolint: revive
+func (g *AzureDevopsClient) GetFileContent(_ models.Repo, _ string, _ string) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("not implemented")
 }
 

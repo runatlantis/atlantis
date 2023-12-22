@@ -698,10 +698,11 @@ func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, er
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (g *GithubClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
-	opt := github.RepositoryContentGetOptions{Ref: pull.HeadBranch}
-	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, fileName, &opt)
-	g.logger.Debug("GET /repos/%v/%v/contents/%s returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, fileName, resp.StatusCode)
+func (g *GithubClient) GetFileContent(repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+	opt := github.RepositoryContentGetOptions{Ref: branch}
+
+	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, repo.Owner, repo.Name, fileName, &opt)
+	g.logger.Debug("GET /repos/%v/%v/contents/%s returned: %v", repo.Owner, repo.Name, fileName, resp.StatusCode)
 
 	if resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil

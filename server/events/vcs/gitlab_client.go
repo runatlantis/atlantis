@@ -527,11 +527,12 @@ func (g *GitlabClient) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]stri
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (g *GitlabClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
-	opt := gitlab.GetRawFileOptions{Ref: gitlab.Ptr(pull.HeadBranch)}
+func (g *GitlabClient) GetFileContent(repo models.Repo, branch string, fileName string) (bool, []byte, error) {
 
-	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, fileName, &opt)
-	g.logger.Debug("GET /projects/%s/repository/files/%s/raw returned: %d", pull.BaseRepo.FullName, fileName, resp.StatusCode)
+	opt := gitlab.GetRawFileOptions{Ref: gitlab.String(branch)}
+
+	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(repo.FullName, fileName, &opt)
+	g.logger.Debug("GET /projects/%s/repository/files/%s/raw returned: %d", repo.FullName, fileName, resp.StatusCode)
 	if resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil
 	}
