@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
 ARG ALPINE_TAG=3.19.0
-ARG DEBIAN_TAG=12.2-slim
+ARG DEBIAN_TAG=12.4-slim
 
 ARG DEFAULT_TERRAFORM_VERSION=1.6.3
 ARG DEFAULT_CONFTEST_VERSION=0.46.0
@@ -90,7 +90,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.4.0
+ENV GIT_LFS_VERSION=3.4.1
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
