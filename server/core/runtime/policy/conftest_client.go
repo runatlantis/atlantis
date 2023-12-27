@@ -20,15 +20,12 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
 const (
 	DefaultConftestVersionEnvKey = "DEFAULT_CONFTEST_VERSION"
 	conftestBinaryName           = "conftest"
 	conftestDownloadURLPrefix    = "https://github.com/open-policy-agent/conftest/releases/download/v"
-	conftestArch                 = "x86_64"
 )
 
 type Arg struct {
@@ -113,8 +110,13 @@ type ConfTestVersionDownloader struct {
 func (c ConfTestVersionDownloader) downloadConfTestVersion(v *version.Version, destPath string) (runtime_models.FilePath, error) {
 	versionURLPrefix := fmt.Sprintf("%s%s", conftestDownloadURLPrefix, v.Original())
 
+	conftestPlatform := getPlatform()
+	if conftestPlatform == "" {
+		return runtime_models.LocalFilePath(""), fmt.Errorf("don't know where to find conftest for %s on %s", runtime.GOOS, runtime.GOARCH)
+	}
+
 	// download binary in addition to checksum file
-	binURL := fmt.Sprintf("%s/conftest_%s_%s_%s.tar.gz", versionURLPrefix, v.Original(), cases.Title(language.English).String(runtime.GOOS), conftestArch)
+	binURL := fmt.Sprintf("%s/conftest_%s_%s.tar.gz", versionURLPrefix, v.Original(), conftestPlatform)
 	checksumURL := fmt.Sprintf("%s/checksums.txt", versionURLPrefix)
 
 	// underlying implementation uses go-getter so the URL is formatted as such.
@@ -312,4 +314,21 @@ func hasFailures(output string) bool {
 		return true
 	}
 	return false
+}
+
+func getPlatform() string {
+	platform := runtime.GOOS + "_" + runtime.GOARCH
+
+	switch platform {
+	case "linux_amd64":
+		return "Linux_x86_64"
+	case "linux_arm64":
+		return "Linux_arm64"
+	case "darwin_amd64":
+		return "Darwin_x86_64"
+	case "darwin_arm64":
+		return "Darwin_arm64"
+	default:
+		return ""
+	}
 }
