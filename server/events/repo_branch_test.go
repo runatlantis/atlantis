@@ -68,9 +68,6 @@ projects:
 	require.NoError(t, err)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
 	}
 
 	parser := &config.ParserValidator{}

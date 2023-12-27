@@ -17,9 +17,6 @@ import (
 
 var globalCfgArgs = valid.GlobalCfgArgs{
 	AllowAllRepoSettings: true,
-	MergeableReq:         false,
-	ApprovedReq:          false,
-	UnDivergedReq:        false,
 }
 
 var globalCfg = valid.NewGlobalCfgFromArgs(globalCfgArgs)
@@ -105,9 +102,6 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "", "")
 			ErrContains(t, c.expErr, err)
 			globalCfgArgs := valid.GlobalCfgArgs{
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
 			}
 			_, err = r.ParseGlobalCfg(confPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			ErrContains(t, c.expErr, err)
@@ -1145,9 +1139,6 @@ workflows:
 
 	r := config.ParserValidator{}
 	globalCfgArgs := valid.GlobalCfgArgs{
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
 	}
 
 	_, err = r.ParseRepoCfg(tmpDir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "repo_id", "branch")
@@ -1157,9 +1148,6 @@ workflows:
 func TestParseGlobalCfg_NotExist(t *testing.T) {
 	r := config.ParserValidator{}
 	globalCfgArgs := valid.GlobalCfgArgs{
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
 	}
 	_, err := r.ParseGlobalCfg("/not/exist", valid.NewGlobalCfgFromArgs(globalCfgArgs))
 	ErrEquals(t, "unable to read /not/exist file: open /not/exist: no such file or directory", err)
@@ -1167,9 +1155,6 @@ func TestParseGlobalCfg_NotExist(t *testing.T) {
 
 func TestParseGlobalCfg(t *testing.T) {
 	globalCfgArgs := valid.GlobalCfgArgs{
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
 	}
 
 	defaultCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
@@ -1623,9 +1608,6 @@ workflows:
 			Ok(t, os.WriteFile(path, []byte(c.input), 0600))
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				MergeableReq:       false,
-				ApprovedReq:        false,
-				UnDivergedReq:      false,
 				PolicyCheckEnabled: false,
 			}
 
@@ -1729,9 +1711,6 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 		"empty object": {
 			json: "{}",
 			exp: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
 			}),
 		},
 		"setting all keys": {
@@ -1800,9 +1779,6 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 			exp: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
 					}).Repos[0],
 					{
 						IDRegex:              regexp.MustCompile(".*"),
@@ -1824,9 +1800,6 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				},
 				Workflows: map[string]valid.Workflow{
 					"default": valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
-						MergeableReq:  false,
-						ApprovedReq:   false,
-						UnDivergedReq: false,
 					}).Workflows["default"],
 					"custom": customWorkflow,
 				},
@@ -1849,9 +1822,6 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pv := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
 			}
 			cfg, err := pv.ParseGlobalCfgJSON(c.json, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			if c.expErr != "" {
@@ -1914,9 +1884,6 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
 			p := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowAllRepoSettings: true,
-				MergeableReq:         false,
-				ApprovedReq:          false,
-				UnDivergedReq:        false,
 			}
 			v2Cfg, err := p.ParseRepoCfg(v2Dir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "", "")
 			if c.expV2Err != "" {
@@ -1928,9 +1895,6 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
 			}
 			globalCfgArgs = valid.GlobalCfgArgs{
 				AllowAllRepoSettings: true,
-				MergeableReq:         false,
-				ApprovedReq:          false,
-				UnDivergedReq:        false,
 			}
 			v3Cfg, err := p.ParseRepoCfg(v3Dir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "", "")
 			Ok(t, err)
