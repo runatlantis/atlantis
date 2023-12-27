@@ -138,12 +138,12 @@
   resolved "https://registry.yarnpkg.com/@babel/parser/-/parser-7.23.3.tgz#0ce0be31a4ca4f1884b5786057cadcb6c3be58f9"
   integrity sha512-uVsWNvlVsIninV2prNz/3lHCb+5CJ+e+IUBfbjToAHODtfGYLfCFuY4AU7TskI+dAKk+njsPiBjq1gKTvZOBaw==
 
-"@docsearch/css@3.5.2", "@docsearch/css@^3.5.1":
+"@docsearch/css@3.5.2", "@docsearch/css@^3.5.2":
   version "3.5.2"
   resolved "https://registry.yarnpkg.com/@docsearch/css/-/css-3.5.2.tgz#610f47b48814ca94041df969d9fcc47b91fc5aac"
   integrity sha512-SPiDHaWKQZpwR2siD0KQUwlStvIAnEyK6tAE2h2Wuoq8ue9skzhlyVQ1ddzOxX6khULnAALDiR/isSF3bnuciA==
 
-"@docsearch/js@^3.5.1":
+"@docsearch/js@^3.5.2":
   version "3.5.2"
   resolved "https://registry.yarnpkg.com/@docsearch/js/-/js-3.5.2.tgz#a11cb2e7e62890e9e940283fed6972ecf632629d"
   integrity sha512-p1YFTCDflk8ieHgFJYfmyHBki1D61+U9idwrLh+GQQMrBSP3DLGKpy0XUJtPjAOPltcVbqsTjiPFfH7JImjUNg==
@@ -151,7 +151,7 @@
     "@docsearch/react" "3.5.2"
     preact "^10.0.0"
 
-"@docsearch/react@3.5.2", "@docsearch/react@^3.5.1":
+"@docsearch/react@3.5.2", "@docsearch/react@^3.5.2":
   version "3.5.2"
   resolved "https://registry.yarnpkg.com/@docsearch/react/-/react-3.5.2.tgz#2e6bbee00eb67333b64906352734da6aef1232b9"
   integrity sha512-9Ahcrs5z2jq/DcAvYtvlqEBHImbm4YJI8M9y0x6Tqg598P40HTEkX7hsMcIuThI+hTFxRGZ9hll0Wygm2yEjng==
@@ -775,22 +775,22 @@
     markdown-it "^13.0.1"
     markdown-it-container "^3.0.0"
 
-"@vuepress/plugin-docsearch@2.0.0-beta.66":
-  version "2.0.0-beta.66"
-  resolved "https://registry.yarnpkg.com/@vuepress/plugin-docsearch/-/plugin-docsearch-2.0.0-beta.66.tgz#8fdc1a630783bf90781ac7444f072ef54da12bed"
-  integrity sha512-gUNejbv00wT5uK6fJvlbKGMN9NhFSMqb6lmSH+9s+4z78sD6hwhpkC7PZry3DlzcvbZstrGHqbfnn3NLhyhSzQ==
+"@vuepress/plugin-docsearch@2.0.0-rc.0":
+  version "2.0.0-rc.0"
+  resolved "https://registry.yarnpkg.com/@vuepress/plugin-docsearch/-/plugin-docsearch-2.0.0-rc.0.tgz#0313d68be24054fbd5689bd5f060a89e6458abaf"
+  integrity sha512-bFbb+RxNyoLVbojv3Fh3UNfMmx9tszdae5ni9nG2xa05giCRwGKT0wFG3Q6n0a9kIQ6V7z3PjCj9x1k4SALPEA==
   dependencies:
-    "@docsearch/css" "^3.5.1"
-    "@docsearch/js" "^3.5.1"
-    "@docsearch/react" "^3.5.1"
-    "@vuepress/client" "2.0.0-beta.66"
-    "@vuepress/core" "2.0.0-beta.66"
-    "@vuepress/shared" "2.0.0-beta.66"
-    "@vuepress/utils" "2.0.0-beta.66"
-    "@vueuse/core" "^10.2.1"
+    "@docsearch/css" "^3.5.2"
+    "@docsearch/js" "^3.5.2"
+    "@docsearch/react" "^3.5.2"
+    "@vuepress/client" "2.0.0-rc.0"
+    "@vuepress/core" "2.0.0-rc.0"
+    "@vuepress/shared" "2.0.0-rc.0"
+    "@vuepress/utils" "2.0.0-rc.0"
+    "@vueuse/core" "^10.6.1"
     ts-debounce "^4.0.0"
-    vue "^3.3.4"
-    vue-router "^4.2.4"
+    vue "^3.3.8"
+    vue-router "^4.2.5"
 
 "@vuepress/plugin-external-link-icon@2.0.0-beta.66":
   version "2.0.0-beta.66"
