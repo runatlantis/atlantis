@@ -84,17 +84,8 @@ type UserConfig struct {
 	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
 	RepoAllowlist                   string `mapstructure:"repo-allowlist"`
 
-	// RequireApproval is whether to require pull request approval before
-	// allowing terraform apply's to be run.
-	RequireApproval bool `mapstructure:"require-approval"`
-	// RequireMergeable is whether to require pull requests to be mergeable before
-	// allowing terraform apply's to run.
-	RequireMergeable bool `mapstructure:"require-mergeable"`
 	// SilenceNoProjects is whether Atlantis should respond to a PR if no projects are found.
-	SilenceNoProjects bool `mapstructure:"silence-no-projects"`
-	// RequireUnDiverged is whether to require pull requests to rebase default branch before
-	// allowing terraform apply's to run.
-	RequireUnDiverged   bool `mapstructure:"require-undiverged"`
+	SilenceNoProjects   bool `mapstructure:"silence-no-projects"`
 	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found.
