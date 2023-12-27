@@ -120,6 +120,7 @@ const (
 	SilenceNoProjectsFlag            = "silence-no-projects"
 	SilenceForkPRErrorsFlag          = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans          = "silence-vcs-status-no-plans"
+	SilenceVCSStatusNoProjectsFlag   = "silence-vcs-status-no-projects"
 	SilenceAllowlistErrorsFlag       = "silence-allowlist-errors"
 	SkipCloneNoChanges               = "skip-clone-no-changes"
 	SlackTokenFlag                   = "slack-token"
@@ -507,6 +508,10 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	SilenceVCSStatusNoPlans: {
+		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
+		defaultValue: false,
+	},
+	SilenceVCSStatusNoProjectsFlag: {
 		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
 		defaultValue: false,
 	},
