@@ -148,7 +148,7 @@ At this time, the Azure DevOps client only supports merging using the default 'n
 
 ### UnDiverged
 Prevent applies if there are any changes on the base branch since the most recent plan.
-Applies to `merge` checkout strategy only.
+Applies to `merge` checkout strategy only which you need to set via `--checkout-strategy` flag.
 
 #### Usage
 You can set the `undiverged` requirement by:
