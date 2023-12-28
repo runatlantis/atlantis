@@ -648,7 +648,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
   ```
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub and GitLab currently. This is not enabled by default. When you use Github App, you need to set `--gh-app-slug` to enable this feature.
+  GitHub and GitLab currently. This is not enabled by default. When using Github App, you need to set `--gh-app-slug` to enable this feature.
 
 ### `--hide-unchanged-plan-comments`
   ```bash
