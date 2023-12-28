@@ -56,7 +56,8 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 	g.Logger.Debug("Exchanging GitHub app code for app credentials")
 	creds := &vcs.GithubAnonymousCredentials{}
 	config := vcs.GithubConfig{}
-	client, err := vcs.NewGithubClient(g.GithubHostname, creds, config, g.Logger)
+	// This client does not post comments, so we don't need to configure it with maxCommentsPerCommand.
+	client, err := vcs.NewGithubClient(g.GithubHostname, creds, config, 0, g.Logger)
 	if err != nil {
 		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return
