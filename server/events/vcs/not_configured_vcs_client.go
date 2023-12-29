@@ -32,7 +32,7 @@ func (a *NotConfiguredVCSClient) GetModifiedFiles(_ models.Repo, _ models.PullRe
 func (a *NotConfiguredVCSClient) CreateComment(_ models.Repo, _ int, _ string, _ string) error {
 	return a.err()
 }
-func (a *NotConfiguredVCSClient) HidePrevCommandComments(_ models.Repo, _ int, _ string) error {
+func (a *NotConfiguredVCSClient) HidePrevCommandComments(_ models.Repo, _ int, _ string, _ string) error {
 	return nil
 }
 func (a *NotConfiguredVCSClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { // nolint: revive

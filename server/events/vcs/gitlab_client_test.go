@@ -566,7 +566,7 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 	planCommentIDs := [2]string{"3", "5"}
 	systemCommentIDs := [1]string{"4"}
 	summaryCommentIDs := [1]string{"2"}
-	planComments := [3]string{"plan comment 1", "plan comment 2", "plan comment 3"}
+	planComments := [3]string{"Ran Plan for 2 projects:", "Ran Plan for dir: `stack1` workspace: `default`", "Ran Plan for 2 projects:"}
 	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>",
 		command.Plan.TitleString())
 	summaryFooter := "</details>"
@@ -585,60 +585,6 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 			planCommentIDs[1], planComments[1], authorID, authorUserName, authorEmail, pullNum) +
 		"]"
 
-	gitlabClientUnderTest = true
-	defer func() { gitlabClientUnderTest = false }()
-	gotNotePutCalls := make([]notePutCallDetails, 0, 1)
-	testServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch r.Method {
-			case "GET":
-				switch r.RequestURI {
-				case "/api/v4/user":
-					w.WriteHeader(http.StatusOK)
-					w.Header().Set("Content-Type", "application/json")
-					response := fmt.Sprintf(`{"id": %d,"username": "%s", "email": "%s"}`, authorID, authorUserName, authorEmail)
-					w.Write([]byte(response)) // nolint: errcheck
-				case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%d/notes?order_by=created_at&sort=asc", pullNum):
-					w.WriteHeader(http.StatusOK)
-					response := issueResp
-					w.Write([]byte(response)) // nolint: errcheck
-				default:
-					t.Errorf("got unexpected request at %q", r.RequestURI)
-					http.Error(w, "not found", http.StatusNotFound)
-				}
-			case "PUT":
-				switch {
-				case strings.HasPrefix(r.RequestURI, fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%d/notes/", pullNum)):
-					w.WriteHeader(http.StatusOK)
-					var body jsonBody
-					err := json.NewDecoder(r.Body).Decode(&body)
-					Ok(t, err)
-					notePutCallDetail := notePutCallDetails{
-						noteID:  path.Base(r.RequestURI),
-						comment: strings.Split(body.Body, "\n"),
-					}
-					gotNotePutCalls = append(gotNotePutCalls, notePutCallDetail)
-					response := "{}"
-					w.Write([]byte(response)) // nolint: errcheck
-				default:
-					t.Errorf("got unexpected request at %q", r.RequestURI)
-					http.Error(w, "not found", http.StatusNotFound)
-				}
-			default:
-				t.Errorf("got unexpected method at %q", r.Method)
-				http.Error(w, "not found", http.StatusNotFound)
-			}
-		}),
-	)
-
-	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
-	Ok(t, err)
-	client := &GitlabClient{
-		Client:  internalClient,
-		Version: nil,
-		logger:  logging.NewNoopLogger(t),
-	}
-
 	repo := models.Repo{
 		FullName: "runatlantis/atlantis",
 		Owner:    "runatlantis",
@@ -649,21 +595,101 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 		},
 	}
 
-	err = client.HidePrevCommandComments(repo, pullNum, command.Plan.TitleString())
-	Ok(t, err)
+	cases := []struct {
+		dir                  string
+		processedComments    int
+		processedCommentIds  []string
+		processedPlanComment []string
+	}{
+		{
+			"",
+			2,
+			[]string{planCommentIDs[0], planCommentIDs[1]},
+			[]string{planComments[0], planComments[1]},
+		},
+		{
+			"stack1",
+			1,
+			[]string{planCommentIDs[1]},
+			[]string{planComments[1]},
+		},
+		{
+			"stack2",
+			0,
+			[]string{},
+			[]string{},
+		},
+	}
 
-	// Check the correct number of plan comments have been processed
-	Equals(t, len(planCommentIDs), len(gotNotePutCalls))
-	// Check the first plan comment has been currectly summarised
-	Equals(t, planCommentIDs[0], gotNotePutCalls[0].noteID)
-	Equals(t, summaryHeader, gotNotePutCalls[0].comment[0])
-	Equals(t, planComments[0], gotNotePutCalls[0].comment[1])
-	Equals(t, summaryFooter, gotNotePutCalls[0].comment[2])
-	// Check the second plan comment has been currectly summarised
-	Equals(t, planCommentIDs[1], gotNotePutCalls[1].noteID)
-	Equals(t, summaryHeader, gotNotePutCalls[1].comment[0])
-	Equals(t, planComments[1], gotNotePutCalls[1].comment[1])
-	Equals(t, summaryFooter, gotNotePutCalls[1].comment[2])
+	for _, c := range cases {
+		t.Run(c.dir, func(t *testing.T) {
+			gitlabClientUnderTest = true
+			defer func() { gitlabClientUnderTest = false }()
+			gotNotePutCalls := make([]notePutCallDetails, 0, 1)
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.Method {
+					case "GET":
+						switch r.RequestURI {
+						case "/api/v4/user":
+							w.WriteHeader(http.StatusOK)
+							w.Header().Set("Content-Type", "application/json")
+							response := fmt.Sprintf(`{"id": %d,"username": "%s", "email": "%s"}`, authorID, authorUserName, authorEmail)
+							w.Write([]byte(response)) // nolint: errcheck
+						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%d/notes?order_by=created_at&sort=asc", pullNum):
+							w.WriteHeader(http.StatusOK)
+							response := issueResp
+							w.Write([]byte(response)) // nolint: errcheck
+						default:
+							t.Errorf("got unexpected request at %q", r.RequestURI)
+							http.Error(w, "not found", http.StatusNotFound)
+						}
+					case "PUT":
+						switch {
+						case strings.HasPrefix(r.RequestURI, fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%d/notes/", pullNum)):
+							w.WriteHeader(http.StatusOK)
+							var body jsonBody
+							json.NewDecoder(r.Body).Decode(&body) // nolint: errcheck
+							notePutCallDetail := notePutCallDetails{
+								noteID:  path.Base(r.RequestURI),
+								comment: strings.Split(body.Body, "\n"),
+							}
+							gotNotePutCalls = append(gotNotePutCalls, notePutCallDetail)
+							response := "{}"
+							w.Write([]byte(response)) // nolint: errcheck
+						default:
+							t.Errorf("got unexpected request at %q", r.RequestURI)
+							http.Error(w, "not found", http.StatusNotFound)
+						}
+					default:
+						t.Errorf("got unexpected method at %q", r.Method)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}),
+			)
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &GitlabClient{
+				Client:  internalClient,
+				Version: nil,
+				logger:  logging.NewNoopLogger(t),
+			}
+
+			err = client.HidePrevCommandComments(repo, pullNum, command.Plan.TitleString(), c.dir)
+			Ok(t, err)
+
+			// Check the correct number of plan comments have been processed
+			Equals(t, c.processedComments, len(gotNotePutCalls))
+			// Check the correct comments have been processed
+			for i := 0; i < c.processedComments; i++ {
+				Equals(t, c.processedCommentIds[i], gotNotePutCalls[i].noteID)
+				Equals(t, summaryHeader, gotNotePutCalls[i].comment[0])
+				Equals(t, c.processedPlanComment[i], gotNotePutCalls[i].comment[1])
+				Equals(t, summaryFooter, gotNotePutCalls[i].comment[2])
+			}
+		})
+	}
 }
 
 func TestGithubClient_GetPullLabels(t *testing.T) {

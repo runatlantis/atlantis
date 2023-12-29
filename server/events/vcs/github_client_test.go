@@ -230,6 +230,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 		},
 		123,
 		command.Plan.TitleString(),
+		"",
 	)
 	Ok(t, err)
 	Equals(t, 2, len(gotMinimizeCalls))
@@ -240,86 +241,120 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 }
 
 func TestGithubClient_HideOldComments(t *testing.T) {
-	// Only comment 6 should be minimized, because it's by the same Atlantis bot user
-	// and it has "plan" in the first line of the comment body.
-	issueResp := `[
+	atlantisUser := "AtlantisUser"
+	pullRequestNum := 123
+	issueResp := strings.ReplaceAll(`[
 	{"node_id": "1", "body": "asd\nplan\nasd", "user": {"login": "someone-else"}},
 	{"node_id": "2", "body": "asd plan\nasd", "user": {"login": "someone-else"}},
 	{"node_id": "3", "body": "asdasdasd\nasdasdasd", "user": {"login": "someone-else"}},
-	{"node_id": "4", "body": "asdasdasd\nasdasdasd", "user": {"login": "user"}},
-	{"node_id": "5", "body": "asd\nplan\nasd", "user": {"login": "user"}},
-	{"node_id": "6", "body": "asd plan\nasd", "user": {"login": "user"}},
-	{"node_id": "7", "body": "asdasdasd", "user": {"login": "user"}},
-	{"node_id": "8", "body": "asd plan\nasd", "user": {"login": "user"}},
-	{"node_id": "9", "body": "Continued Plan from previous comment\nasd", "user": {"login": "user"}}
-]`
+	{"node_id": "4", "body": "asdasdasd\nasdasdasd", "user": {"login": "AtlantisUser"}},
+	{"node_id": "5", "body": "asd\nplan\nasd", "user": {"login": "AtlantisUser"}},
+	{"node_id": "6", "body": "Ran Plan for 2 projects:", "user": {"login": "AtlantisUser"}},
+	{"node_id": "7", "body": "Ran Apply for 2 projects:", "user": {"login": "AtlantisUser"}},
+	{"node_id": "8", "body": "Ran Plan for dir: 'stack1' workspace: 'default'", "user": {"login": "AtlantisUser"}},
+	{"node_id": "9", "body": "Ran Plan for dir: 'stack2' workspace: 'default'", "user": {"login": "AtlantisUser"}},
+	{"node_id": "10", "body": "Continued Plan from previous comment\nasd", "user": {"login": "AtlantisUser"}}
+]`, "'", "`")
 	minimizeResp := "{}"
 	type graphQLCall struct {
 		Variables struct {
 			Input githubv4.MinimizeCommentInput `json:"input"`
 		} `json:"variables"`
 	}
-	gotMinimizeCalls := make([]graphQLCall, 0, 1)
-	testServer := httptest.NewTLSServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch r.Method + " " + r.RequestURI {
-			// This gets the pull request's comments.
-			case "GET /api/v3/repos/owner/repo/issues/123/comments?direction=asc&sort=created":
-				w.Write([]byte(issueResp)) // nolint: errcheck
-				return
-			case "POST /api/graphql":
-				defer r.Body.Close() // nolint: errcheck
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					t.Errorf("read body error: %v", err)
-					http.Error(w, "server error", http.StatusInternalServerError)
-					return
-				}
-				call := graphQLCall{}
-				err = json.Unmarshal(body, &call)
-				if err != nil {
-					t.Errorf("parse body error: %v", err)
-					http.Error(w, "server error", http.StatusInternalServerError)
-					return
-				}
-				gotMinimizeCalls = append(gotMinimizeCalls, call)
-				w.Write([]byte(minimizeResp)) // nolint: errcheck
-				return
-			default:
-				t.Errorf("got unexpected request at %q", r.RequestURI)
-				http.Error(w, "not found", http.StatusNotFound)
-				return
-			}
-		}),
-	)
 
-	testServerURL, err := url.Parse(testServer.URL)
-	Ok(t, err)
-
-	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{}, logging.NewNoopLogger(t))
-	Ok(t, err)
-	defer disableSSLVerification()()
-
-	err = client.HidePrevCommandComments(
-		models.Repo{
-			FullName:          "owner/repo",
-			Owner:             "owner",
-			Name:              "repo",
-			CloneURL:          "",
-			SanitizedCloneURL: "",
-			VCSHost: models.VCSHost{
-				Hostname: "github.com",
-				Type:     models.Github,
-			},
+	cases := []struct {
+		dir                 string
+		processedComments   int
+		processedCommentIds []string
+	}{
+		{
+			// With no dir specified, comments 6, 8, 9 and 10 should be minimized.
+			"",
+			4,
+			[]string{"6", "8", "9", "10"},
 		},
-		123,
-		command.Plan.TitleString(),
-	)
-	Ok(t, err)
-	Equals(t, 3, len(gotMinimizeCalls))
-	Equals(t, "6", gotMinimizeCalls[0].Variables.Input.SubjectID)
-	Equals(t, "9", gotMinimizeCalls[2].Variables.Input.SubjectID)
-	Equals(t, githubv4.ReportedContentClassifiersOutdated, gotMinimizeCalls[0].Variables.Input.Classifier)
+		{
+			// With a dir of "stack1", comment 8 should be minimized.
+			"stack1",
+			1,
+			[]string{"8"},
+		},
+		{
+			// With a dir of "stack2", comment 9 should be minimized.
+			"stack2",
+			1,
+			[]string{"9"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.dir, func(t *testing.T) {
+			gotMinimizeCalls := make([]graphQLCall, 0, 1)
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.Method + " " + r.RequestURI {
+					// This gets the pull request's comments.
+					case fmt.Sprintf("GET /api/v3/repos/owner/repo/issues/%v/comments?direction=asc&sort=created", pullRequestNum):
+						w.Write([]byte(issueResp)) // nolint: errcheck
+						return
+					case "POST /api/graphql":
+						defer r.Body.Close() // nolint: errcheck
+						body, err := io.ReadAll(r.Body)
+						if err != nil {
+							t.Errorf("read body error: %v", err)
+							http.Error(w, "server error", http.StatusInternalServerError)
+							return
+						}
+						call := graphQLCall{}
+						err = json.Unmarshal(body, &call)
+						if err != nil {
+							t.Errorf("parse body error: %v", err)
+							http.Error(w, "server error", http.StatusInternalServerError)
+							return
+						}
+						gotMinimizeCalls = append(gotMinimizeCalls, call)
+						w.Write([]byte(minimizeResp)) // nolint: errcheck
+						return
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}),
+			)
+
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+
+			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{atlantisUser, "pass"}, vcs.GithubConfig{},
+				logging.NewNoopLogger(t))
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			err = client.HidePrevCommandComments(
+				models.Repo{
+					FullName:          "owner/repo",
+					Owner:             "owner",
+					Name:              "repo",
+					CloneURL:          "",
+					SanitizedCloneURL: "",
+					VCSHost: models.VCSHost{
+						Hostname: "github.com",
+						Type:     models.Github,
+					},
+				},
+				pullRequestNum,
+				command.Plan.TitleString(),
+				c.dir,
+			)
+			Ok(t, err)
+			Equals(t, c.processedComments, len(gotMinimizeCalls))
+			for i := 0; i < c.processedComments; i++ {
+				Equals(t, c.processedCommentIds[i], gotMinimizeCalls[i].Variables.Input.SubjectID)
+				Equals(t, githubv4.ReportedContentClassifiersOutdated, gotMinimizeCalls[i].Variables.Input.Classifier)
+			}
+		})
+	}
 }
 
 func TestGithubClient_UpdateStatus(t *testing.T) {

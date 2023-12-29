@@ -586,9 +586,13 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 			body: "Commenting back on pull request",
 		}
 	}
-
-	logger.Info("Running comment command '%v' on repo '%v', pull request: %v for user '%v'.",
-		parseResult.Command.Name, baseRepo.FullName, pullNum, user.Username)
+	if parseResult.Command.RepoRelDir != "" {
+		logger.Info("Running comment command '%v' on dir '%v' on repo '%v', pull request: %v for user '%v'.",
+			parseResult.Command.Name, parseResult.Command.RepoRelDir, baseRepo.FullName, pullNum, user.Username)
+	} else {
+		logger.Info("Running comment command '%v' on repo '%v', pull request: %v for user '%v'.",
+			parseResult.Command.Name, baseRepo.FullName, pullNum, user.Username)
+	}
 	if !e.TestingMode {
 		// Respond with success and then actually execute the command asynchronously.
 		// We use a goroutine so that this function returns and the connection is

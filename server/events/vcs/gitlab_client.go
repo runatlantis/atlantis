@@ -200,7 +200,7 @@ func (g *GitlabClient) ReactToComment(repo models.Repo, pullNum int, commentID i
 	return err
 }
 
-func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error {
 	var allComments []*gitlab.Note
 
 	nextPage := 0
@@ -247,6 +247,11 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 		firstLine := strings.ToLower(body[0])
 		// Skip processing comments that don't contain the command or contain the summary header in the first line
 		if !strings.Contains(firstLine, strings.ToLower(command)) || firstLine == strings.ToLower(summaryHeader) {
+			continue
+		}
+
+		// If dir was specified, skip processing comments that don't contain the dir in the first line
+		if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
 			continue
 		}
 

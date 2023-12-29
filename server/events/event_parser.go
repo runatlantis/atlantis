@@ -39,6 +39,9 @@ var lastBitbucketSha, _ = lru.New[string, string](300)
 
 // PullCommand is a command to run on a pull request.
 type PullCommand interface {
+	// Dir is the path relative to the repo root to run the command in.
+	// Will never end in "/". If empty then the comment specified no directory.
+	Dir() string
 	// CommandName is the name of the command we're running.
 	CommandName() command.Name
 	// SubCommandName is the subcommand name of the command we're running.
@@ -63,6 +66,11 @@ func (c PolicyCheckCommand) SubCommandName() string {
 	return ""
 }
 
+// Dir is empty
+func (c PolicyCheckCommand) Dir() string {
+	return ""
+}
+
 // IsVerbose is false for policy_check commands.
 func (c PolicyCheckCommand) IsVerbose() bool {
 	return false
@@ -84,6 +92,11 @@ func (c AutoplanCommand) CommandName() command.Name {
 
 // SubCommandName is a subcommand for auto plan.
 func (c AutoplanCommand) SubCommandName() string {
+	return ""
+}
+
+// Dir is empty
+func (c AutoplanCommand) Dir() string {
 	return ""
 }
 
@@ -131,6 +144,11 @@ type CommentCommand struct {
 // apply".
 func (c CommentCommand) IsForSpecificProject() bool {
 	return c.RepoRelDir != "" || c.Workspace != "" || c.ProjectName != ""
+}
+
+// Dir returns the dir of this command.
+func (c CommentCommand) Dir() string {
+	return c.RepoRelDir
 }
 
 // CommandName returns the name of this command.
