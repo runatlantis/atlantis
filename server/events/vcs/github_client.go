@@ -141,7 +141,9 @@ listloop:
 			attemptDelay = 2*attemptDelay + 1*time.Second
 
 			pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
-			g.logger.Debug("[attempt %d] GET /repos/%v/%v/pulls/%d/files returned: %v", i+1, repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+			if resp != nil {
+				g.logger.Debug("[attempt %d] GET /repos/%v/%v/pulls/%d/files returned: %v", i+1, repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+			}
 			if err != nil {
 				ghErr, ok := err.(*github.ErrorResponse)
 				if ok && ghErr.Response.StatusCode == 404 {
@@ -190,7 +192,9 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	for i := range comments {
 		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
-		g.logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
+		if resp != nil {
+			g.logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
+		}
 		if err != nil {
 			return err
 		}
@@ -201,11 +205,13 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 // ReactToComment adds a reaction to a comment.
 func (g *GithubClient) ReactToComment(repo models.Repo, _ int, commentID int64, reaction string) error {
 	_, resp, err := g.client.Reactions.CreateIssueCommentReaction(g.ctx, repo.Owner, repo.Name, commentID, reaction)
-	g.logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions returned: %v", repo.Owner, repo.Name, commentID, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions returned: %v", repo.Owner, repo.Name, commentID, resp.StatusCode)
+	}
 	return err
 }
 
-func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error {
 	var allComments []*github.IssueComment
 	nextPage := 0
 	for {
@@ -214,7 +220,9 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 			Direction:   github.String("asc"),
 			ListOptions: github.ListOptions{Page: nextPage},
 		})
-		g.logger.Debug("GET /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
+		if resp != nil {
+			g.logger.Debug("GET /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
+		}
 		if err != nil {
 			return errors.Wrap(err, "listing comments")
 		}
@@ -244,6 +252,12 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 		if !strings.Contains(firstLine, strings.ToLower(command)) {
 			continue
 		}
+
+		// If dir was specified, skip processing comments that don't contain the dir in the first line
+		if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
+			continue
+		}
+
 		var m struct {
 			MinimizeComment struct {
 				MinimizedComment struct {
@@ -257,6 +271,7 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 			Classifier: githubv4.ReportedContentClassifiersOutdated,
 			SubjectID:  comment.GetNodeID(),
 		}
+		g.logger.Debug("Hiding comment %s", comment.GetNodeID())
 		if err := g.v4Client.Mutate(g.ctx, &m, input, nil); err != nil {
 			return errors.Wrapf(err, "minimize comment %s", comment.GetNodeID())
 		}
@@ -328,7 +343,9 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 			opts.Page = nextPage
 		}
 		pageReviews, resp, err := g.client.PullRequests.ListReviews(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
-		g.logger.Debug("GET /repos/%v/%v/pulls/%d/reviews returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+		if resp != nil {
+			g.logger.Debug("GET /repos/%v/%v/pulls/%d/reviews returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+		}
 		if err != nil {
 			return approvalStatus, errors.Wrap(err, "getting reviews")
 		}
@@ -398,7 +415,9 @@ func isRequiredCheck(check string, required []string) bool {
 func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest, vcstatusname string) (bool, error) {
 	//check combined status api
 	status, resp, err := g.client.Repositories.GetCombinedStatus(g.ctx, *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
-	g.logger.Debug("GET /repos/%v/%v/commits/%s/status returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /repos/%v/%v/commits/%s/status returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, resp.StatusCode)
+	}
 	if err != nil {
 		return false, errors.Wrap(err, "getting combined status")
 	}
@@ -415,7 +434,9 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 
 	//get required status checks
 	required, resp, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner, repo.Name, *pull.Base.Ref)
-	g.logger.Debug("GET /repos/%v/%v/branches/%s/protection returned: %v", repo.Owner, repo.Name, *pull.Base.Ref, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /repos/%v/%v/branches/%s/protection returned: %v", repo.Owner, repo.Name, *pull.Base.Ref, resp.StatusCode)
+	}
 	if err != nil {
 		return false, errors.Wrap(err, "getting required status checks")
 	}
@@ -426,7 +447,9 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 
 	//check check suite/check run api
 	checksuites, resp, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
-	g.logger.Debug("GET /repos/%v/%v/commits/%s/check-suites returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /repos/%v/%v/commits/%s/check-suites returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, resp.StatusCode)
+	}
 	if err != nil {
 		return false, errors.Wrap(err, "getting check suites for ref")
 	}
@@ -436,7 +459,9 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 		if *c.Status == "completed" {
 			//iterate over the runs inside the suite
 			suite, resp, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *c.ID, nil)
-			g.logger.Debug("GET /repos/%v/%v/check-suites/%d/check-runs returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *c.ID, resp.StatusCode)
+			if resp != nil {
+				g.logger.Debug("GET /repos/%v/%v/check-suites/%d/check-runs returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *c.ID, resp.StatusCode)
+			}
 			if err != nil {
 				return false, errors.Wrap(err, "getting check runs for check suite")
 			}
@@ -548,7 +573,9 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 		attemptDelay = 2*attemptDelay + 1*time.Second
 
 		pull, resp, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
-		g.logger.Debug("GET /repos/%v/%v/pulls/%d returned: %v", repo.Owner, repo.Name, num, resp.StatusCode)
+		if resp != nil {
+			g.logger.Debug("GET /repos/%v/%v/pulls/%d returned: %v", repo.Owner, repo.Name, num, resp.StatusCode)
+		}
 		if err == nil {
 			return pull, nil
 		}
@@ -580,7 +607,9 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 		TargetURL:   &url,
 	}
 	_, resp, err := g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, status)
-	g.logger.Debug("POST /repos/%v/%v/statuses/%s returned: %v", repo.Owner, repo.Name, pull.HeadCommit, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("POST /repos/%v/%v/statuses/%s returned: %v", repo.Owner, repo.Name, pull.HeadCommit, resp.StatusCode)
+	}
 	return err
 }
 
@@ -589,7 +618,9 @@ func (g *GithubClient) MergePull(pull models.PullRequest, _ models.PullRequestOp
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
 	repo, resp, err := g.client.Repositories.Get(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name)
-	g.logger.Debug("GET /repos/%v/%v returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /repos/%v/%v returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, resp.StatusCode)
+	}
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
 	}
@@ -621,7 +652,9 @@ func (g *GithubClient) MergePull(pull models.PullRequest, _ models.PullRequestOp
 		// the commit message as it normally would.
 		"",
 		options)
-	g.logger.Debug("POST /repos/%v/%v/pulls/%d/merge returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("POST /repos/%v/%v/pulls/%d/merge returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+	}
 	if err != nil {
 		return errors.Wrap(err, "merging pull request")
 	}
@@ -683,7 +716,9 @@ func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) (
 func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, error) {
 	ctx := context.Background()
 	cfg, resp, err := g.client.Apps.CompleteAppManifest(ctx, code)
-	g.logger.Debug("POST /app-manifests/%s/conversions returned: %v", code, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("POST /app-manifests/%s/conversions returned: %v", code, resp.StatusCode)
+	}
 	data := &GithubAppTemporarySecrets{
 		ID:            cfg.GetID(),
 		Key:           cfg.GetPEM(),
@@ -701,7 +736,9 @@ func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, er
 func (g *GithubClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
 	opt := github.RepositoryContentGetOptions{Ref: pull.HeadBranch}
 	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, fileName, &opt)
-	g.logger.Debug("GET /repos/%v/%v/contents/%s returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, fileName, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /repos/%v/%v/contents/%s returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, fileName, resp.StatusCode)
+	}
 
 	if resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil
@@ -725,7 +762,9 @@ func (g *GithubClient) SupportsSingleFileDownload(_ models.Repo) bool {
 func (g *GithubClient) GetCloneURL(_ models.VCSHostType, repo string) (string, error) {
 	parts := strings.Split(repo, "/")
 	repository, resp, err := g.client.Repositories.Get(g.ctx, parts[0], parts[1])
-	g.logger.Debug("GET /repos/%v/%v returned: %v", parts[0], parts[1], resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /repos/%v/%v returned: %v", parts[0], parts[1], resp.StatusCode)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -734,7 +773,9 @@ func (g *GithubClient) GetCloneURL(_ models.VCSHostType, repo string) (string, e
 
 func (g *GithubClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	pullDetails, resp, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, pull.Num)
-	g.logger.Debug("GET /repos/%v/%v/pulls/%d returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /repos/%v/%v/pulls/%d returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+	}
 	if err != nil {
 		return nil, err
 	}

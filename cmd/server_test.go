@@ -118,8 +118,6 @@ var testFlags = map[string]interface{}{
 	RepoAllowlistFlag:                "github.com/runatlantis/atlantis",
 	RepoConfigFlag:                   "",
 	RepoConfigJSONFlag:               "",
-	RequireApprovalFlag:              true,
-	RequireMergeableFlag:             true,
 	SilenceNoProjectsFlag:            false,
 	SilenceForkPRErrorsFlag:          true,
 	SilenceAllowlistErrorsFlag:       true,
