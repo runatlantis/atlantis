@@ -1,6 +1,6 @@
 {{ define "failure" -}}
 **{{ .Command }} Failed**: {{ .Failure }}
-{{ if ne .RenderedContext "" -}}
+{{- if ne .RenderedContext ""}}
 {{ .RenderedContext }}
-{{ end -}}
+{{- end }}
 {{ end -}}
