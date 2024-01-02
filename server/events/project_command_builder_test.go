@@ -169,8 +169,7 @@ projects:
 				Ok(t, err)
 			}
 
-			globalCfgArgs := valid.GlobalCfgArgs{
-			}
+			globalCfgArgs := valid.GlobalCfgArgs{}
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1138,8 +1137,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	userConfig := defaultUserConfig
 
-	globalCfgArgs := valid.GlobalCfgArgs{
-	}
+	globalCfgArgs := valid.GlobalCfgArgs{}
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	terraformClient := terraform_mocks.NewMockClient()
