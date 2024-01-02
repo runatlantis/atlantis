@@ -20,3 +20,6 @@ workspace = "default"
 **Apply Failed**: All policies must pass for project before running apply.
 
 ---
+### Apply Summary
+
+2 projects, 1 successful, 1 failed, 0 errored

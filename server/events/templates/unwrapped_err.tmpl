@@ -1,9 +1,9 @@
 {{ define "unwrappedErr" -}}
-**{{.Command}} Error**
+**{{ .Command }} Error**
 ```
-{{.Error}}
+{{ .Error }}
 ```
-{{- if ne .RenderedContext ""}}
+{{ if ne .RenderedContext "" -}}
 {{ .RenderedContext }}
-{{- end }}
-{{- end }}
+{{ end -}}
+{{ end -}}

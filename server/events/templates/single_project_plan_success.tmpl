@@ -10,5 +10,5 @@ Ran {{ .Command }} for {{ if $result.ProjectName }}project: `{{ $result.ProjectN
 * :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
     * `{{ .ExecutableName }} unlock`
 {{ end -}}
-{{- template "log" . -}}
+{{ template "log" . -}}
 {{ end -}}

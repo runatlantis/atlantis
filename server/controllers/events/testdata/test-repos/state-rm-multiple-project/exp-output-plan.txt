@@ -37,6 +37,10 @@ and found no differences, so no changes are needed.
     * `atlantis plan -d dir2`
 
 ---
+### Plan Summary
+
+2 projects, 0 with changes, 2 with no changes, 0 failed
+
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * `atlantis apply`
 * :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
