@@ -1,26 +1,26 @@
 version: 3
 projects:
-- dir: .
-  name: default
-  workflow: default
-- dir: .
-  workflow: staging
-  name: staging
+  - dir: .
+    name: default
+    workflow: default
+  - dir: .
+    workflow: staging
+    name: staging
 workflows:
   default:
     plan:
       steps:
-      - run: rm -rf .terraform
-      - init:
-          extra_args: [-backend-config=default.backend.tfvars]
-      - plan:
-          extra_args: [-var-file=default.tfvars]
-      - run: echo workspace=$WORKSPACE
+        - run: rm -rf .terraform
+        - init:
+            extra_args: [-backend-config=default.backend.tfvars]
+        - plan:
+            extra_args: [-var-file=default.tfvars]
+        - run: echo workspace=$WORKSPACE
   staging:
     plan:
       steps:
-      - run: rm -rf .terraform
-      - init:
-          extra_args: [-backend-config=staging.backend.tfvars]
-      - plan:
-          extra_args: [-var-file, staging.tfvars]
+        - run: rm -rf .terraform
+        - init:
+            extra_args: [-backend-config=staging.backend.tfvars]
+        - plan:
+            extra_args: [-var-file, staging.tfvars]

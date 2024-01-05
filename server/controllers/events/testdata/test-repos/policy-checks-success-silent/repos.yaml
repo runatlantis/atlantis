@@ -1,6 +1,6 @@
 repos:
-- id: /.*/
-  apply_requirements: [approved]
+  - id: /.*/
+    apply_requirements: [approved]
 policies:
   owners:
     users:
@@ -9,4 +9,3 @@ policies:
     - name: test_policy
       path: policies/policy.rego
       source: local
-        

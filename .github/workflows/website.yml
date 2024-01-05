@@ -1,5 +1,4 @@
 name: website
-
 on:
   push:
     branches:
@@ -14,11 +13,9 @@ on:
     branches:
       - 'main'
       - 'release-**'
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
-
 jobs:
   changes:
     outputs:
@@ -36,7 +33,6 @@ jobs:
               - 'yarn.lock'
               - 'package.json'
               - '.github/workflows/website.yml'
-
   # Check that the website builds and there's no missing links.
   # This job builds the website, starts a server to serve it, and then uses
   # muffet (https://github.com/raviqqe/muffet) to perform the link check.
@@ -47,11 +43,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-
       - name: run http-server
         env:
           # renovate: datasource=github-releases depName=raviqqe/muffet
@@ -67,10 +61,8 @@ jobs:
 
           # run http-server for muffet to check the links
           npx http-server runatlantis.io/.vuepress/dist &
-
       - name: wait until server listened
         run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
-
       # medium.com => was being rate limited: HTTP 429
       - run: |
           ./muffet \
@@ -81,7 +73,6 @@ jobs:
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
             http://localhost:8080/
-
   skip-link-check:
     needs: [changes]
     if: needs.changes.outputs.should-run-link-check == 'false'

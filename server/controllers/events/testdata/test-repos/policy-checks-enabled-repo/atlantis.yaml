@@ -1,5 +1,5 @@
 version: 3
 projects:
-- dir: .
-  workspace: default
-  policy_check: true
+  - dir: .
+    workspace: default
+    policy_check: true

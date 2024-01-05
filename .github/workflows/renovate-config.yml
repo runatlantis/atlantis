@@ -1,5 +1,4 @@
 name: renovate-config
-
 on:
   push:
     paths:
@@ -11,7 +10,6 @@ on:
     paths:
       - '.github/renovate.json5'
   workflow_dispatch:
-
 jobs:
   validate:
     runs-on: ubuntu-22.04

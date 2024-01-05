@@ -1,4 +1,3 @@
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -21,52 +20,52 @@ spec:
       securityContext:
         fsGroup: 1000 # Atlantis group (1000) read/write access to volumes.
       containers:
-      - name: atlantis
-        image: ghcr.io/runatlantis/atlantis:latest
-        env:
-        - name: ATLANTIS_DATA_DIR
-          value: /atlantis
-        - name: ATLANTIS_PORT
-          value: "4141" # Kubernetes sets an ATLANTIS_PORT variable so we need to override.
-        volumeMounts:
-        - name: atlantis-data
-          mountPath: /atlantis
-        ports:
         - name: atlantis
-          containerPort: 4141
+          image: ghcr.io/runatlantis/atlantis:latest
+          env:
+            - name: ATLANTIS_DATA_DIR
+              value: /atlantis
+            - name: ATLANTIS_PORT
+              value: "4141" # Kubernetes sets an ATLANTIS_PORT variable so we need to override.
+          volumeMounts:
+            - name: atlantis-data
+              mountPath: /atlantis
+          ports:
+            - name: atlantis
+              containerPort: 4141
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 256Mi
+              cpu: 100m
+          livenessProbe:
+            # We only need to check every 60s since Atlantis is not a
+            # high-throughput service.
+            periodSeconds: 60
+            httpGet:
+              path: /healthz
+              port: 4141
+              # If using https, change this to HTTPS
+              scheme: HTTP
+          readinessProbe:
+            periodSeconds: 60
+            httpGet:
+              path: /healthz
+              port: 4141
+              # If using https, change this to HTTPS
+              scheme: HTTP
+  volumeClaimTemplates:
+    - metadata:
+        name: atlantis-data
+      spec:
+        accessModes: ["ReadWriteOnce"] # Volume should not be shared by multiple nodes.
         resources:
           requests:
-            memory: 256Mi
-            cpu: 100m
-          limits:
-            memory: 256Mi
-            cpu: 100m
-        livenessProbe:
-          # We only need to check every 60s since Atlantis is not a
-          # high-throughput service.
-          periodSeconds: 60
-          httpGet:
-            path: /healthz
-            port: 4141
-            # If using https, change this to HTTPS
-            scheme: HTTP
-        readinessProbe:
-          periodSeconds: 60
-          httpGet:
-            path: /healthz
-            port: 4141
-            # If using https, change this to HTTPS
-            scheme: HTTP
-  volumeClaimTemplates:
-  - metadata:
-      name: atlantis-data
-    spec:
-      accessModes: ["ReadWriteOnce"] # Volume should not be shared by multiple nodes.
-      resources:
-        requests:
-          # The biggest thing Atlantis stores is the Git repo when it checks it out.
-          # It deletes the repo after the pull request is merged.
-          storage: 5Gi
+            # The biggest thing Atlantis stores is the Git repo when it checks it out.
+            # It deletes the repo after the pull request is merged.
+            storage: 5Gi
 ---
 apiVersion: v1
 kind: Service
@@ -75,8 +74,8 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - name: atlantis
-    port: 80
-    targetPort: 4141
+    - name: atlantis
+      port: 80
+      targetPort: 4141
   selector:
     app.kubernetes.io/name: atlantis

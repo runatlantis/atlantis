@@ -1,5 +1,4 @@
 name: tester
-
 on:
   push:
     branches:
@@ -14,11 +13,9 @@ on:
     branches:
       - 'main'
       - 'release-**'
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
-
 jobs:
   changes:
     outputs:
@@ -84,7 +81,6 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-
   skip-test:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'false'

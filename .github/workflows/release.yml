@@ -1,61 +1,54 @@
 name: release
-
 on:
   push:
     tags:
       - v*.*.* # stable release like, v0.19.2
       - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
   workflow_dispatch:
-
 jobs:
   goreleaser:
     runs-on: ubuntu-22.04
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: true
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-
-    - name: Run GoReleaser for stable release
-      uses: goreleaser/goreleaser-action@v5
-      if: (!contains(github.ref, 'pre'))
-      with:
-        version: v1.16.2
-        # You can pass flags to goreleaser via GORELEASER_ARGS
-        # --clean will save you deleting the dist dir
-        args: release --clean
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Generate changelog for pre release
-      if: contains(github.ref, 'pre')
-      id: changelog
-      run: |
-        echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-        gh api repos/$GITHUB_REPOSITORY/releases/generate-notes \
-          -f tag_name="${GITHUB_REF#refs/tags/}" \
-          -f target_commitish=main \
-          -q .body > tmp-CHANGELOG.md
-      env:
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
-    - name: Run GoReleaser for pre-release
-      uses: goreleaser/goreleaser-action@v5
-      if: contains(github.ref, 'pre')
-      with:
-        version: v1.16.2
-        # You can pass flags to goreleaser via GORELEASER_ARGS
-        # --clean will save you deleting the dist dir
-        args: release --clean --release-notes=tmp-CHANGELOG.md
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GORELEASER_CURRENT_TAG: ${{ steps.changelog.outputs.RELEASE_TAG }}
-
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run GoReleaser for stable release
+        uses: goreleaser/goreleaser-action@v5
+        if: (!contains(github.ref, 'pre'))
+        with:
+          version: v1.16.2
+          # You can pass flags to goreleaser via GORELEASER_ARGS
+          # --clean will save you deleting the dist dir
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate changelog for pre release
+        if: contains(github.ref, 'pre')
+        id: changelog
+        run: |
+          echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          gh api repos/$GITHUB_REPOSITORY/releases/generate-notes \
+            -f tag_name="${GITHUB_REF#refs/tags/}" \
+            -f target_commitish=main \
+            -q .body > tmp-CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Run GoReleaser for pre-release
+        uses: goreleaser/goreleaser-action@v5
+        if: contains(github.ref, 'pre')
+        with:
+          version: v1.16.2
+          # You can pass flags to goreleaser via GORELEASER_ARGS
+          # --clean will save you deleting the dist dir
+          args: release --clean --release-notes=tmp-CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ steps.changelog.outputs.RELEASE_TAG }}
   homebrew:
     name: "Bump Homebrew formula"
     runs-on: ubuntu-22.04

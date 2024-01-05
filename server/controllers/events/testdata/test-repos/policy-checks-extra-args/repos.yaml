@@ -13,4 +13,3 @@ workflows:
         - show
         - policy_check:
             extra_args: ["--all-namespaces"]
-        
