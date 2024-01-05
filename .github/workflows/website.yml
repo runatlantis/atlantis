@@ -1,21 +1,24 @@
 name: website
+
 on:
   push:
     branches:
-    - 'main'
-    - 'release-**'
+      - 'main'
+      - 'release-**'
   pull_request:
     types:
-    - opened
-    - reopened
-    - synchronize
-    - ready_for_review
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
     branches:
-    - 'main'
-    - 'release-**'
+      - 'main'
+      - 'release-**'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
+
 jobs:
   changes:
     outputs:
@@ -23,16 +26,17 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v4
-    - uses: dorny/paths-filter@v2
-      id: changes
-      with:
-        filters: |
-          src:
-            - '**.js'
-            - 'yarn.lock'
-            - 'package.json'
-            - '.github/workflows/website.yml'
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - '**.js'
+              - 'yarn.lock'
+              - 'package.json'
+              - '.github/workflows/website.yml'
+
   # Check that the website builds and there's no missing links.
   # This job builds the website, starts a server to serve it, and then uses
   # muffet (https://github.com/raviqqe/muffet) to perform the link check.
@@ -42,41 +46,46 @@ jobs:
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version-file: .node-version
-    - name: run http-server
-      env:
-        # renovate: datasource=github-releases depName=raviqqe/muffet
-        MUFFET_VERSION: 2.9.3
-      run: |
-        npm install -g yarn
+      - uses: actions/checkout@v4
 
-        # install raviqqe/muffet to check for broken links.
-        curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
 
-        # build the site
-        yarn && yarn website:build
+      - name: run http-server
+        env:
+          # renovate: datasource=github-releases depName=raviqqe/muffet
+          MUFFET_VERSION: 2.9.3
+        run: |
+          npm install -g yarn
 
-        # run http-server for muffet to check the links
-        npx http-server runatlantis.io/.vuepress/dist &
-    - name: wait until server listened
-      run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
-    # medium.com => was being rate limited: HTTP 429
-    - run: |
-        ./muffet \
-          -e 'https://medium.com/runatlantis' \
-          -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
-          -e 'https://github.com/runatlantis/helm-charts#customization' \
-          -e 'https://confluence.atlassian.com/*' \
-          --header 'Accept-Encoding:deflate, gzip' \
-          --buffer-size 8192 \
-          http://localhost:8080/
+          # install raviqqe/muffet to check for broken links.
+          curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
+
+          # build the site
+          yarn && yarn website:build
+
+          # run http-server for muffet to check the links
+          npx http-server runatlantis.io/.vuepress/dist &
+
+      - name: wait until server listened
+        run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
+
+      # medium.com => was being rate limited: HTTP 429
+      - run: |
+          ./muffet \
+            -e 'https://medium.com/runatlantis' \
+            -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
+            -e 'https://github.com/runatlantis/helm-charts#customization' \
+            -e 'https://confluence.atlassian.com/*' \
+            --header 'Accept-Encoding:deflate, gzip' \
+            --buffer-size 8192 \
+            http://localhost:8080/
+
   skip-link-check:
     needs: [changes]
     if: needs.changes.outputs.should-run-link-check == 'false'
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
-    - run: 'echo "No build required"'
+      - run: 'echo "No build required"'

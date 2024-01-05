@@ -1,5 +1,5 @@
 exclude:
   - .circleci/config.yml
-  - .github/workflows/codeql.yml
+  - .github/**/*.yml
 formatter:
   indentless_arrays: true

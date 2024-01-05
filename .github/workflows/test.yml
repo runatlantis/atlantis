@@ -1,21 +1,24 @@
 name: tester
+
 on:
   push:
     branches:
-    - 'main'
-    - 'release-**'
+      - 'main'
+      - 'release-**'
   pull_request:
     types:
-    - opened
-    - reopened
-    - synchronize
-    - ready_for_review
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
     branches:
-    - 'main'
-    - 'release-**'
+      - 'main'
+      - 'release-**'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
+
 jobs:
   changes:
     outputs:
@@ -23,15 +26,15 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v4
-    - uses: dorny/paths-filter@v2
-      id: changes
-      with:
-        filters: |
-          go:
-            - '**.go'
-            - 'go.*'
-            - '.github/workflows/test.yml'
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            go:
+              - '**.go'
+              - 'go.*'
+              - '.github/workflows/test.yml'
   test:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'true'
@@ -39,52 +42,53 @@ jobs:
     runs-on: ubuntu-22.04
     container: ghcr.io/runatlantis/testing-env:latest
     steps:
-    - uses: actions/checkout@v4
-    - run: make test-all
-    - run: make check-fmt
-    ###########################################################
-    # Notifying #contributors about test failure on main branch
-    ###########################################################
-    - name: Slack failure notification
-      if: ${{ github.ref == 'refs/heads/main' && failure() }}
-      uses: slackapi/slack-github-action@e28cf165c92ffef168d23c5c9000cffc8a25e117 # v1.24.0
-      with:
-        payload: |
-          {
-            "blocks": [
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": ":x: Failed GitHub Action:"
-                }
-              },
-              {
-                "type": "section",
-                "fields": [
-                  {
+      - uses: actions/checkout@v4
+      - run: make test-all
+      - run: make check-fmt
+      ###########################################################
+      # Notifying #contributors about test failure on main branch
+      ###########################################################
+      - name: Slack failure notification
+        if: ${{ github.ref == 'refs/heads/main' && failure() }}
+        uses: slackapi/slack-github-action@e28cf165c92ffef168d23c5c9000cffc8a25e117 # v1.24.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
                     "type": "mrkdwn",
-                    "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*Job:*\n${{ github.job }}"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*Repo:*\n${{ github.repository }}"
+                    "text": ":x: Failed GitHub Action:"
                   }
-                ]
-              }
-            ]
-          }
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Job:*\n${{ github.job }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repo:*\n${{ github.repository }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
   skip-test:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'false'
     name: Tests
     runs-on: ubuntu-22.04
     steps:
-    - run: 'echo "No build required"'
+      - run: 'echo "No build required"'

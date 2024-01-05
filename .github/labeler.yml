@@ -1,34 +1,43 @@
 build:
 - changed-files:
   - any-glob-to-any-file: 'Dockerfile*'
+
 dependencies:
 - changed-files:
   - any-glob-to-any-file: 'yarn.lock'
   - any-glob-to-any-file: 'go.*'
+
 docs:
 - changed-files:
   - any-glob-to-any-file: 'runatlantis.io/**/*.md'
   - any-glob-to-any-file: 'README.md'
+
 github-actions:
 - changed-files:
   - any-glob-to-any-file: '.github/**'
+
 go:
 - changed-files:
   - any-glob-to-any-file: '**/*.go'
+
 provider/azuredevops:
 - changed-files:
   - any-glob-to-any-file: 'server/**/*azuredevops*.go'
+
 provider/bitbucket:
 - changed-files:
   - any-glob-to-any-file: 'server/**/*bitbucket*.go'
   - any-glob-to-any-file: 'server/events/vcs/bitbucketcloud/*.go'
   - any-glob-to-any-file: 'server/events/vcs/bitbucketserver/*.go'
+
 provider/github:
 - changed-files:
   - any-glob-to-any-file: 'server/**/*github*.go'
+
 provider/gitlab:
 - changed-files:
   - any-glob-to-any-file: 'server/**/*gitlab*.go'
+
 website:
 - changed-files:
   - any-glob-to-any-file: 'runatlantis.io/.vuepress/**/*'

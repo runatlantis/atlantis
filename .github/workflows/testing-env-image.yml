@@ -1,17 +1,20 @@
 name: testing-env-image
+
 on:
   push:
     branches:
-    - 'main'
-    - 'release-**'
+      - 'main'
+      - 'release-**'
   pull_request:
     branches:
-    - 'main'
-    - 'release-**'
+      - 'main'
+      - 'release-**'
   workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
+
 jobs:
   changes:
     outputs:
@@ -19,14 +22,15 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v4
-    - uses: dorny/paths-filter@v2
-      id: changes
-      with:
-        filters: |
-          src:
-            - 'testing/**'
-            - '.github/workflows/testing-env-image.yml'
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'testing/**'
+              - '.github/workflows/testing-env-image.yml'
+
   build:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'true'
@@ -34,19 +38,23 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
+
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
       with:
         image: tonistiigi/binfmt:latest
         platforms: arm64,arm
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+
     - name: Login to Packages Container registry
       uses: docker/login-action@v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+
     - run: echo "TODAY=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
     - name: Build and push testing-env:${{env.TODAY}} image
       uses: docker/build-push-action@v5
@@ -57,12 +65,13 @@ jobs:
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
-          ghcr.io/runatlantis/testing-env:${{env.TODAY}}
-          ghcr.io/runatlantis/testing-env:latest
+           ghcr.io/runatlantis/testing-env:${{env.TODAY}}
+           ghcr.io/runatlantis/testing-env:latest
+
   skip-build:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'false'
     name: Build Testing Env Image
     runs-on: ubuntu-22.04
     steps:
-    - run: 'echo "No build required"'
+      - run: 'echo "No build required"'

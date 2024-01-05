@@ -1,10 +1,12 @@
 name: release
+
 on:
   push:
     tags:
-    - v*.*.* # stable release like, v0.19.2
-    - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
+      - v*.*.* # stable release like, v0.19.2
+      - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
   workflow_dispatch:
+
 jobs:
   goreleaser:
     runs-on: ubuntu-22.04
@@ -13,10 +15,12 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: true
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version-file: go.mod
+
     - name: Run GoReleaser for stable release
       uses: goreleaser/goreleaser-action@v5
       if: (!contains(github.ref, 'pre'))
@@ -27,6 +31,7 @@ jobs:
         args: release --clean
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Generate changelog for pre release
       if: contains(github.ref, 'pre')
       id: changelog
@@ -38,6 +43,7 @@ jobs:
           -q .body > tmp-CHANGELOG.md
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
     - name: Run GoReleaser for pre-release
       uses: goreleaser/goreleaser-action@v5
       if: contains(github.ref, 'pre')
@@ -49,19 +55,20 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GORELEASER_CURRENT_TAG: ${{ steps.changelog.outputs.RELEASE_TAG }}
+
   homebrew:
     name: "Bump Homebrew formula"
     runs-on: ubuntu-22.04
     if: false
     # if: (!contains(github.ref, 'pre'))
     steps:
-    - uses: mislav/bump-homebrew-formula-action@v2
-      with:
-        # A PR will be sent to github.com/Homebrew/homebrew-core to update this formula:
-        formula-name: atlantis
-        commit-message: |
-          {{formulaName}} {{version}}
+      - uses: mislav/bump-homebrew-formula-action@v2
+        with:
+          # A PR will be sent to github.com/Homebrew/homebrew-core to update this formula:
+          formula-name: atlantis
+          commit-message: |
+            {{formulaName}} {{version}}
 
-          Created by https://github.com/mislav/bump-homebrew-formula-action
-      env:
-        COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            Created by https://github.com/mislav/bump-homebrew-formula-action
+        env:
+          COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
