@@ -1,3 +1,3 @@
 exclude:
-  - .circleci/**
+  - .circleci/config.yml
   - .github/workflows/codeql.yml
