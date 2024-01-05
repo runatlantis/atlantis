@@ -2,10 +2,10 @@ name: "Pull Request Labeler"
 on:
   pull_request_target:
     types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
+    - opened
+    - reopened
+    - synchronize
+    - ready_for_review
 jobs:
   triage:
     permissions:
@@ -14,4 +14,4 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/labeler@v5
+    - uses: actions/labeler@v5

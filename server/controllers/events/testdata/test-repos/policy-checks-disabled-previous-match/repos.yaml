@@ -1,12 +1,12 @@
 repos:
-  - id: "/.*/"
-    policy_check: false
-  - id: github.com/runatlantis/atlantis-tests
+- id: "/.*/"
+  policy_check: false
+- id: github.com/runatlantis/atlantis-tests
 policies:
   owners:
     users:
-      - runatlantis
+    - runatlantis
   policy_sets:
-    - name: test_policy
-      path: policies/policy.rego
-      source: local
+  - name: test_policy
+    path: policies/policy.rego
+    source: local

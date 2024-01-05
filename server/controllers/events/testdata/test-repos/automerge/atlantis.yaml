@@ -1,5 +1,5 @@
 version: 3
 automerge: true
 projects:
-  - dir: dir1
-  - dir: dir2
+- dir: dir1
+- dir: dir2

@@ -2,9 +2,9 @@ name: "Lint PR"
 on:
   pull_request_target:
     types:
-      - opened
-      - edited
-      - synchronize
+    - opened
+    - edited
+    - synchronize
 permissions:
   pull-requests: read
 jobs:
@@ -12,6 +12,6 @@ jobs:
     name: Validate PR title
     runs-on: ubuntu-22.04
     steps:
-      - uses: amannn/action-semantic-pull-request@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: amannn/action-semantic-pull-request@v5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

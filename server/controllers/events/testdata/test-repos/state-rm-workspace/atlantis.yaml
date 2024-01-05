@@ -1,5 +1,5 @@
 version: 3
 projects:
-  - name: dir1-ops
-    dir: dir1
-    workspace: ops
+- name: dir1-ops
+  dir: dir1
+  workspace: ops
