@@ -211,7 +211,7 @@ func (g *GithubClient) ReactToComment(repo models.Repo, _ int, commentID int64, 
 	return err
 }
 
-func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error {
 	var allComments []*github.IssueComment
 	nextPage := 0
 	for {
@@ -252,6 +252,12 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 		if !strings.Contains(firstLine, strings.ToLower(command)) {
 			continue
 		}
+
+		// If dir was specified, skip processing comments that don't contain the dir in the first line
+		if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
+			continue
+		}
+
 		var m struct {
 			MinimizeComment struct {
 				MinimizedComment struct {
@@ -265,6 +271,7 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 			Classifier: githubv4.ReportedContentClassifiersOutdated,
 			SubjectID:  comment.GetNodeID(),
 		}
+		g.logger.Debug("Hiding comment %s", comment.GetNodeID())
 		if err := g.v4Client.Mutate(g.ctx, &m, input, nil); err != nil {
 			return errors.Wrapf(err, "minimize comment %s", comment.GetNodeID())
 		}
