@@ -21,23 +21,23 @@ const (
 )
 
 type Project struct {
-	Name                      *string   `yaml:"name,omitempty"`
-	Branch                    *string   `yaml:"branch,omitempty"`
-	Dir                       *string   `yaml:"dir,omitempty"`
-	Workspace                 *string   `yaml:"workspace,omitempty"`
-	Workflow                  *string   `yaml:"workflow,omitempty"`
-	TerraformVersion          *string   `yaml:"terraform_version,omitempty"`
-	Autoplan                  *Autoplan `yaml:"autoplan,omitempty"`
-	PlanRequirements          []string  `yaml:"plan_requirements,omitempty"`
-	ApplyRequirements         []string  `yaml:"apply_requirements,omitempty"`
-	ImportRequirements        []string  `yaml:"import_requirements,omitempty"`
-	DependsOn                 []string  `yaml:"depends_on,omitempty"`
-	DeleteSourceBranchOnMerge *bool     `yaml:"delete_source_branch_on_merge,omitempty"`
-	RepoLocking               *bool     `yaml:"repo_locking,omitempty"`
-	LockRepoOnApply           *bool     `yaml:"lock_repo_on_apply,omitempty"`
-	ExecutionOrderGroup       *int      `yaml:"execution_order_group,omitempty"`
-	PolicyCheck               *bool     `yaml:"policy_check,omitempty"`
-	CustomPolicyCheck         *bool     `yaml:"custom_policy_check,omitempty"`
+	Name                      *string    `yaml:"name,omitempty"`
+	Branch                    *string    `yaml:"branch,omitempty"`
+	Dir                       *string    `yaml:"dir,omitempty"`
+	Workspace                 *string    `yaml:"workspace,omitempty"`
+	Workflow                  *string    `yaml:"workflow,omitempty"`
+	TerraformVersion          *string    `yaml:"terraform_version,omitempty"`
+	Autoplan                  *Autoplan  `yaml:"autoplan,omitempty"`
+	PlanRequirements          []string   `yaml:"plan_requirements,omitempty"`
+	ApplyRequirements         []string   `yaml:"apply_requirements,omitempty"`
+	ImportRequirements        []string   `yaml:"import_requirements,omitempty"`
+	DependsOn                 []string   `yaml:"depends_on,omitempty"`
+	DeleteSourceBranchOnMerge *bool      `yaml:"delete_source_branch_on_merge,omitempty"`
+	RepoLocking               *bool      `yaml:"repo_locking,omitempty"`
+	RepoLocks                 *RepoLocks `yaml:"repo_locks,omitempty"`
+	ExecutionOrderGroup       *int       `yaml:"execution_order_group,omitempty"`
+	PolicyCheck               *bool      `yaml:"policy_check,omitempty"`
+	CustomPolicyCheck         *bool      `yaml:"custom_policy_check,omitempty"`
 }
 
 func (p Project) Validate() error {
@@ -140,8 +140,8 @@ func (p Project) ToValid() valid.Project {
 		v.RepoLocking = p.RepoLocking
 	}
 
-	if p.LockRepoOnApply != nil {
-		v.LockRepoOnApply = p.LockRepoOnApply
+	if p.RepoLocks != nil {
+		v.RepoLocks = p.RepoLocks.ToValid()
 	}
 
 	if p.ExecutionOrderGroup != nil {

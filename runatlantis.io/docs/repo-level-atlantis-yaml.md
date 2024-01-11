@@ -66,8 +66,9 @@ projects:
   workspace: default
   terraform_version: v0.11.0
   delete_source_branch_on_merge: true
-  repo_locking: true
-  lock_repo_on_apply: false
+  repo_locking: true # deprecated: use repo_locks instead
+  repo_locks:
+    mode: on_plan
   custom_policy_check: false
   autoplan:
     when_modified: ["*.tf", "../modules/**/*.tf", ".terraform.lock.hcl"]
@@ -390,8 +391,9 @@ dir: mydir
 workspace: myworkspace
 execution_order_group: 0
 delete_source_branch_on_merge: false
-repo_locking: true
-lock_repo_on_apply: false
+repo_locking: true # deprecated: use repo_locks instead
+repo_locks:
+  mode: on_plan
 custom_policy_check: false
 autoplan:
 terraform_version: 0.11.0
@@ -401,23 +403,23 @@ import_requirements: ["approved"]
 workflow: myworkflow
 ```
 
-| Key                                      | Type                  | Default     | Required | Description                                                                                                                                                                                                                               |
-|------------------------------------------|-----------------------|-------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| name                                     | string                | none        | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                                         |
-| branch                                   | string                | none        | no       | Regex matching projects by the base branch of pull request (the branch the pull request is getting merged into). Only projects that match the PR's branch will be considered. By default, all branches are matched.                       |
-| dir                                      | string                | none        | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                        |
-| workspace                                | string                | `"default"` | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                    |
-| execution_order_group                    | int                   | `0`         | no       | Index of execution order group. Projects will be sort by this field before planning/applying.                                                                                                                                             |
-| delete_source_branch_on_merge            | bool                  | `false`     | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                         |
-| repo_locking                             | bool                  | `true`      | no       | Get a repository lock in this project when plan.                                                                                                                                                                                          |
-| lock_repo_on_apply                       | bool                  | `false`     | no       | Lock the repository on apply instead of plan.                                                                                                                                                                                             |
-| custom_policy_check                      | bool                  | `false`     | no       | Enable using policy check tools other than Conftest                                                                                                                                                                                       |
-| autoplan                                 | [Autoplan](#autoplan) | none        | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.html).                                                                                                                   |
-| terraform_version                        | string                | none        | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                                              |
-| plan_requirements<br />*(restricted)*    | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.   |
-| apply_requirements<br />*(restricted)*   | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.  |
-| import_requirements<br />*(restricted)*  | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details. |
-| workflow <br />*(restricted)*            | string                | none        | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                                              |
+| Key                                     | Type                    | Default         | Required | Description                                                                                                                                                                                                                               |
+|-----------------------------------------|-------------------------|-----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| name                                    | string                  | none            | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                                         |
+| branch                                  | string                  | none            | no       | Regex matching projects by the base branch of pull request (the branch the pull request is getting merged into). Only projects that match the PR's branch will be considered. By default, all branches are matched.                       |
+| dir                                     | string                  | none            | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                        |
+| workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                    |
+| execution_order_group                   | int                     | `0`             | no       | Index of execution order group. Projects will be sort by this field before planning/applying.                                                                                                                                             |
+| delete_source_branch_on_merge           | bool                    | `false`         | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                         |
+| repo_locking                            | bool                    | `true`          | no       | (deprecated) Get a repository lock in this project when plan.                                                                                                                                                                             |
+| repo_locks                              | [RepoLocks](#repolocks) | `mode: on_plan` | no       | Get a repository lock in this project on plan or apply. See [RepoLocks](#repolocks) for more details.                                                                                                                                     |
+| custom_policy_check                     | bool                    | `false`         | no       | Enable using policy check tools other than Conftest                                                                                                                                                                                       |
+| autoplan                                | [Autoplan](#autoplan)   | none            | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.html).                                                                                                                   |
+| terraform_version                       | string                  | none            | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                                              |
+| plan_requirements<br />*(restricted)*   | array[string]           | none            | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.   |
+| apply_requirements<br />*(restricted)*  | array[string]           | none            | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details.  |
+| import_requirements<br />*(restricted)* | array[string]           | none            | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.html) for more details. |
+| workflow <br />*(restricted)*           | string                  | none            | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                                              |
 
 ::: tip
 A project represents a Terraform state. Typically, there is one state per directory and workspace however it's possible to
@@ -434,3 +436,11 @@ when_modified: ["*.tf", "terragrunt.hcl", ".terraform.lock.hcl"]
 |-----------------------|---------------|----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | enabled               | boolean       | `true`         | no       | Whether autoplanning is enabled for this project.                                                                                                                                                                                                                 |
 | when_modified         | array[string] | `["**/*.tf*"]` | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.html). Paths are relative to the project's dir. |
+
+### RepoLocks
+```yaml
+mode: on_apply
+```
+| Key  | Type   | Default   | Required | Description                                                                                                                           |
+|------|--------|-----------|----------|---------------------------------------------------------------------------------------------------------------------------------------|
+| mode | `Mode` | `on_plan` | no       | Whether or not repository locks are enabled for this project on plan or apply. Valid values are `disabled`, `on_plan` and `on_apply`. |

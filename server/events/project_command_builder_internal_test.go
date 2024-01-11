@@ -84,8 +84,7 @@ workflows:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -144,8 +143,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -206,8 +204,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -276,8 +273,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{},
@@ -433,8 +429,7 @@ workflows:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -497,8 +492,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -564,8 +558,7 @@ workflows:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{},
 			expApplySteps: []string{},
@@ -616,8 +609,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -700,9 +692,9 @@ projects:
 						ErrEquals(t, c.expErr, err)
 						return
 					}
-					ctx := ctxs[0]
 
 					Ok(t, err)
+					ctx := ctxs[0]
 
 					// Construct expected steps.
 					var stepNames []string
@@ -831,8 +823,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -918,9 +909,9 @@ projects:
 						ErrEquals(t, c.expErr, err)
 						return
 					}
-					ctx := ctxs[0]
 
 					Ok(t, err)
+					ctx := ctxs[0]
 
 					Equals(t, 2, len(ctxs))
 					// Construct expected steps.
@@ -1013,8 +1004,7 @@ repos:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPolicyCheckSteps: []string{"show", "policy_check"},
 		},
@@ -1078,8 +1068,7 @@ workflows:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
-				LockRepoOnApply:    false,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 				PolicySetTarget:    "",
 			},
 			expPolicyCheckSteps: []string{"policy_check"},
@@ -1166,9 +1155,8 @@ workflows:
 					return
 				}
 
-				ctx := ctxs[1]
-
 				Ok(t, err)
+				ctx := ctxs[1]
 
 				// Construct expected steps.
 				var stepNames []string
