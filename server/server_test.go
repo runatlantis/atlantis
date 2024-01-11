@@ -125,7 +125,7 @@ func TestIndex_Success(t *testing.T) {
 				RepoFullName:  "lkysow/atlantis-example",
 				PullNum:       9,
 				Time:          now,
-				TimeFormatted: now.Format("02-01-2006 15:04:05"),
+				TimeFormatted: now.Format("2006-01-02 15:04:05"),
 			},
 		},
 		PullToJobMapping: []jobs.PullInfoWithJobIDs{},
