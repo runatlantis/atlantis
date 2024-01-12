@@ -2120,9 +2120,7 @@ projects:
 			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg: true,
-				MergeableReq: false,
-				ApprovedReq:  false,
+				AllowAllRepoSettings: true,
 			}
 
 			if c.CfgSourceBranch != "" {

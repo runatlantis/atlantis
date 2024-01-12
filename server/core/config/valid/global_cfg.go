@@ -178,15 +178,15 @@ var DefaultStateRmStage = Stage{
 }
 
 type GlobalCfgArgs struct {
-	RepoConfigFile     string
-	AllowRepoCfg       bool
-	MergeableReq       bool
-	ApprovedReq        bool
-	UnDivergedReq      bool
-	PolicyCheckEnabled bool
-	PreWorkflowHooks   []*WorkflowHook
-	PostWorkflowHooks  []*WorkflowHook
-	ConfigSourceBranch *string
+	RepoConfigFile string
+	// No longer a user option as of https://github.com/runatlantis/atlantis/pull/3911,
+	// but useful for tests to set to true to not require enumeration of allowed settings
+	// on the repo side
+	AllowAllRepoSettings bool
+	PolicyCheckEnabled   bool
+	PreWorkflowHooks     []*WorkflowHook
+	PostWorkflowHooks    []*WorkflowHook
+	ConfigSourceBranch   *string
 }
 
 func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
