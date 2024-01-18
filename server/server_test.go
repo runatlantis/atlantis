@@ -117,7 +117,7 @@ func TestIndex_Success(t *testing.T) {
 		ApplyLock: templates.ApplyLockData{
 			Locked:        false,
 			Time:          time.Time{},
-			TimeFormatted: "01-01-0001 00:00:00",
+			TimeFormatted: "0001-01-01 00:00:00",
 		},
 		Locks: []templates.LockIndexData{
 			{
