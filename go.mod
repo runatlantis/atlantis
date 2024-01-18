@@ -12,7 +12,7 @@ require (
 	github.com/go-playground/validator/v10 v10.17.0
 	github.com/go-test/deep v1.1.0
 	github.com/golang-jwt/jwt/v5 v5.2.0
-	github.com/google/go-github/v57 v57.0.0
+	github.com/google/go-github/v58 v58.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.5.0
 	github.com/gorilla/mux v1.8.1
@@ -63,6 +63,8 @@ require (
 )
 
 require github.com/twmb/murmur3 v1.1.8 // indirect
+
+require github.com/google/go-github/v57 v57.0.0
 
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
