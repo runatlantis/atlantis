@@ -165,7 +165,7 @@ func (p Project) GetName() string {
 	if p.Name != nil {
 		return *p.Name
 	} else {
-		return *p.Dir
+		return p.Dir
 	}
 }
 
