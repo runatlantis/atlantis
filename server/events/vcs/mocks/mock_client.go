@@ -154,11 +154,11 @@ func (mock *MockClient) GetTeamNamesForUser(repo models.Repo, user models.User) 
 	return ret0, ret1
 }
 
-func (mock *MockClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (mock *MockClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{repo, pullNum, command}
+	params := []pegomock.Param{repo, pullNum, command, dir}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("HidePrevCommandComments", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -548,8 +548,8 @@ func (c *MockClient_GetTeamNamesForUser_OngoingVerification) GetAllCapturedArgum
 	return
 }
 
-func (verifier *VerifierMockClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) *MockClient_HidePrevCommandComments_OngoingVerification {
-	params := []pegomock.Param{repo, pullNum, command}
+func (verifier *VerifierMockClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) *MockClient_HidePrevCommandComments_OngoingVerification {
+	params := []pegomock.Param{repo, pullNum, command, dir}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "HidePrevCommandComments", params, verifier.timeout)
 	return &MockClient_HidePrevCommandComments_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -559,12 +559,12 @@ type MockClient_HidePrevCommandComments_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockClient_HidePrevCommandComments_OngoingVerification) GetCapturedArguments() (models.Repo, int, string) {
-	repo, pullNum, command := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pullNum[len(pullNum)-1], command[len(command)-1]
+func (c *MockClient_HidePrevCommandComments_OngoingVerification) GetCapturedArguments() (models.Repo, int, string, string) {
+	repo, pullNum, command, dir := c.GetAllCapturedArguments()
+	return repo[len(repo)-1], pullNum[len(pullNum)-1], command[len(command)-1], dir[len(dir)-1]
 }
 
-func (c *MockClient_HidePrevCommandComments_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int, _param2 []string) {
+func (c *MockClient_HidePrevCommandComments_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int, _param2 []string, _param3 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(c.methodInvocations))
@@ -578,6 +578,10 @@ func (c *MockClient_HidePrevCommandComments_OngoingVerification) GetAllCapturedA
 		_param2 = make([]string, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(string)
+		}
+		_param3 = make([]string, len(c.methodInvocations))
+		for u, param := range params[3] {
+			_param3[u] = param.(string)
 		}
 	}
 	return

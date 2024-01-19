@@ -149,7 +149,7 @@ func (b *Client) ReactToComment(_ models.Repo, _ int, _ int64, _ string) error {
 	return nil
 }
 
-func (b *Client) HidePrevCommandComments(_ models.Repo, _ int, _ string) error {
+func (b *Client) HidePrevCommandComments(_ models.Repo, _ int, _ string, _ string) error {
 	return nil
 }
 
