@@ -72,6 +72,7 @@ const (
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
+	DisableGlobalLockingFlag         = "disable-global-lock-feature"
 	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
@@ -436,6 +437,9 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableRepoLockingFlag: {
 		description: "Disable atlantis locking repos",
+	},
+	DisableGlobalLockingFlag: {
+		description: "Disable atlantis global apply lock in UI",
 	},
 	DiscardApprovalOnPlanFlag: {
 		description:  "Enables the discarding of approval if a new plan has been executed. Currently only Github is supported",

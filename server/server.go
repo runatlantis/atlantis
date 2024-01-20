@@ -455,8 +455,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	} else {
 		lockingClient = locking.NewClient(backend)
 	}
+	disableGlobalLockFeature := false
+	if userConfig.DisableGlobalLockFeature {
+		disableGlobalLockFeature = true
+	}
 
-	applyLockingClient = locking.NewApplyClient(backend, disableApply)
+	applyLockingClient = locking.NewApplyClient(backend, disableApply, disableGlobalLockFeature)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
@@ -1064,9 +1068,10 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	applyLockData := templates.ApplyLockData{
-		Time:          applyCmdLock.Time,
-		Locked:        applyCmdLock.Locked,
-		TimeFormatted: applyCmdLock.Time.Format("02-01-2006 15:04:05"),
+		Time:                     applyCmdLock.Time,
+		Locked:                   applyCmdLock.Locked,
+		GlobalLockFeatureEnabled: applyCmdLock.GlobalLockFeatureEnabled,
+		TimeFormatted:            applyCmdLock.Time.Format("02-01-2006 15:04:05"),
 	}
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
