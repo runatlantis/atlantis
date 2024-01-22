@@ -33,23 +33,23 @@ type ApplyCommandLock struct {
 	// Locked is true is when apply commands are locked
 	// Either by using omitting apply from AllowCommands or creating a global ApplyCommandLock
 	// DisableApply lock take precedence when set
-	Locked                   bool
-	GlobalLockFeatureEnabled bool
-	Time                     time.Time
-	Failure                  string
+	Locked                 bool
+	GlobalApplyLockEnabled bool
+	Time                   time.Time
+	Failure                string
 }
 
 type ApplyClient struct {
-	backend                  Backend
-	disableApply             bool
-	disableGlobalLockFeature bool
+	backend                Backend
+	disableApply           bool
+	disableGlobalApplyLock bool
 }
 
-func NewApplyClient(backend Backend, disableApply bool, disableGlobalLockFeature bool) ApplyLocker {
+func NewApplyClient(backend Backend, disableApply bool, disableGlobalApplyLock bool) ApplyLocker {
 	return &ApplyClient{
-		backend:                  backend,
-		disableApply:             disableApply,
-		disableGlobalLockFeature: disableGlobalLockFeature,
+		backend:                backend,
+		disableApply:           disableApply,
+		disableGlobalApplyLock: disableGlobalApplyLock,
 	}
 }
 
@@ -95,7 +95,7 @@ func (c *ApplyClient) UnlockApply() error {
 // If DisableApply is set it will always return a lock.
 func (c *ApplyClient) CheckApplyLock() (ApplyCommandLock, error) {
 	response := ApplyCommandLock{
-		GlobalLockFeatureEnabled: true,
+		GlobalApplyLockEnabled: true,
 	}
 
 	if c.disableApply {
@@ -113,8 +113,8 @@ func (c *ApplyClient) CheckApplyLock() (ApplyCommandLock, error) {
 		response.Locked = true
 		response.Time = applyCmdLock.LockTime()
 	}
-	if c.disableGlobalLockFeature {
-		response.GlobalLockFeatureEnabled = false
+	if c.disableGlobalApplyLock {
+		response.GlobalApplyLockEnabled = false
 	}
 
 	return response, nil
