@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v58/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 
@@ -1342,8 +1342,6 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	globalCfgArgs := valid.GlobalCfgArgs{
 		RepoConfigFile:       opt.repoConfigFile,
 		AllowAllRepoSettings: true,
-		MergeableReq:         false,
-		ApprovedReq:          false,
 		PreWorkflowHooks:     preWorkflowHooks,
 		PostWorkflowHooks: []*valid.WorkflowHook{
 			{

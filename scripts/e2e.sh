@@ -20,6 +20,7 @@ cd "${CIRCLE_WORKING_DIRECTORY}/e2e"
 sleep 2
 
 # start ngrok in the background and wait for it to start
+./ngrok config add-authtoken $NGROK_AUTH_TOKEN
 ./ngrok http 4141 > /tmp/ngrok.log &
 sleep 2
 

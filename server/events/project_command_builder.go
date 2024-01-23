@@ -374,7 +374,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					if err != nil {
 						return nil, err
 					}
-					ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
+					ctx.Log.Info("%d projects are changed on MR %d based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
 					if len(matchingProjects) == 0 {
 						ctx.Log.Info("skipping repo clone since no project was modified")
 						return []command.ProjectContext{}, nil

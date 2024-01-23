@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -117,8 +116,6 @@ const (
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
-	RequireApprovalFlag              = "require-approval"
-	RequireMergeableFlag             = "require-mergeable"
 	SilenceNoProjectsFlag            = "silence-no-projects"
 	SilenceForkPRErrorsFlag          = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans          = "silence-vcs-status-no-plans"
@@ -496,16 +493,6 @@ var boolFlags = map[string]boolFlag{
 	RedisInsecureSkipVerify: {
 		description:  "Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate.",
 		defaultValue: DefaultRedisInsecureSkipVerify,
-	},
-	RequireApprovalFlag: {
-		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
-		defaultValue: false,
-		hidden:       true,
-	},
-	RequireMergeableFlag: {
-		description:  "Require pull requests to be mergeable before allowing the apply command to be run.",
-		defaultValue: false,
-		hidden:       true,
 	},
 	SilenceNoProjectsFlag: {
 		description:  "Silences Atlants from responding to PRs when it finds no projects.",
@@ -1057,33 +1044,15 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 }
 
 // deprecationWarnings prints a warning if flags that are deprecated are
-// being used. Right now this only applies to flags that have been made obsolete
-// due to server-side config.
+// being used.
 func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
-	var commandReqs []string
 	var deprecatedFlags []string
-	if userConfig.RequireApproval {
-		deprecatedFlags = append(deprecatedFlags, RequireApprovalFlag)
-		commandReqs = append(commandReqs, valid.ApprovedCommandReq)
-	}
-	if userConfig.RequireMergeable {
-		deprecatedFlags = append(deprecatedFlags, RequireMergeableFlag)
-		commandReqs = append(commandReqs, valid.MergeableCommandReq)
-	}
 
-	// Build up strings with what the recommended yaml and json config should
-	// be instead of using the deprecated flags.
-	yamlCfg := "---\nrepos:\n- id: /.*/"
-	jsonCfg := `{"repos":[{"id":"/.*/"`
-	if len(commandReqs) > 0 {
-		yamlCfg += fmt.Sprintf("\n  plan_requirements: [%s]", strings.Join(commandReqs, ", "))
-		yamlCfg += fmt.Sprintf("\n  apply_requirements: [%s]", strings.Join(commandReqs, ", "))
-		yamlCfg += fmt.Sprintf("\n  import_requirements: [%s]", strings.Join(commandReqs, ", "))
-		jsonCfg += fmt.Sprintf(`, "plan_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
-		jsonCfg += fmt.Sprintf(`, "apply_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
-		jsonCfg += fmt.Sprintf(`, "import_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
-	}
-	jsonCfg += "}]}"
+	// Currently there are no deprecated flags; if flags become deprecated, add them here like so
+	//       if userConfig.SomeDeprecatedFlag {
+	//               deprecatedFlags = append(deprecatedFlags, SomeDeprecatedFlag)
+	//       }
+	//
 
 	if len(deprecatedFlags) > 0 {
 		warning := "WARNING: "
@@ -1092,12 +1061,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		} else {
 			warning += fmt.Sprintf("Flags --%s and --%s have been deprecated.", strings.Join(deprecatedFlags[0:len(deprecatedFlags)-1], ", --"), deprecatedFlags[len(deprecatedFlags)-1:][0])
 		}
-		warning += fmt.Sprintf("\nCreate a --%s file with the following config instead:\n\n%s\n\nor use --%s='%s'\n",
-			RepoConfigFlag,
-			yamlCfg,
-			RepoConfigJSONFlag,
-			jsonCfg,
-		)
 		fmt.Println(warning)
 	}
 

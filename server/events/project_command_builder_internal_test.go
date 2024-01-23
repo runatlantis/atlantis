@@ -638,11 +638,7 @@ projects:
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
+			globalCfgArgs := valid.GlobalCfgArgs{}
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			Ok(t, err)
 
@@ -856,11 +852,7 @@ projects:
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
+			globalCfgArgs := valid.GlobalCfgArgs{}
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			Ok(t, err)
 
@@ -1106,9 +1098,6 @@ workflows:
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				MergeableReq:       false,
-				ApprovedReq:        false,
-				UnDivergedReq:      false,
 				PolicyCheckEnabled: true,
 			}
 
@@ -1262,11 +1251,7 @@ projects:
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
+			globalCfgArgs := valid.GlobalCfgArgs{}
 
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			Ok(t, err)
@@ -1407,9 +1392,6 @@ projects:
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowAllRepoSettings: false,
-				MergeableReq:         false,
-				ApprovedReq:          false,
-				UnDivergedReq:        false,
 			}
 
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
