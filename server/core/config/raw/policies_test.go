@@ -42,7 +42,7 @@ policy_sets:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var got raw.PolicySets
-			err := yaml.UnmarshalStrict([]byte(c.input), &got)
+			err := unmarshalString(c.input, &got)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
@@ -54,7 +54,7 @@ policy_sets:
 			Ok(t, err)
 
 			var got2 raw.PolicySets
-			err = yaml.UnmarshalStrict([]byte(c.input), &got2)
+			err = unmarshalString(c.input, &got2)
 			Ok(t, err)
 			Equals(t, got2, got)
 		})
