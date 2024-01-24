@@ -6,7 +6,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func TestWorkflowHook_YAMLMarshalling(t *testing.T) {
