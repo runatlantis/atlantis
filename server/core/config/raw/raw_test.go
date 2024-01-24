@@ -20,7 +20,7 @@ func Int(v int) *int { return &v }
 // to store v and returns a pointer to it.
 func String(v string) *string { return &v }
 
-// Helper function to unmarshal strings
+// Helper function to unmarshal from strings
 func unmarshalString(in string, out interface{}) error {
 	decoder := yaml.NewDecoder(strings.NewReader(in))
 	decoder.KnownFields(true)
