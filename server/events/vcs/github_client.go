@@ -412,72 +412,80 @@ func isRequiredCheck(check string, required []string) bool {
 }
 
 // GetCombinedStatusMinusApply checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
-func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest, vcstatusname string) (bool, error) {
-	//check combined status api
-	status, resp, err := g.client.Repositories.GetCombinedStatus(g.ctx, *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
-	if resp != nil {
-		g.logger.Debug("GET /repos/%v/%v/commits/%s/status returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, resp.StatusCode)
-	}
-	if err != nil {
-		return false, errors.Wrap(err, "getting combined status")
-	}
-
-	//iterate over statuses - return false if we find one that isn't "apply" and doesn't have state = "success"
-	for _, r := range status.Statuses {
-		if strings.HasPrefix(*r.Context, fmt.Sprintf("%s/%s", vcstatusname, command.Apply.String())) {
-			continue
-		}
-		if *r.State != "success" {
-			return false, nil
-		}
-	}
-
-	//get required status checks
-	required, resp, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner, repo.Name, *pull.Base.Ref)
-	if resp != nil {
-		g.logger.Debug("GET /repos/%v/%v/branches/%s/protection returned: %v", repo.Owner, repo.Name, *pull.Base.Ref, resp.StatusCode)
-	}
-	if err != nil {
-		return false, errors.Wrap(err, "getting required status checks")
-	}
-
-	if required.RequiredStatusChecks == nil {
-		return true, nil
-	}
-
-	//check check suite/check run api
-	checksuites, resp, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
-	if resp != nil {
-		g.logger.Debug("GET /repos/%v/%v/commits/%s/check-suites returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, resp.StatusCode)
-	}
-	if err != nil {
-		return false, errors.Wrap(err, "getting check suites for ref")
-	}
-
-	//iterate over check completed check suites - return false if we find one that doesnt have conclusion = "success"
-	for _, c := range checksuites.CheckSuites {
-		if *c.Status == "completed" {
-			//iterate over the runs inside the suite
-			suite, resp, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *c.ID, nil)
-			if resp != nil {
-				g.logger.Debug("GET /repos/%v/%v/check-suites/%d/check-runs returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *c.ID, resp.StatusCode)
-			}
-			if err != nil {
-				return false, errors.Wrap(err, "getting check runs for check suite")
-			}
-
-			for _, r := range suite.CheckRuns {
-				//check to see if the check is required
-				if isRequiredCheck(*r.Name, required.RequiredStatusChecks.Contexts) {
-					if *c.Conclusion == "success" {
-						continue
+func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				Commits struct {
+					Nodes []struct {
+						Commit struct {
+							StatusCheckRollup struct {
+								Contexts struct {
+									PageInfo struct {
+										EndCursor   githubv4.String
+										HasNextPage bool
+									}
+									Nodes []struct {
+										Typename string `graphql:"__typename"`
+										CheckRun struct {
+											Name       string
+											Status     string
+											Conclusion string
+											IsRequired bool `graphql:"isRequired(pullRequestNumber: $number)"`
+										} `graphql:"... on CheckRun"`
+										StatusContext struct {
+											Context    string
+											State      string
+											IsRequired bool `graphql:"isRequired(pullRequestNumber: $number)"`
+										} `graphql:"... on StatusContext"`
+									}
+								} `graphql:"contexts(first: 100, after: $cursor)"`
+							}
+						}
 					}
+				} `graphql:"commits(last: 1)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":  githubv4.String(repo.Owner),
+		"name":   githubv4.String(repo.Name),
+		"number": githubv4.Int(*pull.Number),
+		"cursor": (*githubv4.String)(nil),
+	}
+
+	for {
+		err := g.v4Client.Query(g.ctx, &query, variables)
+
+		if err != nil {
+			return false, err
+		}
+
+		for _, context := range query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
+			switch context.Typename {
+			case "CheckRun":
+				if context.CheckRun.IsRequired &&
+					(context.CheckRun.Status != "COMPLETED" || context.CheckRun.Conclusion != "SUCCESS") &&
+					!strings.HasPrefix(context.CheckRun.Name, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
 					return false, nil
 				}
-				//ignore checks that arent required
-				continue
+			case "StatusContext":
+				if context.StatusContext.IsRequired &&
+					context.StatusContext.State != "SUCCESS" &&
+					!strings.HasPrefix(context.StatusContext.Context, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+					return false, nil
+				}
+			default:
+				return false, errors.New("unknown typename of context")
 			}
 		}
+
+		if !query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.HasNextPage {
+			break
+		}
+
+		variables["cursor"] = githubv4.NewString(query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.EndCursor)
 	}
 
 	return true, nil
