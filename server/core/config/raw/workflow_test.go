@@ -7,7 +7,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v2"
 )
 
 func TestWorkflow_UnmarshalYAML(t *testing.T) {
@@ -106,7 +105,7 @@ apply:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var w raw.Workflow
-			err := yaml.UnmarshalStrict([]byte(c.input), &w)
+			err := unmarshalString(c.input, &w)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
