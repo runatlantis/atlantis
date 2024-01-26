@@ -690,6 +690,11 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 	Ok(t, err)
 	prJSON := string(jsBytes)
 
+	// PR review decision and checks statuses Response
+	jsBytes, err = os.ReadFile("testdata/github-pull-request-mergeable-status.json")
+	Ok(t, err)
+	prMergeableStatusJSON := string(jsBytes)
+
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
 			response := strings.Replace(prJSON,
@@ -699,66 +704,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			)
 
 			// PR review decision and checks statuses Response
-			prStatusGraphQL := strings.Replace(`{
-				"data": {
-				  "repository": {
-					"pullRequest": {
-					  "reviewDecision": "APPROVED",
-					  "commits": {
-						"nodes": [
-						  {
-							"commit": {
-							  "statusCheckRollup": {
-								"contexts": {
-								  "nodes": [
-									{
-									  "__typename": "CheckRun",
-									  "name": "validate",
-									  "status": "COMPLETED",
-									  "conclusion": "SUCCESS",
-									  "isRequired": true
-									},
-									{
-									  "__typename": "StatusContext",
-									  "context": "atlantis/apply",
-									  "state": "SUCCESS",
-									  "isRequired": true
-									},
-									{
-									  "__typename": "StatusContext",
-									  "context": "atlantis/plan",
-									  "state": "SUCCESS",
-									  "isRequired": false
-									},
-									{
-									  "__typename": "StatusContext",
-									  "context": "atlantis/plan: prod",
-									  "state": "SUCCESS",
-									  "isRequired": false
-									},
-									{
-									  "__typename": "StatusContext",
-									  "context": "atlantis/plan: test",
-									  "state": "SUCCESS",
-									  "isRequired": false
-									},
-									{
-									  "__typename": "StatusContext",
-									  "context": "atlantis/policy_check",
-									  "state": "SUCCESS",
-									  "isRequired": false
-									}
-								  ]
-								}
-							  }
-							}
-						  }
-						]
-					  }
-					}
-				  }
-				}
-			  }`,
+			prMergeableStatus := strings.Replace(prMergeableStatusJSON,
 				`"reviewDecision": "APPROVED",`,
 				fmt.Sprintf(`"reviewDecision": %s,`, c.reviewDecision),
 				1,
@@ -771,7 +717,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 						w.Write([]byte(response)) // nolint: errcheck
 						return
 					case "/api/graphql":
-						w.Write([]byte(prStatusGraphQL)) // nolint: errcheck
+						w.Write([]byte(prMergeableStatus)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
