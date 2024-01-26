@@ -690,21 +690,6 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 	Ok(t, err)
 	prJSON := string(jsBytes)
 
-	// Status Check Response
-	jsBytes, err = os.ReadFile("testdata/github-commit-status-full.json")
-	Ok(t, err)
-	commitJSON := string(jsBytes)
-
-	// Branch protection Response
-	jsBytes, err = os.ReadFile("testdata/github-branch-protection-required-checks.json")
-	Ok(t, err)
-	branchProtectionJSON := string(jsBytes)
-
-	// List check suites Response
-	jsBytes, err = os.ReadFile("testdata/github-commit-check-suites.json")
-	Ok(t, err)
-	checkSuites := string(jsBytes)
-
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
 			response := strings.Replace(prJSON,
@@ -713,16 +698,71 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 				1,
 			)
 
-			// reviewDecision Response
-			reviewDecision := fmt.Sprintf(`{
+			// PR review decision and checks statuses Response
+			prStatusGraphQL := strings.Replace(`{
 				"data": {
-					"repository": {
-						"pullRequest": {
-							"reviewDecision": %s
-						}
+				  "repository": {
+					"pullRequest": {
+					  "reviewDecision": "APPROVED",
+					  "commits": {
+						"nodes": [
+						  {
+							"commit": {
+							  "statusCheckRollup": {
+								"contexts": {
+								  "nodes": [
+									{
+									  "__typename": "CheckRun",
+									  "name": "validate",
+									  "status": "COMPLETED",
+									  "conclusion": "SUCCESS",
+									  "isRequired": true
+									},
+									{
+									  "__typename": "StatusContext",
+									  "context": "atlantis/apply",
+									  "state": "SUCCESS",
+									  "isRequired": true
+									},
+									{
+									  "__typename": "StatusContext",
+									  "context": "atlantis/plan",
+									  "state": "SUCCESS",
+									  "isRequired": false
+									},
+									{
+									  "__typename": "StatusContext",
+									  "context": "atlantis/plan: prod",
+									  "state": "SUCCESS",
+									  "isRequired": false
+									},
+									{
+									  "__typename": "StatusContext",
+									  "context": "atlantis/plan: test",
+									  "state": "SUCCESS",
+									  "isRequired": false
+									},
+									{
+									  "__typename": "StatusContext",
+									  "context": "atlantis/policy_check",
+									  "state": "SUCCESS",
+									  "isRequired": false
+									}
+								  ]
+								}
+							  }
+							}
+						  }
+						]
+					  }
 					}
+				  }
 				}
-			}`, c.reviewDecision)
+			  }`,
+				`"reviewDecision": "APPROVED",`,
+				fmt.Sprintf(`"reviewDecision": %s,`, c.reviewDecision),
+				1,
+			)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -730,17 +770,8 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 					case "/api/v3/repos/octocat/repo/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
 						return
-					case "/api/v3/repos/octocat/repo/pulls/1/reviews?per_page=300":
-						w.Write([]byte("[]")) // nolint: errcheck
-						return
-					case "/api/v3/repos/octocat/repo/commits/new-topic/status":
-						w.Write([]byte(commitJSON)) // nolint: errcheck
 					case "/api/graphql":
-						w.Write([]byte(reviewDecision)) // nolint: errcheck
-					case "/api/v3/repos/octocat/repo/branches/main/protection":
-						w.Write([]byte(branchProtectionJSON)) // nolint: errcheck
-					case "/api/v3/repos/octocat/repo/commits/new-topic/check-suites":
-						w.Write([]byte(checkSuites)) // nolint: errcheck
+						w.Write([]byte(prStatusGraphQL)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
