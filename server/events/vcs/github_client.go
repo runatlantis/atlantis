@@ -495,7 +495,6 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		return false, errors.Wrap(err, "getting pull request")
 	}
 
-	state := githubPR.GetMergeableState()
 	// We map our mergeable check to when the GitHub merge button is clickable.
 	// This corresponds to the following states:
 	// clean: No conflicts, all requirements satisfied.
@@ -505,26 +504,22 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
-	if state != "clean" && state != "unstable" && state != "has_hooks" {
-		//mergeable bypass apply code hidden by feature flag
+	switch githubPR.GetMergeableState() {
+	case "clean", "unstable", "has_hooks":
+		return true, nil
+	case "blocked":
 		if g.config.AllowMergeableBypassApply {
 			g.logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
-			if state == "blocked" {
-				isMergeableMinusApply, err := g.IsMergeableMinusApply(repo, githubPR, vcsstatusname)
-				if err != nil {
-					return false, errors.Wrap(err, "getting pull request status")
-				}
-
-				// If all required status checks EXCEPT atlantis/apply are successful, and the PR is approved based on reviewDecision, let it proceed
-				if isMergeableMinusApply {
-					return true, nil
-				}
+			isMergeableMinusApply, err := g.IsMergeableMinusApply(repo, githubPR, vcsstatusname)
+			if err != nil {
+				return false, errors.Wrap(err, "getting pull request status")
 			}
+			return isMergeableMinusApply, nil
 		}
-
+		return false, nil
+	default:
 		return false, nil
 	}
-	return true, nil
 }
 
 // GetPullRequest returns the pull request.
