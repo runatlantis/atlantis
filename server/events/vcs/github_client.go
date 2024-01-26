@@ -411,32 +411,33 @@ func isRequiredCheck(check string, required []string) bool {
 	return false
 }
 
-// GetCombinedStatusMinusApply checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
-func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
+// IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
+func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
 	var query struct {
 		Repository struct {
 			PullRequest struct {
-				Commits struct {
+				ReviewDecision githubv4.String
+				Commits        struct {
 					Nodes []struct {
 						Commit struct {
 							StatusCheckRollup struct {
 								Contexts struct {
 									PageInfo struct {
 										EndCursor   githubv4.String
-										HasNextPage bool
+										HasNextPage githubv4.Boolean
 									}
 									Nodes []struct {
-										Typename string `graphql:"__typename"`
+										Typename githubv4.String `graphql:"__typename"`
 										CheckRun struct {
-											Name       string
-											Status     string
-											Conclusion string
-											IsRequired bool `graphql:"isRequired(pullRequestNumber: $number)"`
+											Name       githubv4.String
+											Status     githubv4.String
+											Conclusion githubv4.String
+											IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
 										} `graphql:"... on CheckRun"`
 										StatusContext struct {
-											Context    string
-											State      string
-											IsRequired bool `graphql:"isRequired(pullRequestNumber: $number)"`
+											Context    githubv4.String
+											State      githubv4.String
+											IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
 										} `graphql:"... on StatusContext"`
 									}
 								} `graphql:"contexts(first: 100, after: $cursor)"`
@@ -462,22 +463,30 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 			return false, err
 		}
 
+		if query.Repository.PullRequest.ReviewDecision != "APPROVED" && len(query.Repository.PullRequest.ReviewDecision) != 0 {
+			return false, nil
+		}
+
+		if len(query.Repository.PullRequest.Commits.Nodes) == 0 {
+			return false, errors.New("no commits found on PR")
+		}
+
 		for _, context := range query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
 			switch context.Typename {
 			case "CheckRun":
-				if context.CheckRun.IsRequired &&
+				if bool(context.CheckRun.IsRequired) &&
 					(context.CheckRun.Status != "COMPLETED" || context.CheckRun.Conclusion != "SUCCESS") &&
-					!strings.HasPrefix(context.CheckRun.Name, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+					!strings.HasPrefix(string(context.CheckRun.Name), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
 					return false, nil
 				}
 			case "StatusContext":
-				if context.StatusContext.IsRequired &&
+				if bool(context.StatusContext.IsRequired) &&
 					context.StatusContext.State != "SUCCESS" &&
-					!strings.HasPrefix(context.StatusContext.Context, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+					!strings.HasPrefix(string(context.StatusContext.Context), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
 					return false, nil
 				}
 			default:
-				return false, errors.New("unknown typename of context")
+				return false, fmt.Errorf("unknown type of status check, %s", context.Typename)
 			}
 		}
 
@@ -489,34 +498,6 @@ func (g *GithubClient) GetCombinedStatusMinusApply(repo models.Repo, pull *githu
 	}
 
 	return true, nil
-}
-
-// GetPullReviewDecision gets the pull review decision, which takes into account CODEOWNERS
-func (g *GithubClient) GetPullReviewDecision(repo models.Repo, pull models.PullRequest) (approvalStatus bool, err error) {
-	var query struct {
-		Repository struct {
-			PullRequest struct {
-				ReviewDecision string
-			} `graphql:"pullRequest(number: $number)"`
-		} `graphql:"repository(owner: $owner, name: $name)"`
-	}
-
-	variables := map[string]interface{}{
-		"owner":  githubv4.String(repo.Owner),
-		"name":   githubv4.String(repo.Name),
-		"number": githubv4.Int(pull.Num),
-	}
-
-	err = g.v4Client.Query(g.ctx, &query, variables)
-	if err != nil {
-		return approvalStatus, errors.Wrap(err, "getting reviewDecision")
-	}
-
-	if query.Repository.PullRequest.ReviewDecision == "APPROVED" || len(query.Repository.PullRequest.ReviewDecision) == 0 {
-		return true, nil
-	}
-
-	return false, nil
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
@@ -541,20 +522,13 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 		if g.config.AllowMergeableBypassApply {
 			g.logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
 			if state == "blocked" {
-				//check status excluding atlantis apply
-				status, err := g.GetCombinedStatusMinusApply(repo, githubPR, vcsstatusname)
+				isMergeableMinusApply, err := g.IsMergeableMinusApply(repo, githubPR, vcsstatusname)
 				if err != nil {
 					return false, errors.Wrap(err, "getting pull request status")
 				}
 
-				//check to see if pr is approved using reviewDecision
-				approved, err := g.GetPullReviewDecision(repo, pull)
-				if err != nil {
-					return false, errors.Wrap(err, "getting pull request reviewDecision")
-				}
-
-				//if all other status checks EXCEPT atlantis/apply are successful, and the PR is approved based on reviewDecision, let it proceed
-				if status && approved {
+				// If all required status checks EXCEPT atlantis/apply are successful, and the PR is approved based on reviewDecision, let it proceed
+				if isMergeableMinusApply {
 					return true, nil
 				}
 			}
