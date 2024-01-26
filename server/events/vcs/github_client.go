@@ -399,18 +399,6 @@ func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest)
 	return nil
 }
 
-// isRequiredCheck is a helper function to determine if a check is required or not
-func isRequiredCheck(check string, required []string) bool {
-	//in go1.18 can prob replace this with slices.Contains
-	for _, r := range required {
-		if r == check {
-			return true
-		}
-	}
-
-	return false
-}
-
 // IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
 func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
 	var query struct {

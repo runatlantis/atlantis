@@ -553,22 +553,6 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	Ok(t, err)
 	prJSON := string(jsBytes)
 
-	// Status Check Response
-	jsBytes, err = os.ReadFile("testdata/github-commit-status-full.json")
-	Ok(t, err)
-	commitJSON := string(jsBytes)
-
-	//reviewDecision Response
-	reviewDecision := `{
-		"data": {
-			"repository": {
-				"pullRequest": {
-					"reviewDecision": "REVIEW_REQUIRED"
-				}
-			}
-		}
-	}`
-
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
 			response := strings.Replace(prJSON,
@@ -583,13 +567,6 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 					case "/api/v3/repos/owner/repo/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
 						return
-					case "/api/v3/repos/owner/repo/pulls/1/reviews?per_page=300":
-						w.Write([]byte("[]")) // nolint: errcheck
-						return
-					case "/api/v3/repos/owner/repo/commits/new-topic/status":
-						w.Write([]byte(commitJSON)) // nolint: errcheck
-					case "/api/graphql":
-						w.Write([]byte(reviewDecision)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
@@ -768,25 +745,10 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApplyButWithNoBranc
 	Ok(t, err)
 	prJSON := string(jsBytes)
 
-	// Status Check Response
-	jsBytes, err = os.ReadFile("testdata/github-commit-status-full.json")
+	// PR review decision and checks statuses Response
+	jsBytes, err = os.ReadFile("testdata/github-pull-request-mergeable-status.json")
 	Ok(t, err)
-	commitJSON := string(jsBytes)
-
-	// Branch protection Response
-	jsBytes, err = os.ReadFile("testdata/github-branch-protection-no-required-checks.json")
-	Ok(t, err)
-	branchProtectionJSON := string(jsBytes)
-
-	// List check suites Response
-	jsBytes, err = os.ReadFile("testdata/github-commit-check-suites-completed.json")
-	Ok(t, err)
-	checkSuites := string(jsBytes)
-
-	// List check runs in a check suite
-	jsBytes, err = os.ReadFile("testdata/github-commit-check-suites-check-runs-completed.json")
-	Ok(t, err)
-	checkRuns := string(jsBytes)
+	prMergeableStatusJSON := string(jsBytes)
 
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
@@ -796,16 +758,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApplyButWithNoBranc
 				1,
 			)
 
-			// reviewDecision Response
-			reviewDecision := fmt.Sprintf(`{
-				"data": {
-					"repository": {
-						"pullRequest": {
-							"reviewDecision": %s
-						}
-					}
-				}
-			}`, c.reviewDecision)
+			// PR review decision and checks statuses Response
+			prMergeableStatus := strings.Replace(prMergeableStatusJSON,
+				`"reviewDecision": "APPROVED",`,
+				fmt.Sprintf(`"reviewDecision": %s,`, c.reviewDecision),
+				1,
+			)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -813,19 +771,8 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApplyButWithNoBranc
 					case "/api/v3/repos/octocat/Hello-World/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
 						return
-					case "/api/v3/repos/octocat/Hello-World/pulls/1/reviews?per_page=300":
-						w.Write([]byte("[]")) // nolint: errcheck
-						return
-					case "/api/v3/repos/octocat/Hello-World/commits/new-topic/status":
-						w.Write([]byte(commitJSON)) // nolint: errcheck
 					case "/api/graphql":
-						w.Write([]byte(reviewDecision)) // nolint: errcheck
-					case "/api/v3/repos/octocat/Hello-World/branches/main/protection":
-						w.Write([]byte(branchProtectionJSON)) // nolint: errcheck
-					case "/api/v3/repos/octocat/Hello-World/commits/new-topic/check-suites":
-						w.Write([]byte(checkSuites)) // nolint: errcheck
-					case "/api/v3/repos/octocat/Hello-World/check-suites/1234567890/check-runs":
-						w.Write([]byte(checkRuns)) // nolint: errcheck
+						w.Write([]byte(prMergeableStatus)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
