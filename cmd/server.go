@@ -512,7 +512,7 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	SilenceVCSStatusNoProjectsFlag: {
-		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
+		description:  "Silences VCS commit status when for all commands when a project is not defined.",
 		defaultValue: false,
 	},
 	SilenceAllowlistErrorsFlag: {
