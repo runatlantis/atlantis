@@ -119,6 +119,7 @@ var testFlags = map[string]interface{}{
 	RepoConfigFlag:                   "",
 	RepoConfigJSONFlag:               "",
 	SilenceNoProjectsFlag:            false,
+	SilenceVCSStatusNoProjectsFlag:   false,
 	SilenceForkPRErrorsFlag:          true,
 	SilenceAllowlistErrorsFlag:       true,
 	SilenceVCSStatusNoPlans:          true,
