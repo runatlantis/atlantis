@@ -18,7 +18,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
@@ -151,13 +150,6 @@ var testFlags = map[string]interface{}{
 	EnableDiffMarkdownFormat:         false,
 }
 
-// Settings used by userConfig that do not have flags
-var nonFlagSettings = []string{
-	"require-undiverged",
-	"silence-vcs-status-no-projects",
-	"webhooks",
-}
-
 func TestExecute_Defaults(t *testing.T) {
 	t.Log("Should set the defaults for all unspecified flags.")
 
@@ -230,15 +222,16 @@ func TestUserConfigAllTested(t *testing.T) {
 
 		userConfigKey := u.Field(i).Tag.Get("mapstructure")
 		t.Run(userConfigKey, func(t *testing.T) {
-			_, ok := testFlags[userConfigKey]
-			if ok {
+			// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
+			// Some fields are too complicated to have flags, so are only expressible in the yaml
+			flagKey := u.Field(i).Tag.Get("flag")
+			if flagKey == "false" {
 				return
 			}
-			if slices.Contains(nonFlagSettings, userConfigKey) {
-				return
-			}
-			if !ok {
-				t.Errorf("server.UserConfig has field with mapstructure %s that is either not tested. Either add it to server_test.testFlags, or remove it from server.UserConfig", userConfigKey)
+			// If a setting is configured in server.UserConfig, it should be tested here. If there is no corresponding const
+			// for specifying the flag, that probably means one *also* needs to be added to server.go
+			if _, ok := testFlags[userConfigKey]; !ok {
+				t.Errorf("server.UserConfig has field with mapstructure %s that is either not tested or not configured as a flag. Either add it to server_test.testFlags, or remove it from server.UserConfig", userConfigKey)
 			}
 		})
 
