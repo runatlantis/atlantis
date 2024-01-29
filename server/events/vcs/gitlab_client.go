@@ -340,6 +340,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
+			g.logger.Debug("Determined gitlab.PullIsMergeable to be false because commit status %s has status %s", status.Name, status.Status)
 			return false, nil
 		}
 	}
@@ -348,21 +349,29 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus()
 	if err != nil {
+		g.logger.Debug("Determined gitlab.PullIsMergeable to be false because SupportsDetailedMergeStatus returned an error: %v", err)
 		return false, err
 	}
 
-	if ((supportsDetailedMergeStatus &&
-		(mr.DetailedMergeStatus == "mergeable" ||
+	if supportsDetailedMergeStatus {
+		if mr.DetailedMergeStatus == "mergeable" ||
 			mr.DetailedMergeStatus == "ci_still_running" ||
-			mr.DetailedMergeStatus == "ci_must_pass")) ||
-		(!supportsDetailedMergeStatus &&
-			mr.MergeStatus == "can_be_merged")) && //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
+			mr.DetailedMergeStatus == "ci_must_pass" {
+			g.logger.Debug("Determined gitlab.PullIsMergeable (which supports DetailedMergeStatus) be true")
+			return true, nil
+		}
+		g.logger.Debug("Determined gitlab.PullIsMergeable (which supports DetailedMergeStatus) to be false, detailed merge status is %s", mr.DetailedMergeStatus)
+		return false, nil
+	}
+	if (mr.MergeStatus == "can_be_merged") && //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
 		!mr.WorkInProgress &&
 		(allowSkippedPipeline || !isPipelineSkipped) {
+		g.logger.Debug("Determined gitlab.PullIsMergeable (which does not support DetailedMergeStatus) to be true")
 		return true, nil
 	}
+	g.logger.Debug("Determined gitlab.PullIsMergeable (which does not support DetailedMergeStatus) to be false, merge status is %s, approvals before merge is %d, blocking discussions resolved is %t, work in progress is %t, allow skipped pipeline is %t, is pipeline skipped is %t", mr.MergeStatus, mr.ApprovalsBeforeMerge, mr.BlockingDiscussionsResolved, mr.WorkInProgress, allowSkippedPipeline, isPipelineSkipped)
 	return false, nil
 }
 
