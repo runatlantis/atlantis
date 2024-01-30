@@ -418,7 +418,6 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 										Typename githubv4.String `graphql:"__typename"`
 										CheckRun struct {
 											Name       githubv4.String
-											Status     githubv4.String
 											Conclusion githubv4.String
 											IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
 										} `graphql:"... on CheckRun"`
@@ -463,7 +462,7 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 			switch context.Typename {
 			case "CheckRun":
 				if bool(context.CheckRun.IsRequired) &&
-					(context.CheckRun.Status != "COMPLETED" || context.CheckRun.Conclusion != "SUCCESS") &&
+					context.CheckRun.Conclusion != "SUCCESS" &&
 					!strings.HasPrefix(string(context.CheckRun.Name), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
 					return false, nil
 				}
