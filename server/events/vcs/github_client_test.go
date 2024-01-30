@@ -601,62 +601,74 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
 	vcsStatusName := "atlantis"
 	cases := []struct {
-		state          string
-		reviewDecision string
-		expMergeable   bool
+		state                     string
+		statusCheckRollupFilePath string
+		reviewDecision            string
+		expMergeable              bool
 	}{
 		{
 			"dirty",
+			"atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			false,
 		},
 		{
 			"unknown",
+			"atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			false,
 		},
 		{
 			"blocked",
+			"atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			false,
 		},
 		{
 			"blocked",
+			"atlantis-apply-pending.json",
 			`"APPROVED"`,
 			true,
 		},
 		{
 			"blocked",
+			"atlantis-apply-pending.json",
 			"null",
 			true,
 		},
 		{
 			"behind",
+			"atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			false,
 		},
 		{
 			"random",
+			"atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			false,
 		},
 		{
 			"unstable",
+			"atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			true,
 		},
 		{
 			"has_hooks",
+			"atlantis-apply-pending.json",
 			`"APPROVED"`,
 			true,
 		},
 		{
 			"clean",
+			"atlantis-apply-pending.json",
 			`"APPROVED"`,
 			true,
 		},
 		{
 			"",
+			"atlantis-apply-pending.json",
 			`"APPROVED"`,
 			false,
 		},
@@ -667,11 +679,6 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 	Ok(t, err)
 	prJSON := string(jsBytes)
 
-	// PR review decision and checks statuses Response
-	jsBytes, err = os.ReadFile("testdata/github-pull-request-mergeable-status.json")
-	Ok(t, err)
-	prMergeableStatusJSON := string(jsBytes)
-
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
 			response := strings.Replace(prJSON,
@@ -679,6 +686,11 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 				fmt.Sprintf(`"mergeable_state": "%s"`, c.state),
 				1,
 			)
+
+			// PR review decision and checks statuses Response
+			jsBytes, err = os.ReadFile("testdata/github-pull-request-mergeability/" + c.statusCheckRollupFilePath)
+			Ok(t, err)
+			prMergeableStatusJSON := string(jsBytes)
 
 			// PR review decision and checks statuses Response
 			prMergeableStatus := strings.Replace(prMergeableStatusJSON,
@@ -711,84 +723,6 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 				FullName:          "octocat/repo",
 				Owner:             "octocat",
 				Name:              "repo",
-				CloneURL:          "",
-				SanitizedCloneURL: "",
-				VCSHost: models.VCSHost{
-					Type:     models.Github,
-					Hostname: "github.com",
-				},
-			}, models.PullRequest{
-				Num: 1,
-			}, vcsStatusName)
-			Ok(t, err)
-			Equals(t, c.expMergeable, actMergeable)
-		})
-	}
-}
-
-func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApplyButWithNoBranchProtectionChecks(t *testing.T) {
-	vcsStatusName := "atlantis"
-	cases := []struct {
-		state          string
-		reviewDecision string
-		expMergeable   bool
-	}{
-		{
-			"blocked",
-			`"REVIEW_REQUIRED"`,
-			false,
-		},
-	}
-
-	// Use a real GitHub json response and edit the mergeable_state field.
-	jsBytes, err := os.ReadFile("testdata/github-pull-request.json")
-	Ok(t, err)
-	prJSON := string(jsBytes)
-
-	// PR review decision and checks statuses Response
-	jsBytes, err = os.ReadFile("testdata/github-pull-request-mergeable-status.json")
-	Ok(t, err)
-	prMergeableStatusJSON := string(jsBytes)
-
-	for _, c := range cases {
-		t.Run(c.state, func(t *testing.T) {
-			response := strings.Replace(prJSON,
-				`"mergeable_state": "clean"`,
-				fmt.Sprintf(`"mergeable_state": "%s"`, c.state),
-				1,
-			)
-
-			// PR review decision and checks statuses Response
-			prMergeableStatus := strings.Replace(prMergeableStatusJSON,
-				`"reviewDecision": "APPROVED",`,
-				fmt.Sprintf(`"reviewDecision": %s,`, c.reviewDecision),
-				1,
-			)
-
-			testServer := httptest.NewTLSServer(
-				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					switch r.RequestURI {
-					case "/api/v3/repos/octocat/Hello-World/pulls/1":
-						w.Write([]byte(response)) // nolint: errcheck
-						return
-					case "/api/graphql":
-						w.Write([]byte(prMergeableStatus)) // nolint: errcheck
-					default:
-						t.Errorf("got unexpected request at %q", r.RequestURI)
-						http.Error(w, "not found", http.StatusNotFound)
-						return
-					}
-				}))
-			testServerURL, err := url.Parse(testServer.URL)
-			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{AllowMergeableBypassApply: true}, logging.NewNoopLogger(t))
-			Ok(t, err)
-			defer disableSSLVerification()()
-
-			actMergeable, err := client.PullIsMergeable(models.Repo{
-				FullName:          "octocat/Hello-World",
-				Owner:             "octocat",
-				Name:              "Hello-World",
 				CloneURL:          "",
 				SanitizedCloneURL: "",
 				VCSHost: models.VCSHost{

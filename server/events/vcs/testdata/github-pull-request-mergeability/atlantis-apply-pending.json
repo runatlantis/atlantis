@@ -1,0 +1,39 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewDecision": "APPROVED",
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "contexts": {
+                    "pageInfo": {
+                      "endCursor": "QWERTY",
+                      "hasNextPage": false
+                    },
+                    "nodes": [
+                      {
+                        "__typename": "StatusContext",
+                        "context": "atlantis/apply",
+                        "state": "PENDING",
+                        "isRequired": true
+                      },
+                      {
+                        "__typename": "StatusContext",
+                        "context": "atlantis/plan",
+                        "state": "SUCCESS",
+                        "isRequired": false
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
