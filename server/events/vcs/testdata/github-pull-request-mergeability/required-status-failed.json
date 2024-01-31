@@ -2,7 +2,7 @@
   "data": {
     "repository": {
       "pullRequest": {
-        "reviewDecision": "APPROVED",
+        "reviewDecision": null,
         "commits": {
           "nodes": [
             {

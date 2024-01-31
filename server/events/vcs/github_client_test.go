@@ -724,7 +724,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 
 			// PR review decision and checks statuses Response
 			prMergeableStatus := strings.Replace(prMergeableStatusJSON,
-				`"reviewDecision": "APPROVED",`,
+				`"reviewDecision": null,`,
 				fmt.Sprintf(`"reviewDecision": %s,`, c.reviewDecision),
 				1,
 			)
