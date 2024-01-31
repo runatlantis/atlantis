@@ -167,7 +167,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 	exists := p.removeNonExistingDirs(uniqueDirs, absRepoDir)
 
 	for _, p := range exists {
-		projects = append(projects, models.NewProject(repoFullName, p))
+		projects = append(projects, models.NewProject(repoFullName, p, "???????????"))
 	}
 	log.Info("there are %d modified project(s) at path(s): %v",
 		len(projects), strings.Join(exists, ", "))
