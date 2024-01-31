@@ -473,7 +473,7 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 					return false, nil
 				}
 			default:
-				return false, fmt.Errorf("unknown type of status check, %s", context.Typename)
+				return false, fmt.Errorf("unknown type of status check, %q", context.Typename)
 			}
 		}
 
