@@ -113,20 +113,22 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 	repoDir string,
 ) error {
 	for i, hook := range preWorkflowHooks {
-		hookDescription := hook.StepDescription
-		if hookDescription == "" {
-			hookDescription = fmt.Sprintf("Pre workflow hook #%d", i)
+		ctx.HookDescription = hook.StepDescription
+		if ctx.HookDescription == "" {
+			ctx.HookDescription = fmt.Sprintf("Pre workflow hook #%d", i)
 		}
 
+		ctx.HookStepName = fmt.Sprintf("pre %s #%d", ctx.CommandName, i)
+
 		ctx.Log.Debug("Processing pre workflow hook '%s', Command '%s', Target commands [%s]",
-			hookDescription, ctx.CommandName, hook.Commands)
+			ctx.HookDescription, ctx.CommandName, hook.Commands)
 		if hook.Commands != "" && !strings.Contains(hook.Commands, ctx.CommandName) {
 			ctx.Log.Debug("Skipping pre workflow hook '%s' as command '%s' is not in Commands [%s]",
-				hookDescription, ctx.CommandName, hook.Commands)
+				ctx.HookDescription, ctx.CommandName, hook.Commands)
 			continue
 		}
 
-		ctx.Log.Debug("Running pre workflow hook: '%s'", hookDescription)
+		ctx.Log.Debug("Running pre workflow hook: '%s'", ctx.HookDescription)
 		ctx.HookID = uuid.NewString()
 		shell := hook.Shell
 		if shell == "" {
@@ -143,7 +145,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.PendingCommitStatus, hookDescription, "", url); err != nil {
+		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
 			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 			return err
 		}
@@ -151,13 +153,13 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
 
 		if err != nil {
-			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.FailedCommitStatus, hookDescription, runtimeDesc, url); err != nil {
+			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
 				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 			}
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.SuccessCommitStatus, hookDescription, runtimeDesc, url); err != nil {
+		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
 			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 			return err
 		}
