@@ -615,27 +615,39 @@ func (p ProjectPlanStatus) String() string {
 type WorkflowHookCommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
-	// HeadRepo is the repository that is getting merged into the BaseRepo.
-	// If the pull request branch is from the same repository then HeadRepo will
-	// be the same as BaseRepo.
-	HeadRepo Repo
-	// Log is a logger that's been set up for this context.
-	Log logging.SimpleLogging
-	// Pull is the pull request we're responding to.
-	Pull PullRequest
-	// User is the user that triggered this command.
-	User User
-	// Verbose is true when the user would like verbose output.
-	Verbose bool
+	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
+	CommandName string
 	// EscapedCommentArgs are the extra arguments that were added to the atlantis
 	// command, ex. atlantis plan -- -target=resource. We then escape them
 	// by adding a \ before each character so that they can be used within
 	// sh -c safely, i.e. sh -c "terraform plan $(touch bad)".
 	EscapedCommentArgs []string
+	// HeadRepo is the repository that is getting merged into the BaseRepo.
+	// If the pull request branch is from the same repository then HeadRepo will
+	// be the same as BaseRepo.
+	HeadRepo Repo
+	// HookDescription is a description of the hook that is being executed.
+	HookDescription string
 	// UUID for reference
 	HookID string
-	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
-	CommandName string
+	// HookStepName is the name of the step that is being executed.
+	HookStepName string
+	// Log is a logger that's been set up for this context.
+	Log logging.SimpleLogging
+	// Pull is the pull request we're responding to.
+	Pull PullRequest
+	// ProjectName is the name of the project set in atlantis.yaml. If there was
+	// no name this will be an empty string.
+	ProjectName string
+	// RepoRelDir is the directory of this project relative to the repo root.
+	RepoRelDir string
+	// User is the user that triggered this command.
+	User User
+	// Verbose is true when the user would like verbose output.
+	Verbose bool
+	// Workspace is the Terraform workspace this project is in. It will always
+	// be set.
+	Workspace string
 }
 
 // PlanSuccessStats holds stats for a plan.

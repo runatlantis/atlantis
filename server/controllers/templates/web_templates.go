@@ -161,21 +161,33 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <section>
     <p class="title-heading small"><strong>Jobs</strong></p>
     {{ if .PullToJobMapping }}
-    <div class="pulls-grid">
+    <div class="lock-grid">
     <div class="lock-header">
       <span>Repository</span>
       <span>Project</span>
       <span>Workspace</span>
-      <span>Jobs</span>
+      <span>Date/Time</span>
+      <span>Step</span>
+      <span>Description</span>
     </div>
     {{ range .PullToJobMapping }}
       <div class="pulls-row">
-      <span class="pulls-element">{{.Pull.RepoFullName}} #{{.Pull.PullNum}}</span>
-      <span class="pulls-element"><code>{{.Pull.Path}}</code></span>
-      <span class="pulls-element"><code>{{.Pull.Workspace}}</code></span>
+      <span class="pulls-element">{{ .Pull.RepoFullName }} #{{ .Pull.PullNum }}</span>
+      <span class="pulls-element">{{ if .Pull.Path }}<code>{{ .Pull.Path }}</code>{{ end }}</span>
+      <span class="pulls-element">{{ if .Pull.Workspace }}<code>{{ .Pull.Workspace }}</code>{{ end }}</span>
       <span class="pulls-element">
       {{ range .JobIDInfos }}
-        <div><a href="{{ $basePath }}{{ .JobIDUrl }}" target="_blank">{{ .TimeFormatted }}</a></div>
+        <div><span class="lock-datetime">{{ .TimeFormatted }}</span></div>
+      {{ end }}
+      </span>
+      <span class="pulls-element">
+      {{ range .JobIDInfos }}
+        <div><a href="{{ $basePath }}{{ .JobIDUrl }}" target="_blank">{{ .JobStep }}</a></div>
+      {{ end }}
+      </span>
+      <span class="pulls-element">
+      {{ range .JobIDInfos }}
+        <div>{{ .JobDescription }}</div>
       {{ end }}
       </span>
       </div>
