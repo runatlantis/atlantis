@@ -45,9 +45,10 @@ type LockIndexData struct {
 
 // ApplyLockData holds the fields to display in the index view
 type ApplyLockData struct {
-	Locked        bool
-	Time          time.Time
-	TimeFormatted string
+	Locked                 bool
+	GlobalApplyLockEnabled bool
+	Time                   time.Time
+	TimeFormatted          string
 }
 
 // IndexData holds the data for rendering the index page
@@ -98,6 +99,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
   </section>
   <section>
+    {{ if .ApplyLock.GlobalApplyLockEnabled }}
     {{ if .ApplyLock.Locked }}
     <div class="twelve center columns">
       <h6><strong>Apply commands are disabled globally</strong></h6>
@@ -110,6 +112,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
       <h6><strong>Apply commands are enabled</strong></h6>
       <a class="button button-primary" id="applyLockPrompt">Disable Apply Commands</a>
     </div>
+    {{ end }}
     {{ end }}
   </section>
   <br>
@@ -161,21 +164,33 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <section>
     <p class="title-heading small"><strong>Jobs</strong></p>
     {{ if .PullToJobMapping }}
-    <div class="pulls-grid">
+    <div class="lock-grid">
     <div class="lock-header">
       <span>Repository</span>
       <span>Project</span>
       <span>Workspace</span>
-      <span>Jobs</span>
+      <span>Date/Time</span>
+      <span>Step</span>
+      <span>Description</span>
     </div>
     {{ range .PullToJobMapping }}
       <div class="pulls-row">
-      <span class="pulls-element">{{.Pull.RepoFullName}} #{{.Pull.PullNum}}</span>
-      <span class="pulls-element"><code>{{.Pull.Path}}</code></span>
-      <span class="pulls-element"><code>{{.Pull.Workspace}}</code></span>
+      <span class="pulls-element">{{ .Pull.RepoFullName }} #{{ .Pull.PullNum }}</span>
+      <span class="pulls-element">{{ if .Pull.Path }}<code>{{ .Pull.Path }}</code>{{ end }}</span>
+      <span class="pulls-element">{{ if .Pull.Workspace }}<code>{{ .Pull.Workspace }}</code>{{ end }}</span>
       <span class="pulls-element">
       {{ range .JobIDInfos }}
-        <div><a href="{{ $basePath }}{{ .JobIDUrl }}" target="_blank">{{ .TimeFormatted }}</a></div>
+        <div><span class="lock-datetime">{{ .TimeFormatted }}</span></div>
+      {{ end }}
+      </span>
+      <span class="pulls-element">
+      {{ range .JobIDInfos }}
+        <div><a href="{{ $basePath }}{{ .JobIDUrl }}" target="_blank">{{ .JobStep }}</a></div>
+      {{ end }}
+      </span>
+      <span class="pulls-element">
+      {{ range .JobIDInfos }}
+        <div>{{ .JobDescription }}</div>
       {{ end }}
       </span>
       </div>

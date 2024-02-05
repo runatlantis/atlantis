@@ -6,7 +6,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func TestStepConfig_YAMLMarshalling(t *testing.T) {
@@ -155,7 +155,7 @@ key:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var got raw.Step
-			err := yaml.UnmarshalStrict([]byte(c.input), &got)
+			err := unmarshalString(c.input, &got)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
@@ -167,7 +167,7 @@ key:
 			Ok(t, err)
 
 			var got2 raw.Step
-			err = yaml.UnmarshalStrict([]byte(c.input), &got2)
+			err = unmarshalString(c.input, &got2)
 			Ok(t, err)
 			Equals(t, got2, got)
 		})
