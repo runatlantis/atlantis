@@ -42,12 +42,12 @@ require (
 	github.com/uber-go/tally/v4 v4.1.10
 	github.com/urfave/negroni/v3 v3.0.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605
-	github.com/xanzy/go-gitlab v0.96.0
+	github.com/xanzy/go-gitlab v0.97.0
 	go.etcd.io/bbolt v1.3.8
 	go.uber.org/zap v1.26.0
 	golang.org/x/term v0.16.0
 	golang.org/x/text v0.14.0
-	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -132,5 +132,4 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
