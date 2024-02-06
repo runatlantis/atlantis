@@ -187,7 +187,7 @@ func TestNewProject(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.path, func(t *testing.T) {
-			p := models.NewProject("repo/owner", c.path)
+			p := models.NewProject("repo/owner", c.path, "")
 			Equals(t, c.expPath, p.Path)
 		})
 	}

@@ -29,7 +29,7 @@ import (
 
 var lockBucket = "bucket"
 var configBucket = "configBucket"
-var project = models.NewProject("owner/repo", "parent/child")
+var project = models.NewProject("owner/repo", "parent/child", "")
 var workspace = "default"
 var pullNum = 1
 var lock = models.ProjectLock{
@@ -155,7 +155,7 @@ func TestListMultipleLocks(t *testing.T) {
 
 	for _, r := range repos {
 		newLock := lock
-		newLock.Project = models.NewProject(r, "path")
+		newLock.Project = models.NewProject(r, "path", "")
 		_, _, err := b.TryLock(newLock)
 		Ok(t, err)
 	}
@@ -207,7 +207,7 @@ func TestLockingExistingLock(t *testing.T) {
 	t.Log("...succeed if the new project has a different path")
 	{
 		newLock := lock
-		newLock.Project = models.NewProject(project.RepoFullName, "different/path")
+		newLock.Project = models.NewProject(project.RepoFullName, "different/path", "")
 		acquired, currLock, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
@@ -227,7 +227,7 @@ func TestLockingExistingLock(t *testing.T) {
 	t.Log("...succeed if the new project has a different repoName")
 	{
 		newLock := lock
-		newLock.Project = models.NewProject("different/repo", project.Path)
+		newLock.Project = models.NewProject("different/repo", project.Path, "")
 		acquired, currLock, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)

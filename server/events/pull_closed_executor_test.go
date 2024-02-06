@@ -107,7 +107,7 @@ func TestCleanUpPullComments(t *testing.T) {
 			"single lock, empty path",
 			[]models.ProjectLock{
 				{
-					Project:   models.NewProject("owner/repo", ""),
+					Project:   models.NewProject("owner/repo", "", ""),
 					Workspace: "default",
 				},
 			},
@@ -117,7 +117,7 @@ func TestCleanUpPullComments(t *testing.T) {
 			"single lock, non-empty path",
 			[]models.ProjectLock{
 				{
-					Project:   models.NewProject("owner/repo", "path"),
+					Project:   models.NewProject("owner/repo", "path", ""),
 					Workspace: "default",
 				},
 			},
@@ -127,11 +127,11 @@ func TestCleanUpPullComments(t *testing.T) {
 			"single path, multiple workspaces",
 			[]models.ProjectLock{
 				{
-					Project:   models.NewProject("owner/repo", "path"),
+					Project:   models.NewProject("owner/repo", "path", ""),
 					Workspace: "workspace1",
 				},
 				{
-					Project:   models.NewProject("owner/repo", "path"),
+					Project:   models.NewProject("owner/repo", "path", ""),
 					Workspace: "workspace2",
 				},
 			},
@@ -141,19 +141,19 @@ func TestCleanUpPullComments(t *testing.T) {
 			"multiple paths, multiple workspaces",
 			[]models.ProjectLock{
 				{
-					Project:   models.NewProject("owner/repo", "path"),
+					Project:   models.NewProject("owner/repo", "path", ""),
 					Workspace: "workspace1",
 				},
 				{
-					Project:   models.NewProject("owner/repo", "path"),
+					Project:   models.NewProject("owner/repo", "path", ""),
 					Workspace: "workspace2",
 				},
 				{
-					Project:   models.NewProject("owner/repo", "path2"),
+					Project:   models.NewProject("owner/repo", "path2", ""),
 					Workspace: "workspace1",
 				},
 				{
-					Project:   models.NewProject("owner/repo", "path2"),
+					Project:   models.NewProject("owner/repo", "path2", ""),
 					Workspace: "workspace2",
 				},
 			},
@@ -260,7 +260,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 
 		locks := []models.ProjectLock{
 			{
-				Project:   models.NewProject(testdata.GithubRepo.FullName, ""),
+				Project:   models.NewProject(testdata.GithubRepo.FullName, "", ""),
 				Workspace: "default",
 			},
 		}
