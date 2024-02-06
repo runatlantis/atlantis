@@ -114,6 +114,17 @@ func TestCleanUpPullComments(t *testing.T) {
 			"- dir: `.` workspace: `default`",
 		},
 		{
+			"single lock, named project",
+			[]models.ProjectLock{
+				{
+					Project:   models.NewProject("owner/repo", "", "projectname"),
+					Workspace: "default",
+				},
+			},
+			// TODO: Should project name be included in output?
+			"- dir: `.` workspace: `default`",
+		},
+		{
 			"single lock, non-empty path",
 			[]models.ProjectLock{
 				{

@@ -258,6 +258,7 @@ type Project struct {
 }
 
 func (p Project) String() string {
+	// TODO: Incorporate ProjectName?
 	return fmt.Sprintf("repofullname=%s path=%s", p.RepoFullName, p.Path)
 }
 

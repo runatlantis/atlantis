@@ -270,6 +270,19 @@ func TestLockingExistingLock(t *testing.T) {
 		Equals(t, newLock, currLock)
 	}
 
+	// TODO: How should we handle different name?
+	/*
+		t.Log("...succeed if the new project has a different name")
+		{
+			newLock := lock
+			newLock.Project = models.NewProject(project.RepoFullName, project.Path, "different-name")
+			acquired, currLock, err := rdb.TryLock(newLock)
+			Ok(t, err)
+			Equals(t, true, acquired)
+			Equals(t, newLock, currLock)
+		}
+	*/
+
 	t.Log("...not succeed if the new project only has a different pullNum")
 	{
 		newLock := lock
