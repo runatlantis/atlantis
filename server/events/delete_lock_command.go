@@ -54,13 +54,10 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNu
 		return numLocks, nil
 	}
 
-	// The locks controller currently has no implementation of Atlantis project names, so this is hardcoded to an empty string.
-	projectName := ""
-
 	for i := 0; i < numLocks; i++ {
 		lock := locks[i]
 
-		err := l.WorkingDir.DeletePlan(lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, projectName)
+		err := l.WorkingDir.DeletePlan(lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, lock.Project.ProjectName)
 		if err != nil {
 			l.Logger.Warn("Failed to delete plan: %s", err)
 			return numLocks, err
