@@ -7,7 +7,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v2"
 )
 
 func TestConfig_UnmarshalYAML(t *testing.T) {
@@ -202,7 +201,7 @@ allowed_regexp_prefixes:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var conf raw.RepoCfg
-			err := yaml.UnmarshalStrict([]byte(c.input), &conf)
+			err := unmarshalString(c.input, &conf)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return

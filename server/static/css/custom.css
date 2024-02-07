@@ -256,7 +256,6 @@ tbody {
 
 .lock-row {
   display: contents;
-  text-transform: uppercase;
 }
 
 .lock-row a {
@@ -311,7 +310,6 @@ tbody {
 
 .pulls-row {
   display: contents;
-  text-transform: uppercase;
 }
 
 .pulls-element {

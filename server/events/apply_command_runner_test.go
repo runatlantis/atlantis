@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v58/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -258,7 +258,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---",
+				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "When first apply fails, the second not will run",
@@ -343,7 +343,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---",
+				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "When one out of two fails, the following two will not run",
@@ -398,7 +398,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"3. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
-				"4. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
+				"4. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n4 projects, 3 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "Don't block when parallel is not set",
@@ -430,7 +430,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
+				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "Don't block when abortOnExcecutionOrderFail is not set",
@@ -460,7 +460,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
+				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 	}
 
