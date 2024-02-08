@@ -2,6 +2,7 @@ import { googleAnalyticsPlugin } from '@vuepress/plugin-google-analytics'
 import { docsearchPlugin } from '@vuepress/plugin-docsearch'
 import { getDirname, path } from '@vuepress/utils'
 import { defaultTheme, defineUserConfig } from 'vuepress'
+import { sitemapPlugin } from 'vuepress-plugin-sitemap2';
 
 const __dirname = getDirname(import.meta.url)
 
@@ -26,6 +27,9 @@ export default defineUserConfig({
     plugins: [
         googleAnalyticsPlugin({
             id: 'UA-6850151-3',
+        }),
+        sitemapPlugin({
+            hostname: 'https://runatlantis.io',
         }),
         docsearchPlugin({
             // We internally discussed how this API key is exposed in the code and decided
