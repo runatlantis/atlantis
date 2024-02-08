@@ -43,6 +43,12 @@ jobs:
     container: ghcr.io/runatlantis/testing-env:latest
     steps:
       - uses: actions/checkout@v4
+
+      # need to setup go toolchain explicitly
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - run: make test-all
       - run: make check-fmt
       ###########################################################
