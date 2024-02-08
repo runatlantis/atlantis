@@ -121,11 +121,9 @@ jobs:
 
     # Publish release to container registry
     - name: Populate release version
-      if: contains(fromJson('["push", "pull_request"]'), github.event_name)
       run: echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
 
     - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
-      if: contains(fromJson('["push", "pull_request"]'), github.event_name)
       uses: docker/build-push-action@v5
       with:
         cache-from: type=gha
@@ -137,7 +135,7 @@ jobs:
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
         platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
-        push: ${{ env.PUSH }}
+        push: true
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ matrix.image_type }}
         labels: ${{ steps.meta.outputs.labels }}
