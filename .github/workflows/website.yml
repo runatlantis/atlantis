@@ -33,7 +33,7 @@ jobs:
           filters: |
             src:
               - '**.js'
-              - 'yarn.lock'
+              - 'pnpm-lock.yaml'
               - 'package.json'
               - '.github/workflows/website.yml'
 
@@ -48,24 +48,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: wyvox/action-setup-pnpm@v3
         with:
-          node-version-file: .node-version
+          node-version: 20
 
       - name: run http-server
         env:
           # renovate: datasource=github-releases depName=raviqqe/muffet
           MUFFET_VERSION: 2.9.3
         run: |
-          npm install -g yarn
-
           # install raviqqe/muffet to check for broken links.
           curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
 
-          # build the site
-          yarn && yarn website:build
+          # build site
+          pnpm install
+          pnpm website:build
 
-          # run http-server for muffet to check the links
+          # start http-server for integration testing
           npx http-server runatlantis.io/.vuepress/dist &
 
       - name: wait until server listened
