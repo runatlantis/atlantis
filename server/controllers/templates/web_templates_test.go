@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runatlantis/atlantis/server/jobs"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -28,6 +29,21 @@ func TestIndexTemplate(t *testing.T) {
 		},
 		AtlantisVersion: "v0.0.0",
 		CleanedBasePath: "/path",
+		PullToJobMapping: []jobs.PullInfoWithJobIDs{
+			{
+				Pull: jobs.PullInfo{
+					PullNum:      1,
+					Repo:         "repo",
+					RepoFullName: "repo full name",
+					ProjectName:  "project name",
+					Path:         "path",
+					Workspace:    "workspace",
+				},
+				JobIDInfos: []jobs.JobIDInfo{
+					{JobID: "job id", JobIDUrl: "job id url", JobDescription: "job description", Time: time.Now(), TimeFormatted: "02-01-2006 15:04:05", JobStep: "job step"},
+				},
+			},
+		},
 	})
 	Ok(t, err)
 }

@@ -1,9 +1,10 @@
 package events
 
 import (
+	"slices"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"slices"
 )
 
 func NewUnlockCommandRunner(
@@ -29,10 +30,7 @@ type UnlockCommandRunner struct {
 	DisableUnlockLabel string
 }
 
-func (u *UnlockCommandRunner) Run(
-	ctx *command.Context,
-	cmd *CommentCommand,
-) {
+func (u *UnlockCommandRunner) Run(ctx *command.Context, _ *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pullNum := ctx.Pull.Num
 	disableUnlockLabel := u.DisableUnlockLabel

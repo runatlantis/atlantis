@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v54/github"
+	"github.com/google/go-github/v58/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -153,6 +153,16 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
+	// Check if the user who triggered the autoplan has permissions to run 'plan'.
+	ok, err := c.checkUserPermissions(baseRepo, user, "plan")
+	if err != nil {
+		c.Logger.Err("Unable to check user permissions: %s", err)
+		return
+	}
+	if !ok {
+		return
+	}
+
 	ctx := &command.Context{
 		User:       user,
 		Log:        log,
@@ -227,7 +237,7 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 }
 
 // checkUserPermissions checks if the user has permissions to execute the command
-func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmd *CommentCommand) (bool, error) {
+func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmdName string) (bool, error) {
 	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
 		// allowlist restriction is not enabled
 		return true, nil
@@ -236,7 +246,7 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 	if err != nil {
 		return false, err
 	}
-	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmd.Name.String())
+	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmdName)
 	if !ok {
 		return false, nil
 	}
@@ -278,7 +288,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	defer timer.Stop()
 
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
-	ok, err := c.checkUserPermissions(baseRepo, user, cmd)
+	ok, err := c.checkUserPermissions(baseRepo, user, cmd.Name.String())
 	if err != nil {
 		c.Logger.Err("Unable to check user permissions: %s", err)
 		return
@@ -415,7 +425,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	baseRepo models.Repo,
 	maybeHeadRepo *models.Repo,
 	maybePull *models.PullRequest,
-	user models.User,
+	_ models.User,
 	pullNum int,
 	log logging.SimpleLogging,
 ) (headRepo models.Repo, pull models.PullRequest, err error) {

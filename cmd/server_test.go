@@ -24,7 +24,7 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
@@ -38,7 +38,7 @@ var passedConfig server.UserConfig
 
 type ServerCreatorMock struct{}
 
-func (s *ServerCreatorMock) NewServer(userConfig server.UserConfig, config server.Config) (ServerStarter, error) {
+func (s *ServerCreatorMock) NewServer(userConfig server.UserConfig, _ server.Config) (ServerStarter, error) {
 	passedConfig = userConfig
 	return &ServerStarterMock{}, nil
 }
@@ -52,14 +52,18 @@ func (s *ServerStarterMock) Start() error {
 // Adding a new flag? Add it to this slice for testing in alphabetical
 // order.
 var testFlags = map[string]interface{}{
+	ADHostnameFlag:                   "dev.azure.com",
 	ADTokenFlag:                      "ad-token",
 	ADUserFlag:                       "ad-user",
 	ADWebhookPasswordFlag:            "ad-wh-pass",
 	ADWebhookUserFlag:                "ad-wh-user",
 	AtlantisURLFlag:                  "url",
-	AllowCommandsFlag:                "version,plan,unlock,import,approve_policies", // apply is disabled by DisableApply
+	AutoplanModules:                  false,
+	AutoplanModulesFromProjects:      "",
+	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
 	AllowForkPRsFlag:                 true,
-	AllowRepoConfigFlag:              true,
+	APISecretFlag:                    "",
+	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
 	AutoplanFileListFlag:             "**/*.tf,**/*.yml",
 	BitbucketBaseURLFlag:             "https://bitbucket-base-url.com",
@@ -67,14 +71,20 @@ var testFlags = map[string]interface{}{
 	BitbucketUserFlag:                "bitbucket-user",
 	BitbucketWebhookSecretFlag:       "bitbucket-secret",
 	CheckoutStrategyFlag:             CheckoutStrategyMerge,
+	CheckoutDepthFlag:                0,
 	DataDirFlag:                      "/path",
 	DefaultTFVersionFlag:             "v0.11.0",
 	DisableApplyAllFlag:              true,
-	DisableApplyFlag:                 true,
 	DisableMarkdownFoldingFlag:       true,
 	DisableRepoLockingFlag:           true,
+	DisableGlobalApplyLockFlag:       false,
 	DiscardApprovalOnPlanFlag:        true,
+	EmojiReaction:                    "eyes",
+	ExecutableName:                   "atlantis",
+	FailOnPreWorkflowHookError:       false,
+	GHAllowMergeableBypassApply:      false,
 	GHHostnameFlag:                   "ghhostname",
+	GHTeamAllowlistFlag:              "",
 	GHTokenFlag:                      "token",
 	GHUserFlag:                       "user",
 	GHAppIDFlag:                      int64(0),
@@ -87,6 +97,9 @@ var testFlags = map[string]interface{}{
 	GitlabTokenFlag:                  "gitlab-token",
 	GitlabUserFlag:                   "gitlab-user",
 	GitlabWebhookSecretFlag:          "gitlab-secret",
+	HideUnchangedPlanComments:        false,
+	HidePrevPlanComments:             false,
+	IncludeGitUntrackedFiles:         false,
 	LockingDBType:                    "boltdb",
 	LogLevelFlag:                     "debug",
 	MarkdownTemplateOverridesDirFlag: "/path2",
@@ -96,10 +109,18 @@ var testFlags = map[string]interface{}{
 	ParallelPoolSize:                 100,
 	ParallelPlanFlag:                 true,
 	ParallelApplyFlag:                true,
+	QuietPolicyChecks:                false,
+	RedisHost:                        "",
+	RedisInsecureSkipVerify:          false,
+	RedisPassword:                    "",
+	RedisPort:                        6379,
+	RedisTLSEnabled:                  false,
+	RedisDB:                          0,
 	RepoAllowlistFlag:                "github.com/runatlantis/atlantis",
-	RequireApprovalFlag:              true,
-	RequireMergeableFlag:             true,
+	RepoConfigFlag:                   "",
+	RepoConfigJSONFlag:               "",
 	SilenceNoProjectsFlag:            false,
+	SilenceVCSStatusNoProjectsFlag:   false,
 	SilenceForkPRErrorsFlag:          true,
 	SilenceAllowlistErrorsFlag:       true,
 	SilenceVCSStatusNoPlans:          true,
@@ -108,11 +129,18 @@ var testFlags = map[string]interface{}{
 	SSLCertFileFlag:                  "cert-file",
 	SSLKeyFileFlag:                   "key-file",
 	RestrictFileList:                 false,
+	TFDownloadFlag:                   true,
 	TFDownloadURLFlag:                "https://my-hostname.com",
 	TFEHostnameFlag:                  "my-hostname",
 	TFELocalExecutionModeFlag:        true,
 	TFETokenFlag:                     "my-token",
+	UseTFPluginCache:                 true,
+	VarFileAllowlistFlag:             "/path",
 	VCSStatusName:                    "my-status",
+	WebBasicAuthFlag:                 false,
+	WebPasswordFlag:                  "atlantis",
+	WebUsernameFlag:                  "atlantis",
+	WebsocketCheckOrigin:             false,
 	WriteGitCredsFlag:                true,
 	DisableAutoplanFlag:              true,
 	DisableAutoplanLabelFlag:         "no-auto-plan",
@@ -183,6 +211,32 @@ func TestExecute_Flags(t *testing.T) {
 	for flag, exp := range testFlags {
 		Equals(t, exp, configVal(t, passedConfig, flag))
 	}
+}
+
+func TestUserConfigAllTested(t *testing.T) {
+	t.Log("All settings in userConfig should be tested.")
+
+	u := reflect.TypeOf(server.UserConfig{})
+
+	for i := 0; i < u.NumField(); i++ {
+
+		userConfigKey := u.Field(i).Tag.Get("mapstructure")
+		t.Run(userConfigKey, func(t *testing.T) {
+			// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
+			// Some fields are too complicated to have flags, so are only expressible in the config yaml
+			flagKey := u.Field(i).Tag.Get("flag")
+			if flagKey == "false" {
+				return
+			}
+			// If a setting is configured in server.UserConfig, it should be tested here. If there is no corresponding const
+			// for specifying the flag, that probably means one *also* needs to be added to server.go
+			if _, ok := testFlags[userConfigKey]; !ok {
+				t.Errorf("server.UserConfig has field with mapstructure %s that is not tested, and potentially also not configured as a flag. Either add it to testFlags (and potentially as a const in cmd/server), or remove it from server.UserConfig", userConfigKey)
+			}
+		})
+
+	}
+
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
@@ -760,16 +814,6 @@ func TestExecute_AllowAndWhitelist(t *testing.T) {
 	}, t)
 	err := c.Execute()
 	ErrEquals(t, "--repo-allowlist must be set for security purposes", err)
-}
-
-func TestExecute_DisableApplyDeprecation(t *testing.T) {
-	c := setupWithDefaults(map[string]interface{}{
-		DisableApplyFlag:  true,
-		AllowCommandsFlag: "plan,apply,unlock",
-	}, t)
-	err := c.Execute()
-	Ok(t, err)
-	Equals(t, "plan,unlock", passedConfig.AllowCommands)
 }
 
 func TestExecute_AutoDetectModulesFromProjects_Env(t *testing.T) {

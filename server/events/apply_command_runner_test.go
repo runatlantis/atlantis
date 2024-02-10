@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v54/github"
+	"github.com/google/go-github/v58/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -34,13 +34,13 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			ExpComment:     "**Error:** Running `atlantis apply` is disabled.",
 		},
 		{
-			Description:    "When no global apply lock is present and DisableApply flag is false IsDisabled returns false",
+			Description:    "When no global apply lock is present IsDisabled returns false",
 			ApplyLocked:    false,
 			ApplyLockError: nil,
 			ExpComment:     "Ran Apply for 0 projects:",
 		},
 		{
-			Description:    "If ApplyLockChecker returns an error IsDisabled return value of DisableApply flag",
+			Description:    "If ApplyLockChecker returns an error IsDisabled returns false",
 			ApplyLockError: errors.New("error"),
 			ApplyLocked:    false,
 			ExpComment:     "Ran Apply for 0 projects:",
@@ -249,7 +249,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				},
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 			},
 			RunnerInvokeMatch: []*EqMatcher{
@@ -258,7 +258,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---",
+				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "When first apply fails, the second not will run",
@@ -279,7 +279,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:      command.Apply,
@@ -290,7 +290,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Never(),
 			},
-			ExpComment: "Ran Apply for dir: `` workspace: ``\n\n**Apply Error**\n```\nShabang!\n```",
+			ExpComment: "Ran Apply for dir: `` workspace: ``\n\n**Apply Error**\n```\nshabang\n```",
 		},
 		{
 			Description: "When both in a group of two succeeds, the following two will run",
@@ -324,7 +324,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				},
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:      command.Apply,
@@ -343,7 +343,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---",
+				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "When one out of two fails, the following two will not run",
@@ -381,7 +381,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				},
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:      command.Apply,
@@ -397,8 +397,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			ExpComment: "Ran Apply for 4 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"3. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---\n### " +
-				"4. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
+				"3. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
+				"4. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n4 projects, 3 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "Don't block when parallel is not set",
@@ -417,7 +417,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:      command.Apply,
@@ -429,8 +429,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
+				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "Don't block when abortOnExcecutionOrderFail is not set",
@@ -447,7 +447,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Apply,
-					Error:   errors.New("Shabang!"),
+					Error:   errors.New("shabang"),
 				},
 				{
 					Command:      command.Apply,
@@ -459,8 +459,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nShabang!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---",
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
+				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 	}
 
