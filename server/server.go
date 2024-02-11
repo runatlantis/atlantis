@@ -305,7 +305,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GiteaToken != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitea)
 
-		giteaClient, err = gitea.NewClient(userConfig.GiteaHostname, userConfig.GiteaUser, userConfig.GiteaToken)
+		giteaClient, err = gitea.NewClient(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken)
 		if err != nil {
 			return nil, err
 		}

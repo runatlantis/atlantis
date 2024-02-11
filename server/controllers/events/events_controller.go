@@ -34,6 +34,7 @@ import (
 )
 
 const githubHeader = "X-Github-Event"
+const giteaHeader = "X-Gitea-Event"
 const gitlabHeader = "X-Gitlab-Event"
 const azuredevopsHeader = "Request-Id"
 
@@ -95,9 +96,17 @@ type VCSEventsController struct {
 
 // Post handles POST webhook requests.
 func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get(githubHeader) != "" {
+	if r.Header.Get(giteaHeader) != "" {
+		if !e.supportsHost(models.Gitea) {
+			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Gitea")
+			return
+		}
+		e.Logger.Debug("handling Gitea post")
+		e.handleGithubPost(w, r)
+		return
+	} else if r.Header.Get(githubHeader) != "" {
 		if !e.supportsHost(models.Github) {
-			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitHub")
+			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Github")
 			return
 		}
 		e.Logger.Debug("handling GitHub post")

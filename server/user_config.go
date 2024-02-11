@@ -47,10 +47,6 @@ type UserConfig struct {
 	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
 	FailOnPreWorkflowHookError      bool   `mapstructure:"fail-on-pre-workflow-hook-error"`
 	HideUnchangedPlanComments       bool   `mapstructure:"hide-unchanged-plan-comments"`
-	GiteaUser                       string `mapstructure:"gitea-user"`
-	GiteaAppID                      int64  `mapstructure:"gitea-app-id"`
-	GiteaHostname                   string `mapstructure:"gitea-hostname"`
-	GiteaToken                      string `mapstructure:"gitea-token"`
 	GithubAllowMergeableBypassApply bool   `mapstructure:"gh-allow-mergeable-bypass-apply"`
 	GithubHostname                  string `mapstructure:"gh-hostname"`
 	GithubToken                     string `mapstructure:"gh-token"`
@@ -62,6 +58,10 @@ type UserConfig struct {
 	GithubAppKeyFile                string `mapstructure:"gh-app-key-file"`
 	GithubAppSlug                   string `mapstructure:"gh-app-slug"`
 	GithubTeamAllowlist             string `mapstructure:"gh-team-allowlist"`
+	GiteaUser                       string `mapstructure:"gitea-user"`
+	GiteaBaseURL                    string `mapstructure:"gitea-base-url"`
+	GiteaToken                      string `mapstructure:"gitea-token"`
+	GiteaWebhookSecret              string `mapstructure:"gitea-webhook-secret"`
 	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`

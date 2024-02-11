@@ -42,6 +42,7 @@ import (
 )
 
 const githubHeader = "X-Github-Event"
+const giteaHeader = "X-Gitea-Event"
 const gitlabHeader = "X-Gitlab-Event"
 const azuredevopsHeader = "Request-Id"
 
@@ -68,6 +69,17 @@ func TestPost_UnsupportedVCSGithub(t *testing.T) {
 	ResponseContains(t, w, http.StatusBadRequest, "Ignoring request since not configured to support GitHub")
 }
 
+func TestPost_UnsupportedVCSGitea(t *testing.T) {
+	t.Log("when the request is for an unsupported vcs a 400 is returned")
+	e, _, _, _, _, _, _, _, _ := setup(t)
+	e.SupportedVCSHosts = nil
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(giteaHeader, "value")
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusBadRequest, "Ignoring request since not configured to support Gitea")
+}
+
 func TestPost_UnsupportedVCSGitlab(t *testing.T) {
 	t.Log("when the request is for an unsupported vcs a 400 is returned")
 	e, _, _, _, _, _, _, _, _ := setup(t)
@@ -90,6 +102,17 @@ func TestPost_InvalidGithubSecret(t *testing.T) {
 	ResponseContains(t, w, http.StatusBadRequest, "err")
 }
 
+func TestPost_InvalidGiteaSecret(t *testing.T) {
+	t.Log("when the gitea payload can't be validated a 400 is returned")
+	e, v, _, _, _, _, _, _, _ := setup(t)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(giteaHeader, "value")
+	When(v.Validate(req, secret)).ThenReturn(nil, errors.New("err"))
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusBadRequest, "err")
+}
+
 func TestPost_InvalidGitlabSecret(t *testing.T) {
 	t.Log("when the gitlab payload can't be validated a 400 is returned")
 	e, _, gl, _, _, _, _, _, _ := setup(t)
@@ -107,6 +130,17 @@ func TestPost_UnsupportedGithubEvent(t *testing.T) {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "value")
+	When(v.Validate(req, nil)).ThenReturn([]byte(`{"not an event": ""}`), nil)
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, "Ignoring unsupported event")
+}
+
+func TestPost_UnsupportedGiteaEvent(t *testing.T) {
+	t.Log("when the event type is an unsupported gitea event we ignore it")
+	e, v, _, _, _, _, _, _, _ := setup(t)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(giteaHeader, "value")
 	When(v.Validate(req, nil)).ThenReturn([]byte(`{"not an event": ""}`), nil)
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Ignoring unsupported event")
