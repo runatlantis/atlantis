@@ -62,6 +62,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
+	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -176,6 +177,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
 	var azuredevopsClient *vcs.AzureDevopsClient
+	var giteaClient *gitea.GiteaClient
 
 	policyChecksEnabled := false
 	if userConfig.EnablePolicyChecksFlag {
@@ -300,6 +302,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, err
 		}
 	}
+	if userConfig.GiteaToken != "" {
+		supportedVCSHosts = append(supportedVCSHosts, models.Gitea)
+
+		giteaClient, err = gitea.NewClient(userConfig.GiteaHostname, userConfig.GiteaUser, userConfig.GiteaToken)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	home, err := homedir.Dir()
 	if err != nil {
@@ -356,7 +366,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
-	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
+	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient, giteaClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)

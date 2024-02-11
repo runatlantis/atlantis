@@ -300,6 +300,7 @@ const (
 	BitbucketCloud
 	BitbucketServer
 	AzureDevops
+	Gitea
 )
 
 func (h VCSHostType) String() string {
@@ -314,6 +315,8 @@ func (h VCSHostType) String() string {
 		return "BitbucketServer"
 	case AzureDevops:
 		return "AzureDevops"
+	case Gitea:
+		return "Gitea"
 	}
 	return "<missing String() implementation>"
 }
@@ -330,6 +333,8 @@ func NewVCSHostType(t string) (VCSHostType, error) {
 		return BitbucketServer, nil
 	case "AzureDevops":
 		return AzureDevops, nil
+	case "Gitea":
+		return Gitea, nil
 	}
 
 	return -1, fmt.Errorf("%q is not a valid type", t)
