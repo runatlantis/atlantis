@@ -28,7 +28,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var project = models.NewProject("owner/repo", "path")
+var project = models.NewProject("owner/repo", "path", "")
 var workspace = "workspace"
 var pull = models.PullRequest{}
 var user = models.User{}

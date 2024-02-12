@@ -119,7 +119,7 @@ func TestDeleteLocksByPull_SingleSuccess(t *testing.T) {
 	pullNum := 2
 	path := "."
 	workspace := "default"
-	projectName := ""
+	projectName := "projectname"
 
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
@@ -135,6 +135,7 @@ func TestDeleteLocksByPull_SingleSuccess(t *testing.T) {
 			Project: models.Project{
 				Path:         path,
 				RepoFullName: pull.BaseRepo.FullName,
+				ProjectName:  projectName,
 			},
 		},
 	}, nil,
