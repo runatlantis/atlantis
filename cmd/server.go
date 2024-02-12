@@ -93,6 +93,10 @@ const (
 	GHOrganizationFlag               = "gh-org"
 	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
 	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
+	GiteaHostnameFlag                = "gitea-hostname"
+	GiteaTokenFlag                   = "gitea-token"
+	GiteaUserFlag                    = "gitea-user"
+	GiteaWebhookSecretFlag           = "gitea-webhook-secret"
 	GitlabHostnameFlag               = "gitlab-hostname"
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
@@ -317,6 +321,21 @@ var stringFlags = map[string]stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
+	},
+	GiteaHostnameFlag: {
+		description: "Hostname of your Gitea installation.",
+	},
+	GiteaUserFlag: {
+		description: "Gitea username of API user.",
+	},
+	GiteaTokenFlag: {
+		description: "Gitea token of API user.",
+	},
+	GiteaWebhookSecretFlag: {
+		description: "Optional secret used to validate GitLab webhooks." +
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
 	},
 	GitlabHostnameFlag: {
 		description:  "Hostname of your GitLab Enterprise installation. If using gitlab.com, no need to set.",
@@ -889,8 +908,8 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// 4. bitbucket user and token set
 	// 5. azuredevops user and token set
 	// 6. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag, GiteaUserFlag, GiteaTokenFlag)
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.GiteaUser == "") != (userConfig.GiteaToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
 		return vcsErr
 	}
 	if (userConfig.GithubAppID != 0) && ((userConfig.GithubAppKey == "") && (userConfig.GithubAppKeyFile == "")) {
@@ -901,7 +920,7 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
-	if userConfig.GithubAppID == 0 && userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" {
+	if userConfig.GithubAppID == 0 && userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" && userConfig.GiteaUser == "" {
 		return vcsErr
 	}
 
@@ -936,6 +955,8 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		GitlabWebhookSecretFlag:    userConfig.GitlabWebhookSecret,
 		BitbucketTokenFlag:         userConfig.BitbucketToken,
 		BitbucketWebhookSecretFlag: userConfig.BitbucketWebhookSecret,
+		GiteaTokenFlag:             userConfig.GiteaToken,
+		GiteaWebhookSecretFlag:     userConfig.GiteaWebhookSecret,
 	} {
 		if strings.Contains(token, "\n") {
 			s.Logger.Warn("--%s contains a newline which is usually unintentional", name)
