@@ -58,9 +58,9 @@ type UserConfig struct {
 	GithubAppKeyFile                string `mapstructure:"gh-app-key-file"`
 	GithubAppSlug                   string `mapstructure:"gh-app-slug"`
 	GithubTeamAllowlist             string `mapstructure:"gh-team-allowlist"`
-	GiteaUser                       string `mapstructure:"gitea-user"`
 	GiteaBaseURL                    string `mapstructure:"gitea-base-url"`
 	GiteaToken                      string `mapstructure:"gitea-token"`
+	GiteaUser                       string `mapstructure:"gitea-user"`
 	GiteaWebhookSecret              string `mapstructure:"gitea-webhook-secret"`
 	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
 	GitlabToken                     string `mapstructure:"gitlab-token"`

@@ -307,9 +307,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 		giteaClient, err = gitea.NewClient(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken)
 		if err != nil {
-			return nil, err
+			fmt.Println("error setting up gitea client", "error", err)
+			return nil, errors.Wrapf(err, "setting up Gitea client")
+		} else {
+			logger.Info("gitea client configured successfully")
 		}
 	}
+
+	logger.Info("Supported VCS Hosts", "hosts", supportedVCSHosts)
 
 	home, err := homedir.Dir()
 	if err != nil {
@@ -340,6 +345,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 		if userConfig.AzureDevopsUser != "" {
 			if err := vcs.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger, false); err != nil {
+				return nil, err
+			}
+		}
+		if userConfig.GiteaUser != "" {
+			if err := vcs.WriteGitCreds(userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaHostname, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -808,6 +818,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubPullGetter:               githubClient,
 		GitlabMergeRequestGetter:       gitlabClient,
 		AzureDevopsPullGetter:          azuredevopsClient,
+		GiteaPullGetter:                giteaClient,
 		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
 		EventParser:                    eventParser,
 		FailOnPreWorkflowHookError:     userConfig.FailOnPreWorkflowHookError,
