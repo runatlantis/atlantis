@@ -8,7 +8,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v2"
 )
 
 func TestProject_UnmarshalYAML(t *testing.T) {
@@ -74,7 +73,7 @@ execution_order_group: 10`,
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var p raw.Project
-			err := yaml.UnmarshalStrict([]byte(c.input), &p)
+			err := unmarshalString(c.input, &p)
 			Ok(t, err)
 			Equals(t, c.exp, p)
 		})

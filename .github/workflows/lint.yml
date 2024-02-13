@@ -40,11 +40,17 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
+
+    # need to setup go toolchain explicitly
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+
     - name: golangci-lint
       uses: reviewdog/action-golangci-lint@v2
       with:
         tool_name: golangci-lint
-  
+
   skip-lint:
     needs: [changes]
     if: needs.changes.outputs.should-run-linting == 'false'
