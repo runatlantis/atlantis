@@ -1,24 +1,46 @@
 package gitea
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 type GiteaClient struct {
 	giteaClient *gitea.Client
 	username    string
 	token       string
+	client      *gitea.Client
+	ctx         context.Context
+	logger      logging.SimpleLogging
+}
+
+type GiteaPRReviewSummary struct {
+	Reviews []GiteaReview
+}
+
+type GiteaReview struct {
+	ID          int64
+	Body        string
+	Reviewer    string
+	State       gitea.ReviewStateType // e.g., "APPROVED", "PENDING", "REQUEST_CHANGES"
+	SubmittedAt time.Time
+}
+
+type GiteaPullGetter interface {
+	GetPullRequest(repo models.Repo, pullNum int) (*gitea.PullRequest, error)
 }
 
 // NewClient builds a client that makes API calls to Gitea. httpClient is the
 // client to use to make the requests, username and password are used as basic
 // auth in the requests, baseURL is the API's baseURL, ex. https://corp.com:7990.
 // Don't include the API version, ex. '/1.0'.
-func NewClient(baseURL string, username string, token string) (*GiteaClient, error) {
+func NewClient(baseURL string, username string, token string, logger logging.SimpleLogging) (*GiteaClient, error) {
 	giteaClient, err := gitea.NewClient(baseURL,
 		gitea.SetToken(token),
 		gitea.SetUserAgent("atlantis"),
@@ -32,7 +54,19 @@ func NewClient(baseURL string, username string, token string) (*GiteaClient, err
 		giteaClient: giteaClient,
 		username:    username,
 		token:       token,
+		ctx:         context.Background(),
+		logger:      logger,
 	}, nil
+}
+
+func (c *GiteaClient) GetPullRequest(repo models.Repo, pullNum int) (*gitea.PullRequest, error) {
+	pr, _, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pullNum))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return pr, nil
 }
 
 // GetModifiedFiles returns the names of files that were modified in the merge request

@@ -305,7 +305,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GiteaToken != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitea)
 
-		giteaClient, err = gitea.NewClient(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken)
+		giteaClient, err = gitea.NewClient(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken, logger)
 		if err != nil {
 			fmt.Println("error setting up gitea client", "error", err)
 			return nil, errors.Wrapf(err, "setting up Gitea client")
@@ -349,7 +349,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			}
 		}
 		if userConfig.GiteaUser != "" {
-			if err := vcs.WriteGitCreds(userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaHostname, home, logger, false); err != nil {
+			if err := vcs.WriteGitCreds(userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaBaseURL, home, logger, false); err != nil {
 				return nil, err
 			}
 		}

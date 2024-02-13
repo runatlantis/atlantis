@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"code.gitea.io/sdk/gitea"
 	"github.com/google/go-github/v58/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
@@ -25,6 +24,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
@@ -64,10 +64,6 @@ type AzureDevopsPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error)
 }
 
-type GiteaPullGetter interface {
-	GetPullRequest(repo models.Repo, pullNum int) (*gitea.PullRequest, error)
-}
-
 //go:generate pegomock generate --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
 // GitlabMergeRequestGetter makes API calls to get merge requests.
@@ -102,7 +98,7 @@ type DefaultCommandRunner struct {
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
-	GiteaPullGetter          GiteaPullGetter
+	GiteaPullGetter          *gitea.GiteaClient
 	// User config option: Disables autoplan when a pull request is opened or updated.
 	DisableAutoplan      bool
 	DisableAutoplanLabel string
@@ -394,11 +390,11 @@ func (c *DefaultCommandRunner) getGithubData(baseRepo models.Repo, pullNum int) 
 
 func (c *DefaultCommandRunner) getGiteaData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GiteaPullGetter == nil {
-		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support GitHub")
+		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support Gitea")
 	}
 	giteaPull, err := c.GiteaPullGetter.GetPullRequest(baseRepo, pullNum)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to GitHub")
+		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Gitea")
 	}
 	pull, _, headRepo, err := c.EventParser.ParseGiteaPull(giteaPull)
 	if err != nil {
