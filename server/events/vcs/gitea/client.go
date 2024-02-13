@@ -3,6 +3,7 @@ package gitea
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"code.gitea.io/sdk/gitea"
@@ -15,7 +16,6 @@ type GiteaClient struct {
 	giteaClient *gitea.Client
 	username    string
 	token       string
-	client      *gitea.Client
 	ctx         context.Context
 	logger      logging.SimpleLogging
 }
@@ -134,7 +134,62 @@ func (c *GiteaClient) ReactToComment(repo models.Repo, pullNum int, commentID in
 
 // HidePrevCommandComments hides the previous command comments from the pull
 // request.
-func (c *GiteaClient) HidePrevCommandComments(_ models.Repo, _ int, _ string, _ string) error {
+func (c *GiteaClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error {
+	var allComments []*gitea.Comment
+
+	nextPage := int(1)
+	for {
+		// Initialize ListIssueCommentOptions with the current page
+		opts := gitea.ListIssueCommentOptions{
+			ListOptions: gitea.ListOptions{
+				Page:     int(nextPage),
+				PageSize: 100, // Set this to a reasonable number based on your needs and Gitea's limits
+			},
+		}
+
+		comments, resp, err := c.giteaClient.ListIssueComments(repo.Owner, repo.Name, int64(pullNum), opts)
+		if err != nil {
+			return err // Handle the error appropriately
+		}
+
+		allComments = append(allComments, comments...)
+
+		// Break the loop if there are no more pages to fetch
+		if resp.NextPage == 0 {
+			break
+		}
+		nextPage = resp.NextPage
+	}
+
+	currentUser, _, err := c.giteaClient.GetMyUserInfo()
+	if err != nil {
+		return err // Again, consider wrapping this error
+	}
+
+	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>", command)
+	summaryFooter := "</details>"
+	lineFeed := "\n"
+
+	for _, comment := range allComments {
+		if comment.Poster == nil || comment.Poster.UserName != currentUser.UserName {
+			continue
+		}
+
+		body := strings.Split(comment.Body, "\n")
+		if len(body) == 0 || (!strings.Contains(strings.ToLower(body[0]), strings.ToLower(command)) && dir != "" && !strings.Contains(strings.ToLower(body[0]), strings.ToLower(dir))) {
+			continue
+		}
+
+		supersededComment := summaryHeader + lineFeed + comment.Body + lineFeed + summaryFooter + lineFeed
+
+		_, _, err := c.giteaClient.EditIssueComment(repo.Owner, repo.Name, comment.ID, gitea.EditIssueCommentOption{
+			Body: supersededComment,
+		})
+		if err != nil {
+			return err // Handle or wrap this error as needed
+		}
+	}
+
 	return nil
 }
 
