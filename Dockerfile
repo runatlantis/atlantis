@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
 ARG ALPINE_TAG=3.19.1
-ARG DEBIAN_TAG=12.4-slim
+ARG DEBIAN_TAG=12.5-slim
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.7.2
