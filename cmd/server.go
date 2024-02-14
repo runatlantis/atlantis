@@ -160,6 +160,7 @@ const (
 	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
+	DefaultGiteaBaseURL                 = "https://cloud.gitea.com"
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
@@ -323,8 +324,7 @@ var stringFlags = map[string]stringFlag{
 			"Should be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
 	},
 	GiteaBaseURLFlag: {
-		description: "Base URL of Gitea server installation." +
-			" Must include 'http://' or 'https://'.",
+		description: "Base URL of Gitea server installation. Must include 'http://' or 'https://'.",
 	},
 	GiteaUserFlag: {
 		description:  "Gitea username of API user.",
@@ -833,6 +833,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.GitlabHostname == "" {
 		c.GitlabHostname = DefaultGitlabHostname
+	}
+	if c.GiteaBaseURL == "" {
+		c.GiteaBaseURL = DefaultGiteaBaseURL
 	}
 	if c.BitbucketBaseURL == "" {
 		c.BitbucketBaseURL = DefaultBitbucketBaseURL
