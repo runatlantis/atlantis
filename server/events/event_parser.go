@@ -369,6 +369,8 @@ func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFu
 	switch vcsHostType {
 	case models.Github:
 		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, e.GithubToken)
+	case models.Gitea:
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GiteaUser, e.GiteaToken)
 	case models.Gitlab:
 		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
 	}
