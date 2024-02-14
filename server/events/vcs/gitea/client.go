@@ -399,8 +399,17 @@ func (c *GiteaClient) SupportsSingleFileDownload(repo models.Repo) bool {
 }
 
 // GetCloneURL returns the clone URL of the repo
-func (c *GiteaClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
-	return "", errors.New("GetCloneURL not (yet) implemented for Gitea client")
+func (c *GiteaClient) GetCloneURL(_ models.VCSHostType, repo string) (string, error) {
+	parts := strings.Split(repo, "/")
+	if len(parts) < 2 {
+		return "", errors.New("invalid repo format, expected 'owner/repo'")
+	}
+	repository, _, err := c.giteaClient.GetRepo(parts[0], parts[1])
+	if err != nil {
+		c.logger.Debug("GET /repos/%v/%v returned an error: %v", parts[0], parts[1], err)
+		return "", err
+	}
+	return repository.CloneURL, nil
 }
 
 // GetPullLabels returns the labels of a pull request
