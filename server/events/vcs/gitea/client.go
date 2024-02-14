@@ -16,6 +16,7 @@ package gitea
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
@@ -387,7 +388,11 @@ func (c *GiteaClient) GetFileContent(pull models.PullRequest, fileName string) (
 	}
 
 	if content.Type == "file" {
-		return true, []byte(*content.Content), nil
+		decodedData, err := base64.StdEncoding.DecodeString(*content.Content)
+		if err != nil {
+			return true, []byte{}, err
+		}
+		return true, []byte(decodedData), nil
 	}
 
 	return false, nil, nil
