@@ -119,8 +119,7 @@ func (c *GiteaClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest
 	return changedFiles, nil
 }
 
-// CreateComment creates a comment on the merge request. It will write multiple
-// comments if a single comment is too long.
+// CreateComment creates a comment on the merge request. As far as we're aware, Gitea has no built in max comment length right now.
 func (c *GiteaClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
 	opt := gitea.CreateIssueCommentOption{
 		Body: comment,
