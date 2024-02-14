@@ -427,3 +427,15 @@ func (c *GiteaClient) GetPullLabels(repo models.Repo, pull models.PullRequest) (
 
 	return results, nil
 }
+
+func ValidateSignature(payload []byte, signature string, secretKey []byte) error {
+	isValid, err := gitea.VerifyWebhookSignature(string(secretKey), signature, payload)
+	if err != nil {
+		return errors.New("signature verification internal error")
+	}
+	if !isValid {
+		return errors.New("invalid signature")
+	}
+
+	return nil
+}

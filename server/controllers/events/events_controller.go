@@ -36,9 +36,13 @@ import (
 )
 
 const githubHeader = "X-Github-Event"
-const giteaHeader = "X-Gitea-Event"
 const gitlabHeader = "X-Gitlab-Event"
 const azuredevopsHeader = "Request-Id"
+
+const giteaHeader = "X-Gitea-Event"
+const giteaEventTypeHeader = "X-Gitea-Event-Type"
+const giteaSignatureHeader = "X-Gitea-Signature"
+const giteaRequestIDHeader = "X-Gitea-Delivery"
 
 // bitbucketEventTypeHeader is the same in both cloud and server.
 const bitbucketEventTypeHeader = "X-Event-Key"
@@ -94,6 +98,7 @@ type VCSEventsController struct {
 	// Azure DevOps Team Project. If empty, no request validation is done.
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator
+	GiteaWebhookSecret              []byte
 }
 
 func mapGiteaActionToPullRequestEventType(action string) models.PullRequestEventType {
@@ -316,14 +321,23 @@ func (e *VCSEventsController) handleAzureDevopsPost(w http.ResponseWriter, r *ht
 }
 
 func (e *VCSEventsController) handleGiteaPost(w http.ResponseWriter, r *http.Request) {
-	eventType := r.Header.Get("X-Gitea-Event-Type")
-	reqID := r.Header.Get("X-Gitea-Delivery") // Assuming Gitea sends a unique delivery ID
-	defer r.Body.Close()                      // Ensure the request body is closed
+	signature := r.Header.Get(giteaSignatureHeader)
+	eventType := r.Header.Get(giteaEventTypeHeader)
+	reqID := r.Header.Get(giteaRequestIDHeader)
+
+	defer r.Body.Close() // Ensure the request body is closed
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, "X-Gitea-Delivery", reqID)
 		return
+	}
+
+	if len(e.GiteaWebhookSecret) > 0 {
+		if err := gitea.ValidateSignature(body, signature, e.GiteaWebhookSecret); err != nil {
+			e.respond(w, logging.Warn, http.StatusBadRequest, errors.Wrap(err, "request did not pass validation").Error())
+			return
+		}
 	}
 
 	// Log the event type for debugging purposes

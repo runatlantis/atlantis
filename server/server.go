@@ -910,6 +910,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
 		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
 		AzureDevopsRequestValidator:     &events_controllers.DefaultAzureDevopsRequestValidator{},
+		GiteaWebhookSecret:              []byte(userConfig.GiteaWebhookSecret),
 	}
 	githubAppController := &controllers.GithubAppController{
 		AtlantisURL:         parsedURL,
