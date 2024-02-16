@@ -157,13 +157,13 @@ func (c *GiteaClient) HidePrevCommandComments(repo models.Repo, pullNum int, com
 		opts := gitea.ListIssueCommentOptions{
 			ListOptions: gitea.ListOptions{
 				Page:     int(nextPage),
-				PageSize: 100, // Set this to a reasonable number based on your needs and Gitea's limits
+				PageSize: 100,
 			},
 		}
 
 		comments, resp, err := c.giteaClient.ListIssueComments(repo.Owner, repo.Name, int64(pullNum), opts)
 		if err != nil {
-			return err // Handle the error appropriately
+			return err
 		}
 
 		allComments = append(allComments, comments...)
@@ -177,7 +177,7 @@ func (c *GiteaClient) HidePrevCommandComments(repo models.Repo, pullNum int, com
 
 	currentUser, _, err := c.giteaClient.GetMyUserInfo()
 	if err != nil {
-		return err // Again, consider wrapping this error
+		return err
 	}
 
 	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>", command)
@@ -200,7 +200,7 @@ func (c *GiteaClient) HidePrevCommandComments(repo models.Repo, pullNum int, com
 			Body: supersededComment,
 		})
 		if err != nil {
-			return err // Handle or wrap this error as needed
+			return err
 		}
 	}
 
