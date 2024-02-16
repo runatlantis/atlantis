@@ -462,7 +462,7 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 			switch context.Typename {
 			case "CheckRun":
 				if bool(context.CheckRun.IsRequired) &&
-					context.CheckRun.Conclusion != "SUCCESS" &&
+					(context.CheckRun.Conclusion != "SUCCESS" && context.CheckRun.Conclusion != "SKIPPED" ) &&
 					!strings.HasPrefix(string(context.CheckRun.Name), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
 					return false, nil
 				}

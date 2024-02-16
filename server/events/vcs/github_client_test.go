@@ -702,6 +702,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"APPROVED"`,
 			false,
 		},
+		{
+			"blocked",
+			"required-check-skipped.json",
+			`"APPROVED"`,
+			true,
+		},
 	}
 
 	// Use a real GitHub json response and edit the mergeable_state field.
